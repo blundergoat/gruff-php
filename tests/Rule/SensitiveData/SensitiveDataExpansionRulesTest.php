@@ -4,20 +4,20 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\SensitiveData;
 
-use GruffPhp\Config\AnalysisConfig;
-use GruffPhp\Finding\Confidence;
-use GruffPhp\Finding\Finding;
-use GruffPhp\Finding\Pillar;
-use GruffPhp\Parser\PhpFileParser;
-use GruffPhp\Rule\RuleContext;
-use GruffPhp\Rule\RuleRegistry;
-use GruffPhp\Rule\SensitiveData\DatabaseUrlPasswordRule;
-use GruffPhp\Rule\SensitiveData\GcpServiceAccountKeyRule;
-use GruffPhp\Rule\SensitiveData\PhiPatternRule;
-use GruffPhp\Rule\SensitiveData\PiiTestFixtureRule;
-use GruffPhp\Rule\SensitiveData\PrivateKeyRule;
-use GruffPhp\Rule\SensitiveData\UrlEmbeddedCredentialsRule;
-use GruffPhp\Source\SourceFile;
+use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Results\Finding\Confidence;
+use GruffPhp\Results\Finding\Finding;
+use GruffPhp\Results\Finding\Pillar;
+use GruffPhp\Engine\Parser\PhpFileParser;
+use GruffPhp\Rules\Contracts\RuleContext;
+use GruffPhp\Rules\RuleRegistry;
+use GruffPhp\Rules\SensitiveData\DatabaseUrlPasswordRule;
+use GruffPhp\Rules\SensitiveData\GcpServiceAccountKeyRule;
+use GruffPhp\Rules\SensitiveData\PhiPatternRule;
+use GruffPhp\Rules\SensitiveData\PiiTestFixtureRule;
+use GruffPhp\Rules\SensitiveData\PrivateKeyRule;
+use GruffPhp\Rules\SensitiveData\UrlEmbeddedCredentialsRule;
+use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 

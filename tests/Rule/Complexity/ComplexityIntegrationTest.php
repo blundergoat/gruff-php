@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\Complexity;
 
-use GruffPhp\Config\AnalysisConfig;
-use GruffPhp\Config\RuleSettings;
-use GruffPhp\Parser\PhpFileParser;
-use GruffPhp\Rule\Complexity\CognitiveComplexityRule;
-use GruffPhp\Rule\Complexity\CyclomaticComplexityRule;
-use GruffPhp\Rule\Complexity\HalsteadVolumeRule;
-use GruffPhp\Rule\Complexity\MaintainabilityIndexRule;
-use GruffPhp\Rule\Complexity\NestingDepthRule;
-use GruffPhp\Rule\RuleContext;
-use GruffPhp\Rule\RuleRegistry;
-use GruffPhp\Source\SourceFile;
+use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Config\RuleSettings;
+use GruffPhp\Engine\Parser\PhpFileParser;
+use GruffPhp\Rules\Complexity\CognitiveComplexityRule;
+use GruffPhp\Rules\Complexity\CyclomaticComplexityRule;
+use GruffPhp\Rules\Complexity\HalsteadVolumeRule;
+use GruffPhp\Rules\Complexity\MaintainabilityIndexRule;
+use GruffPhp\Rules\Complexity\NestingDepthRule;
+use GruffPhp\Rules\Contracts\RuleContext;
+use GruffPhp\Rules\RuleRegistry;
+use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**

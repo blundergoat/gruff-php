@@ -4,22 +4,22 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\Naming;
 
-use GruffPhp\Config\AnalysisConfig;
-use GruffPhp\Config\RuleSettings;
-use GruffPhp\Finding\Severity;
-use GruffPhp\Parser\PhpFileParser;
-use GruffPhp\Rule\Naming\BooleanPrefixRule;
-use GruffPhp\Rule\Naming\ClassFileMismatchRule;
-use GruffPhp\Rule\Naming\ConfusingNameRule;
-use GruffPhp\Rule\Naming\GenericMethodNameRule;
-use GruffPhp\Rule\Naming\HungarianNotationRule;
-use GruffPhp\Rule\Naming\IdentifierQualityRule;
-use GruffPhp\Rule\Naming\ShortVariableRule;
-use GruffPhp\Rule\Naming\SuffixHungarianRule;
-use GruffPhp\Rule\Naming\TestNamingConsistencyRule;
-use GruffPhp\Rule\RuleContext;
-use GruffPhp\Rule\RuleRegistry;
-use GruffPhp\Source\SourceFile;
+use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Config\RuleSettings;
+use GruffPhp\Results\Finding\Severity;
+use GruffPhp\Engine\Parser\PhpFileParser;
+use GruffPhp\Rules\Naming\BooleanPrefixRule;
+use GruffPhp\Rules\Naming\ClassFileMismatchRule;
+use GruffPhp\Rules\Naming\ConfusingNameRule;
+use GruffPhp\Rules\Naming\GenericMethodNameRule;
+use GruffPhp\Rules\Naming\HungarianNotationRule;
+use GruffPhp\Rules\Naming\IdentifierQualityRule;
+use GruffPhp\Rules\Naming\ShortVariableRule;
+use GruffPhp\Rules\Naming\SuffixHungarianRule;
+use GruffPhp\Rules\Naming\TestNamingConsistencyRule;
+use GruffPhp\Rules\Contracts\RuleContext;
+use GruffPhp\Rules\RuleRegistry;
+use GruffPhp\Engine\Source\SourceFile;
 
 /**
  * Covers the naming rule pack: generic method names, single-char and Hungarian variables with sensible exemptions, boolean prefixes, class-file
@@ -127,6 +127,7 @@ final class NamingRulesTest extends NamingRuleTestCase
         $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
         self::assertContains('BooleanPrefixFixture::active()', $symbols);
         self::assertContains('BooleanPrefixFixture::enabled()', $symbols);
+        self::assertContains('BooleanPrefixFixture::status()', $symbols);
         self::assertContains('BooleanPrefixFixture::check()', $symbols);
         self::assertContains('BooleanPrefixFixture::didRun()', $symbols);
         // A prefix followed by a lowercase letter is no word boundary, so these still flag.
@@ -152,6 +153,19 @@ final class NamingRulesTest extends NamingRuleTestCase
         self::assertNotContains('BooleanPrefixFixture::looksLikeTestFile()', $symbols);
         self::assertNotContains('BooleanPrefixFixture::matchesPattern()', $symbols);
         self::assertNotContains('BooleanPrefixFixture::supportsFeature()', $symbols);
+        self::assertNotContains('BooleanPrefixFixture::allowsGuestAccess()', $symbols);
+        self::assertNotContains('BooleanPrefixFixture::requiresReview()', $symbols);
+        self::assertNotContains('BooleanPrefixFixture::usesCache()', $symbols);
+        self::assertNotContains('BooleanPrefixFixture::acceptsPayload()', $symbols);
+        self::assertNotContains('BooleanPrefixFixture::permitsRetry()', $symbols);
+        self::assertNotContains('BooleanPrefixFixture::includesArchivedRows()', $symbols);
+        self::assertNotContains('BooleanPrefixFixture::excludesInactivePatients()', $symbols);
+        self::assertNotContains('BooleanPrefixFixture::enablesPracticeAssistant()', $symbols);
+        self::assertNotContains('BooleanPrefixFixture::disablesLegacyFallback()', $symbols);
+        self::assertNotContains('BooleanPrefixFixture::supportsSelectedAnswerScope()', $symbols);
+        self::assertNotContains('BooleanPrefixFixture::requiresCreditPurchaseAccess()', $symbols);
+        self::assertNotContains('BooleanPrefixFixture::usesCodeOwnedAnswer()', $symbols);
+        self::assertNotContains('BooleanPrefixFixture::matchesPrompt()', $symbols);
         // An underscore after the prefix is a snake_case word boundary, so these read as predicates.
         self::assertNotContains('BooleanPrefixFixture::has_note_been_actioned()', $symbols);
         self::assertNotContains('BooleanPrefixFixture::is_valid_state()', $symbols);
@@ -367,7 +381,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     /**
      * Build `symbol|identifier` rows for identifier-quality findings with a reported name.
      *
-     * @param list<\GruffPhp\Finding\Finding> $findings - Identifier-quality findings from a fixture.
+     * @param list<\GruffPhp\Results\Finding\Finding> $findings - Identifier-quality findings from a fixture.
      *
      * @return list<string> - symbol and identifier pairs in finding order; findings without string names are omitted
      */
@@ -488,7 +502,7 @@ final class NamingRulesTest extends NamingRuleTestCase
      *
      * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options - Identifier-quality rule option overrides.
      *
-     * @return list<\GruffPhp\Finding\Finding> - identifier-quality findings only, in discovery order; empty when the options suppress every report
+     * @return list<\GruffPhp\Results\Finding\Finding> - identifier-quality findings only, in discovery order; empty when the options suppress every report
      */
     private function identifierQualityFindingsWithOptions(array $options): array
     {
@@ -512,7 +526,7 @@ final class NamingRulesTest extends NamingRuleTestCase
      *
      * @param string $fixture - fixture basename under the naming fixtures dir, parsed then run through the full rule pack
      *
-     * @return list<\GruffPhp\Finding\Finding> - every finding the default rule pack raises against the fixture, in discovery order; empty when the
+     * @return list<\GruffPhp\Results\Finding\Finding> - every finding the default rule pack raises against the fixture, in discovery order; empty when the
      *                                         fixture is clean
      */
     private function analyseFixture(string $fixture): array
@@ -527,7 +541,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
-     * @param list<\GruffPhp\Finding\Finding> $findings - Findings to search for a matching rule, metadata value, and symbol prefix.
+     * @param list<\GruffPhp\Results\Finding\Finding> $findings - Findings to search for a matching rule, metadata value, and symbol prefix.
      * @param string                          $ruleId - rule the finding must come from; others are skipped
      * @param string                          $metadataKey - finding metadata entry to match on, such as the reported identifier name
      * @param string                          $metadataValue - exact value that metadata entry must hold for a match
@@ -558,7 +572,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     /**
      * Group naming findings by reported variable name.
      *
-     * @param list<\GruffPhp\Finding\Finding> $findings - Naming findings to group by reported variable name.
+     * @param list<\GruffPhp\Results\Finding\Finding> $findings - Naming findings to group by reported variable name.
      *
      * @return array<string, list<string>> - reported symbols bucketed by variable name; a name maps to repeated symbols when reported more than
      *                       once, and absent keys mean that variable was never flagged

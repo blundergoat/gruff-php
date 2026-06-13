@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\Complexity;
 
-use GruffPhp\Config\AnalysisConfig;
-use GruffPhp\Config\RuleSettings;
-use GruffPhp\Parser\PhpFileParser;
-use GruffPhp\Rule\Complexity\HalsteadVolumeRule;
-use GruffPhp\Rule\RuleContext;
-use GruffPhp\Rule\RuleRegistry;
-use GruffPhp\Source\SourceFile;
+use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Config\RuleSettings;
+use GruffPhp\Engine\Parser\PhpFileParser;
+use GruffPhp\Rules\Complexity\HalsteadVolumeRule;
+use GruffPhp\Rules\Contracts\RuleContext;
+use GruffPhp\Rules\RuleRegistry;
+use GruffPhp\Engine\Source\SourceFile;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\NodeFinder;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -105,7 +105,7 @@ final class HalsteadVolumeRuleTest extends TestCase
         self::assertSame([], $definition->defaultThresholds);
         self::assertNotNull($definition->severityThreshold);
         self::assertSame(8000, $definition->severityThreshold->threshold);
-        self::assertSame(\GruffPhp\Finding\Severity::Advisory, $definition->severityThreshold->severity);
+        self::assertSame(\GruffPhp\Results\Finding\Severity::Advisory, $definition->severityThreshold->severity);
     }
 
     /**
@@ -155,7 +155,7 @@ final class HalsteadVolumeRuleTest extends TestCase
      *
      * @param array<string, int|float> $thresholds - Rule thresholds.
      *
-     * @return list<\GruffPhp\Finding\Finding> - findings the rule emitted for the fixture under the given thresholds; empty when nothing breached
+     * @return list<\GruffPhp\Results\Finding\Finding> - findings the rule emitted for the fixture under the given thresholds; empty when nothing breached
      */
     private function analyse(array $thresholds): array
     {
@@ -193,9 +193,9 @@ final class HalsteadVolumeRuleTest extends TestCase
     /**
      * Parse the cognitive fixture into an analysis unit.
      *
-     * @return \GruffPhp\Parser\AnalysisUnit - parsed cognitive fixture carrying its repo-relative display path for finding attribution
+     * @return \GruffPhp\Engine\Parser\AnalysisUnit - parsed cognitive fixture carrying its repo-relative display path for finding attribution
      */
-    private function parseFixture(): \GruffPhp\Parser\AnalysisUnit
+    private function parseFixture(): \GruffPhp\Engine\Parser\AnalysisUnit
     {
         $path = __DIR__ . '/../../Fixtures/Complexity/cognitive.php';
 

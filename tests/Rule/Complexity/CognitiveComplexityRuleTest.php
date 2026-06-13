@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\Complexity;
 
-use GruffPhp\Config\AnalysisConfig;
-use GruffPhp\Config\RuleSettings;
-use GruffPhp\Parser\PhpFileParser;
-use GruffPhp\Rule\Complexity\CognitiveComplexityRule;
-use GruffPhp\Rule\RuleContext;
-use GruffPhp\Rule\RuleRegistry;
-use GruffPhp\Source\SourceFile;
+use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Config\RuleSettings;
+use GruffPhp\Results\Finding\Severity;
+use GruffPhp\Engine\Parser\PhpFileParser;
+use GruffPhp\Rules\Complexity\CognitiveComplexityRule;
+use GruffPhp\Rules\Contracts\RuleContext;
+use GruffPhp\Rules\RuleRegistry;
+use GruffPhp\Engine\Source\SourceFile;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\NodeFinder;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -148,7 +149,7 @@ final class CognitiveComplexityRuleTest extends TestCase
         self::assertSame([], $definition->defaultThresholds);
         self::assertNotNull($definition->severityThreshold);
         self::assertSame(20, $definition->severityThreshold->threshold);
-        self::assertSame(\GruffPhp\Finding\Severity::Error, $definition->severityThreshold->severity);
+        self::assertSame(\GruffPhp\Results\Finding\Severity::Error, $definition->severityThreshold->severity);
     }
 
     /**
@@ -182,13 +183,54 @@ final class CognitiveComplexityRuleTest extends TestCase
     }
 
     /**
+     * Verify flat guard-clause validation is lower severity than nested equivalent branching.
+     *
+     * @return void
+     */
+    public function testFlatGuardClauseComplexityIsAdvisoryButNestedLogicStaysSevere(): void
+    {
+        $findings = $this->analyse('guard-clauses.php', ['warning' => 4, 'error' => 14]);
+
+        $bySymbol = [];
+        foreach ($findings as $finding) {
+            $bySymbol[$finding->symbol ?? ''] = $finding;
+        }
+
+        self::assertSame(Severity::Advisory, $bySymbol['GuardClauseComplexityFixture::flatPayloadValidator()']->severity ?? null);
+        self::assertSame('flat-guard-clauses', $bySymbol['GuardClauseComplexityFixture::flatPayloadValidator()']->metadata['complexityShape'] ?? null);
+        self::assertSame('error', $bySymbol['GuardClauseComplexityFixture::flatPayloadValidator()']->metadata['rawThresholdType'] ?? null);
+        self::assertSame(Severity::Error, $bySymbol['GuardClauseComplexityFixture::nestedBusinessLogic()']->severity ?? null);
+        self::assertSame('branching', $bySymbol['GuardClauseComplexityFixture::nestedBusinessLogic()']->metadata['complexityShape'] ?? null);
+    }
+
+    /**
+     * Verify flat fall-through branches that do work (not early-exit guards) keep their branching severity.
+     *
+     * @return void
+     */
+    public function testFlatFallThroughBranchesAreNotDowngradedToAdvisory(): void
+    {
+        $findings = $this->analyse('guard-clauses.php', ['warning' => 4, 'error' => 14]);
+
+        $bySymbol = [];
+        foreach ($findings as $finding) {
+            $bySymbol[$finding->symbol ?? ''] = $finding;
+        }
+
+        // telemetryBuilder is flat but falls through (no return/throw/exit), so it is branching complexity
+        // rather than a guard clause and must not be downgraded to advisory regardless of branch count.
+        self::assertSame(Severity::Warning, $bySymbol['GuardClauseComplexityFixture::telemetryBuilder()']->severity ?? null);
+        self::assertSame('branching', $bySymbol['GuardClauseComplexityFixture::telemetryBuilder()']->metadata['complexityShape'] ?? null);
+    }
+
+    /**
      * Analyse complexity fixtures and return findings for assertions.
      *
      * @param string             $fixture    - fixture filename under Fixtures/Complexity to parse and run.
      * @param array<string, int> $thresholds - warning/error cutoffs keyed by level; sets where the rule starts
      *                                       emitting, so a test can force or suppress findings on the same fixture.
      *
-     * @return list<\GruffPhp\Finding\Finding> - findings the rule emits under those thresholds, to assert on.
+     * @return list<\GruffPhp\Results\Finding\Finding> - findings the rule emits under those thresholds, to assert on.
      */
     private function analyse(string $fixture, array $thresholds): array
     {
@@ -207,9 +249,9 @@ final class CognitiveComplexityRuleTest extends TestCase
      *
      * @param string $filename - Fixture filename.
      *
-     * @return \GruffPhp\Parser\AnalysisUnit - parsed fixture carrying its statements and the repo-relative display path the rule reports against
+     * @return \GruffPhp\Engine\Parser\AnalysisUnit - parsed fixture carrying its statements and the repo-relative display path the rule reports against
      */
-    private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
+    private function parseFixture(string $filename): \GruffPhp\Engine\Parser\AnalysisUnit
     {
         $path = __DIR__ . '/../../Fixtures/Complexity/' . $filename;
 

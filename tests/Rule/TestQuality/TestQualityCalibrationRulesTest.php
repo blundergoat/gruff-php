@@ -4,19 +4,19 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\TestQuality;
 
-use GruffPhp\Config\AnalysisConfig;
-use GruffPhp\Config\RuleSettings;
-use GruffPhp\Finding\Finding;
-use GruffPhp\Parser\AnalysisUnit;
-use GruffPhp\Parser\PhpFileParser;
-use GruffPhp\Rule\RuleContext;
-use GruffPhp\Rule\RuleRegistry;
-use GruffPhp\Rule\TestQuality\ConditionalTestLogicRule;
-use GruffPhp\Rule\TestQuality\MysteryGuestRule;
-use GruffPhp\Rule\TestQuality\RepeatedStructureMissingDataProviderRule;
-use GruffPhp\Rule\TestQuality\TestLongerThanSutRule;
-use GruffPhp\Rule\TestQuality\TestMethodTooLongRule;
-use GruffPhp\Source\SourceFile;
+use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Config\RuleSettings;
+use GruffPhp\Results\Finding\Finding;
+use GruffPhp\Engine\Parser\AnalysisUnit;
+use GruffPhp\Engine\Parser\PhpFileParser;
+use GruffPhp\Rules\Contracts\RuleContext;
+use GruffPhp\Rules\RuleRegistry;
+use GruffPhp\Rules\TestQuality\ConditionalTestLogicRule;
+use GruffPhp\Rules\TestQuality\MysteryGuestRule;
+use GruffPhp\Rules\TestQuality\RepeatedStructureMissingDataProviderRule;
+use GruffPhp\Rules\TestQuality\TestLongerThanSutRule;
+use GruffPhp\Rules\TestQuality\TestMethodTooLongRule;
+use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**

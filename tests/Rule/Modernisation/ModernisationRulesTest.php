@@ -4,25 +4,24 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\Modernisation;
 
-use GruffPhp\Config\AnalysisConfig;
-use GruffPhp\Config\ConfigLoader;
-use GruffPhp\Finding\Finding;
-use GruffPhp\Finding\Pillar;
-use GruffPhp\Parser\AnalysisUnit;
-use GruffPhp\Parser\PhpFileParser;
-use GruffPhp\Rule\Modernisation\ConstructorPromotionCandidateRule;
-use GruffPhp\Rule\Modernisation\EnumCandidateRule;
-use GruffPhp\Rule\Modernisation\FirstClassCallableCandidateRule;
-use GruffPhp\Rule\Modernisation\ForbiddenGlobalAccessRule;
-use GruffPhp\Rule\Modernisation\MatchExpressionCandidateRule;
-use GruffPhp\Rule\Modernisation\MixedTypeOveruseRule;
-use GruffPhp\Rule\Modernisation\NamedArgumentOpportunityRule;
-use GruffPhp\Rule\Modernisation\PublicPropertyRule;
-use GruffPhp\Rule\Modernisation\ReadonlyPropertyCandidateRule;
-use GruffPhp\Rule\RuleContext;
-use GruffPhp\Rule\RuleRegistry;
-use GruffPhp\Rule\Security\ErrorSuppressionRule;
-use GruffPhp\Source\SourceFile;
+use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Config\ConfigLoader;
+use GruffPhp\Results\Finding\Finding;
+use GruffPhp\Results\Finding\Pillar;
+use GruffPhp\Engine\Parser\AnalysisUnit;
+use GruffPhp\Engine\Parser\PhpFileParser;
+use GruffPhp\Rules\Modernisation\ConstructorPromotionCandidateRule;
+use GruffPhp\Rules\Modernisation\FirstClassCallableCandidateRule;
+use GruffPhp\Rules\Modernisation\ForbiddenGlobalAccessRule;
+use GruffPhp\Rules\Modernisation\MatchExpressionCandidateRule;
+use GruffPhp\Rules\Modernisation\MixedTypeOveruseRule;
+use GruffPhp\Rules\Modernisation\NamedArgumentOpportunityRule;
+use GruffPhp\Rules\Modernisation\PublicPropertyRule;
+use GruffPhp\Rules\Modernisation\ReadonlyPropertyCandidateRule;
+use GruffPhp\Rules\Contracts\RuleContext;
+use GruffPhp\Rules\RuleRegistry;
+use GruffPhp\Rules\Security\ErrorSuppressionRule;
+use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -48,7 +47,6 @@ final class ModernisationRulesTest extends TestCase
         );
 
         self::assertRuleCount(ConstructorPromotionCandidateRule::ID, 0, $findings);
-        self::assertRuleCount(EnumCandidateRule::ID, 0, $findings);
         self::assertRuleCount(FirstClassCallableCandidateRule::ID, 0, $findings);
         self::assertRuleCount(MatchExpressionCandidateRule::ID, 0, $findings);
         self::assertRuleCount(MixedTypeOveruseRule::ID, 0, $findings);
@@ -73,10 +71,9 @@ final class ModernisationRulesTest extends TestCase
         self::assertRuleCount(ConstructorPromotionCandidateRule::ID, 2, $findings);
         self::assertRuleCount(ReadonlyPropertyCandidateRule::ID, 2, $findings);
         self::assertRuleCount(PublicPropertyRule::ID, 1, $findings);
-        self::assertRuleCount(EnumCandidateRule::ID, 1, $findings);
         self::assertRuleCount(MatchExpressionCandidateRule::ID, 1, $findings);
         self::assertRuleCount(FirstClassCallableCandidateRule::ID, 1, $findings);
-        self::assertRuleCount(NamedArgumentOpportunityRule::ID, 0, $findings);
+        self::assertRuleCount(NamedArgumentOpportunityRule::ID, 1, $findings);
         self::assertRuleCount(MixedTypeOveruseRule::ID, 1, $findings);
         self::assertRuleCount(ForbiddenGlobalAccessRule::ID, 1, $findings);
     }
@@ -94,7 +91,7 @@ final class ModernisationRulesTest extends TestCase
         self::assertRuleCount(PublicPropertyRule::ID, 1, $findings);
         self::assertRuleCount(MatchExpressionCandidateRule::ID, 1, $findings);
         self::assertRuleCount(MixedTypeOveruseRule::ID, 1, $findings);
-        self::assertRuleCount(NamedArgumentOpportunityRule::ID, 1, $findings);
+        self::assertRuleCount(NamedArgumentOpportunityRule::ID, 4, $findings);
         self::assertRuleCount(ForbiddenGlobalAccessRule::ID, 2, $findings);
     }
 
@@ -108,7 +105,6 @@ final class ModernisationRulesTest extends TestCase
         $findings = $this->analysePath('tests/Fixtures/Modernisation/php81-candidates.php');
 
         self::assertRuleCount(ReadonlyPropertyCandidateRule::ID, 2, $findings);
-        self::assertRuleCount(EnumCandidateRule::ID, 1, $findings);
         self::assertRuleCount(FirstClassCallableCandidateRule::ID, 1, $findings);
     }
 
@@ -174,10 +170,6 @@ final class ModernisationRulesTest extends TestCase
     public static function modernisationFalsePositiveProvider(): array
     {
         return [
-            [
-                'fixture' => 'tests/Fixtures/Modernisation/enum-candidate-mixed-scalar.php',
-                'ruleId'  => EnumCandidateRule::ID,
-            ],
             [
                 'fixture' => 'tests/Fixtures/Modernisation/first-class-callable-non-class-const.php',
                 'ruleId'  => FirstClassCallableCandidateRule::ID,

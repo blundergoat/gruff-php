@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\Size;
 
-use GruffPhp\Config\AnalysisConfig;
-use GruffPhp\Config\RuleSettings;
-use GruffPhp\Finding\Severity;
-use GruffPhp\Parser\PhpFileParser;
-use GruffPhp\Rule\RuleContext;
-use GruffPhp\Rule\RuleRegistry;
-use GruffPhp\Rule\Size\PublicMethodCountRule;
-use GruffPhp\Source\SourceFile;
+use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Config\RuleSettings;
+use GruffPhp\Results\Finding\Severity;
+use GruffPhp\Engine\Parser\PhpFileParser;
+use GruffPhp\Rules\Contracts\RuleContext;
+use GruffPhp\Rules\RuleRegistry;
+use GruffPhp\Rules\Size\PublicMethodCountRule;
+use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -74,7 +74,7 @@ final class PublicMethodCountRuleTest extends TestCase
      * @param string             $fixture - Fixture filename under tests/Fixtures/Size to scan.
      * @param array<string, int> $thresholds - Warning/error public-method-count limits for this case.
      *
-     * @return list<\GruffPhp\Finding\Finding> - findings from this rule only; empty when the fixture stays within limits
+     * @return list<\GruffPhp\Results\Finding\Finding> - findings from this rule only; empty when the fixture stays within limits
      */
     private function analyse(string $fixture, array $thresholds): array
     {
@@ -106,9 +106,9 @@ final class PublicMethodCountRuleTest extends TestCase
      *
      * @param string $filename - Fixture filename.
      *
-     * @return \GruffPhp\Parser\AnalysisUnit - parsed fixture with a repo-relative display path for finding reports
+     * @return \GruffPhp\Engine\Parser\AnalysisUnit - parsed fixture with a repo-relative display path for finding reports
      */
-    private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
+    private function parseFixture(string $filename): \GruffPhp\Engine\Parser\AnalysisUnit
     {
         $path = __DIR__ . '/../../Fixtures/Size/' . $filename;
 

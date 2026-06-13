@@ -123,3 +123,118 @@ final class CrossClassCallerOwnerB
         return $session;
     }
 }
+
+interface CapabilityRowsContract
+{
+    public function rows(): array;
+}
+
+abstract class AbstractPayloadAdapter
+{
+    abstract public function normalisePayload(array $payload): array;
+}
+
+trait RequiresPayloadLabel
+{
+    abstract public function labelFor(array $row): string;
+}
+
+final class ContractRowsAdapter implements CapabilityRowsContract
+{
+    public function rows(): array
+    {
+        return DataCapabilities::rows();
+    }
+}
+
+final class AbstractPayloadAdapterImplementation extends AbstractPayloadAdapter
+{
+    public function normalisePayload(array $payload): array
+    {
+        return PayloadNormaliser::normalise($payload);
+    }
+}
+
+final class TraitPayloadLabelAdapter
+{
+    use RequiresPayloadLabel;
+
+    public function labelFor(array $row): string
+    {
+        return PayloadNormaliser::label($row);
+    }
+}
+
+final readonly class PracticeAssistantSessionDto
+{
+    public function __construct(private string $sessionId)
+    {
+    }
+
+    public function sessionId(): string
+    {
+        return PayloadNormaliser::string($this->sessionId);
+    }
+}
+
+final class DomainVocabularyWrapper
+{
+    public function supportsPracticeAssistant(array $payload): bool
+    {
+        return PayloadNormaliser::matches($payload, 'practice_assistant');
+    }
+}
+
+final class PrivatePassThroughFixture
+{
+    public function useHelper(BookingSession $session): array
+    {
+        return [$this->oneShotHelper($session)];
+    }
+
+    private function rows(): array
+    {
+        return DataCapabilities::rows();
+    }
+
+    private function oneShotHelper(BookingSession $session): BookingSession
+    {
+        return PayloadNormaliser::session($session);
+    }
+}
+
+final class DataCapabilities
+{
+    public static function rows(): array
+    {
+        return [];
+    }
+}
+
+final class PayloadNormaliser
+{
+    public static function normalise(array $payload): array
+    {
+        return $payload;
+    }
+
+    public static function label(array $row): string
+    {
+        return (string) ($row['label'] ?? '');
+    }
+
+    public static function string(string $value): string
+    {
+        return trim($value);
+    }
+
+    public static function matches(array $payload, string $type): bool
+    {
+        return ($payload['type'] ?? null) === $type;
+    }
+
+    public static function session(BookingSession $session): BookingSession
+    {
+        return $session;
+    }
+}

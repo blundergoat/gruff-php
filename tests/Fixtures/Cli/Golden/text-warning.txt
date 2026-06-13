@@ -1,4 +1,4 @@
-gruff-php 0.4.0 analyse
+gruff-php 0.4.1 analyse
 Composite: A (96.10 / 100)
 Findings: 4 total · 0 error · 2 warning · 2 advisory
 Format: text

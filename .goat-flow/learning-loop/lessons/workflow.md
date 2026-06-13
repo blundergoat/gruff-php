@@ -13,7 +13,7 @@ last_reviewed: 2026-05-31
 
 **Root cause:** Treating `git stash` as a "show me the tree without my changes" inspector. Stash mutates both the working tree and the index, so in a session with many uncommitted edits it is a destructive operation, and `--include-untracked` also sweeps up new files like a fresh ADR. It also collides with any pre-existing stash the user left. The actual question — "is this finding pre-existing or mine?" — is answerable without changing anything.
 
-**Prevention:** To decide whether a finding or file state is pre-existing versus introduced this session, stay read-only: (a) re-read the session-start `git status` snapshot already in the task context; (b) `git diff HEAD -- <file>` or `git log -1 -- <file>` to see whether the file was modified or committed before your edits; (c) check whether the finding's file is in your own changed-files list — here all three warnings were in `src/Rule/Docs/MissingParamTagRule.php` and `tests/Rule/Docs/DocsRulesTest.php`, neither of which the agent had touched, which settled it immediately. Never `git stash` to compare. If you genuinely must build against a clean tree, use a throwaway `git worktree add`, which leaves the working copy and any existing stashes untouched.
+**Prevention:** To decide whether a finding or file state is pre-existing versus introduced this session, stay read-only: (a) re-read the session-start `git status` snapshot already in the task context; (b) `git diff HEAD -- <file>` or `git log -1 -- <file>` to see whether the file was modified or committed before your edits; (c) check whether the finding's file is in your own changed-files list — here all three warnings were in `src/Rules/Docs/MissingParamTagRule.php` and `tests/Rule/Docs/DocsRulesTest.php`, neither of which the agent had touched, which settled it immediately. Never `git stash` to compare. If you genuinely must build against a clean tree, use a throwaway `git worktree add`, which leaves the working copy and any existing stashes untouched.
 
 ## Lesson: Universal defaults that ship via `init` must also flow through `AnalysisConfig` so existing projects benefit
 
@@ -109,7 +109,7 @@ The fixture-per-field migration cost is roughly linear in the number of fixtures
 
 **What happened:** After the project ignore list was restored in `.gruff-php.yaml`, the underlying `gruff-php init` generator still emitted a config that could recreate the same loss. A generated artifact fix was not enough because `init --force` could overwrite the existing file again.
 
-**Evidence:** `src/Command/InitCommand.php` (search: `DEFAULT_IGNORED_PATHS`) now defines the default ignored paths for new config files; `src/Command/InitCommand.php` (search: `existingIgnoredPaths`) preserves an existing `paths.ignore` list during forced regeneration; `tests/Console/InitCliTest.php` (search: `testInitForcePreservesExistingPathIgnores`) locks the regression test.
+**Evidence:** `src/Cli/Command/InitCommand.php` (search: `DEFAULT_IGNORED_PATHS`) now defines the default ignored paths for new config files; `src/Cli/Command/InitCommand.php` (search: `existingIgnoredPaths`) preserves an existing `paths.ignore` list during forced regeneration; `tests/Console/InitCliTest.php` (search: `testInitForcePreservesExistingPathIgnores`) locks the regression test.
 
 **Root cause:** Stopping at the damaged generated file instead of tracing the behavior back to the code path that produced it. That left the same destructive behavior available through the CLI.
 
@@ -192,7 +192,7 @@ README.md   pillar tally row          | `naming` | 12 |
 README.md   prose                     "120 rules across 11 pillars"
 ```
 
-Plus an entirely separate drift pattern that no reviewer surfaced at all: the user's earlier `gruff.summary.v1` → `v2` bump in `src/Command/SummaryCommand.php` had left `docs/gruff-cli-summary.md` (three lines including a literal JSON example) and `.goat-flow/architecture.md` ("gruff.summary.v1 digest") advertising the pre-bump constant.
+Plus an entirely separate drift pattern that no reviewer surfaced at all: the user's earlier `gruff.summary.v1` → `v2` bump in `src/Cli/Command/SummaryCommand.php` had left `docs/gruff-cli-summary.md` (three lines including a literal JSON example) and `.goat-flow/architecture.md` ("gruff.summary.v1 digest") advertising the pre-bump constant.
 
 **Root cause:** Treating an AI reviewer's flagged-file list as the canonical drift surface. Reviewers like CodeRabbit and Codex scan the PR diff plus a few "outside diff" candidates; files unrelated to the PR's touched paths are invisible to them. A drift pattern that exists in the PR almost always exists in untouched files too, because the underlying trap is structural ("the same fact is stamped in N places"), not localised.
 

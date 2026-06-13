@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Command;
 
-use GruffPhp\Command\DashboardPageRenderer;
+use GruffPhp\Cli\Dashboard\DashboardPageRenderer;
 use PHPUnit\Framework\TestCase;
 
 /**

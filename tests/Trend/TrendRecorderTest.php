@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Trend;
 
-use GruffPhp\Scoring\Grade;
-use GruffPhp\Scoring\ScoreReport;
-use GruffPhp\Trend\TrendRecorder;
+use GruffPhp\Results\Scoring\Grade;
+use GruffPhp\Results\Scoring\ScoreReport;
+use GruffPhp\Results\Trend\TrendRecorder;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;

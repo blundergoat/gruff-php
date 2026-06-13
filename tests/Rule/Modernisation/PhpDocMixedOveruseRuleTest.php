@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\Modernisation;
 
-use GruffPhp\Config\AnalysisConfig;
-use GruffPhp\Finding\Finding;
-use GruffPhp\Finding\Pillar;
-use GruffPhp\Finding\Severity;
-use GruffPhp\Parser\AnalysisUnit;
-use GruffPhp\Parser\PhpFileParser;
-use GruffPhp\Rule\Modernisation\MixedTypeOveruseRule;
-use GruffPhp\Rule\Modernisation\PhpDocMixedOveruseRule;
-use GruffPhp\Rule\RuleContext;
-use GruffPhp\Rule\RuleRegistry;
-use GruffPhp\Source\SourceFile;
+use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Results\Finding\Finding;
+use GruffPhp\Results\Finding\Pillar;
+use GruffPhp\Results\Finding\Severity;
+use GruffPhp\Engine\Parser\AnalysisUnit;
+use GruffPhp\Engine\Parser\PhpFileParser;
+use GruffPhp\Rules\Modernisation\MixedTypeOveruseRule;
+use GruffPhp\Rules\Modernisation\PhpDocMixedOveruseRule;
+use GruffPhp\Rules\Contracts\RuleContext;
+use GruffPhp\Rules\RuleRegistry;
+use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**

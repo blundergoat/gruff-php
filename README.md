@@ -22,11 +22,11 @@ Wired into a coding agent's loop — as a pre-commit hook, a CI gate (`--fail-on
 
 | Field | Value |
 | --- | --- |
-| Current source | `0.4.0` |
+| Current source | `0.4.1` |
 | Runtime | PHP `^8.3` |
 | Package | `blundergoat/gruff-php` |
 | Binary | `bin/gruff-php` from checkout; `vendor/bin/gruff-php` after install |
-| Rule catalogue | 129 rules across 10 pillars |
+| Rule catalogue | 128 rules across 10 pillars |
 | Primary config | `.gruff-php.yaml`; legacy `.gruff.yaml` is accepted when the primary file is absent |
 | Analysis schema | `gruff.analysis.v2` |
 | Baseline schema | `gruff.baseline.v1` |
@@ -188,7 +188,7 @@ Use `vendor/bin/gruff-php list-rules --format json` to inspect supported thresho
 
 ## Rules And Pillars
 
-The v0.1 catalogue contains 129 registry rules:
+The v0.1 catalogue contains 128 registry rules:
 
 | Pillar | Rules |
 | --- | ---: |
@@ -198,7 +198,7 @@ The v0.1 catalogue contains 129 registry rules:
 | `dead-code` | 10 |
 | `naming` | 11 |
 | `documentation` | 15 |
-| `modernisation` | 10 |
+| `modernisation` | 9 |
 | `security` | 25 |
 | `sensitive-data` | 11 |
 | `test-quality` | 34 |

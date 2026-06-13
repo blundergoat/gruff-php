@@ -4,28 +4,27 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule;
 
-use GruffPhp\Config\AnalysisConfig;
-use GruffPhp\Config\ConfigLoader;
-use GruffPhp\Finding\Finding;
-use GruffPhp\Parser\AnalysisUnit;
-use GruffPhp\Parser\PhpFileParser;
-use GruffPhp\Rule\Complexity\CognitiveComplexityRule;
-use GruffPhp\Rule\Complexity\CyclomaticComplexityRule;
-use GruffPhp\Rule\Complexity\HalsteadVolumeRule;
-use GruffPhp\Rule\Complexity\MaintainabilityIndexRule;
-use GruffPhp\Rule\Docs\MissingReadmeRule;
-use GruffPhp\Rule\RuleContext;
-use GruffPhp\Rule\RuleRegistry;
-use GruffPhp\Rule\Size\AverageMethodLengthRule;
-use GruffPhp\Rule\Size\ClassLengthRule;
-use GruffPhp\Rule\Size\FileLengthRule;
-use GruffPhp\Rule\Size\MethodLengthRule;
-use GruffPhp\Rule\TestQuality\MockingDomainObjectRule;
-use GruffPhp\Rule\TestQuality\PhpUnitCoverageSourceMissingRule;
-use GruffPhp\Rule\TestQuality\PhpUnitDeprecationsNotFatalRule;
-use GruffPhp\Rule\TestQuality\PhpUnitStrictFlagsMissingRule;
-use GruffPhp\Source\SourceDiscovery;
-use GruffPhp\Source\SourceFile;
+use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Config\ConfigLoader;
+use GruffPhp\Results\Finding\Finding;
+use GruffPhp\Engine\Parser\AnalysisUnit;
+use GruffPhp\Engine\Parser\PhpFileParser;
+use GruffPhp\Rules\Complexity\CyclomaticComplexityRule;
+use GruffPhp\Rules\Complexity\HalsteadVolumeRule;
+use GruffPhp\Rules\Complexity\MaintainabilityIndexRule;
+use GruffPhp\Rules\Docs\MissingReadmeRule;
+use GruffPhp\Rules\Contracts\RuleContext;
+use GruffPhp\Rules\RuleRegistry;
+use GruffPhp\Rules\Size\AverageMethodLengthRule;
+use GruffPhp\Rules\Size\ClassLengthRule;
+use GruffPhp\Rules\Size\FileLengthRule;
+use GruffPhp\Rules\Size\MethodLengthRule;
+use GruffPhp\Rules\TestQuality\MockingDomainObjectRule;
+use GruffPhp\Rules\TestQuality\PhpUnitCoverageSourceMissingRule;
+use GruffPhp\Rules\TestQuality\PhpUnitDeprecationsNotFatalRule;
+use GruffPhp\Rules\TestQuality\PhpUnitStrictFlagsMissingRule;
+use GruffPhp\Engine\Source\SourceDiscovery;
+use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -48,10 +47,10 @@ final class RuleRegressionSnapshotTest extends TestCase
     {
         [$units, $findings, $json] = $this->analysePaths(['tests/Fixtures']);
 
-        self::assertCount(165, $units);
-        self::assertCount(2333, $findings);
+        self::assertCount(169, $units);
+        self::assertCount(2543, $findings);
         self::assertSame(
-            'd52a364f138a7d' . 'f38a074949f0e42c2216fdc26b23cc513937a5d7359f6a4d37',
+            '8ea1456353b5cc8cfa2d533cb25f8984e6a1cca74a8df151a7294e742fec4a2d',
             hash('sha256', $json),
         );
     }
@@ -70,7 +69,6 @@ final class RuleRegressionSnapshotTest extends TestCase
         $defaultMissing    = array_values(array_diff($registeredRuleIds, $defaultRuleIds));
 
         self::assertSame([
-                             CognitiveComplexityRule::ID,
                              CyclomaticComplexityRule::ID,
                              HalsteadVolumeRule::ID,
                              MaintainabilityIndexRule::ID,

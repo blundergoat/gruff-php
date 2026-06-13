@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Analysis;
 
-use GruffPhp\Analysis\AnalysisReport;
-use GruffPhp\Finding\Confidence;
-use GruffPhp\Finding\Finding;
-use GruffPhp\Finding\Pillar;
-use GruffPhp\Finding\RuleTier;
-use GruffPhp\Finding\Severity;
+use GruffPhp\Engine\Analysis\AnalysisReport;
+use GruffPhp\Results\Finding\Confidence;
+use GruffPhp\Results\Finding\Finding;
+use GruffPhp\Results\Finding\Pillar;
+use GruffPhp\Results\Finding\RuleTier;
+use GruffPhp\Results\Finding\Severity;
 use PHPUnit\Framework\TestCase;
 
 /**

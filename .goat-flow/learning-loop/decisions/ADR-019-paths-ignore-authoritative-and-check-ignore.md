@@ -1,8 +1,8 @@
 # ADR-019 - `paths.ignore` authoritative everywhere, with a shared ignore engine and `check-ignore`
 
-- Status: Accepted
-- Date: 2026-05-30
-- Relates to: ADR-017 (mission: govern AI-generated code so a human can sign off)
+**Status:** Accepted
+**Date:** 2026-05-30
+**Relates to:** ADR-017 (mission: govern AI-generated code so a human can sign off)
 
 ## Context
 

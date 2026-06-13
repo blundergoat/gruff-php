@@ -12,7 +12,7 @@ to three near-match suggestions and exits with code 2.
 This rule catalogue is generated from `php bin/gruff-php list-rules --format json`.
 Use that command for the full machine-readable metadata, including thresholds and options.
 
-Total rules: 129
+Total rules: 128
 
 ## Summary By Pillar
 
@@ -22,7 +22,7 @@ Total rules: 129
 | `dead-code` | 10 |
 | `documentation` | 15 |
 | `maintainability` | 2 |
-| `modernisation` | 10 |
+| `modernisation` | 9 |
 | `naming` | 11 |
 | `security` | 25 |
 | `sensitive-data` | 11 |
@@ -55,6 +55,13 @@ Total rules: 129
 | `waste.unused-import` | Unused import | `warning` | `high` | yes |
 | `waste.unused-parameter` | Unused parameter | `warning` | `high` | yes |
 
+`dead-code.unused-private-method` counts callable references as real
+usage when the method name is statically visible: `[$this, 'method']`,
+`[self::class, 'method']`, `[ClassName::class, 'method']`, and PHP 8.1
+first-class callable syntax such as `self::method(...)`. Dynamic
+callable names remain conservative and do not mark every private method
+as used.
+
 ### `documentation` (15)
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
@@ -75,6 +82,20 @@ Total rules: 129
 | `docs.todo-density` | TODO/FIXME density | `error` | `high` | yes |
 | `docs.var-annotation-description` | Var annotation description | `warning` | `high` | yes |
 
+`docs.missing-constant-phpdoc` distinguishes missing documentation from
+useful local documentation. By default, constants may use an immediately
+preceding meaningful `//`, `#`, or block comment when the prose is useful
+to a human reviewer and attached directly to the constant. A short
+consecutive constant group can share one local group comment when the
+comment names the group, such as supported roles or keys. Missing
+comments, detached comments, generic comments such as `// constant`, and
+comments that only duplicate the constant name still fire.
+
+Projects that publish constants as API documentation can opt back into
+PHPDoc for public/protected constants with
+`requirePhpdocForApiConstants: true`, or only for exported paths with
+`apiPathPatterns`.
+
 ### `maintainability` (2)
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
@@ -85,12 +106,23 @@ Total rules: 129
 `waste.one-line-method` ships with `minInFileCallers: 2` and
 `namedAlternativeFactoryExempt: true`. The first skips wrappers that are
 called from two or more sites in the same file (centralising shared
-logic is the wrapper's job). The second skips public static factory
-pairs like `Money::fromCents()` / `Money::fromDollars()` that exist for
-naming clarity. These defaults match gruff-php's own self-tuning, where
-the empirical noise floor for the rule sits. Override via the per-rule
-`options` block; the `allowedSymbols` list is the per-project escape
-hatch for named helpers that intentionally stay thin.
+logic is the wrapper's job). The second skips public static named
+factories such as `Money::fromCents()` because the method name is the
+contract. The rule also skips local interface/abstract/trait contract
+implementations, explicit `#[Override]` methods, public APIs on readonly
+data carriers, domain predicates, and cast/normalisation boundaries.
+Private pass-through helpers with no contract or semantic boundary still
+fire, including zero-argument wrappers around another call. Override via
+the per-rule `options` block; the `allowedSymbols` list is the
+per-project escape hatch for named helpers that intentionally stay thin.
+
+`complexity.cyclomatic` and `complexity.cognitive` keep their raw metric
+values in metadata, but flat validation flows made of top-level guard
+clauses that each exit early (return, throw, or exit) are reported at
+advisory severity when they cross the configured threshold. Nested
+decision trees, loops, switch/match
+sprawl, try/catch control flow, and mixed-responsibility methods keep the
+configured warning/error severity.
 
 `modernisation.phpdoc-mixed-overuse` exempts two type shapes that
 legitimately carry a `mixed` leaf. First, unstructured array/list bag
@@ -105,12 +137,11 @@ the rule would otherwise demand. Loose shapes still fire: `array{value:
 mixed}` (single-mixed field), `array<string|int, mixed>` (mixed-keyed
 bag), `Collection<mixed>` (single-leaf generic).
 
-### `modernisation` (10)
+### `modernisation` (9)
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
 | --- | --- | --- | --- | --- |
 | `modernisation.constructor-promotion-candidate` | Constructor property promotion candidate | `advisory` | `medium` | yes |
-| `modernisation.enum-candidate` | Enum candidate | `advisory` | `medium` | yes |
 | `modernisation.first-class-callable-candidate` | First-class callable candidate | `advisory` | `medium` | yes |
 | `modernisation.forbidden-global-access` | Forbidden direct global access | `warning` | `medium` | yes |
 | `modernisation.match-expression-candidate` | Match expression candidate | `advisory` | `medium` | yes |
@@ -126,6 +157,18 @@ Write positions — plain assignments into `$_GET`/`$_POST`/`$_SESSION`
 request-simulation or cleanup, not boundary leaks, so they stay quiet.
 Compound assignments (`.=`, `+=`) read the current value before writing
 and still fire, as do reads inside a write target's dimension expression.
+
+`modernisation.enum-candidate` was retired in 0.4.1. Constant-only
+scalar classes are not a default gruff rubric because safe enum
+migrations require consumer-boundary audits across serialization,
+templates, JavaScript/TypeScript, telemetry, JSON, and agent/runtime
+interfaces.
+
+`modernisation.named-argument-opportunity` reports only when positional
+arguments are likely to hide meaning: many positional arguments, adjacent
+same-type scalar values, or boolean/null flags. Short obvious calls stay
+quiet; the rule remains advisory because named arguments are safest on
+stable APIs where parameter names are an intentional contract.
 
 ### `naming` (11)
 
@@ -145,9 +188,12 @@ and still fire, as do reads inside a write target's dimension expression.
 
 `naming.boolean-prefix` recognises both camelCase and snake_case word
 boundaries after an allowed prefix: `isReady()` and `is_ready()` both
-read as predicates. A prefix followed by a lowercase letter (`hasty`,
-`isolate`) is not a word, and a prefix that does not lead the name
-(`$force`, `$forceShould`) still fires.
+read as predicates. Common domain predicate verbs are accepted by
+default, including `supports*`, `allows*`, `accepts*`, `permits*`,
+`contains*`, `matches*`, `requires*`, `uses*`, `includes*`, `excludes*`,
+`enables*`, and `disables*`. A prefix followed by a
+lowercase letter (`hasty`, `isolate`) is not a word, and a prefix that
+does not lead the name (`$force`, `$forceShould`) still fires.
 
 `naming.identifier-quality` applies its `loopBodyThreshold` escape hatch
 to inline iteration callbacks as well as foreach loops: the sole
@@ -265,6 +311,14 @@ emails, addresses without a marker, and phone numbers outside the
 | `size.parameter-count` | Parameter count | `error` | `high` | yes |
 | `size.property-count` | Property count | `error` | `high` | yes |
 | `size.public-method-count` | Public method count | `error` | `high` | yes |
+
+`size.parameter-count` keeps service constructors with many dependencies
+on the normal severe threshold. Final readonly promoted constructors are
+treated as data carriers: they are exempt below the data-object ceiling
+and advisory above it, because field count alone is not the same risk as
+dependency fan-in. `size.property-count` similarly lowers final readonly
+data carriers to advisory when width is the only signal, while mutable or
+behaviour-heavy classes keep the configured severity.
 
 ### `test-quality` (34)
 

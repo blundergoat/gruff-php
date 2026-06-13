@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\Size;
 
-use GruffPhp\Config\AnalysisConfig;
-use GruffPhp\Config\RuleSettings;
-use GruffPhp\Finding\Severity;
-use GruffPhp\Parser\PhpFileParser;
-use GruffPhp\Rule\RuleContext;
-use GruffPhp\Rule\RuleRegistry;
-use GruffPhp\Rule\Size\MethodLengthRule;
-use GruffPhp\Source\SourceFile;
+use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Config\RuleSettings;
+use GruffPhp\Results\Finding\Severity;
+use GruffPhp\Engine\Parser\PhpFileParser;
+use GruffPhp\Rules\Contracts\RuleContext;
+use GruffPhp\Rules\RuleRegistry;
+use GruffPhp\Rules\Size\MethodLengthRule;
+use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -132,7 +132,7 @@ final class MethodLengthRuleTest extends TestCase
      * @param string             $fixture - Fixture filename under tests/Fixtures/Size to scan.
      * @param array<string, int> $thresholds - Rule option overrides applied before the fixture runs.
      *
-     * @return list<\GruffPhp\Finding\Finding> - findings the rule raised for the fixture; empty when nothing tripped the thresholds
+     * @return list<\GruffPhp\Results\Finding\Finding> - findings the rule raised for the fixture; empty when nothing tripped the thresholds
      */
     private function analyse(string $fixture, array $thresholds): array
     {
@@ -152,9 +152,9 @@ final class MethodLengthRuleTest extends TestCase
      *
      * @param string $filename - Fixture filename.
      *
-     * @return \GruffPhp\Parser\AnalysisUnit - the parsed fixture ready for the rule to analyse, carrying the repo-relative display path
+     * @return \GruffPhp\Engine\Parser\AnalysisUnit - the parsed fixture ready for the rule to analyse, carrying the repo-relative display path
      */
-    private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
+    private function parseFixture(string $filename): \GruffPhp\Engine\Parser\AnalysisUnit
     {
         $path = __DIR__ . '/../../Fixtures/Size/' . $filename;
 

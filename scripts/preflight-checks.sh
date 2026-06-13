@@ -197,7 +197,7 @@ version_consistency_check() {
     # shellcheck disable=SC2016
     php -r '
 $releaseVersion = $argv[1] ?? "";
-$applicationPath = "src/Console/Application.php";
+$applicationPath = "src/Cli/Application.php";
 $changelogPath = "CHANGELOG.md";
 $binaryPath = "bin/gruff-php";
 $errors = [];
@@ -330,7 +330,10 @@ gruff_php_check() {
     local status
     local printed=0
 
-    php bin/gruff-php analyse --fail-on advisory --format json > "$report_path" 2> "$error_path"
+    # --no-cache: the release gate must re-run every rule fresh. The result cache keys on tool version +
+    # config + rule ids, not rule source, so a warm cache masks rule-LOGIC changes made within one version
+    # and the gate would pass (or fail) on stale findings. See .goat-flow/learning-loop/footguns/commands.md.
+    php bin/gruff-php analyse --fail-on advisory --no-cache --format json > "$report_path" 2> "$error_path"
     status=$?
 
     if [[ -s "$report_path" ]]; then

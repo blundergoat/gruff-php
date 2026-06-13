@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Command;
 
-use GruffPhp\Command\DashboardPageRenderer;
-use GruffPhp\Command\DashboardRequestContext;
-use GruffPhp\Command\DashboardScanRunner;
-use GruffPhp\Command\DashboardStateFactory;
+use GruffPhp\Cli\Dashboard\DashboardPageRenderer;
+use GruffPhp\Cli\Dashboard\DashboardRequestContext;
+use GruffPhp\Cli\Dashboard\DashboardScanRunner;
+use GruffPhp\Cli\Dashboard\DashboardStateFactory;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Input\InputArgument;

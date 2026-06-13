@@ -55,9 +55,9 @@ class MissingPhpdocFixture
     }
 }
 
-class RuleContractFixture implements \GruffPhp\Rule\RuleInterface
+class RuleContractFixture implements \GruffPhp\Rules\Contracts\RuleInterface
 {
-    public function definition(): \GruffPhp\Rule\RuleDefinition
+    public function definition(): \GruffPhp\Rules\Contracts\RuleDefinition
     {
         if (rand(0, 1) === 1) {
             throw new \RuntimeException('not executed');
@@ -66,7 +66,7 @@ class RuleContractFixture implements \GruffPhp\Rule\RuleInterface
         throw new \RuntimeException('not executed');
     }
 
-    public function analyse(\GruffPhp\Parser\AnalysisUnit $unit, \GruffPhp\Rule\RuleContext $context): array
+    public function analyse(\GruffPhp\Engine\Parser\AnalysisUnit $unit, \GruffPhp\Rules\Contracts\RuleContext $context): array
     {
         if ($unit->lineCount() > 0 && $context->projectRoot !== '') {
             return [];

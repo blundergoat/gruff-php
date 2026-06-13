@@ -3,7 +3,7 @@
 
 declare(strict_types=1);
 
-use GruffPhp\Console\Application;
+use GruffPhp\Cli\Application;
 
 $composerAutoloadPath = $GLOBALS['_composer_autoload_path'] ?? null;
 $autoloadCandidates   = [

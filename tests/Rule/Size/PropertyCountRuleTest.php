@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\Size;
 
-use GruffPhp\Config\AnalysisConfig;
-use GruffPhp\Config\RuleSettings;
-use GruffPhp\Finding\Severity;
-use GruffPhp\Parser\PhpFileParser;
-use GruffPhp\Rule\RuleContext;
-use GruffPhp\Rule\RuleRegistry;
-use GruffPhp\Rule\Size\PropertyCountRule;
-use GruffPhp\Source\SourceFile;
+use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Config\RuleSettings;
+use GruffPhp\Results\Finding\Severity;
+use GruffPhp\Engine\Parser\PhpFileParser;
+use GruffPhp\Rules\Contracts\RuleContext;
+use GruffPhp\Rules\RuleRegistry;
+use GruffPhp\Rules\Size\PropertyCountRule;
+use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -92,12 +92,44 @@ final class PropertyCountRuleTest extends TestCase
     }
 
     /**
+     * Verify readonly payload objects are advisory instead of severe solely for field count.
+     *
+     * @return void
+     */
+    public function testReadonlyDataCarrierPropertyCountIsAdvisory(): void
+    {
+        $findings = $this->analyse('readonly-data-carrier-properties.php', ['warning' => 15, 'error' => 25]);
+
+        self::assertCount(1, $findings);
+        self::assertSame('ReadonlySessionPayloadFixture', $findings[0]->symbol);
+        self::assertSame(16, $findings[0]->metadata['properties']);
+        self::assertSame('readonly-data-carrier', $findings[0]->metadata['findingKind']);
+        self::assertSame('warning', $findings[0]->metadata['rawThresholdType']);
+        self::assertSame(Severity::Advisory, $findings[0]->severity);
+    }
+
+    /**
+     * Verify a readonly class with a behaviour method is judged as a service, not a data carrier.
+     *
+     * @return void
+     */
+    public function testReadonlyClassWithBehaviourMethodKeepsConfiguredSeverity(): void
+    {
+        $findings = $this->analyse('readonly-carrier-with-behaviour.php', ['warning' => 15, 'error' => 25]);
+
+        self::assertCount(1, $findings);
+        self::assertSame('ReadonlyCarrierWithBehaviourFixture', $findings[0]->symbol);
+        self::assertSame('property-count', $findings[0]->metadata['findingKind']);
+        self::assertSame(Severity::Warning, $findings[0]->severity);
+    }
+
+    /**
      * Analyse fixture paths and return findings for assertions.
      *
      * @param string             $fixture - Fixture filename under tests/Fixtures/Size to scan.
      * @param array<string, int> $thresholds - Warning/error property-count limits for this case.
      *
-     * @return list<\GruffPhp\Finding\Finding> - property-count findings the rule raised for this fixture; empty when the count stays under both
+     * @return list<\GruffPhp\Results\Finding\Finding> - property-count findings the rule raised for this fixture; empty when the count stays under both
      *                                         thresholds
      */
     private function analyse(string $fixture, array $thresholds): array
@@ -118,9 +150,9 @@ final class PropertyCountRuleTest extends TestCase
      *
      * @param string $filename - Fixture filename.
      *
-     * @return \GruffPhp\Parser\AnalysisUnit - parsed fixture with its display path set repo-relative for finding reports
+     * @return \GruffPhp\Engine\Parser\AnalysisUnit - parsed fixture with its display path set repo-relative for finding reports
      */
-    private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
+    private function parseFixture(string $filename): \GruffPhp\Engine\Parser\AnalysisUnit
     {
         $path = __DIR__ . '/../../Fixtures/Size/' . $filename;
 

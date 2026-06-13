@@ -7,23 +7,23 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Config;
 
-use GruffPhp\Config\AnalysisConfig;
-use GruffPhp\Config\ConfigException;
-use GruffPhp\Config\ConfigLoader;
-use GruffPhp\Config\RuleConfigApplier;
-use GruffPhp\Finding\Confidence;
-use GruffPhp\Finding\Pillar;
-use GruffPhp\Finding\RuleTier;
-use GruffPhp\Finding\Severity;
-use GruffPhp\Parser\AnalysisUnit;
-use GruffPhp\Rule\Naming\IdentifierQualityRule;
-use GruffPhp\Rule\RuleContext;
-use GruffPhp\Rule\RuleDefinition;
-use GruffPhp\Rule\RuleInterface;
-use GruffPhp\Rule\RuleRegistry;
-use GruffPhp\Rule\Security\SqlConcatenationRule;
-use GruffPhp\Rule\Security\VariableIncludeRule;
-use GruffPhp\Rule\TestQuality\ExtendsProductionClassRule;
+use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Config\ConfigException;
+use GruffPhp\Engine\Config\ConfigLoader;
+use GruffPhp\Engine\Config\RuleConfigApplier;
+use GruffPhp\Results\Finding\Confidence;
+use GruffPhp\Results\Finding\Pillar;
+use GruffPhp\Results\Finding\RuleTier;
+use GruffPhp\Results\Finding\Severity;
+use GruffPhp\Engine\Parser\AnalysisUnit;
+use GruffPhp\Rules\Naming\IdentifierQualityRule;
+use GruffPhp\Rules\Contracts\RuleContext;
+use GruffPhp\Rules\Contracts\RuleDefinition;
+use GruffPhp\Rules\Contracts\RuleInterface;
+use GruffPhp\Rules\RuleRegistry;
+use GruffPhp\Rules\Security\SqlConcatenationRule;
+use GruffPhp\Rules\Security\VariableIncludeRule;
+use GruffPhp\Rules\TestQuality\ExtendsProductionClassRule;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
@@ -304,7 +304,7 @@ final readonly class FixtureDefaultDisabledRule implements RuleInterface
      * @param AnalysisUnit $analysisUnit - Analysis unit.
      * @param RuleContext  $ruleContext - Rule context for the fixture.
      *
-     * @return list<\GruffPhp\Finding\Finding> - always empty; this fixture exercises only the loader's enabled-state path and never reports
+     * @return list<\GruffPhp\Results\Finding\Finding> - always empty; this fixture exercises only the loader's enabled-state path and never reports
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -351,7 +351,7 @@ final readonly class FixtureOptionsRule implements RuleInterface
      * @param AnalysisUnit $analysisUnit - Analysis unit.
      * @param RuleContext  $ruleContext - Rule context for the fixture.
      *
-     * @return list<\GruffPhp\Finding\Finding> - always empty; this fixture exercises only the option-validation path and never reports
+     * @return list<\GruffPhp\Results\Finding\Finding> - always empty; this fixture exercises only the option-validation path and never reports
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {

@@ -4,16 +4,16 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\Naming;
 
-use GruffPhp\Config\AnalysisConfig;
-use GruffPhp\Config\RuleSettings;
-use GruffPhp\Rule\Naming\AbbreviationAllowlistRule;
-use GruffPhp\Rule\Naming\BooleanPrefixRule;
-use GruffPhp\Rule\Naming\HungarianNotationRule;
-use GruffPhp\Rule\Naming\IdentifierQualityRule;
-use GruffPhp\Rule\Naming\NegativeBooleanRule;
-use GruffPhp\Rule\Naming\ShortVariableRule;
-use GruffPhp\Rule\RuleContext;
-use GruffPhp\Rule\RuleRegistry;
+use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Config\RuleSettings;
+use GruffPhp\Rules\Naming\AbbreviationAllowlistRule;
+use GruffPhp\Rules\Naming\BooleanPrefixRule;
+use GruffPhp\Rules\Naming\HungarianNotationRule;
+use GruffPhp\Rules\Naming\IdentifierQualityRule;
+use GruffPhp\Rules\Naming\NegativeBooleanRule;
+use GruffPhp\Rules\Naming\ShortVariableRule;
+use GruffPhp\Rules\Contracts\RuleContext;
+use GruffPhp\Rules\RuleRegistry;
 
 /**
  * Covers configurable naming-rule behaviour and cross-rule deferral.
@@ -244,7 +244,7 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
      *
      * @param list<string> $acceptedAbbreviations - Accepted abbreviation values to apply before analysing the fixture.
      *
-     * @return list<\GruffPhp\Finding\Finding> - surviving abbreviation-allowlist findings after the supplied accepted abbreviations are applied;
+     * @return list<\GruffPhp\Results\Finding\Finding> - surviving abbreviation-allowlist findings after the supplied accepted abbreviations are applied;
      *                                         empty when every short name is accepted
      */
     private function abbreviationFindings(array $acceptedAbbreviations): array
@@ -270,7 +270,7 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
      *
      * @param list<string> $typePrefixes - Hungarian prefixes treated as type markers for this assertion.
      *
-     * @return list<\GruffPhp\Finding\Finding> - Hungarian-notation findings produced under the supplied type prefixes; empty when no prefixed
+     * @return list<\GruffPhp\Results\Finding\Finding> - Hungarian-notation findings produced under the supplied type prefixes; empty when no prefixed
      *                                         variable matches
      */
     private function hungarianFindings(array $typePrefixes): array
@@ -295,7 +295,7 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
      *
      * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options - Boolean-prefix rule option overrides.
      *
-     * @return list<\GruffPhp\Finding\Finding> - boolean-prefix findings for the fixture's properties and parameters under the supplied options;
+     * @return list<\GruffPhp\Results\Finding\Finding> - boolean-prefix findings for the fixture's properties and parameters under the supplied options;
      *                                         empty when every bool name is exempt
      */
     private function booleanPrefixPropertyFindings(array $options = []): array
@@ -320,7 +320,7 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
      *
      * @param list<string> $cliMirrorAllowlist - Negated boolean names exempted as CLI mirror flags.
      *
-     * @return list<\GruffPhp\Finding\Finding> - negative-boolean findings with BooleanPrefixRule disabled so each negated name is counted once;
+     * @return list<\GruffPhp\Results\Finding\Finding> - negative-boolean findings with BooleanPrefixRule disabled so each negated name is counted once;
      *                                         empty when the allowlist exempts them all
      */
     private function negativeBooleanFindings(array $cliMirrorAllowlist = []): array
@@ -351,7 +351,7 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
     /**
      * Group naming findings by reported identifier name.
      *
-     * @param list<\GruffPhp\Finding\Finding> $findings - Naming findings to group by reported identifier name.
+     * @param list<\GruffPhp\Results\Finding\Finding> $findings - Naming findings to group by reported identifier name.
      *
      * @return array<string, list<string>> - identifier name mapped to the rule ids that flagged it, for asserting which names overlap across rules
      */

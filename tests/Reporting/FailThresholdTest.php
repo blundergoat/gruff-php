@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Reporting;
 
-use GruffPhp\Finding\Severity;
-use GruffPhp\Reporting\FailThreshold;
+use GruffPhp\Results\Finding\Severity;
+use GruffPhp\Output\Reporter\FailThreshold;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 

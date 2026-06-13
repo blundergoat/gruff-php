@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Command;
 
-use GruffPhp\Command\MissingConfigPrompt;
-use GruffPhp\Config\ConfigLoader;
-use GruffPhp\Console\Application;
+use GruffPhp\Cli\Command\MissingConfigPrompt;
+use GruffPhp\Engine\Config\ConfigLoader;
+use GruffPhp\Cli\Application;
 use LogicException;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;

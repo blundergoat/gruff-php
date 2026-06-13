@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\Naming;
 
-use GruffPhp\Config\AnalysisConfig;
-use GruffPhp\Parser\PhpFileParser;
-use GruffPhp\Rule\RuleContext;
-use GruffPhp\Rule\RuleRegistry;
-use GruffPhp\Source\SourceFile;
+use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Parser\PhpFileParser;
+use GruffPhp\Rules\Contracts\RuleContext;
+use GruffPhp\Rules\RuleRegistry;
+use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -35,7 +35,7 @@ abstract class NamingRuleTestCase extends TestCase
      * @param string $fixture - Fixture filename under tests/Fixtures/Naming.
      * @param string $ruleId - Rule id to keep; findings from every other rule are discarded.
      *
-     * @return list<\GruffPhp\Finding\Finding> - findings emitted by the named rule, in detection order; empty when the fixture is clean
+     * @return list<\GruffPhp\Results\Finding\Finding> - findings emitted by the named rule, in detection order; empty when the fixture is clean
      */
     protected function analyseRule(string $fixture, string $ruleId): array
     {
@@ -54,7 +54,7 @@ abstract class NamingRuleTestCase extends TestCase
      * @param string $ruleId - Rule id to keep; findings from every other rule are discarded.
      * @param string $displayPath - Path the rule sees, letting a test exercise path-sensitive naming checks.
      *
-     * @return list<\GruffPhp\Finding\Finding> - findings emitted by the named rule for the inline source, in detection order; empty when no
+     * @return list<\GruffPhp\Results\Finding\Finding> - findings emitted by the named rule for the inline source, in detection order; empty when no
      *                                         violation fires
      */
     protected function analyseSourceRule(string $source, string $ruleId, string $displayPath = 'tests/Fixtures/Naming/inline.php'): array
@@ -83,9 +83,9 @@ abstract class NamingRuleTestCase extends TestCase
      *
      * @param string $filename - Fixture filename.
      *
-     * @return \GruffPhp\Parser\AnalysisUnit - the parsed fixture ready for rule analysis, carrying its repo-relative display path
+     * @return \GruffPhp\Engine\Parser\AnalysisUnit - the parsed fixture ready for rule analysis, carrying its repo-relative display path
      */
-    protected function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
+    protected function parseFixture(string $filename): \GruffPhp\Engine\Parser\AnalysisUnit
     {
         $path = __DIR__ . '/../../Fixtures/Naming/' . $filename;
 

@@ -1,8 +1,8 @@
 # ADR-020 - Incremental per-file result cache
 
-- Status: Accepted
-- Date: 2026-05-30
-- Relates to: ADR-017 (mission: govern AI-generated code; fast hook feedback keeps the agent loop tight)
+**Status:** Accepted
+**Date:** 2026-05-30
+**Relates to:** ADR-017 (mission: govern AI-generated code; fast hook feedback keeps the agent loop tight)
 
 ## Context
 

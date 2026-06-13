@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Console;
 
-use GruffPhp\Console\Application;
+use GruffPhp\Cli\Application;
 use JsonException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;

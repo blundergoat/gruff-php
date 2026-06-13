@@ -2,6 +2,16 @@
 
 Notable user-facing changes to `gruff-php` are listed here.
 
+## 0.4.1 - 2026-06-13
+
+0.4.1 focuses on rule-rubric precision: fewer false positives and fewer over-severe findings without disabling the rules that catch real maintainability problems.
+
+- **BREAKING: Removed `modernisation.enum-candidate`** - Classes that only hold scalar constants are no longer flagged to convert to enums. That's a deliberate design choice, not a default gruff rule, because such constants often cross PHP, Twig/TypeScript, JSON, telemetry, and agent/runtime boundaries.
+- **Tighter rubrics across docs, naming, size, complexity, modernisation, and dead-code** - Fewer false positives and over-severe findings. Now ignored: well-commented constants, intentional one-liners, more boolean-verb names (`includes*`/`excludes*`/`enables*`/`disables*`), immutable data carriers, flat guard-clause validators, clear positional calls, and callable-referenced private methods. Still flagged: useless comments, undocumented constants, bad wrappers, dependency-heavy services, nested complexity, ambiguous positional calls, and real dead code.
+- **Constant PHPDoc strictness is configurable** - By default, `docs.missing-constant-phpdoc` accepts a meaningful `//`, `#`, or block comment (including short grouped ones). Projects that treat constants as public API can require full PHPDoc - everywhere with `requirePhpdocForApiConstants`, or per path with `apiPathPatterns`.
+- **`report` rejects unknown rule filters as a usage error** - `report --include-rule`/`--exclude-rule` now check ids up front, so a typo fails fast (exit code 2) before any prompt, config write, or `analyse` run - just like `analyse` already does.
+- **Internal namespace consolidation** - `src/` drops from 19 top-level directories to six (`Cli`, `Engine`, `Rules`, `Results`, `Output`, `Support`). The Composer root stays `GruffPhp\ => src/`; rule IDs, command names, config keys, JSON schemas, and baselines are unchanged, so CLI, hook, and CI output are identical. Only code that imported gruff-php's internals directly needs updating (e.g. `GruffPhp\Rule\` → `GruffPhp\Rules\`).
+
 ## 0.4.0 - 2026-06-11
 
 0.4.0 retires the project rules whose whole-project analysis made per-edit feedback slow and whose verified false-positive rates made their findings untrustworthy on framework code. With no project rules left, the per-file result cache introduced in 0.3.0 now engages on every default run, and single-file scans no longer pay whole-project cost. Eight per-unit rules also gained precision fixes for mechanical misfires.

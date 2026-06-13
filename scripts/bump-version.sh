@@ -12,7 +12,7 @@ set -euo pipefail
 #   scripts/bump-version.sh 0.2.0-dev   # post-release dev bump
 #
 # Behaviour:
-#   - Rewrites Application::VERSION in src/Console/Application.php.
+#   - Rewrites Application::VERSION in src/Cli/Application.php.
 #   - If the new version is not a prerelease tag and CHANGELOG.md still has an
 #     "Unreleased" marker for that version, stamps it with today's date (or
 #     --release-date when supplied).
@@ -22,7 +22,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-APPLICATION_PHP="src/Console/Application.php"
+APPLICATION_PHP="src/Cli/Application.php"
 CHANGELOG="CHANGELOG.md"
 
 usage() {

@@ -7,16 +7,16 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Config;
 
-use GruffPhp\Config\ConfigException;
-use GruffPhp\Config\ConfigLoader;
-use GruffPhp\Config\SeverityThreshold;
-use GruffPhp\Finding\Pillar;
-use GruffPhp\Finding\Severity;
-use GruffPhp\Reporting\FailThreshold;
-use GruffPhp\Reporting\FailThresholds;
-use GruffPhp\Rule\RuleRegistry;
-use GruffPhp\Rule\Size\FileLengthRule;
-use GruffPhp\Rule\TestQuality\TestMethodTooLongRule;
+use GruffPhp\Engine\Config\ConfigException;
+use GruffPhp\Engine\Config\ConfigLoader;
+use GruffPhp\Engine\Config\SeverityThreshold;
+use GruffPhp\Results\Finding\Pillar;
+use GruffPhp\Results\Finding\Severity;
+use GruffPhp\Output\Reporter\FailThreshold;
+use GruffPhp\Output\Reporter\FailThresholds;
+use GruffPhp\Rules\RuleRegistry;
+use GruffPhp\Rules\Size\FileLengthRule;
+use GruffPhp\Rules\TestQuality\TestMethodTooLongRule;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 /**

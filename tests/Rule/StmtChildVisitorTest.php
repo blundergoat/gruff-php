@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule;
 
-use GruffPhp\Rule\StmtChildBlock;
-use GruffPhp\Rule\StmtChildVisitor;
+use GruffPhp\Rules\Shared\StmtChildBlock;
+use GruffPhp\Rules\Shared\StmtChildVisitor;
 use PhpParser\Node;
 use PhpParser\Node\Stmt;
 use PhpParser\ParserFactory;

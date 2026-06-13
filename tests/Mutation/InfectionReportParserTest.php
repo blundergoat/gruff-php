@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Mutation;
 
-use GruffPhp\Mutation\InfectionReportParser;
-use GruffPhp\Mutation\InfectionRunner;
-use GruffPhp\Mutation\MutationReportException;
+use GruffPhp\Results\Mutation\InfectionReportParser;
+use GruffPhp\Results\Mutation\InfectionRunner;
+use GruffPhp\Results\Mutation\MutationReportException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RecursiveDirectoryIterator;

@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\Naming;
 
-use GruffPhp\Config\AnalysisConfig;
-use GruffPhp\Config\RuleSettings;
-use GruffPhp\Rule\Naming\IdentifierQualityRule;
-use GruffPhp\Rule\RuleContext;
-use GruffPhp\Rule\RuleRegistry;
+use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Config\RuleSettings;
+use GruffPhp\Rules\Naming\IdentifierQualityRule;
+use GruffPhp\Rules\Contracts\RuleContext;
+use GruffPhp\Rules\RuleRegistry;
 
 /**
  * Covers configurable and mutation-focused naming rule behavior.

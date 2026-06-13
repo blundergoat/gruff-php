@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Source;
 
-use GruffPhp\Source\PathIgnoreResolver;
+use GruffPhp\Engine\Source\PathIgnoreResolver;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 

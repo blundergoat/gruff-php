@@ -53,13 +53,22 @@ allowlists:
         - ui
         - uri
         - url
-    secretPreviews: []
+    # The fixture-corpus snapshot digest asserted in tests/Rule/RuleRegressionSnapshotTest.php is a
+    # 64-char hex hash that reads as a high-entropy secret; it is test data, not a credential. Keep this
+    # preview in sync if that digest rotates (it changes whenever rules or fixtures change).
+    secretPreviews:
+        - '8ea1...4a2d (redacted, 64 chars)'
 selection:
     tiers: []
     pillars: []
     rules: []
     excludePillars: []
-    excludeRules: []
+    # modernisation.named-argument-opportunity ships ON by default and is validated for users
+    # (see real-repo scans), but the project does not self-enforce it: its ambiguity path flags
+    # 4-argument calls below this repo's configured minPositionalArguments:5 floor, and adopting
+    # named arguments across the existing call sites is deferred to a deliberate pass.
+    excludeRules:
+        - modernisation.named-argument-opportunity
 rules:
     # Cognitive complexity
     complexity.cognitive:
@@ -104,6 +113,9 @@ rules:
     # Missing constant PHPDoc
     docs.missing-constant-phpdoc:
         enabled: true
+        options:
+            requirePhpdocForApiConstants: false
+            apiPathPatterns: []
     # Missing file PHPDoc
     docs.missing-file-phpdoc:
         enabled: true
@@ -147,9 +159,6 @@ rules:
         enabled: true
     # Constructor property promotion candidate
     modernisation.constructor-promotion-candidate:
-        enabled: true
-    # Enum candidate
-    modernisation.enum-candidate:
         enabled: true
     # First-class callable candidate
     modernisation.first-class-callable-candidate:
@@ -199,11 +208,18 @@ rules:
                 - does
                 - allows
                 - all
+                - accepts
                 - contains
+                - disables
+                - enables
+                - excludes
                 - extends
+                - includes
                 - invokes
                 - matches
+                - permits
                 - refers
+                - requires
                 - returns
                 - looks
                 - supports
@@ -225,6 +241,7 @@ rules:
                 - silent
             acceptedBooleanNames:
                 - excludeFromScore
+                - meaningfulOnly
     # Class/file name mismatch
     naming.class-file-mismatch:
         enabled: true
@@ -290,12 +307,12 @@ rules:
         enabled: true
         options:
             cliMirrorAllowlist:
-                - 'GruffPhp\Command\AnalyseCommandOptions::noConfig'
-                - 'GruffPhp\Command\AnalyseCommandOptions::noBaseline'
-                - 'GruffPhp\Command\AnalyseCommandOptions::noCache'
-                - 'GruffPhp\Command\SummaryCommand::hasConfigConflict::noConfig'
-                - 'GruffPhp\Command\SummaryCommand::analysisConfig::noConfig'
-                - 'GruffPhp\Command\CheckIgnoreCommand::ignorePatterns::noConfig'
+                - 'GruffPhp\Cli\Command\AnalyseCommandOptions::noConfig'
+                - 'GruffPhp\Cli\Command\AnalyseCommandOptions::noBaseline'
+                - 'GruffPhp\Cli\Command\AnalyseCommandOptions::noCache'
+                - 'GruffPhp\Cli\Command\SummaryCommand::hasConfigConflict::noConfig'
+                - 'GruffPhp\Cli\Command\SummaryCommand::analysisConfig::noConfig'
+                - 'GruffPhp\Cli\Command\CheckIgnoreCommand::ignorePatterns::noConfig'
     # Short variable name
     naming.short-variable:
         enabled: true
@@ -676,6 +693,8 @@ rules:
                 - SecretScannerHelper::redactedKeyValue()
                 - TestQualityNodeHelper::calls()
                 - ThresholdTrip::withScope()
+                - DashboardCommand::gruffBinary()
+                - ReportCommand::gruffBinary()
     # Flags variables that only store a value immediately returned by the next statement, when the assignment and the return are the only two statements in their block.
     waste.redundant-variable:
         enabled: true

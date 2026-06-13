@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Command;
 
-use GruffPhp\Command\DashboardHttpResponder;
-use GruffPhp\Command\DashboardPageRenderer;
-use GruffPhp\Command\DashboardRequestContext;
-use GruffPhp\Command\DashboardRequestHandler;
-use GruffPhp\Command\DashboardScanRunner;
-use GruffPhp\Command\DashboardStateFactory;
+use GruffPhp\Cli\Dashboard\DashboardHttpResponder;
+use GruffPhp\Cli\Dashboard\DashboardPageRenderer;
+use GruffPhp\Cli\Dashboard\DashboardRequestContext;
+use GruffPhp\Cli\Dashboard\DashboardRequestHandler;
+use GruffPhp\Cli\Dashboard\DashboardScanRunner;
+use GruffPhp\Cli\Dashboard\DashboardStateFactory;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Input\ArrayInput;

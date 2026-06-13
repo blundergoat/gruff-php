@@ -4,17 +4,20 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\Docs;
 
-use GruffPhp\Rule\Docs\MissingClassPhpdocRule;
-use GruffPhp\Rule\Docs\MissingConstantPhpdocRule;
-use GruffPhp\Rule\Docs\MissingFilePhpdocRule;
-use GruffPhp\Rule\Docs\MissingPropertyPhpdocRule;
-use GruffPhp\Rule\Docs\MissingPublicPhpdocRule;
-use GruffPhp\Rule\Docs\MissingThrowsTagRule;
-use GruffPhp\Rule\Docs\RegexCommentRule;
-use GruffPhp\Rule\Docs\StaleParamTagRule;
-use GruffPhp\Rule\Docs\TodoDensityRule;
-use GruffPhp\Rule\Docs\BarePhpdocTagsRule;
-use GruffPhp\Rule\Docs\VarAnnotationDescriptionRule;
+use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Config\RuleSettings;
+use GruffPhp\Rules\Docs\BarePhpdocTagsRule;
+use GruffPhp\Rules\Docs\MissingClassPhpdocRule;
+use GruffPhp\Rules\Docs\MissingConstantPhpdocRule;
+use GruffPhp\Rules\Docs\MissingFilePhpdocRule;
+use GruffPhp\Rules\Docs\MissingPropertyPhpdocRule;
+use GruffPhp\Rules\Docs\MissingPublicPhpdocRule;
+use GruffPhp\Rules\Docs\MissingThrowsTagRule;
+use GruffPhp\Rules\Docs\RegexCommentRule;
+use GruffPhp\Rules\Docs\StaleParamTagRule;
+use GruffPhp\Rules\Docs\TodoDensityRule;
+use GruffPhp\Rules\Docs\VarAnnotationDescriptionRule;
+use GruffPhp\Rules\RuleRegistry;
 
 /**
  * Covers documentation tag, file, class, property, and constant rules.
@@ -391,35 +394,97 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify constants with a leading `//` line comment get the line-comment-specific message and metadata.
+     * Verify constants accept useful local comments by default.
      *
      * @return void
      */
-    public function testMissingConstantPhpdocSurfacesLineCommentVariant(): void
+    public function testMissingConstantPhpdocAllowsUsefulLocalCommentsByDefault(): void
     {
         $findings = $this->analyseRule('missing-constant-phpdoc-line-comment.php', MissingConstantPhpdocRule::ID);
 
         $byConstant = $this->constantFindingsByName($findings);
 
-        self::assertArrayHasKey('CSV_BYTE_CAP', $byConstant);
+        self::assertArrayNotHasKey('CSV_BYTE_CAP', $byConstant);
+        self::assertArrayNotHasKey('TELEMETRY_KEY', $byConstant);
+        self::assertArrayNotHasKey('ROLE_USER', $byConstant);
+        self::assertArrayNotHasKey('ROLE_ASSISTANT', $byConstant);
         self::assertArrayHasKey('PLAIN_NO_COMMENT', $byConstant);
-
-        $lineCommented = $byConstant['CSV_BYTE_CAP'];
-        self::assertSame('line', $lineCommented->metadata['commentKind'] ?? null);
-        self::assertStringContainsString('leading `//` line comment', $lineCommented->message);
-        self::assertStringContainsString('convert to `/** ... */`', $lineCommented->message);
+        self::assertArrayHasKey('PRIVATE_NO_COMMENT', $byConstant);
+        self::assertArrayHasKey('PRIVATE_USELESS_COMMENT', $byConstant);
+        self::assertArrayHasKey('MAX_PAGES', $byConstant);
+        self::assertArrayHasKey('PRIVATE_TODO_COMMENT', $byConstant);
+        self::assertArrayHasKey('PRIVATE_DETACHED_COMMENT', $byConstant);
+        self::assertArrayNotHasKey('PRIVATE_CACHE_PREFIX', $byConstant);
+        self::assertArrayNotHasKey('PAYLOAD_VERSION_KEY', $byConstant);
+        self::assertArrayNotHasKey('IDEMPOTENCY_KEY', $byConstant);
 
         $plain = $byConstant['PLAIN_NO_COMMENT'];
         self::assertArrayNotHasKey('commentKind', $plain->metadata);
-        self::assertStringContainsString('needs a brief intent description', $plain->message);
+        self::assertSame('missing', $plain->metadata['commentQuality'] ?? null);
+        self::assertStringContainsString('has no nearby comment explaining its purpose', $plain->message);
+
+        self::assertSame('line', $byConstant['PRIVATE_USELESS_COMMENT']->metadata['commentKind'] ?? null);
+        self::assertSame('low-quality', $byConstant['PRIVATE_USELESS_COMMENT']->metadata['commentQuality'] ?? null);
+        self::assertStringContainsString('does not explain the constant\'s purpose', $byConstant['PRIVATE_USELESS_COMMENT']->message);
+        self::assertArrayNotHasKey('commentKind', $byConstant['PRIVATE_DETACHED_COMMENT']->metadata);
+    }
+
+    /**
+     * Verify strict API mode requires PHPDoc for public constants with useful local comments.
+     *
+     * @return void
+     */
+    public function testMissingConstantPhpdocCanRequirePhpdocForApiConstants(): void
+    {
+        $findings = $this->analyseRule(
+            'missing-constant-phpdoc-line-comment.php',
+            MissingConstantPhpdocRule::ID,
+            $this->configWithMissingConstantOptions(['requirePhpdocForApiConstants' => true]),
+        );
+
+        $byConstant = $this->constantFindingsByName($findings);
+
+        self::assertArrayHasKey('CSV_BYTE_CAP', $byConstant);
+        self::assertArrayHasKey('TELEMETRY_KEY', $byConstant);
+        self::assertArrayHasKey('ROLE_USER', $byConstant);
+        self::assertArrayHasKey('ROLE_ASSISTANT', $byConstant);
+        self::assertArrayNotHasKey('DOCUMENTED_TELEMETRY_KEY', $byConstant);
+
+        $telemetry = $byConstant['TELEMETRY_KEY'];
+        self::assertSame('line', $telemetry->metadata['commentKind'] ?? null);
+        self::assertSame('meaningful', $telemetry->metadata['commentQuality'] ?? null);
+        self::assertTrue($telemetry->metadata['requiresApiPhpdoc'] ?? null);
+        self::assertStringContainsString('requires PHPDoc for exported constants', $telemetry->message);
+
+        self::assertTrue($byConstant['ROLE_ASSISTANT']->metadata['groupedLocalComment'] ?? null);
+    }
+
+    /**
+     * Verify API path patterns can opt specific exported paths into strict constant PHPDoc.
+     *
+     * @return void
+     */
+    public function testMissingConstantPhpdocCanRequirePhpdocForApiPathPatterns(): void
+    {
+        $findings = $this->analyseRule(
+            'missing-constant-phpdoc-line-comment.php',
+            MissingConstantPhpdocRule::ID,
+            $this->configWithMissingConstantOptions(['apiPathPatterns' => ['tests/Fixtures/Docs/*']]),
+        );
+
+        $byConstant = $this->constantFindingsByName($findings);
+
+        self::assertArrayHasKey('TELEMETRY_KEY', $byConstant);
+        self::assertTrue($byConstant['TELEMETRY_KEY']->metadata['requiresApiPhpdoc'] ?? null);
+        self::assertArrayNotHasKey('DOCUMENTED_TELEMETRY_KEY', $byConstant);
     }
 
     /**
      * Key constant PHPDoc findings by the reported constant name.
      *
-     * @param list<\GruffPhp\Finding\Finding> $findings - Findings from a missing-constant-phpdoc fixture.
+     * @param list<\GruffPhp\Results\Finding\Finding> $findings - Findings from a missing-constant-phpdoc fixture.
      *
-     * @return array<string, \GruffPhp\Finding\Finding> - findings keyed by constant name; findings without a string name are omitted
+     * @return array<string, \GruffPhp\Results\Finding\Finding> - findings keyed by constant name; findings without a string name are omitted
      */
     private function constantFindingsByName(array $findings): array
     {
@@ -433,5 +498,24 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
         }
 
         return $byConstant;
+    }
+
+    /**
+     * Build a config override for docs.missing-constant-phpdoc options.
+     *
+     * @param array<string, bool|list<string>> $options - Option overrides merged with rule defaults.
+     *
+     * @return AnalysisConfig - Config with the requested missing-constant-phpdoc option values.
+     */
+    private function configWithMissingConstantOptions(array $options): AnalysisConfig
+    {
+        $registry = RuleRegistry::defaults();
+        $config   = AnalysisConfig::fromRegistry($registry);
+        $settings = $config->ruleSettings(MissingConstantPhpdocRule::ID);
+
+        return $config->withRuleSettings(
+            MissingConstantPhpdocRule::ID,
+            new RuleSettings(true, $settings->thresholds, array_merge($settings->options, $options)),
+        );
     }
 }
