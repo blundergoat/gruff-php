@@ -285,12 +285,41 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
             return false;
         }
 
-        $target = strtolower($first->class->getLast());
-        if ($target === 'self' || $target === 'static') {
+        $shortName = strtolower($first->class->getLast());
+        if ($shortName === 'self' || $shortName === 'static') {
             return true;
         }
 
-        return strtolower($this->resolveClassName($classLike)) === $target;
+        // Compare fully-qualified names so a same-short-name class in another namespace cannot mask real dead code.
+        return strtolower($this->resolvedReferenceName($first->class)) === strtolower($this->declaringClassName($classLike));
+    }
+
+    /**
+     * Resolve a class reference to its fully-qualified name.
+     *
+     * @param Node\Name $name - Class name node from a callable-array target.
+     *
+     * @return string - Resolved fully-qualified name, or the written name when no resolution is attached.
+     */
+    private function resolvedReferenceName(Node\Name $name): string
+    {
+        $resolved = $name->getAttribute('resolvedName');
+
+        return $resolved instanceof Node\Name ? $resolved->toString() : $name->toString();
+    }
+
+    /**
+     * Resolve the fully-qualified name of a class-like declaration.
+     *
+     * @param Class_|Trait_|Enum_ $classLike - Declaring scope whose qualified name anchors callable comparisons.
+     *
+     * @return string - Fully-qualified declaration name, or the short name when no namespace is resolved.
+     */
+    private function declaringClassName(Class_|Trait_|Enum_ $classLike): string
+    {
+        $namespacedName = $classLike->namespacedName ?? null;
+
+        return $namespacedName instanceof Node\Name ? $namespacedName->toString() : $this->resolveClassName($classLike);
     }
 
     /**

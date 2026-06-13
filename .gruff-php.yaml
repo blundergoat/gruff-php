@@ -57,7 +57,7 @@ allowlists:
     # 64-char hex hash that reads as a high-entropy secret; it is test data, not a credential. Keep this
     # preview in sync if that digest rotates (it changes whenever rules or fixtures change).
     secretPreviews:
-        - '776a...1001 (redacted, 64 chars)'
+        - '84b9...c126 (redacted, 64 chars)'
 selection:
     tiers: []
     pillars: []

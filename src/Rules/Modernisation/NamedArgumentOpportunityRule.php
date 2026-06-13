@@ -17,6 +17,7 @@ use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Node;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Stmt\ClassMethod;
+use PhpParser\Node\Stmt\Function_;
 
 /**
  * Detects calls whose repeated scalar arguments would be clearer as named arguments.
@@ -63,13 +64,13 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
 
         $definition             = $this->definition();
         $minPositionalArguments = (int) $ruleContext->settingsFor($definition)->numericThreshold('minPositionalArguments');
-        $variadicMethodNames    = $this->variadicMethodNames($analysisUnit);
+        $variadicCallableNames  = $this->variadicCallableNames($analysisUnit);
         $findings               = [];
 
         $calls = NodeIndex::nodesOfAny($analysisUnit, [Expr\FuncCall::class, Expr\MethodCall::class, Expr\StaticCall::class]);
         foreach ($calls as $call) {
             /** @var Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call NodeIndex query restricts these classes. */
-            if (($call instanceof Expr\MethodCall || $call instanceof Expr\StaticCall) && $this->isVariadicMethodCall($call, $variadicMethodNames)) {
+            if ($this->isVariadicCall($call, $variadicCallableNames)) {
                 continue;
             }
 
@@ -184,45 +185,66 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
     }
 
     /**
-     * Find method names declared with variadic parameters in the same file.
+     * Find function and method names declared with variadic parameters in the same file.
      *
-     * @param AnalysisUnit $analysisUnit - Parsed unit whose own method declarations are scanned for variadic params.
+     * @param AnalysisUnit $analysisUnit - Parsed unit whose own function-like declarations are scanned for variadic params.
      *
-     * @return array<string, true> - Lowercase variadic method names.
+     * @return array<string, true> - Lowercase variadic function and method names.
      */
-    private function variadicMethodNames(AnalysisUnit $analysisUnit): array
+    private function variadicCallableNames(AnalysisUnit $analysisUnit): array
     {
         $names = [];
 
-        foreach (NodeIndex::nodesOf($analysisUnit, ClassMethod::class) as $classMethod) {
-            foreach ($classMethod->params as $param) {
+        foreach (NodeIndex::nodesOfAny($analysisUnit, [ClassMethod::class, Function_::class]) as $functionLike) {
+            if (!$functionLike instanceof ClassMethod && !$functionLike instanceof Function_) {
+                continue;
+            }
+
+            foreach ($functionLike->params as $param) {
                 if ($param->variadic) {
-                    $names[strtolower($classMethod->name->toString())] = true;
+                    $names[strtolower($functionLike->name->toString())] = true;
                     break;
                 }
             }
         }
 
-        // The set of same-file variadic method names, used later to suppress misleading suggestions on them.
+        // The set of same-file variadic callable names, used later to suppress misleading suggestions on them.
         return $names;
     }
 
     /**
-     * Detect calls to same-file variadic methods, where named arguments would be misleading.
+     * Detect calls to same-file variadic functions or methods, where named arguments would be misleading.
      *
-     * @param Expr\MethodCall|Expr\StaticCall $call - Call whose method name is matched against the variadic set.
-     * @param array<string, true> $variadicMethodNames - Lowercase method names declared with variadic params.
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Call whose callee name is matched against the variadic set.
+     * @param array<string, true> $variadicNames - Lowercase callable names declared with variadic params.
      *
      * @return bool - True when the call target is variadic.
      */
-    private function isVariadicMethodCall(Expr\MethodCall|Expr\StaticCall $call, array $variadicMethodNames): bool
+    private function isVariadicCall(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call, array $variadicNames): bool
     {
-        if (!$call->name instanceof Node\Identifier) {
-            // A dynamic method name cannot be resolved to a declaration, so it cannot be matched as variadic.
+        $name = $this->callableSimpleName($call);
+        if ($name === null) {
+            // A dynamic or expression callee cannot be resolved to a declaration, so it cannot be matched as variadic.
             return false;
         }
 
-        // True only when this exact method name was recorded as variadic earlier in the same file.
-        return isset($variadicMethodNames[strtolower($call->name->toString())]);
+        // True only when this exact callable name was recorded as variadic earlier in the same file.
+        return isset($variadicNames[strtolower($name)]);
+    }
+
+    /**
+     * Extract the simple callee name from a supported call expression.
+     *
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Call whose callee name is needed.
+     *
+     * @return string|null - Simple callee name, or null when the callee is dynamic.
+     */
+    private function callableSimpleName(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): ?string
+    {
+        if ($call instanceof Expr\FuncCall) {
+            return $call->name instanceof Node\Name ? $call->name->getLast() : null;
+        }
+
+        return $call->name instanceof Node\Identifier ? $call->name->toString() : null;
     }
 }

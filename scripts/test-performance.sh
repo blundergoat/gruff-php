@@ -57,7 +57,7 @@ ${BOLD}Actions${RESET}
 
 ${BOLD}Selection${RESET}
   --corpus=NAME         small | medium | large | external | all. Default: all (full) or medium (quick).
-                        small    = src/Diff               (5 files, warmup-sized)
+                        small    = src/Results/Diff       (7 files, warmup-sized)
                         medium   = src                    (production code)
                         large    = full self-scan         (everything per .gruff.yaml)
                         external = scan a third-party path set via
@@ -148,7 +148,7 @@ done
 
 corpus_paths() {
     case "$1" in
-        small)    echo "src/Diff" ;;
+        small)    echo "src/Results/Diff" ;;
         medium)   echo "src" ;;
         large)    echo "" ;;
         external) echo "$EXTERNAL_PATH" ;;

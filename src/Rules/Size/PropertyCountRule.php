@@ -165,12 +165,33 @@ final readonly class PropertyCountRule implements RuleInterface
         }
 
         foreach ($classLike->getMethods() as $method) {
-            if ($method->name->toString() !== '__construct' && count($method->params) > 0) {
+            if ($method->name->toString() === '__construct') {
+                continue;
+            }
+
+            // A data carrier only exposes parameterless value accessors; a method that takes input or returns
+            // nothing is behaviour, so the class is a service whose property count keeps its configured severity.
+            if (count($method->params) > 0 || $this->isBehaviourMethod($method)) {
                 return false;
             }
         }
 
         return true;
+    }
+
+    /**
+     * Decide whether a non-constructor method performs behaviour rather than expose state.
+     *
+     * @param ClassMethod $method - Parameterless method to classify.
+     *
+     * @return bool - True when the method returns nothing and therefore acts rather than accesses state.
+     */
+    private function isBehaviourMethod(ClassMethod $method): bool
+    {
+        $returnType = $method->returnType;
+
+        return $returnType instanceof Node\Identifier
+            && in_array(strtolower($returnType->name), ['void', 'never'], true);
     }
 
     /**
