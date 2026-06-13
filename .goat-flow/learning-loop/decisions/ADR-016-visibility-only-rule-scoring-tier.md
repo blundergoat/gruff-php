@@ -2,7 +2,10 @@
 
 **Status:** Accepted
 **Date:** 2026-05-27
-**Ticket/Context:** Reviewer report section 13a (`.goat-flow/scratchpad/gruff-php-improvement-feedback.md`) flagged the gap between "rule is informational" and "rule should run at all". The only escape valve today is `enabled: false`, which loses visibility entirely. The composite score is dominated by a few high-volume rules even when the team has decided those rules' findings should not penalise the grade.
+
+## Context
+
+Reviewer report section 13a (`.goat-flow/scratchpad/gruff-php-improvement-feedback.md`) flagged the gap between "rule is informational" and "rule should run at all". The only escape valve today is `enabled: false`, which loses visibility entirely. The composite score is dominated by a few high-volume rules even when the team has decided those rules' findings should not penalise the grade.
 
 ## Decision
 

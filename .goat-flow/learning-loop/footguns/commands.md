@@ -73,7 +73,7 @@ Before v0.4.0, `src/Cli/Command/MissingConfigPrompt.php` (search: `!$input->isIn
 
 **Evidence:** ACTUAL_MEASURED 2026-06-10, PHP 8.3.30. In a config-less git repo, `sleep 20 | timeout 8 php bin/gruff-php analyse --format json X.php` exited 124 on the prompt; adding `-n` completed. `printf 'y\n' | php bin/gruff-php analyse --format json X.php` accepted the prompt and wrote `.gruff-php.yaml`.
 
-**Resolution:** `src/Cli/Command/MissingConfigPrompt.php` (search: `shouldSkipForInput`) now skips the prompt for machine-readable formats and for the real STDIN non-TTY case when Symfony has no explicit test stream. `src/Cli/Command/ReportCommand.php` (search: `'--no-interaction'`) also forwards non-interaction to its child analyse process.
+**Resolution:** `src/Cli/Command/MissingConfigPrompt.php` (search: `hasAnswerableInput`) now skips the prompt for machine-readable formats and for the real STDIN non-TTY case when Symfony has no explicit test stream. `src/Cli/Command/ReportCommand.php` (search: `'--no-interaction'`) also forwards non-interaction to its child analyse process.
 
 **Prevention:** Do not rely on `InputInterface::isInteractive()` alone for prompt safety. Any command that can emit machine-readable output or run under hooks/jobs must either pass `-n`/`--no-interaction`, provide an explicit stream test seam, or check real TTY state before prompting.
 

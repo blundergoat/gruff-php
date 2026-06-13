@@ -1,8 +1,8 @@
 # ADR-021 - Config presets and `extends:` inheritance
 
-- Status: Accepted
-- Date: 2026-05-30
-- Relates to: ADR-017 (mission: gruff must be easy to adopt as a coding-agent hook)
+**Status:** Accepted
+**Date:** 2026-05-30
+**Relates to:** ADR-017 (mission: gruff must be easy to adopt as a coding-agent hook)
 
 ## Context
 
