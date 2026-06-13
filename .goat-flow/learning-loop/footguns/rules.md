@@ -9,9 +9,9 @@ last_reviewed: 2026-06-14
 
 **Status:** active | **Created:** 2026-05-19 | **Evidence:** OBSERVED
 
-Five rules (`NestingDepthRule`, `NpathComplexityRule`, `CognitiveComplexityRule`, `RedundantVariableRule`, `UnreachableCodeRule`) share `src/Rule/StmtChildVisitor.php` (search: `childBlocks`) for child-block enumeration. If PHP adds a new control-flow construct (a future statement-form of `match`, an `using`-style block, etc.) and the helper is not updated, all five rules silently miss the new shape — their per-kind logic just never runs on the unknown statement type. The pre-consolidation pattern was to copy a 4-block `instanceof` chain into each rule; the helper exists precisely so that mistake can't be made one rule at a time.
+Five rules (`NestingDepthRule`, `NpathComplexityRule`, `CognitiveComplexityRule`, `RedundantVariableRule`, `UnreachableCodeRule`) share `src/Rules/Shared/StmtChildVisitor.php` (search: `childBlocks`) for child-block enumeration. If PHP adds a new control-flow construct (a future statement-form of `match`, an `using`-style block, etc.) and the helper is not updated, all five rules silently miss the new shape — their per-kind logic just never runs on the unknown statement type. The pre-consolidation pattern was to copy a 4-block `instanceof` chain into each rule; the helper exists precisely so that mistake can't be made one rule at a time.
 
-**Evidence:** `src/Rule/StmtChildVisitor.php` (search: `isControlFlowStmt`) — the supported statement-type set is fixed in one place. `tests/Rule/StmtChildVisitorTest.php` (search: `testControlFlowStatementIsRecognised`) asserts the set, so adding a new statement type without updating the helper fails the test.
+**Evidence:** `src/Rules/Shared/StmtChildVisitor.php` (search: `isControlFlowStmt`) — the supported statement-type set is fixed in one place. `tests/Rule/StmtChildVisitorTest.php` (search: `testControlFlowStatementIsRecognised`) asserts the set, so adding a new statement type without updating the helper fails the test.
 
 **Prevention:** When a new control-flow statement type lands in this codebase, extend `StmtChildVisitor::isControlFlowStmt` and `StmtChildVisitor::childBlocks`, then add a kind constant on `StmtChildBlock` and the matching dispatch in any rule that needs per-kind math. Never re-introduce a per-rule `instanceof Stmt\X || Stmt\Y || ...` chain — the duplication that the helper exists to prevent.
 
@@ -19,7 +19,7 @@ Five rules (`NestingDepthRule`, `NpathComplexityRule`, `CognitiveComplexityRule`
 
 **Status:** active | **Created:** 2026-05-11 | **Evidence:** OBSERVED
 
-Rule heuristics that search a whole docblock or AST subtree can attribute nested syntax to the wrong owner. `src/Rule/Docs/MissingParamTagRule.php` (search: `extractParamNames`) must parse the parameter variable from the whole `@param` line because generic PHPDoc types can contain spaces, and descriptive docblocks without tags still need to count as method-contract docs. `src/Rule/TestQuality/MockWithoutExpectationRule.php` (search: `isMockCreationExpression`) must decide whether the assigned expression itself creates a mock, not whether any nested constructor argument or helper call creates one.
+Rule heuristics that search a whole docblock or AST subtree can attribute nested syntax to the wrong owner. `src/Rules/Docs/MissingParamTagRule.php` (search: `extractParamNames`) must parse the parameter variable from the whole `@param` line because generic PHPDoc types can contain spaces, and descriptive docblocks without tags still need to count as method-contract docs. `src/Rules/TestQuality/MockWithoutExpectationRule.php` (search: `isMockCreationExpression`) must decide whether the assigned expression itself creates a mock, not whether any nested constructor argument or helper call creates one.
 
 **Prevention:** Add regression fixtures for the exact syntax shape that caused the false positive or false negative. For PHPDoc rules, include generics or array shapes with spaces before the parameter variable, plus one-line descriptive docblocks that should require full contract tags. For AST ownership rules, include a fake or value object whose constructor receives a mock/stub so nested mock creation does not get assigned to the outer variable.
 
@@ -27,7 +27,7 @@ Rule heuristics that search a whole docblock or AST subtree can attribute nested
 
 **Status:** active | **Created:** 2026-05-11 | **Evidence:** OBSERVED
 
-`src/Rule/Docs/MissingPublicPhpdocRule.php` (search: `docs.missing-public-phpdoc`) keeps the historical rule ID for output compatibility, but the rule now requires local PHPDoc on every method declaration, including public, protected, private, abstract, accessor, magic, helper, reporter, and interface implementation methods. Agents must not infer that only public methods are checked from the ID or class name.
+`src/Rules/Docs/MissingPublicPhpdocRule.php` (search: `docs.missing-public-phpdoc`) keeps the historical rule ID for output compatibility, but the rule now requires local PHPDoc on every method declaration, including public, protected, private, abstract, accessor, magic, helper, reporter, and interface implementation methods. Agents must not infer that only public methods are checked from the ID or class name.
 
 **Prevention:** When changing rule semantics, update `RuleDefinition` names, config comments, docs, tests, and golden fixtures together while preserving rule IDs only when output compatibility requires it. Regression tests should assert representative methods across all visibilities so the compatibility name cannot silently narrow behavior again.
 
@@ -35,7 +35,7 @@ Rule heuristics that search a whole docblock or AST subtree can attribute nested
 
 **Status:** active | **Created:** 2026-05-11 | **Evidence:** OBSERVED
 
-`src/Rule/Waste/UnusedParameterRule.php` (search: `analysableNodes`) originally checked standalone functions and private methods only, so a concrete public method like an external healthcare target's `VoiceTraceLogger::trace()` could carry an ignored `$detailed` parameter without any `waste.unused-parameter` finding. The same rule also counted direct `unset($detailed)` as a parameter use even though it is only a placeholder/silencer, not a read of the argument.
+`src/Rules/Waste/UnusedParameterRule.php` (search: `analysableNodes`) originally checked standalone functions and private methods only, so a concrete public method like an external healthcare target's `VoiceTraceLogger::trace()` could carry an ignored `$detailed` parameter without any `waste.unused-parameter` finding. The same rule also counted direct `unset($detailed)` as a parameter use even though it is only a placeholder/silencer, not a read of the argument.
 
 **Prevention:** For waste/dead-code rules, make the conservative boundary explicit in tests and include at least one locally owned public method fixture plus one contract/override fixture. Treat direct `unset($param)` as non-use when the rule's question is "does the method actually consume this argument?" and use finding columns or metadata when multiple same-line findings can otherwise share a fingerprint.
 
@@ -43,7 +43,7 @@ Rule heuristics that search a whole docblock or AST subtree can attribute nested
 
 **Status:** active | **Created:** 2026-05-11 | **Evidence:** OBSERVED
 
-Constructor-promoted properties are represented as `Node\Param` entries with visibility flags, not as `Stmt\Property` declarations. `src/Rule/DeadCode/UnusedPrivatePropertyRule.php` (search: `privateProperties`) originally collected only `Stmt\Property`, so promoted private readonly fields such as an external healthcare target's `VoiceTraceLogger::$appConfigHelper` and `VoiceTraceLogger::$twilioParams` were invisible to the "written but never read" check.
+Constructor-promoted properties are represented as `Node\Param` entries with visibility flags, not as `Stmt\Property` declarations. `src/Rules/DeadCode/UnusedPrivatePropertyRule.php` (search: `privateProperties`) originally collected only `Stmt\Property`, so promoted private readonly fields such as an external healthcare target's `VoiceTraceLogger::$appConfigHelper` and `VoiceTraceLogger::$twilioParams` were invisible to the "written but never read" check.
 
 **Prevention:** Any rule that scans properties must include promoted constructor parameters in fixtures and treat private promoted params as property declarations with an initial write. Also include a used promoted private property and a public promoted property fixture so the rule proves both detection and visibility boundaries.
 
@@ -51,7 +51,7 @@ Constructor-promoted properties are represented as `Node\Param` entries with vis
 
 **Status:** active | **Created:** 2026-05-24 | **Evidence:** OBSERVED
 
-`src/Rule/Naming/BooleanPrefixRule.php` (search: `allowedPrefixes`) checks that bool-returning methods, bool parameters, and bool properties *begin* with one of the configured prefixes (default `is`, `has`, `can`, `should`, `will`). Names that merely contain a prefix later in the identifier still fail. `ConfigLoader::projectHasConfig()` was flagged on its first cut because `has` appeared in the middle of the name; renaming to `hasProjectConfig()` cleared the rule. The same trap fires for parameters: `$shouldForce` passes, `$force` and `$forceShould` both fail.
+`src/Rules/Naming/BooleanPrefixRule.php` (search: `allowedPrefixes`) checks that bool-returning methods, bool parameters, and bool properties *begin* with one of the configured prefixes (default `is`, `has`, `can`, `should`, `will`). Names that merely contain a prefix later in the identifier still fail. `ConfigLoader::projectHasConfig()` was flagged on its first cut because `has` appeared in the middle of the name; renaming to `hasProjectConfig()` cleared the rule. The same trap fires for parameters: `$shouldForce` passes, `$force` and `$forceShould` both fail.
 
 **Prevention:** When adding any bool-returning method, bool parameter, or bool property, put the prefix first. For names that read naturally with the subject before the verb (`projectHasConfig`, `userIsActive`), rephrase as prefix-first (`hasProjectConfig`, `isActiveUser`) or rename the subject out (`hasConfig` on a class already scoped to a project). The rule does not parse English — "name contains a prefix" is not enough; the leading token must be a configured prefix.
 
@@ -67,7 +67,7 @@ Constructor-promoted properties are represented as `Node\Param` entries with vis
 
 **Status:** active | **Created:** 2026-05-25 | **Evidence:** OBSERVED
 
-The rule registry's true count lives only in `src/Rule/RuleRegistry.php` (the `NAMING_RULE_PRIORITY` constant plus the public registration block), but human-readable counts of the same facts are stamped in five other artefacts that don't auto-update. The five stamp locations are:
+The rule registry's true count lives only in `src/Rules/RuleRegistry.php` (the `NAMING_RULE_PRIORITY` constant plus the public registration block), but human-readable counts of the same facts are stamped in five other artefacts that don't auto-update. The five stamp locations are:
 
 ```text
 README.md                       — quality-table line ("Rule catalogue")
@@ -79,7 +79,7 @@ docs/rules.md                   — per-pillar section heading  ### `naming` (N)
 
 PR #6 retired `naming.parameter-type-name`, dropping the registry count from 120 → 119 and the naming-pillar count from 12 → 11. The PR updated the `docs/rules.md` pillar tally but missed the other four stamps. CodeRabbit's outside-diff sweep caught two of the four (the `docs/rules.md` section heading and the `architecture.md` prose); the two README stamps weren't in the PR's touched-file set so neither AI reviewer surfaced them.
 
-**Prevention:** When retiring or adding a rule, after editing `src/Rule/RuleRegistry.php` run a sweep over the five stamp locations above. Greppable form:
+**Prevention:** When retiring or adding a rule, after editing `src/Rules/RuleRegistry.php` run a sweep over the five stamp locations above. Greppable form:
 
 ```bash
 grep -rn 'exposes [0-9]* rule\|Rule catalogue\|^|`naming`\|^### `naming` (' \
@@ -92,7 +92,7 @@ Update every hit before claiming retirement done; do not rely on a single PR rev
 
 **Status:** active | **Created:** 2026-05-27 | **Evidence:** OBSERVED
 
-`src/Rule/Modernisation/PhpDocMixedOveruseRule.php` (search: `isPreciseArrayShape`) exempts `array{...}` shapes that name at least one sibling field with a non-mixed type, on the basis that the nested `mixed` describes a heterogeneous leaf inside a typed envelope. The naive form of this rule — "any nested mixed inside any parametric type is fine" — silently exempts `array<string|int, mixed>` (mixed-keyed bag), `Collection<mixed>` (single-leaf generic), and `array{value: mixed}` (single-mixed-field shape), all of which are genuine type sloppiness the rule should keep flagging. The discriminator is "is there at least one CONCRETE sibling field?"; without it the exemption swallows real signal.
+`src/Rules/Modernisation/PhpDocMixedOveruseRule.php` (search: `isPreciseArrayShape`) exempts `array{...}` shapes that name at least one sibling field with a non-mixed type, on the basis that the nested `mixed` describes a heterogeneous leaf inside a typed envelope. The naive form of this rule — "any nested mixed inside any parametric type is fine" — silently exempts `array<string|int, mixed>` (mixed-keyed bag), `Collection<mixed>` (single-leaf generic), and `array{value: mixed}` (single-mixed-field shape), all of which are genuine type sloppiness the rule should keep flagging. The discriminator is "is there at least one CONCRETE sibling field?"; without it the exemption swallows real signal.
 
 **Evidence:** External reviewer report section 7 (`.goat-flow/scratchpad/gruff-php-improvement-feedback.md`). The reviewer's original phrasing was "nested mixed inside any parametric type should be fine"; applied literally that exempts `Collection<mixed>` which is clearly not a precise envelope. The implemented rule reads the array-shape body, splits on top-level commas (depth-aware via `splitTopLevelComma`), finds the first top-level colon per pair (depth-aware via `topLevelColonIndex`), and returns true only when at least one pair's value type is NOT exactly `mixed` (case-insensitive). Fixtures at `tests/Fixtures/Modernisation/phpdoc-mixed-overuse.php` `preciseArrayShape*` cover both directions.
 
@@ -103,11 +103,11 @@ Update every hit before claiming retirement done; do not rely on a single PR rev
 **Status:** active | **Created:** 2026-06-01 | **Evidence:** OBSERVED
 
 `docs.return-comment` only needs to know whether an `@return` tag has prose after the type, and
-`src/Rule/Docs/PhpdocTagText.php` (search: `returnTagBody`) now reads multiline array-shape tags
+`src/Rules/Docs/PhpdocTagText.php` (search: `returnTagBody`) now reads multiline array-shape tags
 through their closing line. That made comments such as `@return array{ ... } - description` clear
 the gruff rule, but PHPStan treats the whole structural tag body as type syntax; prose after the
-closing `}` produced `phpDoc.parseError` in `src/Command/ListRulesCommand.php` (search:
-`ruleDetailPayload`) and `src/Source/SourceDiscovery.php` (search: `buildGitDiscoveryRequest`),
+closing `}` produced `phpDoc.parseError` in `src/Cli/Command/ListRulesCommand.php` (search:
+`ruleDetailPayload`) and `src/Engine/Source/SourceDiscovery.php` (search: `buildGitDiscoveryRequest`),
 which then cascaded into `missingType.iterableValue` and `argument.type` errors.
 
 **Prevention:** For multiline precise array shapes, keep the human-facing `@return` tag broad and
@@ -122,7 +122,7 @@ alias name from its type body across physical lines; `tests/Mutation/InfectionRe
 
 **Status:** active | **Created:** 2026-06-04 | **Evidence:** OBSERVED
 
-PHP resolves method names case-insensitively but property names case-sensitively: `method_exists($c, 'RENDER')` is true for a declared `render()`, yet `property_exists($c, 'LABEL')` is false for a declared `$label`. A rule that indexes or looks up member names with a single `strtolower()` for both buckets mis-handles properties. `src/Rule/TestQuality/StaticAnalysisRedundantTestRule.php` (search: `memberCandidate`) originally lowercased both the declaration key and the asserted member, so `assertTrue(property_exists(Foo::class, 'LABEL'))` against a `$label` property — a test that actually fails at runtime — was reported as a static-analysis-redundant candidate, steering users to delete a test that was catching a real case typo.
+PHP resolves method names case-insensitively but property names case-sensitively: `method_exists($c, 'RENDER')` is true for a declared `render()`, yet `property_exists($c, 'LABEL')` is false for a declared `$label`. A rule that indexes or looks up member names with a single `strtolower()` for both buckets mis-handles properties. `src/Rules/TestQuality/StaticAnalysisRedundantTestRule.php` (search: `memberCandidate`) originally lowercased both the declaration key and the asserted member, so `assertTrue(property_exists(Foo::class, 'LABEL'))` against a `$label` property — a test that actually fails at runtime — was reported as a static-analysis-redundant candidate, steering users to delete a test that was catching a real case typo.
 
 **Evidence:** PR #8 review (Codex P2, "Preserve property-name case in redundant-test matching"). Reproduction: a fixture with `public string $label` plus `assertTrue(property_exists(Widget::class, 'LABEL'))` was flagged pre-fix and is not flagged post-fix, while `method_exists(Widget::class, 'RENDER')` stays flagged. The fix indexes properties by their declared name (search: `PHP property names are case-sensitive, so index by the declared name as-is`) and keeps methods lowercased (search: `PHP resolves method names case-insensitively`); `memberCandidate` chooses the lookup key by member kind.
 
@@ -132,7 +132,7 @@ PHP resolves method names case-insensitively but property names case-sensitively
 
 **Status:** active | **Created:** 2026-06-04 | **Evidence:** OBSERVED
 
-`NodeIndex::nodesOfAny`/`nodesOf` return matches from a full preorder walk of the whole unit — `src/Rule/NodeIndex.php` (search: `traverse($analysisUnit->statements)`) visits every descendant, so a query for `Stmt\Class_`/`Interface_`/`Trait_`/`Enum_` also returns class-likes declared inside functions, methods, `if` blocks, and other conditionals. PHP does not register those symbols until the enclosing path runs (`class_exists(Foo::class, false)` is false before a nested `class Foo {}` executes), so a rule that treats every indexed declaration as "statically guaranteed to exist" over-claims. `src/Rule/TestQuality/StaticAnalysisRedundantTestRule.php` (search: `topLevelClassLikes`) hit this: a `class` declared inside `if (!class_exists(...)) { ... }` (a common polyfill shape) was treated as proven, so an `assertTrue(class_exists(...))` that genuinely tests the runtime branch was flagged as redundant.
+`NodeIndex::nodesOfAny`/`nodesOf` return matches from a full preorder walk of the whole unit — `src/Rules/Shared/NodeIndex.php` (search: `traverse($analysisUnit->statements)`) visits every descendant, so a query for `Stmt\Class_`/`Interface_`/`Trait_`/`Enum_` also returns class-likes declared inside functions, methods, `if` blocks, and other conditionals. PHP does not register those symbols until the enclosing path runs (`class_exists(Foo::class, false)` is false before a nested `class Foo {}` executes), so a rule that treats every indexed declaration as "statically guaranteed to exist" over-claims. `src/Rules/TestQuality/StaticAnalysisRedundantTestRule.php` (search: `topLevelClassLikes`) hit this: a `class` declared inside `if (!class_exists(...)) { ... }` (a common polyfill shape) was treated as proven, so an `assertTrue(class_exists(...))` that genuinely tests the runtime branch was flagged as redundant.
 
 **Evidence:** PR #8 review (Codex P2, "Skip non-top-level declarations for redundant checks"). Reproduction: a conditionally-declared `Conditional` class plus `assertTrue(class_exists(Conditional::class))` was flagged pre-fix and is not flagged post-fix. The fix walks `$analysisUnit->statements` and only collects class-likes at file scope or directly inside a `Stmt\Namespace_` body (search: `topLevelClassLikes`), instead of using the full-AST `NodeIndex` enumeration.
 
@@ -156,6 +156,16 @@ php-parser declares list properties such as `If_::$stmts`, `ClassMethod::$stmts`
 
 **Prevention:** When a rule helper takes a php-parser node-list property (`$node->stmts`, `$node->params`, `$class->items`, …), annotate the parameter `array<Stmt>` / `Stmt[]` — do not narrow the key to `int`. Reserve `array<int, X>` for lists the rule itself builds and re-keys. `composer phpstan` catches the mismatch quickly, but the instinct to write `array<int, …>` for "a list" is the trap.
 
+## Footgun: "Data carrier / value object" detection must classify behaviour by RETURN type, not by parameter presence
+
+**Status:** active | **Created:** 2026-06-14 | **Evidence:** OBSERVED
+
+The size rules treat immutable value objects gently: `src/Rules/Size/PropertyCountRule.php` (search: `isReadonlyDataCarrier`) softens a high property count to advisory for a final readonly data carrier, and `src/Rules/Size/ParameterCountRule.php` (search: `isPromotedValueObjectConstructor`) exempts a final readonly promoted constructor up to a high ceiling. Both answer "value object or behaviour-carrying service?" by walking the class's non-constructor methods. The trap: treating "a method that takes a parameter" as behaviour over-flags genuine value objects, because value objects legitimately expose param-taking methods that only answer questions about their own state - `with*(x): self` copy-withers, `has*(x): bool` / `equals(other): bool` queries, and static `from*(x): self` factories. A first cut used `count($method->params) > 0 || isBehaviourMethod($method)` and mis-classified the project's OWN value objects `Finding`, `AnalysisReport`, and `AnalyseCommandOptions` as services (they expose `hasFindingsAtSeverity(Severity): bool`, `withMutationBudget(?int): self`, etc.), producing 3 `size.parameter-count` errors on a full self-scan.
+
+**Evidence:** Both rules now disqualify only on the RETURN shape via `isBehaviourMethod` (search: `isBehaviourMethod`): a method is a command/behaviour when it returns `void`/`never` or is untyped (`returnType === null`), because a value object's methods always return a value. Fixtures `tests/Fixtures/Size/readonly-service-constructor.php` (a `void` command) and `tests/Fixtures/Size/readonly-carrier-with-behaviour.php` (an untyped method) lock the service shape, while `tests/Fixtures/Size/promoted-payload.php` (a pure DTO) stays exempt. The over-broad params-based check was caught by the full-project self-scan flagging the project's own DTOs, NOT by any unit test.
+
+**Prevention:** Any "is this a value object / data carrier?" heuristic must classify behaviour by what a method RETURNS (a command returns nothing or is untyped), never by whether it takes a parameter. Add a fixture for a value object with a param-taking query/wither/factory method and assert it stays exempt, plus a void/untyped-command fixture that does not. Accept the inherent limit: a service whose methods all return typed values is shape-indistinguishable from a value object and stays exempt - that is a deliberate non-guess, not a bug.
+
 ## Resolved Entries
 
 ## Footgun: Project rules need full project context, not `--changed-only`
@@ -164,7 +174,7 @@ php-parser declares list properties such as `If_::$stmts`, `ClassMethod::$stmts`
 
 `design.single-implementor-interface` is a `ProjectRuleInterface` (M31, see `.goat-flow/learning-loop/decisions/ADR-003-project-rule-seam.md`). It can only count implementations and external type-hint usages from the units it actually receives. Under the old `gruff-php analyse --diff-vs=<base> --changed-only` path, the unit list was the diff's changed files, not the full project. A single-implementor interface whose implementor was in an unchanged file disappeared from the project rule's view, so the rule emitted zero findings on the diff even though a full-project scan would flag the interface. Observed during M31 dogfood: gruff scanned with `--diff-vs=deploy --changed-only` on an external healthcare target branch reported `0` design.single-implementor-interface findings; a full `src` scan on the same branch reported 7.
 
-**Resolution:** `src/Command/AnalyseCommand.php` (search: `projectContextUnits`) now loads full current/base project context for enabled project rules in changed-only branch review mode, while `src/Rule/RuleRegistry.php` (search: `$projectUnits ?? $units`) keeps file-scoped rules on the narrowed unit list. The reported findings are still filtered back to changed files. `tests/Review/AgentWorkflowCliTest.php` (search: `testBranchReviewChangedOnlyUsesFullProjectContextForProjectRules`) locks the bug shape where only the interface file changes and its implementor is unchanged.
+**Resolution:** `src/Cli/Command/AnalyseCommand.php` (search: `projectContextUnits`) now loads full current/base project context for enabled project rules in changed-only branch review mode, while `src/Rules/RuleRegistry.php` (search: `$projectUnits ?? $units`) keeps file-scoped rules on the narrowed unit list. The reported findings are still filtered back to changed files. `tests/Review/AgentWorkflowCliTest.php` (search: `testBranchReviewChangedOnlyUsesFullProjectContextForProjectRules`) locks the bug shape where only the interface file changes and its implementor is unchanged.
 
 **Prevention:** Keep any future `ProjectRuleInterface` tests paired with a `--diff-vs --changed-only` review fixture where the changed file depends on unchanged project context. Do not route project-level rules through a changed-file-only unit list unless the rule explicitly documents partial-context semantics.
 
@@ -188,7 +198,7 @@ Until `SourceDiscovery::IGNORED_FILENAMES` was added, well-known lockfiles with 
 
 **Status:** resolved | **Created:** 2026-05-27 | **Resolved:** 2026-05-27 | **Evidence:** OBSERVED
 
-`src/Rule/Modernisation/ReadonlyPropertyCandidateRule.php` (search: `lateAssignments`) called `ModernisationNodeHelper::propertyFetchName($assign->var)` directly. For `$this->messages[] = $x`, `$this->messages['k'] = $x`, and `unset($this->messages['k'])`, the AST shape is `Expr\ArrayDimFetch` wrapping the `$this` `PropertyFetch` (or `Stmt\Unset_` entirely outside the `Expr\Assign::class` set), so the helper returned null and the rule treated the property as never mutated late — emitting a readonly candidacy finding even though applying the suggested `readonly` modifier would crash at runtime on the very next array-write. Reviewer cited a real-world hit on a Symfony 6.4 `ChatAssistantSession::appendUserMessage()`-style class.
+`src/Rules/Modernisation/ReadonlyPropertyCandidateRule.php` (search: `lateAssignments`) called `ModernisationNodeHelper::propertyFetchName($assign->var)` directly. For `$this->messages[] = $x`, `$this->messages['k'] = $x`, and `unset($this->messages['k'])`, the AST shape is `Expr\ArrayDimFetch` wrapping the `$this` `PropertyFetch` (or `Stmt\Unset_` entirely outside the `Expr\Assign::class` set), so the helper returned null and the rule treated the property as never mutated late — emitting a readonly candidacy finding even though applying the suggested `readonly` modifier would crash at runtime on the very next array-write. Reviewer cited a real-world hit on a Symfony 6.4 `ChatAssistantSession::appendUserMessage()`-style class.
 
 **Evidence:** External reviewer report at `.goat-flow/scratchpad/gruff-php-improvement-feedback.md` section 2. Reproduction: a final class with `private array $messages;`, constructor `$this->messages = []`, and `$this->messages[] = $x` in a later method produced a readonly candidate finding pre-fix and produces zero findings post-fix.
 
