@@ -1,6 +1,6 @@
 ---
 category: rules
-last_reviewed: 2026-06-04
+last_reviewed: 2026-06-14
 ---
 
 # Rule Footguns
@@ -137,6 +137,24 @@ PHP resolves method names case-insensitively but property names case-sensitively
 **Evidence:** PR #8 review (Codex P2, "Skip non-top-level declarations for redundant checks"). Reproduction: a conditionally-declared `Conditional` class plus `assertTrue(class_exists(Conditional::class))` was flagged pre-fix and is not flagged post-fix. The fix walks `$analysisUnit->statements` and only collects class-likes at file scope or directly inside a `Stmt\Namespace_` body (search: `topLevelClassLikes`), instead of using the full-AST `NodeIndex` enumeration.
 
 **Prevention:** When a rule needs declarations that PHP registers unconditionally (top-level symbols, "this type definitely exists"), do not enumerate them via `NodeIndex` — it has no scope filter. Collect them from `$analysisUnit->statements` plus each `Stmt\Namespace_::$stmts` directly, which excludes function/method/conditional bodies. `NodeIndex` stays correct for "find every node of this shape anywhere" queries (most rules); the trap is specifically assuming its results are top-level.
+
+## Footgun: Same-class callable-array detection must include `[__CLASS__, 'method']`, not just `$this`/`self::class`/`static::class`/`Class::class`
+
+**Status:** active | **Created:** 2026-06-14 | **Evidence:** OBSERVED
+
+`src/Rules/DeadCode/UnusedPrivateMethodRule.php` (search: `isCallableReference`) treats a private method as used when it appears in a callable array `[$this, 'm']`, `[self::class, 'm']`, `[static::class, 'm']`, or `[ClassName::class, 'm']`. The `__CLASS__` magic constant parses to `Node\Scalar\MagicConst\Class_` — NOT an `Expr\ClassConstFetch` — so a `ClassConstFetch`-only check silently misses `[__CLASS__, 'm']`, even though it is semantically identical to `[self::class, 'm']` (both name the defining class). `array(__CLASS__, 'method')` is a common WordPress/static-callback idiom: a final pre-ship scan of the dogfood corpora flagged 10 genuinely-used private methods as unused — 4 in woocommerce, 6 in jetpack, 0 in the Symfony-based shopware/mautic — e.g. `WC_Meta_Box_Product_Data::product_data_tabs_sort()`, used via `uasort( $tabs, array( __CLASS__, 'product_data_tabs_sort' ) )`.
+
+**Evidence:** Fix accepts `$first instanceof Node\Scalar\MagicConst\Class_` (search: `names the defining class`). Regression case at `tests/Fixtures/DeadCode/unused-private-method.php` (search: `comparePromptRowsByType`) is referenced only via `usort($rows, [__CLASS__, 'comparePromptRowsByType'])`; `tests/Rule/DeadCode/DeadCodeRulesTest.php` (search: `comparePromptRowsByType`) asserts it is not flagged, and the file's `assertCount(2)` would become 3 without the fix. `get_class($this)` and `get_called_class()` callable forms produced 0 corpus false positives, so they are deliberately not handled.
+
+**Prevention:** The canonical same-class callable set any callable-aware rule must accept is `[$this, …]`, `[self::class, …]`, `[static::class, …]`, `[ClassName::class, …]` (FQ-compared), and `[__CLASS__, …]`. When adding or reviewing a rule that treats array callables as references (dead-code, first-class-callable, hook detection), include a `[__CLASS__, 'method']` fixture — `MagicConst\Class_` is the easy form to miss because it shares no node type with `Foo::class`.
+
+## Footgun: php-parser node-list properties type as `array<Stmt>` (int|string keys), so PHPStan L10 rejects an `array<int, Stmt>` parameter
+
+**Status:** active | **Created:** 2026-06-14 | **Evidence:** OBSERVED
+
+php-parser declares list properties such as `If_::$stmts`, `ClassMethod::$stmts`, and `Class_::$stmts` as `Stmt[]`, which PHPStan reads as `array<Stmt>` (key type `int|string`), not `array<int, Stmt>`. A rule helper that receives such a property and annotates the parameter `@param array<int, Stmt>` fails PHPStan L10 with `argument.type ... expects array<int, Stmt>, array<Stmt> given`. Observed in the guard-clause classifier change: `src/Rules/Complexity/ComplexityShapeClassifier.php` (search: `isEarlyExitBranch`) was first annotated `array<int, Stmt>` and rejected; `array<Stmt>` cleared it.
+
+**Prevention:** When a rule helper takes a php-parser node-list property (`$node->stmts`, `$node->params`, `$class->items`, …), annotate the parameter `array<Stmt>` / `Stmt[]` — do not narrow the key to `int`. Reserve `array<int, X>` for lists the rule itself builds and re-keys. `composer phpstan` catches the mismatch quickly, but the instinct to write `array<int, …>` for "a list" is the trap.
 
 ## Resolved Entries
 

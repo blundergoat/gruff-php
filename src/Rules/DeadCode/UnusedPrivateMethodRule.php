@@ -254,7 +254,7 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
      * @param Expr                $expr - Candidate expression to test for the callable pair.
      * @param Class_|Trait_|Enum_ $classLike - Declaring scope used to match explicit class-name callables.
      *
-     * @return bool - true for same-class `[$this, 'method']` and `[self::class, 'method']` pairs
+     * @return bool - true for same-class `[$this, 'method']`, `[self::class, 'method']`, and `[__CLASS__, 'method']` pairs
      */
     private function isCallableReference(Expr $expr, Class_|Trait_|Enum_ $classLike): bool
     {
@@ -271,6 +271,11 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
         }
 
         if ($first instanceof Expr\Variable && $first->name === 'this') {
+            return true;
+        }
+
+        if ($first instanceof Node\Scalar\MagicConst\Class_) {
+            // `[__CLASS__, 'method']` names the defining class, the same as `[self::class, 'method']`.
             return true;
         }
 

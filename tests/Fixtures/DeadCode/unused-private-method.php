@@ -15,6 +15,7 @@ class UnusedPrivateMethodFixture
     {
         usort($rows, [self::class, 'comparePromptRowsByLabel']);
         usort($rows, [UnusedPrivateMethodFixture::class, 'comparePromptRowsByScore']);
+        usort($rows, [__CLASS__, 'comparePromptRowsByType']);
         $normalise = [$this, 'normalisePromptRow'];
         $format = self::formatPromptRow(...);
         $rows[] = $normalise($rows[0] ?? []);
@@ -36,6 +37,11 @@ class UnusedPrivateMethodFixture
     private static function comparePromptRowsByScore(array $left, array $right): int
     {
         return ((int) ($left['score'] ?? 0)) <=> ((int) ($right['score'] ?? 0));
+    }
+
+    private static function comparePromptRowsByType(array $left, array $right): int
+    {
+        return strcmp((string) ($left['type'] ?? ''), (string) ($right['type'] ?? ''));
     }
 
     private function normalisePromptRow(array $row): array

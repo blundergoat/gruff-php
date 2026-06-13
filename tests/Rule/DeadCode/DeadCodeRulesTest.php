@@ -62,6 +62,7 @@ final class DeadCodeRulesTest extends TestCase
         self::assertNotContains('UnusedPrivateMethodFixture::usedPrivate()', $symbols);
         self::assertNotContains('UnusedPrivateMethodFixture::comparePromptRowsByLabel()', $symbols);
         self::assertNotContains('UnusedPrivateMethodFixture::comparePromptRowsByScore()', $symbols);
+        self::assertNotContains('UnusedPrivateMethodFixture::comparePromptRowsByType()', $symbols);
         self::assertNotContains('UnusedPrivateMethodFixture::normalisePromptRow()', $symbols);
         self::assertNotContains('UnusedPrivateMethodFixture::formatPromptRow()', $symbols);
     }

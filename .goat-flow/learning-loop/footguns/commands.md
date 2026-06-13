@@ -1,6 +1,6 @@
 ---
 category: commands
-last_reviewed: 2026-06-10
+last_reviewed: 2026-06-14
 ---
 
 # CLI Command Footguns
@@ -34,6 +34,22 @@ The default-applied `gruff-baseline.json` matches accepted-debt findings to live
 **Evidence:** PR #8 review (CodeRabbit, "Don't treat an empty discovered-file set as unscoped"). Both callers pass `AnalysisSourceSet::displayPaths()` (search: `displayPaths`), which is empty exactly when the requested paths discovered no files. The fix drops project-rule findings on an empty set (search: `nothing is in scope`) while still returning unchanged when there are simply no project rules to scope. `tests/Command/AnalysisFindingSupportTest.php` (search: `WhenNoFilesDiscovered`) locks the behaviour.
 
 **Prevention:** For any filter whose job is "keep findings inside scope set S", an empty S means "nothing is in scope" → drop the in-scope-only findings, not "no filter" → keep everything. Only return the input unchanged when the FILTER itself is inactive (no rule ids, no allowlist) — a different condition from an empty scope set. When adding a finding filter, write the empty-scope-set case as an explicit test before the happy path; the `=== [] return $findings` shortcut reads as a harmless guard but silently inverts the filter.
+
+## Footgun: The result cache keys on tool version + config + rule set, not rule source, so a rule-LOGIC change does not invalidate cached findings
+
+**Status:** active | **Created:** 2026-06-14 | **Evidence:** OBSERVED
+
+`src/Engine/Cache/AnalysisFingerprint.php` (search: `forRun`) builds the per-file cache key from the resolved config, the enabled rule ids, and the gruff version (search: `toolVersion`, which writes `'version' => $toolVersion`) — never the rule classes' source. This is correct for end users because every release bumps `Application::VERSION`, which invalidates all entries. But while iterating on a rule's logic *within one version* (the common dev/validation loop), re-running `analyse` against a path that already has a warm `.gruff-cache` returns the OLD findings: same file content + same version + same enabled rules hashes to the same key, so the changed rule logic never re-runs. Observed while validating the guard-clause classifier change (later committed as `84d196d`) — a re-scan of a previously-scanned fixture reported the stale `severity: advisory` / `complexityShape: flat-guard-clauses`, while `--no-cache` on the same path reported the corrected `warning` / `branching`. (ADR-020 documents the cache.)
+
+**Prevention:** Pass `--no-cache` whenever you validate a rule-LOGIC change by re-scanning a path that may have a warm cache (your own prior scans, or a repo's checked-in `.gruff-cache`). Unit tests bypass the cache entirely (they call `$rule->analyse(...)` directly), so this only bites CLI/real-repo validation. Do not bump `Application::VERSION` just to bust the cache for dev iteration — `--no-cache` is the right tool; the version bump is for releases.
+
+## Footgun: `.goat-flow/scratchpad` (plus `/logs`, `/tasks`) is a default ignore, so scanning anything under it returns 0 files without `--include-ignored`
+
+**Status:** active | **Created:** 2026-06-14 | **Evidence:** OBSERVED
+
+`src/Engine/Source/PathIgnoreResolver.php` (search: `.goat-flow/scratchpad`) ships `.goat-flow/logs`, `.goat-flow/scratchpad`, and `.goat-flow/tasks` in the built-in default ignore set (agent-workspace dirs). The bundled dogfood corpora live at `.goat-flow/scratchpad/scan-test-repos/{jetpack,mautic,shopware,woocommerce}`, so `analyse .goat-flow/scratchpad/scan-test-repos/shopware/src` parses **0 files** and exits without error — `ignoredPathDetails` reports `source: default, pattern: .goat-flow/scratchpad`. Adding `--include-ignored` parses 7147. `--no-config` does NOT help: these are *default* ignores, not config ignores.
+
+**Prevention:** When scanning the bundled `scan-test-repos` (or anything under `.goat-flow/scratchpad`), pass `--include-ignored`, and target the repo's source subtree (`<repo>/src`, `/app`, `/projects`, `/plugins`) rather than the repo root so the corpus's own `vendor/` stays out. The silent `0 files` exit (no error) is the trap — always confirm `summary.filesParsed > 0` before trusting a real-repo scan.
 
 ## Resolved Entries
 
