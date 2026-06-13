@@ -323,11 +323,11 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
         $symbol = sprintf('%s::%s', $className, $caseName);
 
         $message = $commentKind !== null
-            ? sprintf('Enum case %s has a leading `//` line comment but no PHPDoc - convert to `/** ... */` for tooling consumers.', $symbol)
+            ? sprintf('Enum case %s has a leading non-PHPDoc comment but no PHPDoc - convert it to `/** ... */` for tooling consumers.', $symbol)
             : sprintf('Enum case %s needs a brief intent description above its declaration (one plain-English line; not a restatement of the case name) and the enum itself is undocumented.', $symbol);
 
         $remediation = $commentKind !== null
-            ? sprintf('Promote the existing `//` comment above %s into a `/** ... */` block, or document the enum at the class level.', $symbol)
+            ? sprintf('Promote the existing comment above %s into a `/** ... */` block, or document the enum at the class level.', $symbol)
             : 'Document either each case with a one-line `/** Description. */` block or add a class-level docblock to the enum. The description should answer "what does this case represent and when is it used".';
 
         $metadata = [

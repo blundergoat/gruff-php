@@ -202,7 +202,7 @@ final readonly class BooleanPrefixRule implements RuleInterface
         return [
             new Finding(
                 ruleId:      $definition->id,
-                message:     sprintf('%s returns bool but does not use a boolean prefix (is, has, can, should, will).', $symbol),
+                message:     sprintf('%s returns bool but does not use a recognised boolean prefix.', $symbol),
                 filePath:    $analysisUnit->file->displayPath,
                 line:        $node->getStartLine(),
                 severity:    $definition->defaultSeverity,

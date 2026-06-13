@@ -253,8 +253,40 @@ final readonly class ParameterCountRule implements RuleInterface
             }
         }
 
-        // Every parameter is a typed promoted property on a final readonly class: the value-object shape.
+        foreach ($parent->getMethods() as $method) {
+            if ($method->name->toString() === '__construct') {
+                continue;
+            }
+
+            // A value object only exposes parameterless value accessors; a method that takes input or
+            // returns nothing/untyped is behaviour, so the class is a dependency-carrying service, not a
+            // value object, and its constructor stays on the normal threshold.
+            if (count($method->params) > 0 || $this->isBehaviourMethod($method)) {
+                return false;
+            }
+        }
+
+        // Typed promoted properties on a final readonly class with no behaviour methods: the value-object shape.
         return true;
+    }
+
+    /**
+     * Decide whether a non-constructor method performs behaviour rather than expose state.
+     *
+     * @param ClassMethod $method - Non-constructor method to classify.
+     *
+     * @return bool - True when the method returns nothing or is untyped, so it acts rather than accesses state.
+     */
+    private function isBehaviourMethod(ClassMethod $method): bool
+    {
+        $returnType = $method->returnType;
+
+        if ($returnType === null) {
+            return true;
+        }
+
+        return $returnType instanceof Node\Identifier
+            && in_array(strtolower($returnType->name), ['void', 'never'], true);
     }
 
     /**

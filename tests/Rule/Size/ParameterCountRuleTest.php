@@ -237,6 +237,25 @@ final class ParameterCountRuleTest extends TestCase
     }
 
     /**
+     * Verify a final readonly constructor with a behaviour method is judged as a service, not a value object.
+     *
+     * @return void
+     */
+    public function testReadonlyServiceConstructorWithBehaviourKeepsDefaultErrorSeverity(): void
+    {
+        $findings = $this->analyseWithDefaultSettings('readonly-service-constructor.php', []);
+
+        $constructorFindings = array_values(array_filter(
+                                                $findings,
+                                                static fn($finding) => $finding->symbol === 'ReadonlyServiceConstructorFixture::__construct()',
+                                            ));
+
+        self::assertCount(1, $constructorFindings);
+        self::assertSame(Severity::Error, $constructorFindings[0]->severity);
+        self::assertSame(11, $constructorFindings[0]->metadata['parameters']);
+    }
+
+    /**
      * Verify a promoted readonly DTO above the default ceiling fires with the ceiling-bypass message.
      *
      * @return void

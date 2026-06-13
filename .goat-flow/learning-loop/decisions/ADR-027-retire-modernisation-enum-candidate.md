@@ -26,7 +26,7 @@ This also fits gruff-php's mission: findings should represent code a human can v
 ## Consequences
 
 - `modernisation.enum-candidate` is removed from `RuleRegistry`.
-- `src/Rule/Modernisation/EnumCandidateRule.php` is deleted.
+- `src/Rules/Modernisation/EnumCandidateRule.php` is deleted.
 - `list-rules` no longer reports the rule.
 - `.gruff-php.yaml` generated defaults no longer include the rule.
 - No enum-specific compatibility shim is added. Existing config behaviour still applies: stale `rules.modernisation.enum-candidate` blocks warn and are ignored, while strict selection paths reject unknown rule ids.

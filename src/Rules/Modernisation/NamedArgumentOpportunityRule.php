@@ -138,11 +138,16 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
             return sprintf('%d positional arguments', $positionalCount);
         }
 
-        if ($positionalCount >= 4 && $hasAdjacentAmbiguity) {
+        // Ambiguous calls are flagged one argument earlier than plain calls, but never below 4 (where
+        // adjacency/flag confusion begins) and never below a raised minPositionalArguments floor, so
+        // raising the threshold to suppress shorter calls also suppresses the ambiguity paths.
+        $ambiguityFloor = max(4, $minPositionalArguments - 1);
+
+        if ($positionalCount >= $ambiguityFloor && $hasAdjacentAmbiguity) {
             return sprintf('%d positional arguments with adjacent same-type scalar values', $positionalCount);
         }
 
-        if ($positionalCount >= 4 && $hasBooleanOrNull) {
+        if ($positionalCount >= $ambiguityFloor && $hasBooleanOrNull) {
             return sprintf('%d positional arguments including boolean/null flags', $positionalCount);
         }
 

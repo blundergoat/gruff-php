@@ -109,6 +109,21 @@ final class PropertyCountRuleTest extends TestCase
     }
 
     /**
+     * Verify a readonly class with a behaviour method is judged as a service, not a data carrier.
+     *
+     * @return void
+     */
+    public function testReadonlyClassWithBehaviourMethodKeepsConfiguredSeverity(): void
+    {
+        $findings = $this->analyse('readonly-carrier-with-behaviour.php', ['warning' => 15, 'error' => 25]);
+
+        self::assertCount(1, $findings);
+        self::assertSame('ReadonlyCarrierWithBehaviourFixture', $findings[0]->symbol);
+        self::assertSame('property-count', $findings[0]->metadata['findingKind']);
+        self::assertSame(Severity::Warning, $findings[0]->severity);
+    }
+
+    /**
      * Analyse fixture paths and return findings for assertions.
      *
      * @param string             $fixture - Fixture filename under tests/Fixtures/Size to scan.

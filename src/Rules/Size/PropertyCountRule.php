@@ -184,11 +184,17 @@ final readonly class PropertyCountRule implements RuleInterface
      *
      * @param ClassMethod $method - Parameterless method to classify.
      *
-     * @return bool - True when the method returns nothing and therefore acts rather than accesses state.
+     * @return bool - True when the method returns nothing or is untyped, so it acts rather than accesses state.
      */
     private function isBehaviourMethod(ClassMethod $method): bool
     {
         $returnType = $method->returnType;
+
+        if ($returnType === null) {
+            // No declared return type: we cannot confirm the method only exposes state, so treat it as
+            // behaviour and keep the configured severity rather than the data-carrier downgrade.
+            return true;
+        }
 
         return $returnType instanceof Node\Identifier
             && in_array(strtolower($returnType->name), ['void', 'never'], true);
