@@ -258,10 +258,10 @@ final readonly class ParameterCountRule implements RuleInterface
                 continue;
             }
 
-            // A value object only exposes parameterless value accessors; a method that takes input or
-            // returns nothing/untyped is behaviour, so the class is a dependency-carrying service, not a
-            // value object, and its constructor stays on the normal threshold.
-            if (count($method->params) > 0 || $this->isBehaviourMethod($method)) {
+            // A value object answers questions about its own state (accessors, `with*()` copies, `equals()`),
+            // which all return a value; a method that returns nothing or is untyped is a command, so the class
+            // is a behaviour-carrying service and its constructor stays on the normal threshold.
+            if ($this->isBehaviourMethod($method)) {
                 return false;
             }
         }

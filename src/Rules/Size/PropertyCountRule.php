@@ -169,9 +169,10 @@ final readonly class PropertyCountRule implements RuleInterface
                 continue;
             }
 
-            // A data carrier only exposes parameterless value accessors; a method that takes input or returns
-            // nothing is behaviour, so the class is a service whose property count keeps its configured severity.
-            if (count($method->params) > 0 || $this->isBehaviourMethod($method)) {
+            // A data carrier answers questions about its own state (accessors, `with*()` copies, `equals()`),
+            // which all return a value; a method that returns nothing or is untyped is a command, so the class
+            // is a behaviour-carrying service whose property count keeps its configured severity.
+            if ($this->isBehaviourMethod($method)) {
                 return false;
             }
         }
