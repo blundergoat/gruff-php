@@ -18,11 +18,11 @@ final readonly class ComplexityShapeClassifier
     public const SHAPE_FLAT_GUARD_CLAUSES = 'flat-guard-clauses';
 
     /**
-     * Detect flat validation/hydration flow made of top-level guard clauses.
+     * Detect flat validation flow made of top-level guard clauses that each exit early.
      *
      * @param Stmt\ClassMethod|Stmt\Function_ $node - Function-like node to classify.
      *
-     * @return bool - True when branch count comes from flat guards, not nested decision logic.
+     * @return bool - True when branch count comes from flat early-exit guards, not nested or fall-through branches.
      */
     public static function isFlatGuardClauseFlow(Stmt\ClassMethod|Stmt\Function_ $node): bool
     {
@@ -65,11 +65,11 @@ final readonly class ComplexityShapeClassifier
     }
 
     /**
-     * Check one top-level `if` for the flat guard shape.
+     * Check one top-level `if` for the flat guard shape: no else/elseif, no nested control, and an early exit.
      *
      * @param Stmt\If_ $ifStatement - Candidate top-level if.
      *
-     * @return bool - True when it has no else/elseif and no nested control.
+     * @return bool - True when it has no else/elseif, no nested control, and a branch that exits early.
      */
     private static function isSimpleTopLevelIf(Stmt\If_ $ifStatement): bool
     {
@@ -83,7 +83,35 @@ final readonly class ComplexityShapeClassifier
             }
         }
 
-        return true;
+        return self::isEarlyExitBranch($ifStatement->stmts);
+    }
+
+    /**
+     * Decide whether a guard branch ends by leaving the method early.
+     *
+     * Mirrors the terminator set the unreachable-code analysis uses: a `return`, or an `exit`/`die` or
+     * `throw` expression. A guard clause short-circuits; a branch that does work and falls through is
+     * ordinary branching, so without this check flat fall-through conditionals (for example building an
+     * array) would be mis-tagged as guard clauses and wrongly downgraded below the fail-on threshold.
+     * `break`/`continue` cannot appear at a method body's top level, so they are intentionally excluded.
+     *
+     * @param array<Stmt> $stmts - Statements in the `if` branch body, in source order.
+     *
+     * @return bool - True when the final statement returns, throws, or exits the process.
+     */
+    private static function isEarlyExitBranch(array $stmts): bool
+    {
+        $last = $stmts === [] ? null : $stmts[array_key_last($stmts)];
+
+        if ($last instanceof Stmt\Return_) {
+            return true;
+        }
+
+        if ($last instanceof Stmt\Expression) {
+            return $last->expr instanceof Expr\Exit_ || $last->expr instanceof Expr\Throw_;
+        }
+
+        return false;
     }
 
     /**

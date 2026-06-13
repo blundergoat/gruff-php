@@ -199,9 +199,28 @@ final class CognitiveComplexityRuleTest extends TestCase
         self::assertSame(Severity::Advisory, $bySymbol['GuardClauseComplexityFixture::flatPayloadValidator()']->severity ?? null);
         self::assertSame('flat-guard-clauses', $bySymbol['GuardClauseComplexityFixture::flatPayloadValidator()']->metadata['complexityShape'] ?? null);
         self::assertSame('error', $bySymbol['GuardClauseComplexityFixture::flatPayloadValidator()']->metadata['rawThresholdType'] ?? null);
-        self::assertSame(Severity::Advisory, $bySymbol['GuardClauseComplexityFixture::telemetryBuilder()']->severity ?? null);
         self::assertSame(Severity::Error, $bySymbol['GuardClauseComplexityFixture::nestedBusinessLogic()']->severity ?? null);
         self::assertSame('branching', $bySymbol['GuardClauseComplexityFixture::nestedBusinessLogic()']->metadata['complexityShape'] ?? null);
+    }
+
+    /**
+     * Verify flat fall-through branches that do work (not early-exit guards) keep their branching severity.
+     *
+     * @return void
+     */
+    public function testFlatFallThroughBranchesAreNotDowngradedToAdvisory(): void
+    {
+        $findings = $this->analyse('guard-clauses.php', ['warning' => 4, 'error' => 14]);
+
+        $bySymbol = [];
+        foreach ($findings as $finding) {
+            $bySymbol[$finding->symbol ?? ''] = $finding;
+        }
+
+        // telemetryBuilder is flat but falls through (no return/throw/exit), so it is branching complexity
+        // rather than a guard clause and must not be downgraded to advisory regardless of branch count.
+        self::assertSame(Severity::Warning, $bySymbol['GuardClauseComplexityFixture::telemetryBuilder()']->severity ?? null);
+        self::assertSame('branching', $bySymbol['GuardClauseComplexityFixture::telemetryBuilder()']->metadata['complexityShape'] ?? null);
     }
 
     /**

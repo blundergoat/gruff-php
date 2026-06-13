@@ -117,9 +117,10 @@ the per-rule `options` block; the `allowedSymbols` list is the
 per-project escape hatch for named helpers that intentionally stay thin.
 
 `complexity.cyclomatic` and `complexity.cognitive` keep their raw metric
-values in metadata, but flat validation/hydration flows made of
-top-level guard clauses are reported at advisory severity when they cross
-the configured threshold. Nested decision trees, loops, switch/match
+values in metadata, but flat validation flows made of top-level guard
+clauses that each exit early (return, throw, or exit) are reported at
+advisory severity when they cross the configured threshold. Nested
+decision trees, loops, switch/match
 sprawl, try/catch control flow, and mixed-responsibility methods keep the
 configured warning/error severity.
 
