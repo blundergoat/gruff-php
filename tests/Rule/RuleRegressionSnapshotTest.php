@@ -9,7 +9,6 @@ use GruffPhp\Engine\Config\ConfigLoader;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Engine\Parser\PhpFileParser;
-use GruffPhp\Rules\Complexity\CognitiveComplexityRule;
 use GruffPhp\Rules\Complexity\CyclomaticComplexityRule;
 use GruffPhp\Rules\Complexity\HalsteadVolumeRule;
 use GruffPhp\Rules\Complexity\MaintainabilityIndexRule;

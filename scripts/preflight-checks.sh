@@ -197,7 +197,7 @@ version_consistency_check() {
     # shellcheck disable=SC2016
     php -r '
 $releaseVersion = $argv[1] ?? "";
-$applicationPath = "src/Console/Application.php";
+$applicationPath = "src/Cli/Application.php";
 $changelogPath = "CHANGELOG.md";
 $binaryPath = "bin/gruff-php";
 $errors = [];

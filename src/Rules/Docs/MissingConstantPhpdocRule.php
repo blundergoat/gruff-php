@@ -156,34 +156,25 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
             $requiresApiPhpdoc = $this->requiresPhpdocForApiConstants($statement, $analysisUnit->file->displayPath, $settings);
             $hasUsefulComment  = $meaningfulLocalKind !== null;
 
-            if ($hasUsefulComment && !$requiresApiPhpdoc) {
-                if ($attachedCommentKind !== null && $this->hasGroupLocalComment($statement)) {
-                    $groupCommentKind    = $attachedCommentKind;
-                    $groupCommentEndLine = $statement->getEndLine();
-                } elseif ($groupedCommentKind !== null) {
-                    $groupCommentEndLine = $statement->getEndLine();
-                } else {
-                    $groupCommentKind    = null;
-                    $groupCommentEndLine = null;
+            if (!$hasUsefulComment || $requiresApiPhpdoc) {
+                foreach ($statement->consts as $const) {
+                    $findings[] = $this->classConstantFinding(
+                        $const->name->toString(),
+                        $className,
+                        $statement->getStartLine(),
+                        $definition,
+                        $analysisUnit,
+                        [
+                            'kind'        => $attachedCommentKind ?? $groupedCommentKind,
+                            'useful'      => $hasUsefulComment,
+                            'apiRequired' => $requiresApiPhpdoc,
+                            'grouped'     => $groupedCommentKind !== null,
+                        ],
+                    );
                 }
-
-                continue;
             }
 
-            foreach ($statement->consts as $const) {
-                $findings[] = $this->classConstantFinding(
-                    constantName:       $const->name->toString(),
-                    className:          $className,
-                    line:               $statement->getStartLine(),
-                    definition:         $definition,
-                    analysisUnit:       $analysisUnit,
-                    commentKind:        $attachedCommentKind ?? $groupedCommentKind,
-                    hasUsefulComment:   $hasUsefulComment,
-                    requiresApiPhpdoc:  $requiresApiPhpdoc,
-                    groupedLocalComment: $groupedCommentKind !== null,
-                );
-            }
-
+            // Carry the group-comment state forward once; the emit and skip paths shared this logic.
             if ($hasUsefulComment && $attachedCommentKind !== null && $this->hasGroupLocalComment($statement)) {
                 $groupCommentKind    = $attachedCommentKind;
                 $groupCommentEndLine = $statement->getEndLine();
@@ -206,10 +197,7 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
      * @param int            $line - 1-based line of the `const` statement the finding points the reviewer at.
      * @param RuleDefinition $definition - Rule defaults supplying the id, severity, tier, pillar, and confidence.
      * @param AnalysisUnit   $analysisUnit - Parsed unit whose display path is recorded on the finding.
-     * @param string|null    $commentKind - Attached non-doc comment kind; switches the message to "improve/promote".
-     * @param bool           $hasUsefulComment - Whether a meaningful local comment exists but still fails strict PHPDoc policy.
-     * @param bool           $requiresApiPhpdoc - Whether strict API PHPDoc mode applied to this constant.
-     * @param bool           $groupedLocalComment - Whether the useful comment was inherited from a short constant group.
+     * @param array{kind: ?string, useful: bool, apiRequired: bool, grouped: bool} $comment - Comment classification: the attached/grouped comment kind, whether it is meaningful, whether strict API PHPDoc applies, and whether it was inherited from a short constant group.
      *
      * @return Finding - Finding for an undocumented class constant.
      */
@@ -219,12 +207,12 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
         int $line,
         RuleDefinition $definition,
         AnalysisUnit $analysisUnit,
-        ?string $commentKind,
-        bool $hasUsefulComment,
-        bool $requiresApiPhpdoc,
-        bool $groupedLocalComment,
+        array $comment,
     ): Finding {
-        $symbol = sprintf('%s::%s', $className, $constantName);
+        $symbol            = sprintf('%s::%s', $className, $constantName);
+        $commentKind       = $comment['kind'];
+        $hasUsefulComment  = $comment['useful'];
+        $requiresApiPhpdoc = $comment['apiRequired'];
 
         if ($requiresApiPhpdoc && $hasUsefulComment) {
             $message     = sprintf('Constant %s has a local comment, but this project requires PHPDoc for exported constants.', $symbol);
@@ -252,7 +240,7 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
             $metadata['requiresApiPhpdoc'] = true;
         }
 
-        if ($groupedLocalComment) {
+        if ($comment['grouped']) {
             $metadata['groupedLocalComment'] = true;
         }
 
@@ -305,7 +293,7 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
                 line:           $statement->getStartLine(),
                 definition:     $definition,
                 analysisUnit:   $analysisUnit,
-                commentKind:    $this->localMeaningfulComment($statement),
+                commentKind:    $this->localCommentKind($statement, meaningfulOnly: true),
             );
         }
 
@@ -366,18 +354,6 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
             remediation: $remediation,
             metadata:    $metadata,
         );
-    }
-
-    /**
-     * Detect an immediately attached meaningful non-doc comment.
-     *
-     * @param Node\Stmt $statement - Const or case statement whose attached leading comments are examined.
-     *
-     * @return string|null - comment kind when the statement has useful local documentation, or null when absent/useless
-     */
-    private function localMeaningfulComment(Node\Stmt $statement): ?string
-    {
-        return $this->localCommentKind($statement, meaningfulOnly: true);
     }
 
     /**

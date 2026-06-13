@@ -430,55 +430,13 @@ final readonly class OneLineMethodRule implements RuleInterface
      */
     private function contractMethodIds(AnalysisUnit $analysisUnit): array
     {
-        $interfaceMethods = [];
-        $abstractMethods  = [];
-        $traitMethods     = [];
-        $contractIds      = [];
+        $interfaceMethods = $this->interfaceMethodSets($analysisUnit);
+        $abstractMethods  = $this->abstractClassMethodSets($analysisUnit);
+        $traitMethods     = $this->traitMethodSets($analysisUnit);
 
-        foreach (NodeIndex::nodesOf($analysisUnit, Interface_::class) as $interface) {
-            $name = $interface->name?->toString();
-            if ($name === null) {
-                continue;
-            }
-
-            $interfaceMethods[strtolower($name)] = $this->methodNameSet($interface);
-        }
-
+        $contractIds = [];
         foreach (NodeIndex::nodesOf($analysisUnit, Class_::class) as $class) {
-            $name = $class->name?->toString();
-            if ($name !== null && $class->isAbstract()) {
-                $abstractMethods[strtolower($name)] = $this->abstractMethodNameSet($class);
-            }
-        }
-
-        foreach (NodeIndex::nodesOf($analysisUnit, Trait_::class) as $trait) {
-            $name = $trait->name?->toString();
-            if ($name !== null) {
-                $traitMethods[strtolower($name)] = $this->abstractMethodNameSet($trait);
-            }
-        }
-
-        foreach (NodeIndex::nodesOf($analysisUnit, Class_::class) as $class) {
-            $requiredMethods = [];
-
-            foreach ($class->implements as $interfaceName) {
-                $requiredMethods += $interfaceMethods[strtolower($interfaceName->getLast())] ?? [];
-            }
-
-            if ($class->extends instanceof Name) {
-                $requiredMethods += $abstractMethods[strtolower($class->extends->getLast())] ?? [];
-            }
-
-            foreach ($class->stmts as $stmt) {
-                if (!$stmt instanceof TraitUse) {
-                    continue;
-                }
-
-                foreach ($stmt->traits as $traitName) {
-                    $requiredMethods += $traitMethods[strtolower($traitName->getLast())] ?? [];
-                }
-            }
-
+            $requiredMethods = $this->requiredContractMethods($class, $interfaceMethods, $abstractMethods, $traitMethods);
             if ($requiredMethods === []) {
                 continue;
             }
@@ -491,6 +449,101 @@ final readonly class OneLineMethodRule implements RuleInterface
         }
 
         return $contractIds;
+    }
+
+    /**
+     * Map same-file interface names to their declared method-name sets.
+     *
+     * @param AnalysisUnit $analysisUnit - Parsed unit whose interface declarations are indexed.
+     *
+     * @return array<string, array<string, true>> - Lowercase interface name to its lowercase method-name set.
+     */
+    private function interfaceMethodSets(AnalysisUnit $analysisUnit): array
+    {
+        $sets = [];
+        foreach (NodeIndex::nodesOf($analysisUnit, Interface_::class) as $interface) {
+            $name = $interface->name?->toString();
+            if ($name !== null) {
+                $sets[strtolower($name)] = $this->methodNameSet($interface);
+            }
+        }
+
+        return $sets;
+    }
+
+    /**
+     * Map same-file abstract class names to their abstract method-name sets.
+     *
+     * @param AnalysisUnit $analysisUnit - Parsed unit whose abstract class declarations are indexed.
+     *
+     * @return array<string, array<string, true>> - Lowercase abstract class name to its lowercase abstract method-name set.
+     */
+    private function abstractClassMethodSets(AnalysisUnit $analysisUnit): array
+    {
+        $sets = [];
+        foreach (NodeIndex::nodesOf($analysisUnit, Class_::class) as $class) {
+            $name = $class->name?->toString();
+            if ($name !== null && $class->isAbstract()) {
+                $sets[strtolower($name)] = $this->abstractMethodNameSet($class);
+            }
+        }
+
+        return $sets;
+    }
+
+    /**
+     * Map same-file trait names to their abstract method-name sets.
+     *
+     * @param AnalysisUnit $analysisUnit - Parsed unit whose trait declarations are indexed.
+     *
+     * @return array<string, array<string, true>> - Lowercase trait name to its lowercase abstract method-name set.
+     */
+    private function traitMethodSets(AnalysisUnit $analysisUnit): array
+    {
+        $sets = [];
+        foreach (NodeIndex::nodesOf($analysisUnit, Trait_::class) as $trait) {
+            $name = $trait->name?->toString();
+            if ($name !== null) {
+                $sets[strtolower($name)] = $this->abstractMethodNameSet($trait);
+            }
+        }
+
+        return $sets;
+    }
+
+    /**
+     * Resolve the contract method names a class must define via its interfaces, abstract parent, and traits.
+     *
+     * @param Class_                             $class - Class declaration whose implemented contracts are resolved.
+     * @param array<string, array<string, true>> $interfaceMethods - Interface name to method-name set.
+     * @param array<string, array<string, true>> $abstractMethods - Abstract class name to abstract method-name set.
+     * @param array<string, array<string, true>> $traitMethods - Trait name to abstract method-name set.
+     *
+     * @return array<string, true> - Lowercase method names the class is contractually required to define.
+     */
+    private function requiredContractMethods(Class_ $class, array $interfaceMethods, array $abstractMethods, array $traitMethods): array
+    {
+        $requiredMethods = [];
+
+        foreach ($class->implements as $interfaceName) {
+            $requiredMethods += $interfaceMethods[strtolower($interfaceName->getLast())] ?? [];
+        }
+
+        if ($class->extends instanceof Name) {
+            $requiredMethods += $abstractMethods[strtolower($class->extends->getLast())] ?? [];
+        }
+
+        foreach ($class->stmts as $stmt) {
+            if (!$stmt instanceof TraitUse) {
+                continue;
+            }
+
+            foreach ($stmt->traits as $traitName) {
+                $requiredMethods += $traitMethods[strtolower($traitName->getLast())] ?? [];
+            }
+        }
+
+        return $requiredMethods;
     }
 
     /**

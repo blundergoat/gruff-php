@@ -33,6 +33,7 @@ abstract class DocsRuleTestCase extends TestCase
      * Analyse documentation fixtures and return findings for assertions.
      *
      * @param string $fixture - Fixture filename under tests/Fixtures/Docs.
+     * @param ?AnalysisConfig $config - Optional analysis config; defaults to the full default-registry config.
      *
      * @return list<\GruffPhp\Results\Finding\Finding> - every finding the default rule set raises against the fixture, unfiltered; empty when the fixture is
      *                                         clean
@@ -51,6 +52,7 @@ abstract class DocsRuleTestCase extends TestCase
      *
      * @param string $fixture - Fixture filename under tests/Fixtures/Docs.
      * @param string $ruleId - Rule id to keep; findings from every other rule are discarded.
+     * @param ?AnalysisConfig $config - Optional analysis config; defaults to the full default-registry config.
      *
      * @return list<\GruffPhp\Results\Finding\Finding> - findings from the named rule only, in encounter order; empty when that rule raises nothing
      */

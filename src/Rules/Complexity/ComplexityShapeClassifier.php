@@ -14,6 +14,7 @@ use PhpParser\Node\Stmt;
  */
 final readonly class ComplexityShapeClassifier
 {
+    // Classification tag for a method whose branches are all top-level guard clauses rather than nested decisions.
     public const SHAPE_FLAT_GUARD_CLAUSES = 'flat-guard-clauses';
 
     /**
@@ -66,17 +67,17 @@ final readonly class ComplexityShapeClassifier
     /**
      * Check one top-level `if` for the flat guard shape.
      *
-     * @param Stmt\If_ $if - Candidate top-level if.
+     * @param Stmt\If_ $ifStatement - Candidate top-level if.
      *
      * @return bool - True when it has no else/elseif and no nested control.
      */
-    private static function isSimpleTopLevelIf(Stmt\If_ $if): bool
+    private static function isSimpleTopLevelIf(Stmt\If_ $ifStatement): bool
     {
-        if ($if->elseifs !== [] || $if->else !== null) {
+        if ($ifStatement->elseifs !== [] || $ifStatement->else !== null) {
             return false;
         }
 
-        foreach ($if->stmts as $stmt) {
+        foreach ($ifStatement->stmts as $stmt) {
             if ($stmt instanceof Stmt\If_ || self::isDisallowedTopLevelStatement($stmt)) {
                 return false;
             }
