@@ -2,6 +2,14 @@
 
 Notable user-facing changes to `gruff-php` are listed here.
 
+## 0.4.1 - 2026-06-13
+
+0.4.1 focuses on rule-rubric precision: fewer false positives and fewer over-severe findings without disabling the rules that catch real maintainability problems.
+
+- **BREAKING: Removed `modernisation.enum-candidate`** - Constant-only scalar classes no longer produce enum migration advisories. Enum conversions are deliberate boundary work, not a default gruff rubric, because string constants often cross PHP, Twig/TypeScript, telemetry, JSON, and agent/runtime boundaries.
+- **Documentation, naming, size, complexity, modernisation, and dead-code rubrics are tighter** - Constants with useful local comments, intentional one-line contracts, common boolean predicate verbs including `includes*`/`excludes*`/`enables*`/`disables*`, immutable data carriers, flat guard-clause validators, obvious positional calls, and callable-referenced private methods no longer produce the same noisy or over-severe findings, while useless comments, truly undocumented constants, optional strict API-PHPDoc violations, bad wrappers, dependency-heavy services, nested complexity, ambiguous positional calls, and real dead code still report.
+- **Constant PHPDoc strictness is configurable** - `docs.missing-constant-phpdoc` accepts meaningful attached `//`, `#`, or block comments by default, including short grouped constant comments. Projects that publish constants as API can require PHPDoc for public/protected constants globally with `requirePhpdocForApiConstants` or by exported path with `apiPathPatterns`.
+
 ## 0.4.0 - 2026-06-11
 
 0.4.0 retires the project rules whose whole-project analysis made per-edit feedback slow and whose verified false-positive rates made their findings untrustworthy on framework code. With no project rules left, the per-file result cache introduced in 0.3.0 now engages on every default run, and single-file scans no longer pay whole-project cost. Eight per-unit rules also gained precision fixes for mechanical misfires.

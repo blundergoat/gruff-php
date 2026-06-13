@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Cache;
 
-use GruffPhp\Cache\ResultCache;
+use GruffPhp\Engine\Cache\ResultCache;
 use PHPUnit\Framework\TestCase;
 
 /**

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Parser;
 
-use GruffPhp\Parser\PhpFileParser;
-use GruffPhp\Source\SourceFile;
+use GruffPhp\Engine\Parser\PhpFileParser;
+use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**

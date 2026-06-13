@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\Size;
 
-use GruffPhp\Config\AnalysisConfig;
-use GruffPhp\Config\RuleSettings;
-use GruffPhp\Finding\Severity;
-use GruffPhp\Parser\PhpFileParser;
-use GruffPhp\Rule\RuleContext;
-use GruffPhp\Rule\RuleRegistry;
-use GruffPhp\Rule\Size\ClassLengthRule;
-use GruffPhp\Source\SourceFile;
+use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Config\RuleSettings;
+use GruffPhp\Results\Finding\Severity;
+use GruffPhp\Engine\Parser\PhpFileParser;
+use GruffPhp\Rules\Contracts\RuleContext;
+use GruffPhp\Rules\RuleRegistry;
+use GruffPhp\Rules\Size\ClassLengthRule;
+use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -107,7 +107,7 @@ final class ClassLengthRuleTest extends TestCase
      * @param string             $fixture - Fixture filename under tests/Fixtures/Size to scan.
      * @param array<string, int> $thresholds - Rule option overrides applied before the fixture runs.
      *
-     * @return list<\GruffPhp\Finding\Finding> - findings the rule emitted for the fixture; empty when the class stays within thresholds
+     * @return list<\GruffPhp\Results\Finding\Finding> - findings the rule emitted for the fixture; empty when the class stays within thresholds
      */
     private function analyse(string $fixture, array $thresholds): array
     {
@@ -127,9 +127,9 @@ final class ClassLengthRuleTest extends TestCase
      *
      * @param string $filename - Fixture filename.
      *
-     * @return \GruffPhp\Parser\AnalysisUnit - parsed fixture ready to feed to the rule, with its display path kept repo-relative
+     * @return \GruffPhp\Engine\Parser\AnalysisUnit - parsed fixture ready to feed to the rule, with its display path kept repo-relative
      */
-    private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
+    private function parseFixture(string $filename): \GruffPhp\Engine\Parser\AnalysisUnit
     {
         $path = __DIR__ . '/../../Fixtures/Size/' . $filename;
 

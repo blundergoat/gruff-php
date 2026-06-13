@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\TestQuality;
 
-use GruffPhp\Parser\AnalysisUnit;
-use GruffPhp\Parser\PhpFileParser;
-use GruffPhp\Rule\TestQuality\TestQualityNodeHelper;
-use GruffPhp\Rule\TestQuality\TestQualityScope;
-use GruffPhp\Source\SourceFile;
+use GruffPhp\Engine\Parser\AnalysisUnit;
+use GruffPhp\Engine\Parser\PhpFileParser;
+use GruffPhp\Rules\TestQuality\TestQualityNodeHelper;
+use GruffPhp\Rules\TestQuality\TestQualityScope;
+use GruffPhp\Engine\Source\SourceFile;
 use PhpParser\Node\Arg;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Stmt;

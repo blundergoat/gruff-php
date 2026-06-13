@@ -4,20 +4,20 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Scoring;
 
-use GruffPhp\Config\AnalysisConfig;
-use GruffPhp\Diff\DiffResult;
-use GruffPhp\Finding\Confidence;
-use GruffPhp\Finding\Finding;
-use GruffPhp\Finding\Pillar;
-use GruffPhp\Finding\RuleTier;
-use GruffPhp\Finding\Severity;
-use GruffPhp\Mutation\InfectionMutant;
-use GruffPhp\Mutation\InfectionReport;
-use GruffPhp\Mutation\MutationAnalysisResult;
-use GruffPhp\Rule\RuleRegistry;
-use GruffPhp\Rule\Size\FileLengthRule;
-use GruffPhp\Scoring\Grade;
-use GruffPhp\Scoring\ScoreCalculator;
+use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Results\Diff\DiffResult;
+use GruffPhp\Results\Finding\Confidence;
+use GruffPhp\Results\Finding\Finding;
+use GruffPhp\Results\Finding\Pillar;
+use GruffPhp\Results\Finding\RuleTier;
+use GruffPhp\Results\Finding\Severity;
+use GruffPhp\Results\Mutation\InfectionMutant;
+use GruffPhp\Results\Mutation\InfectionReport;
+use GruffPhp\Results\Mutation\MutationAnalysisResult;
+use GruffPhp\Rules\RuleRegistry;
+use GruffPhp\Rules\Size\FileLengthRule;
+use GruffPhp\Results\Scoring\Grade;
+use GruffPhp\Results\Scoring\ScoreCalculator;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -318,7 +318,7 @@ final class ScoreCalculatorTest extends TestCase
         $config   = AnalysisConfig::fromRegistry($registry);
         $settings = $config->ruleSettings($ruleId);
 
-        return $config->withRuleSettings($ruleId, new \GruffPhp\Config\RuleSettings(
+        return $config->withRuleSettings($ruleId, new \GruffPhp\Engine\Config\RuleSettings(
             enabled:           $settings->enabled,
             thresholds:        $settings->thresholds,
             options:           $settings->options,
@@ -330,9 +330,9 @@ final class ScoreCalculatorTest extends TestCase
     /**
      * Key pillar scores by pillar name.
      *
-     * @param list<\GruffPhp\Scoring\PillarScore> $pillars - Pillar scores returned by the calculator fixture.
+     * @param list<\GruffPhp\Results\Scoring\PillarScore> $pillars - Pillar scores returned by the calculator fixture.
      *
-     * @return array<string, \GruffPhp\Scoring\PillarScore> - the same scores keyed by pillar name for index-free lookup; empty when no pillars were
+     * @return array<string, \GruffPhp\Results\Scoring\PillarScore> - the same scores keyed by pillar name for index-free lookup; empty when no pillars were
      *                       given
      */
     private function pillarMap(array $pillars): array

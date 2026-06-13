@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\Docs;
 
-use GruffPhp\Config\AnalysisConfig;
-use GruffPhp\Parser\PhpFileParser;
-use GruffPhp\Rule\RuleContext;
-use GruffPhp\Rule\RuleRegistry;
-use GruffPhp\Source\SourceFile;
+use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Parser\PhpFileParser;
+use GruffPhp\Rules\Contracts\RuleContext;
+use GruffPhp\Rules\RuleRegistry;
+use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -34,14 +34,14 @@ abstract class DocsRuleTestCase extends TestCase
      *
      * @param string $fixture - Fixture filename under tests/Fixtures/Docs.
      *
-     * @return list<\GruffPhp\Finding\Finding> - every finding the default rule set raises against the fixture, unfiltered; empty when the fixture is
+     * @return list<\GruffPhp\Results\Finding\Finding> - every finding the default rule set raises against the fixture, unfiltered; empty when the fixture is
      *                                         clean
      */
-    protected function analyseFixture(string $fixture): array
+    protected function analyseFixture(string $fixture, ?AnalysisConfig $config = null): array
     {
         $unit     = $this->parseFixture($fixture);
         $registry = RuleRegistry::defaults();
-        $config   = AnalysisConfig::fromRegistry($registry);
+        $config ??= AnalysisConfig::fromRegistry($registry);
 
         return $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
     }
@@ -52,12 +52,12 @@ abstract class DocsRuleTestCase extends TestCase
      * @param string $fixture - Fixture filename under tests/Fixtures/Docs.
      * @param string $ruleId - Rule id to keep; findings from every other rule are discarded.
      *
-     * @return list<\GruffPhp\Finding\Finding> - findings from the named rule only, in encounter order; empty when that rule raises nothing
+     * @return list<\GruffPhp\Results\Finding\Finding> - findings from the named rule only, in encounter order; empty when that rule raises nothing
      */
-    protected function analyseRule(string $fixture, string $ruleId): array
+    protected function analyseRule(string $fixture, string $ruleId, ?AnalysisConfig $config = null): array
     {
         return array_values(array_filter(
-                                $this->analyseFixture($fixture),
+                                $this->analyseFixture($fixture, $config),
                                 static fn($finding): bool => $finding->ruleId === $ruleId,
                             ));
     }
@@ -67,9 +67,9 @@ abstract class DocsRuleTestCase extends TestCase
      *
      * @param string $filename - Fixture filename.
      *
-     * @return \GruffPhp\Parser\AnalysisUnit - parsed fixture with a repo-relative display path so finding output matches a real checkout
+     * @return \GruffPhp\Engine\Parser\AnalysisUnit - parsed fixture with a repo-relative display path so finding output matches a real checkout
      */
-    private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
+    private function parseFixture(string $filename): \GruffPhp\Engine\Parser\AnalysisUnit
     {
         $path = __DIR__ . '/../../Fixtures/Docs/' . $filename;
 

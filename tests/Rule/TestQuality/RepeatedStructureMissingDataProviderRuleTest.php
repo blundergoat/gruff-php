@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\TestQuality;
 
-use GruffPhp\Config\AnalysisConfig;
-use GruffPhp\Finding\Finding;
-use GruffPhp\Parser\AnalysisUnit;
-use GruffPhp\Parser\PhpFileParser;
-use GruffPhp\Rule\RuleContext;
-use GruffPhp\Rule\RuleRegistry;
-use GruffPhp\Rule\TestQuality\RepeatedStructureMissingDataProviderRule;
-use GruffPhp\Source\SourceFile;
+use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Results\Finding\Finding;
+use GruffPhp\Engine\Parser\AnalysisUnit;
+use GruffPhp\Engine\Parser\PhpFileParser;
+use GruffPhp\Rules\Contracts\RuleContext;
+use GruffPhp\Rules\RuleRegistry;
+use GruffPhp\Rules\TestQuality\RepeatedStructureMissingDataProviderRule;
+use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**

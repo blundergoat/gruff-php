@@ -4,22 +4,22 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\Waste;
 
-use GruffPhp\Config\AnalysisConfig;
-use GruffPhp\Config\RuleSettings;
-use GruffPhp\Finding\Pillar;
-use GruffPhp\Finding\Severity;
-use GruffPhp\Parser\PhpFileParser;
-use GruffPhp\Rule\RuleContext;
-use GruffPhp\Rule\RuleRegistry;
-use GruffPhp\Rule\Waste\CommentedOutCodeRule;
-use GruffPhp\Rule\Waste\EmptyClassRule;
-use GruffPhp\Rule\Waste\EmptyMethodRule;
-use GruffPhp\Rule\Waste\OneLineMethodRule;
-use GruffPhp\Rule\Waste\RedundantVariableRule;
-use GruffPhp\Rule\Waste\UnreachableCodeRule;
-use GruffPhp\Rule\Waste\UnusedImportRule;
-use GruffPhp\Rule\Waste\UnusedParameterRule;
-use GruffPhp\Source\SourceFile;
+use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Config\RuleSettings;
+use GruffPhp\Results\Finding\Pillar;
+use GruffPhp\Results\Finding\Severity;
+use GruffPhp\Engine\Parser\PhpFileParser;
+use GruffPhp\Rules\Contracts\RuleContext;
+use GruffPhp\Rules\RuleRegistry;
+use GruffPhp\Rules\Waste\CommentedOutCodeRule;
+use GruffPhp\Rules\Waste\EmptyClassRule;
+use GruffPhp\Rules\Waste\EmptyMethodRule;
+use GruffPhp\Rules\Waste\OneLineMethodRule;
+use GruffPhp\Rules\Waste\RedundantVariableRule;
+use GruffPhp\Rules\Waste\UnreachableCodeRule;
+use GruffPhp\Rules\Waste\UnusedImportRule;
+use GruffPhp\Rules\Waste\UnusedParameterRule;
+use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -274,10 +274,18 @@ final class WasteRulesTest extends TestCase
         $findings = $this->analyseRule('one-line-methods.php', OneLineMethodRule::ID);
         $symbols  = array_map(static fn($finding): ?string => $finding->symbol, $findings);
 
-        self::assertContains('OneLineMethodFixture::isEligible()', $symbols);
-        self::assertSame(Severity::Advisory, $findings[0]->severity);
-        self::assertSame(Pillar::Maintainability, $findings[0]->pillar);
-        self::assertSame('return', $findings[0]->metadata['statementKind']);
+        self::assertContains('PrivatePassThroughFixture::rows()', $symbols);
+        self::assertContains('PrivatePassThroughFixture::oneShotHelper()', $symbols);
+
+        $rowsFinding = array_values(array_filter(
+                                        $findings,
+                                        static fn($finding): bool => $finding->symbol === 'PrivatePassThroughFixture::rows()',
+                                    ))[0] ?? null;
+
+        self::assertNotNull($rowsFinding);
+        self::assertSame(Severity::Advisory, $rowsFinding->severity);
+        self::assertSame(Pillar::Maintainability, $rowsFinding->pillar);
+        self::assertSame('return', $rowsFinding->metadata['statementKind']);
     }
 
     /**
@@ -293,6 +301,7 @@ final class WasteRulesTest extends TestCase
         self::assertNotContains('OneLineMethodFixture::formatGreeting()', $symbols);
         self::assertNotContains('OneLineMethodFixture::getName()', $symbols);
         self::assertNotContains('OneLineMethodFixture::testItUsesFixture()', $symbols);
+        self::assertNotContains('PracticeAssistantSessionDto::sessionId()', $symbols);
     }
 
     /**
@@ -318,11 +327,17 @@ final class WasteRulesTest extends TestCase
         $findings = $this->analyseRule('one-line-methods.php', OneLineMethodRule::ID, $config);
         $symbols  = array_map(static fn($finding): ?string => $finding->symbol, $findings);
 
-        self::assertContains('OneLineMethodFixture::isEligible()', $symbols);
-        self::assertContains('SingleFactoryFixture::only()', $symbols);
+        self::assertNotContains('OneLineMethodFixture::isEligible()', $symbols);
+        self::assertNotContains('SingleFactoryFixture::only()', $symbols);
         self::assertNotContains('OneLineMethodFixture::sharedHelper()', $symbols);
         self::assertNotContains('AlternativeFactoryFixture::ready()', $symbols);
         self::assertNotContains('AlternativeFactoryFixture::failed()', $symbols);
+        self::assertNotContains('ContractRowsAdapter::rows()', $symbols);
+        self::assertNotContains('AbstractPayloadAdapterImplementation::normalisePayload()', $symbols);
+        self::assertNotContains('TraitPayloadLabelAdapter::labelFor()', $symbols);
+        self::assertNotContains('DomainVocabularyWrapper::supportsPracticeAssistant()', $symbols);
+        self::assertContains('PrivatePassThroughFixture::rows()', $symbols);
+        self::assertContains('PrivatePassThroughFixture::oneShotHelper()', $symbols);
     }
 
     /**
@@ -364,15 +379,16 @@ final class WasteRulesTest extends TestCase
                     'minParameters'                 => 1,
                     'minInFileCallers'              => 0,
                     'namedAlternativeFactoryExempt' => false,
-                    'allowedSymbols'                => ['OneLineMethodFixture::isEligible()'],
+                    'allowedSymbols'                => ['PrivatePassThroughFixture::oneShotHelper()'],
                 ],
             ),
         );
         $findings = $this->analyseRule('one-line-methods.php', OneLineMethodRule::ID, $config);
         $symbols  = array_map(static fn($finding): ?string => $finding->symbol, $findings);
 
-        self::assertNotContains('OneLineMethodFixture::isEligible()', $symbols);
+        self::assertNotContains('PrivatePassThroughFixture::oneShotHelper()', $symbols);
         self::assertContains('OneLineMethodFixture::sharedHelper()', $symbols);
+        self::assertContains('PrivatePassThroughFixture::rows()', $symbols);
     }
 
     /**
@@ -423,7 +439,7 @@ final class WasteRulesTest extends TestCase
      * @param string              $ruleId - Rule identifier to keep; all other findings are discarded.
      * @param AnalysisConfig|null $config - Overriding config, or null to use the registry defaults.
      *
-     * @return list<\GruffPhp\Finding\Finding> - findings emitted only by the requested rule, in analyser order; empty when that rule produced none
+     * @return list<\GruffPhp\Results\Finding\Finding> - findings emitted only by the requested rule, in analyser order; empty when that rule produced none
      */
     private function analyseRule(string $fixture, string $ruleId, ?AnalysisConfig $config = null): array
     {
@@ -439,9 +455,9 @@ final class WasteRulesTest extends TestCase
      *
      * @param string $filename - Fixture filename
      *
-     * @return \GruffPhp\Parser\AnalysisUnit - Hand back the dead-code fixture parsed from disk, with its project-relative display path attached
+     * @return \GruffPhp\Engine\Parser\AnalysisUnit - Hand back the dead-code fixture parsed from disk, with its project-relative display path attached
      */
-    private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
+    private function parseFixture(string $filename): \GruffPhp\Engine\Parser\AnalysisUnit
     {
         $path = __DIR__ . '/../../Fixtures/DeadCode/' . $filename;
 

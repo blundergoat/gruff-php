@@ -63,6 +63,8 @@ Everything else in this directory is a stats failure. If a note cannot earn an A
 - `ADR-024-cluster-correlated-complexity-penalties.md`
 - `ADR-025-return-comment-to-described-return-tag.md`
 - `ADR-026-retire-project-rules.md`
+- `ADR-027-retire-modernisation-enum-candidate.md`
+- `ADR-028-src-namespace-consolidation.md`
 
 ## Required Structure
 

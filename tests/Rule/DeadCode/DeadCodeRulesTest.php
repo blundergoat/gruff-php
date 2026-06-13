@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\DeadCode;
 
-use GruffPhp\Config\AnalysisConfig;
-use GruffPhp\Parser\PhpFileParser;
-use GruffPhp\Rule\DeadCode\UnusedPrivateConstantRule;
-use GruffPhp\Rule\DeadCode\UnusedPrivateMethodRule;
-use GruffPhp\Rule\DeadCode\UnusedPrivatePropertyRule;
-use GruffPhp\Rule\RuleContext;
-use GruffPhp\Rule\RuleRegistry;
-use GruffPhp\Source\SourceFile;
+use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Parser\PhpFileParser;
+use GruffPhp\Rules\DeadCode\UnusedPrivateConstantRule;
+use GruffPhp\Rules\DeadCode\UnusedPrivateMethodRule;
+use GruffPhp\Rules\DeadCode\UnusedPrivatePropertyRule;
+use GruffPhp\Rules\Contracts\RuleContext;
+use GruffPhp\Rules\RuleRegistry;
+use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -60,6 +60,10 @@ final class DeadCodeRulesTest extends TestCase
 
         $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
         self::assertNotContains('UnusedPrivateMethodFixture::usedPrivate()', $symbols);
+        self::assertNotContains('UnusedPrivateMethodFixture::comparePromptRowsByLabel()', $symbols);
+        self::assertNotContains('UnusedPrivateMethodFixture::comparePromptRowsByScore()', $symbols);
+        self::assertNotContains('UnusedPrivateMethodFixture::normalisePromptRow()', $symbols);
+        self::assertNotContains('UnusedPrivateMethodFixture::formatPromptRow()', $symbols);
     }
 
     /**
@@ -257,7 +261,7 @@ final class DeadCodeRulesTest extends TestCase
      * @param string $ruleId  - rule id to isolate; the full pass runs but only this rule's findings come back, so a
      *                        fixture exercising several dead-code shapes can be asserted one rule at a time.
      *
-     * @return list<\GruffPhp\Finding\Finding> - findings from $ruleId alone, re-indexed for positional assertions.
+     * @return list<\GruffPhp\Results\Finding\Finding> - findings from $ruleId alone, re-indexed for positional assertions.
      */
     private function analyseRule(string $fixture, string $ruleId): array
     {
@@ -274,9 +278,9 @@ final class DeadCodeRulesTest extends TestCase
      *
      * @param string $filename - Fixture filename.
      *
-     * @return \GruffPhp\Parser\AnalysisUnit - parsed fixture carrying the repo-relative display path the rules report findings against
+     * @return \GruffPhp\Engine\Parser\AnalysisUnit - parsed fixture carrying the repo-relative display path the rules report findings against
      */
-    private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
+    private function parseFixture(string $filename): \GruffPhp\Engine\Parser\AnalysisUnit
     {
         $path = __DIR__ . '/../../Fixtures/DeadCode/' . $filename;
 

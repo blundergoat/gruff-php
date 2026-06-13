@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Console;
 
-use GruffPhp\Config\ConfigLoader;
+use GruffPhp\Engine\Config\ConfigLoader;
 use Symfony\Component\Process\Process;
 use Symfony\Component\Yaml\Yaml;
 

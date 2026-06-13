@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\Naming;
 
-use GruffPhp\Rule\Naming\IdentifierTokenizer;
+use GruffPhp\Rules\Naming\IdentifierTokenizer;
 use PHPUnit\Framework\TestCase;
 
 /**

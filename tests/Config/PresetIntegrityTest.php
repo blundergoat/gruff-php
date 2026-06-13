@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Config;
 
-use GruffPhp\Config\AnalysisConfig;
-use GruffPhp\Config\ConfigLoader;
-use GruffPhp\Rule\RuleRegistry;
+use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Config\ConfigLoader;
+use GruffPhp\Rules\RuleRegistry;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Yaml\Yaml;

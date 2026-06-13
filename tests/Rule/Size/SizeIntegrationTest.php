@@ -4,19 +4,19 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\Size;
 
-use GruffPhp\Config\AnalysisConfig;
-use GruffPhp\Config\RuleSettings;
-use GruffPhp\Parser\PhpFileParser;
-use GruffPhp\Rule\RuleContext;
-use GruffPhp\Rule\RuleRegistry;
-use GruffPhp\Rule\Size\AverageMethodLengthRule;
-use GruffPhp\Rule\Size\ClassLengthRule;
-use GruffPhp\Rule\Size\FileLengthRule;
-use GruffPhp\Rule\Size\MethodLengthRule;
-use GruffPhp\Rule\Size\ParameterCountRule;
-use GruffPhp\Rule\Size\PropertyCountRule;
-use GruffPhp\Rule\Size\PublicMethodCountRule;
-use GruffPhp\Source\SourceFile;
+use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Config\RuleSettings;
+use GruffPhp\Engine\Parser\PhpFileParser;
+use GruffPhp\Rules\Contracts\RuleContext;
+use GruffPhp\Rules\RuleRegistry;
+use GruffPhp\Rules\Size\AverageMethodLengthRule;
+use GruffPhp\Rules\Size\ClassLengthRule;
+use GruffPhp\Rules\Size\FileLengthRule;
+use GruffPhp\Rules\Size\MethodLengthRule;
+use GruffPhp\Rules\Size\ParameterCountRule;
+use GruffPhp\Rules\Size\PropertyCountRule;
+use GruffPhp\Rules\Size\PublicMethodCountRule;
+use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**

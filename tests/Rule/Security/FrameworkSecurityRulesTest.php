@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\Security;
 
-use GruffPhp\Config\AnalysisConfig;
-use GruffPhp\Finding\Confidence;
-use GruffPhp\Finding\Finding;
-use GruffPhp\Finding\Pillar;
-use GruffPhp\Finding\Severity;
-use GruffPhp\Parser\PhpFileParser;
-use GruffPhp\Rule\RuleContext;
-use GruffPhp\Rule\RuleRegistry;
-use GruffPhp\Rule\Security\DebugModeEnabledRule;
-use GruffPhp\Rule\Security\PermissiveCorsRule;
-use GruffPhp\Source\SourceFile;
+use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Results\Finding\Confidence;
+use GruffPhp\Results\Finding\Finding;
+use GruffPhp\Results\Finding\Pillar;
+use GruffPhp\Results\Finding\Severity;
+use GruffPhp\Engine\Parser\PhpFileParser;
+use GruffPhp\Rules\Contracts\RuleContext;
+use GruffPhp\Rules\RuleRegistry;
+use GruffPhp\Rules\Security\DebugModeEnabledRule;
+use GruffPhp\Rules\Security\PermissiveCorsRule;
+use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**

@@ -4,20 +4,20 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Diff;
 
-use GruffPhp\Diff\ChangedLineRange;
-use GruffPhp\Diff\DiffException;
-use GruffPhp\Diff\DiffFindingFilter;
-use GruffPhp\Diff\DiffResult;
-use GruffPhp\Diff\GitDiffProvider;
-use GruffPhp\Diff\UnifiedDiffParser;
-use GruffPhp\Finding\Confidence;
-use GruffPhp\Finding\Finding;
-use GruffPhp\Finding\Pillar;
-use GruffPhp\Finding\RuleTier;
-use GruffPhp\Finding\Severity;
-use GruffPhp\Parser\AnalysisUnit;
-use GruffPhp\Parser\PhpFileParser;
-use GruffPhp\Source\SourceFile;
+use GruffPhp\Results\Diff\ChangedLineRange;
+use GruffPhp\Results\Diff\DiffException;
+use GruffPhp\Results\Diff\DiffFindingFilter;
+use GruffPhp\Results\Diff\DiffResult;
+use GruffPhp\Results\Diff\GitDiffProvider;
+use GruffPhp\Results\Diff\UnifiedDiffParser;
+use GruffPhp\Results\Finding\Confidence;
+use GruffPhp\Results\Finding\Finding;
+use GruffPhp\Results\Finding\Pillar;
+use GruffPhp\Results\Finding\RuleTier;
+use GruffPhp\Results\Finding\Severity;
+use GruffPhp\Engine\Parser\AnalysisUnit;
+use GruffPhp\Engine\Parser\PhpFileParser;
+use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 

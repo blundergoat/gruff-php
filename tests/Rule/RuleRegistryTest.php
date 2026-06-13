@@ -5,112 +5,111 @@ declare(strict_types=1);
 namespace GruffPhp\Tests\Rule;
 
 use Closure;
-use GruffPhp\Config\AnalysisConfig;
-use GruffPhp\Config\RuleSelection;
-use GruffPhp\Config\RuleSettings;
-use GruffPhp\Finding\Confidence;
-use GruffPhp\Finding\Finding;
-use GruffPhp\Finding\Pillar;
-use GruffPhp\Finding\RuleTier;
-use GruffPhp\Finding\Severity;
-use GruffPhp\Parser\AnalysisUnit;
-use GruffPhp\Parser\PhpFileParser;
-use GruffPhp\Rule\Complexity\CognitiveComplexityRule;
-use GruffPhp\Rule\Complexity\CyclomaticComplexityRule;
-use GruffPhp\Rule\Complexity\HalsteadVolumeRule;
-use GruffPhp\Rule\Complexity\MaintainabilityIndexRule;
-use GruffPhp\Rule\Complexity\NestingDepthRule;
-use GruffPhp\Rule\DeadCode\UnusedPrivateConstantRule;
-use GruffPhp\Rule\DeadCode\UnusedPrivateMethodRule;
-use GruffPhp\Rule\DeadCode\UnusedPrivatePropertyRule;
-use GruffPhp\Rule\Modernisation\ConstructorPromotionCandidateRule;
-use GruffPhp\Rule\Modernisation\EnumCandidateRule;
-use GruffPhp\Rule\Modernisation\FirstClassCallableCandidateRule;
-use GruffPhp\Rule\Modernisation\ForbiddenGlobalAccessRule;
-use GruffPhp\Rule\Modernisation\MatchExpressionCandidateRule;
-use GruffPhp\Rule\Modernisation\MixedTypeOveruseRule;
-use GruffPhp\Rule\Modernisation\NamedArgumentOpportunityRule;
-use GruffPhp\Rule\Modernisation\PublicPropertyRule;
-use GruffPhp\Rule\Modernisation\ReadonlyPropertyCandidateRule;
-use GruffPhp\Rule\Naming\AbbreviationAllowlistRule;
-use GruffPhp\Rule\Naming\IdentifierQualityRule;
-use GruffPhp\Rule\Naming\NegativeBooleanRule;
-use GruffPhp\Rule\Naming\SuffixHungarianRule;
-use GruffPhp\Rule\ProjectRuleAccumulator;
-use GruffPhp\Rule\ProjectRuleInterface;
-use GruffPhp\Rule\RuleContext;
-use GruffPhp\Rule\RuleDefinition;
-use GruffPhp\Rule\RuleInterface;
-use GruffPhp\Rule\RuleRegistry;
-use GruffPhp\Rule\Security\DangerousFunctionCallRule;
-use GruffPhp\Rule\Security\DebugModeEnabledRule;
-use GruffPhp\Rule\Security\DependencyComposerPathRule;
-use GruffPhp\Rule\Security\DependencyComposerScriptRule;
-use GruffPhp\Rule\Security\DependencyComposerUnpinnedRule;
-use GruffPhp\Rule\Security\DependencyComposerVcsRule;
-use GruffPhp\Rule\Security\DisabledSslVerificationRule;
-use GruffPhp\Rule\Security\ErrorSuppressionRule;
-use GruffPhp\Rule\Security\ExtractCompactUserInputRule;
-use GruffPhp\Rule\Security\GithubActionsRiskyWorkflowRule;
-use GruffPhp\Rule\Security\HeaderInjectionRule;
-use GruffPhp\Rule\Security\InsecureRandomRule;
-use GruffPhp\Rule\Security\PathTraversalFileAccessRule;
-use GruffPhp\Rule\Security\PermissiveCorsRule;
-use GruffPhp\Rule\Security\ProcessCommandConstructionRule;
-use GruffPhp\Rule\Security\ReflectedXssRule;
-use GruffPhp\Rule\Security\RequestControlledUrlRule;
-use GruffPhp\Rule\Security\SensitiveDataLoggingRule;
-use GruffPhp\Rule\Security\SilentCatchRule;
-use GruffPhp\Rule\Security\SqlConcatenationRule;
-use GruffPhp\Rule\Security\UnsafeArchiveExtractionRule;
-use GruffPhp\Rule\Security\UnsafeXmlLoadingRule;
-use GruffPhp\Rule\Security\UnsafeUnserializeRule;
-use GruffPhp\Rule\Security\VariableIncludeRule;
-use GruffPhp\Rule\Security\WeakCryptoRule;
-use GruffPhp\Rule\SensitiveData\ApiKeyPatternRule;
-use GruffPhp\Rule\SensitiveData\AwsAccessKeyRule;
-use GruffPhp\Rule\SensitiveData\DatabaseUrlPasswordRule;
-use GruffPhp\Rule\SensitiveData\GcpServiceAccountKeyRule;
-use GruffPhp\Rule\SensitiveData\HardcodedEnvValueRule;
-use GruffPhp\Rule\SensitiveData\HighEntropyStringRule;
-use GruffPhp\Rule\SensitiveData\JwtTokenRule;
-use GruffPhp\Rule\SensitiveData\PhiPatternRule;
-use GruffPhp\Rule\SensitiveData\PiiTestFixtureRule;
-use GruffPhp\Rule\SensitiveData\PrivateKeyRule;
-use GruffPhp\Rule\SensitiveData\UrlEmbeddedCredentialsRule;
-use GruffPhp\Rule\Size\AverageMethodLengthRule;
-use GruffPhp\Rule\Size\ClassLengthRule;
-use GruffPhp\Rule\Size\FileLengthRule;
-use GruffPhp\Rule\Size\MethodLengthRule;
-use GruffPhp\Rule\Size\ParameterCountRule;
-use GruffPhp\Rule\Size\PropertyCountRule;
-use GruffPhp\Rule\Size\PublicMethodCountRule;
-use GruffPhp\Rule\TestQuality\ConditionalTestLogicRule;
-use GruffPhp\Rule\TestQuality\DataProviderAnnotationRule;
-use GruffPhp\Rule\TestQuality\EagerTestRule;
-use GruffPhp\Rule\TestQuality\ExcessiveMockingRule;
-use GruffPhp\Rule\TestQuality\MagicNumberAssertionRule;
-use GruffPhp\Rule\TestQuality\MockOnlyTestRule;
-use GruffPhp\Rule\TestQuality\MysteryGuestRule;
-use GruffPhp\Rule\TestQuality\NoAssertionsRule;
-use GruffPhp\Rule\TestQuality\PrivateReflectionRule;
-use GruffPhp\Rule\TestQuality\SetupBloatRule;
-use GruffPhp\Rule\TestQuality\SkippedWithoutReasonRule;
-use GruffPhp\Rule\TestQuality\SleepInTestRule;
-use GruffPhp\Rule\TestQuality\StaticAnalysisRedundantTestRule;
-use GruffPhp\Rule\TestQuality\SutNotCalledRule;
-use GruffPhp\Rule\TestQuality\TestLongerThanSutRule;
-use GruffPhp\Rule\TestQuality\TestNamingConsistencyRule;
-use GruffPhp\Rule\TestQuality\TrivialAssertionRule;
-use GruffPhp\Rule\TestQuality\TrivialSnapshotRule;
-use GruffPhp\Rule\Waste\CommentedOutCodeRule;
-use GruffPhp\Rule\Waste\EmptyClassRule;
-use GruffPhp\Rule\Waste\EmptyMethodRule;
-use GruffPhp\Rule\Waste\OneLineMethodRule;
-use GruffPhp\Rule\Waste\UnreachableCodeRule;
-use GruffPhp\Rule\Waste\UnusedImportRule;
-use GruffPhp\Rule\Waste\UnusedParameterRule;
-use GruffPhp\Source\SourceFile;
+use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Config\RuleSelection;
+use GruffPhp\Engine\Config\RuleSettings;
+use GruffPhp\Results\Finding\Confidence;
+use GruffPhp\Results\Finding\Finding;
+use GruffPhp\Results\Finding\Pillar;
+use GruffPhp\Results\Finding\RuleTier;
+use GruffPhp\Results\Finding\Severity;
+use GruffPhp\Engine\Parser\AnalysisUnit;
+use GruffPhp\Engine\Parser\PhpFileParser;
+use GruffPhp\Rules\Complexity\CognitiveComplexityRule;
+use GruffPhp\Rules\Complexity\CyclomaticComplexityRule;
+use GruffPhp\Rules\Complexity\HalsteadVolumeRule;
+use GruffPhp\Rules\Complexity\MaintainabilityIndexRule;
+use GruffPhp\Rules\Complexity\NestingDepthRule;
+use GruffPhp\Rules\DeadCode\UnusedPrivateConstantRule;
+use GruffPhp\Rules\DeadCode\UnusedPrivateMethodRule;
+use GruffPhp\Rules\DeadCode\UnusedPrivatePropertyRule;
+use GruffPhp\Rules\Modernisation\ConstructorPromotionCandidateRule;
+use GruffPhp\Rules\Modernisation\FirstClassCallableCandidateRule;
+use GruffPhp\Rules\Modernisation\ForbiddenGlobalAccessRule;
+use GruffPhp\Rules\Modernisation\MatchExpressionCandidateRule;
+use GruffPhp\Rules\Modernisation\MixedTypeOveruseRule;
+use GruffPhp\Rules\Modernisation\NamedArgumentOpportunityRule;
+use GruffPhp\Rules\Modernisation\PublicPropertyRule;
+use GruffPhp\Rules\Modernisation\ReadonlyPropertyCandidateRule;
+use GruffPhp\Rules\Naming\AbbreviationAllowlistRule;
+use GruffPhp\Rules\Naming\IdentifierQualityRule;
+use GruffPhp\Rules\Naming\NegativeBooleanRule;
+use GruffPhp\Rules\Naming\SuffixHungarianRule;
+use GruffPhp\Rules\Shared\ProjectRuleAccumulator;
+use GruffPhp\Rules\Contracts\ProjectRuleInterface;
+use GruffPhp\Rules\Contracts\RuleContext;
+use GruffPhp\Rules\Contracts\RuleDefinition;
+use GruffPhp\Rules\Contracts\RuleInterface;
+use GruffPhp\Rules\RuleRegistry;
+use GruffPhp\Rules\Security\DangerousFunctionCallRule;
+use GruffPhp\Rules\Security\DebugModeEnabledRule;
+use GruffPhp\Rules\Security\DependencyComposerPathRule;
+use GruffPhp\Rules\Security\DependencyComposerScriptRule;
+use GruffPhp\Rules\Security\DependencyComposerUnpinnedRule;
+use GruffPhp\Rules\Security\DependencyComposerVcsRule;
+use GruffPhp\Rules\Security\DisabledSslVerificationRule;
+use GruffPhp\Rules\Security\ErrorSuppressionRule;
+use GruffPhp\Rules\Security\ExtractCompactUserInputRule;
+use GruffPhp\Rules\Security\GithubActionsRiskyWorkflowRule;
+use GruffPhp\Rules\Security\HeaderInjectionRule;
+use GruffPhp\Rules\Security\InsecureRandomRule;
+use GruffPhp\Rules\Security\PathTraversalFileAccessRule;
+use GruffPhp\Rules\Security\PermissiveCorsRule;
+use GruffPhp\Rules\Security\ProcessCommandConstructionRule;
+use GruffPhp\Rules\Security\ReflectedXssRule;
+use GruffPhp\Rules\Security\RequestControlledUrlRule;
+use GruffPhp\Rules\Security\SensitiveDataLoggingRule;
+use GruffPhp\Rules\Security\SilentCatchRule;
+use GruffPhp\Rules\Security\SqlConcatenationRule;
+use GruffPhp\Rules\Security\UnsafeArchiveExtractionRule;
+use GruffPhp\Rules\Security\UnsafeXmlLoadingRule;
+use GruffPhp\Rules\Security\UnsafeUnserializeRule;
+use GruffPhp\Rules\Security\VariableIncludeRule;
+use GruffPhp\Rules\Security\WeakCryptoRule;
+use GruffPhp\Rules\SensitiveData\ApiKeyPatternRule;
+use GruffPhp\Rules\SensitiveData\AwsAccessKeyRule;
+use GruffPhp\Rules\SensitiveData\DatabaseUrlPasswordRule;
+use GruffPhp\Rules\SensitiveData\GcpServiceAccountKeyRule;
+use GruffPhp\Rules\SensitiveData\HardcodedEnvValueRule;
+use GruffPhp\Rules\SensitiveData\HighEntropyStringRule;
+use GruffPhp\Rules\SensitiveData\JwtTokenRule;
+use GruffPhp\Rules\SensitiveData\PhiPatternRule;
+use GruffPhp\Rules\SensitiveData\PiiTestFixtureRule;
+use GruffPhp\Rules\SensitiveData\PrivateKeyRule;
+use GruffPhp\Rules\SensitiveData\UrlEmbeddedCredentialsRule;
+use GruffPhp\Rules\Size\AverageMethodLengthRule;
+use GruffPhp\Rules\Size\ClassLengthRule;
+use GruffPhp\Rules\Size\FileLengthRule;
+use GruffPhp\Rules\Size\MethodLengthRule;
+use GruffPhp\Rules\Size\ParameterCountRule;
+use GruffPhp\Rules\Size\PropertyCountRule;
+use GruffPhp\Rules\Size\PublicMethodCountRule;
+use GruffPhp\Rules\TestQuality\ConditionalTestLogicRule;
+use GruffPhp\Rules\TestQuality\DataProviderAnnotationRule;
+use GruffPhp\Rules\TestQuality\EagerTestRule;
+use GruffPhp\Rules\TestQuality\ExcessiveMockingRule;
+use GruffPhp\Rules\TestQuality\MagicNumberAssertionRule;
+use GruffPhp\Rules\TestQuality\MockOnlyTestRule;
+use GruffPhp\Rules\TestQuality\MysteryGuestRule;
+use GruffPhp\Rules\TestQuality\NoAssertionsRule;
+use GruffPhp\Rules\TestQuality\PrivateReflectionRule;
+use GruffPhp\Rules\TestQuality\SetupBloatRule;
+use GruffPhp\Rules\TestQuality\SkippedWithoutReasonRule;
+use GruffPhp\Rules\TestQuality\SleepInTestRule;
+use GruffPhp\Rules\TestQuality\StaticAnalysisRedundantTestRule;
+use GruffPhp\Rules\TestQuality\SutNotCalledRule;
+use GruffPhp\Rules\TestQuality\TestLongerThanSutRule;
+use GruffPhp\Rules\TestQuality\TestNamingConsistencyRule;
+use GruffPhp\Rules\TestQuality\TrivialAssertionRule;
+use GruffPhp\Rules\TestQuality\TrivialSnapshotRule;
+use GruffPhp\Rules\Waste\CommentedOutCodeRule;
+use GruffPhp\Rules\Waste\EmptyClassRule;
+use GruffPhp\Rules\Waste\EmptyMethodRule;
+use GruffPhp\Rules\Waste\OneLineMethodRule;
+use GruffPhp\Rules\Waste\UnreachableCodeRule;
+use GruffPhp\Rules\Waste\UnusedImportRule;
+use GruffPhp\Rules\Waste\UnusedParameterRule;
+use GruffPhp\Engine\Source\SourceFile;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
@@ -140,7 +139,7 @@ final class RuleRegistryTest extends TestCase
             UnusedParameterRule::ID, AbbreviationAllowlistRule::ID,
             IdentifierQualityRule::ID, NegativeBooleanRule::ID,
             SuffixHungarianRule::ID,
-            ConstructorPromotionCandidateRule::ID, EnumCandidateRule::ID,
+            ConstructorPromotionCandidateRule::ID,
             FirstClassCallableCandidateRule::ID, ForbiddenGlobalAccessRule::ID,
             MatchExpressionCandidateRule::ID, MixedTypeOveruseRule::ID,
             NamedArgumentOpportunityRule::ID, PublicPropertyRule::ID,
@@ -355,9 +354,9 @@ final class RuleRegistryTest extends TestCase
         usort($definitions, static fn(array $left, array $right): int => $left['id'] <=> $right['id']);
         $json = json_encode($definitions, JSON_THROW_ON_ERROR);
 
-        self::assertCount(129, $definitions);
+        self::assertCount(128, $definitions);
         self::assertSame(
-            'e048ea1bc51d59121b5616' . '37911744dfe0f264a0f916a7e0e34ca301ff52614e',
+            'db6826619d58c5926b51' . 'f5b1aa65d88a2091205a165062b1e6af7ac76baade83',
             hash('sha256', $json),
         );
     }
@@ -468,7 +467,7 @@ final class RuleRegistryTest extends TestCase
              * @param AnalysisUnit $analysisUnit - Analysis unit.
              * @param RuleContext  $ruleContext - Rule context for the fixture.
              *
-             * @return list<\GruffPhp\Finding\Finding> - always empty; this fixture only observes definition() calls
+             * @return list<\GruffPhp\Results\Finding\Finding> - always empty; this fixture only observes definition() calls
              */
             public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
             {
@@ -519,7 +518,7 @@ final class RuleRegistryTest extends TestCase
              * @param AnalysisUnit $analysisUnit - Analysis unit.
              * @param RuleContext  $ruleContext - Rule context for the fixture.
              *
-             * @return list<\GruffPhp\Finding\Finding> - exactly one synthetic finding tagged with this rule's id, per unit
+             * @return list<\GruffPhp\Results\Finding\Finding> - exactly one synthetic finding tagged with this rule's id, per unit
              */
             public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
             {
@@ -665,7 +664,7 @@ final class RuleRegistryTest extends TestCase
              * @param AnalysisUnit $analysisUnit - Analysis unit.
              * @param RuleContext  $ruleContext - Rule context for the fixture.
              *
-             * @return list<\GruffPhp\Finding\Finding> - one README-scoped finding per unit, so dedup must collapse them to one
+             * @return list<\GruffPhp\Results\Finding\Finding> - one README-scoped finding per unit, so dedup must collapse them to one
              */
             public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
             {

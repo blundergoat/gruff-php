@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\Naming;
 
-use GruffPhp\Parser\AnalysisUnit;
-use GruffPhp\Parser\PhpFileParser;
-use GruffPhp\Rule\Naming\FunctionLikeScope;
-use GruffPhp\Rule\Naming\FunctionLikeScopeWalker;
-use GruffPhp\Source\SourceFile;
+use GruffPhp\Engine\Parser\AnalysisUnit;
+use GruffPhp\Engine\Parser\PhpFileParser;
+use GruffPhp\Rules\Naming\FunctionLikeScope;
+use GruffPhp\Rules\Naming\FunctionLikeScopeWalker;
+use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**

@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\Size;
 
-use GruffPhp\Config\AnalysisConfig;
-use GruffPhp\Config\RuleSettings;
-use GruffPhp\Finding\Severity;
-use GruffPhp\Parser\PhpFileParser;
-use GruffPhp\Rule\RuleContext;
-use GruffPhp\Rule\RuleRegistry;
-use GruffPhp\Rule\Size\ParameterCountRule;
-use GruffPhp\Source\SourceFile;
+use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Config\RuleSettings;
+use GruffPhp\Results\Finding\Severity;
+use GruffPhp\Engine\Parser\PhpFileParser;
+use GruffPhp\Rules\Contracts\RuleContext;
+use GruffPhp\Rules\RuleRegistry;
+use GruffPhp\Rules\Size\ParameterCountRule;
+use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -222,6 +222,21 @@ final class ParameterCountRuleTest extends TestCase
     }
 
     /**
+     * Verify service constructors with many dependencies keep the severe default threshold.
+     *
+     * @return void
+     */
+    public function testServiceConstructorWithManyDependenciesKeepsDefaultErrorSeverity(): void
+    {
+        $findings = $this->analyseWithDefaultSettings('service-dependencies.php', []);
+
+        self::assertCount(1, $findings);
+        self::assertSame('ServiceWithTooManyDependencies::__construct()', $findings[0]->symbol);
+        self::assertSame(12, $findings[0]->metadata['parameters']);
+        self::assertSame(Severity::Error, $findings[0]->severity);
+    }
+
+    /**
      * Verify a promoted readonly DTO above the default ceiling fires with the ceiling-bypass message.
      *
      * @return void
@@ -239,6 +254,7 @@ final class ParameterCountRuleTest extends TestCase
                                         ));
 
         self::assertCount(1, $ceilingFindings);
+        self::assertSame(Severity::Advisory, $ceilingFindings[0]->severity);
         self::assertSame($expectedParams, $ceilingFindings[0]->metadata['parameters']);
         self::assertSame($defaultCeiling, $ceilingFindings[0]->metadata['promotedConstructorMaxParameters']);
         self::assertSame('promoted-ctor-ceiling', $ceilingFindings[0]->metadata['findingKind']);
@@ -267,6 +283,7 @@ final class ParameterCountRuleTest extends TestCase
                                         ));
 
         self::assertCount(1, $ceilingFindings);
+        self::assertSame(Severity::Advisory, $ceilingFindings[0]->severity);
         self::assertSame($expectedParams, $ceilingFindings[0]->metadata['parameters']);
         self::assertSame($overrideCeiling, $ceilingFindings[0]->metadata['promotedConstructorMaxParameters']);
         self::assertSame('promoted-ctor-ceiling', $ceilingFindings[0]->metadata['findingKind']);
@@ -312,7 +329,7 @@ final class ParameterCountRuleTest extends TestCase
      * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options - Extra rule options merged over the rule
      *                                                             defaults.
      *
-     * @return list<\GruffPhp\Finding\Finding> - findings the rule emitted for the fixture, empty when nothing tripped the threshold
+     * @return list<\GruffPhp\Results\Finding\Finding> - findings the rule emitted for the fixture, empty when nothing tripped the threshold
      */
     private function analyse(string $fixture, array $thresholds, array $options = []): array
     {
@@ -336,7 +353,7 @@ final class ParameterCountRuleTest extends TestCase
      * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options - Option overrides layered onto the shipped
      *                                                             defaults, thresholds untouched.
      *
-     * @return list<\GruffPhp\Finding\Finding> - findings produced under the default thresholds, empty when none fired
+     * @return list<\GruffPhp\Results\Finding\Finding> - findings produced under the default thresholds, empty when none fired
      */
     private function analyseWithDefaultSettings(string $fixture, array $options): array
     {
@@ -361,9 +378,9 @@ final class ParameterCountRuleTest extends TestCase
      *
      * @param string $filename - Fixture filename.
      *
-     * @return \GruffPhp\Parser\AnalysisUnit - the parsed fixture ready for the rule to analyse
+     * @return \GruffPhp\Engine\Parser\AnalysisUnit - the parsed fixture ready for the rule to analyse
      */
-    private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
+    private function parseFixture(string $filename): \GruffPhp\Engine\Parser\AnalysisUnit
     {
         $path = __DIR__ . '/../../Fixtures/Size/' . $filename;
 

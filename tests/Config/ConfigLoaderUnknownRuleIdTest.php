@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Config;
 
-use GruffPhp\Config\ConfigLoader;
-use GruffPhp\Rule\RuleRegistry;
-use GruffPhp\Rule\Size\FileLengthRule;
+use GruffPhp\Engine\Config\ConfigLoader;
+use GruffPhp\Rules\RuleRegistry;
+use GruffPhp\Rules\Size\FileLengthRule;
 
 /**
  * Covers ConfigLoader compatibility with configs naming unknown rule ids: blocks for retired or mistyped rules are skipped instead of failing the

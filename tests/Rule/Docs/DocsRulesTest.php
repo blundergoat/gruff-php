@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\Docs;
 
-use GruffPhp\Finding\Severity;
-use GruffPhp\Rule\Docs\MissingParamTagRule;
-use GruffPhp\Rule\Docs\MissingPublicPhpdocRule;
-use GruffPhp\Rule\Docs\MissingReturnTagRule;
-use GruffPhp\Rule\Docs\PhpdocTagText;
-use GruffPhp\Rule\Docs\ReturnCommentRule;
+use GruffPhp\Results\Finding\Severity;
+use GruffPhp\Rules\Docs\MissingParamTagRule;
+use GruffPhp\Rules\Docs\MissingPublicPhpdocRule;
+use GruffPhp\Rules\Docs\MissingReturnTagRule;
+use GruffPhp\Rules\Docs\PhpdocTagText;
+use GruffPhp\Rules\Docs\ReturnCommentRule;
 
 /**
  * Covers documentation rule enforcement: missing PHPDoc on public/accessor/private/magic/interface-contract methods, and missing param and return
@@ -36,7 +36,7 @@ final class DocsRulesTest extends DocsRuleTestCase
 
         $severityValues = array_values(array_unique(array_map(static fn($finding): string => $finding->severity->value, $findings)));
 
-        self::assertSame([\GruffPhp\Finding\Severity::Error->value], $severityValues);
+        self::assertSame([\GruffPhp\Results\Finding\Severity::Error->value], $severityValues);
     }
 
     /**
@@ -155,7 +155,7 @@ final class DocsRulesTest extends DocsRuleTestCase
     /**
      * Build `symbol|parameter` rows for findings whose metadata identifies a parameter.
      *
-     * @param list<\GruffPhp\Finding\Finding> $findings - Findings from a missing-param-tag fixture.
+     * @param list<\GruffPhp\Results\Finding\Finding> $findings - Findings from a missing-param-tag fixture.
      *
      * @return list<string> - symbol and parameter pairs in finding order; entries without string parameter metadata are omitted
      */

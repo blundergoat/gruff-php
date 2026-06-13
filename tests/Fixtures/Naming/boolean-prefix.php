@@ -15,9 +15,23 @@ class BooleanPrefixFixture
     public function looksLikeTestFile(): bool { return true; }
     public function matchesPattern(): bool { return true; }
     public function supportsFeature(): bool { return true; }
+    public function allowsGuestAccess(): bool { return true; }
+    public function requiresReview(): bool { return true; }
+    public function usesCache(): bool { return true; }
+    public function acceptsPayload(): bool { return true; }
+    public function permitsRetry(): bool { return true; }
+    public function includesArchivedRows(): bool { return true; }
+    public function excludesInactivePatients(): bool { return true; }
+    public function enablesPracticeAssistant(): bool { return true; }
+    public function disablesLegacyFallback(): bool { return true; }
+    public function supportsSelectedAnswerScope(): bool { return true; }
+    public function requiresCreditPurchaseAccess(): bool { return true; }
+    public function usesCodeOwnedAnswer(): bool { return true; }
+    public function matchesPrompt(): bool { return true; }
 
     public function active(): bool { return true; }
     public function enabled(): bool { return true; }
+    public function status(): bool { return true; }
     public function check(): bool { return false; }
     public function didRun(): bool { return true; }
 

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Review;
 
-use GruffPhp\Diff\DiffException;
-use GruffPhp\Review\GitArchiveSnapshot;
+use GruffPhp\Results\Diff\DiffException;
+use GruffPhp\Results\Review\GitArchiveSnapshot;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 

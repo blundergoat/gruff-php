@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Console;
 
-use GruffPhp\Command\MissingConfigPrompt;
+use GruffPhp\Cli\Command\MissingConfigPrompt;
 use Symfony\Component\Process\InputStream;
 use Symfony\Component\Process\Process;
 

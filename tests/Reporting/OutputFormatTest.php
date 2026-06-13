@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Reporting;
 
-use GruffPhp\Reporting\OutputFormat;
+use GruffPhp\Output\Reporter\OutputFormat;
 use PHPUnit\Framework\TestCase;
 
 /**

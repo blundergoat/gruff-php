@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Command;
 
-use GruffPhp\Command\DashboardScanCommandBuilder;
+use GruffPhp\Cli\Dashboard\DashboardScanCommandBuilder;
 use PHPUnit\Framework\TestCase;
 
 /**

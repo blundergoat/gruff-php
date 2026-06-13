@@ -104,6 +104,9 @@ rules:
     # Missing constant PHPDoc
     docs.missing-constant-phpdoc:
         enabled: true
+        options:
+            requirePhpdocForApiConstants: false
+            apiPathPatterns: []
     # Missing file PHPDoc
     docs.missing-file-phpdoc:
         enabled: true
@@ -147,9 +150,6 @@ rules:
         enabled: true
     # Constructor property promotion candidate
     modernisation.constructor-promotion-candidate:
-        enabled: true
-    # Enum candidate
-    modernisation.enum-candidate:
         enabled: true
     # First-class callable candidate
     modernisation.first-class-callable-candidate:
@@ -199,11 +199,18 @@ rules:
                 - does
                 - allows
                 - all
+                - accepts
                 - contains
+                - disables
+                - enables
+                - excludes
                 - extends
+                - includes
                 - invokes
                 - matches
+                - permits
                 - refers
+                - requires
                 - returns
                 - looks
                 - supports

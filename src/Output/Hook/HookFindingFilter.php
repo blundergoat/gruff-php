@@ -1,0 +1,104 @@
+<?php
+
+declare(strict_types=1);
+
+namespace GruffPhp\Output\Hook;
+
+use GruffPhp\Results\Diff\DiffResult;
+use GruffPhp\Results\Finding\Finding;
+
+/**
+ * Applies the agent-hook changed-region and new-only contract.
+ */
+final readonly class HookFindingFilter
+{
+    /**
+     * Filter findings for hook output.
+     *
+     * @param list<Finding>       $findings             - Current findings from a native analysis pass.
+     * @param DiffResult|null     $changedRegion        - Changed-region data, or null/inactive for full-scan hook output.
+     * @param array<string, true> $baseStableIdentities - Stable identities present in the baseline/base ref.
+     * @param bool                $hasNewOnlySource     - Whether --baseline or a comparable --diff base was supplied.
+     *
+     * @return HookFilterResult - kept findings, suppression count, and disambiguated identities for the input set.
+     */
+    public function apply(
+        array $findings,
+        ?DiffResult $changedRegion,
+        array $baseStableIdentities,
+        bool $hasNewOnlySource,
+    ): HookFilterResult {
+        $identities      = HookFindingIdentity::forFindings($findings);
+        $kept            = [];
+        $suppressedCount = 0;
+
+        foreach ($findings as $finding) {
+            $scope = HookFindingScope::classify($finding);
+            $isNew = !isset($baseStableIdentities[$identities[spl_object_id($finding)] ?? HookFindingIdentity::forFinding($finding, $scope)]);
+
+            if ($hasNewOnlySource && !$isNew) {
+                $suppressedCount++;
+                continue;
+            }
+
+            if (!$changedRegion instanceof DiffResult || !$changedRegion->active) {
+                $kept[] = $finding;
+                continue;
+            }
+
+            if ($scope === HookFindingScope::FILE || $scope === HookFindingScope::PROJECT) {
+                if ($hasNewOnlySource) {
+                    $kept[] = $finding;
+                    continue;
+                }
+
+                $suppressedCount++;
+                continue;
+            }
+
+            if ($this->touchesChangedRegion($finding, $changedRegion)) {
+                $kept[] = $finding;
+                continue;
+            }
+
+            $suppressedCount++;
+        }
+
+        return new HookFilterResult($kept, $suppressedCount, $identities);
+    }
+
+    /**
+     * Check whether a line/symbol finding intersects a changed region.
+     *
+     * @param Finding    $finding       - Native finding.
+     * @param DiffResult $changedRegion - Changed-region data.
+     *
+     * @return bool - True when the finding is attributable to the changed region.
+     */
+    private function touchesChangedRegion(Finding $finding, DiffResult $changedRegion): bool
+    {
+        if (!in_array($finding->filePath, $changedRegion->changedFiles, true)) {
+            return false;
+        }
+
+        $ranges = $changedRegion->rangesFor($finding->filePath);
+        if ($ranges === []) {
+            return true;
+        }
+
+        $line = $finding->line;
+        if ($line === null) {
+            return false;
+        }
+
+        $endLine = $finding->endLine ?? $line;
+
+        foreach ($ranges as $range) {
+            if ($range->touches($line, $endLine)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}

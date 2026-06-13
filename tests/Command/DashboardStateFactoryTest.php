@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Command;
 
-use GruffPhp\Command\DashboardScanCommandBuilder;
-use GruffPhp\Command\DashboardStateFactory;
+use GruffPhp\Cli\Dashboard\DashboardScanCommandBuilder;
+use GruffPhp\Cli\Dashboard\DashboardStateFactory;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Input\ArrayInput;

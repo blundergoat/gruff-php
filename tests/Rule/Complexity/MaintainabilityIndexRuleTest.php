@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\Complexity;
 
-use GruffPhp\Config\AnalysisConfig;
-use GruffPhp\Config\RuleSettings;
-use GruffPhp\Parser\AnalysisUnit;
-use GruffPhp\Parser\PhpFileParser;
-use GruffPhp\Rule\Complexity\MaintainabilityIndexRule;
-use GruffPhp\Rule\RuleContext;
-use GruffPhp\Source\SourceFile;
+use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Config\RuleSettings;
+use GruffPhp\Engine\Parser\AnalysisUnit;
+use GruffPhp\Engine\Parser\PhpFileParser;
+use GruffPhp\Rules\Complexity\MaintainabilityIndexRule;
+use GruffPhp\Rules\Contracts\RuleContext;
+use GruffPhp\Engine\Source\SourceFile;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\NodeFinder;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -91,7 +91,7 @@ final class MaintainabilityIndexRuleTest extends TestCase
         self::assertSame([], $definition->defaultThresholds);
         self::assertNotNull($definition->severityThreshold);
         self::assertSame(35, $definition->severityThreshold->threshold);
-        self::assertSame(\GruffPhp\Finding\Severity::Advisory, $definition->severityThreshold->severity);
+        self::assertSame(\GruffPhp\Results\Finding\Severity::Advisory, $definition->severityThreshold->severity);
     }
 
     /**
@@ -102,7 +102,7 @@ final class MaintainabilityIndexRuleTest extends TestCase
     public function testFindingsIncludeRoundedMetadata(): void
     {
         $unit     = $this->parseFixture();
-        $config   = AnalysisConfig::fromRegistry(\GruffPhp\Rule\RuleRegistry::defaults())->withRuleSettings(
+        $config   = AnalysisConfig::fromRegistry(\GruffPhp\Rules\RuleRegistry::defaults())->withRuleSettings(
             MaintainabilityIndexRule::ID,
             new RuleSettings(true, ['warning' => 70, 'error' => 65]),
         );
@@ -127,7 +127,7 @@ final class MaintainabilityIndexRuleTest extends TestCase
     public function testFractionalThresholdIsPreservedInMessage(): void
     {
         $unit     = $this->parseFixture();
-        $config   = AnalysisConfig::fromRegistry(\GruffPhp\Rule\RuleRegistry::defaults())->withRuleSettings(
+        $config   = AnalysisConfig::fromRegistry(\GruffPhp\Rules\RuleRegistry::defaults())->withRuleSettings(
             MaintainabilityIndexRule::ID,
             new RuleSettings(true, ['warning' => 80.5, 'error' => 35]),
         );
