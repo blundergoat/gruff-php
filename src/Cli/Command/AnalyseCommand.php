@@ -596,7 +596,11 @@ final class AnalyseCommand extends Command
             return $options->paths;
         }
 
-        return $reviewDiff->changedFiles === [] ? null : $reviewDiff->changedFiles;
+        if (!$reviewDiff instanceof DiffResult || $reviewDiff->changedFiles === []) {
+            return null;
+        }
+
+        return $reviewDiff->changedFiles;
     }
 
     /**

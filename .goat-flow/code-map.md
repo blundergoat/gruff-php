@@ -1,6 +1,6 @@
 # Code Map - gruff-php
 
-Last reviewed 2026-06-13. Captures the v0.4.1 surface as wired in `composer.json`, `bin/gruff-php`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
+Last reviewed 2026-07-03. Captures the v0.4.1 surface as wired in `composer.json`, `bin/gruff-php`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
 
 ## Top-level layout
 
@@ -18,7 +18,6 @@ Last reviewed 2026-06-13. Captures the v0.4.1 surface as wired in `composer.json
 |-- package-lock.json         = npm lockfile for harness Node tooling
 |-- node_modules/             = harness Node tooling install (gitignored)
 |-- vendor/                   = Composer install (gitignored)
-|-- .gruff-cache/             = incremental result cache (ADR-020); gitignored + discovery-ignored
 |-- bin/                      = PHP CLI entrypoint
 |-- scripts/                  = local maintenance scripts
 |-- src/                      = gruff-php application source (PSR-4 root `GruffPhp\`)
@@ -29,7 +28,7 @@ Last reviewed 2026-06-13. Captures the v0.4.1 surface as wired in `composer.json
 |-- .github/                  = repository-facing guidance and CI workflow, including the gruff security-profile SARIF upload job
 |-- .idea/                    = JetBrains IDE settings (developer-local)
 |-- .goat-flow/               = goat-flow project memory and reference docs
-|-- .claude/                  = Claude Code config, hooks, and installed skills
+|-- .claude/                  = Claude Code settings and installed skills
 |-- .codex/                   = Codex hooks/config surface
 `-- .agents/                  = shared peer-agent skill root (Codex/Gemini)
 ```
@@ -178,8 +177,8 @@ tests/
 |-- architecture.md                           = system architecture notes (this file's sibling)
 |-- code-map.md                               = this repository map
 |-- glossary.md                               = project and harness terms
-|-- config.yaml                               = goat-flow version + configured agents
-|-- hooks/                                    = shared hook scripts, including deny-dangerous and gruff-code-quality
+|-- config.yaml                               = goat-flow version, installed skills, and toggled hook state
+|-- hooks/                                    = shared hook scripts, including deny-dangerous, gruff-code-quality, and post-turn-safety
 |-- learning-loop/
 |   |-- decisions/                            = ADRs, including ADR-028 for source namespace consolidation
 |   |-- footguns/                             = reproducible traps with evidence
@@ -195,10 +194,8 @@ tests/
 `-- logs/                                     = local setup, quality, critique, and security logs (gitignored content under it)
 
 .claude/
-|-- settings.json                             = committed Claude Code settings
+|-- settings.json                             = committed Claude Code settings registering shared hooks
 |-- settings.local.json                       = developer-local Claude Code settings (gitignored)
-|-- hooks/
-|   `-- deny-dangerous.sh                     = PreToolUse shell-safety hook
 `-- skills/
     |-- goat/
     |-- goat-critique/
@@ -210,9 +207,7 @@ tests/
 
 .codex/
 |-- config.toml                               = Codex hooks feature config
-|-- hooks.json                                = Codex PreToolUse hook registration
-`-- hooks/
-    `-- deny-dangerous.sh                     = shell-safety hook (mirrors Claude's)
+`-- hooks.json                                = Codex PreToolUse hook registration for the shared deny-dangerous hook
 
 .agents/
 `-- skills/                                   = peer-agent skills mirroring `.claude/skills/`

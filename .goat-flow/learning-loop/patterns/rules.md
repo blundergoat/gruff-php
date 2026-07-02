@@ -1,6 +1,6 @@
 ---
 category: rules
-last_reviewed: 2026-05-27
+last_reviewed: 2026-07-03
 ---
 
 # Rule Engine Patterns
@@ -16,7 +16,7 @@ last_reviewed: 2026-05-27
 1. **Fix sentence.** What to do in the code (rename, inline, narrow the type, replace the magic literal, etc.). The text should make sense without the second sentence so users who don't want to touch config can act on it alone.
 2. **Config-hatch sentence.** "If this `<name|identifier|pattern|literal>` is intentional, add it to ``rules.<id>.options.<key>`` in `.gruff-php.yaml`." Use backticks around the literal YAML path. For global allowlists (`naming.abbreviation-allowlist` → `allowlists.acceptedAbbreviations`) use the full global path instead of the per-rule path.
 
-**Examples** (`src/Rule/Waste/OneLineMethodRule.php`):
+**Examples** (`src/Rules/Waste/OneLineMethodRule.php`):
 - "Inline the expression at the call site or expand the method so it owns a meaningful contract. If this method is an intentional API contract, add its qualified symbol to `rules.waste.one-line-method.options.allowedSymbols` in `.gruff-php.yaml`."
 
 **Constraints:**
@@ -35,10 +35,10 @@ last_reviewed: 2026-05-27
 
 **Context:** Most gruff rules implement `RuleInterface` and see one `AnalysisUnit` at a time, which is sufficient for AST-driven heuristics scoped to a single file. Some rules need to reason across the whole project (e.g. "this interface has exactly one concrete implementor"). The deciding factor is whether the answer the rule needs can be derived from one file's AST.
 
-**Approach:** Add the rule to `RuleRegistry::defaults()` like any other rule, but have it implement `ProjectRuleInterface` (`definition()` + `analyseProject(list<AnalysisUnit>, RuleContext): list<Finding>`) instead of `RuleInterface`. `RuleRegistry::analyse` runs all per-unit `RuleInterface` rules first, then calls `analyseProject` once for each enabled `ProjectRuleInterface` rule with the full list of parse-clean PHP units. The two-pass dispatch is one branch inside `RuleRegistry::analyse`; see `src/Rule/ProjectRuleInterface.php` and the design rationale in `.goat-flow/learning-loop/decisions/ADR-003-project-rule-seam.md`.
+**Approach:** Add the rule to `RuleRegistry::defaults()` like any other rule, but have it implement `ProjectRuleInterface` (`definition()` + `analyseProject(list<AnalysisUnit>, RuleContext): list<Finding>`) instead of `RuleInterface`. `RuleRegistry::analyse` runs all per-unit `RuleInterface` rules first, then calls `analyseProject` once for each enabled `ProjectRuleInterface` rule with the full list of parse-clean PHP units. The two-pass dispatch is one branch inside `RuleRegistry::analyse`; see `src/Rules/Contracts/ProjectRuleInterface.php` and the design rationale in `.goat-flow/learning-loop/decisions/ADR-003-project-rule-seam.md`.
 
 **Inside the rule:**
-- Run `NameResolver` once per unit to populate `resolvedName` attributes on `Name` nodes; PHP-Parser does not run this by default in the gruff parser pipeline (see `src/Parser/PhpFileParser.php`).
+- Run `NameResolver` once per unit to populate `resolvedName` attributes on `Name` nodes; PHP-Parser does not run this by default in the gruff parser pipeline (see `src/Engine/Parser/PhpFileParser.php`).
 - Build a project index in pass 1 (interfaces / classes / type references) keyed by FQN.
 - Apply heuristics in pass 2 with full visibility.
 - Expose configuration via `RuleDefinition::$defaultOptions` so projects can tune exemptions without disabling the rule (e.g. `externalNamespacePrefixes`, `additionalExcludedPaths`).

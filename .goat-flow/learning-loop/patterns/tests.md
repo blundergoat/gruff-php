@@ -1,6 +1,6 @@
 ---
 category: tests
-last_reviewed: 2026-05-24
+last_reviewed: 2026-07-03
 ---
 
 # Test Patterns
@@ -9,11 +9,11 @@ last_reviewed: 2026-05-24
 
 **Created:** 2026-05-24
 
-**Context:** Some console code branches on `$output instanceof ConsoleOutputInterface` to route prompts or progress to STDERR via `getErrorOutput()` (see `src/Command/MissingConfigPrompt.php`, search: `promptOutput`). Verifying that routing in a test requires a double that (a) implements `ConsoleOutputInterface` so the runtime branch is taken, (b) captures any main-stream writes so the test can assert they did not happen, and (c) exposes a buffer for the error stream so the test can assert what *did* land there. `tests/Command/MissingConfigPromptTest.php` (search: `private function fakeConsoleOutput`) is the canonical implementation.
+**Context:** Some console code branches on `$output instanceof ConsoleOutputInterface` to route prompts or progress to STDERR via `getErrorOutput()` (see `src/Cli/Command/MissingConfigPrompt.php`, search: `promptOutput`). Verifying that routing in a test requires a double that (a) implements `ConsoleOutputInterface` so the runtime branch is taken, (b) captures any main-stream writes so the test can assert they did not happen, and (c) exposes a buffer for the error stream so the test can assert what *did* land there. `tests/Command/MissingConfigPromptTest.php` (search: `private function fakeConsoleOutput`) is the canonical implementation.
 
 **Approach:** Build an anonymous class that extends `Symfony\Component\Console\Output\BufferedOutput` and implements `ConsoleOutputInterface`. The parent's own buffer captures any main-stream writes; the constructor takes a separate `BufferedOutput` exposed via `getErrorOutput()`. Declare the helper's return type as the intersection `BufferedOutput&ConsoleOutputInterface` so PHPStan permits parent methods like `fetch()` on the result without resorting to inline `@var` (which `phpstan.neon.dist` policy forbids). Two interface-required methods need care:
 
-- `setErrorOutput(OutputInterface $output): void` must have a non-empty body that is not a call expression — otherwise `waste.empty-method` or `waste.one-line-method` will fire. Use `unset($output);`. It parses as `Stmt\Unset_`, which `src/Rule/Waste/OneLineMethodRule.php` (search: `Return_` and `Expression`) treats as out of scope.
+- `setErrorOutput(OutputInterface $output): void` must have a non-empty body that is not a call expression — otherwise `waste.empty-method` or `waste.one-line-method` will fire. Use `unset($output);`. It parses as `Stmt\Unset_`, which `src/Rules/Waste/OneLineMethodRule.php` (search: `Return_` and `Expression`) treats as out of scope.
 - `section(): ConsoleSectionOutput` cannot return null and `ConsoleSectionOutput` is impractical to construct in a test. Throw a `LogicException` in a two-statement body so `waste.one-line-method` skips it (`count($classMethod->stmts) !== 1`), and add a `@throws LogicException` tag so `docs.missing-throws-tag` is satisfied.
 
 The test then asserts `$consoleOutput->fetch()` returns `''` (no main-stream leakage) and that the supplied error buffer contains the expected prompt text plus any dispatched sub-command output.

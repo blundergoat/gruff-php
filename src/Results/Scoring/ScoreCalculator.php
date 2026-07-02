@@ -192,12 +192,13 @@ final readonly class ScoreCalculator
         $scores = [];
 
         foreach ($pillarNames as $pillarName) {
-            if ($pillarName === Pillar::Mutation->value && !$mutationAnalysisResult instanceof MutationAnalysisResult) {
-                $scores[] = new PillarScore($pillarName, false, null, 0, 0, 0, 0, 0.0);
-                continue;
-            }
-
             if ($pillarName === Pillar::Mutation->value) {
+                if (!$mutationAnalysisResult instanceof MutationAnalysisResult) {
+                    $scores[] = new PillarScore($pillarName, false, null, 0, 0, 0, 0, 0.0);
+                    continue;
+                }
+
+                $mutationReport   = $mutationAnalysisResult->report;
                 $mutationFindings = array_values(array_filter(
                                                      $findings,
                                                      static fn(Finding $finding): bool => $finding->pillar === Pillar::Mutation,
@@ -206,12 +207,12 @@ final readonly class ScoreCalculator
                 $scores[]         = new PillarScore(
                     pillar:     $pillarName,
                     applicable: true,
-                    grade:      Grade::fromScore($mutationAnalysisResult->report->msi()),
+                    grade:      Grade::fromScore($mutationReport->msi()),
                     findings:   count($mutationFindings),
                     advisory:   $counts['advisory'],
                     warning:    $counts['warning'],
                     error:      $counts['error'],
-                    penalty:    max(0.0, 100.0 - $mutationAnalysisResult->report->msi()),
+                    penalty:    max(0.0, 100.0 - $mutationReport->msi()),
                 );
                 continue;
             }
