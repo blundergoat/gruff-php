@@ -130,13 +130,14 @@ final readonly class TrendRecorder
     /**
      * Read a trend entry's scope, treating legacy scope-less entries as full-project.
      *
-     * @param TrendEntry $entry - Validated history row.
+     * @param TrendEntry $trendEntry - Validated history row.
      *
      * @return string - Entry scope used for delta and retention comparisons.
      */
-    private function entryScope(array $entry): string
+    private function entryScope(array $trendEntry): string
     {
-        $entryScope = $entry['scope'] ?? null;
+        // Old history rows had no scope; users should see them as full-project runs.
+        $entryScope = $trendEntry['scope'] ?? null;
 
         return is_string($entryScope) ? $entryScope : 'full-project';
     }

@@ -164,7 +164,8 @@ final class ReportCommand extends Command
             return Command::INVALID;
         }
 
-        $profileUsageError = $this->profileUsageError($input);
+        $profileUsageError = AnalyseCommandOptions::profileUsageErrorFor($this->optionalStringOption($input, 'profile') ?? 'default');
+        // Show profile typos before report can prompt, write config, or spawn analyse.
         if ($profileUsageError !== null) {
             $output->writeln(sprintf('<error>%s</error>', $profileUsageError));
 
@@ -531,18 +532,6 @@ final class ReportCommand extends Command
             $profileScorePillars,
             $this->ruleIdListOption($input, 'include-rule'),
         );
-    }
-
-    /**
-     * Validate the forwarded profile before the run has side effects.
-     *
-     * @param InputInterface $input - Console input for the report command.
-     *
-     * @return string|null - Usage error for an unsupported profile, or null when supported.
-     */
-    private function profileUsageError(InputInterface $input): ?string
-    {
-        return AnalyseCommandOptions::profileUsageErrorFor($this->optionalStringOption($input, 'profile') ?? 'default');
     }
 
     /**

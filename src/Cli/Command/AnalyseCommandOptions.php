@@ -281,7 +281,7 @@ final readonly class AnalyseCommandOptions
     {
         return $this->optionError
                ?? $this->configUsageError()
-                  ?? $this->profileUsageError()
+                  ?? self::profileUsageErrorFor($this->profile)
                      ?? $this->baselineUsageError()
                         ?? $this->diffUsageError()
                            ?? $this->changedOnlyUsageError()
@@ -546,16 +546,6 @@ final readonly class AnalyseCommandOptions
         }
 
         return '--no-config cannot be combined with --config.';
-    }
-
-    /**
-     * Return the usage error for unsupported rule execution profiles.
-     *
-     * @return string|null - the message naming the unrecognised profile, or null when the profile is "default" or "security".
-     */
-    private function profileUsageError(): ?string
-    {
-        return self::profileUsageErrorFor($this->profile);
     }
 
     /**

@@ -14,7 +14,6 @@ use GruffPhp\Cli\Application;
 use GruffPhp\Output\Reporter\FailThreshold;
 use GruffPhp\Output\Reporter\FailThresholds;
 use GruffPhp\Output\Reporter\OutputFormat;
-use GruffPhp\Results\Finding\Pillar;
 use GruffPhp\Rules\RuleRegistry;
 use Symfony\Component\Console\Application as SymfonyApplication;
 use Symfony\Component\Console\Command\Command;
@@ -269,9 +268,13 @@ final readonly class AnalyseCommandSetupBuilder
         array        $profileScorePillars,
         array        $includeRuleIds,
     ): ?string {
-        $profilePillarNames = self::profilePillarNames($profileScorePillars);
-        $profilePillarList  = self::formatPillarList($profilePillarNames);
-        $profilePillarIds   = implode('/', $profilePillarNames);
+        $profilePillarNames = [];
+        // Build the profile wording the user sees in the usage error.
+        foreach ($profileScorePillars as $profileScorePillar) {
+            $profilePillarNames[] = $profileScorePillar->value;
+        }
+        $profilePillarsLabel = self::formatPillarList($profilePillarNames);
+        $profilePillarIds    = implode('/', $profilePillarNames);
 
         // Check each requested rule against the pillars the profile's grade actually counts.
         foreach ($includeRuleIds as $ruleId) {
@@ -283,7 +286,7 @@ final readonly class AnalyseCommandSetupBuilder
                     $ruleId,
                     $pillar->value,
                     $profile,
-                    $profilePillarList,
+                    $profilePillarsLabel,
                     $profile,
                     $profilePillarIds,
                 );
@@ -291,18 +294,6 @@ final readonly class AnalyseCommandSetupBuilder
         }
 
         return null;
-    }
-
-    /**
-     * Convert a profile's scored pillars into their CLI-facing names.
-     *
-     * @param list<Pillar> $profileScorePillars - Pillars scored by the selected profile.
-     *
-     * @return list<string> - Pillar values in the profile's declared order.
-     */
-    private static function profilePillarNames(array $profileScorePillars): array
-    {
-        return array_map(static fn(Pillar $pillar): string => $pillar->value, $profileScorePillars);
     }
 
     /**
@@ -314,10 +305,12 @@ final readonly class AnalyseCommandSetupBuilder
      */
     private static function formatPillarList(array $pillarNames): string
     {
+        // Empty profile wording should read plainly if a future profile scores no pillars.
         if ($pillarNames === []) {
             return 'no';
         }
 
+        // A single pillar needs no joining words in the CLI message.
         if (count($pillarNames) === 1) {
             return $pillarNames[0];
         }

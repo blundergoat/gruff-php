@@ -368,7 +368,7 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Decide whether the runtime could reach a sink without executing this node.
+     * Decide whether a finding can still reach the report without this earlier write running.
      *
      * A write inside a branch the sink does not share may be skipped on the path that
      * reaches the sink, so trackers let such writes add evidence toward a finding but
@@ -380,41 +380,25 @@ final class SecurityNodeHelper
      * @param Node|null       $scopeBoundary - Enclosing function-like boundary, or null for file scope.
      * @param array<int, true> $sinkAncestorIds - Ancestor-id set of the sink, from ancestorIdsWithin().
      *
-     * @return bool - true when a branch, loop, catch, match/ternary arm, or short-circuit operator that the
-     *              sink does not share sits between the node and the scope boundary
+     * @return bool - true when the user-facing finding must keep earlier taint evidence alive
      */
     public static function isSkippableBeforeSink(Node $node, Node $sink, ?Node $scopeBoundary, array $sinkAncestorIds): bool
     {
         $parent = $node->getAttribute('parent');
 
-        // Climb toward the scope boundary looking for a skipping construct outside the sink's own chain.
+        // Walk outward from the write until the sink's scope boundary is reached.
         while ($parent instanceof Node && $parent !== $scopeBoundary) {
-            $isSkippingConstruct = $parent instanceof Stmt\If_
-                || $parent instanceof Stmt\ElseIf_
-                || $parent instanceof Stmt\Else_
-                || $parent instanceof Stmt\Switch_
-                || $parent instanceof Stmt\Case_
-                || $parent instanceof Stmt\While_
-                || $parent instanceof Stmt\Do_
-                || $parent instanceof Stmt\For_
-                || $parent instanceof Stmt\Foreach_
-                || $parent instanceof Stmt\Catch_
-                || $parent instanceof Expr\Ternary
-                || $parent instanceof Expr\Match_
-                || $parent instanceof Expr\BinaryOp\BooleanAnd
-                || $parent instanceof Expr\BinaryOp\BooleanOr
-                || $parent instanceof Expr\BinaryOp\Coalesce;
-
-            if ($isSkippingConstruct) {
+            // A skipping ancestor means the CLI must not let this write erase a possible finding.
+            if (self::isPotentialSkippingConstruct($parent)) {
                 $parentId = spl_object_id($parent);
 
-                // A construct the sink also sits inside cannot separate the write from the sink's path,
-                // unless the write and sink live in sibling branches of that shared construct.
+                // If the sink is outside this branch, users can reach the sink without this write.
                 if (!isset($sinkAncestorIds[$parentId])) {
                     return true;
                 }
 
-                if ($parent instanceof Stmt\If_ && self::ifBranchesDiffer($node, $sink, $parent)) {
+                // Sibling if/else paths also keep earlier taint visible in the report.
+                if ($parent instanceof Stmt\If_ && self::hasDifferentIfBranches($node, $sink, $parent)) {
                     return true;
                 }
             }
@@ -426,54 +410,85 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Decide whether two nodes sit in different executable branches of the same if-chain.
+     * Decide whether a node can skip code that would affect a user-facing finding.
+     *
+     * @param Node $node - Candidate ancestor node between a write and sink.
+     *
+     * @return bool - true when this ancestor can make the write optional before the sink
+     */
+    private static function isPotentialSkippingConstruct(Node $node): bool
+    {
+        return $node instanceof Stmt\If_
+            || $node instanceof Stmt\ElseIf_
+            || $node instanceof Stmt\Else_
+            || $node instanceof Stmt\Switch_
+            || $node instanceof Stmt\Case_
+            || $node instanceof Stmt\While_
+            || $node instanceof Stmt\Do_
+            || $node instanceof Stmt\For_
+            || $node instanceof Stmt\Foreach_
+            || $node instanceof Stmt\Catch_
+            || $node instanceof Expr\Ternary
+            || $node instanceof Expr\Match_
+            || $node instanceof Expr\BinaryOp\BooleanAnd
+            || $node instanceof Expr\BinaryOp\BooleanOr
+            || $node instanceof Expr\BinaryOp\Coalesce;
+    }
+
+    /**
+     * Decide whether two nodes sit in different branches of one if-chain.
      *
      * @param Node     $node - Write/event node being classified.
      * @param Node     $sink - Sink node whose path is being compared.
-     * @param Stmt\If_ $if - Shared if-chain ancestor.
+     * @param Stmt\If_ $ifStatement - Shared if-chain ancestor.
      *
-     * @return bool - true when both nodes are in known sibling bodies of the if-chain
+     * @return bool - true when the CLI should keep earlier taint because only one branch runs
      */
-    private static function ifBranchesDiffer(Node $node, Node $sink, Stmt\If_ $if): bool
+    private static function hasDifferentIfBranches(Node $node, Node $sink, Stmt\If_ $ifStatement): bool
     {
-        $nodeBranch = self::ifBranchKey($node, $if);
-        $sinkBranch = self::ifBranchKey($sink, $if);
+        $nodeBranch = self::ifBranchKey($node, $ifStatement);
+        $sinkBranch = self::ifBranchKey($sink, $ifStatement);
 
         return $nodeBranch !== null && $sinkBranch !== null && $nodeBranch !== $sinkBranch;
     }
 
     /**
-     * Identify the body branch a node belongs to for a specific if-chain.
+     * Identify which if-chain body a node belongs to for reporting decisions.
      *
-     * Conditions return null because they are evaluated before any reachable branch body and
-     * should not be treated as skippable relative to a sink inside that same branch chain.
+     * Conditions return null because they run before the body the user can reach.
      *
      * @param Node     $node - Descendant candidate.
-     * @param Stmt\If_ $if - If-chain ancestor to classify against.
+     * @param Stmt\If_ $ifStatement - If-chain ancestor to classify against.
      *
      * @return string|null - stable branch key for if/elseif/else bodies, or null for conditions/unrelated nodes
      */
-    private static function ifBranchKey(Node $node, Stmt\If_ $if): ?string
+    private static function ifBranchKey(Node $node, Stmt\If_ $ifStatement): ?string
     {
         $current = $node;
         $parent  = $current->getAttribute('parent');
 
         while ($parent instanceof Node) {
-            if ($parent === $if) {
-                if (in_array($current, $if->stmts, true)) {
+            // Once the shared if-chain is reached, classify the direct child branch.
+            if ($parent === $ifStatement) {
+                // The main if body is one possible path to the user-facing sink.
+                if (in_array($current, $ifStatement->stmts, true)) {
                     return 'if';
                 }
 
-                foreach ($if->elseifs as $elseIf) {
+                // Each elseif body is a separate path in the report's runtime story.
+                foreach ($ifStatement->elseifs as $elseIf) {
+                    // A matching elseif node means the write and sink may be mutually exclusive.
                     if ($current === $elseIf) {
                         return 'elseif:' . spl_object_id($elseIf);
                     }
                 }
 
-                if ($if->else instanceof Stmt\Else_ && $current === $if->else) {
-                    return 'else:' . spl_object_id($if->else);
+                // The else body is the fallback path a user can reach when earlier tests fail.
+                if ($ifStatement->else instanceof Stmt\Else_ && $current === $ifStatement->else) {
+                    return 'else:' . spl_object_id($ifStatement->else);
                 }
 
+                // Conditions and unrelated children are not branch bodies, so they cannot split the finding.
                 return null;
             }
 
