@@ -2,7 +2,7 @@
 
 Notable user-facing changes to `gruff-php` are listed here.
 
-## 0.5.0 - Unreleased
+## 0.5.0 - 2026-07-03
 
 0.5.0 makes gruff's identities line-stable — baselines, branch review, and SARIF all stop churning when unrelated edits shift line numbers — sharpens eight rules against false positives and evasion gaps, brings `report` up to `analyse`'s workflow surface, and makes release version bumps drift-proof.
 
