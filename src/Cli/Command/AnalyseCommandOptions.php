@@ -333,7 +333,22 @@ final readonly class AnalyseCommandOptions
      */
     public function profileScorePillars(): ?array
     {
-        if ($this->profile !== self::PROFILE_SECURITY) {
+        return self::scorePillarsForProfile($this->profile);
+    }
+
+    /**
+     * Return the scored pillar set for a profile name.
+     *
+     * Static so commands that forward analyse options (report) can validate profile/include
+     * coherence against the same pillar set before any prompt or subprocess runs.
+     *
+     * @param string $profile - Requested profile name.
+     *
+     * @return list<Pillar>|null - the pillars the security profile scores, or null when the profile scores every pillar
+     */
+    public static function scorePillarsForProfile(string $profile): ?array
+    {
+        if ($profile !== self::PROFILE_SECURITY) {
             return null;
         }
 
