@@ -1,7 +1,7 @@
 ---
 name: goat-plan
 description: "Use when starting a non-trivial implementation that needs structured task breakdown with progress tracking."
-goat-flow-skill-version: "1.12.1"
+goat-flow-skill-version: "1.13.0"
 ---
 # /goat-plan
 
@@ -41,7 +41,7 @@ Use for milestones, replans, rescope, resume-from-plan. **NOT this skill:** test
 
 0. **Path-Only Intake / Read-Only Orientation** - path-only or ambiguous task path. Summarize status, ask next action, stop.
 1. **Named-File Update** - user asks to update, improve, tighten, rewrite, or fix a specific existing plan file. A path alone is not write approval. Proceed to Phase 2 § Mode 1 only for plan-file edits, not code implementation.
-2. **Read-Only Analysis** - analysis signals: "what would the milestones look like", "break this down for me", "plan this out", "sketch the milestones", "how would you approach this", "walk me through the plan", "reporting-only", "no-implementation". No files written; inline output; Phase 3 skipped; transition to file mode available later.
+2. **Read-Only Analysis** - analysis signals: "what would the milestones look like", "break this down for me", "plan this out", "sketch the milestones", "reporting-only", "no-implementation". No files written; inline output; Phase 3 skipped; transition to file mode available later.
 3. **Small File-Write** - Hotfix / Small Feature scope (1-2 milestones, low blast radius), no analysis signals. Same write path as Mode 4; the only difference is ceremony - concise milestone files, not full ones. Write directly to `.goat-flow/plans/<active>/`.
 4. **File-Write (default at Standard+)** - implementation signals ("create milestones", "set up the plan", "start planning") OR Standard / System / Infrastructure scope with a clear objective and no analysis signals. Write full milestone files directly to `.goat-flow/plans/<active>/`.
 
@@ -147,7 +147,7 @@ Write artifacts immediately. Do NOT invoke/ask about `/goat-critique`; run it on
 
 For a fresh plan, create a slugged task directory and update `.goat-flow/plans/.active` to that slug in the same batch. Write one milestone per `.goat-flow/plans/<active>/M*.md` file.
 
-**Filename format:** start with `M` so dashboard and task tooling discover it; use a readable slug, e.g. `Milestone-prove-api-integration.md`.
+**Filename format:** start with `M` plus a zero-padded number so dashboard and task tooling discover and order it; use a readable slug, e.g. `M01-prove-api-integration.md`.
 
 **File format:** use the Phase 1 milestone field set plus title and Status, ending with Testing Gate (static/contract + automated + manual + acceptance) and Mid-implementation proof.
 

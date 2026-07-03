@@ -1,4 +1,4 @@
-# AGENTS.md - project v1.5.1 / goat-flow 1.12.1 (2026-07-03)
+# AGENTS.md - project v1.5.1 / goat-flow 1.13.0 (2026-07-03)
 gruff-php is an opinionated PHP code-quality analyzer; its mission is to govern AI-generated code so a human can verify, trust, and sign off on it (legible, secure, genuinely tested). Current invariant: keep app claims and commands grounded in real source/config files.
 
 ## Truth Order
@@ -32,6 +32,7 @@ gruff-php is an opinionated PHP code-quality analyzer; its mission is to govern 
 - Skill reference: `.goat-flow/skill-docs/`
 - Tool playbooks: `.goat-flow/skill-docs/playbooks/README.md`, `.goat-flow/skill-docs/playbooks/browser-use.md`, `.goat-flow/skill-docs/playbooks/page-capture.md`
 - Orientation: `.goat-flow/architecture.md`, `.goat-flow/code-map.md`, `.goat-flow/glossary.md`
+- Codex hook reality: `.codex/hooks.json` registers only `deny-dangerous`; `gruff-code-quality` and `post-turn-safety` may be enabled globally but are unsupported for Codex until its post-tool/Stop lifecycles are verified. Run `goat-flow hooks list . --agent codex` before claiming Codex hook coverage.
 
 ## Commit Messages
 

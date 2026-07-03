@@ -1,5 +1,5 @@
 ---
-goat-flow-reference-version: "1.12.1"
+goat-flow-reference-version: "1.13.0"
 ---
 # ISSUE.md Format
 
@@ -27,9 +27,9 @@ Future tense. What needs to be delivered - not how. Each bullet is a testable re
 ```markdown
 ## What
 
-- Dashboard login will need refresh-token rotation so signed-in users can continue work after access tokens expire
-- Session storage will need atomic refresh-token replacement so concurrent requests cannot restore stale credentials
-- Operational documentation will explain the supported rotation behaviour and rollback trigger
+- Dashboard login needs refresh-token rotation so signed-in users can continue work after access tokens expire
+- Session storage needs atomic refresh-token replacement so concurrent requests cannot restore stale credentials
+- Operational documentation needs to explain the supported rotation behaviour and rollback trigger
 ```
 
 Do not duplicate file-level detail that the milestone files or diff already show. No past tense - this section reads as "here is what must ship" even if the work is already done (the Phase 4 revision flips tense to confirm delivery).

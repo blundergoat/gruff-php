@@ -1,5 +1,5 @@
 ---
-goat-flow-reference-version: "1.12.1"
+goat-flow-reference-version: "1.13.0"
 ---
 # Milestone Template - Detailed Field Reference
 
@@ -88,12 +88,6 @@ Prove the OAuth provider issues rotated refresh tokens and that the app can pers
 ## Testing Gate
 ### Static / Contract Check
 - [ ] `npm run typecheck` exits 0
-
-### Automated
-- [ ] Not applicable; provider behavior needs a live OAuth sandbox
-
-### Acceptance
-- [ ] Static check passed and local refresh flow proves token rotation end-to-end
 
 ### Manual
 - [ ] Refresh an expiring session in a local browser; expected: the user remains signed in and the stored refresh token changes

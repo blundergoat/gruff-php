@@ -1,10 +1,12 @@
-version: "1.12.1"
+version: "1.13.0"
 
 skills:
   install: all
 
 # Togglable goat-flow hook state. Missing entries use registry defaults.
 # Manage with the dashboard Hooks page or `goat-flow hooks <enable|disable|sync>`.
+# These are global desired states; effective installation still depends on
+# agent lifecycle support. Verify with `goat-flow hooks list . --agent <id>`.
 hooks:
   deny-dangerous:
     enabled: true

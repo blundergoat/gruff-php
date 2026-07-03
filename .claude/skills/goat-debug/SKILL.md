@@ -1,7 +1,7 @@
 ---
 name: goat-debug
 description: "Use when diagnosing a bug, unexpected behaviour, system failure, or unfamiliar code that needs structured investigation."
-goat-flow-skill-version: "1.12.1"
+goat-flow-skill-version: "1.13.0"
 ---
 # /goat-debug
 
@@ -88,7 +88,7 @@ Use this as the output shape, not as a canned diagnosis. Real incident: a `goat-
 | # | Hypothesis | Category | Action | Expected outcome |
 |---|---|---|---|---|
 | 1 | `SKILL.md` lacks a worked phase example | Data | `rg -n '### Worked Example' SKILL.md` | No `### Worked Example` heading CONFIRMS the deduction. |
-| 2 | Shared references already supply the missing example | Configuration | `rg -n 'D1\|Minimal Failing Case\|worked' skill-preamble.md skill-conventions.md` | If only rules/templates appear, ELIMINATE this as a fix. |
+| 2 | Shared references already supply the missing example | Configuration | `rg -n 'D1|Minimal Failing Case|worked' skill-preamble.md skill-conventions.md` | If only rules/templates appear, ELIMINATE this as a fix. |
 
 - **D1.5 minimal case:** the three composed files reproduce the score; dashboard metadata and unrelated skill copies are removed because the missing walkthrough is visible in the composed bundle.
 - **D2 root cause shape:** `SKILL.md` (search: `## Output Format`) had an output skeleton but no concrete phase walkthrough; confidence is HIGH only after reproducing the assessment or rerunning the quality report.

@@ -1,13 +1,13 @@
 # Code Map - gruff-php
 
-Last reviewed 2026-07-03. Captures the current source surface as wired in `composer.json`, `bin/gruff-php`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
+Last reviewed 2026-07-04. Captures the current source surface as wired in `composer.json`, `bin/gruff-php`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
 
 ## Top-level layout
 
 ```text
 .
 |-- README.md                 = project entry doc; also probed by docs.missing-readme rule
-|-- CHANGELOG.md              = unreleased notes for the v0.1 surface
+|-- CHANGELOG.md              = release history; the top section tracks the current `Application::VERSION`
 |-- CLAUDE.md                 = Claude Code root instruction file
 |-- AGENTS.md                 = Codex peer instruction file
 |-- composer.json             = Composer metadata, runtime deps, bin, autoload, `check`/`phpstan`/`security:scan`/`test` scripts
@@ -177,7 +177,7 @@ tests/
 |-- architecture.md                           = system architecture notes (this file's sibling)
 |-- code-map.md                               = this repository map
 |-- glossary.md                               = project and harness terms
-|-- config.yaml                               = goat-flow version, installed skills, and toggled hook state
+|-- config.yaml                               = goat-flow version, installed skills, and global hook desired state
 |-- hooks/                                    = shared hook scripts, including deny-dangerous, gruff-code-quality, and post-turn-safety
 |-- learning-loop/
 |   |-- decisions/                            = ADRs, including ADR-028 for source namespace consolidation
@@ -207,7 +207,7 @@ tests/
 
 .codex/
 |-- config.toml                               = Codex hooks feature config
-`-- hooks.json                                = Codex PreToolUse hook registration for the shared deny-dangerous hook
+`-- hooks.json                                = Codex PreToolUse hook registration for the shared deny-dangerous hook; Codex post-tool/Stop hooks are unsupported in goat-flow 1.13.0
 
 .agents/
 `-- skills/                                   = peer-agent skills mirroring `.claude/skills/`
