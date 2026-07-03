@@ -10,7 +10,11 @@ use GruffPhp\Engine\Source\SourceDiscoveryResult;
 use GruffPhp\Engine\Source\SourceFile;
 
 /**
- * Carries parsed analysis units, diagnostics, and discovery metadata.
+ * The parsed sources for one analysis run — units, diagnostics, and discovery metadata.
+ *
+ * Sits between source loading and rule execution: it holds the parsed `AnalysisUnit`s the rules
+ * inspect, the diagnostics (like parse errors) surfaced to the user, and the discovery result behind
+ * the "N discovered / parsed / ignored / missing" counts shown in the summary and report.
  */
 final readonly class AnalysisSourceSet
 {
@@ -21,12 +25,12 @@ final readonly class AnalysisSourceSet
     private ?int $explicitParsedFileCount;
 
     /**
-      * User flow: Supports the terminal command path and the feedback it prints.
-      *
-     * @param SourceDiscoveryResult $discovery - Discovery result for the requested paths.
-     * @param list<AnalysisUnit>    $analysisUnits - Parsed analysis units, possibly released.
-     * @param list<RunDiagnostic>   $diagnostics - Diagnostics emitted while loading sources.
-     * @param int|null              $parsedFileCount - Optional pre-computed parsed-file count for streaming flows.
+     * Bundles one run's discovered files and parsed units with the counts the user ultimately sees.
+     *
+     * @param SourceDiscoveryResult $discovery       - Discovery result for the requested paths.
+     * @param list<AnalysisUnit>    $analysisUnits   - Parsed analysis units, possibly released.
+     * @param list<RunDiagnostic>   $diagnostics     - Diagnostics emitted while loading sources.
+     * @param int|null              $parsedFileCount - Pre-computed parsed-file count for streaming flows; null derives it live from the units.
      */
     public function __construct(
         public SourceDiscoveryResult $discovery,
@@ -38,10 +42,8 @@ final readonly class AnalysisSourceSet
     }
 
     /**
-     * List the project-relative display paths of the discovered source files.
+     * Lists the project-relative paths of the discovered files — the paths shown beside each finding.
      *
-      * User flow: Supports the terminal command path and the feedback it prints.
-      *
      * @return list<string> - Project-relative source file paths in discovery order.
      */
     public function displayPaths(): array
@@ -53,19 +55,15 @@ final readonly class AnalysisSourceSet
     }
 
     /**
-     * Count successfully parsed analysis units in the loaded source set.
+     * Counts the files gruff actually parsed, feeding the "N parsed" figure in the summary and report.
      *
-      * User flow: Supports the terminal command path and the feedback it prints.
-      *
      * @return int - Number of units without parse diagnostics.
      */
     public function parsedFileCount(): int
     {
-        // User view: choose the terminal output branch for this case.
-        // User view: missing data becomes the expected terminal output state.
+        // Streaming flows release each unit's AST before constructing the set, so the live units are
+        // no longer countable; trust the count captured at parse time.
         if ($this->explicitParsedFileCount !== null) {
-            // Streaming flows release each unit's AST before constructing the set, so the
-            // live units are no longer countable; trust the count captured at parse time.
             return $this->explicitParsedFileCount;
         }
 

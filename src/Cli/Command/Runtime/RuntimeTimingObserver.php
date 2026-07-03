@@ -7,7 +7,11 @@ namespace GruffPhp\Cli\Command\Runtime;
 use GruffPhp\Rules\Shared\RuleRunnerObserver;
 
 /**
- * Collects per-rule wall-clock totals reported by RuleRegistry::analyse().
+ * Collects per-rule wall-clock timing while an analysis run executes.
+ *
+ * Plugged into `RuleRegistry::analyse()` so that, when a run is measuring performance, each rule's
+ * time is accumulated here. The tallied totals let the tool report which rules cost the most of a
+ * scan's wall-clock, slowest first — the numbers behind any performance breakdown shown to the user.
  */
 final class RuntimeTimingObserver implements RuleRunnerObserver
 {
@@ -15,18 +19,16 @@ final class RuntimeTimingObserver implements RuleRunnerObserver
     private array $totals = [];
 
     /**
-     * Accumulate one rule invocation's duration into the per-rule totals.
+     * Records one rule invocation's duration, so per-rule totals build up as the scan runs.
      *
-      * User flow: Supports the terminal command path and the feedback it prints.
-      *
-     * @param string $ruleId - Rule identifier as declared in the rule's RuleDefinition.
+     * @param string $ruleId     - Rule identifier as declared in the rule's RuleDefinition.
      * @param int    $durationNs - Wall-clock nanoseconds the rule spent in analyse().
      *
      * @return void
      */
     public function onRuleExecuted(string $ruleId, int $durationNs): void
     {
-        // User view: choose the terminal output branch for this case.
+        // First time this rule reports in: open its running total before adding to it.
         if (!isset($this->totals[$ruleId])) {
             $this->totals[$ruleId] = ['totalNs' => 0, 'invocations' => 0];
         }
@@ -36,17 +38,15 @@ final class RuntimeTimingObserver implements RuleRunnerObserver
     }
 
     /**
-     * Emit the collected per-rule totals as a stable, sorted list.
+     * Produces the final per-rule timing table, slowest first — the order the user reads it in.
      *
-      * User flow: Supports the terminal command path and the feedback it prints.
-      *
      * @return list<array{ruleId: string, totalNs: int, invocations: int}> - Ordered by descending total time.
      */
     public function snapshot(): array
     {
         $rows = [];
 
-        // User view: add each item that can appear in terminal output.
+        // Flatten the keyed totals into a plain list so it can be sorted and rendered.
         foreach ($this->totals as $ruleId => $row) {
             $rows[] = ['ruleId' => $ruleId, 'totalNs' => $row['totalNs'], 'invocations' => $row['invocations']];
         }

@@ -7,15 +7,17 @@ namespace GruffPhp\Cli\Dashboard;
 use GruffPhp\Engine\Config\ConfigLoader;
 
 /**
- * Builds command arguments for dashboard-triggered scans.
+ * Turns a dashboard scan form into the exact `gruff-php analyse` command to run.
+ *
+ * When a user clicks "scan" in the dashboard, their chosen paths and toggles arrive as form fields;
+ * this translates them into a safe argv (PHP binary, gruff binary, flags, then path operands after
+ * `--`) so a dashboard-triggered scan runs exactly the analyse the CLI would.
  */
 final readonly class DashboardScanCommandBuilder
 {
     /**
-     * Build dashboard-triggered analyse commands for the given gruff-php binary.
+     * Binds the builder to the gruff-php binary that dashboard scans will invoke.
      *
-      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
-      *
      * @param string $gruffBinary - Absolute gruff-php binary path used in dashboard scans.
      */
     public function __construct(private string $gruffBinary)
@@ -23,48 +25,40 @@ final readonly class DashboardScanCommandBuilder
     }
 
     /**
-     * Parse a dashboard paths string into command arguments.
+     * Splits the dashboard's free-text paths field into individual path operands.
      *
-      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
-      *
      * @param string $paths - Space-separated paths from the dashboard form, with double quotes for paths containing spaces.
      *
      * @return list<string> - parsed path operands in form order; defaults to ['.'] when input is blank or all-empty
      */
     public function parsePaths(string $paths): array
     {
-        // User view: choose the dashboard view branch for this case.
-        // User view: an empty value becomes a clear dashboard view fallback.
+        // Blank field means "scan here", so default to the project the user is looking at.
         if (trim($paths) === '') {
             return ['.'];
         }
 
         $parsedPaths = [];
+        // Tokenise into quoted paths (group 1, for names with spaces) or bare paths (group 2).
         preg_match_all('/"((?:\\\\.|[^"\\\\])*)"|(\S+)/', $paths, $matches, PREG_SET_ORDER);
 
-        // User view: add each item that can appear in dashboard view.
+        // Walk each token the form supplied, unwrapping quoted paths back into plain filesystem paths.
         foreach ($matches as $match) {
-            // User view: missing data becomes a safe dashboard view default.
             $quotedPath = $match[1] ?? '';
-            // User view: missing data becomes a safe dashboard view default.
-            // User view: an empty value becomes a clear dashboard view fallback.
             $path       = $quotedPath !== '' ? $this->unescapeQuotedPath($quotedPath) : ($match[2] ?? '');
-            // User view: choose the dashboard view branch for this case.
-            // User view: an empty value becomes a clear dashboard view fallback.
+            // Drop empty tokens so a stray space can't smuggle a phantom path into the scan.
             if ($path !== '') {
                 $parsedPaths[] = $path;
             }
         }
 
-        // User view: an empty value becomes a clear dashboard view fallback.
+        // If it all parsed away to nothing (e.g. just empty quotes), still fall back to "scan here".
         return $parsedPaths === [] ? ['.'] : $parsedPaths;
     }
 
     /**
-     * Decode only the quote and backslash escapes emitted by the dashboard path tokenizer.
+     * Undoes only the \" and \\ escapes the dashboard tokenizer added, leaving the real path untouched.
      *
-      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
-      *
      * @param string $quotedPath - Raw inner text of a double-quoted token, still carrying \" and \\ escapes.
      *
      * @return string - decoded path with the wrapper \" and \\ escapes resolved; inner content otherwise untouched
@@ -78,10 +72,10 @@ final readonly class DashboardScanCommandBuilder
     }
 
     /**
-      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
-      *
-     * @param list<string>           $paths - Source paths selected in the dashboard form; appended after `--`.
-     * @param array<string, string>  $state - Sanitised dashboard form state used to build analyse flags.
+     * Assembles the full analyse argv from the user's sanitised dashboard form choices.
+     *
+     * @param list<string>          $paths - Source paths selected in the dashboard form; appended after `--`.
+     * @param array<string, string> $state - Sanitised dashboard form state used to build analyse flags.
      *
      * @phpstan-param array{project: string, paths: string, scanScope: string, failOn: string, config: string, baseline: string, noBaseline: string,
      *                noConfig: string, includeIgnored: string, reportInteractive: string} $state
@@ -92,43 +86,38 @@ final readonly class DashboardScanCommandBuilder
     {
         $command = [PHP_BINARY, $this->gruffBinary, 'analyse', '--format', 'html', '--fail-on', $state['failOn']];
 
-        // User view: choose the dashboard view branch for this case.
+        // Config choice: honour the user's "no config" toggle first, else pass any explicit non-default config file.
         if ($state['noConfig'] === '1') {
             $command[] = '--no-config';
-        }
-        // User view: an empty value becomes a clear dashboard view fallback.
-        // User view: choose the next dashboard view branch for this case.
-        elseif ($state['config'] !== '' && $state['config'] !== ConfigLoader::DEFAULT_CONFIG_FILE) {
+        } elseif ($state['config'] !== '' && $state['config'] !== ConfigLoader::DEFAULT_CONFIG_FILE) {
             $command[] = '--config';
             $command[] = $state['config'];
         }
 
-        // User view: choose the dashboard view branch for this case.
+        // Baseline choice: skip the baseline entirely, or point the scan at the baseline file the user named.
         if ($state['noBaseline'] === '1') {
             $command[] = '--no-baseline';
-        }
-        // User view: an empty value becomes a clear dashboard view fallback.
-        // User view: choose the next dashboard view branch for this case.
-        elseif ($state['baseline'] !== '') {
+        } elseif ($state['baseline'] !== '') {
             $command[] = '--baseline';
             $command[] = $state['baseline'];
         }
 
-        // User view: choose the dashboard view branch for this case.
+        // The user ticked "include ignored files", so widen the scan past the usual ignore rules.
         if ($state['includeIgnored'] === '1') {
             $command[] = '--include-ignored';
         }
 
-        // User view: choose the dashboard view branch for this case.
+        // The user asked for the interactive HTML report instead of the plain static one.
         if ($state['reportInteractive'] === '1') {
             $command[] = '--report-interactive';
         }
 
-        // User view: choose the dashboard view branch for this case.
+        // Scope set to "diff": scan only what changed rather than the whole project.
         if ($state['scanScope'] === 'diff') {
             $command[] = '--diff';
         }
 
+        // Everything after `--` is a path operand, so user paths can never be mistaken for flags.
         $command[] = '--';
         array_push($command, ...$paths);
 

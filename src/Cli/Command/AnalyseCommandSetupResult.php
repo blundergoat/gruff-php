@@ -9,20 +9,22 @@ use GruffPhp\Output\Reporter\OutputFormat;
 use Symfony\Component\Console\Command\Command;
 
 /**
- * Represents either ready analysis setup or an early command error.
+ * Result of preparing the `analyse` command — either a ready-to-run setup or an early stop.
+ *
+ * The setup phase can succeed, fail with a plain console error, fail with a report-formatted error
+ * (so `--format=json` still returns structured output), or bow out after another component already
+ * printed something. This one type carries whichever outcome occurred, plus the exit code to return.
  */
 final readonly class AnalyseCommandSetupResult
 {
     /**
      * Create a setup result variant.
      *
-      * User flow: Supports the terminal command path and the feedback it prints.
-      *
-     * @param AnalyseCommandSetup|null $setup - Ready setup payload, when setup succeeded.
-     * @param AnalysisReport|null      $report - Report-formatted setup error payload, when available.
-     * @param OutputFormat|null        $format - Output format for a report-formatted setup error.
+     * @param AnalyseCommandSetup|null $setup      - Ready setup payload, when setup succeeded.
+     * @param AnalysisReport|null      $report     - Report-formatted setup error payload, when available.
+     * @param OutputFormat|null        $format     - Output format for a report-formatted setup error.
      * @param string|null              $plainError - Plain console error message, when setup failed before report formatting.
-     * @param int                      $exitCode - Symfony command exit code for this result.
+     * @param int                      $exitCode   - Symfony command exit code for this result.
      */
     private function __construct(
         public ?AnalyseCommandSetup $setup,
@@ -34,10 +36,8 @@ final readonly class AnalyseCommandSetupResult
     }
 
     /**
-     * Build a successful setup result.
+     * Wraps a validated setup so the command proceeds straight to the scan.
      *
-      * User flow: Supports the terminal command path and the feedback it prints.
-      *
      * @param AnalyseCommandSetup $setup - Ready setup payload.
      *
      * @return self - Ready setup result.
@@ -49,11 +49,9 @@ final readonly class AnalyseCommandSetupResult
     }
 
     /**
-     * Build a plain console error result.
+     * Stops with an unformatted console message — for setup failures before an output format is known.
      *
-      * User flow: Supports the terminal command path and the feedback it prints.
-      *
-     * @param string $message - Plain error message for console output.
+     * @param string $message  - Plain error message for console output.
      * @param int    $exitCode - Symfony command exit code for the failure.
      *
      * @return self - Plain error setup result.
@@ -65,10 +63,8 @@ final readonly class AnalyseCommandSetupResult
     }
 
     /**
-     * Build an early exit result after another component already wrote output.
+     * Bows out with just an exit code when another component (a prompt or `--help`) already wrote output.
      *
-      * User flow: Supports the terminal command path and the feedback it prints.
-      *
      * @param int $exitCode - Symfony command exit code for the early exit.
      *
      * @return self - Early exit setup result.
@@ -80,10 +76,8 @@ final readonly class AnalyseCommandSetupResult
     }
 
     /**
-     * Build a report-formatted setup error result.
+     * Fails through the report formatter, so machine formats like `--format=json` still return structured output.
      *
-      * User flow: Supports the terminal command path and the feedback it prints.
-      *
      * @param AnalysisReport $report - Report payload describing the setup failure.
      * @param OutputFormat   $format - Output format selected for the report.
      *

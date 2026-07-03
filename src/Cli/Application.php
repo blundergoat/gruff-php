@@ -15,29 +15,32 @@ use GruffPhp\Cli\Command\SummaryCommand;
 use Symfony\Component\Console\Application as SymfonyApplication;
 
 /**
- * Registers the gruff-php CLI commands with Symfony Console.
+ * The gruff-php CLI entry point — wires every subcommand into Symfony Console.
+ *
+ * This is what `bin/gruff-php` boots: it registers the commands a user can type (`analyse`,
+ * `summary`, `report`, `dashboard`, `init`, `hook`, `list-rules`, `check-ignore`) and stamps the
+ * tool name and version shown in `--help` and on every report header.
  */
 final class Application extends SymfonyApplication
 {
     /**
-     * Console application name displayed by Symfony.
+     * Console application name shown by Symfony and printed on report headers.
      */
     public const NAME = 'gruff-php';
 
     /**
-     * Version displayed by the CLI.
+     * Version shown by `--version` and stamped onto every report the user sees.
      */
     public const VERSION = '0.5.0';
 
     /**
-     * Register the gruff-php CLI command surface with Symfony Console.
-      * User flow: Supports the terminal command path and the feedback it prints.
-      *
+     * Registers the full command surface so every `gruff-php <command>` a user types is wired up.
      */
     public function __construct()
     {
         parent::__construct(self::NAME, self::VERSION);
 
+        // Every subcommand a user can run; each entry becomes one `gruff-php <name>` invocation.
         $this->addCommands([
             new AnalyseCommand(),
             new CheckIgnoreCommand(),

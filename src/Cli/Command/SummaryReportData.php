@@ -8,26 +8,28 @@ use GruffPhp\Results\Scoring\FileScore;
 use GruffPhp\Results\Scoring\ScoreReport;
 
 /**
- * Carries all data needed to render text or JSON summary output.
+ * Immutable payload the `summary` command hands to its renderers.
+ *
+ * Bundles everything one summary needs — scanned paths, file counts, composite score, severity
+ * totals, and the top-rules/top-offenders lists — so the text and JSON renderers read identical
+ * numbers and the user sees a consistent digest whichever format they chose.
  */
 final readonly class SummaryReportData
 {
     /**
-     * Capture source, score, and aggregate finding data for summary rendering.
+     * Capture source, score, and aggregate finding data for one summary render.
      *
-      * User flow: Supports the terminal command path and the feedback it prints.
-      *
-     * @param list<string>                                                                                     $paths - Paths requested by the summary command.
-     * @param string|null                                                                                      $configPath - Effective config path used for analysis.
+     * @param list<string>                                                                                     $paths             - Paths the user named; empty means none were given, so the whole project was scanned.
+     * @param string|null                                                                                      $configPath        - Effective config path for the run; null when no config file was used.
      * @param int                                                                                              $sourcesDiscovered - Number of files discovered before parsing.
-     * @param int                                                                                              $sourcesParsed - Number of files parsed without parse errors.
-     * @param int                                                                                              $ignoredPaths - Number of ignored paths reported by discovery.
-     * @param int                                                                                              $missingPaths - Number of missing input paths.
-     * @param int                                                                                              $parseErrors - Number of parse-error diagnostics.
-     * @param ScoreReport                                                                                      $score - Composite score report for the run.
-     * @param array{advisory: int, warning: int, error: int, total: int}                                       $totals - Finding totals by severity.
-     * @param list<array{ruleId: string, count: int, advisory: int, warning: int, error: int, pillar: string}> $topRules - Highest-volume rules.
-     * @param list<FileScore>                                                                                  $topOffenders - Lowest-scoring file summaries.
+     * @param int                                                                                              $sourcesParsed     - Number of files parsed without parse errors.
+     * @param int                                                                                              $ignoredPaths      - Number of ignored paths reported by discovery.
+     * @param int                                                                                              $missingPaths      - Number of missing input paths.
+     * @param int                                                                                              $parseErrors       - Number of parse-error diagnostics.
+     * @param ScoreReport                                                                                      $score             - Composite score report for the run.
+     * @param array{advisory: int, warning: int, error: int, total: int}                                       $totals            - Finding totals by severity.
+     * @param list<array{ruleId: string, count: int, advisory: int, warning: int, error: int, pillar: string}> $topRules          - Highest-volume rules; empty when the run had no findings.
+     * @param list<FileScore>                                                                                  $topOffenders      - Lowest-scoring files; empty when nothing scored below the pass mark.
      */
     public function __construct(
         public array $paths,
