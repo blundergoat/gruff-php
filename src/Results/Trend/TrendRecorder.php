@@ -32,8 +32,9 @@ final readonly class TrendRecorder
     {
         $resolvedPath  = PathHelper::resolveAgainst($projectRoot, $path);
         $entries       = $this->readEntries($resolvedPath);
-        $previous      = $entries === [] ? null : $entries[array_key_last($entries)];
-        $previousScore = $this->scoreFromEntry($previous);
+        // The user's trend delta compares like-for-like only: a diff-scoped score is never measured
+        // against a full-project predecessor. Every run still appends its own entry.
+        $previousScore = $this->scoreFromEntry($this->latestEntryForScope($entries, $score->scope));
         $trendEntry    = [
             'schemaVersion' => AnalysisReport::SCHEMA_VERSION,
             'timestamp' => gmdate(DATE_ATOM),
@@ -51,17 +52,47 @@ final readonly class TrendRecorder
             throw new RuntimeException(sprintf('Unable to create history directory: %s', $directory));
         }
 
-        if (file_put_contents($resolvedPath, json_encode($entries, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . PHP_EOL, LOCK_EX) === false) {
+        // Invalid bytes become U+FFFD so a history write can never crash the user's run; history values
+        // are never match keys, so substitution cannot desynchronise anything.
+        if (file_put_contents($resolvedPath, json_encode($entries, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR) . PHP_EOL, LOCK_EX) === false) {
             throw new RuntimeException(sprintf('Unable to write history file: %s', $resolvedPath));
         }
 
         return new TrendReport(
             path:          PathHelper::relativeToRoot($resolvedPath, $projectRoot) ?? PathHelper::canonical($resolvedPath),
+            scope:         $score->scope,
             currentScore:  $score->composite->score,
             previousScore: $previousScore,
             delta:         $previousScore === null ? null : round($score->composite->score - $previousScore, 2),
             entries:       $entries,
         );
+    }
+
+    /**
+     * Find the most recent history entry recorded with the given scope.
+     *
+     * Keeps the delta a user sees after `analyse --history-file` honest: a diff-scoped
+     * score is only ever compared with an earlier diff-scoped score, never a full run.
+     *
+     * @param list<TrendEntry> $entries - Validated history rows in file order.
+     * @param string           $scope - Current run's score scope ('full-project' or 'diff').
+     *
+     * @return TrendEntry|null - latest same-scope row, or null when the history holds none; rows without a
+     *                         scope field predate scope stamping and are treated as full-project
+     */
+    private function latestEntryForScope(array $entries, string $scope): ?array
+    {
+        // Walk newest-first so the delta compares against the most recent comparable run.
+        for ($index = count($entries) - 1; $index >= 0; $index--) {
+            $entryScope = $entries[$index]['scope'] ?? null;
+
+            // Match same-scope rows only; scope-less rows are legacy history from full runs.
+            if ((is_string($entryScope) ? $entryScope : 'full-project') === $scope) {
+                return $entries[$index];
+            }
+        }
+
+        return null;
     }
 
     /**

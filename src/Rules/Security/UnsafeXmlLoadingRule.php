@@ -29,6 +29,15 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     public const ID = 'security.unsafe-xml-loading';
 
     /**
+     * Class names whose load/loadXML/open/xml methods are network-capable XML loaders.
+     *
+     * Generic method names such as `open` or `load` are only flagged when the receiver
+     * is provably one of these classes; matching accepts both short and imported
+     * fully-qualified spellings via SecurityNodeHelper::hasMatchingClassName().
+     */
+    private const XML_RECEIVER_CLASS_NAMES = ['DOMDocument', 'SimpleXMLElement', 'XMLReader'];
+
+    /**
      * Describe the unsafe XML loading rule.
      *
      * @return RuleDefinition - Rule metadata and defaults.
@@ -87,13 +96,19 @@ final class UnsafeXmlLoadingRule implements RuleInterface
      * @param AnalysisUnit                    $analysisUnit - Parsed unit supplying the display path for any finding.
      * @param Expr\MethodCall|Expr\StaticCall $call - Loader call to inspect (`load`, `loadXML`, `open`, `xml`).
      *
-     * @return list<Finding> - One finding when the loader takes request-controlled data without LIBXML_NONET, else empty.
+     * @return list<Finding> - One finding when an XML-capable receiver loads request-controlled data without LIBXML_NONET, else empty.
      */
     private function xmlMethodFindings(AnalysisUnit $analysisUnit, Expr\MethodCall|Expr\StaticCall $call): array
     {
         $method = SecurityNodeHelper::methodName($call);
         if (!in_array($method, ['load', 'loadxml', 'open', 'xml'], true)) {
             // Not an XML-loading entry point, so it cannot trigger external-entity or network fetches; skip it.
+            return [];
+        }
+
+        // Loader-shaped names are everywhere (archives, ORMs, builders); without receiver evidence
+        // of an XML parser class this is not an XML sink, so the user sees no false warning.
+        if (!$this->isXmlCapableReceiver($analysisUnit, $call)) {
             return [];
         }
 
@@ -112,6 +127,100 @@ final class UnsafeXmlLoadingRule implements RuleInterface
 
         // Request-controlled XML reaches a network-capable loader with no LIBXML_NONET: the exact unsafe shape to flag.
         return [$this->finding($analysisUnit, $call, $method)];
+    }
+
+    /**
+     * Decide whether the call's receiver is provably an XML-capable parser class.
+     *
+     * This gate is why `gruff-php analyse --include-rule security.unsafe-xml-loading` warns
+     * on real XML parsers but stays quiet on archives, ORMs, and builders that happen to
+     * share the same method names.
+     *
+     * @param AnalysisUnit                    $analysisUnit - Parsed unit supplying top-level statements for receiver tracing.
+     * @param Expr\MethodCall|Expr\StaticCall $call - Loader-named call whose receiver is being classified.
+     *
+     * @return bool - true for static calls on an allowlisted XML class, inline `new DOMDocument()` receivers, and
+     *              variables whose latest same-scope assignment before the call constructs an allowlisted XML class;
+     *              false for every unknown receiver so generic `open`/`load`/`xml` methods stay unflagged
+     */
+    private function isXmlCapableReceiver(AnalysisUnit $analysisUnit, Expr\MethodCall|Expr\StaticCall $call): bool
+    {
+        // Static calls name their class directly, so the allowlist check is immediate.
+        if ($call instanceof Expr\StaticCall) {
+            return SecurityNodeHelper::hasMatchingClassName($call->class, self::XML_RECEIVER_CLASS_NAMES);
+        }
+
+        $receiver = $call->var;
+        // An inline construction names the class right at the call site.
+        if ($receiver instanceof Expr\New_) {
+            return SecurityNodeHelper::hasMatchingClassName($receiver->class, self::XML_RECEIVER_CLASS_NAMES);
+        }
+
+        // A plain variable needs its earlier assignments traced to learn what it holds.
+        if ($receiver instanceof Expr\Variable && is_string($receiver->name)) {
+            return $this->isVariableXmlParser($analysisUnit, $receiver->name, $call);
+        }
+
+        // Property fetches, chained calls, and other receiver shapes carry no class evidence; stay silent.
+        return false;
+    }
+
+    /**
+     * Trace whether a receiver variable can hold an XML parser at the loader call.
+     *
+     * Same-scope writes are replayed in source order. A write the runtime could skip
+     * on the sink's path (it sits in a branch the sink does not share) can add XML
+     * evidence but never erase it, so one conditional rebind cannot hide a real
+     * parser from the user; an unskippable write fully rebinds the receiver.
+     *
+     * @param AnalysisUnit    $analysisUnit - Parsed unit supplying top-level statements when the call has no enclosing function.
+     * @param string          $variableName - Receiver variable name at the loader call.
+     * @param Expr\MethodCall $call - Loader call whose byte offset bounds the assignment search.
+     *
+     * @return bool - true when the replayed writes leave the receiver possibly bound to an allowlisted XML
+     *              parser at the call; false when it was never assigned in scope or ends provably non-XML
+     */
+    private function isVariableXmlParser(AnalysisUnit $analysisUnit, string $variableName, Expr\MethodCall $call): bool
+    {
+        $callPosition = $call->getStartFilePos();
+        // Without byte offsets the assignment order cannot be proven; stay silent rather than guess.
+        if ($callPosition < 0) {
+            return false;
+        }
+
+        $scope      = SecurityNodeHelper::enclosingFunctionLike($call);
+        $statements = $scope instanceof Node\FunctionLike ? ($scope->getStmts() ?? []) : $analysisUnit->statements;
+        $nodeFinder = new NodeFinder();
+        $writes     = $nodeFinder->find(
+            array_values($statements),
+            static fn(Node $candidate): bool => $candidate instanceof Expr\Assign
+                                                && $candidate->var instanceof Expr\Variable
+                                                && $candidate->var->name === $variableName
+                                                && $candidate->getStartFilePos() >= 0
+                                                && $candidate->getStartFilePos() < $callPosition,
+        );
+        usort($writes, static fn(Node $left, Node $right): int => $left->getStartFilePos() <=> $right->getStartFilePos());
+
+        $sinkAncestorIds = SecurityNodeHelper::ancestorIdsWithin($call, $scope);
+        $isPossiblyXml   = false;
+
+        // Replay the writes in order; the possibly-XML state left at the call is what counts.
+        foreach ($writes as $write) {
+            // Writes from nested closures do not bind this scope's variable.
+            if (!$write instanceof Expr\Assign || SecurityNodeHelper::enclosingFunctionLike($write) !== $scope) {
+                continue;
+            }
+
+            $constructsXmlParser = $write->expr instanceof Expr\New_
+                && SecurityNodeHelper::hasMatchingClassName($write->expr->class, self::XML_RECEIVER_CLASS_NAMES);
+
+            // A skippable write can add XML evidence but never erase it; an unskippable one rebinds fully.
+            $isPossiblyXml = SecurityNodeHelper::isSkippableBeforeSink($write, $scope, $sinkAncestorIds)
+                ? ($isPossiblyXml || $constructsXmlParser)
+                : $constructsXmlParser;
+        }
+
+        return $isPossiblyXml;
     }
 
     /**

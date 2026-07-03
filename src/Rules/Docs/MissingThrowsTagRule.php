@@ -15,7 +15,10 @@ use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
+use PhpParser\Node;
 use PhpParser\Node\Expr\Throw_;
+use PhpParser\Node\FunctionLike;
+use PhpParser\Node\Stmt\ClassLike;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 use PhpParser\NodeFinder;
@@ -70,9 +73,7 @@ final readonly class MissingThrowsTagRule implements RuleInterface
                 continue;
             }
 
-            $throws = $nodeFinder->findInstanceOf($node->stmts ?? [], Throw_::class);
-
-            if ($throws === []) {
+            if (!$this->hasDirectThrow($node->stmts ?? [])) {
                 continue;
             }
 
@@ -107,5 +108,71 @@ final readonly class MissingThrowsTagRule implements RuleInterface
         }
 
         return $findings;
+    }
+
+    /**
+     * Check whether a statement list throws in its own lexical scope.
+     *
+     * @param array<Node> $statements - Function-like body statements to search.
+     *
+     * @return bool - true when a `throw` sits directly in this scope; throws inside nested closures, arrow
+     *              functions, anonymous classes, or nested functions belong to those scopes' own contracts
+     */
+    private function hasDirectThrow(array $statements): bool
+    {
+        // One direct throw anywhere in the body is enough to require an @throws tag on the docblock.
+        foreach ($statements as $statement) {
+            if ($this->containsDirectThrow($statement)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Recursively search one node for a same-scope throw, pruning nested scopes.
+     *
+     * This is why the user is never asked to document a callback's exception on the
+     * outer method. Immediately invoked closures are pruned too: their throw
+     * propagates like any called function's, and this rule documents lexical throws only.
+     *
+     * @param Node $node - Node to inspect.
+     *
+     * @return bool - true when the node is or directly contains a throw before any nested scope boundary
+     */
+    private function containsDirectThrow(Node $node): bool
+    {
+        // Found a throw that belongs to this method's own contract.
+        if ($node instanceof Throw_) {
+            return true;
+        }
+
+        // Scope boundary: closures, arrow functions, nested functions, and (anonymous) class
+        // bodies own their throws; they are not part of the enclosing method's contract.
+        if ($node instanceof FunctionLike || $node instanceof ClassLike) {
+            return false;
+        }
+
+        // Keep descending through ordinary statements and expressions.
+        foreach ($node->getSubNodeNames() as $name) {
+            $subNode = $node->$name;
+
+            // Single child node: recurse straight into it.
+            if ($subNode instanceof Node && $this->containsDirectThrow($subNode)) {
+                return true;
+            }
+
+            // Child lists (statement bodies, argument lists): recurse into each node they hold.
+            if (is_array($subNode)) {
+                foreach ($subNode as $child) {
+                    if ($child instanceof Node && $this->containsDirectThrow($child)) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
     }
 }

@@ -85,6 +85,12 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
                 continue;
             }
 
+            // Computed same-class dispatch may reach any private method here, so telling the user to
+            // delete one would be unsafe advice; accepted trade-off: skip this whole class-like.
+            if ($this->hasUnresolvableDynamicDispatch($nodeFinder, $classLike)) {
+                continue;
+            }
+
             $calledNames = $this->calledPrivateMethodNames($nodeFinder, $classLike);
             $findings    = array_merge(
                 $findings,
@@ -162,22 +168,80 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
         if ($node instanceof Expr\MethodCall
             && $node->var instanceof Expr\Variable
             && $node->var->name === 'this'
-            && $node->name instanceof Node\Identifier
         ) {
-            // A literal `$this->name()` call counts as a use of that private method.
-            return $node->name->toString();
+            if ($node->name instanceof Node\Identifier) {
+                // A literal `$this->name()` call counts as a use of that private method.
+                return $node->name->toString();
+            }
+
+            if ($node->name instanceof Node\Scalar\String_) {
+                // `$this->{'name'}()` resolves exactly like the literal call, so count it precisely.
+                return $node->name->value;
+            }
         }
 
         if ($node instanceof Expr\StaticCall
             && ($node->class instanceof Node\Name)
             && in_array($node->class->toString(), ['self', 'static'], true)
-            && $node->name instanceof Node\Identifier
         ) {
-            // A `self::name()` or `static::name()` call counts as a use of that private method.
-            return $node->name->toString();
+            if ($node->name instanceof Node\Identifier) {
+                // A `self::name()` or `static::name()` call counts as a use of that private method.
+                return $node->name->toString();
+            }
+
+            if ($node->name instanceof Node\Scalar\String_) {
+                // `self::{'name'}()` resolves exactly like the literal call, so count it precisely.
+                return $node->name->value;
+            }
         }
 
         return null;
+    }
+
+    /**
+     * Detect same-class dynamic dispatch whose target name cannot be resolved statically.
+     *
+     * @param NodeFinder          $nodeFinder - Reused tree walker over the class-like body.
+     * @param Class_|Trait_|Enum_ $classLike - Class-like declaration whose body is searched for dynamic dispatch.
+     *
+     * @return bool - true when a `$this->{$expr}()`, `self::{$expr}()`, `static::{$expr}()`, or same-class callable
+     *              array with a non-literal method slot exists; dynamic calls on other receivers never count
+     */
+    private function hasUnresolvableDynamicDispatch(NodeFinder $nodeFinder, Class_|Trait_|Enum_ $classLike): bool
+    {
+        // Scan the whole class-like body: one computed dispatch anywhere makes every candidate unsafe to report.
+        foreach ($nodeFinder->find($classLike->stmts, static fn(): bool => true) as $node) {
+            // A computed instance call on the object itself: the target name is unknowable statically.
+            if ($node instanceof Expr\MethodCall
+                && $node->var instanceof Expr\Variable
+                && $node->var->name === 'this'
+                && !$node->name instanceof Node\Identifier
+                && !$node->name instanceof Node\Scalar\String_
+            ) {
+                return true;
+            }
+
+            // The static-call twin of the same shape, reached through self or static.
+            if ($node instanceof Expr\StaticCall
+                && $node->class instanceof Node\Name
+                && in_array($node->class->toString(), ['self', 'static'], true)
+                && !$node->name instanceof Node\Identifier
+                && !$node->name instanceof Node\Scalar\String_
+            ) {
+                return true;
+            }
+
+            // A same-class callable array whose method slot is computed can invoke any private method here.
+            if ($node instanceof Expr\Array_
+                && count($node->items) === 2
+                && !$node->items[1]->value instanceof Node\Scalar\String_
+                && $this->isSameClassCallableTarget($node->items[0]->value, $classLike)
+            ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -263,22 +327,35 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
             return false;
         }
 
-        $first  = $expr->items[0]->value;
-        $second = $expr->items[1]->value;
-
-        if (!$second instanceof Node\Scalar\String_) {
+        if (!$expr->items[1]->value instanceof Node\Scalar\String_) {
             return false;
         }
 
+        return $this->isSameClassCallableTarget($expr->items[0]->value, $classLike);
+    }
+
+    /**
+     * Check whether a callable-array first element targets the declaring class.
+     *
+     * @param Expr                $first - First element of a two-item array literal.
+     * @param Class_|Trait_|Enum_ $classLike - Declaring scope used to match explicit class-name callables.
+     *
+     * @return bool - true for `$this`, `__CLASS__`, `self::class`, `static::class`, and the declaring class's own
+     *              `Name::class` reference; false for every other receiver expression
+     */
+    private function isSameClassCallableTarget(Expr $first, Class_|Trait_|Enum_ $classLike): bool
+    {
+        // The object itself is always the defining class.
         if ($first instanceof Expr\Variable && $first->name === 'this') {
             return true;
         }
 
+        // `[__CLASS__, 'method']` names the defining class, the same as `[self::class, 'method']`.
         if ($first instanceof Node\Scalar\MagicConst\Class_) {
-            // `[__CLASS__, 'method']` names the defining class, the same as `[self::class, 'method']`.
             return true;
         }
 
+        // Beyond those two shapes, only a `SomeName::class` constant can still target this class.
         if (!$first instanceof Expr\ClassConstFetch
             || !$first->name instanceof Node\Identifier
             || strtolower($first->name->toString()) !== 'class'
@@ -286,11 +363,13 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
             return false;
         }
 
+        // Dynamic class expressions carry no name to compare against.
         if (!$first->class instanceof Node\Name) {
             return false;
         }
 
         $shortName = strtolower($first->class->getLast());
+        // self::class and static::class resolve to the defining class by definition.
         if ($shortName === 'self' || $shortName === 'static') {
             return true;
         }

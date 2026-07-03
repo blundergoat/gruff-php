@@ -22,14 +22,14 @@ Wired into a coding agent's loop — as a pre-commit hook, a CI gate (`--fail-on
 
 | Field | Value |
 | --- | --- |
-| Current source | `0.4.1` |
+| Current source | `0.5.0-dev` |
 | Runtime | PHP `^8.3` |
 | Package | `blundergoat/gruff-php` |
 | Binary | `bin/gruff-php` from checkout; `vendor/bin/gruff-php` after install |
 | Rule catalogue | 128 rules across 10 pillars |
 | Primary config | `.gruff-php.yaml`; legacy `.gruff.yaml` is accepted when the primary file is absent |
 | Analysis schema | `gruff.analysis.v2` |
-| Baseline schema | `gruff.baseline.v1` |
+| Baseline schema | `gruff.baseline.v2` |
 | Severity gate | `--fail-on` with `none`, `advisory`, `warning`, `error` |
 | Dashboard | `127.0.0.1:8765` by default |
 
@@ -154,6 +154,12 @@ Security-focused gates can bypass adoption baselines:
 vendor/bin/gruff-php analyse --profile security --no-baseline --fail-on warning
 ```
 
+`--profile security` is a scoring contract as well as an execution filter:
+`--include-rule` ids must belong to the security or sensitive-data pillars, and
+any other pillar's rule id is a usage error so a non-security finding can never
+hide behind a security-only composite. `--exclude-rule` still narrows the
+profile's rule set freely.
+
 ## Configuration
 
 Place `.gruff-php.yaml` in the project root. `analyse`, `report`, and `dashboard` auto-load it unless `--config <path>` or `--no-config` is supplied. Legacy `.gruff.yaml` files are still auto-loaded when `.gruff-php.yaml` is absent. Unknown keys and unsupported rule options fail closed.
@@ -207,13 +213,25 @@ Some dead-code pillar rules keep a `waste.*` rule-id prefix for historical conti
 
 ## Baselines And Changed-Code Scans
 
-Baselines suppress reviewed findings by fingerprint:
+Baselines suppress reviewed findings by grouped counts: each `gruff.baseline.v2`
+row accepts `count` instances of one `(file, ruleId, message)` identity, so
+accepted debt keeps matching after unrelated edits shift line numbers. Instances
+beyond a group's accepted count report as new; missing instances report as
+resolved.
 
 ```bash
 vendor/bin/gruff-php analyse --generate-baseline --fail-on none
 vendor/bin/gruff-php analyse --baseline=gruff-baseline.json --fail-on warning
 vendor/bin/gruff-php analyse --no-baseline --fail-on none
 ```
+
+Because the finding message is part of the match key, releases that reword a
+rule's message invalidate the affected baseline groups — regenerate the baseline
+after upgrading across such a release (0.5.0 rewords several rule messages; see
+`CHANGELOG.md`). Legacy `gruff.baseline.v1` files fail closed with a regenerate
+instruction rather than parsing silently. Known blind spot: fixing one accepted
+instance while adding a different one with the same file, rule, and message
+keeps the group within budget and reports as unchanged.
 
 Changed-code scans can filter to symbol-aware changed regions and report how many findings were suppressed as out of scope:
 
@@ -261,7 +279,7 @@ Default scans are local source inspections. `gruff-php` parses PHP files and sel
 
 ## Stability Contract
 
-The current pre-1.0 line treats rule IDs, finding fingerprints, baseline identity, `gruff.analysis.v2`, `gruff.baseline.v1`, SARIF rendering, and CLI exit semantics as compatibility-sensitive. Breaking changes should be tagged as a future minor release and recorded in [`CHANGELOG.md`](CHANGELOG.md).
+The current pre-1.0 line treats rule IDs, finding fingerprints, baseline identity, `gruff.analysis.v2`, `gruff.baseline.v2`, SARIF rendering, and CLI exit semantics as compatibility-sensitive. Breaking changes should be tagged as a future minor release and recorded in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## How It Compares
 

@@ -12,15 +12,20 @@ use JsonException;
  * Reads and writes gruff baseline files relative to a project root.
  *
  * @phpstan-type BaselineJsonValue bool|float|int|string|null
- * @phpstan-type BaselineFindingRow array<string, BaselineJsonValue>
- * @phpstan-type BaselineFileData array{schemaVersion: string, findings: list<BaselineFindingRow>}
+ * @phpstan-type BaselineGroupRow array<string, BaselineJsonValue>
+ * @phpstan-type BaselineFileData array{schemaVersion: string, groups: list<BaselineGroupRow>}
  */
 final readonly class BaselineStore
 {
     /**
      * Schema identifier required in persisted baseline files.
      */
-    public const SCHEMA_VERSION = 'gruff.baseline.v1';
+    public const SCHEMA_VERSION = 'gruff.baseline.v2';
+
+    /**
+     * Retired per-finding fingerprint schema that fails closed with a regenerate instruction.
+     */
+    public const LEGACY_SCHEMA_VERSION = 'gruff.baseline.v1';
 
     /**
      * Conventional baseline file name discovered in project roots.
@@ -39,32 +44,37 @@ final readonly class BaselineStore
     /**
      * Read and validate a baseline file.
      *
+     * Runs whenever the user passes `--baseline` or a `gruff-baseline.json` sits at the
+     * project root, e.g. `gruff-php analyse src --baseline gruff-baseline.json`.
+     *
      * @param string $path - Baseline path to read, relative to the project root when needed.
      *
-     * @return BaselineData - in-memory baseline carrying the source path and one entry per validated finding row
+     * @return BaselineData - in-memory baseline carrying the source path and one entry per validated group row
      */
     public function read(string $path): BaselineData
     {
         $decoded = $this->readBaselineObject($path);
 
-        return new BaselineData($path, $this->entriesFromFindings($decoded['findings']));
+        return new BaselineData($path, $this->entriesFromGroups($decoded['groups']));
     }
 
     /**
      * Decode the baseline JSON root and validate its schema envelope.
      *
-     * @param string $path - Baseline path to decode; a missing file or bad schema throws BaselineException.
+     * @param string $path - Baseline path to decode; a missing file, retired v1 schema, or bad schema throws BaselineException.
      *
-     * @return BaselineFileData - validated envelope with the schema version pinned and every finding row checked
+     * @return BaselineFileData - validated envelope with the schema version pinned and every group row checked
      */
     private function readBaselineObject(string $path): array
     {
         $absolutePath = $this->absolutePath($path);
+        // A missing file is a setup problem the user can fix; name the path they asked for.
         if (!is_file($absolutePath)) {
             throw new BaselineException(sprintf('Baseline file not found: %s', $path));
         }
 
         $contents = file_get_contents($absolutePath);
+        // Unreadable usually means permissions; surface it instead of pretending there is no baseline.
         if ($contents === false) {
             throw new BaselineException(sprintf('Unable to read baseline file: %s', $path));
         }
@@ -75,72 +85,90 @@ final readonly class BaselineStore
             throw new BaselineException(sprintf('Invalid baseline JSON: %s', $exception->getMessage()), 0, $exception);
         }
 
+        // Valid JSON that is not an object cannot be a baseline; fail before touching its keys.
         if (!is_array($decoded) || array_is_list($decoded)) {
             throw new BaselineException('Baseline root must be a JSON object.');
         }
 
-        if (($decoded['schemaVersion'] ?? null) !== self::SCHEMA_VERSION) {
+        $schemaVersion = $decoded['schemaVersion'] ?? null;
+        // An old v1 file fails closed with the exact command the user should run, never a silent misparse.
+        if ($schemaVersion === self::LEGACY_SCHEMA_VERSION) {
+            throw new BaselineException(sprintf(
+                'Baseline schema "%s" is no longer supported: baselines now group accepted findings by file, rule, and message. Regenerate with `gruff-php analyse --generate-baseline %s`.',
+                self::LEGACY_SCHEMA_VERSION,
+                $path,
+            ));
+        }
+
+        // Anything else (a typo, a future schema) gets the plain expected-version message.
+        if ($schemaVersion !== self::SCHEMA_VERSION) {
             throw new BaselineException(sprintf('Baseline schemaVersion must be "%s".', self::SCHEMA_VERSION));
         }
 
         return [
             'schemaVersion' => self::SCHEMA_VERSION,
-            'findings'      => $this->readFindingsList($decoded['findings'] ?? null),
+            'groups'        => $this->readGroupsList($decoded['groups'] ?? null),
         ];
     }
 
     /**
-     * Read findings list for the baseline workflow.
+     * Read the groups list for the baseline workflow.
      *
-     * @param mixed $findings - Raw decoded JSON findings key; anything but a list of scalar-keyed objects throws.
+     * @param mixed $groups - Raw decoded JSON groups key; anything but a list of scalar-keyed objects throws.
      *
-     * @return list<BaselineFindingRow> - findings in file order, each a string-keyed map of scalar-or-null values; empty when the source list was
-     *                                  empty
+     * @return list<BaselineGroupRow> - group rows in file order, each a string-keyed map of scalar-or-null values; empty when the source list was
+     *                                empty
      */
-    private function readFindingsList(mixed $findings): array
+    private function readGroupsList(mixed $groups): array
     {
-        if (!is_array($findings) || !array_is_list($findings)) {
-            throw new BaselineException('Baseline key "findings" must be a list.');
+        // The groups key must be a list; anything else means a hand edit broke the file shape.
+        if (!is_array($groups) || !array_is_list($groups)) {
+            throw new BaselineException('Baseline key "groups" must be a list.');
         }
 
         $rows = [];
 
-        foreach ($findings as $index => $finding) {
-            if (!is_array($finding) || array_is_list($finding)) {
-                throw new BaselineException(sprintf('Baseline finding %d must be a JSON object.', $index));
+        // Vet each row so a later matching error can never be caused by malformed input.
+        foreach ($groups as $index => $group) {
+            // Rows must be JSON objects; the index tells the user exactly which row to fix.
+            if (!is_array($group) || array_is_list($group)) {
+                throw new BaselineException(sprintf('Baseline group %d must be a JSON object.', $index));
             }
 
-            $baselineFinding = [];
-            foreach ($finding as $key => $value) {
+            $baselineGroup = [];
+            // Copy fields across, rejecting anything a baseline row has no business containing.
+            foreach ($group as $key => $value) {
+                // Numeric keys signal a broken edit rather than a real field name.
                 if (!is_string($key)) {
-                    throw new BaselineException(sprintf('Baseline finding %d contains a non-string key.', $index));
+                    throw new BaselineException(sprintf('Baseline group %d contains a non-string key.', $index));
                 }
 
+                // Nested structures cannot be part of a group row; only scalars and null are stored.
                 if (!is_bool($value) && !is_float($value) && !is_int($value) && !is_string($value) && $value !== null) {
-                    throw new BaselineException(sprintf('Baseline finding %d field "%s" must be a scalar or null.', $index, $key));
+                    throw new BaselineException(sprintf('Baseline group %d field "%s" must be a scalar or null.', $index, $key));
                 }
 
-                $baselineFinding[$key] = $value;
+                $baselineGroup[$key] = $value;
             }
 
-            $rows[] = $baselineFinding;
+            $rows[] = $baselineGroup;
         }
 
         return $rows;
     }
 
     /**
-     * Build entries from findings for the baseline workflow.
+     * Build entries from group rows for the baseline workflow.
      *
-     * @param list<BaselineFindingRow> $findings - Serialized finding rows decoded from the baseline payload.
+     * @param list<BaselineGroupRow> $groups - Serialized group rows decoded from the baseline payload.
      *
-     * @return list<BaselineEntry> - one entry per input row in file order; empty when no findings were supplied
+     * @return list<BaselineEntry> - one entry per input row in file order; empty when no groups were supplied
      */
-    private function entriesFromFindings(array $findings): array
+    private function entriesFromGroups(array $groups): array
     {
         $entries = [];
-        foreach ($findings as $index => $finding) {
-            $entries[] = BaselineEntry::fromArray($finding, $index);
+        foreach ($groups as $index => $group) {
+            $entries[] = BaselineEntry::fromArray($group, $index);
         }
 
         // One BaselineEntry per row, in file order; the index is carried so malformed rows can name their position.
@@ -157,14 +185,12 @@ final readonly class BaselineStore
      */
     public function write(string $path, array $findings): BaselineData
     {
-        $entries      = array_map(
-            static fn(Finding $finding): BaselineEntry => BaselineEntry::fromFinding($finding),
-            $findings,
-        );
+        $entries      = $this->groupEntriesFromFindings($findings);
         $baselineData = new BaselineData($path, $entries);
         $absolutePath = $this->absolutePath($path);
         $directory    = dirname($absolutePath);
 
+        // Create the target directory on demand so `--generate-baseline path/to/file` just works.
         if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
             throw new BaselineException(sprintf('Unable to create baseline directory: %s', $directory));
         }
@@ -172,14 +198,16 @@ final readonly class BaselineStore
         $payload = [
             'schemaVersion' => self::SCHEMA_VERSION,
             'generatedAt'   => gmdate('c'),
-            'findings'      => array_map(
+            'groups'        => array_map(
                 static fn(BaselineEntry $baselineEntry): array => $baselineEntry->toArray(),
                 $entries,
             ),
         ];
 
         try {
-            $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+            // JSON_INVALID_UTF8_SUBSTITUTE keeps persisted values symmetric with BaselineEntry's group-key
+            // substitution, so a finding whose message carried invalid bytes still matches after a round trip.
+            $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR);
         } catch (JsonException $exception) {
             throw new BaselineException(sprintf('Unable to encode baseline: %s', $exception->getMessage()), 0, $exception);
         }
@@ -187,6 +215,46 @@ final readonly class BaselineStore
         $this->writeAtomically($absolutePath, $json . PHP_EOL, $path);
 
         return $baselineData;
+    }
+
+    /**
+     * Aggregate live findings into deterministic baseline group rows.
+     *
+     * This shapes what `gruff-php analyse --generate-baseline` writes: the user commits one
+     * compact row per accepted problem instead of one row per finding location.
+     *
+     * @param list<Finding> $findings - Findings to persist; instances sharing (file, ruleId, message) collapse into one row.
+     *
+     * @return list<BaselineEntry> - one row per group with its instance count, sorted by (file, ruleId, message) so
+     *                             regenerated baselines diff cleanly regardless of finding order
+     */
+    private function groupEntriesFromFindings(array $findings): array
+    {
+        $groups = [];
+
+        // Count identical findings into one row each; two eval calls in a file become one row with count 2.
+        foreach ($findings as $finding) {
+            $groupKey = BaselineEntry::groupKeyForFinding($finding);
+            $existing = $groups[$groupKey] ?? null;
+
+            $groups[$groupKey] = $existing instanceof BaselineEntry
+                ? new BaselineEntry($existing->filePath, $existing->ruleId, $existing->message, $existing->count + 1)
+                : new BaselineEntry(
+                    filePath: $finding->filePath,
+                    ruleId:   $finding->ruleId,
+                    message:  $finding->message,
+                    count:    1,
+                );
+        }
+
+        $entries = array_values($groups);
+        usort(
+            $entries,
+            static fn(BaselineEntry $left, BaselineEntry $right): int => [$left->filePath, $left->ruleId, $left->message]
+                <=> [$right->filePath, $right->ruleId, $right->message],
+        );
+
+        return $entries;
     }
 
     /**

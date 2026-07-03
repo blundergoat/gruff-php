@@ -161,6 +161,40 @@ final class SecurityRulesTest extends TestCase
     }
 
     /**
+     * Provide precision fixtures whose exact finding lines pin one rule's attack-shape coverage each.
+     *
+     * @return array<string, array{string, string, list<int>}> - rows of fixture file, rule id, and the exact finding lines; the XML row's silent
+     *                       lines are the noisy-valid ZipArchive, ORM, builder, and LIBXML_NONET shapes
+     */
+    public static function precisionFixtureCases(): array
+    {
+        return [
+            'variable include attack shapes'  => ['variable-include-precision.php', VariableIncludeRule::ID, [9, 10, 13, 17, 19, 20, 32]],
+            'sql concatenation attack shapes' => ['sql-concatenation-precision.php', SqlConcatenationRule::ID, [7, 8, 9, 10, 25]],
+            // 54/64: a conditional rebind never hides a real parser, and a conditional construction
+            // counts as possibly-XML; the rebind on the sink's own path stays silent.
+            'xml loaders need xml receivers'  => ['xml-receiver-gating.php', UnsafeXmlLoadingRule::ID, [22, 27, 33, 38, 54, 64]],
+        ];
+    }
+
+    /**
+     * Verify each precision fixture flags exactly its attack-shape lines and nothing else.
+     *
+     * @param string    $fixture - Fixture filename under tests/Fixtures/Security to analyse.
+     * @param string    $ruleId - Rule whose findings are pinned.
+     * @param list<int> $expectedLines - Exact finding lines the fixture must produce.
+     *
+     * @return void
+     */
+    #[DataProvider('precisionFixtureCases')]
+    public function testPrecisionFixturesFlagExactLines(string $fixture, string $ruleId, array $expectedLines): void
+    {
+        $findings = $this->findingsForRule($this->parseFixture($fixture), $ruleId);
+
+        self::assertSame($expectedLines, self::findingLines($findings));
+    }
+
+    /**
      * Verify boundary security patterns detected.
      *
      * @return void
@@ -185,30 +219,6 @@ final class SecurityRulesTest extends TestCase
 
         self::assertCount(1, $findings);
         self::assertSame(9, $findings[0]->line);
-    }
-
-    /**
-     * Verify attack-shaped include paths all keep flagging in the precision fixture.
-     *
-     * @return void
-     */
-    public function testVariableIncludePrecisionFixtureFlagsEveryAttackShape(): void
-    {
-        $findings = $this->findingsForRule($this->parseFixture('variable-include-precision.php'), VariableIncludeRule::ID);
-
-        self::assertSame([9, 10, 13, 17, 19, 20, 32], self::findingLines($findings));
-    }
-
-    /**
-     * Verify attack-shaped SQL constructions all keep flagging in the precision fixture.
-     *
-     * @return void
-     */
-    public function testSqlConcatenationPrecisionFixtureFlagsEveryAttackShape(): void
-    {
-        $findings = $this->findingsForRule($this->parseFixture('sql-concatenation-precision.php'), SqlConcatenationRule::ID);
-
-        self::assertSame([7, 8, 9, 10, 25], self::findingLines($findings));
     }
 
     /**

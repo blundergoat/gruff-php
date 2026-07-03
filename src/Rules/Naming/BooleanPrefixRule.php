@@ -54,11 +54,6 @@ final readonly class BooleanPrefixRule implements RuleInterface
     ];
 
     /**
-     * Negative flag prefixes owned by NegativeBooleanRule for properties and parameters.
-     */
-    private const NEGATIVE_PREFIXES = ['no', 'not', 'non', 'disable', 'skip', 'dont', 'cant', 'wont'];
-
-    /**
      * Exact boolean identifier names accepted as-is, regardless of prefix (P3).
      *
      * Unlike protocol acronyms there is no universal set of bare boolean names
@@ -409,24 +404,13 @@ final readonly class BooleanPrefixRule implements RuleInterface
      *
      * @param string $name - Identifier name to test; the negative prefix must be followed by a word boundary.
      *
-     * @return bool - True when the name starts with a configured negative prefix.
+     * @return bool - True when the name starts with a configured negative prefix, so NegativeBooleanRule owns it.
      */
     private function hasNegativeFlagName(string $name): bool
     {
-        foreach (self::NEGATIVE_PREFIXES as $prefix) {
-            if (!str_starts_with($name, $prefix) || strlen($name) <= strlen($prefix)) {
-                continue;
-            }
-
-            $nextChar = $name[strlen($prefix)];
-            if (($nextChar >= 'A' && $nextChar <= 'Z') || $nextChar === '_') {
-                // Negative prefix at a camelCase (`noCache`) or snake_case (`no_cache`) boundary;
-                // NegativeBooleanRule owns these instead.
-                return true;
-            }
-        }
-
-        return false;
+        // Delegate to the owning rule's predicate so the prefix set and camelCase/snake_case
+        // boundary rules can never drift apart and drop a name between the two rules again.
+        return NegativeBooleanRule::negativeFlagPrefix($name) !== null;
     }
 
     /**

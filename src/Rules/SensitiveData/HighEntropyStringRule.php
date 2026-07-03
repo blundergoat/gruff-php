@@ -191,7 +191,7 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
             || str_starts_with($candidateSecret, 'AIza')
             || str_starts_with($candidateSecret, 'xox')
             || str_starts_with($candidateSecret, 'https://hooks.slack.com/services/')
-            || substr_count($candidateSecret, '.') === 2
+            || JwtTokenRule::matchesJwtShape($candidateSecret)
             || (strlen($candidateSecret) <= 48 && ctype_alpha($candidateSecret));
     }
 
@@ -215,8 +215,8 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
             return true;
         }
 
-        // Recognize common source/config/documentation file extensions in path-like literals.
-        return preg_match('/\\.(?:php|inc|json|xml|neon|ya?ml|txt|md|stub)$/i', $candidateSecret) === 1;
+        // Recognize common source/config/documentation/script file extensions in path-like literals.
+        return preg_match('/\\.(?:php|inc|json|xml|neon|ya?ml|txt|md|stub|sh)$/i', $candidateSecret) === 1;
     }
 
     /**

@@ -694,7 +694,8 @@ final class HookCommand extends Command
      */
     private function writeJson(OutputInterface $output, array $payload): void
     {
-        $output->write(json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . PHP_EOL);
+        // Invalid source bytes become U+FFFD so the coding agent driving the hook always gets parseable JSON.
+        $output->write(json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR) . PHP_EOL);
     }
 
     /**

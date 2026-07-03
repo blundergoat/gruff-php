@@ -1,6 +1,6 @@
 ---
 category: commands
-last_reviewed: 2026-06-14
+last_reviewed: 2026-07-03
 ---
 
 # CLI Command Footguns
@@ -11,19 +11,9 @@ last_reviewed: 2026-06-14
 
 `src/Cli/Command/ReportCommand.php` (search: `MissingConfigPrompt::maybeOffer`) validates its own `--output` directory before firing the init prompt, but the analyse-level options it forwards (`--format`, `--fail-on`, `--mutation-budget`, threshold flags) are not validated until the analyse subprocess runs at `src/Cli/Command/ReportCommand.php` (search: `analyseCommand`). A typo like `php bin/gruff-php report --fail-on bogus` in an interactive empty-config repo fires the prompt and (if accepted) writes `.gruff-php.yaml` before the subprocess rejects the value and exits `INVALID`. `AnalyseCommand`, `DashboardCommand`, and `SummaryCommand` already validate every option they own before `MissingConfigPrompt::maybeOffer` is reached.
 
-**Evidence:** PR #3 review (Codex P2 × 3, since narrowed). Reproduce by running `php bin/gruff-php report --fail-on bogus` in an empty-config TTY repo and answering `y` — `.gruff-php.yaml` is written even though the analyse subprocess exits `INVALID` immediately after. The `analyse` and `dashboard` shapes from the original Codex report have been resolved.
+**Evidence:** PR #3 review (Codex P2 × 3, since narrowed). Reproduce by running `php bin/gruff-php report --fail-on bogus` in an empty-config TTY repo and answering `y` — `.gruff-php.yaml` is written even though the analyse subprocess exits `INVALID` immediately after. The `analyse` and `dashboard` shapes from the original Codex report have been resolved. Recurrence (2026-07-03): the 0.5.0 report/analyse option-parity work initially added the `--profile security --include-rule <non-security>` rejection only on the analyse side, so report re-triggered this exact footgun for the new surface; an external review caught it, and `ReportCommand::profileIncludeUsageError` now pre-validates that combination before the prompt (rule-id filters were already pre-validated). Still unvalidated pre-prompt: `--format`, `--fail-on`, `--mutation-budget`, and other enum/threshold values.
 
 **Prevention:** Any prompt that performs a filesystem side effect must run after all input validation completes — including validation done by a delegated subprocess. For commands that forward options to another command, either pre-validate the forwarded options locally before the prompt, or move the prompt past the subprocess invocation so the side effect only runs once the subprocess has accepted the inputs. The pattern file `.goat-flow/learning-loop/patterns/commands.md` records the canonical execute() order.
-
-## Footgun: Editing above a baseline-suppressed finding resurfaces it as a new finding
-
-**Status:** active | **Created:** 2026-05-31 | **Evidence:** OBSERVED
-
-The default-applied `gruff-baseline.json` matches accepted-debt findings to live findings purely by `fingerprint`: `src/Results/Baseline/BaselineFilter.php` (search: `$entriesByFingerprint`) indexes entries by `BaselineEntry::fingerprint` and looks each finding up by `Finding::fingerprint()`. That fingerprint hashes the finding's `line`/`endLine`/`column` — `src/Results/Finding/Finding.php` (search: `'line' => $this->line`) — and matching has no line-insensitive fallback (`Finding::stableIdentity()` is computed but never consulted during baseline matching). So inserting or deleting any line *above* a suppressed finding shifts its line, changes its fingerprint, un-matches the baseline entry, and the previously-accepted finding re-appears as `new` (failing `--fail-on advisory`). During the 0.3.0 self-scan cleanup, four accepted-debt findings (`PhpDocMixedOveruseRule::hasSignatureBroadTypeCoverage` cognitive, `isPreciseArrayShape` regex-comment, `topLevelColonIndex` missing-return, `AnalyseCommandOptions::diffMode` missing-return) each resurfaced this way after an unrelated edit earlier in the same file.
-
-**Evidence:** `src/Results/Baseline/BaselineFilter.php` (search: `$entriesByFingerprint[$fingerprint]`) is fingerprint-only; `src/Results/Finding/Finding.php` (search: `function fingerprint`) shows `line` is part of the hash. The analyse output's "Movement: N new" line and "Stale entries" tip surface the resurfaced findings.
-
-**Prevention:** When refactoring a file that carries baseline-suppressed findings, first run `grep <ClassName> gruff-baseline.json` to learn which findings it has accepted, then either (a) add the new code *below* every suppressed finding and keep any edit above them net-zero in line count — the trick used to keep `stripTopLevelNullUnion` from shifting `PhpDocMixedOveruseRule`'s baselined methods — or (b) fix the resurfaced finding for real, or (c) regenerate with `gruff-php analyse --generate-baseline gruff-baseline.json` after reviewing the movement diff.
 
 ## Footgun: Finding-scope filters must treat an empty target set as drop-all, not pass-through
 
@@ -52,6 +42,18 @@ The default-applied `gruff-baseline.json` matches accepted-debt findings to live
 **Prevention:** When scanning the bundled `scan-test-repos` (or anything under `.goat-flow/scratchpad`), pass `--include-ignored`, and target the repo's source subtree (`<repo>/src`, `/app`, `/projects`, `/plugins`) rather than the repo root so the corpus's own `vendor/` stays out. The silent `0 files` exit (no error) is the trap — always confirm `summary.filesParsed > 0` before trusting a real-repo scan.
 
 ## Resolved Entries
+
+## Footgun: Editing above a baseline-suppressed finding resurfaced it as a new finding
+
+**Status:** resolved | **Created:** 2026-05-31 | **Resolved:** 2026-07-03 | **Evidence:** OBSERVED
+
+Before baseline v2 (ADR-029), the default-applied `gruff-baseline.json` matched accepted-debt findings to live findings purely by `fingerprint`, which hashes the finding's `line`/`endLine`/`column`. Inserting or deleting any line *above* a suppressed finding shifted its line, changed its fingerprint, un-matched the baseline entry, and the previously-accepted finding re-appeared as `new` (failing `--fail-on advisory`). During the 0.3.0 self-scan cleanup, four accepted-debt findings (`PhpDocMixedOveruseRule::hasSignatureBroadTypeCoverage` cognitive, `isPreciseArrayShape` regex-comment, `topLevelColonIndex` missing-return, `AnalyseCommandOptions::diffMode` missing-return) each resurfaced this way after an unrelated edit earlier in the same file.
+
+**Evidence:** Reproduced 2026-07-03 on the pre-fix binary: one line inserted above the second of two accepted findings reported `new=1, unchanged=1, absent=1`.
+
+**Resolution:** `gruff.baseline.v2` (ADR-029) matches by grouped `(file, ruleId, message)` counts in `src/Results/Baseline/BaselineFilter.php` (search: `byGroup`), so line numbers no longer participate in baseline matching; the same edit now reports `new=0, unchanged=N, absent=0`. Legacy v1 files fail closed with a regenerate instruction.
+
+**Prevention:** Baselines survive line shifts now, but the match key includes the message: rewording a rule message invalidates its groups (regenerate after such releases), and a fix-one/add-one swap within the same `(file, ruleId, message)` group is invisible while the live count stays within the accepted count.
 
 ## Footgun: A narrow-path `analyse`/`hook` re-parsed the whole project when built-in project rules were enabled
 

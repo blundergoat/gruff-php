@@ -11,6 +11,7 @@ use PhpParser\Node\FunctionLike;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\Node\Scalar;
+use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
 /**
@@ -27,6 +28,42 @@ final class SecurityNodeHelper
     {
         // The canonical set every taint check treats as attacker-controlled; keep $_ENV/$_SESSION out by design.
         return ['_GET', '_POST', '_REQUEST', '_COOKIE', '_SERVER', '_FILES'];
+    }
+
+    /**
+     * Match the assignment shapes local taint tracking understands.
+     *
+     * This decides which writes every security sink sees when a user runs, for example,
+     * `gruff-php analyse src --include-rule security.header-injection`. Concat assignment
+     * is tracked because appending request input taints a value exactly like assigning it.
+     * Reference assignment is deliberately NOT tracked: `=&` creates an alias whose later
+     * writes flow both ways, which last-write-wins tracking would classify backwards, so
+     * aliased flows stay out of scope rather than mislead the user. Arithmetic operators
+     * stay out until a concrete sink justifies them.
+     *
+     * @param Node $node - Candidate node from a scope walk.
+     *
+     * @return bool - true for plain assignment or concat assignment nodes
+     */
+    public static function isTaintTrackedAssignment(Node $node): bool
+    {
+        return $node instanceof Expr\Assign
+            || $node instanceof Expr\AssignOp\Concat;
+    }
+
+    /**
+     * Resolve the plain local variable a taint-tracked assignment writes to.
+     *
+     * @param Expr\Assign|Expr\AssignOp\Concat $assignment - Assignment node from a scope walk.
+     *
+     * @return string|null - the written variable name, or null for property/offset/dynamic targets that local
+     *                     taint tracking does not model
+     */
+    public static function assignmentTargetName(Expr\Assign|Expr\AssignOp\Concat $assignment): ?string
+    {
+        return $assignment->var instanceof Expr\Variable && is_string($assignment->var->name)
+            ? $assignment->var->name
+            : null;
     }
 
     /**
@@ -215,30 +252,40 @@ final class SecurityNodeHelper
         $nodeFinder       = new NodeFinder();
         $assignments      = $nodeFinder->find(
             $statements,
-            static fn(Node $candidate): bool => $candidate instanceof Expr\Assign
+            static fn(Node $candidate): bool => self::isTaintTrackedAssignment($candidate)
                                                 && $candidate->getStartFilePos() >= 0
                                                 && $candidate->getStartFilePos() < $sinkPosition,
         );
 
+        // Replay each write in source order so the taint state at the sink reflects what really ran.
         foreach ($assignments as $assignment) {
-            if (!$assignment instanceof Expr\Assign) {
+            // Narrow to the tracked assignment shapes; the finder predicate already matched them.
+            if (!$assignment instanceof Expr\Assign && !$assignment instanceof Expr\AssignOp\Concat) {
                 continue;
             }
 
+            // Writes inside nested closures cannot affect this scope's locals at the sink.
             if (self::enclosingFunctionLike($assignment) !== $scope) {
                 continue;
             }
 
-            if (!$assignment->var instanceof Expr\Variable || !is_string($assignment->var->name)) {
+            $variableName = self::assignmentTargetName($assignment);
+            // Property and array-offset targets are beyond same-scope local tracking; skip them.
+            if ($variableName === null) {
                 continue;
             }
 
-            $variableName = $assignment->var->name;
+            // Request data on the right side, direct or via an already-tainted local, taints the target.
             if (
                 self::containsDirectUserInput($assignment->expr)
                 || self::hasTaintedVariableReference($assignment->expr, $taintedVariables)
             ) {
                 $taintedVariables[$variableName] = true;
+                continue;
+            }
+
+            // A clean concat append neither taints nor cleans: the variable keeps whatever it held.
+            if ($assignment instanceof Expr\AssignOp\Concat) {
                 continue;
             }
 
@@ -296,6 +343,76 @@ final class SecurityNodeHelper
 
         // Deduplicated local names only; superglobals are excluded since they are sources, not laundered locals.
         return array_keys($names);
+    }
+
+    /**
+     * Collect the identities of every ancestor between a node and its scope boundary.
+     *
+     * @param Node      $node - Node whose ancestor chain is captured (typically a sink call).
+     * @param Node|null $scopeBoundary - Enclosing function-like to stop at, or null to walk to the file root.
+     *
+     * @return array<int, true> - set of ancestor object ids, so a write can test whether it shares the sink's branches
+     */
+    public static function ancestorIdsWithin(Node $node, ?Node $scopeBoundary): array
+    {
+        $ancestorIds = [];
+        $parent      = $node->getAttribute('parent');
+
+        // Record every ancestor up to (excluding) the scope boundary.
+        while ($parent instanceof Node && $parent !== $scopeBoundary) {
+            $ancestorIds[spl_object_id($parent)] = true;
+            $parent                              = $parent->getAttribute('parent');
+        }
+
+        return $ancestorIds;
+    }
+
+    /**
+     * Decide whether the runtime could reach a sink without executing this node.
+     *
+     * A write inside a branch the sink does not share may be skipped on the path that
+     * reaches the sink, so trackers let such writes add evidence toward a finding but
+     * never erase what an earlier write established. A write inside the sink's own
+     * branch chain always runs before the sink and counts as unconditional.
+     *
+     * @param Node            $node - Write/event node whose reachability is being classified.
+     * @param Node|null       $scopeBoundary - Enclosing function-like boundary, or null for file scope.
+     * @param array<int, true> $sinkAncestorIds - Ancestor-id set of the sink, from ancestorIdsWithin().
+     *
+     * @return bool - true when a branch, loop, catch, match/ternary arm, or short-circuit operator that the
+     *              sink does not share sits between the node and the scope boundary
+     */
+    public static function isSkippableBeforeSink(Node $node, ?Node $scopeBoundary, array $sinkAncestorIds): bool
+    {
+        $parent = $node->getAttribute('parent');
+
+        // Climb toward the scope boundary looking for a skipping construct outside the sink's own chain.
+        while ($parent instanceof Node && $parent !== $scopeBoundary) {
+            $isSkippingConstruct = $parent instanceof Stmt\If_
+                || $parent instanceof Stmt\ElseIf_
+                || $parent instanceof Stmt\Else_
+                || $parent instanceof Stmt\Switch_
+                || $parent instanceof Stmt\Case_
+                || $parent instanceof Stmt\While_
+                || $parent instanceof Stmt\Do_
+                || $parent instanceof Stmt\For_
+                || $parent instanceof Stmt\Foreach_
+                || $parent instanceof Stmt\Catch_
+                || $parent instanceof Expr\Ternary
+                || $parent instanceof Expr\Match_
+                || $parent instanceof Expr\BinaryOp\BooleanAnd
+                || $parent instanceof Expr\BinaryOp\BooleanOr
+                || $parent instanceof Expr\BinaryOp\Coalesce;
+
+            // A construct the sink also sits inside cannot separate the write from the sink's path.
+            if ($isSkippingConstruct && !isset($sinkAncestorIds[spl_object_id($parent)])) {
+                return true;
+            }
+
+            $parent = $parent->getAttribute('parent');
+        }
+
+        return false;
     }
 
     /**
@@ -416,6 +533,9 @@ final class SecurityNodeHelper
      */
     public static function hasMatchingClassName(Node $class, array $classNames): bool
     {
+        // Matching is deliberately name-based (short names match FQCN tails and vice versa): a userland
+        // class sharing a built-in's short name matches too. Callers accept name evidence, not resolved
+        // types, so imported and fully-qualified spellings keep matching without a name-resolution pass.
         $resolvedName = self::className($class);
         if ($resolvedName === null) {
             // An unresolvable class name can never equal a configured target, so it cannot match.

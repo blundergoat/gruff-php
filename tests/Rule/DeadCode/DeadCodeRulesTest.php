@@ -68,6 +68,31 @@ final class DeadCodeRulesTest extends TestCase
     }
 
     /**
+     * Verify dynamic private dispatch suppresses delete guidance while precise cases keep reporting.
+     *
+     * @return void
+     */
+    public function testDynamicPrivateDispatchSuppressesOnlyItsOwnClassLike(): void
+    {
+        $findings = $this->analyseRule('dynamic-private-dispatch.php', UnusedPrivateMethodRule::ID);
+
+        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
+        // Computed $this->{$m}(), static::{$hook}(), and [$this, $method] each suppress their own class-like.
+        self::assertNotContains('EventRouter::handleCreated()', $symbols);
+        self::assertNotContains('EventRouter::handleDeleted()', $symbols);
+        self::assertNotContains('HooksTrait::bootHook()', $symbols);
+        self::assertNotContains('CallableMapRouter::mappedHandler()', $symbols);
+        // A string-literal dynamic name resolves precisely, so siblings still report...
+        self::assertNotContains('LiteralDynamicCaller::invokeExact()', $symbols);
+        self::assertContains('LiteralDynamicCaller::stillUnused()', $symbols);
+        // ...dynamic calls on foreign receivers never suppress, and enums join the precise handling.
+        self::assertContains('ForeignDispatcher::neverCalled()', $symbols);
+        self::assertNotContains('Signal::labelFor()', $symbols);
+        self::assertContains('Signal::unusedInEnum()', $symbols);
+        self::assertCount(3, $findings);
+    }
+
+    /**
      * Verify magic methods excluded.
      *
      * @return void

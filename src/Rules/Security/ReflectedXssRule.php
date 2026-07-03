@@ -174,7 +174,7 @@ final class ReflectedXssRule implements RuleInterface
         $nodeFinder  = new NodeFinder();
         $assignments = $nodeFinder->find(
             $statements,
-            static fn(Node $candidate): bool => $candidate instanceof Expr\Assign
+            static fn(Node $candidate): bool => SecurityNodeHelper::isTaintTrackedAssignment($candidate)
                                                 && $candidate->getStartFilePos() >= 0
                                                 && $candidate->getStartFilePos() < $sinkPosition,
         );
@@ -183,21 +183,36 @@ final class ReflectedXssRule implements RuleInterface
             static fn(Node $left, Node $right): int => $left->getStartFilePos() <=> $right->getStartFilePos(),
         );
 
+        // Replay each write in source order so the alias map at the echo/print reflects what really ran.
         foreach ($assignments as $assignment) {
-            if (!$assignment instanceof Expr\Assign || !$assignment->var instanceof Expr\Variable || !is_string($assignment->var->name)) {
+            // Narrow to the tracked assignment shapes; the finder predicate already matched them.
+            if (!$assignment instanceof Expr\Assign && !$assignment instanceof Expr\AssignOp\Concat) {
                 continue;
             }
 
+            $variableName = SecurityNodeHelper::assignmentTargetName($assignment);
+            // Property and array-offset targets are beyond same-scope alias tracking; skip them.
+            if ($variableName === null) {
+                continue;
+            }
+
+            // Writes inside nested closures cannot affect this scope's aliases at the sink.
             if ($this->enclosingFunctionLike($assignment) !== $scope) {
                 continue;
             }
 
+            // Unescaped request data on the right side marks the target as a dangerous alias.
             if ($this->hasUnescapedRequestExpression($assignment->expr, $tainted)) {
-                $tainted[$assignment->var->name] = true;
+                $tainted[$variableName] = true;
                 continue;
             }
 
-            unset($tainted[$assignment->var->name]);
+            // A clean concat append neither taints nor cleans: the alias keeps whatever it held.
+            if ($assignment instanceof Expr\AssignOp\Concat) {
+                continue;
+            }
+
+            unset($tainted[$variableName]);
         }
 
         // The map contains only aliases still tainted immediately before the sink.

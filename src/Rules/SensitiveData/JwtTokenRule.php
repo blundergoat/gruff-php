@@ -24,6 +24,27 @@ final readonly class JwtTokenRule implements SourceTextRuleInterface
     public const ID = 'sensitive-data.jwt-token';
 
     /**
+     * Three-segment JWT shape: two base64url `eyJ` JSON segments plus a signature segment.
+     */
+    private const JWT_SHAPE_PATTERN = 'eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}';
+
+    /**
+     * Decide whether a whole literal is JWT-shaped.
+     *
+     * Shared with the high-entropy rule so each dotted secret reports exactly once:
+     * real JWTs under this rule, opaque dotted tokens under high-entropy.
+     *
+     * @param string $literal - Candidate string literal.
+     *
+     * @return bool - true when the entire literal matches the three-segment `eyJ` JWT shape this rule scans for
+     */
+    public static function matchesJwtShape(string $literal): bool
+    {
+        // Anchors the shared three-segment JWT pattern so the ENTIRE literal must be JWT-shaped, not a substring.
+        return preg_match('/^' . self::JWT_SHAPE_PATTERN . '$/', $literal) === 1;
+    }
+
+    /**
      * Describe the JWT token sensitive-data rule.
      *
      * @return RuleDefinition - Rule metadata and defaults.
@@ -57,7 +78,7 @@ final readonly class JwtTokenRule implements SourceTextRuleInterface
             return [];
         }
 
-        preg_match_all('/\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/', $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
+        preg_match_all('/\b' . self::JWT_SHAPE_PATTERN . '\b/', $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
         $findings      = [];
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);

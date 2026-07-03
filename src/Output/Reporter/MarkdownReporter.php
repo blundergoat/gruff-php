@@ -90,12 +90,14 @@ final readonly class MarkdownReporter
                 $lines[] = '';
                 $lines[] = '<details><summary>Resolved baseline entries</summary>';
                 $lines[] = '';
+                // One bullet per fixed group inside the collapsed details block of the PR comment.
                 foreach ($report->baseline->staleEntries as $resolvedEntry) {
                     $lines[] = sprintf(
-                        '- `%s` %s%s',
+                        '- `%s` %s (resolved %d): %s',
                         $resolvedEntry->ruleId,
                         $resolvedEntry->filePath,
-                        $resolvedEntry->line !== null ? ':' . $resolvedEntry->line : '',
+                        $resolvedEntry->count,
+                        $resolvedEntry->message,
                     );
                 }
                 $lines[] = '';

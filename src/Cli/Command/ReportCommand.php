@@ -28,13 +28,21 @@ final class ReportCommand extends Command
      */
     private const STRING_OPTIONS = [
         'config',
+        'profile',
         'infection-report',
+        'infection-bin',
+        'infection-config',
+        'infection-test-framework-options',
         'mutation-baseline',
         'mutation-budget',
         'history-file',
         'diff-vs',
+        'since',
+        'changed-ranges',
+        'changed-scope',
         'paths-relative-to',
         'min-severity',
+        'runtime-mode',
     ];
 
     /**
@@ -45,8 +53,13 @@ final class ReportCommand extends Command
     private const BOOLEAN_OPTIONS = [
         'no-baseline',
         'no-config',
+        'no-cache',
         'include-ignored',
         'changed-only',
+        'fail-on-new',
+        'baseline-include-absent',
+        'infection-run',
+        'print-runtime',
     ];
 
     /**
@@ -76,16 +89,26 @@ final class ReportCommand extends Command
             ->addOption('output', null, InputOption::VALUE_REQUIRED, 'Write the report to this file.')
             ->addOption('config', null, InputOption::VALUE_REQUIRED, 'Path to a gruff YAML config file (.yaml or .yml).')
             ->addOption('no-config', null, InputOption::VALUE_NONE, 'Skip auto-applying the default .gruff-php.yaml file for this run.')
+            ->addOption('profile', null, InputOption::VALUE_REQUIRED, 'Rule execution profile: default or security.')
             ->addOption('fail-on', null, InputOption::VALUE_REQUIRED, 'Finding severity that fails the scan: advisory, warning, error, or none.', default: 'none')
+            ->addOption('fail-on-new', null, InputOption::VALUE_NONE, 'Fail only on findings introduced by the change (requires --baseline or --diff-vs). The report artifact is still written when analysis completes.')
+            ->addOption('no-cache', null, InputOption::VALUE_NONE, 'Disable the on-disk result cache for this run (analyse every file fresh).')
             ->addOption('report-editor-link', null, InputOption::VALUE_REQUIRED, 'Editor link style for HTML file:line references: vscode, phpstorm, or none.', default: 'none')
             ->addOption('report-interactive', null, InputOption::VALUE_OPTIONAL, 'Render opt-in interactive HTML finding filters. Accepts true or false.', default: null)
             ->addOption('include-ignored', null, InputOption::VALUE_NONE, 'Scan ignored files by using filesystem traversal instead of Git/default ignores.')
             ->addOption('infection-report', null, InputOption::VALUE_REQUIRED, 'Path to a full Infection JSON report to ingest.')
+            ->addOption('infection-run', null, InputOption::VALUE_NONE, 'Run Infection before ingesting the report path supplied by --infection-report.')
+            ->addOption('infection-bin', null, InputOption::VALUE_REQUIRED, 'Infection executable for --infection-run.')
+            ->addOption('infection-config', null, InputOption::VALUE_REQUIRED, 'Path to infection.json5 for --infection-run.')
+            ->addOption('infection-test-framework-options', null, InputOption::VALUE_REQUIRED, 'Options passed to Infection/PHPUnit for --infection-run.')
             ->addOption('mutation-baseline', null, InputOption::VALUE_REQUIRED, 'Path to a baseline Infection JSON report for MSI diff mode.')
             ->addOption('mutation-budget', null, InputOption::VALUE_REQUIRED, 'Maximum escaped/timed-out mutants allowed.')
             ->addOption('diff', null, InputOption::VALUE_OPTIONAL, 'Filter findings to changed lines. Use working-tree, staged, unstaged, or a base ref.', default: null)
             ->addOption('diff-vs', null, InputOption::VALUE_REQUIRED, 'Compare current findings against a base Git ref and report introduced/removed/unchanged findings.')
             ->addOption('changed-only', null, InputOption::VALUE_NONE, 'With --diff-vs, compare only files changed from the base ref.')
+            ->addOption('since', null, InputOption::VALUE_REQUIRED, 'Filter findings to files and regions changed since this Git base ref.')
+            ->addOption('changed-ranges', null, InputOption::VALUE_REQUIRED, 'Filter findings to explicit line ranges, for example "3-3,8-10".')
+            ->addOption('changed-scope', null, InputOption::VALUE_REQUIRED, 'Changed-region scope: symbol, hunk, or file. Use file to keep file-level aggregates and class aggregate span hits in changed-file review workflows.')
             ->addOption('paths-relative-to', null, InputOption::VALUE_REQUIRED, 'Normalize absolute finding paths relative to this directory for reports.')
             ->addOption('min-severity', null, InputOption::VALUE_REQUIRED, 'Display only findings at or above advisory, warning, or error.')
             ->addOption('include-pillar', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Display only these comma-separated pillars or repeated values.')
@@ -99,7 +122,10 @@ final class ReportCommand extends Command
                 InputOption::VALUE_OPTIONAL,
                 'Suppress findings that match a gruff baseline JSON file. Defaults to "gruff-baseline.json" at the project root when present.',
             )
-            ->addOption('no-baseline', null, InputOption::VALUE_NONE, 'Skip auto-applying the default baseline file for this run.');
+            ->addOption('no-baseline', null, InputOption::VALUE_NONE, 'Skip auto-applying the default baseline file for this run.')
+            ->addOption('baseline-include-absent', null, InputOption::VALUE_NONE, 'With a baseline applied, list resolved (absent) baseline entries in text, markdown, and HTML output.')
+            ->addOption('print-runtime', null, InputOption::VALUE_NONE, 'Emit performance instrumentation (wall, peak memory, phase, optional per-rule) as JSON on stderr.')
+            ->addOption('runtime-mode', null, InputOption::VALUE_REQUIRED, 'Runtime payload detail: summary (default) or detailed (adds per-rule totals).');
     }
 
     /**
@@ -134,6 +160,15 @@ final class ReportCommand extends Command
         $ruleFilterError = $this->ruleFilterUsageError($input);
         if ($ruleFilterError !== null) {
             $output->writeln(sprintf('<error>%s</error>', $ruleFilterError));
+
+            return Command::INVALID;
+        }
+
+        $profileIncludeError = $this->profileIncludeUsageError($input);
+        // Rejecting the incoherent combination here keeps the init prompt from firing (and possibly
+        // writing config) for a run the forwarded analyse would refuse anyway.
+        if ($profileIncludeError !== null) {
+            $output->writeln(sprintf('<error>%s</error>', $profileIncludeError));
 
             return Command::INVALID;
         }
@@ -460,6 +495,35 @@ final class ReportCommand extends Command
 
         // Normalise array/bool/empty option values to null so callers can treat "unset" uniformly.
         return is_string($optionValue) && $optionValue !== '' ? $optionValue : null;
+    }
+
+    /**
+     * Validate the forwarded profile/include combination before the run has side effects.
+     *
+     * Mirrors the analyse command's own pre-prompt rejection so
+     * `report --profile security --include-rule <non-security id>` fails fast here
+     * instead of firing the init prompt and only then dying in the subprocess.
+     * Must run after ruleFilterUsageError so every id is known to the registry.
+     *
+     * @param InputInterface $input - Console input for the report command.
+     *
+     * @return string|null - Usage error for the first out-of-profile include, or null when coherent.
+     */
+    private function profileIncludeUsageError(InputInterface $input): ?string
+    {
+        $profile             = $this->optionalStringOption($input, 'profile') ?? 'default';
+        $profileScorePillars = AnalyseCommandOptions::scorePillarsForProfile($profile);
+        // Profiles that score every pillar (and unknown profiles the child will reject) have nothing to check.
+        if ($profileScorePillars === null) {
+            return null;
+        }
+
+        return AnalyseCommandSetupBuilder::outOfProfileIncludeError(
+            RuleRegistry::defaults(),
+            $profile,
+            $profileScorePillars,
+            $this->ruleIdListOption($input, 'include-rule'),
+        );
     }
 
     /**

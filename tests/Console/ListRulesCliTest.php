@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Console;
 
+use GruffPhp\Cli\Application;
 use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
 
@@ -24,7 +25,7 @@ final class ListRulesCliTest extends CliTestCase
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         self::assertStringContainsString('gruff-php', $process->getOutput());
-        self::assertStringContainsString('0.4.1', $process->getOutput());
+        self::assertStringContainsString(Application::VERSION, $process->getOutput());
     }
 
     /**

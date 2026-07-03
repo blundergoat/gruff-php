@@ -66,6 +66,14 @@ final class CognitiveComplexityRuleTest extends TestCase
             'switch with nested cases'        => ['switchWithNestedCases', 8],
             'short ternary'                   => ['shortTernary', 3],
             'plain return'                    => ['plainReturn', 1],
+            // Match mirrors cognitive switch: one increment for the construct plus recursive arm scoring,
+            // with no per-arm cost. Cyclomatic complexity intentionally differs: it charges every arm.
+            'match with two arms'             => ['matchTwoArms', 1],
+            'match with six arms'             => ['matchSixArms', 1],
+            'nested match'                    => ['matchNested', 3],
+            'match inside if'                 => ['matchInsideIf', 3],
+            'match inside loop'               => ['matchInsideLoop', 3],
+            'match with arm-body ternary'     => ['matchWithConditionComplexity', 3],
         ];
     }
 
@@ -135,6 +143,25 @@ final class CognitiveComplexityRuleTest extends TestCase
         self::assertSame('warning', $deeplyNested->metadata['thresholdType'] ?? null);
         $deeplyNestedFixtureEndLine = 97;
         self::assertSame($deeplyNestedFixtureEndLine, $deeplyNested->endLine);
+    }
+
+    /**
+     * Verify a match-bearing method trips a lowered threshold and reports its computed score.
+     *
+     * @return void
+     */
+    public function testMatchComplexityTripsLoweredThresholdWithReportedValue(): void
+    {
+        $findings = $this->analyse('cognitive.php', ['warning' => 2, 'error' => 30]);
+
+        $nestedMatch = array_values(array_filter(
+                                        $findings,
+                                        static fn($finding): bool => $finding->symbol === 'CognitiveFixture::matchNested()',
+                                    ))[0] ?? null;
+
+        self::assertNotNull($nestedMatch);
+        self::assertSame(3, $nestedMatch->metadata['complexity'] ?? null);
+        self::assertStringContainsString('cognitive complexity of 3', $nestedMatch->message);
     }
 
     /**

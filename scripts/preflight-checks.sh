@@ -280,6 +280,30 @@ if ($releaseVersion !== "") {
     }
 }
 
+// Documentation stamps must match Application::VERSION exactly; bump-version.sh rewrites all of
+// them, so any mismatch here names the stale file. CLI golden fixtures are deliberately absent
+// from this list: their stamps are normalised to Application::VERSION at compare time in
+// tests/Console/AnalyseCliTest.php, so they cannot drift.
+$documentStampChecks = [
+    ["README.md", "/\| Current source \| `([^`]+)` \|/", "README.md current-source stamp"],
+    ["docs/gruff-cli-summary.md", "/^gruff-php (\S+) summary$/m", "docs/gruff-cli-summary.md header stamp"],
+    ["docs/gruff-cli-summary.md", "/\"version\": \"([^\"]+)\"/", "docs/gruff-cli-summary.md JSON example stamp"],
+];
+foreach ($documentStampChecks as [$documentPath, $stampPattern, $stampLabel]) {
+    $documentBody = file_get_contents($documentPath);
+    if ($documentBody === false) {
+        $fail("could not read " . $documentPath);
+        continue;
+    }
+    if (!preg_match($stampPattern, $documentBody, $match)) {
+        $fail("could not find " . $stampLabel);
+        continue;
+    }
+    if ($applicationVersion !== "" && $match[1] !== $applicationVersion) {
+        $fail($stampLabel . " is " . $match[1] . " but Application::VERSION is " . $applicationVersion . "; run scripts/bump-version.sh " . $applicationVersion);
+    }
+}
+
 if ($errors !== []) {
     fwrite(STDOUT, implode("\n", $errors));
     exit(1);

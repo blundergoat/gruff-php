@@ -552,6 +552,9 @@ final class AnalyseCommand extends Command
     /**
      * Resolve which paths discovery should scan, narrowing to changed files when a diff-driven mode is active.
      *
+     * The final changed-only branch reads the review diff directly: the guard at the top of this
+     * method already returned when that diff was null on the changed-only path.
+     *
      * @param string                $projectRoot - Project root the requested and changed paths resolve against.
      * @param AnalyseCommandOptions $options - Effective CLI options, including changed-only and requested-path flags.
      * @param DiffResult|null       $reviewDiff - --diff-vs review diff; null when it failed or carries no changed files.
@@ -596,11 +599,7 @@ final class AnalyseCommand extends Command
             return $options->paths;
         }
 
-        if (!$reviewDiff instanceof DiffResult || $reviewDiff->changedFiles === []) {
-            return null;
-        }
-
-        return $reviewDiff->changedFiles;
+        return $reviewDiff->changedFiles === [] ? null : $reviewDiff->changedFiles;
     }
 
     /**

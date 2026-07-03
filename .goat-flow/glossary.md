@@ -16,7 +16,7 @@ The complete result of one scan: schema version, tool metadata, run metadata, pa
 
 ### Baseline
 
-A reviewed-finding suppression file. `gruff-php` writes and reads `gruff.baseline.v1`; entries match by stable finding identity so known findings can be suppressed without disabling rules.
+A reviewed-finding suppression file. `gruff-php` writes and reads `gruff.baseline.v2`: grouped count rows keyed by `(file, ruleId, message)`, matched by count arithmetic so accepted findings stay suppressed across line shifts without disabling rules.
 
 ### Changed-Code Scan
 

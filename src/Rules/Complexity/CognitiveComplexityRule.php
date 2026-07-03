@@ -348,6 +348,11 @@ final readonly class CognitiveComplexityRule implements RuleInterface
             return $total;
         }
 
+        // Match expressions get their own scorer so switch-to-match rewrites cannot dodge the gate.
+        if ($expr instanceof Expr\Match_) {
+            return self::walkMatch($expr, $nesting);
+        }
+
         if ($expr instanceof Closure) {
             // A closure opens a new nesting level, so its body is scored one deeper.
             return self::walkStatements($expr->stmts ?? [], $nesting + 1);
@@ -375,6 +380,35 @@ final readonly class CognitiveComplexityRule implements RuleInterface
         }
 
         // Combined score of every sub-expression reached by the generic descent.
+        return $total;
+    }
+
+    /**
+     * Score a `match` expression: +1 + nesting for the construct, plus arms scored one level deeper.
+     *
+     * Mirrors cognitive `switch`: one increment for the construct, never per arm, so a small match
+     * stays cheap while a match stuffed with nested logic costs what the reader actually pays.
+     * Cyclomatic complexity intentionally differs by charging every arm as a branch.
+     *
+     * @param Expr\Match_ $match - The `match` expression whose subject, arm conditions, and arm bodies are scored.
+     * @param int         $nesting - Current nesting depth; the match increment grows with it.
+     *
+     * @return int - The match increment plus its subject at the current depth and every arm one level deeper.
+     */
+    private static function walkMatch(Expr\Match_ $match, int $nesting): int
+    {
+        $total = 1 + $nesting;
+        $total += self::walkExprCognitive($match->cond, $nesting);
+
+        // Every arm's conditions and body are real reading work, so each is scored one level deeper.
+        foreach ($match->arms as $arm) {
+            foreach ($arm->conds ?? [] as $armCondition) {
+                $total += self::walkExprCognitive($armCondition, $nesting + 1);
+            }
+
+            $total += self::walkExprCognitive($arm->body, $nesting + 1);
+        }
+
         return $total;
     }
 

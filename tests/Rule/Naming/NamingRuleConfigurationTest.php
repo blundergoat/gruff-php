@@ -198,16 +198,28 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
         self::assertContains('skipValidation', $names);
         self::assertNotContains('nonNull', $names);
         self::assertNotContains('notFound', $names);
+        // Snake_case negative prefixes report at underscore boundaries; word-internal "no"/"non" never match.
+        self::assertContains('no_cache', $names);
+        self::assertContains('not_ready', $names);
+        self::assertNotContains('normalised_output', $names);
         self::assertContains('Fixtures\\Naming\\NegativeBooleanFixture::noConfig', $keys);
         self::assertContains('Fixtures\\Naming\\NegativeBooleanFixture::configure::disableCache', $keys);
         self::assertContains('Fixtures\\Naming\\NegativeBooleanFixture::configure::skipValidation', $keys);
         self::assertContains('Fixtures\\Naming\\CliMirrorOptions::noConfig', $keys);
+        self::assertContains('Fixtures\\Naming\\SnakeCaseSyncOptions::no_cache', $keys);
+        self::assertContains('Fixtures\\Naming\\SnakeCaseSyncOptions::synchronise::not_ready', $keys);
+        self::assertContains('Fixtures\\Naming\\SnakeCliMirrorOptions::no_color', $keys);
 
-        $allowlistedFindings = $this->negativeBooleanFindings(['Fixtures\\Naming\\CliMirrorOptions::noConfig']);
+        $allowlistedFindings = $this->negativeBooleanFindings([
+                                                                  'Fixtures\\Naming\\CliMirrorOptions::noConfig',
+                                                                  'Fixtures\\Naming\\SnakeCliMirrorOptions::no_color',
+                                                              ]);
         $allowlistedKeys     = array_map(static fn($finding): mixed => $finding->metadata['allowlistKey'] ?? null, $allowlistedFindings);
 
         self::assertContains('Fixtures\\Naming\\NegativeBooleanFixture::noConfig', $allowlistedKeys);
         self::assertNotContains('Fixtures\\Naming\\CliMirrorOptions::noConfig', $allowlistedKeys);
+        self::assertContains('Fixtures\\Naming\\SnakeCaseSyncOptions::no_cache', $allowlistedKeys);
+        self::assertNotContains('Fixtures\\Naming\\SnakeCliMirrorOptions::no_color', $allowlistedKeys);
     }
 
     /**
@@ -237,6 +249,14 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
 
         self::assertContains(IdentifierQualityRule::ID, $rules['strX'] ?? []);
         self::assertNotContains(HungarianNotationRule::ID, $rules['strX'] ?? []);
+
+        // Snake_case negatives get exactly one owner too: negative-boolean wins, boolean-prefix defers.
+        $snakeUnit     = $this->parseFixture('negative-boolean.php');
+        $snakeFindings = $registry->analyse([$snakeUnit], new RuleContext(__DIR__ . '/../../..', AnalysisConfig::fromRegistry($registry)));
+        $snakeRules    = $this->rulesByIdentifierName($snakeFindings);
+
+        self::assertContains(NegativeBooleanRule::ID, $snakeRules['no_cache'] ?? []);
+        self::assertNotContains(BooleanPrefixRule::ID, $snakeRules['no_cache'] ?? []);
     }
 
     /**

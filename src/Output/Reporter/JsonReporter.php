@@ -20,10 +20,12 @@ final readonly class JsonReporter
      */
     public function render(AnalysisReport $report): string
     {
-        // Pretty-printed so the file is diffable; a trailing newline keeps shell redirection POSIX-clean.
+        // Pretty-printed and newline-terminated so `analyse --format json > report.json` stays diffable and
+        // POSIX-clean. Invalid source bytes become U+FFFD instead of crashing the user's CI run; structural
+        // encode failures still throw.
         return json_encode(
             $report->toArray(),
-            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR,
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR,
         ) . PHP_EOL;
     }
 }

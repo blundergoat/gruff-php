@@ -1,6 +1,6 @@
 # Code Map - gruff-php
 
-Last reviewed 2026-07-03. Captures the v0.4.1 surface as wired in `composer.json`, `bin/gruff-php`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
+Last reviewed 2026-07-03. Captures the current source surface as wired in `composer.json`, `bin/gruff-php`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
 
 ## Top-level layout
 
@@ -66,7 +66,7 @@ Application source map:
     |   |-- Hook/ = hook finding filtering, scope attribution, identity, and presenter values
     |   +-- Reporter/ = text, JSON, HTML, Markdown, GitHub annotations, hotspot, SARIF, format, display-filter, and fail-threshold output
     |-- Results/ = serialisable analysis results and optional enrichment payloads
-    |   |-- Baseline/ = baseline read/write/apply/report values for gruff.baseline.v1
+    |   |-- Baseline/ = baseline read/write/apply/report values for gruff.baseline.v2 grouped counts
     |   |-- Diff/ = Git diff ranges, diff-mode metadata, and changed-line finding filter
     |   |-- Finding/ = finding value, severity, confidence, pillar, and tier enums
     |   |-- Mutation/ = Infection report parsing, optional Infection run wrapper, mutation findings, budgets, and mutation payloads
@@ -226,4 +226,4 @@ tests/
 - CI lives in `.github/workflows/ci.yml`: `verify` runs Composer checks and preflight on PHP 8.3/8.4, `security` gates on `composer security:scan` with read-only permissions, and `security-sarif` uploads gruff SARIF on non-PR events with `security-events: write`.
 - `composer.json`'s `check` script lints every committed PHP source/test file with `php -l` via `find src tests -name '*.php'` (excluding the intentional `tests/Fixtures/Source/syntax-error` fixtures), so new files are linted automatically rather than from a hand-maintained list.
 - Pillars currently emitted by registered static rules: Size, Complexity, Maintainability, DeadCode, Naming, Documentation, Modernisation, Security, SensitiveData, TestQuality. Optional Infection ingestion emits Mutation findings. Other `Pillar::*` cases (Coupling, Architecture, Design) are reserved; Design emptied when the project rules were retired (ADR-026).
-- Static baselines are explicit `gruff.baseline.v1` JSON files. They suppress exact fingerprint/rule/file matches only; inline suppression comments are intentionally absent in v0.1.
+- Static baselines are explicit `gruff.baseline.v2` JSON files of grouped count rows. Matching is count arithmetic per `(file, ruleId, message)` group (ADR-029), so line shifts never resurface accepted debt; legacy v1 files fail closed with a regenerate instruction. Inline suppression comments are intentionally absent.

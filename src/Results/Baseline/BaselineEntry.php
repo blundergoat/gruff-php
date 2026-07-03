@@ -7,102 +7,144 @@ namespace GruffPhp\Results\Baseline;
 use GruffPhp\Results\Finding\Finding;
 
 /**
- * Represents one persisted baseline fingerprint and its source metadata.
+ * One row of the user's committed gruff-baseline.json: an accepted finding identity plus how many
+ * instances the team signed off on. These rows are what keep `analyse --baseline` green on known
+ * debt while anything new still fails the run.
  */
 final readonly class BaselineEntry
 {
     /**
-     * Capture the stable fields used to match a finding against a baseline.
+     * Capture one accepted-debt group keyed by file, rule, and message.
      *
-     * @param string      $fingerprint - Stable finding fingerprint used for baseline matching.
-     * @param string      $ruleId - Rule identifier that produced the finding.
-     * @param string      $filePath - Display path recorded for the finding.
-     * @param int|null    $line - Source line recorded for the finding, when known.
-     * @param string|null $symbol - Symbol recorded for the finding, when available.
-     * @param string      $message - Finding message preserved for stale-entry reporting.
+     * @param string $filePath - Display path shared by every instance in the group.
+     * @param string $ruleId - Rule identifier that produced the findings.
+     * @param string $message - Exact finding message shared by every instance in the group.
+     * @param int    $count - Accepted instance count for the group; always at least one.
      */
     public function __construct(
-        public string  $fingerprint,
-        public string  $ruleId,
-        public string  $filePath,
-        public ?int    $line,
-        public ?string $symbol,
-        public string  $message,
+        public string $filePath,
+        public string $ruleId,
+        public string $message,
+        public int    $count,
     ) {
     }
 
     /**
-     * Create a baseline entry from a live analysis finding.
+     * Build the line-insensitive group key a live finding matches against.
      *
-     * @param Finding $finding - Live analysis finding to persist in the baseline.
+     * @param Finding $finding - Live analysis finding to key.
      *
-     * @return self - baseline entry snapshotting the finding's fingerprint and identity, decoupled from later mutation
+     * @return string - the same (file, ruleId, message) key groupKey() builds for persisted entries
      */
-    public static function fromFinding(Finding $finding): self
+    public static function groupKeyForFinding(Finding $finding): string
     {
-        // Snapshot the finding's identity now; the entry must stay stable even if the finding changes later.
-        return new self(
-            fingerprint: $finding->fingerprint(),
-            ruleId:      $finding->ruleId,
-            filePath:    $finding->filePath,
-            line:        $finding->line,
-            symbol:      $finding->symbol,
-            message:     $finding->message,
-        );
+        return self::groupKeyFor($finding->filePath, $finding->ruleId, $finding->message);
     }
 
     /**
-     * @param array<string, bool|float|int|string|null> $baselineRow - Serialized baseline row decoded from JSON.
-     * @param int                                       $index - Zero-based baseline entry position for error messages.
+     * Build the group key for raw identity fields.
      *
-     * @return self - baseline entry rebuilt from a validated on-disk row, ready to match against live findings
+     * Lines and columns are deliberately left out: the user can reformat or insert
+     * code above accepted debt without their committed baseline breaking.
+     *
+     * @param string $filePath - Display path for the group.
+     * @param string $ruleId - Rule identifier for the group.
+     * @param string $message - Finding message for the group.
+     *
+     * @return string - NUL-joined (file, ruleId, message) key with every part UTF-8-substituted, so on-disk rows and
+     *                raw in-memory findings produce identical keys
+     */
+    public static function groupKeyFor(string $filePath, string $ruleId, string $message): string
+    {
+        return self::utf8Substituted($filePath) . "\0" . self::utf8Substituted($ruleId) . "\0" . self::utf8Substituted($message);
+    }
+
+    /**
+     * Return this entry's group key.
+     *
+     * @return string - the (file, ruleId, message) key used to index this group against live findings
+     */
+    public function groupKey(): string
+    {
+        return self::groupKeyFor($this->filePath, $this->ruleId, $this->message);
+    }
+
+    /**
+     * Substitute invalid UTF-8 bytes the same way the JSON write path does.
+     *
+     * The baseline file stores substituted text, so keying live findings through the
+     * same substitution means a weird byte in a message can never un-match the
+     * user's accepted debt.
+     *
+     * @param string $identityText - Raw identity field text (file path, rule id, or message).
+     *
+     * @return string - the text unchanged when already valid UTF-8, else with invalid byte sequences replaced by U+FFFD
+     */
+    private static function utf8Substituted(string $identityText): string
+    {
+        // The empty //u pattern is the canonical fast probe: it matches exactly when the subject
+        // is already valid UTF-8, which is the normal case needing no substitution work.
+        if (preg_match('//u', $identityText) === 1) {
+            return $identityText;
+        }
+
+        $encoded = json_encode($identityText, JSON_INVALID_UTF8_SUBSTITUTE);
+        // Encoding can only fail on non-UTF-8 pathologies; keep the raw text rather than lose the key.
+        if ($encoded === false) {
+            return $identityText;
+        }
+
+        $decoded = json_decode($encoded);
+
+        return is_string($decoded) ? $decoded : $identityText;
+    }
+
+    /**
+     * @param array<string, bool|float|int|string|null> $baselineRow - Serialized baseline group row decoded from JSON.
+     * @param int                                       $index - Zero-based baseline row position for error messages.
+     *
+     * @return self - baseline group rebuilt from a validated on-disk row, ready to match against live findings
      * @throws BaselineException When required fields are missing or malformed.
      */
     public static function fromArray(array $baselineRow, int $index): self
     {
-        foreach (['fingerprint', 'ruleId', 'file', 'message'] as $key) {
+        // Check each identity field in turn: a hand-edited baseline should fail loudly, not half-match.
+        foreach (['file', 'ruleId', 'message'] as $key) {
+            // A missing or empty field means the row can never match a finding, so name it for the user.
             if (!isset($baselineRow[$key]) || !is_string($baselineRow[$key]) || $baselineRow[$key] === '') {
-                throw new BaselineException(sprintf('Baseline finding %d must include non-empty "%s".', $index, $key));
+                throw new BaselineException(sprintf('Baseline group %d must include non-empty "%s".', $index, $key));
             }
         }
 
-        $line = $baselineRow['line'] ?? null;
-        if ($line !== null && !is_int($line)) {
-            throw new BaselineException(sprintf('Baseline finding %d field "line" must be an integer or null.', $index));
+        $count = $baselineRow['count'] ?? null;
+        // A zero or negative count could never suppress anything, so reject the row as malformed.
+        if (!is_int($count) || $count < 1) {
+            throw new BaselineException(sprintf('Baseline group %d field "count" must be an integer of at least 1.', $index));
         }
 
-        $symbol = $baselineRow['symbol'] ?? null;
-        if ($symbol !== null && !is_string($symbol)) {
-            throw new BaselineException(sprintf('Baseline finding %d field "symbol" must be a string or null.', $index));
-        }
-
-        // Row has passed every field guard above, so build the entry from the now-trusted values.
+        // Row has passed every field guard above, so build the group from the now-trusted values.
         return new self(
-            fingerprint: $baselineRow['fingerprint'],
-            ruleId:      $baselineRow['ruleId'],
-            filePath:    $baselineRow['file'],
-            line:        $line,
-            symbol:      $symbol,
-            message:     $baselineRow['message'],
+            filePath: $baselineRow['file'],
+            ruleId:   $baselineRow['ruleId'],
+            message:  $baselineRow['message'],
+            count:    $count,
         );
     }
 
     /**
-     * Serialize this value object into the array shape used by reports.
+     * Serialize this value object into the array shape used by baseline files and reports.
      *
-     * @return array{fingerprint: string, ruleId: string, file: string, line: int|null, symbol: string|null, message: string} - JSON-ready baseline
-     *                            row; "file" holds the display path, line/symbol null when the finding lacked them
+     * @return array{file: string, ruleId: string, message: string, count: int} - JSON-ready baseline group row; "file" holds the display path, and
+     *                            in absent/resolved report rows "count" carries the resolved instance count instead of the accepted count
      */
     public function toArray(): array
     {
         // On-disk baseline JSON keys ("file" for the file path) that fromArray() reads back.
         return [
-            'fingerprint' => $this->fingerprint,
-            'ruleId'      => $this->ruleId,
-            'file'        => $this->filePath,
-            'line'        => $this->line,
-            'symbol'      => $this->symbol,
-            'message'     => $this->message,
+            'file'    => $this->filePath,
+            'ruleId'  => $this->ruleId,
+            'message' => $this->message,
+            'count'   => $this->count,
         ];
     }
 }

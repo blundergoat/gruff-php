@@ -476,12 +476,14 @@ final readonly class HtmlReporter
             );
 
             if ($report->shouldListAbsentBaseline) {
+                // One score-driver note per fixed group so the HTML report credits the cleanup work.
                 foreach ($report->baseline->staleEntries as $resolvedEntry) {
                     $items[] = sprintf(
-                        'Resolved: %s %s%s',
+                        'Resolved: %s %s (resolved %d): %s',
                         $resolvedEntry->ruleId,
                         $resolvedEntry->filePath,
-                        $resolvedEntry->line !== null ? ':' . $resolvedEntry->line : '',
+                        $resolvedEntry->count,
+                        $resolvedEntry->message,
                     );
                 }
             }

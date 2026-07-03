@@ -308,12 +308,14 @@ final readonly class TextReporter
 
         if ($report->shouldListAbsentBaseline && $report->baseline->staleEntries !== []) {
             $lines[] = '  Resolved entries:';
+            // One line per fixed group so the user can see exactly which accepted debt they cleared.
             foreach ($report->baseline->staleEntries as $resolvedEntry) {
                 $lines[] = sprintf(
-                    '    %s %s%s',
+                    '    %s %s (resolved %d): %s',
                     $resolvedEntry->ruleId,
                     $resolvedEntry->filePath,
-                    $resolvedEntry->line !== null ? ':' . $resolvedEntry->line : '',
+                    $resolvedEntry->count,
+                    $resolvedEntry->message,
                 );
             }
         }

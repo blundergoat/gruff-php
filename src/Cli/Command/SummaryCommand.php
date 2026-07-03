@@ -574,7 +574,8 @@ final class SummaryCommand extends Command
             'topOffenders'  => array_map(static fn($file): array => $file->toArray(), $summaryReportData->topOffenders),
         ];
 
-        return json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        // Invalid source bytes become U+FFFD so `summary --format json` always hands the user parseable JSON.
+        return json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR);
     }
 
     /**

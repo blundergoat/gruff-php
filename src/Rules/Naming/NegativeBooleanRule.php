@@ -42,8 +42,13 @@ final readonly class NegativeBooleanRule implements RuleInterface
     /** Stable identifier for the negative-boolean rule. */
     public const ID = 'naming.negative-boolean';
 
-    /** Negative prefixes that make boolean flags harder to read. */
-    private const NEGATIVE_PREFIXES = ['no', 'not', 'non', 'disable', 'skip', 'dont', 'cant', 'wont'];
+    /**
+     * Negative prefixes that make boolean flags harder to read.
+     *
+     * Public because BooleanPrefixRule defers matching names to this rule; both rules
+     * must agree on the prefix set and the boundary rules or names fall between them.
+     */
+    public const NEGATIVE_PREFIXES = ['no', 'not', 'non', 'disable', 'skip', 'dont', 'cant', 'wont'];
 
     /**
      * Describe the negative boolean rule.
@@ -129,7 +134,7 @@ final readonly class NegativeBooleanRule implements RuleInterface
         array $allowlist,
     ): ?Finding {
         $name         = $propertyProperty->name->toString();
-        $prefix       = $this->negativePrefix($name);
+        $prefix       = self::negativeFlagPrefix($name);
         $allowlistKey = $this->propertyAllowlistKey($propertyProperty);
 
         if ($prefix === null || ($allowlistKey !== null && in_array($allowlistKey, $allowlist, true))) {
@@ -169,7 +174,7 @@ final readonly class NegativeBooleanRule implements RuleInterface
         }
 
         $name         = $param->var->name;
-        $prefix       = $this->negativePrefix($name);
+        $prefix       = self::negativeFlagPrefix($name);
         $allowlistKey = $this->parameterAllowlistKey($scope, $param);
 
         if ($prefix === null || ($allowlistKey !== null && in_array($allowlistKey, $allowlist, true))) {
@@ -233,21 +238,28 @@ final readonly class NegativeBooleanRule implements RuleInterface
     }
 
     /**
-     * Detect the configured negative prefix at a camel-case word boundary.
+     * Detect the configured negative prefix at a camelCase or snake_case word boundary.
+     *
+     * Shared with BooleanPrefixRule's deferral check so `no_cache` and `noCache` are
+     * owned by exactly one rule; `north`/`normalised`-style words never match because
+     * the prefix must end at an uppercase letter or underscore boundary.
      *
      * @param string $name - Identifier to test, without its leading sigil.
      *
      * @return string|null - Matched prefix, or null when the name is acceptable.
      */
-    private function negativePrefix(string $name): ?string
+    public static function negativeFlagPrefix(string $name): ?string
     {
+        // Try each known negative word against the front of the identifier.
         foreach (self::NEGATIVE_PREFIXES as $prefix) {
+            // The prefix must start the name and leave at least one character after it.
             if (!str_starts_with($name, $prefix) || strlen($name) <= strlen($prefix)) {
                 continue;
             }
 
             $nextChar = $name[strlen($prefix)];
-            if ($nextChar >= 'A' && $nextChar <= 'Z') {
+            // Only a word boundary counts, so plain words like "north" never read as negatives.
+            if (($nextChar >= 'A' && $nextChar <= 'Z') || $nextChar === '_') {
                 return $prefix;
             }
         }

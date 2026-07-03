@@ -22,18 +22,36 @@ vendor/bin/gruff-php analyse src --format json --fail-on none > gruff-php.json
 Each finding carries two identifier fields:
 
 - `fingerprint` — 16-character SHA-256 prefix over `ruleId + file + line +
-  endLine + column + symbol + message`. The line-sensitive identity used
-  by baseline matching (so a moved violation can be re-baselined
-  deliberately) and by SARIF emission.
+  endLine + column + symbol + message`. The precise, line-sensitive identity
+  emitted per finding and mirrored into SARIF as `gruffFingerprint`.
 - `stableIdentity` — 16-character SHA-256 prefix over `ruleId + file +
-  symbol` (or `ruleId + file + message` when symbol is null). The
+  symbol + message` (or `ruleId + file + message` when symbol is null). The
   line-insensitive identity intended for custom diff tooling that needs
   to track "the same finding" across unrelated edits that shift line
-  numbers. Two findings of the same rule on the same symbol share a
-  `stableIdentity` but have different `fingerprint` values.
+  numbers. Two findings of the same rule on the same symbol and message
+  share a `stableIdentity` but have different `fingerprint` values.
 
-For baseline matching, use `fingerprint`. For line-shift-resilient diff
-tooling, use `stableIdentity`.
+Baselines do not match on either hash: `gruff.baseline.v2` files store grouped
+count rows `{file, ruleId, message, count}` and matching is count arithmetic
+per `(file, ruleId, message)` group, so line numbers never affect baseline
+results. For line-shift-resilient diff tooling, use `stableIdentity`.
+
+When a baseline is generated or applied, the `gruff.analysis.v2` payload
+includes a `baseline` object: `path`, `generated`, `totalEntries` (group rows
+loaded), `suppressedFindings`, `staleEvaluation` (`full-project`,
+`not-evaluated-diff-scope`, or `generated`), `staleEntries` (absent group row
+count), `source` (`explicit` or `default`), `stale` (absent group rows
+`{file, ruleId, message, count}` where `count` is the resolved instance total
+for that group), and `buckets` (`new` / `unchanged` / `absent` instance
+tallies).
+
+Trend history (`--history-file`) appends one entry per run and stamps the
+run's score scope. The reported `trend.scope` names the series, and
+`trend.delta` compares like-for-like scopes only: a full-project score is
+compared with the latest full-project entry, a diff/changed-region score
+(`--diff`, `--since`, `--changed-ranges`) with the latest diff entry, and
+`previousScore`/`delta` are null when the history holds no earlier entry of
+the same scope.
 
 Changed-region reports (`--diff`, `--since`, or `--changed-ranges`) include a
 top-level `suppressedCount`, mirrored as `diff.suppressedCount`, when diff
@@ -59,6 +77,16 @@ Use `html` for archived human review or dashboard scan output:
 vendor/bin/gruff-php report src --format html --output gruff-php.html
 ```
 
+`report` delegates to `analyse` and supports the analyse options that affect
+analysis selection, gating, baselines, cache, mutation ingestion, or rendered
+report content — including `--profile`, `--since`, `--changed-ranges`,
+`--changed-scope`, `--fail-on-new`, `--no-cache`, `--baseline-include-absent`,
+the `--infection-*` runtime options, and `--print-runtime`/`--runtime-mode`.
+With `--fail-on-new`, the report artifact is still written and the exit code
+reflects the gate, matching `analyse` semantics. Two analyse flags stay
+analyse-only by design: `--generate-baseline` (report never writes baselines)
+and `--file` (pass paths positionally instead).
+
 ## Markdown
 
 Use `markdown` for pull request comments and release notes.
@@ -79,6 +107,16 @@ Use `sarif` for GitHub code scanning or other SARIF consumers:
 ```sh
 vendor/bin/gruff-php analyse src --format sarif --fail-on none > gruff-php.sarif
 ```
+
+Each SARIF result carries two `partialFingerprints` keys that map onto the
+JSON finding identity fields:
+
+- `gruffFingerprint` — the precise, line-sensitive `fingerprint`. Byte-compatible
+  with earlier releases; changes whenever the finding's location changes.
+- `gruffStableIdentity` — the line-insensitive `stableIdentity`. Survives
+  unrelated edits that shift line numbers, so SARIF consumers (for example
+  GitHub Code Scanning) can keep an alert open across line drift instead of
+  closing and reopening it.
 
 ## Exit Codes
 

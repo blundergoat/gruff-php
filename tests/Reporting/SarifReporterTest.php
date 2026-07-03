@@ -118,6 +118,7 @@ final class SarifReporterTest extends TestCase
         self::assertSame($expectedEndLine, $region['endLine'] ?? null);
         $partialFingerprints = $this->stringKeyedArray($result, 'partialFingerprints');
         self::assertSame($finding->fingerprint(), $this->stringValue($partialFingerprints, 'gruffFingerprint'));
+        self::assertSame($finding->stableIdentity(), $this->stringValue($partialFingerprints, 'gruffStableIdentity'));
         self::assertArrayNotHasKey('primary', $partialFingerprints);
         $resultProperties = $this->stringKeyedArray($result, 'properties');
         self::assertSame(['maintainability'], $this->listValue($resultProperties, 'secondaryPillars'));
@@ -186,6 +187,34 @@ final class SarifReporterTest extends TestCase
         yield 'error' => [Severity::Error, 'error'];
         yield 'warning' => [Severity::Warning, 'warning'];
         yield 'advisory' => [Severity::Advisory, 'note'];
+    }
+
+    /**
+     * Verify the stable partial fingerprint survives line drift while the precise fingerprint does not.
+     *
+     * @return void
+     * @throws JsonException
+     */
+    public function testSarifReporterStableIdentitySurvivesLineShiftWhilePreciseFingerprintChanges(): void
+    {
+        $lineBeforeShift = 10;
+        $lineAfterShift  = 20;
+        $payload         = $this->decode((new SarifReporter())->render($this->report([
+                                                                                         $this->finding(line: $lineBeforeShift),
+                                                                                         $this->finding(line: $lineAfterShift),
+                                                                                     ])));
+        $results         = $this->listValue($this->sarifRun($payload), 'results');
+        $first           = $this->stringKeyedArray($this->stringKeyedArray($results[0] ?? null), 'partialFingerprints');
+        $second          = $this->stringKeyedArray($this->stringKeyedArray($results[1] ?? null), 'partialFingerprints');
+
+        self::assertSame(
+            $this->stringValue($first, 'gruffStableIdentity'),
+            $this->stringValue($second, 'gruffStableIdentity'),
+        );
+        self::assertNotSame(
+            $this->stringValue($first, 'gruffFingerprint'),
+            $this->stringValue($second, 'gruffFingerprint'),
+        );
     }
 
     /**

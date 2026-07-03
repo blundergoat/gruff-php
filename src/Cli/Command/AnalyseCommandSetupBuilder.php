@@ -124,6 +124,14 @@ final readonly class AnalyseCommandSetupBuilder
             );
         }
 
+        $profileIncludeError = $this->profileIncludeRuleError($registry, $options);
+        if ($profileIncludeError !== null) {
+            return AnalyseCommandSetupResult::reportError(
+                $this->usageReport($options, $formatResult, $failThreshold->value, $profileIncludeError),
+                $formatResult,
+            );
+        }
+
         $promptExitCode = MissingConfigPrompt::maybeOffer(
             input:                   $input,
             output:                  $output,
@@ -215,6 +223,67 @@ final readonly class AnalyseCommandSetupBuilder
             excludePillars: $existing->excludePillars,
             excludeRules:   array_values(array_unique([...$existing->excludeRules, ...$excludeRules])),
         );
+    }
+
+    /**
+     * Reject --include-rule ids whose pillar the active profile never scores.
+     *
+     * A command like `gruff-php analyse --profile security --include-rule docs.missing-public-phpdoc`
+     * fails fast here: without this gate it would emit a docs error while the user's grade
+     * stayed a security-only 100 (ADR-030). Excludes stay a plain narrowing operation.
+     *
+     * @param RuleRegistry          $registry - Registry resolving rule ids to their definitions.
+     * @param AnalyseCommandOptions $options - Validated options carrying the profile and include filters.
+     *
+     * @return string|null - Usage error naming the first out-of-profile include, or null when compatible.
+     */
+    private function profileIncludeRuleError(RuleRegistry $registry, AnalyseCommandOptions $options): ?string
+    {
+        $profileScorePillars = $options->profileScorePillars();
+        // The default profile scores every pillar, so there is nothing to reject.
+        if ($profileScorePillars === null) {
+            return null;
+        }
+
+        return self::outOfProfileIncludeError($registry, $options->profile, $profileScorePillars, $options->includeRules);
+    }
+
+    /**
+     * Build the usage error for --include-rule ids outside a profile's scored pillars.
+     *
+     * Shared with ReportCommand so both commands reject the same incoherent combinations
+     * with identical wording, and report can do it before its init prompt runs.
+     *
+     * @param RuleRegistry         $registry - Registry resolving rule ids to their definitions; ids must already be validated.
+     * @param string               $profile - Requested profile name, echoed into the error message.
+     * @param list<\GruffPhp\Results\Finding\Pillar> $profileScorePillars - Pillars the profile's composite counts.
+     * @param list<string>         $includeRuleIds - Requested --include-rule ids.
+     *
+     * @return string|null - usage error naming the first out-of-profile include and both remedies, or null when
+     *                     every include belongs to a scored pillar (including the no-includes case)
+     */
+    public static function outOfProfileIncludeError(
+        RuleRegistry $registry,
+        string       $profile,
+        array        $profileScorePillars,
+        array        $includeRuleIds,
+    ): ?string {
+        // Check each requested rule against the pillars the profile's grade actually counts.
+        foreach ($includeRuleIds as $ruleId) {
+            $pillar = $registry->get($ruleId)->definition()->pillar;
+            // An unscored pillar would emit findings the grade ignores; tell the user both ways out.
+            if (!in_array($pillar, $profileScorePillars, true)) {
+                return sprintf(
+                    '--include-rule %s selects a %s rule, but --profile %s executes and scores only security and sensitive-data rules. Drop --profile %s or include only security/sensitive-data rule ids.',
+                    $ruleId,
+                    $pillar->value,
+                    $profile,
+                    $profile,
+                );
+            }
+        }
+
+        return null;
     }
 
     /**

@@ -203,6 +203,53 @@ final class SensitiveDataRulesTest extends TestCase
     }
 
     /**
+     * Verify opaque dotted tokens stay entropy-eligible while JWTs remain the JWT rule's alone.
+     *
+     * @return void
+     */
+    public function testDottedOpaqueTokensAreEntropyEligibleWhileJwtsStayDelegated(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'gruff-dotted-token-entropy-');
+        self::assertIsString($path);
+        $path .= '.php';
+        // Both tokens are concatenated from short chunks so this test file's own source never
+        // matches gruff's secret scanners; only the generated fixture carries the full literals.
+        $opaqueToken = 'vTr4K2mQ.9fXZ81beLKw' . '72mYh37Rp.hV5c2LqN8d' . 'WjS6xTAGy';
+        $sampleJwt   = 'eyJhbGciOiJIUzI1NiIs' . 'InR5cCI6IkpXVCJ9.eyJ' . 'zdWIiOiIxMjM0NTY3ODkw' . 'In0.dozjgNryP4J3jVmN' . 'Hl0w5N65nCX63nCz';
+        $source      = "<?php\n\n"
+                  . '$sessionToken = ' . var_export($opaqueToken, true) . ";\n"
+                  . '$sampleJwt = ' . var_export($sampleJwt, true) . ";\n"
+                  . '$routeName = ' . var_export('authentication.permissions.middleware-groups', true) . ";\n"
+                  . '$versionLabel = ' . var_export('3.11.4-security-hardening-release-notes', true) . ";\n"
+                  . '$metricsDomain = ' . var_export('telemetry.blundergoat-analytics.example', true) . ";\n"
+                  . '$archivePath = ' . var_export('storage/app.private/uploads.tmp/archive-name.tar.gz', true) . ";\n";
+        self::assertNotFalse(file_put_contents($path, $source));
+
+        try {
+            $unit        = (new PhpFileParser())->parse(new SourceFile($path, 'tests/Fixtures/SensitiveData/inline-dotted-token-entropy.php'));
+            $findings    = $this->analyseUnits([$unit]);
+            $highEntropy = array_values(array_filter(
+                                            $findings,
+                                            static fn(Finding $finding): bool => $finding->ruleId === HighEntropyStringRule::ID,
+                                        ));
+            $jwtFindings = array_values(array_filter(
+                                            $findings,
+                                            static fn(Finding $finding): bool => $finding->ruleId === JwtTokenRule::ID,
+                                        ));
+
+            // The opaque dotted token reports as high entropy only; the JWT reports under the JWT rule only
+            // (no double report); the dotted route, version, domain, and path literals all stay silent.
+            self::assertCount(1, $highEntropy);
+            self::assertSame(3, $highEntropy[0]->line);
+            self::assertStringContainsString('vTr4', $highEntropy[0]->message);
+            self::assertCount(1, $jwtFindings);
+            self::assertSame(4, $jwtFindings[0]->line);
+        } finally {
+            self::assertTrue(unlink($path));
+        }
+    }
+
+    /**
      * Verify gruff configuration path literals are not treated as high-entropy secrets.
      *
      * @return void

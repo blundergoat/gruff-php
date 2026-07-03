@@ -7,52 +7,90 @@ namespace GruffPhp\Results\Baseline;
 use GruffPhp\Results\Finding\Finding;
 
 /**
- * Filters live findings against baseline entries and optional diff scope.
+ * Filters live findings against baseline groups and optional diff scope.
  */
 final readonly class BaselineFilter
 {
     /**
+     * Match live findings against baseline groups by count.
+     *
+     * This is the heart of a `gruff-php analyse --baseline gruff-baseline.json` run: it decides
+     * which findings the user already accepted (suppressed), which are new (still fail the run),
+     * and which accepted debt got fixed (resolved). Per group with B accepted and C live
+     * instances: unchanged = min(B, C), new = max(0, C - B), resolved = max(0, B - C). Line
+     * numbers never participate, so accepted debt survives edits that shift lines.
+     *
      * @param BaselineData  $baseline - Loaded baseline data to apply.
      * @param list<Finding> $findings - Findings to compare against the baseline.
      * @param bool          $hasDiffScope - Whether diff filtering is active for this baseline pass.
      *
      * @return array{findings: list<Finding>, new: list<Finding>, unchanged: list<Finding>, report: BaselineReport} - partitioned result: "findings"
      *                         and "new" both hold the unsuppressed findings callers act on (empty when every finding matched the baseline),
-     *                         "unchanged" the baseline-suppressed ones, and "report" the summary with stale-entry accounting
+     *                         "unchanged" the baseline-suppressed ones, and "report" the summary with absent-group accounting
      */
     public function apply(BaselineData $baseline, array $findings, bool $hasDiffScope): array
     {
-        $entriesByFingerprint = $baseline->byFingerprint();
-        $matchedFingerprints  = [];
-        $newFindings          = [];
-        $unchangedFindings    = [];
+        $entriesByGroup = $baseline->byGroup();
 
+        // Bucket live findings into the same (file, ruleId, message) groups the baseline stores.
+        $liveByGroup = [];
         foreach ($findings as $finding) {
-            $fingerprint = $finding->fingerprint();
-            $entry       = $entriesByFingerprint[$fingerprint] ?? null;
+            $liveByGroup[BaselineEntry::groupKeyForFinding($finding)][] = $finding;
+        }
 
-            if ($entry instanceof BaselineEntry
-                && $entry->ruleId === $finding->ruleId
-                && $entry->filePath === $finding->filePath
-            ) {
-                $matchedFingerprints[$fingerprint] = true;
-                $unchangedFindings[]               = $finding;
+        // Within each group the first `count` instances in (line, column) order stay suppressed;
+        // any instances beyond the accepted count surface as new.
+        $suppressedFindingIds = [];
+        foreach ($liveByGroup as $groupKey => $groupFindings) {
+            $acceptedGroup = $entriesByGroup[$groupKey] ?? null;
+            // No baseline row for this group: the user never accepted these findings, so all stay new.
+            if (!$acceptedGroup instanceof BaselineEntry) {
+                continue;
+            }
+
+            usort(
+                $groupFindings,
+                static fn(Finding $left, Finding $right): int => [$left->line ?? 0, $left->column ?? 0]
+                    <=> [$right->line ?? 0, $right->column ?? 0],
+            );
+
+            foreach (array_slice($groupFindings, 0, $acceptedGroup->count) as $suppressedFinding) {
+                $suppressedFindingIds[spl_object_id($suppressedFinding)] = true;
+            }
+        }
+
+        // Partition in original input order so the user's report lists findings deterministically.
+        $newFindings       = [];
+        $unchangedFindings = [];
+        foreach ($findings as $finding) {
+            // Suppressed findings are accepted debt: they disappear from the run's failing set.
+            if (isset($suppressedFindingIds[spl_object_id($finding)])) {
+                $unchangedFindings[] = $finding;
                 continue;
             }
 
             $newFindings[] = $finding;
         }
 
-        $absentEntries   = [];
-        $staleEvaluation = 'full-project';
+        $absentEntries       = [];
+        $absentInstanceCount = 0;
+        $staleEvaluation     = 'full-project';
 
         if ($hasDiffScope) {
+            // A partial scan cannot prove a group resolved: unscanned files simply produced no findings.
             $staleEvaluation = 'not-evaluated-diff-scope';
         } else {
-            foreach ($baseline->entries as $entry) {
-                if (!isset($matchedFingerprints[$entry->fingerprint])) {
-                    $absentEntries[] = $entry;
+            // Full-project scans can tell the user which accepted debt they actually fixed.
+            foreach ($entriesByGroup as $groupKey => $acceptedGroup) {
+                $resolvedCount = $acceptedGroup->count - count($liveByGroup[$groupKey] ?? []);
+                // Live instances still cover this group's budget, so nothing resolved here.
+                if ($resolvedCount <= 0) {
+                    continue;
                 }
+
+                // Absent rows reuse the group shape with count meaning "instances resolved this run".
+                $absentEntries[]      = new BaselineEntry($acceptedGroup->filePath, $acceptedGroup->ruleId, $acceptedGroup->message, $resolvedCount);
+                $absentInstanceCount += $resolvedCount;
             }
         }
 
@@ -70,7 +108,7 @@ final readonly class BaselineFilter
                 staleEntries:       $absentEntries,
                 newCount:           count($newFindings),
                 unchangedCount:     count($unchangedFindings),
-                absentCount:        count($absentEntries),
+                absentCount:        $absentInstanceCount,
             ),
         ];
     }

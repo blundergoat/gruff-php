@@ -77,8 +77,9 @@ final readonly class SarifReporter
         ];
 
         try {
-            // Trailing newline keeps the document POSIX-line-terminated when redirected to a .sarif file.
-            return json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . PHP_EOL;
+            // Trailing newline keeps redirected .sarif files POSIX-clean; JSON_INVALID_UTF8_SUBSTITUTE swaps
+            // bad source bytes for U+FFFD so the user's Code Scanning upload never dies on one weird byte.
+            return json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR) . PHP_EOL;
         } catch (JsonException $exception) {
             // Encoding failure still emits parseable JSON so a SARIF consumer reports an error instead of choking.
             return sprintf('{"error":"Unable to encode SARIF: %s"}%s', addslashes($exception->getMessage()), PHP_EOL);
@@ -150,8 +151,9 @@ final readonly class SarifReporter
      * @param int     $ruleIndex - Zero-based offset of this finding's rule in the driver `rules` array, so the
      *                           result can reference its rule by index rather than repeating the descriptor.
      *
-     * @return array<string, mixed> - one SARIF `result` entry for the run's `results` list, with `region` keys present only when the finding carries
-     *                       line/column data and `partialFingerprints` set so consumers can track the finding across line drift
+     * @return array<string, mixed> - one SARIF `result` entry with `region` keys only when the finding has line/column data, plus two
+     *                       `partialFingerprints`: the precise `gruffFingerprint` and the line-insensitive `gruffStableIdentity`, so a
+     *                       Code Scanning alert stays open across line drift instead of closing and reopening on the user
      */
     private function result(Finding $finding, int $ruleIndex): array
     {
@@ -198,7 +200,7 @@ final readonly class SarifReporter
             $properties['metadata'] = $finding->metadata;
         }
 
-        // partialFingerprints carries the gruff fingerprint so SARIF tooling can track a finding across line drift.
+        // Two fingerprints: the precise one moves with the line, the stable one survives line drift.
         return [
             'ruleId'              => $finding->ruleId,
             'ruleIndex'           => $ruleIndex,
@@ -210,7 +212,8 @@ final readonly class SarifReporter
                                           'physicalLocation' => $physicalLocation,
                                       ]],
             'partialFingerprints' => [
-                'gruffFingerprint' => $finding->fingerprint(),
+                'gruffFingerprint'    => $finding->fingerprint(),
+                'gruffStableIdentity' => $finding->stableIdentity(),
             ],
             'properties'          => $properties,
         ];

@@ -208,15 +208,17 @@ final readonly class Finding
      */
     public function fingerprint(): string
     {
+        // JSON_INVALID_UTF8_SUBSTITUTE keeps hashing total: a finding whose message or path carries
+        // invalid bytes hashes its substituted form instead of throwing before any reporter runs.
         $encoded = json_encode([
-                                   'ruleId' => $this->ruleId,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                'file' => $this->filePath,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                'line' => $this->line,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                'endLine' => $this->endLine,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                'column' => $this->column,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                'symbol' => $this->symbol,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                'message' => $this->message,
-                               ], JSON_THROW_ON_ERROR);
+                                   'ruleId'  => $this->ruleId,
+                                   'file'    => $this->filePath,
+                                   'line'    => $this->line,
+                                   'endLine' => $this->endLine,
+                                   'column'  => $this->column,
+                                   'symbol'  => $this->symbol,
+                                   'message' => $this->message,
+                               ], JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR);
 
         return substr(hash('sha256', $encoded), 0, 16);
     }
@@ -231,9 +233,9 @@ final readonly class Finding
      * same identity. `message` is included even when symbol is set so multiple
      * findings sharing one symbol (e.g. `docs.missing-param-tag` emitting one
      * finding per missing parameter, all under the same method name) stay
-     * distinct in external diff tooling. For baseline matching, callers should
-     * still use {@see fingerprint()}; this field is informational for external
-     * diff tooling.
+     * distinct in external diff tooling. Baselines match on grouped
+     * (file, ruleId, message) counts rather than on either hash; this field is
+     * informational for external diff tooling and SARIF consumers.
      *
      * @return string - 16-hex-char SHA-256 prefix that omits line/endLine/column, so the identity survives line shifts; informational for external
      *                diff tooling, not baseline matching
@@ -246,6 +248,7 @@ final readonly class Finding
 
         // $payload omits line/endLine/column, so this identity survives line shifts. Same 16-hex
         // width as fingerprint() so both read as one finding-id format to external diff tooling.
-        return substr(hash('sha256', json_encode($payload, JSON_THROW_ON_ERROR)), 0, 16);
+        // JSON_INVALID_UTF8_SUBSTITUTE mirrors fingerprint(): invalid bytes hash their substituted form.
+        return substr(hash('sha256', json_encode($payload, JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR)), 0, 16);
     }
 }

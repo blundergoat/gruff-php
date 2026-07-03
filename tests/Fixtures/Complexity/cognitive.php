@@ -232,4 +232,68 @@ class CognitiveFixture
 
         return;
     }
+
+    public function matchTwoArms(int $value): string
+    {
+        return match ($value) {
+            1 => 'one',
+            default => 'other',
+        };
+    }
+
+    public function matchSixArms(int $value): string
+    {
+        return match ($value) {
+            1 => 'one',
+            2 => 'two',
+            3 => 'three',
+            4 => 'four',
+            5 => 'five',
+            default => 'other',
+        };
+    }
+
+    public function matchNested(int $outer, int $inner): string
+    {
+        return match ($outer) {
+            1 => match ($inner) {
+                1 => 'one-one',
+                default => 'one-other',
+            },
+            default => 'other',
+        };
+    }
+
+    public function matchInsideIf(bool $flag, int $value): string
+    {
+        if ($flag) {
+            return match ($value) {
+                1 => 'one',
+                default => 'other',
+            };
+        }
+
+        return 'fallback';
+    }
+
+    public function matchInsideLoop(array $items): array
+    {
+        $labels = [];
+        foreach ($items as $item) {
+            $labels[] = match ($item) {
+                1 => 'one',
+                default => 'other',
+            };
+        }
+
+        return $labels;
+    }
+
+    public function matchWithConditionComplexity(int $value, bool $flag): string
+    {
+        return match (true) {
+            $value > 10 => $flag ? 'big-flagged' : 'big',
+            default => 'small',
+        };
+    }
 }
