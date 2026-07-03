@@ -209,9 +209,10 @@ final class SensitiveDataRulesTest extends TestCase
      */
     public function testDottedOpaqueTokensAreEntropyEligibleWhileJwtsStayDelegated(): void
     {
-        $path = tempnam(sys_get_temp_dir(), 'gruff-dotted-token-entropy-');
-        self::assertIsString($path);
-        $path .= '.php';
+        $tempPath = tempnam(sys_get_temp_dir(), 'gruff-dotted-token-entropy-');
+        self::assertIsString($tempPath);
+        $path = $tempPath . '.php';
+        self::assertTrue(rename($tempPath, $path));
         // Both tokens are concatenated from short chunks so this test file's own source never
         // matches gruff's secret scanners; only the generated fixture carries the full literals.
         $opaqueToken = 'vTr4K2mQ.9fXZ81beLKw' . '72mYh37Rp.hV5c2LqN8d' . 'WjS6xTAGy';
@@ -223,9 +224,9 @@ final class SensitiveDataRulesTest extends TestCase
                   . '$versionLabel = ' . var_export('3.11.4-security-hardening-release-notes', true) . ";\n"
                   . '$metricsDomain = ' . var_export('telemetry.blundergoat-analytics.example', true) . ";\n"
                   . '$archivePath = ' . var_export('storage/app.private/uploads.tmp/archive-name.tar.gz', true) . ";\n";
-        self::assertNotFalse(file_put_contents($path, $source));
-
         try {
+            self::assertNotFalse(file_put_contents($path, $source));
+
             $unit        = (new PhpFileParser())->parse(new SourceFile($path, 'tests/Fixtures/SensitiveData/inline-dotted-token-entropy.php'));
             $findings    = $this->analyseUnits([$unit]);
             $highEntropy = array_values(array_filter(

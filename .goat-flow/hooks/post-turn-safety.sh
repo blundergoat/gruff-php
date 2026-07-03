@@ -21,9 +21,26 @@ MAX_FINDINGS="${GOAT_FLOW_POST_TURN_SAFETY_MAX_FINDINGS:-20}"
 findings=0
 reported_findings="
 "
+hook_payload=""
 
 repo_root() {
   git rev-parse --show-toplevel 2>/dev/null
+}
+
+read_hook_payload() {
+  if [ ! -t 0 ]; then
+    hook_payload="$(cat || true)"
+  fi
+}
+
+stop_hook_already_active() {
+  [ -n "$hook_payload" ] || return 1
+
+  if command -v jq >/dev/null 2>&1; then
+    printf '%s' "$hook_payload" | jq -e '.stop_hook_active == true' >/dev/null 2>&1 && return 0
+  fi
+
+  printf '%s' "$hook_payload" | grep -Eq '"stop_hook_active"[[:space:]]*:[[:space:]]*true'
 }
 
 has_head() {
@@ -512,10 +529,16 @@ scan_untracked_changes() {
 
 main() {
   local root
+
+  read_hook_payload
+  if stop_hook_already_active; then
+    return 0
+  fi
+
   root="$(repo_root)"
   if [ -z "$root" ]; then
-    printf 'post-turn-safety: git repository root unavailable; cannot scan changed content.\n' >&2
-    return 1
+    printf 'post-turn-safety: git repository root unavailable; changed-content scan skipped.\n' >&2
+    return 0
   fi
 
   cd "$root" || {

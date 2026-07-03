@@ -171,9 +171,9 @@ final class SecurityRulesTest extends TestCase
         return [
             'variable include attack shapes'  => ['variable-include-precision.php', VariableIncludeRule::ID, [9, 10, 13, 17, 19, 20, 32]],
             'sql concatenation attack shapes' => ['sql-concatenation-precision.php', SqlConcatenationRule::ID, [7, 8, 9, 10, 25]],
-            // 54/64: a conditional rebind never hides a real parser, and a conditional construction
-            // counts as possibly-XML; the rebind on the sink's own path stays silent.
-            'xml loaders need xml receivers'  => ['xml-receiver-gating.php', UnsafeXmlLoadingRule::ID, [22, 27, 33, 38, 54, 64]],
+            // 54/64/82: a conditional rebind never hides a real parser, including sibling-branch sinks,
+            // and a conditional construction counts as possibly-XML; the rebind on the sink's own path stays silent.
+            'xml loaders need xml receivers'  => ['xml-receiver-gating.php', UnsafeXmlLoadingRule::ID, [22, 27, 33, 38, 54, 64, 82]],
         ];
     }
 

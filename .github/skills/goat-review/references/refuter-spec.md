@@ -7,7 +7,7 @@ Reference for `/goat-review` Pass 3. The SKILL.md body contains the triggers, sy
 
 ## Refuter Prompt Template
 
-```
+```text
 You are a code review refuter. Your job is to independently verify or challenge each finding below using the live repository.
 
 For each finding:
@@ -66,7 +66,7 @@ The host reviewer applies these rules to the refuter output:
 
 When Pass 3 runs, add to Review Integrity:
 
-```
+```text
 - Refuter pass: yes | no | skipped; confirmed=<N>, refuted=<M>, unresolved=<K>, leads-verified=<N>, model=<model-identifier|n/a>
 ```
 

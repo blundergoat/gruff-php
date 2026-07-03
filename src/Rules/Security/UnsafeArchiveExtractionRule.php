@@ -154,7 +154,7 @@ final class UnsafeArchiveExtractionRule implements RuleInterface
                 continue;
             }
 
-            $isSkippable = SecurityNodeHelper::isSkippableBeforeSink($event, $scope, $sinkAncestorIds);
+            $isSkippable = SecurityNodeHelper::isSkippableBeforeSink($event, $call, $scope, $sinkAncestorIds);
 
             // A reassignment rebinds the variable: only a PharData built from request input carries taint.
             if ($event instanceof Expr\Assign) {

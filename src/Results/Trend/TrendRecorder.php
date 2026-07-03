@@ -16,6 +16,9 @@ use RuntimeException;
  */
 final readonly class TrendRecorder
 {
+    /** Maximum retained snapshots per score scope. */
+    private const MAX_HISTORY_ENTRIES_PER_SCOPE = 50;
+
     /**
      * Append a score snapshot to the bounded history file.
      *
@@ -45,7 +48,7 @@ final readonly class TrendRecorder
         ];
 
         $entries[] = $trendEntry;
-        $entries   = array_slice($entries, -50);
+        $entries   = $this->trimEntriesPerScope($entries);
         $directory = dirname($resolvedPath);
 
         if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
@@ -84,15 +87,58 @@ final readonly class TrendRecorder
     {
         // Walk newest-first so the delta compares against the most recent comparable run.
         for ($index = count($entries) - 1; $index >= 0; $index--) {
-            $entryScope = $entries[$index]['scope'] ?? null;
-
             // Match same-scope rows only; scope-less rows are legacy history from full runs.
-            if ((is_string($entryScope) ? $entryScope : 'full-project') === $scope) {
+            if ($this->entryScope($entries[$index]) === $scope) {
                 return $entries[$index];
             }
         }
 
         return null;
+    }
+
+    /**
+     * Bound history independently per score scope while preserving file order.
+     *
+     * @param list<TrendEntry> $entries - Validated history rows plus the new row in file order.
+     *
+     * @return list<TrendEntry> - newest rows per scope, still ordered oldest-to-newest overall
+     */
+    private function trimEntriesPerScope(array $entries): array
+    {
+        $seenByScope = [];
+        $keptIndexes = [];
+
+        for ($index = count($entries) - 1; $index >= 0; $index--) {
+            $scope               = $this->entryScope($entries[$index]);
+            $seenByScope[$scope] = ($seenByScope[$scope] ?? 0) + 1;
+
+            if ($seenByScope[$scope] <= self::MAX_HISTORY_ENTRIES_PER_SCOPE) {
+                $keptIndexes[$index] = true;
+            }
+        }
+
+        ksort($keptIndexes);
+
+        $boundedEntries = [];
+        foreach (array_keys($keptIndexes) as $index) {
+            $boundedEntries[] = $entries[$index];
+        }
+
+        return $boundedEntries;
+    }
+
+    /**
+     * Read a trend entry's scope, treating legacy scope-less entries as full-project.
+     *
+     * @param TrendEntry $entry - Validated history row.
+     *
+     * @return string - Entry scope used for delta and retention comparisons.
+     */
+    private function entryScope(array $entry): string
+    {
+        $entryScope = $entry['scope'] ?? null;
+
+        return is_string($entryScope) ? $entryScope : 'full-project';
     }
 
     /**

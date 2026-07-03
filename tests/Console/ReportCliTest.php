@@ -233,6 +233,36 @@ final class ReportCliTest extends CliTestCase
     }
 
     /**
+     * Verify unsupported profiles are rejected before report can offer or write config.
+     *
+     * @return void
+     */
+    public function testReportCommandRejectsUnknownProfileBeforeConfigPrompt(): void
+    {
+        $repo = $this->createBaselineProject();
+
+        try {
+            $process = new Process([
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff-php',
+                'report',
+                'src',
+                '--profile',
+                'security-plus',
+                '--fail-on',
+                'none',
+            ], $repo);
+            $process->run();
+
+            self::assertSame(2, $process->getExitCode());
+            self::assertStringContainsString('Unsupported profile "security-plus". Use default or security.', $process->getOutput());
+            self::assertFileDoesNotExist($repo . '/.gruff-php.yaml');
+        } finally {
+            $this->removeDir($repo);
+        }
+    }
+
+    /**
      * Run git inside a fixture repository.
      *
      * @param string $repo - Fixture repository root.

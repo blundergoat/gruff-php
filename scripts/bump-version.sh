@@ -33,7 +33,7 @@ README_MD="README.md"
 SUMMARY_DOC="docs/gruff-cli-summary.md"
 
 usage() {
-  sed -n '3,18p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '3,25p' "$0" | sed 's/^# \{0,1\}//'
   exit "${1:-1}"
 }
 

@@ -376,13 +376,14 @@ final class SecurityNodeHelper
      * branch chain always runs before the sink and counts as unconditional.
      *
      * @param Node            $node - Write/event node whose reachability is being classified.
+     * @param Node            $sink - Sink node whose runtime path must be reached.
      * @param Node|null       $scopeBoundary - Enclosing function-like boundary, or null for file scope.
      * @param array<int, true> $sinkAncestorIds - Ancestor-id set of the sink, from ancestorIdsWithin().
      *
      * @return bool - true when a branch, loop, catch, match/ternary arm, or short-circuit operator that the
      *              sink does not share sits between the node and the scope boundary
      */
-    public static function isSkippableBeforeSink(Node $node, ?Node $scopeBoundary, array $sinkAncestorIds): bool
+    public static function isSkippableBeforeSink(Node $node, Node $sink, ?Node $scopeBoundary, array $sinkAncestorIds): bool
     {
         $parent = $node->getAttribute('parent');
 
@@ -404,15 +405,83 @@ final class SecurityNodeHelper
                 || $parent instanceof Expr\BinaryOp\BooleanOr
                 || $parent instanceof Expr\BinaryOp\Coalesce;
 
-            // A construct the sink also sits inside cannot separate the write from the sink's path.
-            if ($isSkippingConstruct && !isset($sinkAncestorIds[spl_object_id($parent)])) {
-                return true;
+            if ($isSkippingConstruct) {
+                $parentId = spl_object_id($parent);
+
+                // A construct the sink also sits inside cannot separate the write from the sink's path,
+                // unless the write and sink live in sibling branches of that shared construct.
+                if (!isset($sinkAncestorIds[$parentId])) {
+                    return true;
+                }
+
+                if ($parent instanceof Stmt\If_ && self::ifBranchesDiffer($node, $sink, $parent)) {
+                    return true;
+                }
             }
 
             $parent = $parent->getAttribute('parent');
         }
 
         return false;
+    }
+
+    /**
+     * Decide whether two nodes sit in different executable branches of the same if-chain.
+     *
+     * @param Node     $node - Write/event node being classified.
+     * @param Node     $sink - Sink node whose path is being compared.
+     * @param Stmt\If_ $if - Shared if-chain ancestor.
+     *
+     * @return bool - true when both nodes are in known sibling bodies of the if-chain
+     */
+    private static function ifBranchesDiffer(Node $node, Node $sink, Stmt\If_ $if): bool
+    {
+        $nodeBranch = self::ifBranchKey($node, $if);
+        $sinkBranch = self::ifBranchKey($sink, $if);
+
+        return $nodeBranch !== null && $sinkBranch !== null && $nodeBranch !== $sinkBranch;
+    }
+
+    /**
+     * Identify the body branch a node belongs to for a specific if-chain.
+     *
+     * Conditions return null because they are evaluated before any reachable branch body and
+     * should not be treated as skippable relative to a sink inside that same branch chain.
+     *
+     * @param Node     $node - Descendant candidate.
+     * @param Stmt\If_ $if - If-chain ancestor to classify against.
+     *
+     * @return string|null - stable branch key for if/elseif/else bodies, or null for conditions/unrelated nodes
+     */
+    private static function ifBranchKey(Node $node, Stmt\If_ $if): ?string
+    {
+        $current = $node;
+        $parent  = $current->getAttribute('parent');
+
+        while ($parent instanceof Node) {
+            if ($parent === $if) {
+                if (in_array($current, $if->stmts, true)) {
+                    return 'if';
+                }
+
+                foreach ($if->elseifs as $elseIf) {
+                    if ($current === $elseIf) {
+                        return 'elseif:' . spl_object_id($elseIf);
+                    }
+                }
+
+                if ($if->else instanceof Stmt\Else_ && $current === $if->else) {
+                    return 'else:' . spl_object_id($if->else);
+                }
+
+                return null;
+            }
+
+            $current = $parent;
+            $parent  = $current->getAttribute('parent');
+        }
+
+        return null;
     }
 
     /**

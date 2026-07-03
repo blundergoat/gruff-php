@@ -356,6 +356,25 @@ final readonly class AnalyseCommandOptions
     }
 
     /**
+     * Return the usage error for unsupported rule execution profiles.
+     *
+     * Shared with report so forwarded profile errors are rejected before report-only side effects.
+     *
+     * @param string $profile - Requested profile name.
+     *
+     * @return string|null - the message naming the unrecognised profile, or null when the profile is supported
+     */
+    public static function profileUsageErrorFor(string $profile): ?string
+    {
+        if (in_array($profile, [self::PROFILE_DEFAULT, self::PROFILE_SECURITY], true)) {
+            return null;
+        }
+
+        // Reject unknown profiles loudly rather than silently falling back to default behaviour.
+        return sprintf('Unsupported profile "%s". Use default or security.', $profile);
+    }
+
+    /**
      * Report whether an opt-in changed-region analysis mode is active.
      *
      * @return bool - true when any changed-region opt-in (--diff, --since, or --changed-ranges) is active, so discovery should be scoped.
@@ -536,12 +555,7 @@ final readonly class AnalyseCommandOptions
      */
     private function profileUsageError(): ?string
     {
-        if (in_array($this->profile, [self::PROFILE_DEFAULT, self::PROFILE_SECURITY], true)) {
-            return null;
-        }
-
-        // Reject unknown profiles loudly rather than silently falling back to default behaviour.
-        return sprintf('Unsupported profile "%s". Use default or security.', $this->profile);
+        return self::profileUsageErrorFor($this->profile);
     }
 
     /**

@@ -164,6 +164,13 @@ final class ReportCommand extends Command
             return Command::INVALID;
         }
 
+        $profileUsageError = $this->profileUsageError($input);
+        if ($profileUsageError !== null) {
+            $output->writeln(sprintf('<error>%s</error>', $profileUsageError));
+
+            return Command::INVALID;
+        }
+
         $profileIncludeError = $this->profileIncludeUsageError($input);
         // Rejecting the incoherent combination here keeps the init prompt from firing (and possibly
         // writing config) for a run the forwarded analyse would refuse anyway.
@@ -513,7 +520,7 @@ final class ReportCommand extends Command
     {
         $profile             = $this->optionalStringOption($input, 'profile') ?? 'default';
         $profileScorePillars = AnalyseCommandOptions::scorePillarsForProfile($profile);
-        // Profiles that score every pillar (and unknown profiles the child will reject) have nothing to check.
+        // Profiles that score every pillar have nothing to check; unknown profiles were rejected earlier.
         if ($profileScorePillars === null) {
             return null;
         }
@@ -524,6 +531,18 @@ final class ReportCommand extends Command
             $profileScorePillars,
             $this->ruleIdListOption($input, 'include-rule'),
         );
+    }
+
+    /**
+     * Validate the forwarded profile before the run has side effects.
+     *
+     * @param InputInterface $input - Console input for the report command.
+     *
+     * @return string|null - Usage error for an unsupported profile, or null when supported.
+     */
+    private function profileUsageError(InputInterface $input): ?string
+    {
+        return AnalyseCommandOptions::profileUsageErrorFor($this->optionalStringOption($input, 'profile') ?? 'default');
     }
 
     /**

@@ -215,7 +215,7 @@ final class UnsafeXmlLoadingRule implements RuleInterface
                 && SecurityNodeHelper::hasMatchingClassName($write->expr->class, self::XML_RECEIVER_CLASS_NAMES);
 
             // A skippable write can add XML evidence but never erase it; an unskippable one rebinds fully.
-            $isPossiblyXml = SecurityNodeHelper::isSkippableBeforeSink($write, $scope, $sinkAncestorIds)
+            $isPossiblyXml = SecurityNodeHelper::isSkippableBeforeSink($write, $call, $scope, $sinkAncestorIds)
                 ? ($isPossiblyXml || $constructsXmlParser)
                 : $constructsXmlParser;
         }

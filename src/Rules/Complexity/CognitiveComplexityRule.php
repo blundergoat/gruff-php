@@ -398,6 +398,7 @@ final readonly class CognitiveComplexityRule implements RuleInterface
     private static function walkMatch(Expr\Match_ $match, int $nesting): int
     {
         $total = 1 + $nesting;
+        // Unlike switch subjects, match subjects are expressions inside a value-producing expression tree.
         $total += self::walkExprCognitive($match->cond, $nesting);
 
         // Every arm's conditions and body are real reading work, so each is scored one level deeper.

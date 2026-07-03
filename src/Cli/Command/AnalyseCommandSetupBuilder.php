@@ -14,6 +14,7 @@ use GruffPhp\Cli\Application;
 use GruffPhp\Output\Reporter\FailThreshold;
 use GruffPhp\Output\Reporter\FailThresholds;
 use GruffPhp\Output\Reporter\OutputFormat;
+use GruffPhp\Results\Finding\Pillar;
 use GruffPhp\Rules\RuleRegistry;
 use Symfony\Component\Console\Application as SymfonyApplication;
 use Symfony\Component\Console\Command\Command;
@@ -268,22 +269,62 @@ final readonly class AnalyseCommandSetupBuilder
         array        $profileScorePillars,
         array        $includeRuleIds,
     ): ?string {
+        $profilePillarNames = self::profilePillarNames($profileScorePillars);
+        $profilePillarList  = self::formatPillarList($profilePillarNames);
+        $profilePillarIds   = implode('/', $profilePillarNames);
+
         // Check each requested rule against the pillars the profile's grade actually counts.
         foreach ($includeRuleIds as $ruleId) {
             $pillar = $registry->get($ruleId)->definition()->pillar;
             // An unscored pillar would emit findings the grade ignores; tell the user both ways out.
             if (!in_array($pillar, $profileScorePillars, true)) {
                 return sprintf(
-                    '--include-rule %s selects a %s rule, but --profile %s executes and scores only security and sensitive-data rules. Drop --profile %s or include only security/sensitive-data rule ids.',
+                    '--include-rule %s selects a %s rule, but --profile %s executes and scores only %s rules. Drop --profile %s or include only %s rule ids.',
                     $ruleId,
                     $pillar->value,
                     $profile,
+                    $profilePillarList,
                     $profile,
+                    $profilePillarIds,
                 );
             }
         }
 
         return null;
+    }
+
+    /**
+     * Convert a profile's scored pillars into their CLI-facing names.
+     *
+     * @param list<Pillar> $profileScorePillars - Pillars scored by the selected profile.
+     *
+     * @return list<string> - Pillar values in the profile's declared order.
+     */
+    private static function profilePillarNames(array $profileScorePillars): array
+    {
+        return array_map(static fn(Pillar $pillar): string => $pillar->value, $profileScorePillars);
+    }
+
+    /**
+     * Format a short human-readable pillar list.
+     *
+     * @param list<string> $pillarNames - Pillar names in display order.
+     *
+     * @return string - Names joined as "a", "a and b", or "a, b and c".
+     */
+    private static function formatPillarList(array $pillarNames): string
+    {
+        if ($pillarNames === []) {
+            return 'no';
+        }
+
+        if (count($pillarNames) === 1) {
+            return $pillarNames[0];
+        }
+
+        $lastPillarName = array_pop($pillarNames);
+
+        return implode(', ', $pillarNames) . ' and ' . $lastPillarName;
     }
 
     /**

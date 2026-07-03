@@ -59,12 +59,12 @@ final class TaintAssignmentTest extends TestCase
                                      static fn(Finding $finding): bool => $finding->ruleId === UnsafeArchiveExtractionRule::ID,
                                  ));
 
-        // 18/25 are the destination/entries shapes; 32/54 the direct tainted-source shapes; 66/89 the
-        // conditional shapes (a skippable clean re-open cannot clear taint, and a skippable tainted
-        // open still flags). Clean open, unskippable re-open/reassignment, and the clean re-open on
-        // the sink's own path must all stay silent.
+        // 18/25 are the destination/entries shapes; 32/54 the direct tainted-source shapes; 66/89/100
+        // the conditional shapes (a skippable clean re-open cannot clear taint, including sibling
+        // branches, and a skippable tainted open still flags). Clean open, unskippable re-open/reassignment,
+        // and the clean re-open on the sink's own path must all stay silent.
         self::assertSame(
-            [18, 25, 32, 54, 66, 89],
+            [18, 25, 32, 54, 66, 89, 100],
             array_map(static fn(Finding $finding): ?int => $finding->line, $findings),
         );
         self::assertSame('Archive extraction with request-controlled destination or entries detected.', $findings[0]->message);
@@ -73,6 +73,7 @@ final class TaintAssignmentTest extends TestCase
         self::assertSame('archive-source', $findings[3]->metadata['taint'] ?? null);
         self::assertSame('archive-source', $findings[4]->metadata['taint'] ?? null);
         self::assertSame('archive-source', $findings[5]->metadata['taint'] ?? null);
+        self::assertSame('archive-source', $findings[6]->metadata['taint'] ?? null);
     }
 
     /**

@@ -72,3 +72,13 @@ function reboundOnSinkPath(bool $useBuilder, object $builder): void
         $document->loadXML($_GET['xml']);
     }
 }
+
+function reboundInSiblingBranchKeepsXmlEvidence(bool $useBuilder, object $builder): void
+{
+    $document = new DOMDocument();
+    if ($useBuilder) {
+        $document = $builder;
+    } else {
+        $document->loadXML($_GET['xml']);
+    }
+}

@@ -88,3 +88,15 @@ function conditionalTaintedOpenFlags(bool $useUpload): void
 
     $zip->extractTo('/srv/files');
 }
+
+function cleanReopenInSiblingBranchDoesNotClearSource(bool $useSafeArchive): void
+{
+    $zip = new \ZipArchive();
+    $zip->open($_FILES['archive']['tmp_name']);
+
+    if ($useSafeArchive) {
+        $zip->open('/var/data/fixed.zip');
+    } else {
+        $zip->extractTo('/srv/files');
+    }
+}

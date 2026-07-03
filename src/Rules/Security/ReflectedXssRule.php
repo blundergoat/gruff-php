@@ -186,7 +186,7 @@ final class ReflectedXssRule implements RuleInterface
         // Replay each write in source order so the alias map at the echo/print reflects what really ran.
         foreach ($assignments as $assignment) {
             // Narrow to the tracked assignment shapes; the finder predicate already matched them.
-            if (!$assignment instanceof Expr\Assign && !$assignment instanceof Expr\AssignOp\Concat) {
+            if (!($assignment instanceof Expr\Assign) && !($assignment instanceof Expr\AssignOp\Concat)) {
                 continue;
             }
 
