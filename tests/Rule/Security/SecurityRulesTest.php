@@ -195,6 +195,18 @@ final class SecurityRulesTest extends TestCase
     }
 
     /**
+     * Verify XML loader calls on typed and assigned `$this` properties keep the receiver gate precise.
+     *
+     * @return void
+     */
+    public function testXmlPropertyReceiversUseTypedAndAssignedEvidence(): void
+    {
+        $findings = $this->findingsForRule($this->xmlPropertyReceiverUnit(), UnsafeXmlLoadingRule::ID);
+
+        self::assertSame([13, 14, 18, 26], self::findingLines($findings));
+    }
+
+    /**
      * Verify boundary security patterns detected.
      *
      * @return void
@@ -724,6 +736,47 @@ if (is_array($env = @include dirname(__DIR__) . '/.env.local.php')) {
 require_once __DIR__ . '/' . ($_GET['page'] ?? 'home.php');
 PHP,
             'tests/Fixtures/Security/inline-fixed-includes.php',
+        );
+    }
+
+    /**
+     * Parse XML property-receiver shapes into an analysis unit.
+     *
+     * @return AnalysisUnit - unit whose typed, constructor-assigned, same-scope assigned, and promoted XML properties should flag
+     */
+    private function xmlPropertyReceiverUnit(): AnalysisUnit
+    {
+        return $this->parseSource(
+            <<<'PHP'
+<?php
+final class PropertyXmlReceiverFixture
+{
+    private DOMDocument $typedDocument;
+    private $constructorDocument;
+    private $sameScopeDocument;
+    private object $builder;
+    public function __construct(object $builder)
+    {
+        $this->constructorDocument = new DOMDocument();
+        $this->builder = $builder;
+    }
+    public function typedPropertyLoad(): void { $this->typedDocument->loadXML($_GET['xml']); }
+    public function constructorAssignedPropertyLoad(): void { $this->constructorDocument->loadXML($_GET['xml']); }
+    public function sameScopeAssignedPropertyLoad(): void
+    {
+        $this->sameScopeDocument = new DOMDocument();
+        $this->sameScopeDocument->loadXML($_GET['xml']);
+    }
+    public function safeTypedPropertyLoad(): void { $this->typedDocument->loadXML($_GET['xml'], LIBXML_NONET); }
+    public function unknownPropertyReceiver(): void { $this->builder->loadXML($_GET['xml']); }
+}
+final class PromotedXmlPropertyReceiverFixture
+{
+    public function __construct(private XMLReader $reader) {}
+    public function promotedPropertyOpen(): void { $this->reader->open($_GET['xml']); }
+}
+PHP,
+            'tests/Fixtures/Security/inline-xml-property-receivers.php',
         );
     }
 
