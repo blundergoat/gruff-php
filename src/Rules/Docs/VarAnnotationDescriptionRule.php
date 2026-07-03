@@ -37,6 +37,8 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
     /**
      * Describe the local var-annotation description rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - metadata and defaults the registry uses to wire this rule
      */
     public function definition(): RuleDefinition
@@ -56,6 +58,8 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
     /**
      * Find local var assertions that do not explain why the assertion is needed.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - parsed unit to inspect
      * @param RuleContext $ruleContext - rule context for this analysis pass
      *
@@ -64,6 +68,7 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         // Fast bail: nothing to find when the file has no @var tag.
+        // User view: choose the findings list branch for this case.
         if (!str_contains($analysisUnit->source, '@var')) {
             // No @var anywhere means no annotation to judge, so report nothing.
             return [];
@@ -85,21 +90,26 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
             static fn(Node $node): bool => $node->getDocComment() instanceof Doc,
         );
 
+        // User view: add each item that can appear in findings list.
         foreach ($candidates as $node) {
             $doc = $node->getDocComment();
+            // User view: choose the findings list branch for this case.
             if (!$doc instanceof Doc) {
                 continue;
             }
 
             $docText = $doc->getText();
+            // User view: choose the findings list branch for this case.
             if (!str_contains($docText, '@var')) {
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
             if ($this->isDeclarationNode($node)) {
                 continue;
             }
 
+            // User view: add each item that can appear in findings list.
             foreach ($this->bareVarAnnotations($docText) as $variable) {
                 $findings[] = new Finding(
                     ruleId:      $definition->id,
@@ -123,6 +133,8 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
     /**
      * Distinguish declaration docblocks from local variable assertion docblocks.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Node $node - AST node carrying the @var docblock; a declaration node means the tag documents that
      *                   declaration rather than a local assertion, so it is exempt from this rule.
      *
@@ -143,6 +155,8 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
     /**
      * Find local var assertion tags that name a type without explaining intent.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $docText - raw docblock text, including the comment markers
      *
      * @return list<string> - variable names whose local var assertion stated a type but no reason; empty
@@ -153,23 +167,30 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
         $descriptiveLines = [];
         $bareVariables    = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (preg_split('/\R/', $docText) ?: [] as $line) {
             $line = trim($line, " \t\n\r\0\x0B/*");
 
+            // User view: choose the findings list branch for this case.
+            // User view: an empty value becomes a clear findings list fallback.
             if ($line === '') {
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
             if (!str_starts_with($line, '@')) {
                 $descriptiveLines[] = $line;
                 continue;
             }
 
             // Capture the asserted variable and any trailing explanation on local @var tags.
+            // User view: choose the findings list branch for this case.
             if (preg_match('/^@var\b.*?\$(?<variable>[A-Za-z_\x80-\xff][A-Za-z0-9_\x80-\xff]*)(?<description>.*)$/u', $line, $matches) !== 1) {
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
+            // User view: an empty value becomes a clear findings list fallback.
             if (trim($matches['description']) !== '') {
                 continue;
             }
@@ -177,6 +198,8 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
             $bareVariables[] = $matches['variable'];
         }
 
+        // User view: choose the findings list branch for this case.
+        // User view: an empty value becomes a clear findings list fallback.
         if ($descriptiveLines !== []) {
             // Any prose line already explains the docblock, so suppress every bare-@var finding for it.
             return [];

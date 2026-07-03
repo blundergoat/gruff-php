@@ -37,6 +37,8 @@ final readonly class AverageMethodLengthRule implements RuleInterface
     /**
      * Describe the average-method-length rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and thresholds.
      */
     public function definition(): RuleDefinition
@@ -56,6 +58,8 @@ final readonly class AverageMethodLengthRule implements RuleInterface
     /**
      * Find class-like scopes whose average method length exceeds thresholds.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -70,6 +74,7 @@ final readonly class AverageMethodLengthRule implements RuleInterface
 
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach ($classLikes as $classLike) {
             /** @var Class_|Trait_|Enum_ $classLike Finder predicate restricts results to class-like declarations. */
             $methods = array_filter(
@@ -77,12 +82,15 @@ final readonly class AverageMethodLengthRule implements RuleInterface
                 static fn (Node $stmt): bool => $stmt instanceof ClassMethod,
             );
 
+            // User view: choose the findings list branch for this case.
+            // User view: an empty value becomes a clear findings list fallback.
             if ($methods === []) {
                 continue;
             }
 
             $totalLines = 0;
 
+            // User view: add each item that can appear in findings list.
             foreach ($methods as $method) {
                 $totalLines += NodeIndex::logicalStatementLineCount($method);
             }
@@ -90,6 +98,8 @@ final readonly class AverageMethodLengthRule implements RuleInterface
             $average        = $totalLines / count($methods);
             $thresholdMatch = $settings->highValueThresholdMatch($average);
 
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($thresholdMatch === null) {
                 continue;
             }
@@ -132,24 +142,32 @@ final readonly class AverageMethodLengthRule implements RuleInterface
     /**
      * Build a display symbol for a class-like node.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Node $node - Class-like node (Class_, Trait_, or Enum_) whose declared name labels the finding.
      *
      * @return string - Class-like display symbol.
      */
     private function resolveSymbol(Node $node): string
     {
+        // User view: choose the findings list branch for this case.
         if ($node instanceof Class_) {
             // Anonymous classes carry no name node, so synthesise a label keyed to the declaration line.
+            // User view: missing data becomes a safe findings list default.
             return $node->name?->toString() ?? sprintf('class@anonymous:%d', $node->getStartLine());
         }
 
+        // User view: choose the findings list branch for this case.
         if ($node instanceof Trait_) {
             // Traits are always named in valid PHP; the fallback only guards against an unparsed name node.
+            // User view: missing data becomes a safe findings list default.
             return $node->name?->toString() ?? sprintf('trait@%d', $node->getStartLine());
         }
 
+        // User view: choose the findings list branch for this case.
         if ($node instanceof Enum_) {
             // Enums are always named in valid PHP; the fallback only guards against an unparsed name node.
+            // User view: missing data becomes a safe findings list default.
             return $node->name?->toString() ?? sprintf('enum@%d', $node->getStartLine());
         }
 
@@ -160,12 +178,15 @@ final readonly class AverageMethodLengthRule implements RuleInterface
     /**
      * Format threshold numbers without unnecessary decimal places.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param int|float $number - Threshold value to render; whole floats are shown without a trailing decimal.
      *
      * @return string - Human-readable threshold value with fractional values preserved and whole values stripped.
      */
     private function formatNumber(int|float $number): string
     {
+        // User view: choose the findings list branch for this case.
         if (is_float($number) && floor($number) !== $number) {
             return (string) $number;
         }

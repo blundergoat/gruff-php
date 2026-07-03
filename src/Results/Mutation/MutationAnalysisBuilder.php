@@ -13,6 +13,8 @@ use GruffPhp\Support\PathHelper;
 final readonly class MutationAnalysisBuilder
 {
     /**
+      * User flow: Folds mutation results into the quality feedback users see.
+      *
      * @param string                  $projectRoot - Project root used to resolve mutation report paths.
      * @param MutationAnalysisOptions $options - Mutation-analysis options selected for the run.
      * @param list<RunDiagnostic>     $diagnostics - Diagnostics collected while loading mutation data.
@@ -24,6 +26,8 @@ final readonly class MutationAnalysisBuilder
         MutationAnalysisOptions $options,
         array &$diagnostics,
     ): ?MutationAnalysisResult {
+        // User view: choose the mutation feedback branch for this case.
+        // User view: missing data becomes the expected mutation feedback state.
         if ($options->infectionReportPath === null) {
             $this->addOptionDiagnostics($options, $diagnostics);
 
@@ -31,6 +35,7 @@ final readonly class MutationAnalysisBuilder
             return null;
         }
 
+        // User view: choose the mutation feedback branch for this case.
         if (!$this->canRunInfection($projectRoot, $options, $diagnostics)) {
             // Infection could not produce usable output; the diagnostic was already recorded by the gate.
             return null;
@@ -40,6 +45,7 @@ final readonly class MutationAnalysisBuilder
 
         try {
             $report         = $infectionReportParser->parse($options->infectionReportPath);
+            // User view: missing data becomes the expected mutation feedback state.
             $baselineReport = $options->mutationBaselinePath === null
                 ? null
                 : $infectionReportParser->parse($options->mutationBaselinePath);
@@ -58,6 +64,8 @@ final readonly class MutationAnalysisBuilder
     }
 
     /**
+      * User flow: Folds mutation results into the quality feedback users see.
+      *
      * @param string                  $projectRoot - Anchor for resolving the report path Infection writes to.
      * @param MutationAnalysisOptions $options - Run options; gates whether Infection is invoked or trusted as-is.
      * @param list<RunDiagnostic>     $diagnostics - Run-by-reference sink; a failure diagnostic is appended on error.
@@ -69,11 +77,13 @@ final readonly class MutationAnalysisBuilder
         MutationAnalysisOptions $options,
         array &$diagnostics,
     ): bool {
+        // User view: choose the mutation feedback branch for this case.
         if (!$options->shouldRunInfection) {
             // Caller opted not to run Infection, so trust the pre-existing report on disk as-is.
             return true;
         }
 
+        // User view: missing data becomes a safe mutation feedback default.
         $reportPath      = PathHelper::resolveAgainst($projectRoot, $options->infectionReportPath ?? '');
         $preRunSignature = $this->reportSignature($reportPath);
 
@@ -84,6 +94,7 @@ final readonly class MutationAnalysisBuilder
             $options->infectionTestFrameworkOptions,
         );
 
+        // User view: choose the mutation feedback branch for this case.
         if ($runResult->diagnostic instanceof RunDiagnostic) {
             $diagnostics[] = $runResult->diagnostic;
 
@@ -93,6 +104,7 @@ final readonly class MutationAnalysisBuilder
 
         clearstatcache(true, $reportPath);
 
+        // User view: choose the mutation feedback branch for this case.
         if ($this->isReportFresh($reportPath, $preRunSignature)) {
             // Report was created or rewritten by this run, so it reflects the current code.
             return true;
@@ -114,6 +126,8 @@ final readonly class MutationAnalysisBuilder
     /**
      * Append diagnostics for invalid or skipped mutation options.
      *
+      * User flow: Folds mutation results into the quality feedback users see.
+      *
      * @param MutationAnalysisOptions $options - Options whose flags set without --infection-report count as misuse.
      * @param list<RunDiagnostic>     $diagnostics - Run-by-reference sink; one usage-error is appended per stray flag.
      *
@@ -121,6 +135,7 @@ final readonly class MutationAnalysisBuilder
      */
     private function addOptionDiagnostics(MutationAnalysisOptions $options, array &$diagnostics): void
     {
+        // User view: choose the mutation feedback branch for this case.
         if ($options->shouldRunInfection) {
             $diagnostics[] = new RunDiagnostic(
                 type:    'usage-error',
@@ -128,6 +143,8 @@ final readonly class MutationAnalysisBuilder
             );
         }
 
+        // User view: choose the mutation feedback branch for this case.
+        // User view: missing data becomes the expected mutation feedback state.
         if ($options->infectionConfigPath !== null) {
             $diagnostics[] = new RunDiagnostic(
                 type:    'usage-error',
@@ -136,6 +153,8 @@ final readonly class MutationAnalysisBuilder
             );
         }
 
+        // User view: choose the mutation feedback branch for this case.
+        // User view: missing data becomes the expected mutation feedback state.
         if ($options->infectionTestFrameworkOptions !== null) {
             $diagnostics[] = new RunDiagnostic(
                 type:    'usage-error',
@@ -143,6 +162,8 @@ final readonly class MutationAnalysisBuilder
             );
         }
 
+        // User view: choose the mutation feedback branch for this case.
+        // User view: missing data becomes the expected mutation feedback state.
         if ($options->mutationBaselinePath !== null) {
             $diagnostics[] = new RunDiagnostic(
                 type:    'usage-error',
@@ -151,6 +172,8 @@ final readonly class MutationAnalysisBuilder
             );
         }
 
+        // User view: choose the mutation feedback branch for this case.
+        // User view: missing data becomes the expected mutation feedback state.
         if ($options->mutationBudget !== null) {
             $diagnostics[] = new RunDiagnostic(
                 type:    'usage-error',
@@ -162,12 +185,15 @@ final readonly class MutationAnalysisBuilder
     /**
      * Capture the report state before an Infection run.
      *
+      * User flow: Folds mutation results into the quality feedback users see.
+      *
      * @param string $reportPath - Absolute path to the JSON report whose mtime, size, and hash are sampled.
      *
      * @return array{mtime: int, size: int, hash: string}|null - Existing report signature, or null when absent.
      */
     private function reportSignature(string $reportPath): ?array
     {
+        // User view: choose the mutation feedback branch for this case.
         if (!is_file($reportPath)) {
             // No file yet means no prior state to compare against; null signals "absent", not "error".
             return null;
@@ -177,6 +203,7 @@ final readonly class MutationAnalysisBuilder
         $size  = filesize($reportPath);
         $hash  = hash_file('sha256', $reportPath);
 
+        // User view: choose the mutation feedback branch for this case.
         if (!is_int($mtime) || !is_int($size) || !is_string($hash)) {
             // Any stat call failing leaves an incomplete signature, so treat the whole sample as unusable.
             return null;
@@ -195,6 +222,8 @@ final readonly class MutationAnalysisBuilder
      * A pre-existing report whose mtime, size, and hash have not changed is treated as stale to avoid
      * surfacing outdated mutation results when Infection exits before rewriting it.
      *
+      * User flow: Folds mutation results into the quality feedback users see.
+      *
      * @param string $reportPath - Path to the report on disk, re-sampled after the run.
      * @param array{mtime: int, size: int, hash: string}|null $preRunSignature - Report state before running Infection.
      *
@@ -202,17 +231,22 @@ final readonly class MutationAnalysisBuilder
      */
     private function isReportFresh(string $reportPath, ?array $preRunSignature): bool
     {
+        // User view: choose the mutation feedback branch for this case.
         if (!is_file($reportPath)) {
             // Infection wrote no report at all, so there is nothing fresh to consume.
             return false;
         }
 
+        // User view: choose the mutation feedback branch for this case.
+        // User view: missing data becomes the expected mutation feedback state.
         if ($preRunSignature === null) {
             // No report existed before the run, so any file present now was produced by it.
             return true;
         }
 
         $currentSignature = $this->reportSignature($reportPath);
+        // User view: choose the mutation feedback branch for this case.
+        // User view: missing data becomes the expected mutation feedback state.
         if ($currentSignature === null) {
             // The report vanished or became unreadable mid-check; cannot confirm freshness, so reject it.
             return false;

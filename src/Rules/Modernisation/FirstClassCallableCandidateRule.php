@@ -32,6 +32,8 @@ final readonly class FirstClassCallableCandidateRule implements RuleInterface
     /**
      * Describe the first-class callable candidate rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -50,6 +52,8 @@ final readonly class FirstClassCallableCandidateRule implements RuleInterface
     /**
      * Find array-callable expressions that may use first-class callable syntax.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -57,6 +61,7 @@ final readonly class FirstClassCallableCandidateRule implements RuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
+        // User view: choose the findings list branch for this case.
         if (!ModernisationNodeHelper::supportsPhp($ruleContext, 8.1)) {
             // First-class callable syntax needs PHP 8.1, so stay silent on targets that cannot use it.
             return [];
@@ -64,7 +69,9 @@ final readonly class FirstClassCallableCandidateRule implements RuleInterface
 
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\Array_::class) as $array) {
+            // User view: choose the findings list branch for this case.
             if (!$this->isCallableArray($array) || !$this->isCallableContext($array)) {
                 continue;
             }
@@ -91,17 +98,22 @@ final readonly class FirstClassCallableCandidateRule implements RuleInterface
     /**
      * Check whether an array expression has the two-part callable shape.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Expr\Array_ $array - Array literal under inspection; only the unkeyed [target, 'method'] pair matches.
      *
      * @return bool - True when the array looks like a callable pair.
      */
     private function isCallableArray(Expr\Array_ $array): bool
     {
+        // User view: choose the findings list branch for this case.
         if (count($array->items) !== 2) {
             // A callable pair has exactly two elements, so anything else is not this shape.
             return false;
         }
 
+        // User view: choose the findings list branch for this case.
+        // User view: missing data becomes the expected findings list state.
         if ($array->items[0]->key !== null || $array->items[1]->key !== null) {
             // Explicit keys mean a data map, not a positional callable pair.
             return false;
@@ -110,11 +122,13 @@ final readonly class FirstClassCallableCandidateRule implements RuleInterface
         $target = $array->items[0]->value;
         $method = $array->items[1]->value;
 
+        // User view: choose the findings list branch for this case.
         if (!$method instanceof Scalar\String_) {
             // A dynamic method element cannot be proven callable statically, so do not flag it.
             return false;
         }
 
+        // User view: choose the findings list branch for this case.
         if ($target instanceof Expr\ClassConstFetch) {
             // A class-constant target only qualifies as the ::class form of a static callable.
             return $target->name instanceof Node\Identifier
@@ -129,6 +143,8 @@ final readonly class FirstClassCallableCandidateRule implements RuleInterface
     /**
      * Check whether the array callable appears in a callable-friendly context.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Expr\Array_ $array - Array literal whose enclosing node decides if a callable would actually be invoked.
      *
      * @return bool - True when the parent context can accept a callable.

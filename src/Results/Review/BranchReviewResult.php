@@ -16,6 +16,8 @@ use GruffPhp\Results\Finding\Finding;
 final readonly class BranchReviewResult
 {
     /**
+      * User flow: Compares branch feedback for review workflows.
+      *
      * @param string        $base - Base ref used for the review comparison.
      * @param bool          $isChangedOnly - Whether the review was restricted to changed files.
      * @param list<Finding> $introduced - Findings introduced by the branch.
@@ -34,6 +36,8 @@ final readonly class BranchReviewResult
     }
 
     /**
+      * User flow: Compares branch feedback for review workflows.
+      *
      * @param callable(list<Finding>): list<Finding> $filter - Callback applied independently to introduced, removed, and unchanged finding lists.
      *
      * @return self - new result carrying the same base ref, changed-only flag, and delta score, with each finding group (introduced, removed,
@@ -56,6 +60,8 @@ final readonly class BranchReviewResult
      * sorted by net change. Net = introduced - removed. Zero-net rules are
      * omitted. Ties are broken by rule id ascending so output is deterministic.
      *
+      * User flow: Compares branch feedback for review workflows.
+      *
      * @return list<array{ruleId: string, introduced: int, removed: int, net: int}> - one row per rule with a nonzero net change, ascending by net
      *                            (largest reductions first) then rule id; empty when introduced and removed cancel out
      */
@@ -63,11 +69,13 @@ final readonly class BranchReviewResult
     {
         $buckets = [];
 
+        // User view: add each item that can appear in branch review feedback.
         foreach ($this->introduced as $finding) {
             $buckets[$finding->ruleId] ??= ['introduced' => 0, 'removed' => 0];
             $buckets[$finding->ruleId]['introduced']++;
         }
 
+        // User view: add each item that can appear in branch review feedback.
         foreach ($this->removed as $finding) {
             $buckets[$finding->ruleId] ??= ['introduced' => 0, 'removed' => 0];
             $buckets[$finding->ruleId]['removed']++;
@@ -75,8 +83,10 @@ final readonly class BranchReviewResult
 
         $rows = [];
 
+        // User view: add each item that can appear in branch review feedback.
         foreach ($buckets as $ruleId => $counts) {
             $netDelta = $counts['introduced'] - $counts['removed'];
+            // User view: choose the branch review feedback branch for this case.
             if ($netDelta === 0) {
                 continue;
             }
@@ -100,6 +110,8 @@ final readonly class BranchReviewResult
     /**
      * Serialize this value object into the array shape used by reports.
      *
+      * User flow: Compares branch feedback for review workflows.
+      *
      * @return array<string, ReviewValue> - report payload keyed by field name: base ref, changed-only flag, per-bucket counts, delta score (null
      *                       when unavailable), per-rule deltas, and the serialized finding groups
      */

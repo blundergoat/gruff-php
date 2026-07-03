@@ -26,6 +26,8 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
     /**
      * Describe the database URL password sensitive-data rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -46,6 +48,8 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
     /**
      * Find database connection URLs that embed passwords.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -55,6 +59,7 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
     {
         // Fast bail: a credential-bearing DB URL needs scheme://...:...@...
         // Skip the alternation when no supported scheme prefix appears.
+        // User view: choose the findings list branch for this case.
         if (preg_match('#(?:mysql|mariadb|mongodb|pgsql|postgres|postgresql|redis)://#i', $analysisUnit->source) !== 1) {
             // No supported DB scheme in the source means there can be no inline credential to report.
             return [];
@@ -69,18 +74,22 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
 
         $findings      = [];
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
+        // User view: add each item that can appear in findings list.
         foreach ($matches[0] as $index => $match) {
             [$databaseUrl, $offset] = $match;
+            // User view: choose the findings list branch for this case.
             if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
                 continue;
             }
 
             $password = $matches['password'][$index][0];
+            // User view: choose the findings list branch for this case.
             if (SecretScannerHelper::isLikelyDummyValue($password)) {
                 continue;
             }
 
             $preview = preg_replace('#:' . preg_quote($password, '#') . '@#', ':<redacted:' . strlen($password) . ' chars>@', $databaseUrl);
+            // User view: choose the findings list branch for this case.
             if (!is_string($preview)) {
                 $preview = '<redacted database URL>';
             }

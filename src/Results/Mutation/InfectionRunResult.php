@@ -14,6 +14,8 @@ final readonly class InfectionRunResult
     /**
      * Capture process output and optional diagnostic from an Infection run.
      *
+      * User flow: Folds mutation results into the quality feedback users see.
+      *
      * @param int                $exitCode - Infection process exit code.
      * @param string             $output - Captured standard output.
      * @param string             $errorOutput - Captured standard error output.

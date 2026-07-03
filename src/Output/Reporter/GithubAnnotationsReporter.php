@@ -15,6 +15,8 @@ final readonly class GithubAnnotationsReporter
     /**
      * Render findings as GitHub Actions workflow commands.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param AnalysisReport $report - Analysis report to render.
      *
      * @return string - GitHub annotation output.
@@ -23,17 +25,21 @@ final readonly class GithubAnnotationsReporter
     {
         $lines = [];
 
+        // User view: add each item that can appear in report output.
         foreach ($report->findings as $finding) {
             $lines[] = $this->annotation($finding);
         }
 
         // Append the trailing newline only when there is output, so a clean report emits nothing, not a blank line.
+        // User view: an empty value becomes a clear report output fallback.
         return implode(PHP_EOL, $lines) . ($lines === [] ? '' : PHP_EOL);
     }
 
     /**
      * Render one finding as a GitHub annotation command.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param Finding $finding - Finding to encode; severity selects the command level and a null line is omitted.
      *
      * @return string - GitHub annotation line.
@@ -50,10 +56,14 @@ final readonly class GithubAnnotationsReporter
             'title=' . $this->escapeProperty($finding->ruleId),
         ];
 
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($finding->line !== null) {
             $properties[] = 'line=' . $finding->line;
         }
 
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($finding->endLine !== null) {
             $properties[] = 'endLine=' . $finding->endLine;
         }
@@ -65,6 +75,8 @@ final readonly class GithubAnnotationsReporter
     /**
      * Escape annotation property text according to GitHub command rules.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param string $text - Raw property value; property context also reserves `:` and `,` as delimiters.
      *
      * @return string - Escaped property value.
@@ -82,6 +94,8 @@ final readonly class GithubAnnotationsReporter
     /**
      * Escape annotation message text according to GitHub command rules.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param string $text - Raw message body; only `%` and newlines are reserved in the data segment.
      *
      * @return string - Escaped data value.

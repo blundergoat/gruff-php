@@ -34,6 +34,8 @@ final readonly class MissingClassPhpdocRule implements RuleInterface
     /**
      * Describe the missing class PHPDoc rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -52,6 +54,8 @@ final readonly class MissingClassPhpdocRule implements RuleInterface
     /**
      * Find class-like declarations that do not have a PHPDoc block.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -62,15 +66,21 @@ final readonly class MissingClassPhpdocRule implements RuleInterface
         $definition = $this->definition();
         $findings   = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (NodeIndex::nodesOf($analysisUnit, ClassLike::class) as $node) {
+            // User view: choose the findings list branch for this case.
             if (!$node instanceof Class_ && !$node instanceof Interface_ && !$node instanceof Trait_ && !$node instanceof Enum_) {
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($node->name === null) {
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($node->getDocComment() !== null) {
                 continue;
             }
@@ -102,6 +112,8 @@ final readonly class MissingClassPhpdocRule implements RuleInterface
     /**
      * Return the declaration kind for a class-like node.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Node $node - Class-like node already confirmed to be a class, interface, trait, or enum.
      *
      * @return string - One of class, interface, trait, or enum.

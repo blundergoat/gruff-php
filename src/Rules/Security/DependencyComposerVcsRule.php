@@ -34,6 +34,8 @@ final class DependencyComposerVcsRule implements SourceTextRuleInterface
     /**
      * Describe the Composer VCS-repository rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -52,6 +54,8 @@ final class DependencyComposerVcsRule implements SourceTextRuleInterface
     /**
      * Find `repositories` entries that resolve dependencies from version control.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -59,24 +63,30 @@ final class DependencyComposerVcsRule implements SourceTextRuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
+        // User view: choose the findings list branch for this case.
         if (!ComposerManifest::isManifest($analysisUnit->file->displayPath)) {
             // This rule only applies to composer.json; every other file yields no findings.
             return [];
         }
 
         $manifest = ComposerManifest::decode($analysisUnit->source);
+        // User view: choose the findings list branch for this case.
+        // User view: missing data becomes the expected findings list state.
         if ($manifest === null || !isset($manifest['repositories']) || !is_array($manifest['repositories'])) {
             // Unparseable manifest or no repositories block means there is nothing of this shape to flag.
             return [];
         }
 
         $findings = [];
+        // User view: add each item that can appear in findings list.
         foreach ($manifest['repositories'] as $repository) {
+            // User view: choose the findings list branch for this case.
             if (!is_array($repository)) {
                 continue;
             }
 
             $type = isset($repository['type']) && is_string($repository['type']) ? strtolower($repository['type']) : '';
+            // User view: choose the findings list branch for this case.
             if (!in_array($type, self::VCS_TYPES, true)) {
                 continue;
             }

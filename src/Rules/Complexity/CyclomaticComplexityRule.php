@@ -65,6 +65,8 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     /**
      * Describe the cyclomatic complexity rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and thresholds.
      */
     public function definition(): RuleDefinition
@@ -84,6 +86,8 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     /**
      * Find functions and methods whose cyclomatic complexity exceeds thresholds.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context carrying thresholds.
      *
@@ -98,8 +102,10 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
 
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node NodeIndex query is constrained to function-like classes. */
+            // User view: choose the findings list branch for this case.
             if (!self::hasExecutableBody($node)) {
                 continue;
             }
@@ -107,6 +113,8 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
             $ccn            = self::computeCyclomaticComplexity($node);
             $thresholdMatch = $settings->highValueThresholdMatch($ccn);
 
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($thresholdMatch === null) {
                 continue;
             }
@@ -156,6 +164,8 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     }
 
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param ClassMethod|Function_ $node - Function-like node whose control-flow constructs are counted.
      *
      * @return int - Cyclomatic complexity number.
@@ -163,12 +173,15 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     public static function computeCyclomaticComplexity(Node $node): int
     {
         static $cyclomaticCache = null;
+        // User view: choose the findings list branch for this case.
         if (!$cyclomaticCache instanceof \WeakMap) {
             $cyclomaticCache = new \WeakMap();
         }
 
+        // User view: choose the findings list branch for this case.
         if (isset($cyclomaticCache[$node])) {
             $cached = $cyclomaticCache[$node];
+            // User view: choose the findings list branch for this case.
             if (is_int($cached)) {
                 // Reuse the memoised score so a node walked by several complexity rules is only counted once.
                 return $cached;
@@ -177,13 +190,19 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
 
         $ccn = 1;
 
+        // User view: add each item that can appear in findings list.
         foreach (NodeIndex::bodyDescendants($node) as $child) {
+            // User view: choose the findings list branch for this case.
             if (self::isDecisionNode($child)) {
                 $ccn++;
             }
 
+            // User view: choose the findings list branch for this case.
             if ($child instanceof Expr\Match_) {
+                // User view: add each item that can appear in findings list.
                 foreach ($child->arms as $arm) {
+                    // User view: choose the findings list branch for this case.
+                    // User view: missing data becomes the expected findings list state.
                     if ($arm->conds !== null) {
                         $ccn += count($arm->conds);
                     }
@@ -199,6 +218,8 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     /**
      * Check whether a node contributes one cyclomatic complexity point.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Node $child - Body descendant being classified as a decision point or not.
      *
      * @return bool - True when the node is counted as a decision point.
@@ -208,12 +229,15 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
         // Branch statements and short-circuit operators each fork control flow; a `default` case (cond null) does not.
         return self::isInstanceOfAny($child, self::BRANCH_STATEMENT_TYPES)
             || self::isInstanceOfAny($child, self::BRANCH_EXPRESSION_TYPES)
+            // User view: missing data becomes the expected findings list state.
             || ($child instanceof Stmt\Case_ && $child->cond !== null);
     }
 
     /**
      * Check whether a node is an instance of any configured class.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Node                      $node - Node whose runtime class is tested against the candidates.
      * @param list<class-string<Node>> $classes - Candidate node classes.
      *
@@ -221,7 +245,9 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
      */
     private static function isInstanceOfAny(Node $node, array $classes): bool
     {
+        // User view: add each item that can appear in findings list.
         foreach ($classes as $class) {
+            // User view: choose the findings list branch for this case.
             if ($node instanceof $class) {
                 // First matching class is enough; the caller only needs membership, not which class matched.
                 return true;
@@ -234,20 +260,25 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     /**
      * Build a display symbol for a function-like node.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param ClassMethod|Function_ $node - Function-like node to describe.
      *
      * @return string - Function or method display symbol.
      */
     public static function resolveSymbol(ClassMethod|Function_ $node): string
     {
+        // User view: choose the findings list branch for this case.
         if ($node instanceof ClassMethod) {
             $parent    = $node->getAttribute('parent');
             $className = $parent instanceof Stmt\Class_
                 || $parent instanceof Stmt\Trait_
                 || $parent instanceof Stmt\Enum_
+                // User view: missing data becomes a safe findings list default.
                 ? ($parent->name?->toString() ?? 'class@anonymous')
                 : null;
 
+            // User view: missing data becomes the expected findings list state.
             return $className !== null
                 ? sprintf('%s::%s()', $className, $node->name->toString())
                 : $node->name->toString() . '()';
@@ -268,6 +299,8 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
      * A free {@see Function_} always carries a body, so this only ever filters
      * bodyless methods.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param ClassMethod|Function_ $node - Function-like node under inspection.
      *
      * @return bool - True when the node has a statement body the rule can measure.
@@ -275,18 +308,22 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     public static function hasExecutableBody(ClassMethod|Function_ $node): bool
     {
         // A null statement list marks a bodyless declaration (abstract/interface), which has no control flow to score.
+        // User view: missing data becomes the expected findings list state.
         return $node->stmts !== null;
     }
 
     /**
      * Format threshold numbers without unnecessary decimal places.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param int|float $number - Configured threshold to render; whole floats are shown without a trailing decimal.
      *
      * @return string - Human-readable threshold value.
      */
     private static function formatNumber(int|float $number): string
     {
+        // User view: choose the findings list branch for this case.
         if (is_float($number) && floor($number) !== $number) {
             return (string) $number;
         }

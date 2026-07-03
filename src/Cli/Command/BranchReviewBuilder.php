@@ -28,6 +28,8 @@ final readonly class BranchReviewBuilder
     /**
      * Compare current findings against a base ref snapshot and report introduced/removed/unchanged findings.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string              $projectRoot - Project root the comparison runs from.
      * @param AnalyseCommandOptions $options - Effective CLI analysis options.
      * @param AnalysisConfig      $config - Effective rule and path configuration.
@@ -49,6 +51,8 @@ final readonly class BranchReviewBuilder
         ?DiffResult $reviewDiff,
         array &$diagnostics,
     ): ?BranchReviewResult {
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($options->diffVs === null || $reviewDiff === null) {
             return null;
         }
@@ -65,6 +69,8 @@ final readonly class BranchReviewBuilder
         $baseSnapshotPaths        = $this->baseSnapshotPaths($projectRoot, $options, $reviewDiff, $shouldLoadProjectContext);
         $baseAnalysisPaths        = $this->baseAnalysisPaths($projectRoot, $options, $reviewDiff);
 
+        // User view: choose the terminal output branch for this case.
+        // User view: an empty value becomes a clear terminal output fallback.
         if ($options->isChangedOnly && !$shouldLoadProjectContext && $baseSnapshotPaths === []) {
             $baseScore = (new ScoreCalculator())->calculate([], null, null, scorePillars: $options->profileScorePillars(), analysisConfig: $config);
 
@@ -84,6 +90,8 @@ final readonly class BranchReviewBuilder
             $basePaths    = (new AnalysisFindingSupport())->existingSnapshotPaths($baseRoot, $baseAnalysisPaths);
             $baseFindings = [];
 
+            // User view: choose the terminal output branch for this case.
+            // User view: an empty value becomes a clear terminal output fallback.
             if ($basePaths !== []) {
                 $baseSources = (new AnalysisSourceLoader())->load(
                     $baseRoot,
@@ -104,10 +112,13 @@ final readonly class BranchReviewBuilder
                 $baseFindings = (new AnalysisFindingSupport())->filterAllowedSecretPreviews($baseFindings, $config);
             }
 
+            // User view: choose the terminal output branch for this case.
             if ($options->isChangedOnly) {
                 $baseFindings = (new AnalysisFindingSupport())->filterFindingsToChangedFiles($baseFindings, $reviewDiff->changedFiles);
             }
 
+            // User view: choose the terminal output branch for this case.
+            // User view: missing data becomes the expected terminal output state.
             if ($options->baseline->baselinePath !== null && $options->baseline->generateBaselinePath === null) {
                 try {
                     $baseFindings = (new BaselineApplication())->filterExisting($projectRoot, $options->baseline->baselinePath, $baseFindings);
@@ -142,6 +153,8 @@ final readonly class BranchReviewBuilder
             // rather than aborting the run.
             return null;
         } finally {
+            // User view: choose the terminal output branch for this case.
+            // User view: missing data becomes the expected terminal output state.
             if ($baseRoot !== null) {
                 $gitArchiveSnapshot->remove($baseRoot);
             }
@@ -151,6 +164,8 @@ final readonly class BranchReviewBuilder
     /**
      * Resolve the project files project-wide rules need for the current analyse run.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string                $projectRoot - Project root used for full-tree discovery.
      * @param AnalyseCommandOptions $options - Effective CLI analysis options.
      * @param AnalysisConfig        $config - Effective rule and path configuration.
@@ -168,6 +183,7 @@ final readonly class BranchReviewBuilder
         ?DiffResult $reviewDiff,
         AnalysisSourceSet $analysisSourceSet,
     ): array {
+        // User view: choose the terminal output branch for this case.
         if (!$this->shouldLoadProjectContext(
             projectRoot: $projectRoot,
             options:     $options,
@@ -191,6 +207,8 @@ final readonly class BranchReviewBuilder
     /**
      * Decide which files the base-ref snapshot must contain for this run.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string                $projectRoot - Project root the requested paths resolve to.
      * @param AnalyseCommandOptions $options - Effective CLI options; sets changed-only scope.
      * @param DiffResult            $reviewDiff - Review diff metadata; the changed-file set.
@@ -206,23 +224,31 @@ final readonly class BranchReviewBuilder
     ): array {
         $support = new AnalysisFindingSupport();
 
+        // User view: choose the terminal output branch for this case.
         if ($shouldLoadProjectContext) {
             return [];
         }
 
+        // User view: choose the terminal output branch for this case.
         if (!$options->isChangedOnly) {
             return $support->normaliseRequestedPaths($projectRoot, $options->paths);
         }
 
+        // User view: choose the terminal output branch for this case.
+        // User view: an empty value becomes a clear terminal output fallback.
         if ($reviewDiff->changedFiles === []) {
             return [];
         }
 
+        // User view: choose the terminal output branch for this case.
+        // User view: an empty value becomes a clear terminal output fallback.
         if ($options->paths === []) {
             return $reviewDiff->changedFiles;
         }
 
         $requestedPaths = $support->normaliseRequestedPaths($projectRoot, $options->paths);
+        // User view: choose the terminal output branch for this case.
+        // User view: an empty value becomes a clear terminal output fallback.
         if ($requestedPaths === []) {
             return [];
         }
@@ -239,6 +265,8 @@ final readonly class BranchReviewBuilder
     /**
      * Decide which snapshot files to actually analyse, which can be narrower than the copied set.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string                $projectRoot - Project root the requested paths resolve against.
      * @param AnalyseCommandOptions $options - Effective CLI options; selects changed-only vs requested.
      * @param DiffResult            $reviewDiff - Review diff metadata supplying the changed-file set.
@@ -247,10 +275,14 @@ final readonly class BranchReviewBuilder
      */
     private function baseAnalysisPaths(string $projectRoot, AnalyseCommandOptions $options, DiffResult $reviewDiff): array
     {
+        // User view: choose the terminal output branch for this case.
+        // User view: an empty value becomes a clear terminal output fallback.
         if ($options->isChangedOnly && $options->paths === []) {
             return $reviewDiff->changedFiles;
         }
 
+        // User view: choose the terminal output branch for this case.
+        // User view: an empty value becomes a clear terminal output fallback.
         if ($options->paths === []) {
             return [];
         }
@@ -261,6 +293,8 @@ final readonly class BranchReviewBuilder
     /**
      * Load the full base-ref tree so project-wide rules see the same context on both sides of the diff.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string                $baseRoot - Snapshot root of the base ref checkout to walk.
      * @param AnalyseCommandOptions $options - Effective CLI options; supplies the ignored-path inclusion flag.
      * @param AnalysisConfig        $config - Effective rule and path configuration supplying ignore patterns.
@@ -281,6 +315,8 @@ final readonly class BranchReviewBuilder
     /**
      * Report whether narrowed analysis still has to load whole-tree context for project-level rules.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string                $projectRoot - Project root requested paths resolve against.
      * @param AnalyseCommandOptions $options - Effective CLI options carrying changed-only and changed-region flags.
      * @param RuleRegistry          $registry - Rule registry consulted for any enabled project-wide rule.
@@ -296,10 +332,12 @@ final readonly class BranchReviewBuilder
         AnalysisConfig $config,
         ?DiffResult $reviewDiff,
     ): bool {
+        // User view: choose the terminal output branch for this case.
         if (!$registry->hasEnabledProjectRules($config)) {
             return false;
         }
 
+        // User view: choose the terminal output branch for this case.
         if ($options->hasChangedRegionMode()) {
             return true;
         }
@@ -308,12 +346,15 @@ final readonly class BranchReviewBuilder
         // does, so it must not trigger the separate full-tree context load that genuinely narrower paths
         // need; otherwise `analyse . --diff-vs=<ref>` reparses the whole tree twice for the same scope.
         $requestedPaths = (new AnalysisFindingSupport())->normaliseRequestedPaths($projectRoot, $options->paths);
+        // User view: choose the terminal output branch for this case.
+        // User view: an empty value becomes a clear terminal output fallback.
         if ($requestedPaths !== [] && $requestedPaths !== ['.']) {
             return true;
         }
 
         return $options->isChangedOnly
             && $reviewDiff instanceof DiffResult
+            // User view: an empty value becomes a clear terminal output fallback.
             && $reviewDiff->changedFiles !== [];
     }
 }

@@ -37,6 +37,8 @@ final readonly class HungarianNotationRule implements RuleInterface
     /**
      * Describe the Hungarian notation rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -57,6 +59,8 @@ final readonly class HungarianNotationRule implements RuleInterface
     /**
      * Find local variables that use type-prefix naming.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -68,6 +72,7 @@ final readonly class HungarianNotationRule implements RuleInterface
         $prefixes   = $this->normalisedPrefixes($ruleContext->settingsFor($definition)->stringListOption('typePrefixes'));
         $findings   = [];
 
+        // User view: add each item that can appear in findings list.
         foreach ((new FunctionLikeScopeWalker())->scopes($analysisUnit->statements) as $scope) {
             array_push(
                 $findings,
@@ -82,6 +87,8 @@ final readonly class HungarianNotationRule implements RuleInterface
     /**
      * Find Hungarian notation parameters in one function-like scope.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param RuleDefinition    $definition - Rule definition supplying severity, pillar, and ids for emitted findings.
      * @param AnalysisUnit      $analysisUnit - Parsed unit, used for the finding's file path and line numbers.
      * @param FunctionLikeScope $scope - Single function-like scope whose declared parameters are inspected.
@@ -99,7 +106,9 @@ final readonly class HungarianNotationRule implements RuleInterface
         $findings = [];
         $symbol   = $this->symbol($scope);
 
+        // User view: add each item that can appear in findings list.
         foreach ($scope->node->params as $param) {
+            // User view: choose the findings list branch for this case.
             if (!$param->var instanceof Variable || !is_string($param->var->name)) {
                 continue;
             }
@@ -113,6 +122,7 @@ final readonly class HungarianNotationRule implements RuleInterface
                 symbol:       $symbol,
                 prefixes:     $prefixes,
             );
+            // User view: choose the findings list branch for this case.
             if ($finding instanceof Finding) {
                 $findings[] = $finding;
             }
@@ -124,6 +134,8 @@ final readonly class HungarianNotationRule implements RuleInterface
     /**
      * Find Hungarian notation local variables in one function-like scope.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param RuleDefinition    $definition - Rule definition supplying severity, pillar, and ids for emitted findings.
      * @param AnalysisUnit      $analysisUnit - Parsed unit, used for the finding's file path and line numbers.
      * @param FunctionLikeScope $scope - Single function-like scope whose collected local variables are inspected.
@@ -141,6 +153,7 @@ final readonly class HungarianNotationRule implements RuleInterface
         $findings = [];
         $symbol   = $this->symbol($scope);
 
+        // User view: add each item that can appear in findings list.
         foreach ($scope->localVariables as $name => $variable) {
             $finding = $this->finding(
                 definition:   $definition,
@@ -151,6 +164,7 @@ final readonly class HungarianNotationRule implements RuleInterface
                 symbol:       $symbol,
                 prefixes:     $prefixes,
             );
+            // User view: choose the findings list branch for this case.
             if ($finding instanceof Finding) {
                 $findings[] = $finding;
             }
@@ -162,6 +176,8 @@ final readonly class HungarianNotationRule implements RuleInterface
     /**
      * Build a Hungarian notation finding when the identifier matches a type prefix.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param RuleDefinition $definition - Rule definition supplying severity, pillar, and ids for the finding.
      * @param AnalysisUnit   $analysisUnit - Parsed unit, source of the finding's file path.
      * @param Node           $node - AST node whose start line locates the offending identifier.
@@ -183,6 +199,8 @@ final readonly class HungarianNotationRule implements RuleInterface
     ): ?Finding {
         $prefix = $this->detectPrefix($name, $prefixes);
 
+        // User view: choose the findings list branch for this case.
+        // User view: missing data becomes the expected findings list state.
         if ($prefix === null) {
             // No configured prefix matched, so this identifier is clean and yields no finding.
             return null;
@@ -207,6 +225,8 @@ final readonly class HungarianNotationRule implements RuleInterface
     /**
      * Detect a configured type prefix followed by an uppercase boundary.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string       $name - Identifier to test; a match needs the prefix plus an uppercase next character.
      * @param list<string> $prefixes - Configured lowercase type prefixes.
      *
@@ -214,7 +234,9 @@ final readonly class HungarianNotationRule implements RuleInterface
      */
     private function detectPrefix(string $name, array $prefixes): ?string
     {
+        // User view: add each item that can appear in findings list.
         foreach ($prefixes as $prefix) {
+            // User view: choose the findings list branch for this case.
             if (str_starts_with($name, $prefix)
                 && strlen($name) > strlen($prefix)
                 && ctype_upper($name[strlen($prefix)])
@@ -229,6 +251,8 @@ final readonly class HungarianNotationRule implements RuleInterface
     }
 
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param list<string> $prefixes - Configured type prefixes.
      *
      * @return list<string> - Lowercase type prefixes.
@@ -245,12 +269,15 @@ final readonly class HungarianNotationRule implements RuleInterface
     /**
      * Resolve the human-readable symbol for a function-like scope.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param FunctionLikeScope $scope - Scope to label; named callables resolve to their name, others to kind@line.
      *
      * @return string - Named callable symbol or synthetic closure/arrow label.
      */
     private function symbol(FunctionLikeScope $scope): string
     {
+        // User view: choose the findings list branch for this case.
         if ($scope->node instanceof ClassMethod || $scope->node instanceof Function_) {
             // Named callables get their declared symbol so the finding points at a recognisable place.
             return CyclomaticComplexityRule::resolveSymbol($scope->node);

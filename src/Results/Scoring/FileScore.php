@@ -12,6 +12,8 @@ final readonly class FileScore
     /**
      * Capture score, finding totals, and optional metrics for one file.
      *
+      * User flow: Turns findings into score and trend signals users track.
+      *
      * @param string     $filePath - Display path for the scored file.
      * @param Grade      $grade - Letter grade and numeric score for the file.
      * @param int        $findings - Total findings counted for the file.
@@ -47,6 +49,8 @@ final readonly class FileScore
      * is rounded to 2 decimals so downstream diffs stay stable; nullable metric keys stay null when
      * the metric was not measured for this file.
      *
+      * User flow: Turns findings into score and trend signals users track.
+      *
      * @return array{
      *     file: string,
      *     score: float,

@@ -45,24 +45,33 @@ final readonly class HookFindingScope
     /**
      * Return the hook-contract scope for one finding.
      *
+      * User flow: Shapes hook feedback before a developer continues their workflow.
+      *
      * @param Finding $finding - Native finding emitted by a rule.
      *
      * @return string - one of line, symbol, file, or project.
      */
     public static function classify(Finding $finding): string
     {
+        // User view: choose the hook output branch for this case.
         if (isset(self::FILE_SCOPE_RULE_IDS[$finding->ruleId])) {
             return self::FILE;
         }
 
+        // User view: choose the hook output branch for this case.
+        // User view: missing data becomes the expected hook output state.
         if ($finding->line === null) {
             return self::PROJECT;
         }
 
+        // User view: choose the hook output branch for this case.
+        // User view: missing data becomes the expected hook output state.
         if ($finding->symbol !== null) {
             return self::SYMBOL;
         }
 
+        // User view: choose the hook output branch for this case.
+        // User view: missing data becomes the expected hook output state.
         if ($finding->endLine !== null && $finding->endLine > $finding->line) {
             return self::SYMBOL;
         }

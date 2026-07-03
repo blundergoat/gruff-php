@@ -32,6 +32,8 @@ final readonly class PublicMethodCountRule implements RuleInterface
     /**
      * Describe the public method count rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and thresholds.
      */
     public function definition(): RuleDefinition
@@ -50,6 +52,8 @@ final readonly class PublicMethodCountRule implements RuleInterface
     /**
      * Find classes and enums with too many public methods.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -64,23 +68,30 @@ final readonly class PublicMethodCountRule implements RuleInterface
 
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach ($classLikes as $classLike) {
             /** @var Class_|Enum_ $classLike Finder predicate restricts results to class and enum declarations. */
             $publicCount = 0;
 
+            // User view: add each item that can appear in findings list.
             foreach ($classLike->stmts as $stmt) {
+                // User view: choose the findings list branch for this case.
                 if ($stmt instanceof ClassMethod && $stmt->isPublic()) {
                     $publicCount++;
                 }
             }
             $thresholdMatch = $settings->highValueThresholdMatch($publicCount);
 
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($thresholdMatch === null) {
                 continue;
             }
 
             $symbol = $classLike instanceof Class_
+                // User view: missing data becomes a safe findings list default.
                 ? ($classLike->name?->toString() ?? sprintf('class@anonymous:%d', $classLike->getStartLine()))
+                // User view: missing data becomes a safe findings list default.
                 : ($classLike->name?->toString() ?? sprintf('enum@%d', $classLike->getStartLine()));
 
             $findings[] = new Finding(
@@ -116,12 +127,15 @@ final readonly class PublicMethodCountRule implements RuleInterface
     /**
      * Format threshold numbers without unnecessary decimal places.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param int|float $number - Threshold value to render; whole values are shown without a trailing decimal.
      *
      * @return string - Human-readable threshold value with fractional values preserved and whole values stripped.
      */
     private function formatNumber(int|float $number): string
     {
+        // User view: choose the findings list branch for this case.
         if (is_float($number) && floor($number) !== $number) {
             return (string) $number;
         }

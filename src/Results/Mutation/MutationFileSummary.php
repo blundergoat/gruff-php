@@ -12,6 +12,8 @@ final readonly class MutationFileSummary
     /**
      * Capture per-file mutation testing totals and MSI percentages.
      *
+      * User flow: Folds mutation results into the quality feedback users see.
+      *
      * @param string $filePath - Display path for the mutated source file.
      * @param int    $totalMutants - Total mutants reported for the file.
      * @param int    $killedMutants - Mutants killed by the test suite.
@@ -32,6 +34,8 @@ final readonly class MutationFileSummary
     }
 
     /**
+      * User flow: Folds mutation results into the quality feedback users see.
+      *
      * @return array{
      *     file: string,
      *     totalMutants: int,

@@ -17,6 +17,8 @@ final class RuntimeTimingObserver implements RuleRunnerObserver
     /**
      * Accumulate one rule invocation's duration into the per-rule totals.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string $ruleId - Rule identifier as declared in the rule's RuleDefinition.
      * @param int    $durationNs - Wall-clock nanoseconds the rule spent in analyse().
      *
@@ -24,6 +26,7 @@ final class RuntimeTimingObserver implements RuleRunnerObserver
      */
     public function onRuleExecuted(string $ruleId, int $durationNs): void
     {
+        // User view: choose the terminal output branch for this case.
         if (!isset($this->totals[$ruleId])) {
             $this->totals[$ruleId] = ['totalNs' => 0, 'invocations' => 0];
         }
@@ -35,12 +38,15 @@ final class RuntimeTimingObserver implements RuleRunnerObserver
     /**
      * Emit the collected per-rule totals as a stable, sorted list.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @return list<array{ruleId: string, totalNs: int, invocations: int}> - Ordered by descending total time.
      */
     public function snapshot(): array
     {
         $rows = [];
 
+        // User view: add each item that can appear in terminal output.
         foreach ($this->totals as $ruleId => $row) {
             $rows[] = ['ruleId' => $ruleId, 'totalNs' => $row['totalNs'], 'invocations' => $row['invocations']];
         }

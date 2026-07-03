@@ -12,6 +12,8 @@ use GruffPhp\Results\Finding\Finding;
 final readonly class HookFilterResult
 {
     /**
+      * User flow: Shapes hook feedback before a developer continues their workflow.
+      *
      * @param list<Finding>      $findings        - Findings kept for hook output.
      * @param int                $suppressedCount - Findings removed by hook filtering.
      * @param array<int, string> $identities      - Disambiguated hook identity keyed by spl_object_id($finding), spanning the full input set.

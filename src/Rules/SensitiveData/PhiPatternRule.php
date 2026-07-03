@@ -26,6 +26,8 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
     /**
      * List the regex patterns enforced by this rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return list<array{name: string, pattern: string}> - one entry per identifier family; name keys the context check and message, pattern is the
      *                          matching regex
      */
@@ -43,6 +45,8 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
     /**
      * Describe the PHI identifier pattern rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - the rule's id, pillar, tier, and default Warning/Medium severity used by the registry
      */
     public function definition(): RuleDefinition
@@ -61,6 +65,8 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
     /**
      * Find health identifier patterns when nearby text gives PHI context.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -73,6 +79,7 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
         // line as the matched identifier. If the file has no PHI context
         // keyword anywhere, none of the per-pattern matches can ever pass
         // hasPhiContext().
+        // User view: choose the findings list branch for this case.
         if (preg_match('/\b(?:health|medicare|mrn|nhi|patient|ssn|tax_file_number|tfn)\b/i', $analysisUnit->source) !== 1) {
             // No PHI context keyword anywhere, so no per-pattern match could survive hasPhiContext().
             return [];
@@ -81,21 +88,26 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
         $findings      = [];
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
 
+        // User view: add each item that can appear in findings list.
         foreach ($this->patterns() as $definition) {
             preg_match_all($definition['pattern'], $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
+            // User view: add each item that can appear in findings list.
             foreach ($matches[0] as $match) {
                 [$candidateSecret, $offset] = $match;
+                // User view: choose the findings list branch for this case.
                 if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
                     continue;
                 }
 
                 $lineNumber = SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset);
                 $line       = $this->lineText($analysisUnit->source, $lineNumber);
+                // User view: choose the findings list branch for this case.
                 if (!$this->hasPhiContext($line, $definition['name'])) {
                     continue;
                 }
 
+                // User view: choose the findings list branch for this case.
                 if ($this->isPlaceholderPhiLine($line, $candidateSecret, $analysisUnit->file->displayPath)) {
                     continue;
                 }
@@ -120,6 +132,8 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
     /**
      * Check whether a matched identifier line contains health-data context.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $line - Source line that produced the candidate match.
      * @param string $detector - Pattern name (e.g. ssn, mrn) whose own keyword also counts as context.
      *
@@ -143,6 +157,8 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
     /**
      * Suppress PHI-looking identifiers that are obvious examples or placeholders.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $line - Source line carrying the match, lower-cased here for keyword checks.
      * @param string $candidateSecret - Matched identifier text; punctuation is stripped before comparison.
      * @param string $displayPath - Unit path; example/placeholder wording only suppresses under docs/.
@@ -153,13 +169,16 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
     private function isPlaceholderPhiLine(string $line, string $candidateSecret, string $displayPath): bool
     {
         $normalizedLine      = strtolower($line);
+        // User view: missing data becomes a safe findings list default.
         $normalizedCandidate = preg_replace('/[^a-z0-9]/i', '', $candidateSecret) ?? '';
 
+        // User view: choose the findings list branch for this case.
         if ($normalizedCandidate === '123456789' && str_contains($normalizedLine, 'patientfundmembershipnum')) {
             // The fund-membership sample 123456789 is a documented placeholder, never a real identifier.
             return true;
         }
 
+        // User view: choose the findings list branch for this case.
         if (!str_starts_with($displayPath, 'docs/')) {
             // Outside docs/, treat every match as real; only documentation may carry sample identifiers.
             return false;
@@ -175,6 +194,8 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
     /**
      * Return source text for a 1-based line number.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $source - Full unit source to slice by newline.
      * @param int    $lineNumber - 1-based line to read; out-of-range numbers yield an empty string.
      *
@@ -184,6 +205,7 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
     {
         $lines = explode("\n", $source);
 
+        // User view: missing data becomes a safe findings list default.
         return $lines[$lineNumber - 1] ?? '';
     }
 }

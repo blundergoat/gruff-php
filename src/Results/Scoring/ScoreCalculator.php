@@ -54,6 +54,8 @@ final readonly class ScoreCalculator
     ];
 
     /**
+      * User flow: Turns findings into score and trend signals users track.
+      *
      * @param list<Finding>               $findings - Findings included in the score calculation.
      * @param MutationAnalysisResult|null $mutationAnalysisResult - Optional mutation result included in scoring.
      * @param DiffResult|null             $diffResult - Optional diff result limiting the scoring scope label.
@@ -78,7 +80,9 @@ final readonly class ScoreCalculator
         $scoreTotal = 0.0;
         $scoreCount = 0;
 
+        // User view: add each item that can appear in score output.
         foreach ($pillars as $pillar) {
+            // User view: choose the score output branch for this case.
             if (!$pillar->applicable || !$pillar->grade instanceof Grade) {
                 continue;
             }
@@ -108,6 +112,8 @@ final readonly class ScoreCalculator
      * flow through reports (the scorer never sees them after this filter), but
      * they do not affect the composite or pillar penalty buckets. See ADR-016.
      *
+      * User flow: Turns findings into score and trend signals users track.
+      *
      * @param list<Finding>       $findings - Findings produced for the run, before the scoring filter.
      * @param AnalysisConfig|null $analysisConfig - Config whose per-rule excludeFromScore flags drop informational findings from scoring; null keeps
      *                                            every finding.
@@ -116,6 +122,7 @@ final readonly class ScoreCalculator
      */
     private function scoredFindings(array $findings, ?AnalysisConfig $analysisConfig): array
     {
+        // User view: choose the score output branch for this case.
         if (!$analysisConfig instanceof AnalysisConfig) {
             // No config means no per-rule exclusions to honour, so every finding stays in scoring.
             return $findings;
@@ -126,7 +133,10 @@ final readonly class ScoreCalculator
         return array_values(array_filter(
                                 $findings,
                                 static function (Finding $finding) use ($rules): bool {
+                                    // User view: missing data becomes a safe score output default.
                                     $settings = $rules[$finding->ruleId] ?? null;
+                                    // User view: choose the score output branch for this case.
+                                    // User view: missing data becomes the expected score output state.
                                     if ($settings !== null) {
                                         // Configured rule decides: drop the finding from scoring when it is marked excludeFromScore.
                                         return !$settings->isExcludedFromScore();
@@ -139,6 +149,8 @@ final readonly class ScoreCalculator
     }
 
     /**
+      * User flow: Turns findings into score and trend signals users track.
+      *
      * @param MutationAnalysisResult|null $mutationAnalysisResult - Present means the summary names the MSI-based mutation pillar; null means it states
      *                                                            mutation was skipped.
      *
@@ -149,6 +161,7 @@ final readonly class ScoreCalculator
     {
         $base = 'Per-pillar scores start at 100 and subtract weighted finding penalties; correlated size and complexity findings on one symbol share a single penalty; the composite is the average of applicable pillar scores.';
 
+        // User view: choose the score output branch for this case.
         if ($mutationAnalysisResult instanceof MutationAnalysisResult) {
             return $base . ' Mutation uses the supplied Infection MSI as the mutation pillar score.';
         }
@@ -159,6 +172,8 @@ final readonly class ScoreCalculator
     /**
      * Calculate per-pillar scores from the active finding set.
      *
+      * User flow: Turns findings into score and trend signals users track.
+      *
      * @param list<Finding>               $findings - Scored findings bucketed into per-pillar penalties.
      * @param array<int, float>           $penalties - Clustered penalty per finding keyed by spl_object_id() (see findingPenalties()).
      * @param MutationAnalysisResult|null $mutationAnalysisResult - Mutation report that adds the Mutation pillar graded from its MSI; null omits that
@@ -169,19 +184,26 @@ final readonly class ScoreCalculator
      */
     private function pillarScores(array $findings, array $penalties, ?MutationAnalysisResult $mutationAnalysisResult, ?array $scorePillars): array
     {
+        // User view: missing data becomes the expected score output state.
         $pillarNames = $scorePillars === null
             ? self::STATIC_PILLARS
             : array_values(array_unique(array_map(static fn(Pillar $pillar): string => $pillar->value, $scorePillars)));
 
+        // User view: choose the score output branch for this case.
+        // User view: missing data becomes the expected score output state.
         if ($scorePillars === null) {
+            // User view: add each item that can appear in score output.
             foreach ($findings as $finding) {
+                // User view: choose the score output branch for this case.
                 if (!in_array($finding->pillar->value, $pillarNames, true)) {
                     $pillarNames[] = $finding->pillar->value;
                 }
             }
         }
 
+        // User view: choose the score output branch for this case.
         if (
+            // User view: missing data becomes the expected score output state.
             $scorePillars === null
             && $mutationAnalysisResult instanceof MutationAnalysisResult
             && !in_array(Pillar::Mutation->value, $pillarNames, true)
@@ -191,8 +213,11 @@ final readonly class ScoreCalculator
 
         $scores = [];
 
+        // User view: add each item that can appear in score output.
         foreach ($pillarNames as $pillarName) {
+            // User view: choose the score output branch for this case.
             if ($pillarName === Pillar::Mutation->value) {
+                // User view: choose the score output branch for this case.
                 if (!$mutationAnalysisResult instanceof MutationAnalysisResult) {
                     $scores[] = new PillarScore($pillarName, false, null, 0, 0, 0, 0, 0.0);
                     continue;
@@ -242,6 +267,8 @@ final readonly class ScoreCalculator
     /**
      * Calculate per-file scores from the active finding set.
      *
+      * User flow: Turns findings into score and trend signals users track.
+      *
      * @param list<Finding>               $findings - Scored findings bucketed by file path.
      * @param array<int, float>           $penalties - Clustered penalty per finding keyed by spl_object_id() (see findingPenalties()).
      * @param MutationAnalysisResult|null $mutationAnalysisResult - Mutation report whose per-file MSI summaries enrich each file score; null leaves
@@ -255,13 +282,16 @@ final readonly class ScoreCalculator
         /** @var array<string, list<Finding>> $byFile Accumulator shape is built incrementally from finding file paths. */
         $byFile = [];
 
+        // User view: add each item that can appear in score output.
         foreach ($findings as $finding) {
             $byFile[$finding->filePath]   ??= [];
             $byFile[$finding->filePath][] = $finding;
         }
 
         $mutationByFile = [];
+        // User view: choose the score output branch for this case.
         if ($mutationAnalysisResult instanceof MutationAnalysisResult) {
+            // User view: add each item that can appear in score output.
             foreach ($mutationAnalysisResult->report->fileSummaries() as $summary) {
                 $mutationByFile[$summary->filePath] = $summary;
                 $byFile[$summary->filePath]         ??= [];
@@ -270,9 +300,11 @@ final readonly class ScoreCalculator
 
         $scores = [];
 
+        // User view: add each item that can appear in score output.
         foreach ($byFile as $filePath => $fileFindings) {
             $counts          = $this->severityCounts($fileFindings);
             $penalty         = $this->sumPenalties($fileFindings, $penalties) * 5.0;
+            // User view: missing data becomes a safe score output default.
             $mutationSummary = $mutationByFile[$filePath] ?? null;
 
             $scores[] = new FileScore(
@@ -302,6 +334,8 @@ final readonly class ScoreCalculator
     /**
      * Bucket complexity findings by rule identifier.
      *
+      * User flow: Turns findings into score and trend signals users track.
+      *
      * @param list<Finding> $findings - Findings for one score calculation; only cyclomatic-complexity findings contribute to these buckets.
      *
      * @return array<string, int> - fixed five-bucket cyclomatic histogram keyed by range label; every bucket present, zero when empty
@@ -316,23 +350,34 @@ final readonly class ScoreCalculator
             '21+'   => 0,
         ];
 
+        // User view: add each item that can appear in score output.
         foreach ($findings as $finding) {
+            // User view: choose the score output branch for this case.
             if ($finding->ruleId !== 'complexity.cyclomatic') {
                 continue;
             }
 
+            // User view: missing data becomes a safe score output default.
             $complexity = $finding->metadata['complexity'] ?? null;
+            // User view: choose the score output branch for this case.
             if (!is_int($complexity)) {
                 continue;
             }
 
+            // User view: choose the score output branch for this case.
             if ($complexity <= 5) {
                 $buckets['1-5']++;
-            } elseif ($complexity <= 10) {
+            }
+            // User view: choose the next score output branch for this case.
+            elseif ($complexity <= 10) {
                 $buckets['6-10']++;
-            } elseif ($complexity <= 15) {
+            }
+            // User view: choose the next score output branch for this case.
+            elseif ($complexity <= 15) {
                 $buckets['11-15']++;
-            } elseif ($complexity <= 20) {
+            }
+            // User view: choose the next score output branch for this case.
+            elseif ($complexity <= 20) {
                 $buckets['16-20']++;
             } else {
                 $buckets['21+']++;
@@ -345,6 +390,8 @@ final readonly class ScoreCalculator
     /**
      * Convert one finding severity and confidence into a score penalty.
      *
+      * User flow: Turns findings into score and trend signals users track.
+      *
      * @param Finding $finding - Finding whose severity and confidence set the base weight, before any cluster sharing.
      *
      * @return float - the finding's base penalty (severity weight times confidence weight) before any cluster sharing; always non-negative
@@ -381,6 +428,8 @@ final readonly class ScoreCalculator
      * penalty. The map is keyed by spl_object_id() because the same penalty must
      * follow each finding into both the pillar and file penalty buckets.
      *
+      * User flow: Turns findings into score and trend signals users track.
+      *
      * @param list<Finding> $findings - Scored findings to weight.
      *
      * @return array<int, float> - penalty per finding, keyed by spl_object_id().
@@ -388,16 +437,21 @@ final readonly class ScoreCalculator
     private function findingPenalties(array $findings): array
     {
         $penalties = [];
+        // User view: add each item that can appear in score output.
         foreach ($findings as $finding) {
             $penalties[spl_object_id($finding)] = $this->penaltyFor($finding);
         }
 
         /** @var array<string, list<Finding>> $clusters Correlated findings grouped by file|symbol|line key. */
         $clusters = [];
+        // User view: add each item that can appear in score output.
         foreach ($findings as $finding) {
+            // User view: choose the score output branch for this case.
             if (
                 !in_array($finding->ruleId, self::CORRELATED_COMPLEXITY_RULES, true)
+                // User view: missing data becomes the expected score output state.
                 || $finding->symbol === null
+                // User view: missing data becomes the expected score output state.
                 || $finding->line === null
             ) {
                 continue;
@@ -407,12 +461,15 @@ final readonly class ScoreCalculator
             $clusters[$key][] = $finding;
         }
 
+        // User view: add each item that can appear in score output.
         foreach ($clusters as $cluster) {
+            // User view: choose the score output branch for this case.
             if (count($cluster) < 2) {
                 continue;
             }
 
             $shared = max(array_map(fn(Finding $finding): float => $this->penaltyFor($finding), $cluster)) / count($cluster);
+            // User view: add each item that can appear in score output.
             foreach ($cluster as $finding) {
                 $penalties[spl_object_id($finding)] = $shared;
             }
@@ -424,6 +481,8 @@ final readonly class ScoreCalculator
     /**
      * Total the clustered penalties for a subset of findings.
      *
+      * User flow: Turns findings into score and trend signals users track.
+      *
      * @param list<Finding>     $findings - Findings whose weights to total.
      * @param array<int, float> $penalties - Penalty per finding keyed by spl_object_id(), from findingPenalties().
      *
@@ -432,7 +491,9 @@ final readonly class ScoreCalculator
     private function sumPenalties(array $findings, array $penalties): float
     {
         $total = 0.0;
+        // User view: add each item that can appear in score output.
         foreach ($findings as $finding) {
+            // User view: missing data becomes a safe score output default.
             $total += $penalties[spl_object_id($finding)] ?? $this->penaltyFor($finding);
         }
 
@@ -442,6 +503,8 @@ final readonly class ScoreCalculator
     /**
      * Count findings by severity for scoring and summaries.
      *
+      * User flow: Turns findings into score and trend signals users track.
+      *
      * @param list<Finding> $findings - Findings to tally for score summaries; all severities are counted even when the input is empty.
      *
      * @return array{advisory: int, warning: int, error: int} - finding tally per severity; all three keys always present, zero when none
@@ -450,6 +513,7 @@ final readonly class ScoreCalculator
     {
         $counts = ['advisory' => 0, 'warning' => 0, 'error' => 0];
 
+        // User view: add each item that can appear in score output.
         foreach ($findings as $finding) {
             $counts[$finding->severity->value]++;
         }
@@ -458,6 +522,8 @@ final readonly class ScoreCalculator
     }
 
     /**
+      * User flow: Turns findings into score and trend signals users track.
+      *
      * @param list<Finding> $findings - Findings to scan for the requested rule metadata.
      * @param string        $ruleId - Only findings from this rule are considered; others are skipped before reading metadata.
      * @param string        $key - Metadata entry to maximise; non-integer or absent values are ignored.
@@ -469,16 +535,21 @@ final readonly class ScoreCalculator
     {
         $maximumValue = null;
 
+        // User view: add each item that can appear in score output.
         foreach ($findings as $finding) {
+            // User view: choose the score output branch for this case.
             if ($finding->ruleId !== $ruleId) {
                 continue;
             }
 
+            // User view: missing data becomes a safe score output default.
             $metricValue = $finding->metadata[$key] ?? null;
+            // User view: choose the score output branch for this case.
             if (!is_int($metricValue)) {
                 continue;
             }
 
+            // User view: missing data becomes the expected score output state.
             $maximumValue = $maximumValue === null ? $metricValue : max($maximumValue, $metricValue);
         }
 
@@ -486,6 +557,8 @@ final readonly class ScoreCalculator
     }
 
     /**
+      * User flow: Turns findings into score and trend signals users track.
+      *
      * @param list<Finding> $findings - Findings for a single file score; only size rules with integer `lines` metadata contribute.
      *
      * @return int|null - largest `lines` count across file/method/class size findings, or null when the file had no size finding reporting a line
@@ -495,16 +568,21 @@ final readonly class ScoreCalculator
     {
         $maximumLines = null;
 
+        // User view: add each item that can appear in score output.
         foreach ($findings as $finding) {
+            // User view: choose the score output branch for this case.
             if (!in_array($finding->ruleId, ['size.file-length', 'size.method-length', 'size.class-length'], true)) {
                 continue;
             }
 
+            // User view: missing data becomes a safe score output default.
             $lineCount = $finding->metadata['lines'] ?? null;
+            // User view: choose the score output branch for this case.
             if (!is_int($lineCount)) {
                 continue;
             }
 
+            // User view: missing data becomes the expected score output state.
             $maximumLines = $maximumLines === null ? $lineCount : max($maximumLines, $lineCount);
         }
 

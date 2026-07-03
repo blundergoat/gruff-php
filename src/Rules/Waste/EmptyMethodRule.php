@@ -31,6 +31,8 @@ final readonly class EmptyMethodRule implements RuleInterface
     /**
      * Describe the empty method rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -49,6 +51,8 @@ final readonly class EmptyMethodRule implements RuleInterface
     /**
      * Find function-like declarations with empty bodies.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -61,16 +65,22 @@ final readonly class EmptyMethodRule implements RuleInterface
 
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
+            // User view: choose the findings list branch for this case.
             if ($node instanceof ClassMethod && $node->isAbstract()) {
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
+            // User view: an empty value becomes a clear findings list fallback.
             if ($node->stmts === null || $node->stmts !== []) {
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
             if ($node instanceof ClassMethod && $this->isPromotedConstructor($node)) {
                 continue;
             }
@@ -98,18 +108,23 @@ final readonly class EmptyMethodRule implements RuleInterface
     /**
      * Allow empty constructors that only define promoted properties.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param ClassMethod $classMethod - Method to test; only `__construct` with promoted params earns the exemption.
      *
      * @return bool - True when the constructor exists solely for property promotion.
      */
     private function isPromotedConstructor(ClassMethod $classMethod): bool
     {
+        // User view: choose the findings list branch for this case.
         if ($classMethod->name->toString() !== '__construct') {
             // Non-constructors gain nothing from an empty body, so they stay reportable.
             return false;
         }
 
+        // User view: add each item that can appear in findings list.
         foreach ($classMethod->params as $param) {
+            // User view: choose the findings list branch for this case.
             if ($param->isPromoted()) {
                 // A promoted param means the empty body is doing real work (assigning the property); exempt it.
                 return true;

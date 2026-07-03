@@ -37,6 +37,8 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
     /**
      * Describe the test naming consistency rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata, defaults, and options.
      */
     public function definition(): RuleDefinition
@@ -56,6 +58,8 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
     /**
      * Find mixed test naming styles and weakly descriptive test names.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -66,12 +70,16 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
         $findings = [];
         $patterns = $ruleContext->settingsFor($this->definition())->stringListOption('poorNamePatterns');
 
+        // User view: add each item that can appear in findings list.
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Class_::class) as $class) {
             $camelCount = 0;
             $snakeCount = 0;
+            // User view: missing data becomes a safe findings list default.
             $className  = $class->name?->toString() ?? sprintf('anonymous@%d', $class->getStartLine());
 
+            // User view: add each item that can appear in findings list.
             foreach ($class->getMethods() as $method) {
+                // User view: choose the findings list branch for this case.
                 if (!TestQualityNodeHelper::isTestMethod($method)) {
                     continue;
                 }
@@ -79,7 +87,10 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
                 $methodName = $method->name->toString();
                 $afterTest  = substr($methodName, 4);
 
+                // User view: choose the findings list branch for this case.
+                // User view: an empty value becomes a clear findings list fallback.
                 if ($afterTest !== '') {
+                    // User view: choose the findings list branch for this case.
                     if (str_contains($afterTest, '_')) {
                         $snakeCount++;
                     } else {
@@ -88,6 +99,8 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
                 }
 
                 $matchedPattern = $this->matchPoorNamePattern($methodName, $patterns);
+                // User view: choose the findings list branch for this case.
+                // User view: missing data becomes the expected findings list state.
                 if ($matchedPattern !== null) {
                     $findings[] = new Finding(
                         ruleId:      self::ID,
@@ -105,6 +118,7 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
                 }
             }
 
+            // User view: choose the findings list branch for this case.
             if ($camelCount === 0 || $snakeCount === 0) {
                 continue;
             }
@@ -130,6 +144,8 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
     /**
      * Return the first configured poor-name pattern this method name matches, if any.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string       $methodName - Full test method name including the `test` prefix, matched as-is.
      * @param list<string> $patterns - Configured regexes flagging low-signal names; first match wins.
      *
@@ -137,7 +153,9 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
      */
     private function matchPoorNamePattern(string $methodName, array $patterns): ?string
     {
+        // User view: add each item that can appear in findings list.
         foreach ($patterns as $pattern) {
+            // User view: choose the findings list branch for this case.
             if ($this->isPatternMatch($pattern, $methodName)) {
                 // Surface the offending regex so the finding can name which rule the test name tripped.
                 return $pattern;
@@ -150,6 +168,8 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
     /**
      * Safely test a user-configured regex pattern against a method name.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $pattern - User-configured regex with delimiters; an invalid pattern matches nothing, not errors.
      * @param string $methodName - Test method name to test the pattern against.
      *

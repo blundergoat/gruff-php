@@ -64,6 +64,8 @@ final class DashboardScanRunner
     /**
      * Capture collaborators used to execute dashboard scans and render results.
      *
+      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
+      *
      * @param string                $gruffBinary - Absolute gruff-php binary path used for scan requests.
      * @param DashboardStateFactory $stateFactory - Factory used to resolve dashboard state.
      * @param DashboardPageRenderer $renderer - Renderer used for scan output and errors.
@@ -78,6 +80,8 @@ final class DashboardScanRunner
     /**
      * Run a dashboard scan request and return HTML for the iframe.
      *
+      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
+      *
      * @param DashboardRequestContext $dashboardRequestContext - Dashboard request context.
      * @param array<string, string>   $query - Request query values from the dashboard form.
      *
@@ -90,6 +94,8 @@ final class DashboardScanRunner
         $dashboardScanCommandBuilder = new DashboardScanCommandBuilder($this->gruffBinary);
         $scanRoot                    = $this->stateFactory->resolveProjectRoot($state['project'], $dashboardRequestContext->launchRoot);
 
+        // User view: choose the dashboard view branch for this case.
+        // User view: missing data becomes the expected dashboard view state.
         if ($scanRoot === null) {
             // Refuse to spawn a scan against an unresolved root; show the bad project path instead of guessing.
             return $renderer->errorHtml(
@@ -104,11 +110,15 @@ final class DashboardScanRunner
         $command   = $dashboardScanCommandBuilder->analyseCommand($paths, $state);
         $startedAt = microtime(true);
 
+        // User view: choose the dashboard view branch for this case.
         if ($state['scanScope'] !== 'diff' && $state['includeIgnored'] !== '1') {
             $cacheKey     = hash('sha256', $scanRoot . "\0" . implode("\0", $command));
             $fingerprint  = $this->cacheFingerprint($scanRoot, $paths, $state);
+            // User view: missing data becomes a safe dashboard view default.
             $cachedResult = $this->cache[$cacheKey] ?? null;
 
+            // User view: choose the dashboard view branch for this case.
+            // User view: missing data becomes the expected dashboard view state.
             if ($cachedResult !== null && $cachedResult['fingerprint'] === $fingerprint) {
                 // Sources are unchanged since the cached run, so reuse its HTML and only refresh the timing banner.
                 return $renderer->injectDashboardMetadata(
@@ -132,6 +142,7 @@ final class DashboardScanRunner
         try {
             $process->run();
             $stderr   = $process->getErrorOutput();
+            // User view: missing data becomes a safe dashboard view default.
             $exitCode = $process->getExitCode() ?? Command::FAILURE;
         } catch (ProcessTimedOutException $exception) {
             $stderr   = $exception->getMessage();
@@ -141,11 +152,15 @@ final class DashboardScanRunner
         $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
         $html       = $process->getOutput();
 
+        // User view: choose the dashboard view branch for this case.
+        // User view: an empty value becomes a clear dashboard view fallback.
         if ($html === '') {
             // Empty stdout means analyse crashed or printed nothing usable; surface stderr so the failure is diagnosable.
+            // User view: an empty value becomes a clear dashboard view fallback.
             return $renderer->errorHtml('The scan did not produce HTML output.', $stderr === '' ? 'No stderr output.' : $stderr, $exitCode, $durationMs);
         }
 
+        // User view: choose the dashboard view branch for this case.
         if (isset($cacheKey, $fingerprint)) {
             $this->evictCacheEntryIfNeeded($cacheKey);
             $this->cache[$cacheKey] = [
@@ -161,6 +176,8 @@ final class DashboardScanRunner
     /**
      * Build an invalidation fingerprint for the requested scan inputs.
      *
+      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
+      *
      * @param         string                                                                                                                                                                                              $scanRoot - Resolved project root the paths are taken relative to.
      * @param         list<string>                                                                                                                                                                                        $paths - Requested scan paths.
      * @param         array<string, string>                                                                                                                                                                               $state - Dashboard query state.
@@ -172,15 +189,20 @@ final class DashboardScanRunner
     {
         $parts = [$scanRoot, $state['includeIgnored']];
 
+        // User view: add each item that can appear in dashboard view.
         foreach ($paths as $path) {
             $this->appendPathFingerprint($parts, $scanRoot, $path);
         }
 
+        // User view: choose the dashboard view branch for this case.
         if ($state['noConfig'] !== '1') {
+            // User view: an empty value becomes a clear dashboard view fallback.
             $this->appendPathFingerprint($parts, $scanRoot, $state['config'] === '' ? ConfigLoader::DEFAULT_CONFIG_FILE : $state['config']);
         }
 
+        // User view: choose the dashboard view branch for this case.
         if ($state['noBaseline'] !== '1') {
+            // User view: an empty value becomes a clear dashboard view fallback.
             $this->appendPathFingerprint($parts, $scanRoot, $state['baseline'] === '' ? 'gruff-baseline.json' : $state['baseline']);
         }
 
@@ -192,6 +214,8 @@ final class DashboardScanRunner
     /**
      * Add a file, directory, or missing-path marker to a cache fingerprint.
      *
+      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
+      *
      * @param list<string> $parts - Fingerprint parts collected so far; appended to by reference.
      * @param string       $scanRoot - Project root that $path is resolved against.
      * @param string       $path - Project-relative or absolute path to fingerprint; may not exist on disk.
@@ -203,6 +227,7 @@ final class DashboardScanRunner
         $absolutePath = PathHelper::resolveAgainst($scanRoot, $path);
         $realPath     = realpath($absolutePath);
 
+        // User view: choose the dashboard view branch for this case.
         if (!is_string($realPath)) {
             $parts[] = 'missing:' . $absolutePath;
 
@@ -210,6 +235,7 @@ final class DashboardScanRunner
             return;
         }
 
+        // User view: choose the dashboard view branch for this case.
         if (is_file($realPath)) {
             $parts[] = $this->fileFingerprint($realPath);
 
@@ -217,6 +243,7 @@ final class DashboardScanRunner
             return;
         }
 
+        // User view: choose the dashboard view branch for this case.
         if (is_dir($realPath)) {
             $this->appendDirectoryFingerprint($parts, $scanRoot, $realPath);
         }
@@ -225,6 +252,8 @@ final class DashboardScanRunner
     /**
      * Add recursive file metadata for a directory to a cache fingerprint.
      *
+      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
+      *
      * @param list<string> $parts - Fingerprint parts collected so far; appended to by reference.
      * @param string       $scanRoot - Project root used to decide which nested directories are ignored.
      * @param string       $directory - Absolute directory whose files are walked into the fingerprint.
@@ -243,7 +272,9 @@ final class DashboardScanRunner
                 ),
             );
 
+            // User view: add each item that can appear in dashboard view.
             foreach ($recursiveIteratorIterator as $file) {
+                // User view: choose the dashboard view branch for this case.
                 if (!$file instanceof SplFileInfo || !$file->isFile()) {
                     continue;
                 }
@@ -261,6 +292,8 @@ final class DashboardScanRunner
     /**
      * Check whether a directory is outside the dashboard cache invalidation surface.
      *
+      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
+      *
      * @param  string $scanRoot - Project root used to derive the directory's relative path for root matching.
      * @param  string $directory - Absolute directory being considered for the recursive walk.
      *
@@ -270,6 +303,7 @@ final class DashboardScanRunner
     {
         $name = basename($directory);
 
+        // User view: choose the dashboard view branch for this case.
         if (in_array($name, self::CACHE_IGNORED_DIRECTORIES, true)) {
             // Matched by basename anywhere in the tree (vendor, node_modules, VCS dirs); skip regardless of depth.
             return true;
@@ -284,6 +318,8 @@ final class DashboardScanRunner
     /**
      * Return file metadata used for dashboard cache invalidation.
      *
+      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
+      *
      * @param  string $path - Absolute path to an existing file whose metadata identifies the cached version.
      *
      * @return string - File path, modification time, size, and content hash.
@@ -298,12 +334,15 @@ final class DashboardScanRunner
     /**
      * Keep the in-process dashboard result cache bounded.
      *
+      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
+      *
      * @param  string $cacheKey - Key about to be (re)written; dropped first so a refresh moves it to newest.
      *
      * @return void
      */
     private function evictCacheEntryIfNeeded(string $cacheKey): void
     {
+        // User view: choose the dashboard view branch for this case.
         if (array_key_exists($cacheKey, $this->cache)) {
             unset($this->cache[$cacheKey]);
         }

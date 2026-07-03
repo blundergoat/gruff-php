@@ -26,6 +26,8 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
     /**
      * Describe the AWS access key sensitive-data rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -44,6 +46,8 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
     /**
      * Find string literals that resemble AWS access key IDs.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -51,6 +55,7 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
+        // User view: choose the findings list branch for this case.
         if (!str_contains($analysisUnit->source, 'AKIA') && !str_contains($analysisUnit->source, 'ASIA')) {
             // Neither AWS key-id prefix is present, so the regex cannot match; skip it to keep the rule near-free.
             return [];
@@ -60,12 +65,15 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
 
         $findings      = [];
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
+        // User view: add each item that can appear in findings list.
         foreach ($matches[0] as $match) {
             [$candidateSecret, $offset] = $match;
+            // User view: choose the findings list branch for this case.
             if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
             if (SecretScannerHelper::isLikelyDummyValue($candidateSecret)) {
                 continue;
             }

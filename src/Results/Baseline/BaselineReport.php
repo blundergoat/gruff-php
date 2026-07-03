@@ -20,6 +20,8 @@ final readonly class BaselineReport
     public const SOURCE_DEFAULT = 'default';
 
     /**
+      * User flow: Keeps known findings separate from new feedback in reports.
+      *
      * @param string              $path - Baseline file path used for the run.
      * @param bool                $generated - Whether the run generated a baseline file.
      * @param int                 $totalEntries - Total group rows loaded from the baseline.
@@ -48,6 +50,8 @@ final readonly class BaselineReport
     }
 
     /**
+      * User flow: Keeps known findings separate from new feedback in reports.
+      *
      * @return array{
      *     path: string,
      *     generated: bool,

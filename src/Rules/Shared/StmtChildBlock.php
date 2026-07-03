@@ -35,6 +35,8 @@ final readonly class StmtChildBlock
     public const KIND_FINALLY_BODY = 'finally-body';
 
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string      $kind - One of the `KIND_*` constants identifying the block role.
      * @param array<Stmt> $statements - Statements inside the block, as PhpParser yields them.
      * @param Node        $owner - Owning node (Stmt, Else_, ElseIf_, Case_, Catch_, or Finally_) - gives rules access to extras.

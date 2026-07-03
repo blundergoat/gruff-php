@@ -14,6 +14,8 @@ use GruffPhp\Results\Finding\Severity;
 final readonly class FindingDisplayFilter
 {
     /**
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param Severity|null $minSeverity - Minimum severity that should be displayed.
      * @param list<Pillar>  $includePillars - Pillars explicitly included in output.
      * @param list<Pillar>  $excludePillars - Pillars explicitly excluded from output.
@@ -32,6 +34,8 @@ final readonly class FindingDisplayFilter
     /**
      * Keep only findings visible under the selected display filter.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param list<Finding> $findings - Candidate findings before severity, pillar, and rule filters are applied.
      *
      * @return list<Finding> - findings that pass every active filter, re-keyed to a 0-indexed list; empty when all are filtered out
@@ -44,18 +48,27 @@ final readonly class FindingDisplayFilter
     /**
      * Check whether any display filter is configured.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @return bool - true when at least one filter dimension is configured; callers use it to decide whether to annotate filtered output
      */
     public function isActive(): bool
     {
+        // User view: missing data becomes the expected report output state.
         return $this->minSeverity !== null
+               // User view: an empty value becomes a clear report output fallback.
                || $this->includePillars !== []
+               // User view: an empty value becomes a clear report output fallback.
                || $this->excludePillars !== []
+               // User view: an empty value becomes a clear report output fallback.
                || $this->includeRules !== []
+               // User view: an empty value becomes a clear report output fallback.
                || $this->excludeRules !== [];
     }
 
     /**
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @return array{
      *     active: bool,
      *     minSeverity: string|null,
@@ -81,27 +94,36 @@ final readonly class FindingDisplayFilter
     /**
      * Determine whether one finding passes all configured filters.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param Finding $finding - Finding under test against severity floor and pillar/rule include-exclude sets.
      *
      * @return bool - true when the finding clears the severity floor and every pillar/rule include-exclude gate; false drops it from output
      */
     private function allows(Finding $finding): bool
     {
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($this->minSeverity !== null && $this->severityRank($finding->severity) < $this->severityRank($this->minSeverity)) {
             // Below the severity floor: drop it before any pillar or rule check runs.
             return false;
         }
 
+        // User view: choose the report output branch for this case.
+        // User view: an empty value becomes a clear report output fallback.
         if ($this->includePillars !== [] && !in_array($finding->pillar, $this->includePillars, true)) {
             // An include set is an allowlist; a pillar outside it is excluded.
             return false;
         }
 
+        // User view: choose the report output branch for this case.
         if (in_array($finding->pillar, $this->excludePillars, true)) {
             // Exclude wins over include for pillars already passed above.
             return false;
         }
 
+        // User view: choose the report output branch for this case.
+        // User view: an empty value becomes a clear report output fallback.
         if ($this->includeRules !== [] && !in_array($finding->ruleId, $this->includeRules, true)) {
             // Same allowlist semantics at the rule-id granularity.
             return false;
@@ -114,6 +136,8 @@ final readonly class FindingDisplayFilter
     /**
      * Convert severity to a comparable rank.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param Severity $severity - Severity whose ordering position is needed for the minimum-severity comparison.
      *
      * @return int - ordering rank where a larger value is more severe, so the minimum-severity floor can be compared with a numeric >=

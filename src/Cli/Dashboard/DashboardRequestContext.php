@@ -14,6 +14,8 @@ final readonly class DashboardRequestContext
     /**
      * Capture request-level state shared by dashboard handlers.
      *
+      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
+      *
      * @param InputInterface $input - Console input used to seed dashboard state.
      * @param string         $launchRoot - Shell working directory that launched the dashboard.
      * @param string         $projectRoot - Active project root for scan requests.

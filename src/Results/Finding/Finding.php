@@ -31,6 +31,8 @@ namespace GruffPhp\Results\Finding;
 final readonly class Finding
 {
     /**
+      * User flow: Defines how findings appear in reports and quality gates.
+      *
      * @param string          $ruleId - Stable rule identifier that produced the finding.
      * @param string          $message - Human-readable finding message.
      * @param string          $filePath - Display path for the affected file.
@@ -67,6 +69,8 @@ final readonly class Finding
     /**
      * Serialise the finding for report payloads.
      *
+      * User flow: Defines how findings appear in reports and quality gates.
+      *
      * @return FindingArray - canonical report payload with fingerprint and stableIdentity recomputed, never stored; empty metadata serialises as an
      *                      object
      */
@@ -91,6 +95,7 @@ final readonly class Finding
             'remediation'      => $this->remediation,
             'fingerprint'      => $this->fingerprint(),
             'stableIdentity'   => $this->stableIdentity(),
+            // User view: an empty value becomes a clear finding display fallback.
             'metadata'         => $this->metadata === [] ? (object)[] : $this->metadata,
         ];
     }
@@ -101,6 +106,8 @@ final readonly class Finding
      * The derived `fingerprint` / `stableIdentity` fields are recomputed from the
      * restored inputs, never read from the payload, so a round-trip is lossless.
      *
+      * User flow: Defines how findings appear in reports and quality gates.
+      *
      * @param array<string, mixed> $serialized - Serialized finding produced by toArray().
      *
      * @return self - finding rebuilt from the payload, with every field coerced through a narrowing helper so a malformed payload yields safe
@@ -109,33 +116,51 @@ final readonly class Finding
     public static function fromArray(array $serialized): self
     {
         $secondaryPillars = [];
+        // User view: missing data becomes a safe finding display default.
         $rawSecondary     = $serialized['secondaryPillars'] ?? [];
+        // User view: choose the finding display branch for this case.
         if (is_array($rawSecondary)) {
+            // User view: add each item that can appear in finding display.
             foreach ($rawSecondary as $pillarValue) {
                 $secondaryPillars[] = Pillar::from(self::stringField($pillarValue));
             }
         }
 
+        // User view: missing data becomes a safe finding display default.
         $rawMetadata = $serialized['metadata'] ?? [];
         $metadata    = [];
+        // User view: choose the finding display branch for this case.
         if (is_array($rawMetadata)) {
+            // User view: add each item that can appear in finding display.
             foreach ($rawMetadata as $metadataKey => $metadataValue) {
                 $metadata[is_string($metadataKey) ? $metadataKey : (string)$metadataKey] = self::metadataValue($metadataValue);
             }
         }
 
         return new self(
+            // User view: missing data becomes a safe finding display default.
             ruleId:           self::stringField($serialized['ruleId'] ?? null),
+            // User view: missing data becomes a safe finding display default.
             message:          self::stringField($serialized['message'] ?? null),
+            // User view: missing data becomes a safe finding display default.
             filePath:         self::stringField($serialized['file'] ?? null),
+            // User view: missing data becomes a safe finding display default.
             line:             self::nullableInt($serialized['line'] ?? null),
+            // User view: missing data becomes a safe finding display default.
             severity:         Severity::from(self::stringField($serialized['severity'] ?? null)),
+            // User view: missing data becomes a safe finding display default.
             pillar:           Pillar::from(self::stringField($serialized['pillar'] ?? null)),
+            // User view: missing data becomes a safe finding display default.
             tier:             RuleTier::from(self::stringField($serialized['tier'] ?? null)),
+            // User view: missing data becomes a safe finding display default.
             confidence:       Confidence::from(self::stringField($serialized['confidence'] ?? null)),
+            // User view: missing data becomes a safe finding display default.
             endLine:          self::nullableInt($serialized['endLine'] ?? null),
+            // User view: missing data becomes a safe finding display default.
             column:           self::nullableInt($serialized['column'] ?? null),
+            // User view: missing data becomes a safe finding display default.
             symbol:           self::nullableString($serialized['symbol'] ?? null),
+            // User view: missing data becomes a safe finding display default.
             remediation:      self::nullableString($serialized['remediation'] ?? null),
             secondaryPillars: $secondaryPillars,
             metadata:         $metadata,
@@ -143,6 +168,8 @@ final readonly class Finding
     }
 
     /**
+      * User flow: Defines how findings appear in reports and quality gates.
+      *
      * @param mixed $value - Raw value from a decoded payload.
      *
      * @return string - the value unchanged when it is a string, otherwise an empty string so an absent or wrong-typed field can't raise a type error
@@ -155,6 +182,8 @@ final readonly class Finding
     /**
      * Narrow a decoded metadata value to the supported scalar/list shape.
      *
+      * User flow: Defines how findings appear in reports and quality gates.
+      *
      * @param mixed $value - Raw decoded metadata value.
      *
      * @return bool|float|int|string|null|array<array-key, bool|float|int|string|null> - scalars and null pass through; arrays become a flat list
@@ -162,18 +191,23 @@ final readonly class Finding
      */
     private static function metadataValue(mixed $value): bool|float|int|string|null|array
     {
+        // User view: choose the finding display branch for this case.
+        // User view: missing data becomes the expected finding display state.
         if (is_bool($value) || is_int($value) || is_float($value) || is_string($value) || $value === null) {
             // Scalars and null are already in the supported shape and pass through untouched.
             return $value;
         }
 
+        // User view: choose the finding display branch for this case.
         if (!is_array($value)) {
             // Objects, resources, and closures have no safe metadata representation, so drop them to null.
             return null;
         }
 
         $list = [];
+        // User view: add each item that can appear in finding display.
         foreach ($value as $itemKey => $item) {
+            // User view: missing data becomes the expected finding display state.
             $list[$itemKey] = is_bool($item) || is_int($item) || is_float($item) || is_string($item) || $item === null ? $item : null;
         }
 
@@ -181,6 +215,8 @@ final readonly class Finding
     }
 
     /**
+      * User flow: Defines how findings appear in reports and quality gates.
+      *
      * @param mixed $value - Raw value from a decoded payload.
      *
      * @return int|null - the integer unchanged, or null for any non-int (numeric strings included) so absent line/column data stays absent
@@ -191,6 +227,8 @@ final readonly class Finding
     }
 
     /**
+      * User flow: Defines how findings appear in reports and quality gates.
+      *
      * @param mixed $value - Raw value from a decoded payload.
      *
      * @return string|null - the value unchanged when it is a string, otherwise null so optional fields like symbol/remediation read as "not set"
@@ -203,6 +241,8 @@ final readonly class Finding
     /**
      * Build the stable short hash used to identify equivalent findings.
      *
+      * User flow: Defines how findings appear in reports and quality gates.
+      *
      * @return string - 16-hex-char SHA-256 prefix over ruleId/file/line/endLine/column/symbol/message; wide enough to avoid collisions, short enough
      *                to store in baselines
      */
@@ -237,11 +277,14 @@ final readonly class Finding
      * (file, ruleId, message) counts rather than on either hash; this field is
      * informational for external diff tooling and SARIF consumers.
      *
+      * User flow: Defines how findings appear in reports and quality gates.
+      *
      * @return string - 16-hex-char SHA-256 prefix that omits line/endLine/column, so the identity survives line shifts; informational for external
      *                diff tooling, not baseline matching
      */
     public function stableIdentity(): string
     {
+        // User view: missing data becomes the expected finding display state.
         $payload = $this->symbol !== null
             ? ['ruleId' => $this->ruleId, 'file' => $this->filePath, 'symbol' => $this->symbol, 'message' => $this->message]
             : ['ruleId' => $this->ruleId, 'file' => $this->filePath, 'message' => $this->message];

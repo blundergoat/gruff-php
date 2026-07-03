@@ -42,6 +42,8 @@ final readonly class ReturnCommentRule implements RuleInterface
     /**
      * Describe the described-return-tag documentation rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - rule metadata and defaults for the registry and listings
      */
     public function definition(): RuleDefinition
@@ -61,6 +63,8 @@ final readonly class ReturnCommentRule implements RuleInterface
     /**
      * Find value-returning function-likes whose `@return` tag is present but undescribed.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $unit    - parsed unit to inspect
      * @param RuleContext  $context - rule context for this analysis pass
      *
@@ -72,14 +76,18 @@ final readonly class ReturnCommentRule implements RuleInterface
         $nodes      = NodeIndex::nodesOfAny($unit, [ClassMethod::class, Function_::class]);
         $findings   = [];
 
+        // User view: add each item that can appear in findings list.
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
+            // User view: choose the findings list branch for this case.
             if (!$this->isValueReturning($node)) {
                 continue;
             }
 
             $docComment = $node->getDocComment();
 
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($docComment === null) {
                 // No docblock: docs.missing-public-phpdoc owns the gap, so stay silent to avoid double-reporting.
                 continue;
@@ -87,11 +95,14 @@ final readonly class ReturnCommentRule implements RuleInterface
 
             $returnBody = PhpdocTagText::returnTagBody($docComment->getText());
 
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($returnBody === null) {
                 // No @return tag: docs.missing-return-tag owns presence, so stay silent.
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
             if (PhpdocTagText::hasReturnTagDescription($returnBody)) {
                 continue;
             }
@@ -122,12 +133,15 @@ final readonly class ReturnCommentRule implements RuleInterface
      * (mirroring MissingReturnTagRule). When no return type is declared, fall back to whether the
      * body actually returns an expression.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param ClassMethod|Function_ $node - function-like declaration to classify
      *
      * @return bool - true when the declaration yields a value an @return tag should describe
      */
     private function isValueReturning(ClassMethod|Function_ $node): bool
     {
+        // User view: choose the findings list branch for this case.
         if ($node instanceof ClassMethod && in_array($node->name->toString(), ['__construct', '__destruct'], true)) {
             // Constructors and destructors have no return contract to describe.
             return false;
@@ -135,6 +149,7 @@ final readonly class ReturnCommentRule implements RuleInterface
 
         $returnType = $node->getReturnType();
 
+        // User view: choose the findings list branch for this case.
         if ($returnType instanceof Identifier) {
             $typeName = strtolower($returnType->name);
 
@@ -142,6 +157,8 @@ final readonly class ReturnCommentRule implements RuleInterface
             return $typeName !== 'void' && $typeName !== 'never';
         }
 
+        // User view: choose the findings list branch for this case.
+        // User view: missing data becomes the expected findings list state.
         if ($returnType !== null) {
             // Any other declared shape (named, nullable, union, intersection) carries a value.
             return true;
@@ -154,6 +171,8 @@ final readonly class ReturnCommentRule implements RuleInterface
     /**
      * Detect at least one `return <expr>;` inside a function-like body.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param ClassMethod|Function_ $node - function-like declaration whose body is scanned
      *
      * @return bool - true when any return statement carries an expression
@@ -162,8 +181,11 @@ final readonly class ReturnCommentRule implements RuleInterface
     {
         $finder = new NodeFinder();
 
+        // User view: add each item that can appear in findings list.
         foreach ($finder->findInstanceOf((array)$node->stmts, Return_::class) as $return) {
             /** @var Return_ $return Finder predicate restricts results to return statements. */
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($return->expr !== null) {
                 return true;
             }

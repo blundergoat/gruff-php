@@ -39,6 +39,8 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
     /**
      * Describe the missing constant PHPDoc rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -70,6 +72,8 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
     /**
      * Find class constants and enum cases without PHPDoc.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -81,7 +85,10 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
         $settings   = $ruleContext->settingsFor($definition);
         $findings   = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (NodeIndex::nodesOf($analysisUnit, ClassLike::class) as $classLike) {
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if (!$this->isSupportedClassLike($classLike) || $classLike->name === null) {
                 continue;
             }
@@ -99,6 +106,8 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
     /**
      * Check whether a class-like node can own constants or enum cases.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param ClassLike $classLike - Class-like node to test; only constant- and case-bearing kinds qualify.
      *
      * @return bool - True when the node should be inspected.
@@ -115,6 +124,8 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
     /**
      * Find undocumented class constants in one class-like node.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param ClassLike      $classLike - Node whose direct `const` statements are scanned for missing docs.
      * @param string         $className - Owning class name, used to build the `Class::CONST` symbol per finding.
      * @param RuleDefinition $definition - Shared rule defaults so every finding carries identical severity and tier.
@@ -134,7 +145,10 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
         $groupCommentKind    = null;
         $groupCommentEndLine = null;
 
+        // User view: add each item that can appear in findings list.
         foreach ($classLike->stmts as $statement) {
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if (!$statement instanceof ClassConst || $statement->getDocComment() !== null) {
                 $groupCommentKind    = null;
                 $groupCommentEndLine = null;
@@ -144,19 +158,26 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
             $attachedCommentKind  = $this->localCommentKind($statement, false);
             $meaningfulLocalKind  = $this->localCommentKind($statement, true);
             $groupedCommentKind   = null;
+            // User view: missing data becomes the expected findings list state.
             $isConsecutiveInGroup = $groupCommentKind !== null
+                // User view: missing data becomes the expected findings list state.
                 && $groupCommentEndLine !== null
                 && $statement->getStartLine() === $groupCommentEndLine + 1;
 
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($meaningfulLocalKind === null && $attachedCommentKind === null && $isConsecutiveInGroup) {
                 $meaningfulLocalKind = $groupCommentKind;
                 $groupedCommentKind  = $groupCommentKind;
             }
 
             $requiresApiPhpdoc = $this->requiresPhpdocForApiConstants($statement, $analysisUnit->file->displayPath, $settings);
+            // User view: missing data becomes the expected findings list state.
             $hasUsefulComment  = $meaningfulLocalKind !== null;
 
+            // User view: choose the findings list branch for this case.
             if (!$hasUsefulComment || $requiresApiPhpdoc) {
+                // User view: add each item that can appear in findings list.
                 foreach ($statement->consts as $const) {
                     $findings[] = $this->classConstantFinding(
                         $const->name->toString(),
@@ -165,9 +186,11 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
                         $definition,
                         $analysisUnit,
                         [
+                            // User view: missing data becomes a safe findings list default.
                             'kind'        => $attachedCommentKind ?? $groupedCommentKind,
                             'useful'      => $hasUsefulComment,
                             'apiRequired' => $requiresApiPhpdoc,
+                            // User view: missing data becomes the expected findings list state.
                             'grouped'     => $groupedCommentKind !== null,
                         ],
                     );
@@ -175,10 +198,15 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
             }
 
             // Carry the group-comment state forward once; the emit and skip paths shared this logic.
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($hasUsefulComment && $attachedCommentKind !== null && $this->hasGroupLocalComment($statement)) {
                 $groupCommentKind    = $attachedCommentKind;
                 $groupCommentEndLine = $statement->getEndLine();
-            } elseif ($groupedCommentKind !== null) {
+            }
+            // User view: missing data becomes the expected findings list state.
+            // User view: choose the next findings list branch for this case.
+            elseif ($groupedCommentKind !== null) {
                 $groupCommentEndLine = $statement->getEndLine();
             } else {
                 $groupCommentKind    = null;
@@ -192,6 +220,8 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
     /**
      * Build one class-constant PHPDoc finding.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string         $constantName - Bare constant name; combined with the class to form the reported symbol.
      * @param string         $className - Owning class name for the `Class::CONST` symbol and message text.
      * @param int            $line - 1-based line of the `const` statement the finding points the reviewer at.
@@ -214,10 +244,14 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
         $hasUsefulComment  = $comment['useful'];
         $requiresApiPhpdoc = $comment['apiRequired'];
 
+        // User view: choose the findings list branch for this case.
         if ($requiresApiPhpdoc && $hasUsefulComment) {
             $message     = sprintf('Constant %s has a local comment, but this project requires PHPDoc for exported constants.', $symbol);
             $remediation = sprintf('Promote the local comment above %s into a `/** ... */` block, or narrow `rules.docs.missing-constant-phpdoc.options.apiPathPatterns` / disable `requirePhpdocForApiConstants` if this is not exported API.', $symbol);
-        } elseif ($commentKind !== null) {
+        }
+        // User view: missing data becomes the expected findings list state.
+        // User view: choose the next findings list branch for this case.
+        elseif ($commentKind !== null) {
             $message     = sprintf('Constant %s has a local comment, but it does not explain the constant\'s purpose.', $symbol);
             $remediation = sprintf('Replace the comment above %s with a concise explanation of why, when, or how the constant is used.', $symbol);
         } else {
@@ -229,17 +263,22 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
             'constantName' => $constantName,
             'kind' => 'class-constant',
             'className' => $className,
+            // User view: missing data becomes the expected findings list state.
             'commentQuality' => $hasUsefulComment ? 'meaningful' : ($commentKind !== null ? 'low-quality' : 'missing'),
         ];
 
+        // User view: choose the findings list branch for this case.
+        // User view: missing data becomes the expected findings list state.
         if ($commentKind !== null) {
             $metadata['commentKind'] = $commentKind;
         }
 
+        // User view: choose the findings list branch for this case.
         if ($requiresApiPhpdoc) {
             $metadata['requiresApiPhpdoc'] = true;
         }
 
+        // User view: choose the findings list branch for this case.
         if ($comment['grouped']) {
             $metadata['groupedLocalComment'] = true;
         }
@@ -263,6 +302,8 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
     /**
      * Find undocumented enum cases when the enum itself is undocumented.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param ClassLike      $classLike - Node inspected; non-enums and documented enums short-circuit to none.
      * @param string         $className - Owning enum name, used to build the `Enum::CASE` symbol per finding.
      * @param RuleDefinition $definition - Shared rule defaults so every finding carries identical severity and tier.
@@ -276,13 +317,18 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
         RuleDefinition $definition,
         AnalysisUnit $analysisUnit,
     ): array {
+        // User view: choose the findings list branch for this case.
+        // User view: missing data becomes the expected findings list state.
         if (!$classLike instanceof Enum_ || $classLike->getDocComment() !== null) {
             // A class-level enum docblock already documents the cases, so per-case findings would be noise.
             return [];
         }
 
         $findings = [];
+        // User view: add each item that can appear in findings list.
         foreach ($classLike->stmts as $statement) {
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if (!$statement instanceof EnumCase || $statement->getDocComment() !== null) {
                 continue;
             }
@@ -303,6 +349,8 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
     /**
      * Build one enum-case PHPDoc finding.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string         $caseName - Bare case name; combined with the enum to form the reported symbol.
      * @param string         $className - Owning enum name for the `Enum::CASE` symbol and message text.
      * @param int            $line - 1-based line of the `case` statement the finding points the reviewer at.
@@ -322,10 +370,12 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
     ): Finding {
         $symbol = sprintf('%s::%s', $className, $caseName);
 
+        // User view: missing data becomes the expected findings list state.
         $message = $commentKind !== null
             ? sprintf('Enum case %s has a leading non-PHPDoc comment but no PHPDoc - convert it to `/** ... */` for tooling consumers.', $symbol)
             : sprintf('Enum case %s needs a brief intent description above its declaration (one plain-English line; not a restatement of the case name) and the enum itself is undocumented.', $symbol);
 
+        // User view: missing data becomes the expected findings list state.
         $remediation = $commentKind !== null
             ? sprintf('Promote the existing comment above %s into a `/** ... */` block, or document the enum at the class level.', $symbol)
             : 'Document either each case with a one-line `/** Description. */` block or add a class-level docblock to the enum. The description should answer "what does this case represent and when is it used".';
@@ -336,6 +386,8 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
             'className' => $className,
         ];
 
+        // User view: choose the findings list branch for this case.
+        // User view: missing data becomes the expected findings list state.
         if ($commentKind !== null) {
             $metadata['commentKind'] = $commentKind;
         }
@@ -359,6 +411,8 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
     /**
      * Detect an immediately attached non-doc comment.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Node\Stmt $statement - Const or case statement whose attached leading comments are examined.
      * @param bool      $meaningfulOnly - Whether generic/restating comments should be ignored.
      *
@@ -366,16 +420,21 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
      */
     private function localCommentKind(Node\Stmt $statement, bool $meaningfulOnly): ?string
     {
+        // User view: add each item that can appear in findings list.
         foreach ($statement->getComments() as $comment) {
+            // User view: choose the findings list branch for this case.
             if ($comment instanceof Doc || $comment->getEndLine() !== $statement->getStartLine() - 1) {
                 continue;
             }
 
             $kind = $this->commentKind($comment);
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($kind === null) {
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
             if (!$meaningfulOnly || $this->isMeaningfulCommentText($comment->getText(), $statement)) {
                 return $kind;
             }
@@ -387,17 +446,23 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
     /**
      * Check whether a meaningful local comment is phrased as a short constant-group comment.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param ClassConst $statement - Constant statement with an attached comment candidate.
      *
      * @return bool - True when the comment can cover immediately consecutive constants in the same group.
      */
     private function hasGroupLocalComment(ClassConst $statement): bool
     {
+        // User view: add each item that can appear in findings list.
         foreach ($statement->getComments() as $comment) {
+            // User view: choose the findings list branch for this case.
             if ($comment instanceof Doc || $comment->getEndLine() !== $statement->getStartLine() - 1) {
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($this->commentKind($comment) !== null
                 && $this->isMeaningfulCommentText($comment->getText(), $statement)
                 && $this->isGroupCommentText($comment->getText())
@@ -412,6 +477,8 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
     /**
      * Determine whether strict PHPDoc mode applies to public/protected constants in this path.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param ClassConst   $statement - Constant declaration being inspected.
      * @param string       $displayPath - Repository-relative path being analysed.
      * @param RuleSettings $settings - Effective rule settings.
@@ -420,10 +487,12 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
      */
     private function requiresPhpdocForApiConstants(ClassConst $statement, string $displayPath, RuleSettings $settings): bool
     {
+        // User view: choose the findings list branch for this case.
         if ($statement->isPrivate()) {
             return false;
         }
 
+        // User view: choose the findings list branch for this case.
         if ($settings->option('requirePhpdocForApiConstants') === true) {
             return true;
         }
@@ -434,6 +503,8 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
     /**
      * Check whether a path matches any configured API glob.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string       $displayPath - Repository-relative path.
      * @param list<string> $patterns - Configured API path globs.
      *
@@ -443,7 +514,9 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
     {
         $normalizedPath = str_replace('\\', '/', $displayPath);
 
+        // User view: add each item that can appear in findings list.
         foreach ($patterns as $pattern) {
+            // User view: choose the findings list branch for this case.
             if (fnmatch($pattern, $normalizedPath, FNM_NOESCAPE)) {
                 return true;
             }
@@ -455,6 +528,8 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
     /**
      * Distinguish line and block comments from other comment tokens.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Comment $comment - Already-confirmed non-doc comment whose opening delimiter is classified.
      *
      * @return string|null - `line` for `//`/`#`, `block` for `/* ... *\/`, or null when unknown
@@ -463,10 +538,12 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
     {
         $text = ltrim($comment->getText());
 
+        // User view: choose the findings list branch for this case.
         if (str_starts_with($text, '//') || str_starts_with($text, '#')) {
             return 'line';
         }
 
+        // User view: choose the findings list branch for this case.
         if (str_starts_with($text, '/*')) {
             return 'block';
         }
@@ -477,6 +554,8 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
     /**
      * Judge whether local comment prose is useful enough to satisfy a private constant.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string         $rawText - Raw parser comment text, delimiters included.
      * @param Node\Stmt      $statement - Constant statement whose names are used to reject duplicate comments.
      *
@@ -485,11 +564,14 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
     private function isMeaningfulCommentText(string $rawText, Node\Stmt $statement): bool
     {
         $text = $this->plainCommentText($rawText);
+        // User view: choose the findings list branch for this case.
+        // User view: an empty value becomes a clear findings list fallback.
         if ($text === '') {
             return false;
         }
 
         $words = $this->commentWords($text);
+        // User view: choose the findings list branch for this case.
         if (count($words) < 2) {
             return false;
         }
@@ -508,12 +590,16 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
             'configuration' => true,
         ];
 
+        // User view: choose the findings list branch for this case.
         if (count(array_diff_key(array_fill_keys($words, true), $genericWords)) === 0) {
             return false;
         }
 
+        // User view: choose the findings list branch for this case.
         if ($statement instanceof ClassConst) {
+            // User view: add each item that can appear in findings list.
             foreach ($statement->consts as $const) {
+                // User view: choose the findings list branch for this case.
                 if ($this->normalisedText($text) === $this->normalisedText($const->name->toString())) {
                     return false;
                 }
@@ -526,6 +612,8 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
     /**
      * Detect prose that is likely intended to cover a short consecutive constant group.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $rawText - Raw parser comment text, delimiters included.
      *
      * @return bool - True when the comment names a group/category rather than a single value.
@@ -554,14 +642,19 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
     /**
      * Strip comment delimiters and leading block-comment stars.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $rawText - Raw comment text.
      *
      * @return string - Plain prose content.
      */
     private function plainCommentText(string $rawText): string
     {
+        // User view: missing data becomes a safe findings list default.
         $text = preg_replace('/^\s*(?:\/\/|#)\s?/m', '', $rawText) ?? $rawText;
+        // User view: missing data becomes a safe findings list default.
         $text = preg_replace('/^\s*\/\*\s?|\s*\*\/\s*$/', '', $text) ?? $text;
+        // User view: missing data becomes a safe findings list default.
         $text = preg_replace('/^\s*\*\s?/m', '', $text) ?? $text;
 
         return trim($text);
@@ -570,6 +663,8 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
     /**
      * Split prose into lowercase words for generic-comment checks.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $text - Plain comment prose.
      *
      * @return list<string> - Lowercase words.
@@ -584,12 +679,15 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
     /**
      * Normalise identifiers and short prose for duplicate-comment comparison.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $text - Comment text or constant name.
      *
      * @return string - Lowercase alphanumeric-only text.
      */
     private function normalisedText(string $text): string
     {
+        // User view: missing data becomes a safe findings list default.
         return preg_replace('/[^a-z0-9]+/', '', strtolower($text)) ?? '';
     }
 }

@@ -20,6 +20,8 @@ final readonly class SarifReporter
     /**
      * Render findings as a SARIF 2.1.0 JSON document.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param AnalysisReport $report - Analysis report to render.
      *
      * @return string - the SARIF 2.1.0 JSON document with trailing newline; on encode failure a minimal JSON
@@ -28,11 +30,13 @@ final readonly class SarifReporter
     public function render(AnalysisReport $report): string
     {
         $rules = [];
+        // User view: add each item that can appear in report output.
         foreach (RuleRegistry::defaults()->all() as $rule) {
             $definition             = $rule->definition();
             $rules[$definition->id] = $this->rule($definition);
         }
 
+        // User view: add each item that can appear in report output.
         foreach ($report->findings as $finding) {
             $rules[$finding->ruleId] ??= [
                 'id'               => $finding->ruleId,
@@ -55,6 +59,8 @@ final readonly class SarifReporter
         $properties  = [
             'gruffSchemaVersion' => AnalysisReport::SCHEMA_VERSION,
         ];
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($report->score !== null) {
             $properties['score'] = $report->score->composite->score;
             $properties['grade'] = $report->score->composite->letter;
@@ -89,6 +95,8 @@ final readonly class SarifReporter
     /**
      * Render one registry definition as a SARIF driver rule.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param RuleDefinition $definition - Native rule definition.
      *
      * @return array{
@@ -110,6 +118,8 @@ final readonly class SarifReporter
             'confidence'      => $definition->confidence->value,
             'defaultEnabled'  => $definition->isEnabledByDefault,
         ];
+        // User view: choose the report output branch for this case.
+        // User view: an empty value becomes a clear report output fallback.
         if ($definition->secondaryPillars !== []) {
             $properties['secondaryPillars'] = array_map(
                 static fn(Pillar $pillar): string => $pillar->value,
@@ -117,12 +127,18 @@ final readonly class SarifReporter
             );
         }
         $single = $definition->severityThreshold;
+        // User view: choose the report output branch for this case.
         if ($single instanceof \GruffPhp\Engine\Config\SeverityThreshold) {
             $properties['threshold'] = $single->threshold;
             $properties['severity']  = $single->severity->value;
-        } elseif ($definition->defaultThresholds !== []) {
+        }
+        // User view: an empty value becomes a clear report output fallback.
+        // User view: choose the next report output branch for this case.
+        elseif ($definition->defaultThresholds !== []) {
             $properties['thresholds'] = $definition->defaultThresholds;
         }
+        // User view: choose the report output branch for this case.
+        // User view: an empty value becomes a clear report output fallback.
         if ($definition->defaultOptions !== []) {
             $properties['options'] = $definition->defaultOptions;
         }
@@ -147,6 +163,8 @@ final readonly class SarifReporter
     /**
      * Build one SARIF result payload for a finding.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param Finding $finding - Finding to serialize into a single SARIF result entry.
      * @param int     $ruleIndex - Zero-based offset of this finding's rule in the driver `rules` array, so the
      *                           result can reference its rule by index rather than repeating the descriptor.
@@ -165,13 +183,19 @@ final readonly class SarifReporter
                 'uri' => $uri,
             ],
         ];
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($finding->line !== null) {
             $region = [
                 'startLine' => $finding->line,
             ];
+            // User view: choose the report output branch for this case.
+            // User view: missing data becomes the expected report output state.
             if ($finding->column !== null) {
                 $region['startColumn'] = $finding->column;
             }
+            // User view: choose the report output branch for this case.
+            // User view: missing data becomes the expected report output state.
             if ($finding->endLine !== null) {
                 $region['endLine'] = $finding->endLine;
             }
@@ -184,18 +208,26 @@ final readonly class SarifReporter
             'tier'       => $finding->tier->value,
             'confidence' => $finding->confidence->value,
         ];
+        // User view: choose the report output branch for this case.
+        // User view: an empty value becomes a clear report output fallback.
         if ($finding->secondaryPillars !== []) {
             $properties['secondaryPillars'] = array_map(
                 static fn(Pillar $pillar): string => $pillar->value,
                 $finding->secondaryPillars,
             );
         }
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($finding->symbol !== null) {
             $properties['symbol'] = $finding->symbol;
         }
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($finding->remediation !== null) {
             $properties['remediation'] = $finding->remediation;
         }
+        // User view: choose the report output branch for this case.
+        // User view: an empty value becomes a clear report output fallback.
         if ($finding->metadata !== []) {
             $properties['metadata'] = $finding->metadata;
         }
@@ -222,6 +254,8 @@ final readonly class SarifReporter
     /**
      * Map gruff-php severities onto SARIF result levels.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param Severity $severity - Gruff severity to translate; advisory collapses to SARIF `note`, which has no peer.
      *
      * @return string - one of SARIF's `error`/`warning`/`note` level names; advisory collapses to `note`

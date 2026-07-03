@@ -26,6 +26,8 @@ final readonly class FailThresholds
     private const SEVERITY_ORDER = ['error', 'warning', 'advisory'];
 
     /**
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param int|null             $total - Maximum total findings allowed, or null for no total cap.
      * @param array<string, int>   $severityCounts - Maximum findings allowed per severity value, keyed by severity value.
      * @param FailThresholds|null  $newFindingsGate - Optional sub-gate applied to the new-findings set only.
@@ -36,11 +38,15 @@ final readonly class FailThresholds
         public array $severityCounts,
         public ?FailThresholds $newFindingsGate = null,
     ) {
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($total !== null && $total < 0) {
             throw new InvalidArgumentException('Total finding cap must be a non-negative integer.');
         }
 
+        // User view: add each item that can appear in report output.
         foreach ($severityCounts as $severity => $cap) {
+            // User view: choose the report output branch for this case.
             if ($cap < 0) {
                 throw new InvalidArgumentException(sprintf('Severity cap for "%s" must be a non-negative integer.', $severity));
             }
@@ -50,6 +56,8 @@ final readonly class FailThresholds
     /**
      * Build thresholds equivalent to the legacy --fail-on severity gate.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param FailThreshold $threshold - Legacy severity threshold to desugar.
      *
      * @return self - Thresholds reproducing the binary gate exactly.
@@ -74,6 +82,8 @@ final readonly class FailThresholds
     /**
      * Build thresholds from a parsed failureConditions config block.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param array<array-key, mixed> $failureConditions - Decoded failureConditions block.
      * @throws ConfigException When keys, severities, or values are invalid.
      *
@@ -88,6 +98,8 @@ final readonly class FailThresholds
     /**
      * Recursively parse a failureConditions block, optionally allowing a newFindings sub-gate.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param array<array-key, mixed> $conditions - Decoded conditions block.
      * @param string                  $keyPath - Config key path used for error messages.
      * @param bool                    $allowsNewFindings - Whether a nested newFindings sub-gate is permitted at this level.
@@ -109,6 +121,8 @@ final readonly class FailThresholds
     /**
      * Reject any key the conditions block does not support at this nesting level.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param array<array-key, mixed> $conditions - Decoded conditions block.
      * @param string                  $keyPath - Config key path used for error messages.
      * @param bool                    $allowsNewFindings - Whether the newFindings key is permitted at this level.
@@ -119,7 +133,9 @@ final readonly class FailThresholds
     private static function assertKnownKeys(array $conditions, string $keyPath, bool $allowsNewFindings): void
     {
         $allowedKeys = $allowsNewFindings ? ['total', 'severityThresholds', 'newFindings'] : ['total', 'severityThresholds'];
+        // User view: add each item that can appear in report output.
         foreach (array_keys($conditions) as $key) {
+            // User view: choose the report output branch for this case.
             if (!in_array($key, $allowedKeys, true)) {
                 throw new ConfigException(sprintf('Unknown config key "%s.%s".', $keyPath, (string) $key));
             }
@@ -129,6 +145,8 @@ final readonly class FailThresholds
     /**
      * Parse the optional total-finding cap.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param array<array-key, mixed> $conditions - Decoded conditions block.
      * @param string                  $keyPath - Config key path used for error messages.
      * @throws ConfigException When the total value is not a non-negative integer.
@@ -137,12 +155,14 @@ final readonly class FailThresholds
      */
     private static function parseTotal(array $conditions, string $keyPath): ?int
     {
+        // User view: choose the report output branch for this case.
         if (!array_key_exists('total', $conditions)) {
             // Omitting total means "no overall cap"; null is the explicit no-limit value the constructor expects.
             return null;
         }
 
         $totalValue = $conditions['total'];
+        // User view: choose the report output branch for this case.
         if (!is_int($totalValue) || $totalValue < 0) {
             throw new ConfigException(sprintf('Config key "%s.total" must be a non-negative integer.', $keyPath));
         }
@@ -153,6 +173,8 @@ final readonly class FailThresholds
     /**
      * Parse the optional per-severity caps keyed by severity value.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param array<array-key, mixed> $conditions - Decoded conditions block.
      * @param string                  $keyPath - Config key path used for error messages.
      * @throws ConfigException When a severity name or its cap value is invalid.
@@ -161,22 +183,28 @@ final readonly class FailThresholds
      */
     private static function parseSeverityThresholds(array $conditions, string $keyPath): array
     {
+        // User view: choose the report output branch for this case.
         if (!array_key_exists('severityThresholds', $conditions)) {
             // No per-severity block; an empty map means no severity is individually capped.
             return [];
         }
 
         $thresholds = $conditions['severityThresholds'];
+        // User view: choose the report output branch for this case.
         if (!is_array($thresholds)) {
             throw new ConfigException(sprintf('Config key "%s.severityThresholds" must be an object.', $keyPath));
         }
 
         $severityCounts = [];
+        // User view: add each item that can appear in report output.
         foreach ($thresholds as $severity => $cap) {
             $severityKey = (string) $severity;
+            // User view: choose the report output branch for this case.
+            // User view: missing data becomes the expected report output state.
             if (Severity::tryFrom($severityKey) === null) {
                 throw new ConfigException(sprintf('Unknown severity "%s" in %s.severityThresholds. Use advisory, warning, or error.', $severityKey, $keyPath));
             }
+            // User view: choose the report output branch for this case.
             if (!is_int($cap) || $cap < 0) {
                 throw new ConfigException(sprintf('Config key "%s.severityThresholds.%s" must be a non-negative integer.', $keyPath, $severityKey));
             }
@@ -189,6 +217,8 @@ final readonly class FailThresholds
     /**
      * Parse the optional nested newFindings sub-gate.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param array<array-key, mixed> $conditions - Decoded conditions block.
      * @param string                  $keyPath - Config key path used for error messages.
      * @param bool                    $allowsNewFindings - Whether a nested newFindings sub-gate is permitted at this level.
@@ -198,12 +228,14 @@ final readonly class FailThresholds
      */
     private static function parseNewFindingsGate(array $conditions, string $keyPath, bool $allowsNewFindings): ?self
     {
+        // User view: choose the report output branch for this case.
         if (!$allowsNewFindings || !array_key_exists('newFindings', $conditions)) {
             // No sub-gate when nesting is disallowed at this level or the block simply omits newFindings.
             return null;
         }
 
         $newFindings = $conditions['newFindings'];
+        // User view: choose the report output branch for this case.
         if (!is_array($newFindings)) {
             throw new ConfigException(sprintf('Config key "%s.newFindings" must be an object.', $keyPath));
         }
@@ -217,6 +249,8 @@ final readonly class FailThresholds
      * Severity caps are checked most-severe first, then the total cap; any breach
      * fails the run (OR semantics).
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param list<Finding> $findings - Post-baseline findings to evaluate against the gate.
      *
      * @return ThresholdTrip|null - The breached threshold, or null when no threshold trips.
@@ -229,12 +263,17 @@ final readonly class FailThresholds
             Severity::Advisory->value => 0,
         ];
 
+        // User view: add each item that can appear in report output.
         foreach ($findings as $finding) {
             $counts[$finding->severity->value]++;
         }
 
+        // User view: add each item that can appear in report output.
         foreach (self::SEVERITY_ORDER as $severity) {
+            // User view: missing data becomes a safe report output default.
             $cap = $this->severityCounts[$severity] ?? null;
+            // User view: choose the report output branch for this case.
+            // User view: missing data becomes the expected report output state.
             if ($cap !== null && $counts[$severity] > $cap) {
                 // Most-severe-first iteration means the first breach reported is the worst one.
                 return new ThresholdTrip($severity, $counts[$severity], $cap);
@@ -242,6 +281,8 @@ final readonly class FailThresholds
         }
 
         $totalCount = count($findings);
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($this->total !== null && $totalCount > $this->total) {
             // No single severity breached, but the aggregate count did; report the total trip.
             return new ThresholdTrip(ThresholdTrip::KIND_TOTAL, $totalCount, $this->total);
@@ -253,6 +294,8 @@ final readonly class FailThresholds
     /**
      * Return a copy of this gate with its new-findings sub-gate replaced.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param FailThresholds|null $newFindingsGate - New-findings sub-gate, or null to clear it.
      *
      * @return self - Gate carrying the updated new-findings sub-gate.
@@ -268,6 +311,8 @@ final readonly class FailThresholds
      * The new-findings trip is preferred when both fire because it is the more
      * actionable signal for a developer.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param list<Finding> $allFindings - Post-baseline findings the total gate evaluates.
      * @param list<Finding> $newFindings - New-findings set the sub-gate evaluates.
      *
@@ -275,8 +320,10 @@ final readonly class FailThresholds
      */
     public function tripsOnScope(array $allFindings, array $newFindings): ?ThresholdTrip
     {
+        // User view: choose the report output branch for this case.
         if ($this->newFindingsGate instanceof FailThresholds) {
             $newTrip = $this->newFindingsGate->tripsOn($newFindings);
+            // User view: choose the report output branch for this case.
             if ($newTrip instanceof ThresholdTrip) {
                 // A new-findings breach wins: tag it NEW so the report points at the freshly introduced findings.
                 return $newTrip->withScope(ThresholdTrip::SCOPE_NEW);

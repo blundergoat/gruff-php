@@ -26,6 +26,8 @@ interface ProjectRuleAccumulator
     /**
      * Describe the rule for the registry and reports.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata.
      */
     public function definition(): RuleDefinition;
@@ -33,6 +35,8 @@ interface ProjectRuleAccumulator
     /**
      * Reset any accumulated state at the start of a project pass.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param RuleContext $ruleContext - Rule context carrying config and settings.
      *
      * @return void
@@ -42,6 +46,8 @@ interface ProjectRuleAccumulator
     /**
      * Extract project-level data from one analysis unit.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to accumulate.
      * @param RuleContext  $ruleContext - Rule context carrying config and settings.
      *
@@ -54,6 +60,8 @@ interface ProjectRuleAccumulator
     /**
      * Produce project-level findings from the accumulated state and clear it.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param RuleContext $ruleContext - Rule context carrying config and settings.
      *
      * @return list<Finding> - Findings emitted from the accumulated summary.

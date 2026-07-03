@@ -24,6 +24,8 @@ final readonly class StmtChildVisitor
     /**
      * Whether a node is a control-flow statement that owns child blocks.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Node $node - Node to inspect.
      *
      * @return bool - true when the node is an If/For/Foreach/While/Do/Switch/TryCatch that childBlocks() walks; false otherwise
@@ -45,19 +47,25 @@ final readonly class StmtChildVisitor
      *
      * Yields nothing for non-control-flow nodes.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Node $node - Node to inspect.
      *
      * @return iterable<StmtChildBlock> - one block per child statement list in source order; empty for non-control-flow nodes
      */
     public static function childBlocks(Node $node): iterable // @phpstan-return iterable<StmtChildBlock>
     {
+        // User view: choose the findings list branch for this case.
         if ($node instanceof Stmt\If_) {
             yield new StmtChildBlock(StmtChildBlock::KIND_IF_BODY, $node->stmts, $node);
 
+            // User view: add each item that can appear in findings list.
             foreach ($node->elseifs as $elseif) {
                 yield new StmtChildBlock(StmtChildBlock::KIND_ELSEIF_BODY, $elseif->stmts, $elseif);
             }
 
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($node->else !== null) {
                 yield new StmtChildBlock(StmtChildBlock::KIND_ELSE_BODY, $node->else->stmts, $node->else);
             }
@@ -66,6 +74,7 @@ final readonly class StmtChildVisitor
             return;
         }
 
+        // User view: choose the findings list branch for this case.
         if ($node instanceof Stmt\For_
             || $node instanceof Stmt\Foreach_
             || $node instanceof Stmt\While_
@@ -77,7 +86,9 @@ final readonly class StmtChildVisitor
             return;
         }
 
+        // User view: choose the findings list branch for this case.
         if ($node instanceof Stmt\Switch_) {
+            // User view: add each item that can appear in findings list.
             foreach ($node->cases as $case) {
                 yield new StmtChildBlock(StmtChildBlock::KIND_SWITCH_CASE, $case->stmts, $case);
             }
@@ -86,13 +97,17 @@ final readonly class StmtChildVisitor
             return;
         }
 
+        // User view: choose the findings list branch for this case.
         if ($node instanceof Stmt\TryCatch) {
             yield new StmtChildBlock(StmtChildBlock::KIND_TRY_BODY, $node->stmts, $node);
 
+            // User view: add each item that can appear in findings list.
             foreach ($node->catches as $catch) {
                 yield new StmtChildBlock(StmtChildBlock::KIND_CATCH_BODY, $catch->stmts, $catch);
             }
 
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($node->finally !== null) {
                 yield new StmtChildBlock(StmtChildBlock::KIND_FINALLY_BODY, $node->finally->stmts, $node->finally);
             }

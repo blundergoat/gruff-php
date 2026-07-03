@@ -1,9 +1,19 @@
 ---
 category: workflow
-last_reviewed: 2026-05-31
+last_reviewed: 2026-07-04
 ---
 
 # Workflow Lessons
+
+## Lesson: Comment codemods must not insert null-check comments after terminating statements inside closures
+
+**Created:** 2026-07-04
+
+**What happened:** During the literal source comment sweep, the token codemod saw an outer `!== null` check after a `findFirst(..., static function (...) { return ...; })` call and inserted a `// User view:` line immediately above the `}) !== null` line. In PHP's AST that comment became a `Nop` statement inside the closure after its `return`, so `php bin/gruff-php analyse --no-cache --fail-on advisory --no-baseline` reported `waste.unreachable-code` in `src/Rules/Waste/OneLineMethodRule.php`. The comment had to be moved above the `return $nodeFinder->findFirst(...)` statement.
+
+**Evidence:** `src/Rules/Waste/OneLineMethodRule.php` (search: `private function containsCall`) - the null-check comment now sits before the outer return expression instead of between the closure return and `}) !== null`.
+
+**Prevention:** When a codemod inserts comments for null/empty checks, detect lines that close a nested closure or callback before the comparison. Place the comment above the outer statement that owns the comparison, not directly above the closing `})` line. After any broad comment codemod, run the project's own analyser, not only `php -l`, because comments can parse as `Nop` nodes and trip reachability rules even when syntax and runtime behavior are unchanged.
 
 ## Lesson: Don't `git stash` to probe pre-existing state — it's not read-only and can entangle other stashes
 

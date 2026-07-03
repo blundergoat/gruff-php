@@ -14,6 +14,8 @@ final readonly class SeverityThreshold
     /**
      * Pair a numeric threshold with the severity it should emit.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param int|float $threshold - Numeric threshold value.
      * @param Severity  $severity - Severity emitted when the threshold matches.
      */

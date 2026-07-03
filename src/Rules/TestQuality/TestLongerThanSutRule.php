@@ -29,6 +29,8 @@ final readonly class TestLongerThanSutRule implements RuleInterface
     /**
      * Describe the long-test-versus-SUT rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and thresholds.
      */
     public function definition(): RuleDefinition
@@ -47,6 +49,8 @@ final readonly class TestLongerThanSutRule implements RuleInterface
     /**
      * Find long tests that appear to exercise only one SUT call.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -58,12 +62,16 @@ final readonly class TestLongerThanSutRule implements RuleInterface
         $minTestLines = (int) $ruleContext->settingsFor($definition)->numericThreshold('minTestLines');
         $findings     = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             $sutCalls = $this->sutCalls($scope);
+            // User view: choose the findings list branch for this case.
+            // User view: an empty value becomes a clear findings list fallback.
             if ($scope->lineCount() < $minTestLines || count($sutCalls) > 1 || TestQualityNodeHelper::assertionCalls($scope) === []) {
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
             if (count($sutCalls) === 1 && $this->isIntegrationHarnessCall($sutCalls[0])) {
                 continue;
             }
@@ -89,6 +97,8 @@ final readonly class TestLongerThanSutRule implements RuleInterface
     /**
      * Count apparent non-assertion SUT calls in a test scope.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param TestQualityScope $scope - Single test method whose call sites are filtered down to candidate SUT calls.
      *
      * @return list<Expr\FuncCall|Expr\MethodCall|Expr\StaticCall> - Apparent SUT calls.
@@ -97,13 +107,17 @@ final readonly class TestLongerThanSutRule implements RuleInterface
     {
         $calls = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (TestQualityNodeHelper::calls($scope) as $call) {
+            // User view: choose the findings list branch for this case.
             if (TestQualityNodeHelper::isAssertionCall($call) || TestQualityNodeHelper::isMockCreationCall($call) || TestQualityNodeHelper::isMockVerificationCall($call)) {
                 // Assertions and mock plumbing are test scaffolding, never the system under test.
                 continue;
             }
 
             $name = TestQualityNodeHelper::callName($call);
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($name !== null && !in_array($name, ['sleep', 'usleep'], true)) {
                 $calls[] = $call;
             }
@@ -115,23 +129,28 @@ final readonly class TestLongerThanSutRule implements RuleInterface
     /**
      * Detect integration-test harness calls that naturally need more arrangement than the SUT call itself.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - The sole SUT call, examined to exempt harness drivers.
      *
      * @return bool - True when the single call is a command/process/application harness invocation.
      */
     private function isIntegrationHarnessCall(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
     {
+        // User view: choose the findings list branch for this case.
         if (!$call instanceof Expr\MethodCall) {
             // Only instance-method drivers (tester/process objects) qualify; free functions never count as harnesses.
             return false;
         }
 
         $name = TestQualityNodeHelper::callName($call);
+        // User view: choose the findings list branch for this case.
         if ($name === 'execute') {
             // `$tester->execute(...)` drives a command/application harness, whose setup dwarfs the call.
             return $this->isHarnessReceiver($call->var, ['tester']);
         }
 
+        // User view: choose the findings list branch for this case.
         if ($name === 'run') {
             // `$process->run()` / `$tester->run()` likewise wrap heavy arrangement around one call.
             return $this->isHarnessReceiver($call->var, ['process', 'tester']);
@@ -144,6 +163,8 @@ final readonly class TestLongerThanSutRule implements RuleInterface
     /**
      * Detect harness-looking receiver variables and direct new expressions.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Expr         $receiver - Method-call receiver, matched as a named variable or an inline `new`.
      * @param list<string> $variableTokens - Lowercase variable-name fragments accepted as harnesses.
      *
@@ -151,9 +172,12 @@ final readonly class TestLongerThanSutRule implements RuleInterface
      */
     private function isHarnessReceiver(Expr $receiver, array $variableTokens): bool
     {
+        // User view: choose the findings list branch for this case.
         if ($receiver instanceof Expr\Variable && is_string($receiver->name)) {
             $variableName = strtolower($receiver->name);
+            // User view: add each item that can appear in findings list.
             foreach ($variableTokens as $token) {
+                // User view: choose the findings list branch for this case.
                 if (str_contains($variableName, $token)) {
                     // Receiver variable name contains an allowed harness fragment, so treat the call as a driver.
                     return true;
@@ -161,6 +185,7 @@ final readonly class TestLongerThanSutRule implements RuleInterface
             }
         }
 
+        // User view: choose the findings list branch for this case.
         if ($receiver instanceof Expr\New_ && $receiver->class instanceof Name) {
             $className = strtolower($receiver->class->getLast());
 

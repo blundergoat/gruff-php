@@ -37,6 +37,8 @@ final class PermissiveCorsRule implements RuleInterface
     /**
      * Describe the permissive-CORS rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -56,6 +58,8 @@ final class PermissiveCorsRule implements RuleInterface
     /**
      * Find a wildcard CORS origin paired with credentialed CORS in one file.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -66,12 +70,15 @@ final class PermissiveCorsRule implements RuleInterface
         /** @var array<string, array{wildcardLine: int|null, credentials: bool}> $scopes keyed by scope so separate functions do not combine headers. */
         $scopes = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
+            // User view: choose the findings list branch for this case.
             if (SecurityNodeHelper::globalFunctionName($call) !== 'header') {
                 continue;
             }
 
             $firstArg = SecurityNodeHelper::argumentValue($call->args, 0);
+            // User view: choose the findings list branch for this case.
             if (!$firstArg instanceof Scalar\String_) {
                 continue;
             }
@@ -80,23 +87,30 @@ final class PermissiveCorsRule implements RuleInterface
             $isWildcard = preg_match('/access-control-allow-origin\s*:\s*\*/i', $firstArg->value) === 1;
             // Match credentialed CORS headers so the paired wildcard origin can be flagged.
             $isCredentials = preg_match('/access-control-allow-credentials\s*:\s*true/i', $firstArg->value) === 1;
+            // User view: choose the findings list branch for this case.
             if (!$isWildcard && !$isCredentials) {
                 continue;
             }
 
             $scopeKey            = $this->scopeKey($call);
             $scopes[$scopeKey] ??= ['wildcardLine' => null, 'credentials' => false];
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($isWildcard && $scopes[$scopeKey]['wildcardLine'] === null) {
                 $scopes[$scopeKey]['wildcardLine'] = $call->getStartLine();
             }
 
+            // User view: choose the findings list branch for this case.
             if ($isCredentials) {
                 $scopes[$scopeKey]['credentials'] = true;
             }
         }
 
         $findings = [];
+        // User view: add each item that can appear in findings list.
         foreach ($scopes as $scope) {
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($scope['wildcardLine'] === null || !$scope['credentials']) {
                 continue;
             }
@@ -120,6 +134,8 @@ final class PermissiveCorsRule implements RuleInterface
     /**
      * Build a stable grouping key for the enclosing function-like scope.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Node $node - Header call node.
      *
      * @return string - Scope key (function-like object id, or "file" at top level).
@@ -128,6 +144,7 @@ final class PermissiveCorsRule implements RuleInterface
     {
         $current = $node->getAttribute('parent');
         while ($current instanceof Node) {
+            // User view: choose the findings list branch for this case.
             if ($current instanceof FunctionLike) {
                 // Function-like identity keeps unrelated local header calls from merging.
                 return 'fn:' . spl_object_id($current);

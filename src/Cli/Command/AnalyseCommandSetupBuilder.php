@@ -28,6 +28,8 @@ final readonly class AnalyseCommandSetupBuilder
     /**
      * Build the validated analysis setup from console input.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface           $input - Symfony console input for the analyse command.
      * @param OutputInterface          $output - Symfony console output for optional init prompting.
      * @param SymfonyApplication|null  $symfonyApplication - Console application used to dispatch the init command.
@@ -41,6 +43,7 @@ final readonly class AnalyseCommandSetupBuilder
     ): AnalyseCommandSetupResult {
         $projectRoot = getcwd();
 
+        // User view: choose the terminal output branch for this case.
         if ($projectRoot === false) {
             return AnalyseCommandSetupResult::plainError(
                 '<error>Unable to determine current working directory.</error>',
@@ -54,6 +57,8 @@ final readonly class AnalyseCommandSetupBuilder
     /**
      * Build setup, prompting for an init config only after option validation passes.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface          $input - Symfony console input for the analyse command.
      * @param OutputInterface         $output - Console output used for the optional init prompt.
      * @param SymfonyApplication|null $symfonyApplication - Console application used to dispatch the init command.
@@ -68,6 +73,7 @@ final readonly class AnalyseCommandSetupBuilder
         string $projectRoot,
     ): AnalyseCommandSetupResult {
         $options = AnalyseCommandOptions::fromInput($input);
+        // User view: choose the terminal output branch for this case.
         if ($options->usageError() === '--no-config cannot be combined with --config.') {
             return AnalyseCommandSetupResult::plainError(
                 '<error>--no-config cannot be combined with --config.</error>',
@@ -76,11 +82,13 @@ final readonly class AnalyseCommandSetupBuilder
         }
 
         $formatResult = $this->format($input->getOption('format'));
+        // User view: choose the terminal output branch for this case.
         if (!$formatResult instanceof OutputFormat) {
             return AnalyseCommandSetupResult::plainError($formatResult, Command::INVALID);
         }
 
         $failThreshold = $this->failThreshold($input->getOption('fail-on'));
+        // User view: choose the terminal output branch for this case.
         if (!$failThreshold instanceof FailThreshold) {
             return AnalyseCommandSetupResult::reportError(
                 $this->usageReport(
@@ -94,6 +102,7 @@ final readonly class AnalyseCommandSetupBuilder
         }
 
         $mutationBudget = $this->mutationBudget($input->getOption('mutation-budget'));
+        // User view: choose the terminal output branch for this case.
         if ($mutationBudget === false) {
             return AnalyseCommandSetupResult::reportError(
                 $this->usageReport(
@@ -108,6 +117,8 @@ final readonly class AnalyseCommandSetupBuilder
 
         $options    = $options->withMutationBudget($mutationBudget);
         $usageError = $options->usageError();
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($usageError !== null) {
             return AnalyseCommandSetupResult::reportError(
                 $this->usageReport($options, $formatResult, $failThreshold->value, $usageError),
@@ -117,6 +128,8 @@ final readonly class AnalyseCommandSetupBuilder
 
         $registry        = RuleRegistry::defaults();
         $ruleFilterError = $this->ruleFilterError($registry, $options->includeRules, $options->excludeRules);
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($ruleFilterError !== null) {
             return AnalyseCommandSetupResult::reportError(
                 $this->usageReport($options, $formatResult, $failThreshold->value, $ruleFilterError),
@@ -125,6 +138,8 @@ final readonly class AnalyseCommandSetupBuilder
         }
 
         $profileIncludeError = $this->profileIncludeRuleError($registry, $options);
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($profileIncludeError !== null) {
             return AnalyseCommandSetupResult::reportError(
                 $this->usageReport($options, $formatResult, $failThreshold->value, $profileIncludeError),
@@ -141,6 +156,8 @@ final readonly class AnalyseCommandSetupBuilder
             shouldSkipConfig:        $options->noConfig,
             isMachineReadableFormat: $formatResult->isMachineReadable(),
         );
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($promptExitCode !== null) {
             return AnalyseCommandSetupResult::exitCode($promptExitCode);
         }
@@ -154,12 +171,15 @@ final readonly class AnalyseCommandSetupBuilder
             failThreshold: $failThreshold,
             configLoader:  $configLoader,
         );
+        // User view: choose the terminal output branch for this case.
         if ($configResult instanceof AnalysisReport) {
             return AnalyseCommandSetupResult::reportError($configResult, $formatResult);
         }
         $failThreshold        = $this->resolveFailThresholdWithConfig($input, $configResult, $failThreshold);
         $failThresholds       = $this->resolveFailThresholds($input, $configResult, $failThreshold);
         $referenceError       = $this->newFindingsReferenceError($options, $failThresholds);
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($referenceError !== null) {
             return AnalyseCommandSetupResult::reportError(
                 $this->usageReport(
@@ -173,9 +193,13 @@ final readonly class AnalyseCommandSetupBuilder
             );
         }
         $profileRuleSelection = $options->profileRuleSelection();
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($profileRuleSelection !== null) {
             $configResult = $configResult->withRuleSelection($profileRuleSelection);
         }
+        // User view: choose the terminal output branch for this case.
+        // User view: an empty value becomes a clear terminal output fallback.
         if ($options->includeRules !== [] || $options->excludeRules !== []) {
             $configResult = $configResult->withRuleSelection(
                 $this->refinedSelection($configResult->ruleSelection(), $options->includeRules, $options->excludeRules),
@@ -204,6 +228,8 @@ final readonly class AnalyseCommandSetupBuilder
      * keeps the configured selection and only drops the named rules, so a
      * configured selection.rules narrowing is not widened to the whole rule set.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param RuleSelection $existing - Selection already resolved from config and profile.
      * @param list<string>  $includeRules - CLI --include-rule ids; when non-empty they focus the run.
      * @param list<string>  $excludeRules - CLI --exclude-rule ids dropped on top of the existing selection.
@@ -212,6 +238,8 @@ final readonly class AnalyseCommandSetupBuilder
      */
     private function refinedSelection(RuleSelection $existing, array $includeRules, array $excludeRules): RuleSelection
     {
+        // User view: choose the terminal output branch for this case.
+        // User view: an empty value becomes a clear terminal output fallback.
         if ($includeRules !== []) {
             return new RuleSelection(rules: $includeRules, excludeRules: $excludeRules);
         }
@@ -232,6 +260,8 @@ final readonly class AnalyseCommandSetupBuilder
      * fails fast here: without this gate it would emit a docs error while the user's grade
      * stayed a security-only 100 (ADR-030). Excludes stay a plain narrowing operation.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param RuleRegistry          $registry - Registry resolving rule ids to their definitions.
      * @param AnalyseCommandOptions $options - Validated options carrying the profile and include filters.
      *
@@ -241,6 +271,8 @@ final readonly class AnalyseCommandSetupBuilder
     {
         $profileScorePillars = $options->profileScorePillars();
         // The default profile scores every pillar, so there is nothing to reject.
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($profileScorePillars === null) {
             return null;
         }
@@ -254,6 +286,8 @@ final readonly class AnalyseCommandSetupBuilder
      * Shared with ReportCommand so both commands reject the same incoherent combinations
      * with identical wording, and report can do it before its init prompt runs.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param RuleRegistry         $registry - Registry resolving rule ids to their definitions; ids must already be validated.
      * @param string               $profile - Requested profile name, echoed into the error message.
      * @param list<\GruffPhp\Results\Finding\Pillar> $profileScorePillars - Pillars the profile's composite counts.
@@ -270,6 +304,7 @@ final readonly class AnalyseCommandSetupBuilder
     ): ?string {
         $profilePillarNames = [];
         // Build the profile wording the user sees in the usage error.
+        // User view: add each item that can appear in terminal output.
         foreach ($profileScorePillars as $profileScorePillar) {
             $profilePillarNames[] = $profileScorePillar->value;
         }
@@ -277,9 +312,11 @@ final readonly class AnalyseCommandSetupBuilder
         $profilePillarIds    = implode('/', $profilePillarNames);
 
         // Check each requested rule against the pillars the profile's grade actually counts.
+        // User view: add each item that can appear in terminal output.
         foreach ($includeRuleIds as $ruleId) {
             $pillar = $registry->get($ruleId)->definition()->pillar;
             // An unscored pillar would emit findings the grade ignores; tell the user both ways out.
+            // User view: choose the terminal output branch for this case.
             if (!in_array($pillar, $profileScorePillars, true)) {
                 return sprintf(
                     '--include-rule %s selects a %s rule, but --profile %s executes and scores only %s rules. Drop --profile %s or include only %s rule ids.',
@@ -299,6 +336,8 @@ final readonly class AnalyseCommandSetupBuilder
     /**
      * Format a short human-readable pillar list.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param list<string> $pillarNames - Pillar names in display order.
      *
      * @return string - Names joined as "a", "a and b", or "a, b and c".
@@ -306,11 +345,14 @@ final readonly class AnalyseCommandSetupBuilder
     private static function formatPillarList(array $pillarNames): string
     {
         // Empty profile wording should read plainly if a future profile scores no pillars.
+        // User view: choose the terminal output branch for this case.
+        // User view: an empty value becomes a clear terminal output fallback.
         if ($pillarNames === []) {
             return 'no';
         }
 
         // A single pillar needs no joining words in the CLI message.
+        // User view: choose the terminal output branch for this case.
         if (count($pillarNames) === 1) {
             return $pillarNames[0];
         }
@@ -323,6 +365,8 @@ final readonly class AnalyseCommandSetupBuilder
     /**
      * Validate execution-level rule filters before they can narrow the run to zero rules.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param RuleRegistry $registry - Registry whose ids define valid CLI rule filters.
      * @param list<string> $includeRules - Rule ids from --include-rule.
      * @param list<string> $excludeRules - Rule ids from --exclude-rule.
@@ -331,8 +375,11 @@ final readonly class AnalyseCommandSetupBuilder
      */
     private function ruleFilterError(RuleRegistry $registry, array $includeRules, array $excludeRules): ?string
     {
+        // User view: add each item that can appear in terminal output.
         foreach (['--include-rule' => $includeRules, '--exclude-rule' => $excludeRules] as $option => $ruleIds) {
             $unknownRuleIds = $registry->unknownRuleIds($ruleIds);
+            // User view: choose the terminal output branch for this case.
+            // User view: an empty value becomes a clear terminal output fallback.
             if ($unknownRuleIds !== []) {
                 return sprintf('Unknown rule id "%s" for %s.', $unknownRuleIds[0], $option);
             }
@@ -344,6 +391,8 @@ final readonly class AnalyseCommandSetupBuilder
     /**
      * Parse the requested output format.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param mixed $optionValue - Raw --format console option; a non-string (option absent) defaults to text.
      *
      * @return OutputFormat|string - Parsed format, or a formatted usage error string.
@@ -354,6 +403,7 @@ final readonly class AnalyseCommandSetupBuilder
         $format   = OutputFormat::fromInput($rawValue);
 
         // Null coalesce turns an unrecognised format into the tagged usage-error string the caller checks for.
+        // User view: missing data becomes a safe terminal output default.
         return $format ?? sprintf(
             '<error>USAGE-ERROR Unsupported output format "%s". Use text, json, html, markdown, github, hotspot, or sarif.</error>',
             $rawValue,
@@ -363,6 +413,8 @@ final readonly class AnalyseCommandSetupBuilder
     /**
      * Apply ADR-015 precedence to the parsed --fail-on value.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface $input - Console input used for explicit-flag detection.
      * @param AnalysisConfig $config - Loaded analysis config supplying per-command overrides.
      * @param FailThreshold  $explicitOrDefault - Already-parsed CLI value; binary default when --fail-on omitted.
@@ -374,12 +426,14 @@ final readonly class AnalyseCommandSetupBuilder
         AnalysisConfig $config,
         FailThreshold $explicitOrDefault,
     ): FailThreshold {
+        // User view: choose the terminal output branch for this case.
         if ($input->hasParameterOption('--fail-on', true)) {
             // An explicit CLI --fail-on outranks config under ADR-015, so use the parsed value as-is.
             return $explicitOrDefault;
         }
 
         // No explicit flag: a per-command config threshold wins, falling back to the binary default.
+        // User view: missing data becomes a safe terminal output default.
         return $config->failThresholdFor('analyse') ?? $explicitOrDefault;
     }
 
@@ -391,6 +445,8 @@ final readonly class AnalyseCommandSetupBuilder
      * threshold (config minimumSeverity or the binary default) is desugared so the
      * gate stays byte-identical to today.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface $input - Console input used for explicit-flag detection.
      * @param AnalysisConfig $config - Loaded config supplying the optional failureConditions block.
      * @param FailThreshold  $failThreshold - Already-resolved singular threshold for the run.
@@ -406,17 +462,20 @@ final readonly class AnalyseCommandSetupBuilder
         $hasExplicitFailOn       = $input->hasParameterOption('--fail-on', true);
         $hasExplicitFailOnNew    = $input->hasParameterOption('--fail-on-new', true);
 
+        // User view: choose the terminal output branch for this case.
         if ($hasExplicitFailOn) {
             return FailThresholds::fromFailOn($failThreshold)->withNewFindingsGate(
                 $hasExplicitFailOnNew ? FailThresholds::fromFailOn(FailThreshold::Error) : null,
             );
         }
 
+        // User view: choose the terminal output branch for this case.
         if ($hasExplicitFailOnNew) {
             return FailThresholds::fromFailOn(FailThreshold::None)
                 ->withNewFindingsGate(FailThresholds::fromFailOn(FailThreshold::Error));
         }
 
+        // User view: choose the terminal output branch for this case.
         if ($configFailureConditions instanceof FailThresholds) {
             return $configFailureConditions;
         }
@@ -428,6 +487,8 @@ final readonly class AnalyseCommandSetupBuilder
      * Return the "no reference point" error when a new-findings gate is configured
      * without a baseline or --diff-vs to define "new" against, else null.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param AnalyseCommandOptions $options - Validated options carrying baseline and diff-vs selections.
      * @param FailThresholds        $failThresholds - Resolved gate, whose new-findings sub-gate may be set.
      *
@@ -435,11 +496,16 @@ final readonly class AnalyseCommandSetupBuilder
      */
     private function newFindingsReferenceError(AnalyseCommandOptions $options, FailThresholds $failThresholds): ?string
     {
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($failThresholds->newFindingsGate === null) {
             return null;
         }
 
+        // User view: missing data becomes the expected terminal output state.
         $baselineWillApply = $options->baseline->baselinePath !== null && $options->baseline->generateBaselinePath === null;
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($baselineWillApply || $options->diffVs !== null) {
             return null;
         }
@@ -450,6 +516,8 @@ final readonly class AnalyseCommandSetupBuilder
     /**
      * Parse the requested failure threshold.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param mixed $optionValue - Raw --fail-on console option; a non-string (option absent) defaults to advisory.
      *
      * @return FailThreshold|string - Parsed threshold, or the unsupported raw value.
@@ -458,18 +526,23 @@ final readonly class AnalyseCommandSetupBuilder
     {
         $rawValue = is_string($optionValue) ? $optionValue : FailThreshold::Advisory->value;
 
+        // User view: missing data becomes a safe terminal output default.
         return FailThreshold::fromInput($rawValue) ?? $rawValue;
     }
 
     /**
      * Parse the optional mutation finding budget.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param mixed $optionValue - Raw --mutation-budget console option; null means the flag was not supplied.
      *
      * @return int|false|null - Non-negative budget, false for invalid input, or null when omitted.
      */
     private function mutationBudget(mixed $optionValue): int|false|null
     {
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($optionValue === null) {
             return null;
         }
@@ -481,6 +554,8 @@ final readonly class AnalyseCommandSetupBuilder
     /**
      * Load analysis configuration or convert configuration failures to a report.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param AnalyseCommandOptions $options - Validated options; its noConfig/configPath select the load path.
      * @param RuleRegistry          $registry - Default rule set used to seed config when loading is disabled.
      * @param OutputFormat          $format - Output format stamped onto the error report when loading fails.
@@ -514,6 +589,8 @@ final readonly class AnalyseCommandSetupBuilder
     /**
      * Resolve the config path that should be reported for this run.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param AnalyseCommandOptions $options - Validated options; noConfig and an explicit configPath drive the result.
      * @param ConfigLoader          $configLoader - Loader used to auto-discover the path when none was given explicitly.
      *
@@ -521,16 +598,20 @@ final readonly class AnalyseCommandSetupBuilder
      */
     private function effectiveConfigPath(AnalyseCommandOptions $options, ConfigLoader $configLoader): ?string
     {
+        // User view: choose the terminal output branch for this case.
         if ($options->noConfig) {
             return null;
         }
 
+        // User view: missing data becomes a safe terminal output default.
         return $options->configPath ?? $configLoader->resolveConfigPath(null);
     }
 
     /**
      * Build a zero-finding report for CLI usage and configuration errors.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param AnalyseCommandOptions $options - Validated options supplying the requested paths and config path for context.
      * @param OutputFormat          $format - Format the caller will render this error report in.
      * @param string                $failOn - Fail-on value to record on the report so its threshold field stays accurate.

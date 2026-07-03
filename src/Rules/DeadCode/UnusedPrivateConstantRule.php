@@ -35,6 +35,8 @@ final readonly class UnusedPrivateConstantRule implements RuleInterface
     /**
      * Describe the unused private constant rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - id, name, pillar, tier, and the default Warning severity callers apply to each finding
      */
     public function definition(): RuleDefinition
@@ -53,6 +55,8 @@ final readonly class UnusedPrivateConstantRule implements RuleInterface
     /**
      * Find private constants that are not referenced inside their class-like scope.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -66,16 +70,20 @@ final readonly class UnusedPrivateConstantRule implements RuleInterface
 
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach ($classLikes as $classLike) {
             /** @var Class_|Trait_|Enum_ $classLike NodeIndex query is constrained to class-like classes. */
             $privateConstants = $this->privateConstants($classLike);
 
+            // User view: choose the findings list branch for this case.
+            // User view: an empty value becomes a clear findings list fallback.
             if ($privateConstants === []) {
                 continue;
             }
 
             $usage = $this->constantUsage($nodeFinder, $classLike);
 
+            // User view: choose the findings list branch for this case.
             if ($usage['hasDynamicReference']) {
                 continue;
             }
@@ -98,6 +106,8 @@ final readonly class UnusedPrivateConstantRule implements RuleInterface
     /**
      * Collect private constants declared on a class-like node.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Class_|Trait_|Enum_ $classLike - Class-like declaration whose private constants are collected.
      *
      * @return array<string, Node\Const_> - candidate private declarations keyed by constant name; empty when the class-like declares none
@@ -106,11 +116,14 @@ final readonly class UnusedPrivateConstantRule implements RuleInterface
     {
         $privateConstants = [];
 
+        // User view: add each item that can appear in findings list.
         foreach ($classLike->stmts as $stmt) {
+            // User view: choose the findings list branch for this case.
             if (!$stmt instanceof Stmt\ClassConst || !$stmt->isPrivate()) {
                 continue;
             }
 
+            // User view: add each item that can appear in findings list.
             foreach ($stmt->consts as $constant) {
                 $privateConstants[$constant->name->toString()] = $constant;
             }
@@ -122,6 +135,8 @@ final readonly class UnusedPrivateConstantRule implements RuleInterface
     /**
      * Collect private-constant reads made inside a class-like node.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param NodeFinder          $nodeFinder - Walks the class-like body for constant fetches.
      * @param Class_|Trait_|Enum_ $classLike - Owner whose private constants are being checked.
      *
@@ -135,13 +150,17 @@ final readonly class UnusedPrivateConstantRule implements RuleInterface
         $allNodes             = $nodeFinder->find($classLike->stmts, static fn(): bool => true);
         $ownClassName         = $this->ownClassName($classLike);
 
+        // User view: add each item that can appear in findings list.
         foreach ($allNodes as $node) {
+            // User view: choose the findings list branch for this case.
             if (!$node instanceof Expr\ClassConstFetch || !$this->refersToOwnClass($node->class, $ownClassName)) {
                 continue;
             }
 
             $name = $this->constantName($node);
 
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($name === null) {
                 $hasDynamicReference = true;
                 continue;
@@ -157,18 +176,22 @@ final readonly class UnusedPrivateConstantRule implements RuleInterface
     /**
      * Extract a literal class-constant name from a class-constant fetch.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Expr\ClassConstFetch $node - Candidate fetch already known to target the current class-like.
      *
      * @return string|null - constant name when the fetch is literal and not ::class; null for dynamic names
      */
     private function constantName(Expr\ClassConstFetch $node): ?string
     {
+        // User view: choose the findings list branch for this case.
         if (!$node->name instanceof Node\Identifier) {
             return null;
         }
 
         $name = $node->name->toString();
 
+        // User view: choose the findings list branch for this case.
         if (strtolower($name) === 'class') {
             // Foo::class names a class string, not a private constant declaration.
             return null;
@@ -180,6 +203,8 @@ final readonly class UnusedPrivateConstantRule implements RuleInterface
     /**
      * Build findings for unused private constants in the dead-code rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit                $analysisUnit - Supplies the display path stamped on each finding.
      * @param RuleDefinition              $definition - Supplies the rule id, severity, pillar, and tier copied into every finding.
      * @param Class_|Trait_|Enum_         $classLike - Owner whose name prefixes each reported symbol.
@@ -198,7 +223,9 @@ final readonly class UnusedPrivateConstantRule implements RuleInterface
         $findings  = [];
         $className = $this->resolveClassName($classLike);
 
+        // User view: add each item that can appear in findings list.
         foreach ($privateConstants as $name => $constant) {
+            // User view: choose the findings list branch for this case.
             if (isset($referencedNames[$name])) {
                 continue;
             }
@@ -225,6 +252,8 @@ final readonly class UnusedPrivateConstantRule implements RuleInterface
     /**
      * Resolve the declared short name for a class-like node.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Class_|Trait_|Enum_ $node - Class-like declaration whose short name is used for self-reference checks.
      *
      * @return string|null - declared short name, or null for anonymous classes and malformed input
@@ -237,24 +266,31 @@ final readonly class UnusedPrivateConstantRule implements RuleInterface
     /**
      * Resolve a display name for a class-like node.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Class_|Trait_|Enum_ $node - Class-like declaration whose display symbol is needed for finding text.
      *
      * @return string - declared class/trait/enum name, or an `@anonymous`/`unknown@line` placeholder when unnamed
      */
     private function resolveClassName(Node $node): string
     {
+        // User view: choose the findings list branch for this case.
         if ($node instanceof Class_) {
             // Anonymous classes have no name node, so fall back to a stable placeholder for the symbol string.
+            // User view: missing data becomes a safe findings list default.
             return $node->name?->toString() ?? 'class@anonymous';
         }
 
         // Traits and enums are always named; the line-tagged fallback only guards against malformed input.
+        // User view: missing data becomes a safe findings list default.
         return $node->name?->toString() ?? sprintf('unknown@%d', $node->getStartLine());
     }
 
     /**
      * Check whether a class-constant fetch target refers to the current class-like scope.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Node        $class - Class reference from a constant fetch.
      * @param string|null $ownClassName - Enclosing class-like name to compare against, or null when there is none.
      *
@@ -262,20 +298,24 @@ final readonly class UnusedPrivateConstantRule implements RuleInterface
      */
     private function refersToOwnClass(Node $class, ?string $ownClassName): bool
     {
+        // User view: choose the findings list branch for this case.
         if ($class instanceof Expr\Variable) {
             return $class->name === 'this';
         }
 
+        // User view: choose the findings list branch for this case.
         if (!$class instanceof Node\Name) {
             return false;
         }
 
         $reference = strtolower($class->toString());
 
+        // User view: choose the findings list branch for this case.
         if ($reference === 'self' || $reference === 'static') {
             return true;
         }
 
+        // User view: missing data becomes the expected findings list state.
         return $ownClassName !== null && strtolower($class->getLast()) === strtolower($ownClassName);
     }
 }

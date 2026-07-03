@@ -18,6 +18,8 @@ use PhpParser\Node\Stmt\Function_;
 final readonly class IdentifierAstWalker
 {
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param list<Node>           $nodes - Roots to traverse.
      * @param callable(Node): bool $predicate - Predicate that selects matching descendants.
      *
@@ -27,6 +29,7 @@ final readonly class IdentifierAstWalker
     {
         $matches = [];
 
+        // User view: add each item that can appear in findings list.
         foreach ($nodes as $node) {
             $this->collectMatchingNodes($node, $predicate, $matches);
         }
@@ -35,6 +38,8 @@ final readonly class IdentifierAstWalker
     }
 
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Node                 $node - Current node to test; recursion stops at function-like boundaries.
      * @param callable(Node): bool $predicate - Predicate that selects matching descendants.
      * @param list<Node>           $matches - Output list of matching descendant nodes.
@@ -43,15 +48,18 @@ final readonly class IdentifierAstWalker
      */
     private function collectMatchingNodes(Node $node, callable $predicate, array &$matches): void
     {
+        // User view: choose the findings list branch for this case.
         if ($node instanceof ClassMethod || $node instanceof Function_ || $node instanceof Closure || $node instanceof ArrowFunction) {
             // Stop at a function-like boundary so inner-callable declarations stay out of the parent scope.
             return;
         }
 
+        // User view: choose the findings list branch for this case.
         if ($predicate($node)) {
             $matches[] = $node;
         }
 
+        // User view: add each item that can appear in findings list.
         foreach ($this->childNodes($node) as $child) {
             $this->collectMatchingNodes($child, $predicate, $matches);
         }
@@ -60,6 +68,8 @@ final readonly class IdentifierAstWalker
     /**
      * List direct child nodes that can be recursively traversed.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Node $node - Parent node whose declared sub-node slots are flattened into traversable children.
      *
      * @return list<Node> - the node's immediate child Nodes in sub-node declaration order; empty when it has no Node-valued slots
@@ -68,6 +78,7 @@ final readonly class IdentifierAstWalker
     {
         $children = [];
 
+        // User view: add each item that can appear in findings list.
         foreach ($node->getSubNodeNames() as $name) {
             $this->collectChildNodes($node->{$name}, $children);
         }
@@ -78,6 +89,8 @@ final readonly class IdentifierAstWalker
     /**
      * Append traversable child nodes to the current collection.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param mixed      $subNode - One sub-node slot value: a Node, an array of them, or a scalar/null that is skipped.
      * @param list<Node> $children - Accumulator mutated in place; discovered child nodes are appended in traversal order.
      *
@@ -85,6 +98,7 @@ final readonly class IdentifierAstWalker
      */
     private function collectChildNodes(mixed $subNode, array &$children): void
     {
+        // User view: choose the findings list branch for this case.
         if ($subNode instanceof Node) {
             $children[] = $subNode;
 
@@ -92,11 +106,13 @@ final readonly class IdentifierAstWalker
             return;
         }
 
+        // User view: choose the findings list branch for this case.
         if (!is_array($subNode)) {
             // Scalars, strings, and null are leaf slot values with no traversable children, so skip them.
             return;
         }
 
+        // User view: add each item that can appear in findings list.
         foreach ($subNode as $childSubNode) {
             $this->collectChildNodes($childSubNode, $children);
         }

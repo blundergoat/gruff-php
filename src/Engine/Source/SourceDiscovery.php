@@ -53,6 +53,8 @@ final readonly class SourceDiscovery
     /**
      * Build the source-discovery scanner for the given project root.
      *
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param string $projectRoot - Project root used to resolve requested paths.
      */
     public function __construct(private string $projectRoot)
@@ -61,6 +63,8 @@ final readonly class SourceDiscovery
     }
 
     /**
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param list<string> $paths - Requested paths to discover.
      * @param bool         $shouldIncludeIgnored - Whether built-in ignored paths should still be included.
      * @param list<string> $configuredIgnorePatterns - Additional ignore patterns from config.
@@ -69,10 +73,13 @@ final readonly class SourceDiscovery
      */
     public function discover(array $paths, bool $shouldIncludeIgnored = false, array $configuredIgnorePatterns = []): SourceDiscoveryResult
     {
+        // User view: an empty value becomes a clear source analysis fallback.
         $requestedPaths = $paths === [] ? ['.'] : $paths;
 
+        // User view: choose the source analysis branch for this case.
         if (!$shouldIncludeIgnored) {
             $gitResult = $this->discoverGitVisible($requestedPaths, $configuredIgnorePatterns);
+            // User view: choose the source analysis branch for this case.
             if ($gitResult instanceof SourceDiscoveryResult) {
                 // Git's tracked/unignored view is authoritative when available, so skip the filesystem walk.
                 return $gitResult;
@@ -83,6 +90,7 @@ final readonly class SourceDiscovery
         $missingPaths   = [];
         $ignoredDetails = [];
 
+        // User view: add each item that can appear in source analysis.
         foreach ($requestedPaths as $path) {
             $this->collectPath(
                 path:                     $path,
@@ -104,6 +112,8 @@ final readonly class SourceDiscovery
     /**
      * Resolve one requested path into discovered files, missing inputs, or ignore records.
      *
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param string                    $path - Requested path to resolve against the project root.
      * @param bool                      $shouldIncludeIgnored - Whether built-in ignored paths should still be included.
      * @param list<string>              $configuredIgnorePatterns - Additional ignore patterns from config.
@@ -123,6 +133,7 @@ final readonly class SourceDiscovery
     ): void {
         $absolutePath = $this->absolutePath($path);
 
+        // User view: choose the source analysis branch for this case.
         if (!file_exists($absolutePath)) {
             $missingPaths[] = $path;
 
@@ -131,14 +142,18 @@ final readonly class SourceDiscovery
 
         $displayPath = $this->displayPath($absolutePath);
         $decision    = $this->ignoreResolver->decide($displayPath, $absolutePath, $configuredIgnorePatterns, $shouldIncludeIgnored);
+        // User view: choose the source analysis branch for this case.
         if ($decision->ignored) {
             $ignoredDetails[] = IgnoredPath::from($displayPath, $decision);
 
             return;
         }
 
+        // User view: choose the source analysis branch for this case.
         if (is_file($absolutePath)) {
             $type = $this->sourceType($absolutePath);
+            // User view: choose the source analysis branch for this case.
+            // User view: missing data becomes the expected source analysis state.
             if ($type !== null) {
                 $files[$this->canonicalPath($absolutePath)] = new SourceFile(
                     $this->canonicalPath($absolutePath),
@@ -150,11 +165,15 @@ final readonly class SourceDiscovery
             return;
         }
 
+        // User view: choose the source analysis branch for this case.
         if (is_dir($absolutePath)) {
+            // User view: add each item that can appear in source analysis.
             foreach ($this->walkDirectory($absolutePath, $shouldIncludeIgnored, $configuredIgnorePatterns, $ignoredDetails) as $file) {
                 $canonicalPath = $this->canonicalPath($file->getPathname());
                 $type          = $this->sourceType($canonicalPath);
 
+                // User view: choose the source analysis branch for this case.
+                // User view: missing data becomes the expected source analysis state.
                 if ($type !== null) {
                     $files[$canonicalPath] = new SourceFile($canonicalPath, $this->displayPath($canonicalPath), $type);
                 }
@@ -165,6 +184,8 @@ final readonly class SourceDiscovery
     /**
      * Yield source files below a directory while applying ignore patterns.
      *
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param string            $directory - Existing directory whose tree is recursively scanned.
      * @param bool              $shouldIncludeIgnored - When true, default/generated ignores are bypassed so those files surface too.
      * @param list<string>      $configuredIgnorePatterns - Additional ignore patterns from config.
@@ -188,6 +209,7 @@ final readonly class SourceDiscovery
                 $displayPath = $this->displayPath($path);
                 $decision    = $this->ignoreResolver->decide($displayPath, $path, $configuredIgnorePatterns, $shouldIncludeIgnored);
 
+                // User view: choose the source analysis branch for this case.
                 if (!$decision->ignored) {
                     // Keeping the node lets the iterator descend into it and yield its files.
                     return true;
@@ -195,6 +217,7 @@ final readonly class SourceDiscovery
 
                 // Configured ignores are recorded for files and directories alike;
                 // built-in default/generated ignores are only surfaced for directories.
+                // User view: choose the source analysis branch for this case.
                 if ($decision->source === PathIgnoreResolver::SOURCE_CONFIG || $isDir) {
                     $ignoredDetails[] = IgnoredPath::from($displayPath, $decision);
                 }
@@ -206,11 +229,15 @@ final readonly class SourceDiscovery
 
         $recursiveIteratorIterator = new RecursiveIteratorIterator($recursiveCallbackFilterIterator, RecursiveIteratorIterator::SELF_FIRST);
 
+        // User view: add each item that can appear in source analysis.
         foreach ($recursiveIteratorIterator as $file) {
+            // User view: choose the source analysis branch for this case.
             if (!$file instanceof SplFileInfo) {
                 continue;
             }
 
+            // User view: choose the source analysis branch for this case.
+            // User view: missing data becomes the expected source analysis state.
             if ($file->isFile() && $this->sourceType($file->getPathname()) !== null) {
                 yield $file;
             }
@@ -220,6 +247,8 @@ final readonly class SourceDiscovery
     /**
      * Resolve a user-supplied path against the project root, returning an absolute filesystem path.
      *
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param string $path - Relative or absolute path as typed by the user.
      *
      * @return string - absolute filesystem path; relative inputs are anchored to the project root, absolute inputs returned unchanged
@@ -232,6 +261,8 @@ final readonly class SourceDiscovery
     /**
      * Canonicalise a path via realpath(), falling back to the original string when the file does not exist.
      *
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param string $path - Absolute path to canonicalise; need not exist on disk.
      *
      * @return string - symlink-resolved canonical path when the file exists, otherwise the input string verbatim
@@ -244,18 +275,23 @@ final readonly class SourceDiscovery
     /**
      * Format a path for user-facing output relative to the project root; the root itself renders as ".".
      *
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param string $path - Absolute path to render for display.
      *
      * @return string - project-root-relative path for inputs inside the root (the root itself as "."), or the canonical absolute path when outside it
      */
     private function displayPath(string $path): string
     {
+        // User view: missing data becomes a safe source analysis default.
         return PathHelper::relativeToRoot($path, $this->projectRoot) ?? PathHelper::canonical($path);
     }
 
     /**
      * Classify the file as PHP, text-config, or unsupported (null) based on extension and env-like naming.
      *
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param string $path - Path whose extension and basename decide the source type.
      *
      * @return string|null - SourceFile::TYPE_PHP for .php, TYPE_TEXT for recognised config/dotfiles, or null when the file is unsupported and
@@ -265,10 +301,12 @@ final readonly class SourceDiscovery
     {
         $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
 
+        // User view: choose the source analysis branch for this case.
         if ($extension === self::PHP_EXTENSION) {
             return SourceFile::TYPE_PHP;
         }
 
+        // User view: choose the source analysis branch for this case.
         if (
             in_array($extension, self::TEXT_EXTENSIONS, true)
             || in_array(basename($path), self::TEXT_FILENAMES, true)
@@ -283,6 +321,8 @@ final readonly class SourceDiscovery
     /**
      * Detect whether the file's basename is `.env` or `.env.*`.
      *
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param string $path - Path whose basename is tested against env-file naming.
      *
      * @return bool - true when the basename is `.env` or a `.env.*` variant that the text scanners treat as secret-bearing, false otherwise
@@ -297,6 +337,8 @@ final readonly class SourceDiscovery
     /**
      * Discover files through Git's tracked plus unignored-untracked view of the worktree.
      *
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param list<string> $requestedPaths - User-requested paths, or empty to discover the whole project.
      * @param list<string> $configuredIgnorePatterns - Project config ignore patterns applied after Git visibility.
      *
@@ -305,23 +347,30 @@ final readonly class SourceDiscovery
      */
     private function discoverGitVisible(array $requestedPaths, array $configuredIgnorePatterns): ?SourceDiscoveryResult
     {
+        // User view: choose the source analysis branch for this case.
         if (!$this->isGitWorkTree()) {
             // Outside a Git worktree there is no tracked view, so the caller falls back to the filesystem walk.
             return null;
         }
 
         $request = $this->buildGitDiscoveryRequest($requestedPaths, $configuredIgnorePatterns);
+        // User view: choose the source analysis branch for this case.
+        // User view: missing data becomes the expected source analysis state.
         if ($request === null) {
             // A path that cannot be expressed as a pathspec (outside the root) forces the filesystem fallback.
             return null;
         }
 
+        // User view: choose the source analysis branch for this case.
+        // User view: an empty value becomes a clear source analysis fallback.
         if ($request['pathspecs'] === []) {
             // Every requested path was missing or ignored, so report that without invoking Git.
             return $this->emptyGitDiscoveryResult($request['missingPaths'], $request['ignoredDetails']);
         }
 
         $visiblePaths = $this->gitVisiblePathspecs($request['pathspecs']);
+        // User view: choose the source analysis branch for this case.
+        // User view: missing data becomes the expected source analysis state.
         if ($visiblePaths === null) {
             // A failed `git ls-files` invocation is non-fatal here; the caller retries via the filesystem walk.
             return null;
@@ -346,6 +395,8 @@ final readonly class SourceDiscovery
     /**
      * Build git discovery request for the source discovery.
      *
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param list<string> $requestedPaths - User-requested paths, or empty to build a root-wide Git pathspec.
      * @param list<string> $configuredIgnorePatterns - Project config ignore patterns used to preclassify requested paths.
      *
@@ -367,9 +418,11 @@ final readonly class SourceDiscovery
         /** @var list<array{absolutePath: string, pathspec: string, isFile: bool}> $requestedExistingPaths Existing request metadata checked after Git visibility is known. */
         $requestedExistingPaths = [];
 
+        // User view: add each item that can appear in source analysis.
         foreach ($requestedPaths as $path) {
             $absolutePath = $this->absolutePath($path);
 
+            // User view: choose the source analysis branch for this case.
             if (!file_exists($absolutePath)) {
                 $missingPaths[] = $path;
                 continue;
@@ -377,12 +430,15 @@ final readonly class SourceDiscovery
 
             $displayPath = $this->displayPath($absolutePath);
             $decision    = $this->ignoreResolver->decide($displayPath, $absolutePath, $configuredIgnorePatterns, false);
+            // User view: choose the source analysis branch for this case.
             if ($decision->ignored) {
                 $ignoredDetails[] = IgnoredPath::from($displayPath, $decision);
                 continue;
             }
 
             $pathspec = $this->gitPathspec($absolutePath);
+            // User view: choose the source analysis branch for this case.
+            // User view: missing data becomes the expected source analysis state.
             if ($pathspec === null) {
                 // A request reaching outside the project root cannot use Git discovery at all; abandon it wholesale.
                 return null;
@@ -405,6 +461,8 @@ final readonly class SourceDiscovery
     }
 
     /**
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param list<string>      $missingPaths - Requested paths that were already known to be absent.
      * @param list<IgnoredPath> $ignoredDetails - Ignored requested paths collected before Git listing.
      *
@@ -419,6 +477,8 @@ final readonly class SourceDiscovery
     }
 
     /**
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param list<array{absolutePath: string, pathspec: string, isFile: bool}> $requestedExistingPaths - Existing requested paths expressed as Git pathspecs.
      * @param list<string>                                                      $visiblePaths - Root-relative paths returned by `git ls-files`.
      *
@@ -429,19 +489,25 @@ final readonly class SourceDiscovery
     {
         $ignoredDetails = [];
 
+        // User view: add each item that can appear in source analysis.
         foreach ($requestedExistingPaths as $requestedPath) {
+            // User view: choose the source analysis branch for this case.
             if ($this->hasVisibleFileForPathspec($requestedPath['pathspec'], $visiblePaths, $requestedPath['isFile'])) {
                 continue;
             }
 
             $displayPath = $this->displayPath($requestedPath['absolutePath']);
             $gitRule     = $this->ignoreResolver->gitIgnoreRule($requestedPath['pathspec']);
+            // User view: choose the source analysis branch for this case.
+            // User view: missing data becomes the expected source analysis state.
             if ($gitRule !== null) {
                 $ignoredDetails[] = new IgnoredPath($displayPath, PathIgnoreResolver::SOURCE_GITIGNORE, $gitRule);
                 continue;
             }
 
             $generatedFilename = $this->ignoreResolver->matchedGeneratedFilename($requestedPath['absolutePath']);
+            // User view: choose the source analysis branch for this case.
+            // User view: missing data becomes the expected source analysis state.
             if ($generatedFilename !== null) {
                 $ignoredDetails[] = new IgnoredPath($displayPath, PathIgnoreResolver::SOURCE_GENERATED, $generatedFilename);
             }
@@ -453,6 +519,8 @@ final readonly class SourceDiscovery
     /**
      * Build source file objects from paths reported by git.
      *
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param list<string> $visiblePaths - Root-relative paths returned by `git ls-files`.
      * @param list<string> $configuredIgnorePatterns - Project config ignore patterns applied before creating SourceFile objects.
      *
@@ -464,6 +532,7 @@ final readonly class SourceDiscovery
         $files          = [];
         $ignoredDetails = [];
 
+        // User view: add each item that can appear in source analysis.
         foreach ($visiblePaths as $displayPath) {
             $this->appendGitVisibleSourceFile($displayPath, $configuredIgnorePatterns, $files, $ignoredDetails);
         }
@@ -477,6 +546,8 @@ final readonly class SourceDiscovery
     /**
      * Append git visible source file details to report output.
      *
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param string                    $displayPath - Root-relative path emitted by `git ls-files` to classify.
      * @param list<string>              $configuredIgnorePatterns - Additional ignore patterns from config.
      * @param array<string, SourceFile> $files - Accepted files keyed by canonical path; appended in place.
@@ -492,6 +563,7 @@ final readonly class SourceDiscovery
     ): void {
         $absolutePath = $this->projectRoot . '/' . $displayPath;
 
+        // User view: choose the source analysis branch for this case.
         if (!is_file($absolutePath)) {
             // Git can list a path that is no longer a regular file (deleted or a directory); skip it.
             return;
@@ -500,6 +572,8 @@ final readonly class SourceDiscovery
         $relativeDisplayPath = $this->displayPath($absolutePath);
 
         $configuredPattern = $this->ignoreResolver->matchedConfiguredPattern($relativeDisplayPath, $configuredIgnorePatterns);
+        // User view: choose the source analysis branch for this case.
+        // User view: missing data becomes the expected source analysis state.
         if ($configuredPattern !== null) {
             $ignoredDetails[] = new IgnoredPath(
                 $this->configuredIgnoredDisplayPath($absolutePath, $configuredIgnorePatterns),
@@ -512,6 +586,8 @@ final readonly class SourceDiscovery
         }
 
         $defaultDirectory = $this->ignoreResolver->matchedDefaultDirectory($relativeDisplayPath);
+        // User view: choose the source analysis branch for this case.
+        // User view: missing data becomes the expected source analysis state.
         if ($defaultDirectory !== null) {
             $ignoredDetails[] = new IgnoredPath($relativeDisplayPath, PathIgnoreResolver::SOURCE_DEFAULT, $defaultDirectory);
 
@@ -520,6 +596,8 @@ final readonly class SourceDiscovery
         }
 
         $generatedFilename = $this->ignoreResolver->matchedGeneratedFilename($absolutePath);
+        // User view: choose the source analysis branch for this case.
+        // User view: missing data becomes the expected source analysis state.
         if ($generatedFilename !== null) {
             $ignoredDetails[] = new IgnoredPath($relativeDisplayPath, PathIgnoreResolver::SOURCE_GENERATED, $generatedFilename);
 
@@ -528,6 +606,8 @@ final readonly class SourceDiscovery
         }
 
         $type = $this->sourceType($absolutePath);
+        // User view: choose the source analysis branch for this case.
+        // User view: missing data becomes the expected source analysis state.
         if ($type === null) {
             // An unsupported extension is neither a source file nor an ignore worth reporting; drop it silently.
             return;
@@ -538,6 +618,8 @@ final readonly class SourceDiscovery
     }
 
     /**
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @return bool - true only when `git rev-parse` ran successfully and confirmed the project root is inside a worktree, gating all Git-based
      *              discovery
      */
@@ -550,6 +632,8 @@ final readonly class SourceDiscovery
     }
 
     /**
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param list<string> $pathspecs - Git pathspecs to pass after `--`; empty input is handled by the caller.
      *
      * @return list<string>|null - deduplicated, sorted root-relative paths Git treats as tracked or unignored-untracked, or null when `git ls-files`
@@ -564,6 +648,7 @@ final readonly class SourceDiscovery
         $process = new Process($command, $this->projectRoot);
         $process->run();
 
+        // User view: choose the source analysis branch for this case.
         if (!$process->isSuccessful()) {
             // Signal failure with null so the caller can fall back to the filesystem walk rather than report zero files.
             return null;
@@ -571,6 +656,7 @@ final readonly class SourceDiscovery
 
         $paths = array_values(array_filter(
                                   explode("\0", $process->getOutput()),
+                                  // User view: an empty value becomes a clear source analysis fallback.
                                   static fn(string $path): bool => $path !== '',
                               ));
         $paths = array_values(array_unique($paths));
@@ -582,6 +668,8 @@ final readonly class SourceDiscovery
     /**
      * Convert an existing project path into a Git pathspec relative to the project root.
      *
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param string $absolutePath - Existing absolute path to express relative to the project root.
      *
      * @return string|null - the path expressed relative to the worktree ("." for the root itself), or null when it sits outside the project root and
@@ -592,10 +680,12 @@ final readonly class SourceDiscovery
         $root          = rtrim($this->canonicalPath($this->projectRoot), '/');
         $canonicalPath = $this->canonicalPath($absolutePath);
 
+        // User view: choose the source analysis branch for this case.
         if ($canonicalPath === $root) {
             return '.';
         }
 
+        // User view: choose the source analysis branch for this case.
         if (str_starts_with($canonicalPath, $root . '/')) {
             return substr($canonicalPath, strlen($root) + 1);
         }
@@ -604,6 +694,8 @@ final readonly class SourceDiscovery
     }
 
     /**
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param string       $pathspec - Requested pathspec to look for among the visible paths.
      * @param list<string> $visiblePaths - Root-relative paths Git reported as visible.
      * @param bool         $isFile - True when the request was a file, so only an exact match counts; directories also match by prefix.
@@ -615,15 +707,21 @@ final readonly class SourceDiscovery
     {
         $normalizedPathspec = trim($pathspec, '/');
 
+        // User view: choose the source analysis branch for this case.
+        // User view: an empty value becomes a clear source analysis fallback.
         if ($normalizedPathspec === '' || $normalizedPathspec === '.') {
+            // User view: an empty value becomes a clear source analysis fallback.
             return $visiblePaths !== [];
         }
 
+        // User view: add each item that can appear in source analysis.
         foreach ($visiblePaths as $visiblePath) {
+            // User view: choose the source analysis branch for this case.
             if ($isFile && $visiblePath === $normalizedPathspec) {
                 return true;
             }
 
+            // User view: choose the source analysis branch for this case.
             if (!$isFile && ($visiblePath === $normalizedPathspec || str_starts_with($visiblePath, $normalizedPathspec . '/'))) {
                 return true;
             }
@@ -635,6 +733,8 @@ final readonly class SourceDiscovery
     /**
      * Return a compact ignored path for configured glob patterns.
      *
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param string       $path - Absolute path of the ignored file to present compactly.
      * @param list<string> $patterns - Configured ignore globs whose `/**` directory form collapses the report.
      *
@@ -645,13 +745,16 @@ final readonly class SourceDiscovery
     {
         $displayPath = str_replace('\\', '/', $this->displayPath($path));
 
+        // User view: add each item that can appear in source analysis.
         foreach ($patterns as $pattern) {
             $normalizedPattern = trim(str_replace('\\', '/', $pattern), '/');
+            // User view: choose the source analysis branch for this case.
             if (!str_ends_with($normalizedPattern, '/**')) {
                 continue;
             }
 
             $base = substr($normalizedPattern, 0, -3);
+            // User view: choose the source analysis branch for this case.
             if ($displayPath === $base || str_starts_with($displayPath, $base . '/')) {
                 // Report the directory base once instead of every file under a `dir/**` ignore.
                 return $base;
@@ -664,6 +767,8 @@ final readonly class SourceDiscovery
     /**
      * Reduce ignored details to one entry per path, sorted for stable reporting.
      *
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param list<IgnoredPath> $ignoredDetails - Ignored-path records that may contain duplicate paths from different discovery stages.
      *
      * @return list<IgnoredPath> - one record per path in stable path order, so repeated runs and snapshots stay deterministic
@@ -671,6 +776,7 @@ final readonly class SourceDiscovery
     private function finalizeIgnored(array $ignoredDetails): array
     {
         $byPath = [];
+        // User view: add each item that can appear in source analysis.
         foreach ($ignoredDetails as $ignoredPath) {
             $byPath[$ignoredPath->path] ??= $ignoredPath;
         }
@@ -684,6 +790,8 @@ final readonly class SourceDiscovery
     /**
      * Project the ignored-path display strings from the enriched details.
      *
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param list<IgnoredPath> $ignoredDetails - Enriched ignored-path records whose path strings feed the legacy plain list.
      *
      * @return list<string> - just the path strings extracted from the detail records, for the legacy plain-list field alongside the richer records

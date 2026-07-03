@@ -39,6 +39,8 @@ final readonly class ExtendsProductionClassRule implements RuleInterface
     /**
      * Describe the test extends production class rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -69,6 +71,8 @@ final readonly class ExtendsProductionClassRule implements RuleInterface
     /**
      * Find test classes that inherit directly from production classes.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -84,12 +88,16 @@ final readonly class ExtendsProductionClassRule implements RuleInterface
 
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Class_::class) as $class) {
             $className = $class->name?->toString();
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($className === null || $class->extends === null) {
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
             if (!str_ends_with($className, 'Test') && !str_ends_with($className, 'Tests')) {
                 continue;
             }
@@ -98,10 +106,12 @@ final readonly class ExtendsProductionClassRule implements RuleInterface
             $parentShort = strtolower($parent->getLast());
 
             // Drop underscores first so snake_case bases such as WC_Unit_Test_Case still spell *TestCase.
+            // User view: choose the findings list branch for this case.
             if (str_ends_with(str_replace('_', '', $parentShort), 'testcase')) {
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
             if (in_array($parentShort, $additionalBases, true) || in_array(strtolower($parent->toString()), $additionalBases, true)) {
                 // The project declared this exact base as a test base via additionalTestBaseClasses.
                 continue;

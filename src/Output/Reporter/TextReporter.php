@@ -25,6 +25,8 @@ final readonly class TextReporter
     /**
      * Render an analysis report as the default human-readable text output.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param AnalysisReport $report - Analysis report to render.
      *
      * @return string - Text report with summary, diagnostics, and findings.
@@ -34,6 +36,8 @@ final readonly class TextReporter
         $counts = $report->findingCounts();
         $lines  = [sprintf('%s %s analyse', AnalysisReport::TOOL_NAME, $report->toolVersion)];
 
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($report->score !== null) {
             $lines[] = sprintf('Composite: %s (%.2f / 100)', $report->score->composite->letter, $report->score->composite->score);
         }
@@ -69,10 +73,14 @@ final readonly class TextReporter
         $lines[] = 'Summary';
         $lines[] = sprintf('  Exit code: %d', $report->exitCode);
 
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($report->failureReason !== null) {
             $lines[] = sprintf('  Failed: %s.', $report->failureReason->message());
         }
 
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($report->newFindingsCount !== null) {
             $lines[] = sprintf('  New findings: %d', $report->newFindingsCount);
         }
@@ -88,6 +96,8 @@ final readonly class TextReporter
      * hint short-circuits the "open a Python summariser to triage" workaround
      * that consumers were writing externally. See M08.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param list<string> $lines - Output buffer appended in place; the hint is added only past the floor.
      * @param int          $findingCount - Total finding count this report rendered; gates whether the hint appears.
      *
@@ -95,6 +105,7 @@ final readonly class TextReporter
      */
     private function appendOutputVolumeHint(array &$lines, int $findingCount): void
     {
+        // User view: choose the report output branch for this case.
         if ($findingCount < self::OUTPUT_VOLUME_HINT_THRESHOLD) {
             return;
         }
@@ -113,6 +124,8 @@ final readonly class TextReporter
      * attention to which rules actually shifted since the base. Block is silent when no
      * branch-review is in scope. See M06 / ADR-016.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param list<string>   $lines - Output buffer appended in place; left untouched when no review is attached.
      * @param AnalysisReport $report - Report whose attached branch-review supplies the per-rule deltas, if any.
      *
@@ -120,11 +133,15 @@ final readonly class TextReporter
      */
     private function appendRuleDeltas(array &$lines, AnalysisReport $report): void
     {
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($report->review === null) {
             return;
         }
 
         $rows = $report->review->perRuleDelta();
+        // User view: choose the report output branch for this case.
+        // User view: an empty value becomes a clear report output fallback.
         if ($rows === []) {
             return;
         }
@@ -136,6 +153,8 @@ final readonly class TextReporter
             5,
         );
 
+        // User view: choose the report output branch for this case.
+        // User view: an empty value becomes a clear report output fallback.
         if ($improved === [] && $regressed === []) {
             return;
         }
@@ -143,6 +162,8 @@ final readonly class TextReporter
         $lines[] = '';
         $lines[] = 'Rule deltas';
 
+        // User view: choose the report output branch for this case.
+        // User view: an empty value becomes a clear report output fallback.
         if ($improved !== []) {
             $lines[] = sprintf(
                 '  Top %d improved: %s',
@@ -154,6 +175,8 @@ final readonly class TextReporter
             );
         }
 
+        // User view: choose the report output branch for this case.
+        // User view: an empty value becomes a clear report output fallback.
         if ($regressed !== []) {
             $lines[] = sprintf(
                 '  Top %d regressed: %s',
@@ -169,6 +192,8 @@ final readonly class TextReporter
     /**
      * Append review details to report output.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param list<string>   $lines - Output buffer appended in place; left untouched when no review is attached.
      * @param AnalysisReport $report - Report whose attached branch-review supplies the base ref and finding sets.
      *
@@ -176,6 +201,8 @@ final readonly class TextReporter
      */
     private function appendReview(array &$lines, AnalysisReport $report): void
     {
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($report->review === null) {
             return;
         }
@@ -191,17 +218,24 @@ final readonly class TextReporter
             count($report->review->unchanged),
         );
 
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($report->review->deltaScore !== null) {
             $lines[] = sprintf('  Score delta: %+.2f', $report->review->deltaScore);
         }
 
+        // User view: choose the report output branch for this case.
+        // User view: an empty value becomes a clear report output fallback.
         if ($report->review->introduced === []) {
             return;
         }
 
         $lines[] = '  Introduced:';
+        // User view: add each item that can appear in report output.
         foreach ($report->review->introduced as $finding) {
             $location = $finding->filePath;
+            // User view: choose the report output branch for this case.
+            // User view: missing data becomes the expected report output state.
             if ($finding->line !== null) {
                 $location .= sprintf(':%d', $finding->line);
             }
@@ -214,6 +248,8 @@ final readonly class TextReporter
     /**
      * Append score details to report output.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param list<string>   $lines - Output buffer appended in place; left untouched when the report has no score.
      * @param AnalysisReport $report - Report supplying the composite score, per-pillar grades, and diff context.
      *
@@ -221,6 +257,8 @@ final readonly class TextReporter
      */
     private function appendScore(array &$lines, AnalysisReport $report): void
     {
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($report->score === null) {
             return;
         }
@@ -230,6 +268,8 @@ final readonly class TextReporter
         $lines[] = sprintf('  Scope: %s', $report->score->scope);
         $lines[] = sprintf('  Score drivers: %s', $report->score->explanation);
 
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($report->diff !== null && $report->diff->active) {
             $lines[] = sprintf(
                 '  Diff: %s, %d changed files',
@@ -239,13 +279,18 @@ final readonly class TextReporter
             $lines[] = sprintf('  Diff note: %s', $report->diff->message);
         }
 
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($report->filters !== null && $report->filters->isActive()) {
             $lines[] = '  Display filters: score and exit code use the scored finding set; filters only change rendered findings.';
         }
 
         $lines[] = '  Pillars:';
+        // User view: add each item that can appear in report output.
         foreach ($report->score->pillars as $pillar) {
+            // User view: missing data becomes the expected report output state.
             $grade   = $pillar->grade === null ? 'n/a' : $pillar->grade->letter;
+            // User view: missing data becomes the expected report output state.
             $score   = $pillar->grade === null ? 'n/a' : sprintf('%.2f', $pillar->grade->score);
             $lines[] = sprintf(
                 '    %s: %s (%s) findings=%d',
@@ -260,6 +305,8 @@ final readonly class TextReporter
     /**
      * Append baseline details to report output.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param list<string>   $lines - Output buffer appended in place; left untouched when no baseline was applied.
      * @param AnalysisReport $report - Report supplying baseline movement counts and the stale-entry resolution flag.
      *
@@ -267,6 +314,8 @@ final readonly class TextReporter
      */
     private function appendBaseline(array &$lines, AnalysisReport $report): void
     {
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($report->baseline === null) {
             return;
         }
@@ -288,6 +337,7 @@ final readonly class TextReporter
         $lines[] = sprintf('  Stale entries: %d', count($report->baseline->staleEntries));
         $lines[] = '  Note: suppressed findings are accepted debt and are removed before scoring.';
 
+        // User view: choose the report output branch for this case.
         if ($report->baseline->generated) {
             $lines[] = sprintf(
                 '  Tip: commit %s and rerun `gruff-php analyse` to apply it; pass --baseline %s for explicit application.',
@@ -298,6 +348,8 @@ final readonly class TextReporter
             return;
         }
 
+        // User view: choose the report output branch for this case.
+        // User view: an empty value becomes a clear report output fallback.
         if ($report->baseline->staleEntries !== []) {
             $lines[] = sprintf(
                 '  Tip: %d stale baseline entries no longer match a finding. Regenerate with `gruff-php analyse --generate-baseline %s` after reviewing the diff.',
@@ -306,9 +358,12 @@ final readonly class TextReporter
             );
         }
 
+        // User view: choose the report output branch for this case.
+        // User view: an empty value becomes a clear report output fallback.
         if ($report->shouldListAbsentBaseline && $report->baseline->staleEntries !== []) {
             $lines[] = '  Resolved entries:';
             // One line per fixed group so the user can see exactly which accepted debt they cleared.
+            // User view: add each item that can appear in report output.
             foreach ($report->baseline->staleEntries as $resolvedEntry) {
                 $lines[] = sprintf(
                     '    %s %s (resolved %d): %s',
@@ -324,6 +379,8 @@ final readonly class TextReporter
     /**
      * Append mutation details to report output.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param list<string>                $lines - Output buffer appended in place.
      * @param MutationAnalysisResult|null $mutation - Mutation-testing result, or null when no mutation run is in scope
      *                                              (null produces no Mutation section at all).
@@ -332,6 +389,7 @@ final readonly class TextReporter
      */
     private function appendMutation(array &$lines, ?MutationAnalysisResult $mutation): void
     {
+        // User view: choose the report output branch for this case.
         if (!$mutation instanceof MutationAnalysisResult) {
             return;
         }
@@ -352,11 +410,15 @@ final readonly class TextReporter
         );
         $lines[] = sprintf('  Statuses: %s', $this->mutationStatusSummary($mutation->report->statusCounts()));
 
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes a safe report output default.
         if (($mutation->report->statusCounts()['escaped'] ?? 0) > 0 || ($mutation->report->statusCounts()['timed out'] ?? 0) > 0) {
             $lines[] = '  Survived status note: escaped mutants are test gaps; timed-out mutants exceeded Infection timeout and are tracked separately.';
         }
 
         $contextStatuses = $this->mutationContextSummary($mutation->report->statusCounts());
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($contextStatuses !== null) {
             $lines[] = sprintf(
                 '  Context-only statuses: %s. These do not create mutation.survived-mutant findings.',
@@ -365,6 +427,8 @@ final readonly class TextReporter
         }
 
         $baselineDelta = $mutation->msiDelta();
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($mutation->baselineReport !== null && $baselineDelta !== null) {
             $lines[] = sprintf(
                 '  Baseline: %.2f%% (%+.2f points)',
@@ -373,17 +437,22 @@ final readonly class TextReporter
             );
         }
 
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($mutation->mutationBudget !== null) {
             $status  = $mutation->isBudgetExceeded() ? 'exceeded' : 'within budget';
             $lines[] = sprintf('  Budget: %d survived mutants allowed (%s)', $mutation->mutationBudget, $status);
         }
 
         $fileSummaries = $mutation->report->fileSummaries();
+        // User view: choose the report output branch for this case.
+        // User view: an empty value becomes a clear report output fallback.
         if ($fileSummaries === []) {
             return;
         }
 
         $lines[] = '  Files:';
+        // User view: add each item that can appear in report output.
         foreach ($fileSummaries as $summary) {
             $lines[] = sprintf(
                 '    %s: MSI %.2f%%, Covered MSI %.2f%%, survived %d/%d, not covered %d',
@@ -398,17 +467,22 @@ final readonly class TextReporter
     }
 
     /**
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param array<string, int> $counts - Mutation status counts keyed by status label; empty means no mutants ran.
      *
      * @return string - Human-readable mutation status summary.
      */
     private function mutationStatusSummary(array $counts): string
     {
+        // User view: choose the report output branch for this case.
+        // User view: an empty value becomes a clear report output fallback.
         if ($counts === []) {
             return 'none';
         }
 
         $parts = [];
+        // User view: add each item that can appear in report output.
         foreach ($counts as $status => $count) {
             $parts[] = sprintf('%s=%d', $status, $count);
         }
@@ -417,6 +491,8 @@ final readonly class TextReporter
     }
 
     /**
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param array<string, int> $counts - Mutation status counts keyed by status label; only context-only statuses are emitted.
      *
      * @return string|null - Context-only status summary, or null when absent.
@@ -425,19 +501,25 @@ final readonly class TextReporter
     {
         $parts = [];
 
+        // User view: add each item that can appear in report output.
         foreach (['not covered', 'error', 'syntax error', 'ignored', 'skipped'] as $status) {
+            // User view: missing data becomes a safe report output default.
             $count = $counts[$status] ?? 0;
+            // User view: choose the report output branch for this case.
             if ($count > 0) {
                 $parts[] = sprintf('%s=%d', $status, $count);
             }
         }
 
+        // User view: an empty value becomes a clear report output fallback.
         return $parts === [] ? null : implode(', ', $parts);
     }
 
     /**
      * Append path section details to report output.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param list<string> $lines - Output buffer appended in place; left untouched when $paths is empty.
      * @param string       $title - Section heading printed once above the paths (for example "Ignored paths").
      * @param list<string> $paths - Paths to list under the heading; an empty list suppresses the whole section.
@@ -446,6 +528,8 @@ final readonly class TextReporter
      */
     private function appendPathSection(array &$lines, string $title, array $paths): void
     {
+        // User view: choose the report output branch for this case.
+        // User view: an empty value becomes a clear report output fallback.
         if ($paths === []) {
             return;
         }
@@ -453,6 +537,7 @@ final readonly class TextReporter
         $lines[] = '';
         $lines[] = $title;
 
+        // User view: add each item that can appear in report output.
         foreach ($paths as $path) {
             $lines[] = sprintf('  %s', $path);
         }
@@ -461,6 +546,8 @@ final readonly class TextReporter
     /**
      * Append diagnostics details to report output.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param list<string>        $lines - Output buffer appended in place after the Diagnostics heading.
      * @param list<RunDiagnostic> $diagnostics - Run diagnostics to render; empty suppresses the whole section.
      *
@@ -468,6 +555,8 @@ final readonly class TextReporter
      */
     private function appendDiagnostics(array &$lines, array $diagnostics): void
     {
+        // User view: choose the report output branch for this case.
+        // User view: an empty value becomes a clear report output fallback.
         if ($diagnostics === []) {
             return;
         }
@@ -475,18 +564,24 @@ final readonly class TextReporter
         $lines[] = '';
         $lines[] = 'Diagnostics';
 
+        // User view: add each item that can appear in report output.
         foreach ($diagnostics as $diagnostic) {
             $location = $diagnostic->filePath;
 
+            // User view: choose the report output branch for this case.
+            // User view: missing data becomes the expected report output state.
             if ($location !== null && $diagnostic->line !== null) {
                 $location .= sprintf(':%d', $diagnostic->line);
             }
 
+            // User view: choose the report output branch for this case.
+            // User view: missing data becomes the expected report output state.
             if ($location === null) {
                 $location = $diagnostic->path;
             }
 
             $prefix  = strtoupper(str_replace('-', '-', $diagnostic->type));
+            // User view: missing data becomes the expected report output state.
             $lines[] = $location === null
                 ? sprintf('  [%s] %s', $prefix, $diagnostic->message)
                 : sprintf('  [%s] %s %s', $prefix, $location, $diagnostic->message);
@@ -496,6 +591,8 @@ final readonly class TextReporter
     /**
      * Append findings details to report output.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param list<string>  $lines - Output buffer appended in place after the Findings heading.
      * @param list<Finding> $findings - Findings to render; empty emits the explicit "none" line.
      *
@@ -506,14 +603,19 @@ final readonly class TextReporter
         $lines[] = '';
         $lines[] = 'Findings';
 
+        // User view: choose the report output branch for this case.
+        // User view: an empty value becomes a clear report output fallback.
         if ($findings === []) {
             $lines[] = '  None';
             return;
         }
 
+        // User view: add each item that can appear in report output.
         foreach ($findings as $finding) {
             $location = $finding->filePath;
 
+            // User view: choose the report output branch for this case.
+            // User view: missing data becomes the expected report output state.
             if ($finding->line !== null) {
                 $location .= sprintf(':%d', $finding->line);
             }

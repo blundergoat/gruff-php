@@ -27,6 +27,8 @@ final readonly class MockOnlyTestRule implements RuleInterface
     /**
      * Describe the mock-only test rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -44,6 +46,8 @@ final readonly class MockOnlyTestRule implements RuleInterface
     /**
      * Find tests that exercise only mocks without a concrete subject.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -53,15 +57,19 @@ final readonly class MockOnlyTestRule implements RuleInterface
     {
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             $hasMock         = false;
             $hasVerification = false;
 
+            // User view: add each item that can appear in findings list.
             foreach (TestQualityNodeHelper::calls($scope) as $call) {
                 $hasMock         = $hasMock || TestQualityNodeHelper::isMockCreationCall($call);
                 $hasVerification = $hasVerification || TestQualityNodeHelper::isMockVerificationCall($call);
             }
 
+            // User view: choose the findings list branch for this case.
+            // User view: an empty value becomes a clear findings list fallback.
             if (!$hasMock || !$hasVerification || TestQualityNodeHelper::assertionCalls($scope) !== []) {
                 continue;
             }

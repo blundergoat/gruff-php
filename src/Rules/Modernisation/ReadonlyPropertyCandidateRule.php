@@ -31,6 +31,8 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
     /**
      * Describe the readonly property candidate rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -48,6 +50,8 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
     /**
      * Find constructor-assigned properties that could be readonly.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -55,6 +59,7 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
+        // User view: choose the findings list branch for this case.
         if (!ModernisationNodeHelper::supportsPhp($ruleContext, 8.1)) {
             // The readonly modifier landed in PHP 8.1; below that target the candidate cannot be acted on.
             return [];
@@ -62,6 +67,7 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
 
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Class_::class) as $class) {
             array_push($findings, ...$this->classFindings($analysisUnit, $class));
         }
@@ -72,6 +78,8 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
     /**
      * Build readonly-candidate findings for one eligible final class.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit used to anchor finding paths.
      * @param Stmt\Class_  $class - Class declaration being inspected.
      *
@@ -79,6 +87,7 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
      */
     private function classFindings(AnalysisUnit $analysisUnit, Stmt\Class_ $class): array
     {
+        // User view: choose the findings list branch for this case.
         if (!$this->isEligibleClass($class)) {
             return [];
         }
@@ -87,13 +96,18 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
         $lateAssignments        = $this->lateAssignments($class);
         $findings               = [];
 
+        // User view: add each item that can appear in findings list.
         foreach ($class->getProperties() as $property) {
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($property->isStatic() || $property->isReadonly() || $property->type === null) {
                 continue;
             }
 
+            // User view: add each item that can appear in findings list.
             foreach ($property->props as $propertyProperty) {
                 $finding = $this->propertyFinding($analysisUnit, $propertyProperty, $constructorAssignments, $lateAssignments);
+                // User view: choose the findings list branch for this case.
                 if ($finding instanceof Finding) {
                     $findings[] = $finding;
                 }
@@ -106,6 +120,8 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
     /**
      * Check whether a class shape can safely receive property-level readonly suggestions.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Stmt\Class_ $class - Class declaration being inspected.
      *
      * @return bool - true when the class is final, non-readonly, has no parent, and uses no traits
@@ -114,13 +130,17 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
     {
         return $class->isFinal()
             && !$class->isReadonly()
+            // User view: missing data becomes the expected findings list state.
             && $class->extends === null
+            // User view: an empty value becomes a clear findings list fallback.
             && $class->getTraitUses() === [];
     }
 
     /**
      * Build a readonly-candidate finding for one declared property, or null when the property is not eligible.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit                    $analysisUnit - Parsed unit used to anchor finding paths.
      * @param Stmt\PropertyProperty           $propertyProperty - Single property declaration inside a property statement.
      * @param array<string, true>             $constructorAssignments - Properties written by the constructor.
@@ -135,6 +155,8 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
         array $lateAssignments,
     ): ?Finding {
         $name = $propertyProperty->name->toString();
+        // User view: choose the findings list branch for this case.
+        // User view: missing data becomes the expected findings list state.
         if ($propertyProperty->default !== null || !isset($constructorAssignments[$name]) || isset($lateAssignments[$name])) {
             return null;
         }
@@ -159,6 +181,8 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
     /**
      * Collect constructor assignments that affect the modernisation rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Stmt\Class_ $class - Final class under inspection; only its `__construct` body is scanned.
      *
      * @return array<string, true> - Names of properties assigned via `$this->prop = ...` inside the constructor.
@@ -167,21 +191,28 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
     {
         $assignments = [];
         $constructor = null;
+        // User view: add each item that can appear in findings list.
         foreach ($class->getMethods() as $method) {
+            // User view: choose the findings list branch for this case.
             if (strtolower($method->name->toString()) === '__construct') {
                 $constructor = $method;
                 break;
             }
         }
 
+        // User view: choose the findings list branch for this case.
         if (!$constructor instanceof Stmt\ClassMethod) {
             // No constructor means no constructor-only assignment, so no property qualifies as a candidate here.
             return [];
         }
 
         $nodeFinder = new NodeFinder();
+        // User view: add each item that can appear in findings list.
+        // User view: missing data becomes a safe findings list default.
         foreach ($nodeFinder->findInstanceOf($constructor->stmts ?? [], Expr\Assign::class) as $assign) {
             $name = ModernisationNodeHelper::propertyFetchName($assign->var);
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($name !== null && ModernisationNodeHelper::isThisPropertyFetch($assign->var)) {
                 $assignments[$name] = true;
             }
@@ -194,6 +225,8 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
     /**
      * Collect late assignments that affect the modernisation rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Stmt\Class_ $class - Final class under inspection; every method except `__construct` is scanned.
      *
      * @return array<string, true> - Names of properties mutated or unset outside the constructor, which disqualify
@@ -204,16 +237,23 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
         $assignments = [];
         $nodeFinder  = new NodeFinder();
 
+        // User view: add each item that can appear in findings list.
         foreach ($class->getMethods() as $method) {
+            // User view: choose the findings list branch for this case.
             if (strtolower($method->name->toString()) === '__construct') {
                 continue;
             }
 
+            // User view: add each item that can appear in findings list.
+            // User view: missing data becomes a safe findings list default.
             foreach ($nodeFinder->findInstanceOf($method->stmts ?? [], Expr\Assign::class) as $assign) {
                 $this->recordPropertyMutation($assign->var, $assignments);
             }
 
+            // User view: add each item that can appear in findings list.
+            // User view: missing data becomes a safe findings list default.
             foreach ($nodeFinder->findInstanceOf($method->stmts ?? [], Stmt\Unset_::class) as $unset) {
+                // User view: add each item that can appear in findings list.
                 foreach ($unset->vars as $unsetTarget) {
                     $this->recordPropertyMutation($unsetTarget, $assignments);
                 }
@@ -227,6 +267,8 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
     /**
      * Walk through any chain of array-index fetches and record the underlying `$this` property mutation.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Expr $expr - Assignment or unset target; array-index writes like `$this->items[] = x` resolve to the
      *   base property so element mutation still counts as mutating the property.
      * @param array<string, true> &$assignments - Accumulator mutated in place; the resolved property name is added
@@ -242,6 +284,8 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
         }
 
         $name = ModernisationNodeHelper::propertyFetchName($target);
+        // User view: choose the findings list branch for this case.
+        // User view: missing data becomes the expected findings list state.
         if ($name !== null && ModernisationNodeHelper::isThisPropertyFetch($target)) {
             $assignments[$name] = true;
         }

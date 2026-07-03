@@ -12,6 +12,8 @@ use GruffPhp\Results\Finding\Finding;
 final readonly class BranchReviewComparator
 {
     /**
+      * User flow: Compares branch feedback for review workflows.
+      *
      * @param list<Finding> $current - Current branch findings to compare.
      * @param list<Finding> $base - Base branch findings to compare against.
      * @param string        $baseRef - Base ref used to produce the comparison.
@@ -35,7 +37,9 @@ final readonly class BranchReviewComparator
         $unchanged             = [];
         $removed               = [];
 
+        // User view: add each item that can appear in branch review feedback.
         foreach ($currentByKey as $key => $currentFindings) {
+            // User view: missing data becomes a safe branch review feedback default.
             $baseFindings = $baseByKey[$key] ?? [];
             $matched      = min(count($currentFindings), count($baseFindings));
 
@@ -48,7 +52,9 @@ final readonly class BranchReviewComparator
             }
         }
 
+        // User view: add each item that can appear in branch review feedback.
         foreach ($baseByKey as $key => $baseFindings) {
+            // User view: missing data becomes a safe branch review feedback default.
             $currentFindings = $currentByKey[$key] ?? [];
             $matched         = min(count($baseFindings), count($currentFindings));
 
@@ -63,6 +69,8 @@ final readonly class BranchReviewComparator
     /**
      * Index findings by branch-review identity.
      *
+      * User flow: Compares branch feedback for review workflows.
+      *
      * @param list<Finding>         $findings - Findings to bucket by review identity before comparison.
      * @param FindingReviewIdentity $identity - Key strategy that buckets findings so matching ignores line drift.
      *
@@ -73,6 +81,7 @@ final readonly class BranchReviewComparator
     {
         $indexed = [];
 
+        // User view: add each item that can appear in branch review feedback.
         foreach ($findings as $finding) {
             $indexed[$identity->key($finding)][] = $finding;
         }

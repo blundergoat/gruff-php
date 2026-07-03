@@ -18,6 +18,8 @@ final readonly class FunctionLikeScope
     /**
      * Capture a function-like node with its immediate parameter and local variable names.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param ClassMethod|Function_|Closure|ArrowFunction $node - Function-like AST node.
      * @param string                                      $kind - Scope kind: method, function, closure, or arrow.
      * @param array<string, true>                         $parameterNames - Parameter names declared directly by this scope.

@@ -77,6 +77,8 @@ final class ReportCommand extends Command
     /**
      * Configure the report command arguments and options.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @return void
      */
     protected function configure(): void
@@ -131,6 +133,8 @@ final class ReportCommand extends Command
     /**
      * Run analysis through the analyse command and emit or write the report.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface  $input - Console input carrying report paths, format, and forwarded analyse options.
      * @param OutputInterface $output - Destination for the rendered report, status lines, and forwarded child stderr.
      *
@@ -140,6 +144,7 @@ final class ReportCommand extends Command
     {
         $projectRoot = getcwd();
 
+        // User view: choose the terminal output branch for this case.
         if ($projectRoot === false) {
             $output->writeln('<error>Unable to determine current working directory.</error>');
 
@@ -148,8 +153,11 @@ final class ReportCommand extends Command
 
         $outputPath     = $this->optionalStringOption($input, 'output');
         $resolvedOutput = null;
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($outputPath !== null) {
             $resolvedOutput = PathHelper::resolveAgainst($projectRoot, $outputPath);
+            // User view: choose the terminal output branch for this case.
             if (!is_dir(dirname($resolvedOutput))) {
                 $output->writeln(sprintf('<error>Report output directory does not exist: %s</error>', dirname($resolvedOutput)));
 
@@ -158,14 +166,19 @@ final class ReportCommand extends Command
         }
 
         $ruleFilterError = $this->ruleFilterUsageError($input);
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($ruleFilterError !== null) {
             $output->writeln(sprintf('<error>%s</error>', $ruleFilterError));
 
             return Command::INVALID;
         }
 
+        // User view: missing data becomes a safe terminal output default.
         $profileUsageError = AnalyseCommandOptions::profileUsageErrorFor($this->optionalStringOption($input, 'profile') ?? 'default');
         // Show profile typos before report can prompt, write config, or spawn analyse.
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($profileUsageError !== null) {
             $output->writeln(sprintf('<error>%s</error>', $profileUsageError));
 
@@ -175,6 +188,8 @@ final class ReportCommand extends Command
         $profileIncludeError = $this->profileIncludeUsageError($input);
         // Rejecting the incoherent combination here keeps the init prompt from firing (and possibly
         // writing config) for a run the forwarded analyse would refuse anyway.
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($profileIncludeError !== null) {
             $output->writeln(sprintf('<error>%s</error>', $profileIncludeError));
 
@@ -191,8 +206,11 @@ final class ReportCommand extends Command
             projectRoot:             $projectRoot,
             explicitConfigPath:      $this->optionalStringOption($input, 'config'),
             shouldSkipConfig:        (bool)$input->getOption('no-config'),
+            // User view: missing data becomes a safe terminal output default.
             isMachineReadableFormat: ($this->optionalStringOption($input, 'format') ?? 'html') === 'json',
         );
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($promptExitCode !== null) {
             return $promptExitCode;
         }
@@ -203,20 +221,27 @@ final class ReportCommand extends Command
         $this->writeStderr($output, $process->getErrorOutput());
         $report = $process->getOutput();
 
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($resolvedOutput === null) {
             $output->write($report, false, OutputInterface::OUTPUT_RAW);
 
+            // User view: missing data becomes a safe terminal output default.
             return $process->getExitCode() ?? Command::FAILURE;
         }
 
+        // User view: missing data becomes a safe terminal output default.
         $exitCode = $process->getExitCode() ?? Command::FAILURE;
 
+        // User view: choose the terminal output branch for this case.
+        // User view: an empty value becomes a clear terminal output fallback.
         if ($exitCode === Command::INVALID || ($report === '' && $exitCode !== Command::SUCCESS)) {
             $output->writeln(sprintf('<error>Analyse exited with code %d; %s was not written.</error>', $exitCode, $outputPath));
 
             return $exitCode;
         }
 
+        // User view: choose the terminal output branch for this case.
         if (file_put_contents($resolvedOutput, $report) === false) {
             $output->writeln(sprintf('<error>Unable to write report: %s</error>', $resolvedOutput));
 
@@ -231,6 +256,8 @@ final class ReportCommand extends Command
     /**
      * Build the analyse command argv used by report generation.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface $input - Report-command input whose options and paths are translated into analyse flags.
      *
      * @return list<string> - full analyse subprocess argv, starting with the PHP binary and `analyse`, with forwarded flags and trailing paths
@@ -240,6 +267,7 @@ final class ReportCommand extends Command
         // The child analyse runs behind pipes where nobody can answer a prompt, so always pass
         // --no-interaction; the report command itself already handled the missing-config offer.
         $command   = [PHP_BINARY, $this->gruffBinary(), 'analyse', '--no-interaction', '--format'];
+        // User view: missing data becomes a safe terminal output default.
         $command[] = $this->optionalStringOption($input, 'format') ?? 'html';
         $command[] = '--fail-on';
         $command[] = $this->resolveFailOn($input);
@@ -259,6 +287,8 @@ final class ReportCommand extends Command
     /**
      * Append user paths after an option separator so dash-prefixed paths stay positional.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param list<string>   $command - Analyse command arguments built so far.
      * @param InputInterface $input - Supplies the variadic paths argument appended after the `--` separator.
      *
@@ -269,6 +299,8 @@ final class ReportCommand extends Command
         /** @var list<string> $paths The command definition declares a variadic paths argument. */
         $paths = $input->getArgument('paths');
 
+        // User view: choose the terminal output branch for this case.
+        // User view: an empty value becomes a clear terminal output fallback.
         if ($paths === []) {
             return;
         }
@@ -280,6 +312,8 @@ final class ReportCommand extends Command
     /**
      * Forward all configured string-valued options to the analyse command.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param list<string>   $command - Analyse command arguments built so far.
      * @param InputInterface $input - Source of the STRING_OPTIONS values; empty or unset options are skipped.
      *
@@ -287,9 +321,12 @@ final class ReportCommand extends Command
      */
     private function appendStringOptions(array &$command, InputInterface $input): void
     {
+        // User view: add each item that can appear in terminal output.
         foreach (self::STRING_OPTIONS as $option) {
             $optionValue = $this->optionalStringOption($input, $option);
 
+            // User view: choose the terminal output branch for this case.
+            // User view: missing data becomes the expected terminal output state.
             if ($optionValue === null) {
                 continue;
             }
@@ -302,6 +339,8 @@ final class ReportCommand extends Command
     /**
      * Forward the report editor-link option unless it uses the default disabled value.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param list<string>   $command - Analyse command arguments built so far.
      * @param InputInterface $input - Source of report-editor-link; the default "none" is treated as unset and dropped.
      *
@@ -310,6 +349,8 @@ final class ReportCommand extends Command
     private function appendReportEditorLinkOption(array &$command, InputInterface $input): void
     {
         $reportEditorLink = $this->optionalStringOption($input, 'report-editor-link');
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($reportEditorLink !== null && $reportEditorLink !== 'none') {
             $command[] = '--report-editor-link';
             $command[] = $reportEditorLink;
@@ -319,6 +360,8 @@ final class ReportCommand extends Command
     /**
      * Forward the optional baseline flag with its optional path.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param list<string>   $command - Analyse command arguments built so far.
      * @param InputInterface $input - Source of --baseline; the flag is forwarded only when the user passed it.
      *
@@ -326,10 +369,13 @@ final class ReportCommand extends Command
      */
     private function appendBaselineOption(array &$command, InputInterface $input): void
     {
+        // User view: choose the terminal output branch for this case.
         if ($input->hasParameterOption('--baseline', true)) {
             $optionValue = $this->optionalStringOption($input, 'baseline');
             $command[]   = '--baseline';
 
+            // User view: choose the terminal output branch for this case.
+            // User view: missing data becomes the expected terminal output state.
             if ($optionValue !== null) {
                 $command[] = $optionValue;
             }
@@ -339,6 +385,8 @@ final class ReportCommand extends Command
     /**
      * Forward true boolean flags to the analyse command.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param list<string>   $command - Analyse command arguments built so far.
      * @param InputInterface $input - Source of the BOOLEAN_OPTIONS flags; only flags resolving to true are forwarded.
      *
@@ -346,7 +394,9 @@ final class ReportCommand extends Command
      */
     private function appendBooleanOptions(array &$command, InputInterface $input): void
     {
+        // User view: add each item that can appear in terminal output.
         foreach (self::BOOLEAN_OPTIONS as $option) {
+            // User view: choose the terminal output branch for this case.
             if ((bool)$input->getOption($option)) {
                 $command[] = '--' . $option;
             }
@@ -356,6 +406,8 @@ final class ReportCommand extends Command
     /**
      * Forward repeated filter options to the analyse command.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param list<string>   $command - Analyse command arguments built so far.
      * @param InputInterface $input - Source of the REPEATED_OPTIONS arrays; each non-empty value yields one flag pair.
      *
@@ -363,14 +415,19 @@ final class ReportCommand extends Command
      */
     private function appendRepeatedOptions(array &$command, InputInterface $input): void
     {
+        // User view: add each item that can appear in terminal output.
         foreach (self::REPEATED_OPTIONS as $option) {
             $values = $input->getOption($option);
 
+            // User view: choose the terminal output branch for this case.
             if (!is_array($values)) {
                 continue;
             }
 
+            // User view: add each item that can appear in terminal output.
             foreach ($values as $optionValue) {
+                // User view: choose the terminal output branch for this case.
+                // User view: an empty value becomes a clear terminal output fallback.
                 if (is_string($optionValue) && $optionValue !== '') {
                     $command[] = '--' . $option;
                     $command[] = $optionValue;
@@ -382,6 +439,8 @@ final class ReportCommand extends Command
     /**
      * Forward the optional interactive report flag.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param list<string>   $command - Analyse command arguments built so far.
      * @param InputInterface $input - Source of --report-interactive; a string value is passed as `=value`, else bare.
      *
@@ -389,9 +448,12 @@ final class ReportCommand extends Command
      */
     private function appendReportInteractiveOption(array &$command, InputInterface $input): void
     {
+        // User view: choose the terminal output branch for this case.
         if ($input->hasParameterOption('--report-interactive', true)) {
             $interactive = $input->getOption('report-interactive');
 
+            // User view: choose the terminal output branch for this case.
+            // User view: an empty value becomes a clear terminal output fallback.
             if (is_string($interactive) && $interactive !== '') {
                 $command[] = '--report-interactive=' . $interactive;
             } else {
@@ -403,6 +465,8 @@ final class ReportCommand extends Command
     /**
      * Forward the optional diff flag with its optional mode value.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param list<string>   $command - Analyse command arguments built so far.
      * @param InputInterface $input - Source of --diff; forwarded only when present, with its mode value when non-empty.
      *
@@ -410,10 +474,13 @@ final class ReportCommand extends Command
      */
     private function appendDiffOption(array &$command, InputInterface $input): void
     {
+        // User view: choose the terminal output branch for this case.
         if ($input->hasParameterOption('--diff', true)) {
             $command[] = '--diff';
             $diff      = $input->getOption('diff');
 
+            // User view: choose the terminal output branch for this case.
+            // User view: an empty value becomes a clear terminal output fallback.
             if (is_string($diff) && $diff !== '') {
                 $command[] = $diff;
             }
@@ -428,6 +495,8 @@ final class ReportCommand extends Command
      * --fail-on, so the subprocess uses it directly rather than re-applying
      * analyse's own precedence chain (which has a different binary default).
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface $input - Console input for the report command.
      *
      * @return string - Resolved threshold suitable for `--fail-on`.
@@ -438,12 +507,16 @@ final class ReportCommand extends Command
         // ('none') even when the user did not pass --fail-on at all, so we have to
         // detect "explicit" via the raw parameter list. Otherwise the config-supplied
         // minimumSeverity.report value can never win, defeating the M11 wiring.
+        // User view: choose the terminal output branch for this case.
         if ($input->hasParameterOption('--fail-on', true)) {
             // Explicit CLI flag is the top of the precedence chain; empty value degrades to `none`.
+            // User view: missing data becomes a safe terminal output default.
             return $this->optionalStringOption($input, 'fail-on') ?? 'none';
         }
 
         $configThreshold = $this->loadConfigFailThreshold($input);
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($configThreshold !== null) {
             // No CLI flag, so config.minimumSeverity.report takes precedence over the binary default.
             return $configThreshold;
@@ -460,18 +533,22 @@ final class ReportCommand extends Command
      * same config and will surface any failures through its usual diagnostic
      * path. Returning null lets the caller fall back to the binary default.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface $input - Console input for the report command.
      *
      * @return string|null - Resolved threshold string, or null when unavailable.
      */
     private function loadConfigFailThreshold(InputInterface $input): ?string
     {
+        // User view: choose the terminal output branch for this case.
         if ((bool)$input->getOption('no-config')) {
             // --no-config opts out of config entirely, so there is no threshold to contribute.
             return null;
         }
 
         $projectRoot = getcwd();
+        // User view: choose the terminal output branch for this case.
         if ($projectRoot === false) {
             // Without a working directory the config cannot be located; let the caller use the default.
             return null;
@@ -492,6 +569,8 @@ final class ReportCommand extends Command
     /**
      * Read a non-empty string option from console input.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface $input - Console input to read the option from.
      * @param string         $name - Option name to read, without the leading dashes.
      *
@@ -502,6 +581,7 @@ final class ReportCommand extends Command
         $optionValue = $input->getOption($name);
 
         // Normalise array/bool/empty option values to null so callers can treat "unset" uniformly.
+        // User view: an empty value becomes a clear terminal output fallback.
         return is_string($optionValue) && $optionValue !== '' ? $optionValue : null;
     }
 
@@ -513,15 +593,20 @@ final class ReportCommand extends Command
      * instead of firing the init prompt and only then dying in the subprocess.
      * Must run after ruleFilterUsageError so every id is known to the registry.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface $input - Console input for the report command.
      *
      * @return string|null - Usage error for the first out-of-profile include, or null when coherent.
      */
     private function profileIncludeUsageError(InputInterface $input): ?string
     {
+        // User view: missing data becomes a safe terminal output default.
         $profile             = $this->optionalStringOption($input, 'profile') ?? 'default';
         $profileScorePillars = AnalyseCommandOptions::scorePillarsForProfile($profile);
         // Profiles that score every pillar have nothing to check; unknown profiles were rejected earlier.
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($profileScorePillars === null) {
             return null;
         }
@@ -541,6 +626,8 @@ final class ReportCommand extends Command
      * typo fails as a usage error without first writing config or spawning a
      * scan, mirroring the analyse command's own pre-prompt filter validation.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface $input - Console input for the report command.
      *
      * @return string|null - Usage error for the first unknown id, or null when every id is registered.
@@ -549,8 +636,11 @@ final class ReportCommand extends Command
     {
         $registry = RuleRegistry::defaults();
 
+        // User view: add each item that can appear in terminal output.
         foreach (['include-rule', 'exclude-rule'] as $optionName) {
             $unknownRuleIds = $registry->unknownRuleIds($this->ruleIdListOption($input, $optionName));
+            // User view: choose the terminal output branch for this case.
+            // User view: an empty value becomes a clear terminal output fallback.
             if ($unknownRuleIds !== []) {
                 return sprintf('Unknown rule id "%s" for --%s.', $unknownRuleIds[0], $optionName);
             }
@@ -565,6 +655,8 @@ final class ReportCommand extends Command
      * Splits exactly like the analyse command parses the same options so
      * validation here matches what the forwarded child run would reject.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface $input - Console input for the report command.
      * @param string         $name - Repeatable option name to read.
      *
@@ -574,19 +666,26 @@ final class ReportCommand extends Command
     {
         $values = $input->getOption($name);
 
+        // User view: choose the terminal output branch for this case.
         if (!is_array($values)) {
             return [];
         }
 
         $ruleIds = [];
 
+        // User view: add each item that can appear in terminal output.
         foreach ($values as $optionValue) {
+            // User view: choose the terminal output branch for this case.
+            // User view: an empty value becomes a clear terminal output fallback.
             if (!is_string($optionValue) || $optionValue === '') {
                 continue;
             }
 
+            // User view: add each item that can appear in terminal output.
             foreach (explode(',', $optionValue) as $optionPart) {
                 $trimmedOptionPart = trim($optionPart);
+                // User view: choose the terminal output branch for this case.
+                // User view: an empty value becomes a clear terminal output fallback.
                 if ($trimmedOptionPart !== '') {
                     $ruleIds[] = $trimmedOptionPart;
                 }
@@ -599,6 +698,8 @@ final class ReportCommand extends Command
     /**
      * Return the package-local gruff-php executable path.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @return string - Absolute gruff-php binary path.
      */
     private function gruffBinary(): string
@@ -610,6 +711,8 @@ final class ReportCommand extends Command
     /**
      * Forward child process stderr to the most appropriate output stream.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param OutputInterface $output - Target stream; the dedicated error channel is used when one is available.
      * @param string          $stderr - Captured analyse stderr; an empty string is a no-op, otherwise a newline is ensured.
      *
@@ -617,14 +720,18 @@ final class ReportCommand extends Command
      */
     private function writeStderr(OutputInterface $output, string $stderr): void
     {
+        // User view: choose the terminal output branch for this case.
+        // User view: an empty value becomes a clear terminal output fallback.
         if ($stderr === '') {
             // Nothing to forward; avoid emitting a stray blank line for silent runs.
             return;
         }
 
+        // User view: choose the terminal output branch for this case.
         if ($output instanceof ConsoleOutputInterface) {
             $output->getErrorOutput()->write($stderr, false, OutputInterface::OUTPUT_RAW);
 
+            // User view: choose the terminal output branch for this case.
             if (!str_ends_with($stderr, "\n")) {
                 $output->getErrorOutput()->writeln('');
             }
@@ -635,6 +742,7 @@ final class ReportCommand extends Command
 
         $output->write($stderr, false, OutputInterface::OUTPUT_RAW);
 
+        // User view: choose the terminal output branch for this case.
         if (!str_ends_with($stderr, "\n")) {
             $output->writeln('');
         }

@@ -29,6 +29,8 @@ final readonly class MatchExpressionCandidateRule implements RuleInterface
     /**
      * Describe the match-expression candidate rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -47,6 +49,8 @@ final readonly class MatchExpressionCandidateRule implements RuleInterface
     /**
      * Find switch statements whose direct-return branches may become match expressions.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -54,6 +58,7 @@ final readonly class MatchExpressionCandidateRule implements RuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
+        // User view: choose the findings list branch for this case.
         if (!ModernisationNodeHelper::supportsPhp($ruleContext, 8.0)) {
             // The match expression needs PHP 8.0, so stay silent on targets that cannot use it.
             return [];
@@ -61,7 +66,9 @@ final readonly class MatchExpressionCandidateRule implements RuleInterface
 
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Switch_::class) as $switch) {
+            // User view: choose the findings list branch for this case.
             if (count($switch->cases) < 3 || !$this->allCasesReturnDirectly($switch)) {
                 continue;
             }
@@ -89,13 +96,17 @@ final readonly class MatchExpressionCandidateRule implements RuleInterface
     /**
      * Check whether every switch case consists of exactly one return statement.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Stmt\Switch_ $switch - Switch under inspection; only an all-direct-return body maps cleanly onto a match.
      *
      * @return bool - True when all cases return directly.
      */
     private function allCasesReturnDirectly(Stmt\Switch_ $switch): bool
     {
+        // User view: add each item that can appear in findings list.
         foreach ($switch->cases as $case) {
+            // User view: choose the findings list branch for this case.
             if (count($case->stmts) !== 1 || !$case->stmts[0] instanceof Stmt\Return_) {
                 // Any case with fall-through or extra statements would not survive the rewrite, so reject.
                 return false;

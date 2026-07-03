@@ -74,6 +74,8 @@ final readonly class EagerTestRule implements RuleInterface
     /**
      * Describe the eager test rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and thresholds.
      */
     public function definition(): RuleDefinition
@@ -93,6 +95,8 @@ final readonly class EagerTestRule implements RuleInterface
     /**
      * Find tests that assert many times across multiple apparent SUT calls.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -104,10 +108,12 @@ final readonly class EagerTestRule implements RuleInterface
         $minAssertions = (int) $ruleContext->settingsFor($definition)->numericThreshold('minAssertions');
         $findings      = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             $assertionCount = count(TestQualityNodeHelper::assertionCalls($scope));
             $sutCalls       = $this->distinctSutCalls($scope);
 
+            // User view: choose the findings list branch for this case.
             if ($assertionCount < $minAssertions || count($sutCalls) < 2) {
                 continue;
             }
@@ -133,6 +139,8 @@ final readonly class EagerTestRule implements RuleInterface
     /**
      * Collect distinct method calls made on likely system-under-test receivers.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param  TestQualityScope $scope - Single test method whose body is searched for SUT exercise calls.
      *
      * @return array<string, string> - Distinct method names keyed by name, taken from the busiest receiver only.
@@ -142,8 +150,11 @@ final readonly class EagerTestRule implements RuleInterface
         $resultVariables = $this->collectResultVariables($scope);
         $callsByReceiver = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (TestQualityNodeHelper::calls($scope) as $call) {
             $name = TestQualityNodeHelper::callName($call);
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($name === null
                 || TestQualityNodeHelper::isAssertionCall($call)
                 || TestQualityNodeHelper::isMockCreationCall($call)
@@ -155,11 +166,14 @@ final readonly class EagerTestRule implements RuleInterface
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
             if ($call instanceof Expr\MethodCall && $this->isResultVariableReceiver($call->var, $resultVariables)) {
                 continue;
             }
 
             $receiver = $this->receiverKey($call);
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($receiver === null) {
                 continue;
             }
@@ -171,6 +185,8 @@ final readonly class EagerTestRule implements RuleInterface
     }
 
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param  Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Candidate SUT call whose ancestors are
      *                                                            walked for an enclosing assertion.
      *
@@ -181,6 +197,7 @@ final readonly class EagerTestRule implements RuleInterface
         $parent = $call->getAttribute('parent');
 
         while ($parent instanceof Node) {
+            // User view: choose the findings list branch for this case.
             if (($parent instanceof Expr\FuncCall || $parent instanceof Expr\MethodCall || $parent instanceof Expr\StaticCall)
                 && TestQualityNodeHelper::isAssertionCall($parent)
             ) {
@@ -194,6 +211,8 @@ final readonly class EagerTestRule implements RuleInterface
     }
 
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param  Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Candidate call whose ancestors are
      *                                                            walked for an enclosing finally block.
      *
@@ -204,6 +223,7 @@ final readonly class EagerTestRule implements RuleInterface
         $parent = $call->getAttribute('parent');
 
         while ($parent instanceof Node) {
+            // User view: choose the findings list branch for this case.
             if ($parent instanceof Node\Stmt\Finally_) {
                 return true;
             }
@@ -215,6 +235,8 @@ final readonly class EagerTestRule implements RuleInterface
     }
 
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param  Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Candidate call under inspection; only
      *                                                            method calls can be observations.
      * @param  string $name - Called method name resolved by the caller; compared against the lower-case
@@ -224,30 +246,37 @@ final readonly class EagerTestRule implements RuleInterface
      */
     private function isObservationCall(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call, string $name): bool
     {
+        // User view: choose the findings list branch for this case.
         if (!$call instanceof Expr\MethodCall) {
             return false;
         }
 
+        // User view: choose the findings list branch for this case.
         if ($this->isDirectThisCall($call)) {
             return true;
         }
 
+        // User view: choose the findings list branch for this case.
         if (in_array($name, self::SETUP_METHODS, true)) {
             return true;
         }
 
         $receiver = $this->receiverName($call->var);
 
+        // User view: choose the findings list branch for this case.
         if ($receiver === 'process' && in_array($name, self::PROCESS_HARNESS_METHODS, true)) {
             return true;
         }
 
+        // User view: missing data becomes the expected findings list state.
         return $receiver !== null
             && in_array($receiver, self::OBSERVATION_RECEIVERS, true)
             && $this->isObservationMethodName($name);
     }
 
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param  Expr\MethodCall $call - Method call whose receiver is checked for being the bare `$this` test case.
      *
      * @return bool - True when the call is a direct test-case helper call.
@@ -259,6 +288,8 @@ final readonly class EagerTestRule implements RuleInterface
     }
 
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param  Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Call to key by receiver; free functions
      *                                                            and self/parent/static yield null.
      *
@@ -266,16 +297,20 @@ final readonly class EagerTestRule implements RuleInterface
      */
     private function receiverKey(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): ?string
     {
+        // User view: choose the findings list branch for this case.
         if ($call instanceof Expr\FuncCall) {
             return null;
         }
 
+        // User view: choose the findings list branch for this case.
         if ($call instanceof Expr\StaticCall) {
+            // User view: choose the findings list branch for this case.
             if (!$call->class instanceof Node\Name) {
                 return null;
             }
 
             $class = strtolower($call->class->toString());
+            // User view: choose the findings list branch for this case.
             if (in_array($class, ['parent', 'self', 'static'], true)) {
                 return null;
             }
@@ -287,6 +322,8 @@ final readonly class EagerTestRule implements RuleInterface
     }
 
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param  Expr $receiver - Receiver expression to key; method-call chains are unwound to their root before keying.
      *
      * @return string|null - Receiver identity for method-call grouping.
@@ -297,14 +334,17 @@ final readonly class EagerTestRule implements RuleInterface
             $receiver = $receiver->var;
         }
 
+        // User view: choose the findings list branch for this case.
         if ($receiver instanceof Expr\Variable && is_string($receiver->name)) {
             return 'var:' . strtolower($receiver->name);
         }
 
+        // User view: choose the findings list branch for this case.
         if ($receiver instanceof Expr\New_ && $receiver->class instanceof Node\Name) {
             return 'new:' . strtolower($receiver->class->toString());
         }
 
+        // User view: choose the findings list branch for this case.
         if ($receiver instanceof Expr\PropertyFetch) {
             return $this->propertyReceiverKey($receiver);
         }
@@ -313,6 +353,8 @@ final readonly class EagerTestRule implements RuleInterface
     }
 
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param  Expr\PropertyFetch $receiver - Property access (such as `$this->sut`) keyed as owner plus
      *                                      property name; dynamic names yield null.
      *
@@ -320,11 +362,14 @@ final readonly class EagerTestRule implements RuleInterface
      */
     private function propertyReceiverKey(Expr\PropertyFetch $receiver): ?string
     {
+        // User view: choose the findings list branch for this case.
         if (!$receiver->name instanceof Node\Identifier) {
             return null;
         }
 
         $owner = $this->receiverExpressionKey($receiver->var);
+        // User view: choose the findings list branch for this case.
+        // User view: missing data becomes the expected findings list state.
         if ($owner === null) {
             return null;
         }
@@ -335,6 +380,8 @@ final readonly class EagerTestRule implements RuleInterface
     /**
      * Choose the receiver with the widest distinct call surface.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param  array<string, array<string, string>> $callsByReceiver - Distinct call-name sets keyed by receiver identity.
      *
      * @return array<string, string> - The single widest call set; empty when no receiver was recorded.
@@ -343,7 +390,9 @@ final readonly class EagerTestRule implements RuleInterface
     {
         $largest = [];
 
+        // User view: add each item that can appear in findings list.
         foreach ($callsByReceiver as $calls) {
+            // User view: choose the findings list branch for this case.
             if (count($calls) > count($largest)) {
                 $largest = $calls;
             }
@@ -353,6 +402,8 @@ final readonly class EagerTestRule implements RuleInterface
     }
 
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param  Expr $receiver - Receiver expression unwound through method-call chains to its root variable.
      *
      * @return string|null - Receiver variable name, or null for dynamic/non-variable receivers.
@@ -363,6 +414,7 @@ final readonly class EagerTestRule implements RuleInterface
             $receiver = $receiver->var;
         }
 
+        // User view: choose the findings list branch for this case.
         if (!$receiver instanceof Expr\Variable || !is_string($receiver->name)) {
             return null;
         }
@@ -371,13 +423,17 @@ final readonly class EagerTestRule implements RuleInterface
     }
 
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param  string $name - Method name to classify against the get/has/is prefixes and the bare `count` reader.
      *
      * @return bool - True when the method name follows a result-observation convention.
      */
     private function isObservationMethodName(string $name): bool
     {
+        // User view: add each item that can appear in findings list.
         foreach (self::OBSERVATION_METHOD_PREFIXES as $prefix) {
+            // User view: choose the findings list branch for this case.
             if (str_starts_with($name, $prefix)) {
                 return true;
             }
@@ -389,6 +445,8 @@ final readonly class EagerTestRule implements RuleInterface
     /**
      * Collect variables that receive assertion result values.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param  TestQualityScope $scope - Test method whose assignments are scanned for call-result variables.
      *
      * @return array<string, true> - Set of local variable names (keyed by name) that hold a call result.
@@ -397,11 +455,14 @@ final readonly class EagerTestRule implements RuleInterface
     {
         $variables = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (NodeIndex::descendantsOfAny($scope->node, [Expr\Assign::class]) as $assign) {
+            // User view: choose the findings list branch for this case.
             if (!$assign->var instanceof Expr\Variable || !is_string($assign->var->name)) {
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
             if ($this->isCallChainExpression($assign->expr)) {
                 $variables[$assign->var->name] = true;
             }
@@ -413,6 +474,8 @@ final readonly class EagerTestRule implements RuleInterface
     /**
      * Detect call-chain expressions whose assigned variables represent result values.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param  Expr $expr - Right-hand side of an assignment; a call expression marks its target as a result variable.
      *
      * @return bool - True when the expression is a call result.
@@ -429,6 +492,8 @@ final readonly class EagerTestRule implements RuleInterface
     }
 
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param  Expr                $receiver - Receiver expression unwound to its root variable before
      *                                              the membership test.
      * @param  array<string, true> $resultVariables - Result-variable name set from collectResultVariables(),

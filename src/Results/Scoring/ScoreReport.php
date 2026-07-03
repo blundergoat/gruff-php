@@ -10,6 +10,8 @@ namespace GruffPhp\Results\Scoring;
 final readonly class ScoreReport
 {
     /**
+      * User flow: Turns findings into score and trend signals users track.
+      *
      * @param Grade              $composite - Overall grade for the analysis run.
      * @param list<PillarScore>  $pillars - Pillar scores included in the report.
      * @param list<FileScore>    $topOffenders - Lowest-scoring files shown in reports.
@@ -28,6 +30,8 @@ final readonly class ScoreReport
     }
 
     /**
+      * User flow: Turns findings into score and trend signals users track.
+      *
      * @return array{
      *     composite: array{score: float, grade: string},
      *     pillars: list<array{

@@ -49,6 +49,8 @@ final class PathTraversalFileAccessRule implements RuleInterface
     /**
      * Describe the path traversal file access rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -67,6 +69,8 @@ final class PathTraversalFileAccessRule implements RuleInterface
     /**
      * Find filesystem sinks that receive request-controlled paths.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -76,14 +80,20 @@ final class PathTraversalFileAccessRule implements RuleInterface
     {
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
             $name = SecurityNodeHelper::globalFunctionName($call);
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($name === null || !isset(self::PATH_ARGUMENTS[$name])) {
                 continue;
             }
 
+            // User view: add each item that can appear in findings list.
             foreach (self::PATH_ARGUMENTS[$name] as $argumentIndex) {
                 $pathArg = SecurityNodeHelper::argumentValue($call->args, $argumentIndex);
+                // User view: choose the findings list branch for this case.
+                // User view: missing data becomes the expected findings list state.
                 if ($pathArg === null || SecurityNodeHelper::containsUrlLiteral($pathArg) || !SecurityNodeHelper::containsUserInput($pathArg)) {
                     continue;
                 }
@@ -93,12 +103,16 @@ final class PathTraversalFileAccessRule implements RuleInterface
             }
         }
 
+        // User view: add each item that can appear in findings list.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\New_::class) as $new) {
+            // User view: choose the findings list branch for this case.
             if (!SecurityNodeHelper::hasMatchingClassName($new->class, ['FilesystemIterator', 'RecursiveDirectoryIterator', 'SplFileObject'])) {
                 continue;
             }
 
             $pathArg = SecurityNodeHelper::argumentValue($new->args, 0);
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($pathArg !== null && SecurityNodeHelper::containsUserInput($pathArg)) {
                 $findings[] = $this->finding($analysisUnit, $new, 'filesystem-object');
             }
@@ -110,6 +124,8 @@ final class PathTraversalFileAccessRule implements RuleInterface
     /**
      * Build the path traversal finding.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit supplying the display path recorded on the finding.
      * @param Node         $node - Call or `new` node whose start line localises the finding for the reviewer.
      * @param string       $sink - Sink label (function name, or `filesystem-object`) recorded on the finding.

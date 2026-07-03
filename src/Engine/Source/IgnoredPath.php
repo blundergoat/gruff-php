@@ -10,6 +10,8 @@ namespace GruffPhp\Engine\Source;
 final readonly class IgnoredPath
 {
     /**
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param string      $path - Project-relative display path that was ignored.
      * @param string      $source - Reason category: config, default, generated, or gitignore.
      * @param string|null $pattern - Matching glob, directory token, filename, or git rule.
@@ -24,6 +26,8 @@ final readonly class IgnoredPath
     /**
      * Build an ignored-path detail from a path and the engine decision that excluded it.
      *
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param string         $path - Display path that was ignored.
      * @param IgnoreDecision $decision - Engine decision carrying the source and pattern.
      *
@@ -32,12 +36,15 @@ final readonly class IgnoredPath
     public static function from(string $path, IgnoreDecision $decision): self
     {
         // A decision with no recorded source is treated as a config exclusion, the default ignore origin.
+        // User view: missing data becomes a safe source analysis default.
         return new self($path, $decision->source ?? PathIgnoreResolver::SOURCE_CONFIG, $decision->pattern);
     }
 
     /**
      * Serialize the ignored-path detail into the report array shape.
      *
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @return array{path: string, source: string, pattern: string|null} - report row; pattern is null when the exclusion had no concrete match string
      */
     public function toArray(): array

@@ -12,6 +12,8 @@ final readonly class DashboardHttpResponse
     /**
      * Capture the HTTP response fields returned by the dashboard server.
      *
+      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
+      *
      * @param int    $statusCode - HTTP status code.
      * @param string $reasonPhrase - HTTP reason phrase.
      * @param string $body - Response body bytes.

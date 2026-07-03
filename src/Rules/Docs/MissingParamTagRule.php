@@ -32,6 +32,8 @@ final readonly class MissingParamTagRule implements RuleInterface
     /**
      * Describe the missing @param tag rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -49,6 +51,8 @@ final readonly class MissingParamTagRule implements RuleInterface
     /**
      * Find documented function-like declarations with undocumented parameters, at any visibility.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -61,16 +65,21 @@ final readonly class MissingParamTagRule implements RuleInterface
 
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
             $docComment = $node->getDocComment();
 
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
+            // User view: an empty value becomes a clear findings list fallback.
             if ($docComment === null || $node->params === []) {
                 continue;
             }
 
             $docText = $docComment->getText();
 
+            // User view: choose the findings list branch for this case.
             if (!$this->hasContractDoc($docText)) {
                 continue;
             }
@@ -78,13 +87,16 @@ final readonly class MissingParamTagRule implements RuleInterface
             $documentedParams = $this->extractParamNames($docText);
             $symbol           = CyclomaticComplexityRule::resolveSymbol($node);
 
+            // User view: add each item that can appear in findings list.
             foreach ($node->params as $param) {
+                // User view: choose the findings list branch for this case.
                 if (!$param->var instanceof Variable || !is_string($param->var->name)) {
                     continue;
                 }
 
                 $paramName = $param->var->name;
 
+                // User view: choose the findings list branch for this case.
                 if (in_array($paramName, $documentedParams, true)) {
                     continue;
                 }
@@ -112,6 +124,8 @@ final readonly class MissingParamTagRule implements RuleInterface
      * Extract parameter names documented by @param tags. Depth-aware so multi-line array shapes match the
      * closing documented variable even when it sits on a different line from the `@param` token.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $docText - Raw docblock text.
      *
      * @return list<string> - Parameter names found in the docblock.
@@ -125,6 +139,7 @@ final readonly class MissingParamTagRule implements RuleInterface
 
         while ($position < $length) {
             $tagPosition = strpos($stripped, '@param', $position);
+            // User view: choose the findings list branch for this case.
             if ($tagPosition === false) {
                 break;
             }
@@ -135,14 +150,18 @@ final readonly class MissingParamTagRule implements RuleInterface
             // `@param-immutable`, etc. (which document output-only or constraint
             // semantics, not an input parameter) would be treated as `@param`
             // and falsely suppress the missing-input-tag finding.
+            // User view: choose the findings list branch for this case.
             if ($position < $length) {
                 $next = $stripped[$position];
+                // User view: choose the findings list branch for this case.
                 if ($next === '-' || ctype_alnum($next) || $next === '_') {
                     continue;
                 }
             }
 
             $varName = self::scanForParamVariable($stripped, $length, $position);
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($varName !== null) {
                 $paramNames[] = $varName;
             }
@@ -156,6 +175,8 @@ final readonly class MissingParamTagRule implements RuleInterface
      * first parameter variable token reached at depth zero. Stops at the next `@tag` (next docblock entry) or
      * end of input.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $stripped - Docblock text with `/**`, ` * `, and `*\/` framing removed.
      * @param int    $length - Pre-computed `strlen($stripped)` to avoid recomputation per call.
      * @param int    $position - Cursor position (mutated to point past the matched variable).
@@ -168,13 +189,16 @@ final readonly class MissingParamTagRule implements RuleInterface
         while ($position < $length) {
             $character = $stripped[$position];
 
+            // User view: choose the findings list branch for this case.
             if ($character === '{' || $character === '<' || $character === '[' || $character === '(') {
                 $depth++;
                 $position++;
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
             if ($character === '}' || $character === '>' || $character === ']' || $character === ')') {
+                // User view: choose the findings list branch for this case.
                 if ($depth > 0) {
                     $depth--;
                 }
@@ -182,12 +206,14 @@ final readonly class MissingParamTagRule implements RuleInterface
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
             if ($depth === 0 && $character === '@') {
                 // Reached the next tag before a variable; this @param has no input name.
                 return null;
             }
 
             // Anchored regex pulls the `$name` token at the current cursor position; the `/A` anchor enforces start-at-offset.
+            // User view: choose the findings list branch for this case.
             if ($depth === 0 && $character === '$' && preg_match('/\$(\w+)/A', $stripped, $matches, 0, $position) === 1) {
                 $position += strlen($matches[0]);
 
@@ -205,29 +231,39 @@ final readonly class MissingParamTagRule implements RuleInterface
      * depth-aware parser. Newlines are preserved so multi-line bracketed shapes keep their line breaks
      * for caller inspection; only the per-line `*` decoration is stripped.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $docText - Raw docblock text including its `/**`, ` * `, and `*\/` framing.
      *
      * @return string - Docblock text without framing characters.
      */
     private static function stripDocFraming(string $docText): string
     {
+        // User view: missing data becomes a safe findings list default.
         $stripped = preg_replace('/^\s*\/\*\*+/', '', $docText) ?? '';
+        // User view: missing data becomes a safe findings list default.
         $stripped = preg_replace('/\*\/\s*$/', '', $stripped) ?? '';
 
+        // User view: missing data becomes a safe findings list default.
         return preg_replace('/^\s*\*\s?/m', '', $stripped) ?? '';
     }
 
     /**
      * Check whether a docblock carries enough contract text to require @param tags.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $docText - Raw docblock text scanned for prose or contract-bearing tags.
      *
      * @return bool - True when parameter tags should be enforced.
      */
     private function hasContractDoc(string $docText): bool
     {
+        // User view: add each item that can appear in findings list.
         foreach (preg_split('/\R/', $docText) ?: [] as $line) {
             $line = trim($line, " \t\n\r\0\x0B/*");
+            // User view: choose the findings list branch for this case.
+            // User view: an empty value becomes a clear findings list fallback.
             if ($line === '' || str_starts_with($line, '@')) {
                 continue;
             }

@@ -19,6 +19,8 @@ final readonly class HtmlReporter
     /**
      * Build the HTML reporter with the project root and editor-link preferences.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param string $projectRoot - Project root used to build editor links.
      * @param string $editorLink - Editor-link mode used in finding rows.
      * @param bool   $interactive - Whether interactive filtering controls should be included.
@@ -33,6 +35,8 @@ final readonly class HtmlReporter
     /**
      * Render the full inspection report as a single HTML document.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param AnalysisReport $report - Analysis report to render.
      *
      * @return string - a complete standalone HTML document (doctype through closing html), inlining the styles and the filter script in interactive
@@ -41,7 +45,9 @@ final readonly class HtmlReporter
     public function render(AnalysisReport $report): string
     {
         $score        = $report->score;
+        // User view: missing data becomes a safe report output default.
         $grade        = $score?->composite->letter ?? 'n/a';
+        // User view: missing data becomes the expected report output state.
         $numericScore = $score === null ? 'n/a' : sprintf('%.2f / 100', $score->composite->score);
         $counts       = $report->findingCounts();
         $title        = sprintf('gruff-php inspection report - %s', $grade);
@@ -55,6 +61,7 @@ final readonly class HtmlReporter
                . '<meta charset="UTF-8">' . PHP_EOL
                . '<meta name="viewport" content="width=device-width, initial-scale=1.0">' . PHP_EOL
                . sprintf('<title>%s</title>', $this->escape($title)) . PHP_EOL
+               // User view: an empty value becomes a clear report output fallback.
                . '<style>' . HtmlReportAssets::css($report->diagnostics !== [], $this->interactive) . '</style>' . PHP_EOL
                . '</head>' . PHP_EOL
                . '<body>' . PHP_EOL
@@ -76,13 +83,17 @@ final readonly class HtmlReporter
     /**
      * Render the report masthead (brand, paths, scope, format).
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param AnalysisReport $report - Report whose requested paths, diff scope, format, and tool version label the header.
      *
      * @return string - the masthead header fragment carrying the brand, the resolved paths/scope/format meta panel, and the tool version
      */
     private function masthead(AnalysisReport $report): string
     {
+        // User view: an empty value becomes a clear report output fallback.
         $paths     = $report->requestedPaths === [] ? ['.'] : $report->requestedPaths;
+        // User view: missing data becomes the expected report output state.
         $diffLabel = $report->diff !== null && $report->diff->active
             ? sprintf('%s · %d changed files', $report->diff->mode, count($report->diff->changedFiles))
             : 'full project';
@@ -101,18 +112,23 @@ final readonly class HtmlReporter
     /**
      * Render the diagnostics section listing run messages, or empty when there are none.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param AnalysisReport $report - Report whose run diagnostics drive the section; an empty list omits it entirely.
      *
      * @return string - the diagnostics section wrapping one row per run message, or an empty string when there are no diagnostics
      */
     private function diagnostics(AnalysisReport $report): string
     {
+        // User view: choose the report output branch for this case.
+        // User view: an empty value becomes a clear report output fallback.
         if ($report->diagnostics === []) {
             return '';
         }
 
         $html = '<section class="diagnostics"><h2 class="section-head">diagnostics <span class="aside">run messages</span></h2><div class="diagnostic-list">';
 
+        // User view: add each item that can appear in report output.
         foreach ($report->diagnostics as $diagnostic) {
             $html .= $this->diagnosticRow($diagnostic);
         }
@@ -121,6 +137,8 @@ final readonly class HtmlReporter
     }
 
     /**
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param string                                                     $grade - Composite letter grade already resolved by the caller;
      *                                                                                 rendered into the grade stamp.
      * @param string                                                     $numericScore - Pre-formatted "NN.NN / 100" score string, or "n/a" when no
@@ -159,6 +177,8 @@ final readonly class HtmlReporter
      * grade, score (2dp), findings, and per-severity counts, sorted by
      * findings DESC then pillar ASC.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param AnalysisReport $report - Report whose applicable pillar scores populate the table (mutation excluded).
      *
      * @return string - the pillars section table, one row per applicable pillar, or a "No pillars." placeholder row when none apply
@@ -177,10 +197,13 @@ final readonly class HtmlReporter
                 . '<th scope="col" class="num">error</th>'
                 . '</tr></thead><tbody>';
 
+        // User view: choose the report output branch for this case.
+        // User view: an empty value becomes a clear report output fallback.
         if ($rows === []) {
             $html .= '<tr><td colspan="7">No pillars.</td></tr>';
         }
 
+        // User view: add each item that can appear in report output.
         foreach ($rows as $pillar) {
             $html .= $this->pillarRow($pillar);
         }
@@ -191,20 +214,26 @@ final readonly class HtmlReporter
     /**
      * Render the top-offenders table sorted by score.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param AnalysisReport $report - Report whose score supplies the ranked offender files; no score yields an empty table.
      *
      * @return string - the top-offenders section table, one row per ranked file, or a "No offenders found." placeholder when there are none
      */
     private function offenders(AnalysisReport $report): string
     {
+        // User view: missing data becomes the expected report output state.
         $items = $report->score === null ? [] : $report->score->topOffenders;
         $html  = '<section class="offenders"><h2 class="section-head">top offenders <span class="aside">sorted by score</span></h2>'
                  . '<table class="offender-list"><thead><tr><th scope="col">file</th><th scope="col" class="num">cyclo</th><th scope="col" class="num">cognit.</th><th scope="col" class="num">LOC</th><th scope="col" class="num">findings</th><th scope="col" class="num">grade</th></tr></thead><tbody>';
 
+        // User view: choose the report output branch for this case.
+        // User view: an empty value becomes a clear report output fallback.
         if ($items === []) {
             $html .= '<tr><td colspan="6">No offenders found.</td></tr>';
         }
 
+        // User view: add each item that can appear in report output.
         foreach ($items as $item) {
             $html .= $this->offenderRow($item);
         }
@@ -215,17 +244,22 @@ final readonly class HtmlReporter
     /**
      * Render the cyclomatic-complexity distribution histogram.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param AnalysisReport $report - Report whose complexity distribution buckets become histogram bars; empty renders a flat chart.
      *
      * @return string - the distribution chart section: the summary sentence, one histogram bar per CC bucket, and the bucket-label axis
      */
     private function distribution(AnalysisReport $report): string
     {
+        // User view: missing data becomes the expected report output state.
         $distribution = $report->score === null ? [] : $report->score->complexityDistribution;
+        // User view: an empty value becomes a clear report output fallback.
         $maximumCount = max(1, ...array_values($distribution === [] ? [0] : $distribution));
         $bars         = '';
         $axis         = '';
 
+        // User view: add each item that can appear in report output.
         foreach ($distribution as $label => $count) {
             $height = max(4, (int)round(($count / $maximumCount) * 100));
             $class  = in_array($label, ['16-20', '21+'], true) ? ' fail' : (in_array($label, ['11-15'], true) ? ' warn' : '');
@@ -242,6 +276,8 @@ final readonly class HtmlReporter
     /**
      * Render the flagged-findings section with optional interactive filters.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param AnalysisReport $report - Report whose findings become rows; the filter form is added only in interactive mode.
      *
      * @return string - the flagged-findings section: the optional filter form, one card per finding, or a "No findings." placeholder when empty
@@ -256,10 +292,13 @@ final readonly class HtmlReporter
             $listAttributes,
         );
 
+        // User view: choose the report output branch for this case.
+        // User view: an empty value becomes a clear report output fallback.
         if ($report->findings === []) {
             $html .= '<div class="empty">No findings.</div>';
         }
 
+        // User view: add each item that can appear in report output.
         foreach ($report->findings as $finding) {
             $html .= $this->findingRow($finding);
         }
@@ -270,6 +309,8 @@ final readonly class HtmlReporter
     /**
      * Render the report footer with tool version and schema id.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param AnalysisReport $report - Report supplying the tool version shown in the footer (schema id is a class constant).
      *
      * @return string - the footer band carrying the tool version, the tagline, and the schema id
@@ -286,14 +327,20 @@ final readonly class HtmlReporter
     /**
      * Render a single row of the canonical pillars table.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param PillarScore $pillar - Pillar score for this row; a null grade renders "n/a" and a neutral grade pill.
      *
      * @return string - one table row pairing the pillar name and grade pill with its score, finding total, and per-severity counts
      */
     private function pillarRow(PillarScore $pillar): string
     {
+        // User view: missing data becomes the expected report output state.
         $grade      = $pillar->grade === null ? 'n/a' : $pillar->grade->letter;
+        // User view: missing data becomes the expected report output state.
+        // User view: missing data becomes a safe report output default.
         $gradeClass = $pillar->grade === null ? 'n' : strtolower($grade[0] ?? 'n');
+        // User view: missing data becomes the expected report output state.
         $score      = $pillar->grade === null ? 'n/a' : sprintf('%.2f', $pillar->grade->score);
 
         return '<tr>'
@@ -313,22 +360,29 @@ final readonly class HtmlReporter
      * data without recomputing severity counts or scores. The mutation pillar
      * is excluded so the HTML keeps mutation details in findings.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param AnalysisReport $report - Report whose pillar scores are filtered and sorted; a null score yields no rows.
      *
      * @return list<PillarScore> - applicable, mutation-excluded pillars in table display order (findings DESC, then pillar ASC); empty when no score
      */
     private function pillarSummaryRows(AnalysisReport $report): array
     {
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($report->score === null) {
             return [];
         }
 
         $rows = [];
+        // User view: add each item that can appear in report output.
         foreach ($report->score->pillars as $pillar) {
+            // User view: choose the report output branch for this case.
             if (!$pillar->applicable) {
                 continue;
             }
 
+            // User view: choose the report output branch for this case.
             if (strtolower($pillar->pillar) === 'mutation') {
                 continue;
             }
@@ -347,6 +401,8 @@ final readonly class HtmlReporter
      * Return the CSS tier class for a per-severity count cell. Zero-valued
      * cells stay neutral so a clean pillar reads as visually quiet.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param int    $count - Number of findings at this severity; zero suppresses the colour class.
      * @param string $tier - CSS class applied when the count is positive (for example "note", "warn", "fail").
      *
@@ -360,6 +416,8 @@ final readonly class HtmlReporter
     /**
      * Render a single row of the top-offenders table.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param FileScore $file - Per-file score for this row; complexity and LOC metrics may be null and render "n/a".
      *
      * @return string - one table row pairing the file path and grade pill with its cyclomatic, cognitive, LOC, and finding metrics
@@ -379,6 +437,8 @@ final readonly class HtmlReporter
     /**
      * Render a single flagged-finding row with severity, rule, and location.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param Finding $finding - Finding to render; its fields also become data-* filter attributes in interactive mode.
      *
      * @return string - one finding card: the severity badge, rule id, message, location, and pillar, plus filter data-* attributes in interactive
@@ -414,6 +474,8 @@ final readonly class HtmlReporter
     /**
      * Render a label-value pair for the masthead meta panel.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param string $label - Short uppercase key shown on the left (for example "paths", "scope", "format").
      * @param string $displayText - Already-resolved value text shown on the right; escaped here, not by the caller.
      *
@@ -431,6 +493,8 @@ final readonly class HtmlReporter
     /**
      * Render a single statistic block inside the verdict stats grid.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param string $number - Pre-stringified count shown large (the caller casts the integer total/severity tally).
      * @param string $label - Lowercase caption under the number (for example "findings", "errors").
      * @param string $class - Severity colour class for the number ("fail", "warn", "note"), or empty for the neutral total.
@@ -450,6 +514,8 @@ final readonly class HtmlReporter
     /**
      * Render concise score-context notes for the HTML report.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param AnalysisReport $report - Report whose score, diff, baseline, filters, and mutation inputs become driver notes.
      *
      * @return string - the "score drivers" list of explanation, diff, baseline-movement, filter, and mutation notes, or an empty string when no
@@ -457,16 +523,22 @@ final readonly class HtmlReporter
      */
     private function scoreContext(AnalysisReport $report): string
     {
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($report->score === null) {
             return '';
         }
 
         $items = [$report->score->explanation];
 
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($report->diff !== null && $report->diff->active) {
             $items[] = $report->diff->message;
         }
 
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($report->baseline !== null) {
             $items[] = sprintf(
                 'Baseline movement: %d new, %d unchanged, %d resolved; unchanged findings are accepted debt removed before scoring.',
@@ -475,8 +547,10 @@ final readonly class HtmlReporter
                 $report->baseline->absentCount,
             );
 
+            // User view: choose the report output branch for this case.
             if ($report->shouldListAbsentBaseline) {
                 // One score-driver note per fixed group so the HTML report credits the cleanup work.
+                // User view: add each item that can appear in report output.
                 foreach ($report->baseline->staleEntries as $resolvedEntry) {
                     $items[] = sprintf(
                         'Resolved: %s %s (resolved %d): %s',
@@ -489,10 +563,14 @@ final readonly class HtmlReporter
             }
         }
 
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($report->filters !== null && $report->filters->isActive()) {
             $items[] = 'Display filters affect rendered findings only; score and exit code use the scored finding set.';
         }
 
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($report->mutation !== null) {
             $items[] = sprintf(
                 'Mutation input from %s contributes MSI to the score; HTML keeps mutation details in findings rather than a separate mutation visualization.',
@@ -501,6 +579,7 @@ final readonly class HtmlReporter
         }
 
         $list = '';
+        // User view: add each item that can appear in report output.
         foreach ($items as $item) {
             $list .= sprintf('<li>%s</li>', $this->escape($item));
         }
@@ -511,16 +590,21 @@ final readonly class HtmlReporter
     /**
      * Stringify an optional integer; null renders as "n/a".
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param int|null $integer - Metric value, or null when the offender row has no measurement for that column.
      *
      * @return string - the integer as a decimal string, or "n/a" when the value is null so empty cells read explicitly
      */
     private function optionalInt(?int $integer): string
     {
+        // User view: missing data becomes the expected report output state.
         return $integer === null ? 'n/a' : (string)$integer;
     }
 
     /**
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param AnalysisReport                                             $report - Report whose findings are scanned to count the distinct pillars
      *                                                                           carrying warnings/errors.
      * @param array{advisory: int, warning: int, error: int, total: int} $counts - Severity tallies used to decide whether the summary is clean or thresholded.
@@ -531,12 +615,15 @@ final readonly class HtmlReporter
     {
         $thresholdFindings = $counts['warning'] + $counts['error'];
 
+        // User view: choose the report output branch for this case.
         if ($thresholdFindings === 0) {
             return 'No warning or error findings flagged.';
         }
 
         $pillars = [];
+        // User view: add each item that can appear in report output.
         foreach ($report->findings as $finding) {
+            // User view: choose the report output branch for this case.
             if (!in_array($finding->severity->value, ['warning', 'error'], true)) {
                 continue;
             }
@@ -554,14 +641,19 @@ final readonly class HtmlReporter
     }
 
     /**
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param array<string, int> $distribution - Complexity bucket counts keyed by range label; absent buckets are treated as zero.
      *
      * @return string - a one-line summary of how many methods exceed CC 10, with the per-bucket split across 11-15, 16-20, and 21+
      */
     private function cyclomaticSummary(array $distribution): string
     {
+        // User view: missing data becomes a safe report output default.
         $moderate = $distribution['11-15'] ?? 0;
+        // User view: missing data becomes a safe report output default.
         $high     = $distribution['16-20'] ?? 0;
+        // User view: missing data becomes a safe report output default.
         $severe   = $distribution['21+'] ?? 0;
         $exceeds  = $moderate + $high + $severe;
 
@@ -579,6 +671,8 @@ final readonly class HtmlReporter
     /**
      * Render a clickable file-and-line span; emits an editor-link anchor when configured.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param string   $filePath - Report-relative or absolute path shown to the reader and carried in data-path.
      * @param int|null $line - Line number appended after a colon, or null to show the path alone (used for file-level rows).
      *
@@ -587,10 +681,13 @@ final readonly class HtmlReporter
      */
     private function locationMarkup(string $filePath, ?int $line): string
     {
+        // User view: missing data becomes the expected report output state.
         $text              = $line === null ? $filePath : sprintf('%s:%d', $filePath, $line);
         $locationAttribute = sprintf(' data-path="%s"', $this->escape($text));
         $href              = $this->editorHref($filePath, $line);
 
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($href !== null) {
             return sprintf(
                 '<a class="loc-link" href="%s"%s>%s</a>',
@@ -606,6 +703,8 @@ final readonly class HtmlReporter
     /**
      * Build the editor-link URL for the configured editor, or null when disabled.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param string   $filePath - Path to open; resolved to absolute before being encoded into the editor URL.
      * @param int|null $line - Target line for the editor to jump to, or null to open the file without a line anchor.
      *
@@ -614,6 +713,7 @@ final readonly class HtmlReporter
      */
     private function editorHref(string $filePath, ?int $line): ?string
     {
+        // User view: choose the report output branch for this case.
         if ($this->editorLink === 'none') {
             return null;
         }
@@ -622,6 +722,7 @@ final readonly class HtmlReporter
 
         return match ($this->editorLink) {
             'vscode' => $this->vscodeHref($absolutePath, $line),
+            // User view: missing data becomes the expected report output state.
             'phpstorm' => 'phpstorm://open?file=' . rawurlencode($absolutePath) . ($line === null ? '' : '&line=' . $line),
             default => null,
         };
@@ -630,6 +731,8 @@ final readonly class HtmlReporter
     /**
      * Build a VS Code file protocol URL for Unix, Windows drive, and UNC paths.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param string   $absolutePath - Absolute filesystem path; separators are normalised and each segment URL-encoded.
      * @param int|null $line - Line to open at, appended as ":line", or null to open the file without a line anchor.
      *
@@ -642,6 +745,7 @@ final readonly class HtmlReporter
         $segments        = explode('/', $path);
         $encodedSegments = [];
 
+        // User view: add each item that can appear in report output.
         foreach ($segments as $index => $segment) {
             // Match a Windows drive segment so the drive colon remains usable by VS Code.
             $encodedSegments[] = $index === 0 && preg_match('/^[A-Za-z]:$/', $segment) === 1
@@ -650,27 +754,34 @@ final readonly class HtmlReporter
         }
 
         $encodedPath = implode('/', $encodedSegments);
+        // User view: choose the report output branch for this case.
         if (!str_starts_with($encodedPath, '/')) {
             $encodedPath = '/' . $encodedPath;
         }
 
+        // User view: missing data becomes the expected report output state.
         return 'vscode://file' . $encodedPath . ($line === null ? '' : ':' . $line);
     }
 
     /**
      * Resolve the absolute path of a report-relative file path, using the configured project root.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param string $filePath - Path from a finding; already-absolute paths pass through, relative ones join the project root.
      *
      * @return string - the path unchanged when already absolute, otherwise the relative path joined onto the project root (falling back to cwd)
      */
     private function absolutePath(string $filePath): string
     {
+        // User view: choose the report output branch for this case.
         if (PathHelper::isAbsolute($filePath)) {
             return $filePath;
         }
 
         $projectRoot = $this->projectRoot;
+        // User view: choose the report output branch for this case.
+        // User view: an empty value becomes a clear report output fallback.
         if ($projectRoot === '') {
             $cwd         = getcwd();
             $projectRoot = is_string($cwd) ? $cwd : '';
@@ -682,6 +793,8 @@ final readonly class HtmlReporter
     /**
      * Render the interactive filter form for findings (severity, pillar, path, text, group-by).
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param AnalysisReport $report - Report whose findings supply the distinct pillar options and the total finding count.
      *
      * @return string - the filter form: the severity and pillar multi-selects, path and search inputs, group-by radios, and the live finding count
@@ -690,6 +803,7 @@ final readonly class HtmlReporter
     {
         $pillars = [];
 
+        // User view: add each item that can appear in report output.
         foreach ($report->findings as $finding) {
             $pillars[$finding->pillar->value] = true;
         }
@@ -697,6 +811,7 @@ final readonly class HtmlReporter
         ksort($pillars);
 
         $pillarOptions = '';
+        // User view: add each item that can appear in report output.
         foreach (array_keys($pillars) as $pillar) {
             $pillarOptions .= sprintf('<option value="%s">%s</option>', $this->escape($pillar), $this->escape($pillar));
         }
@@ -725,6 +840,8 @@ final readonly class HtmlReporter
     /**
      * Render a single row of the diagnostics list.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param RunDiagnostic $diagnostic - Diagnostic whose type, message, and optional location populate the row.
      *
      * @return string - one diagnostic line: the type label, the message, and (when present) the file/line it points at
@@ -742,6 +859,8 @@ final readonly class HtmlReporter
     /**
      * Render the file-and-line span for a diagnostic, or empty when no location is set.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param RunDiagnostic $diagnostic - Diagnostic whose filePath or path locates it; a line is appended only with a filePath.
      *
      * @return string - the location span (filePath or path, with a line appended only alongside a filePath), or an empty string when no location is
@@ -749,12 +868,17 @@ final readonly class HtmlReporter
      */
     private function diagnosticLocation(RunDiagnostic $diagnostic): string
     {
+        // User view: missing data becomes a safe report output default.
         $location = $diagnostic->filePath ?? $diagnostic->path;
 
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($location === null) {
             return '';
         }
 
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($diagnostic->filePath !== null && $diagnostic->line !== null) {
             $location .= ':' . $diagnostic->line;
         }
@@ -765,6 +889,8 @@ final readonly class HtmlReporter
     /**
      * Escape a value for safe insertion into HTML attribute or text content.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param string $text - Untrusted text (path, message, label) to neutralise before it reaches the document.
      *
      * @return string - the text with HTML special characters and quotes escaped (and invalid bytes substituted) so it is safe in both attribute and

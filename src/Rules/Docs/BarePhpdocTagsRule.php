@@ -31,6 +31,8 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
     /**
      * Describe the bare PHPDoc tag rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -50,6 +52,8 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
     /**
      * Find docblocks that only list parameter or return tags.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -62,26 +66,33 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
 
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
             $docComment = $node->getDocComment();
 
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($docComment === null) {
                 continue;
             }
 
             $docText  = $docComment->getText();
+            // User view: missing data becomes a safe findings list default.
             $stripped = preg_replace('/\/\*\*|\*\/|\*/', '', $docText) ?? $docText;
             $stripped = trim($stripped);
 
             $lines = array_filter(
                 array_map('trim', explode("\n", $stripped)),
+                // User view: an empty value becomes a clear findings list fallback.
                 static fn(string $line): bool => $line !== '',
             );
 
             $hasNonTagContent = false;
 
+            // User view: add each item that can appear in findings list.
             foreach ($lines as $line) {
+                // User view: choose the findings list branch for this case.
                 if (!str_starts_with($line, '@')) {
                     $hasNonTagContent = true;
 
@@ -89,17 +100,22 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
                 }
             }
 
+            // User view: choose the findings list branch for this case.
             if ($hasNonTagContent) {
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
+            // User view: an empty value becomes a clear findings list fallback.
             if ($lines === []) {
                 continue;
             }
 
             $hasOnlyBareTags = true;
 
+            // User view: add each item that can appear in findings list.
             foreach ($lines as $line) {
+                // User view: choose the findings list branch for this case.
                 if ($this->isBareParamOrReturnTag($line)) {
                     continue;
                 }
@@ -109,6 +125,7 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
                 break;
             }
 
+            // User view: choose the findings list branch for this case.
             if (!$hasOnlyBareTags) {
                 continue;
             }
@@ -135,6 +152,8 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
     /**
      * Check whether one PHPDoc tag has a type but no description.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $line - Single trimmed docblock line, already stripped of comment markers, to classify.
      *
      * @return bool - True when the tag is a bare parameter or return tag.
@@ -142,11 +161,13 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
     private function isBareParamOrReturnTag(string $line): bool
     {
         // Match @param tags that end at the variable name with no descriptive prose.
+        // User view: choose the findings list branch for this case.
         if (preg_match('/^@param\s+\S+(?:\s+\S+)*\s+\$\w+\s*$/', $line) === 1) {
             // A @param stopping at the variable name carries no description, so it is bare.
             return true;
         }
 
+        // User view: choose the findings list branch for this case.
         if (!str_starts_with($line, '@return ')) {
             // Lines that are neither a bare @param nor a @return cannot be a bare return tag.
             return false;

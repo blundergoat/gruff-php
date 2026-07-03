@@ -25,6 +25,8 @@ final readonly class ThresholdTrip
     public const SCOPE_NEW = 'new';
 
     /**
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param string $thresholdKind - Threshold that tripped: "total" or a severity value (advisory, warning, error).
      * @param int    $count - Actual finding count observed for the threshold.
      * @param int    $cap - Configured maximum that was exceeded.
@@ -41,6 +43,8 @@ final readonly class ThresholdTrip
     /**
      * Return a copy of this trip re-scoped to the given finding set.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param string $scope - Scope to apply: "total" or "new".
      *
      * @return self - new trip with the same kind/count/cap but the supplied scope; the original is left unchanged
@@ -54,6 +58,8 @@ final readonly class ThresholdTrip
     /**
      * Build a one-line human-readable description of the trip.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @return string - one-line gate-failure explanation naming the overflowing severity (or total) and the breached cap
      */
     public function message(): string
@@ -69,6 +75,8 @@ final readonly class ThresholdTrip
     /**
      * Serialize this value object into the array shape used by reports.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @return array{thresholdKind: string, count: int, cap: int, scope: string, message: string} - flat report payload with the pre-rendered message
      *                              included alongside the raw fields
      */

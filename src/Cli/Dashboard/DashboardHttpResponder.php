@@ -12,6 +12,8 @@ use RuntimeException;
 final class DashboardHttpResponder
 {
     /**
+      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
+      *
      * @param resource              $client - Socket client receiving the dashboard response.
      * @param DashboardHttpResponse $response - HTTP response to write to the client.
      * @param bool                  $isHeadRequest - Whether the body should be omitted for a HEAD request.
@@ -32,12 +34,15 @@ final class DashboardHttpResponder
 
         $this->writeAll($client, implode("\r\n", $headers));
 
+        // User view: choose the dashboard view branch for this case.
         if (!$isHeadRequest) {
             $this->writeAll($client, $response->body);
         }
     }
 
     /**
+      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
+      *
      * @param resource $client - Socket client receiving the payload.
      * @param string   $payload - Raw bytes to send in full; the loop retries short writes until every byte is sent.
      *
@@ -51,6 +56,7 @@ final class DashboardHttpResponder
         while ($offset < $length) {
             $written = fwrite($client, substr($payload, $offset));
 
+            // User view: choose the dashboard view branch for this case.
             if ($written === false || $written === 0) {
                 throw new RuntimeException('Unable to write complete dashboard HTTP response.');
             }

@@ -40,6 +40,8 @@ final class DebugModeEnabledRule implements RuleInterface
     /**
      * Describe the debug-mode rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -65,6 +67,8 @@ final class DebugModeEnabledRule implements RuleInterface
     /**
      * Find ini_set calls that turn error display on.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -74,17 +78,22 @@ final class DebugModeEnabledRule implements RuleInterface
     {
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
+            // User view: choose the findings list branch for this case.
             if (SecurityNodeHelper::globalFunctionName($call) !== 'ini_set') {
                 continue;
             }
 
             $directive = SecurityNodeHelper::argumentValue($call->args, 0);
+            // User view: choose the findings list branch for this case.
             if (!$directive instanceof Scalar\String_ || !in_array(strtolower($directive->value), self::DISPLAY_DIRECTIVES, true)) {
                 continue;
             }
 
             $directiveValue = SecurityNodeHelper::argumentValue($call->args, 1);
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($directiveValue === null || !$this->isTruthy($directiveValue)) {
                 continue;
             }
@@ -111,22 +120,27 @@ final class DebugModeEnabledRule implements RuleInterface
     /**
      * Decide whether a literal argument turns the directive on.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Expr $directiveValue - Second argument to ini_set.
      *
      * @return bool - True when the value is a truthy on-literal.
      */
     private function isTruthy(Expr $directiveValue): bool
     {
+        // User view: choose the findings list branch for this case.
         if ($directiveValue instanceof Scalar\String_) {
             // Literal string switches are the common ini_set shape for enabling display.
             return in_array(strtolower($directiveValue->value), ['1', 'on', 'true', 'yes', 'stdout', 'stderr'], true);
         }
 
+        // User view: choose the findings list branch for this case.
         if ($directiveValue instanceof Scalar\Int_) {
             // Non-zero integer literals are PHP truthy toggles for ini settings.
             return $directiveValue->value !== 0;
         }
 
+        // User view: choose the findings list branch for this case.
         if ($directiveValue instanceof Expr\ConstFetch) {
             // Only the true constant clearly enables display in static syntax.
             return strtolower($directiveValue->name->toString()) === 'true';

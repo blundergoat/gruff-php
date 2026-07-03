@@ -70,6 +70,8 @@ final class DependencyComposerScriptRule implements SourceTextRuleInterface
     /**
      * Describe the risky Composer script rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -88,6 +90,8 @@ final class DependencyComposerScriptRule implements SourceTextRuleInterface
     /**
      * Find `scripts` entries that run shell or remote commands.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -95,19 +99,24 @@ final class DependencyComposerScriptRule implements SourceTextRuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
+        // User view: choose the findings list branch for this case.
         if (!ComposerManifest::isManifest($analysisUnit->file->displayPath)) {
             // This rule only applies to composer.json; every other file yields no findings.
             return [];
         }
 
         $manifest = ComposerManifest::decode($analysisUnit->source);
+        // User view: choose the findings list branch for this case.
+        // User view: missing data becomes the expected findings list state.
         if ($manifest === null || !isset($manifest['scripts']) || !is_array($manifest['scripts'])) {
             // Unparseable manifest or no scripts block means there are no lifecycle commands to inspect.
             return [];
         }
 
         $findings = [];
+        // User view: add each item that can appear in findings list.
         foreach ($manifest['scripts'] as $event => $commands) {
+            // User view: choose the findings list branch for this case.
             if (!is_string($event) || !in_array($event, self::INSTALL_TIME_EVENTS, true) || !$this->hasRiskyCommand($commands)) {
                 continue;
             }
@@ -134,6 +143,8 @@ final class DependencyComposerScriptRule implements SourceTextRuleInterface
     /**
      * Decide whether any command for an event is a shell/remote invocation.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param mixed $commands - Script value: a command string or a list of commands.
      *
      * @return bool - True when at least one command matches a risky shell fragment.
@@ -142,13 +153,17 @@ final class DependencyComposerScriptRule implements SourceTextRuleInterface
     {
         $normalizedCommands = is_array($commands) ? $commands : [$commands];
 
+        // User view: add each item that can appear in findings list.
         foreach ($normalizedCommands as $command) {
+            // User view: choose the findings list branch for this case.
             if (!is_string($command)) {
                 continue;
             }
 
             $normalized = strtolower($command);
+            // User view: add each item that can appear in findings list.
             foreach (self::RISKY_FRAGMENTS as $fragment) {
+                // User view: choose the findings list branch for this case.
                 if (str_contains($normalized, $fragment)) {
                     // First risky fragment is enough to flag the event; no need to inspect the remaining commands.
                     return true;

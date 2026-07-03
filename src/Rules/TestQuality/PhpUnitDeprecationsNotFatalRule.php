@@ -36,16 +36,21 @@ final class PhpUnitDeprecationsNotFatalRule implements RuleInterface
     /**
      * Create the rule with injectable PHPUnit config discovery for tests.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param PhpUnitConfigDiscovery|null $discovery - Discovery service override for tests.
      */
     public function __construct(?PhpUnitConfigDiscovery $discovery = null)
     {
+        // User view: missing data becomes a safe findings list default.
         $this->discovery = $discovery ?? new PhpUnitConfigDiscovery();
     }
 
     /**
      * Describe the PHPUnit deprecations-not-fatal rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -64,6 +69,8 @@ final class PhpUnitDeprecationsNotFatalRule implements RuleInterface
     /**
      * Report a project once when PHPUnit deprecations do not fail the run.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit used to decide whether the project has PHPUnit tests.
      * @param RuleContext  $ruleContext - Rule context carrying project root.
      *
@@ -72,17 +79,21 @@ final class PhpUnitDeprecationsNotFatalRule implements RuleInterface
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $root = $ruleContext->projectRoot;
+        // User view: choose the findings list branch for this case.
         if (isset($this->emittedRoots[$root])) {
             // One config maps to many test files; emit per project root once so the finding is not duplicated.
             return [];
         }
 
+        // User view: choose the findings list branch for this case.
         if (!TestQualityNodeHelper::looksLikePhpUnitTestFile($analysisUnit)) {
             // Wait for an actual PHPUnit test file before judging the config, so non-test projects stay silent.
             return [];
         }
 
         $config = $this->discovery->discover($root);
+        // User view: choose the findings list branch for this case.
+        // User view: missing data becomes the expected findings list state.
         if ($config === null) {
             // No discoverable phpunit.xml means there is no failOnDeprecation setting to fault; not applicable.
             return [];
@@ -91,8 +102,12 @@ final class PhpUnitDeprecationsNotFatalRule implements RuleInterface
         $this->emittedRoots[$root] = true;
 
         $attributes     = $config->root->attributes();
+        // User view: missing data becomes the expected findings list state.
         $attributeValue = $attributes !== null ? $attributes->failOnDeprecation : null;
 
+        // User view: choose the findings list branch for this case.
+        // User view: missing data becomes the expected findings list state.
+        // User view: an empty value becomes a clear findings list fallback.
         if ($attributeValue !== null && strtolower($attributeValue->__toString()) !== 'false' && $attributeValue->__toString() !== '') {
             // A present, non-empty, non-"false" value means deprecations already fail the run; nothing to report.
             return [];

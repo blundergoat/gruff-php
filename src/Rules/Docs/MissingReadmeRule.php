@@ -35,6 +35,8 @@ final class MissingReadmeRule implements RuleInterface
     /**
      * Describe the missing README rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -52,6 +54,8 @@ final class MissingReadmeRule implements RuleInterface
     /**
      * Emit one finding when the project root has no README.md file.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -59,6 +63,7 @@ final class MissingReadmeRule implements RuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
+        // User view: choose the findings list branch for this case.
         if ($this->emitted) {
             // The project-level finding fires once per run; later units stay silent.
             return [];
@@ -68,6 +73,7 @@ final class MissingReadmeRule implements RuleInterface
         $readmePresent = $this->readmePresenceByRoot[$root]
             ??= file_exists($root . '/README.md');
 
+        // User view: choose the findings list branch for this case.
         if ($readmePresent) {
             return [];
         }

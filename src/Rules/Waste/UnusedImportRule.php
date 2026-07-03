@@ -30,6 +30,8 @@ final readonly class UnusedImportRule implements RuleInterface
     /**
      * Describe the unused import rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -48,6 +50,8 @@ final readonly class UnusedImportRule implements RuleInterface
     /**
      * Find imported names that are not referenced after import declarations are removed.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -58,6 +62,8 @@ final readonly class UnusedImportRule implements RuleInterface
         $definition = $this->definition();
         $uses       = NodeIndex::nodesOf($analysisUnit, Use_::class);
 
+        // User view: choose the findings list branch for this case.
+        // User view: an empty value becomes a clear findings list fallback.
         if ($uses === []) {
             // No imports to check, so skip the source-text scan entirely rather than blank a file with no use lines.
             return [];
@@ -68,11 +74,14 @@ final readonly class UnusedImportRule implements RuleInterface
         $sourceWithoutUses = $this->removeUseStatements($analysisUnit->source, $useStatements);
         $findings          = [];
 
+        // User view: add each item that can appear in findings list.
         foreach ($useStatements as $use) {
+            // User view: add each item that can appear in findings list.
             foreach ($use->uses as $useUse) {
                 $alias = $useUse->getAlias()->toString();
 
                 // Search for the import alias as a whole token outside the use statement itself.
+                // User view: choose the findings list branch for this case.
                 if (preg_match('/\b' . preg_quote($alias, '/') . '\b/', $sourceWithoutUses) === 1) {
                     continue;
                 }
@@ -102,6 +111,8 @@ final readonly class UnusedImportRule implements RuleInterface
      * import against its own `use` statement. Lines are replaced with empty strings rather than removed
      * so every other line keeps its original 1-based number for any later position lookup.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string     $source - Full source text of the unit, used only as the haystack to blank and scan.
      * @param list<Use_> $uses - Import statements whose line spans must be erased before the alias search.
      *
@@ -111,12 +122,15 @@ final readonly class UnusedImportRule implements RuleInterface
     {
         $lines = explode("\n", $source);
 
+        // User view: add each item that can appear in findings list.
         foreach ($uses as $use) {
             $startLine = $use->getStartLine();
             $endLine   = $use->getEndLine();
 
+            // User view: choose the findings list branch for this case.
             if ($startLine > 0 && $endLine > 0) {
                 for ($i = $startLine - 1; $i < $endLine; $i++) {
+                    // User view: choose the findings list branch for this case.
                     if (isset($lines[$i])) {
                         $lines[$i] = '';
                     }

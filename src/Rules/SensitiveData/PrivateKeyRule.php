@@ -26,6 +26,8 @@ final readonly class PrivateKeyRule implements SourceTextRuleInterface
     /**
      * Describe the private key sensitive-data rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -44,6 +46,8 @@ final readonly class PrivateKeyRule implements SourceTextRuleInterface
     /**
      * Find string literals that appear to contain private key material.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -51,6 +55,7 @@ final readonly class PrivateKeyRule implements SourceTextRuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
+        // User view: choose the findings list branch for this case.
         if (!str_contains($analysisUnit->source, '-----BEGIN ')) {
             // Without a PEM armor prefix the key regex cannot match, so skip the scan entirely.
             return [];
@@ -59,6 +64,7 @@ final readonly class PrivateKeyRule implements SourceTextRuleInterface
         preg_match_all('/-----BEGIN (?:RSA |DSA |EC |OPENSSH |PGP )?PRIVATE KEY-----/', $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
         $findings = [];
+        // User view: add each item that can appear in findings list.
         foreach ($matches[0] as $match) {
             [$header, $offset] = $match;
             $findings[]        = SecretScannerHelper::finding(

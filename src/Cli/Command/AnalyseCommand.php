@@ -56,6 +56,8 @@ final class AnalyseCommand extends Command
     /**
      * Configure the analyse command arguments and options.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @return void
      */
     protected function configure(): void
@@ -122,6 +124,8 @@ final class AnalyseCommand extends Command
     /**
      * Run source discovery, rule analysis, optional mutation ingestion, and reporting.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface  $input - Parsed CLI arguments and options for this analyse run.
      * @param OutputInterface $output - Destination for the rendered report; stderr is used for runtime payloads.
      *
@@ -140,6 +144,7 @@ final class AnalyseCommand extends Command
 
         $setupResult = (new AnalyseCommandSetupBuilder())->build($input, $output, $this->getApplication());
 
+        // User view: choose the terminal output branch for this case.
         if (!$setupResult->setup instanceof AnalyseCommandSetup) {
             return $this->renderSetupFailure($setupResult, $output);
         }
@@ -184,15 +189,19 @@ final class AnalyseCommand extends Command
             $diagnostics,
         );
 
+        // User view: choose the terminal output branch for this case.
         if ($mutationAnalysis instanceof MutationAnalysisResult) {
             $findings = array_merge($findings, (new MutationFindingFactory())->findingsFor($mutationAnalysis));
         }
 
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($options->diffVs !== null && $options->isChangedOnly && $reviewDiff instanceof DiffResult) {
             $findings = $findingSupport->filterFindingsToChangedFiles($findings, $reviewDiff->changedFiles);
         }
 
         $suppressedCount = null;
+        // User view: choose the terminal output branch for this case.
         if ($diff instanceof DiffResult && $diff->active) {
             $diffFilterResult = (new DiffFindingFilter())->apply($findings, $diff, $sources->analysisUnits, $options->changedScope);
             $findings         = $diffFilterResult->findings;
@@ -207,6 +216,7 @@ final class AnalyseCommand extends Command
             findings:        $findings,
             diff:            $diff,
             diagnostics:     $diagnostics,
+            // User view: missing data becomes the expected terminal output state.
             hasPartialScope: $options->diffVs !== null && $options->isChangedOnly,
         );
         $findings       = $findingSupport->normalizeFindingPaths($findings, $options->pathsRelativeTo);
@@ -214,10 +224,12 @@ final class AnalyseCommand extends Command
         $scoreStart     = hrtime(true);
         $score          = (new ScoreCalculator())->calculate($findings, $mutationAnalysis, $diff, scorePillars: $options->profileScorePillars(), analysisConfig: $config);
         $scoreNs        = hrtime(true) - $scoreStart;
+        // User view: missing data becomes the expected terminal output state.
         $reviewFindings = $options->diffVs === null ? $findings : array_values(array_filter(
                                                                                    $findings,
                                                                                    static fn(Finding $finding): bool => $finding->pillar !== Pillar::Mutation,
                                                                                ));
+        // User view: missing data becomes the expected terminal output state.
         $reviewScore    = $options->diffVs === null
             ? $score->composite->score
             : (new ScoreCalculator())->calculate($reviewFindings, null, null, scorePillars: $options->profileScorePillars(), analysisConfig: $config)->composite->score;
@@ -307,6 +319,8 @@ final class AnalyseCommand extends Command
     /**
      * Write the performance instrumentation payload as a single JSON line on stderr.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param bool                                                                     $shouldEmit - Whether --print-runtime requested the
      *                                                                                                        payload; a no-op when false.
      * @param OutputInterface                                                          $output - Run output; the payload goes to its
@@ -337,6 +351,7 @@ final class AnalyseCommand extends Command
         ?RuntimeTimingObserver $runtimeTimingObserver,
         bool                   $isDetailed,
     ): void {
+        // User view: choose the terminal output branch for this case.
         if (!$shouldEmit) {
             return;
         }
@@ -351,6 +366,8 @@ final class AnalyseCommand extends Command
             'mode'          => $isDetailed ? 'detailed' : 'summary',
         ];
 
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($isDetailed && $runtimeTimingObserver !== null) {
             $payload['rules'] = $runtimeTimingObserver->snapshot();
         }
@@ -358,6 +375,8 @@ final class AnalyseCommand extends Command
         $line   = json_encode($payload, JSON_THROW_ON_ERROR) . PHP_EOL;
         $stderr = $output instanceof ConsoleOutputInterface ? $output->getErrorOutput() : null;
 
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($stderr !== null) {
             $stderr->write($line);
 
@@ -370,6 +389,8 @@ final class AnalyseCommand extends Command
     /**
      * Render setup errors using either plain console text or the requested report format.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param AnalyseCommandSetupResult $result - Failed setup outcome with the error, exit code, and any partial report.
      * @param OutputInterface           $output - Destination the error text or formatted report is written to.
      *
@@ -377,12 +398,15 @@ final class AnalyseCommand extends Command
      */
     private function renderSetupFailure(AnalyseCommandSetupResult $result, OutputInterface $output): int
     {
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($result->plainError !== null) {
             $output->writeln($result->plainError);
 
             return $result->exitCode;
         }
 
+        // User view: choose the terminal output branch for this case.
         if ($result->report instanceof AnalysisReport && $result->format instanceof OutputFormat) {
             $this->renderReport($result->report, $result->format, $output);
         }
@@ -393,6 +417,8 @@ final class AnalyseCommand extends Command
     /**
      * Resolve the Git diff for --diff-vs or --since against a single base ref.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string              $projectRoot - Project root the Git diff is computed within.
      * @param string|null         $diffMode - Git ref or diff selector to compare against; null means no diff was requested.
      * @param list<RunDiagnostic> $diagnostics - Run diagnostics; a diff-mode error is appended in place on failure.
@@ -401,6 +427,8 @@ final class AnalyseCommand extends Command
      */
     private function buildDiffResult(string $projectRoot, ?string $diffMode, array &$diagnostics): ?DiffResult
     {
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($diffMode === null) {
             return DiffResult::inactive();
         }
@@ -420,6 +448,8 @@ final class AnalyseCommand extends Command
     /**
      * Build the changed-region diff result requested by --diff, --since, or --changed-ranges.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string                $projectRoot - Project root the diff and requested paths resolve against.
      * @param AnalyseCommandOptions $options - CLI options selecting the changed-region source (ranges, since, or diff).
      * @param list<RunDiagnostic>   $diagnostics - Run diagnostics; a diff-mode error is appended in place on failure.
@@ -428,16 +458,22 @@ final class AnalyseCommand extends Command
      */
     private function buildChangedDiffResult(string $projectRoot, AnalyseCommandOptions $options, array &$diagnostics): ?DiffResult
     {
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($options->changedRanges !== null) {
             return $this->buildExplicitRangesDiffResult($projectRoot, $options, $diagnostics);
         }
 
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($options->since !== null) {
             return $this->buildDiffResult($projectRoot, $options->since, $diagnostics);
         }
 
+        // User view: choose the terminal output branch for this case.
         if ($options->diffMode === '-') {
             $patch = stream_get_contents(STDIN);
+            // User view: choose the terminal output branch for this case.
             if ($patch === false) {
                 $diagnostics[] = new RunDiagnostic(
                     type:    'diff-mode-error',
@@ -465,6 +501,8 @@ final class AnalyseCommand extends Command
     /**
      * Build the changed-region diff result from explicit --changed-ranges line ranges.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string                $projectRoot - Project root the requested paths resolve against.
      * @param AnalyseCommandOptions $options - Effective CLI options carrying paths and the changed ranges.
      * @param list<RunDiagnostic>   $diagnostics - Run diagnostics; diff-mode errors are appended in place.
@@ -474,6 +512,8 @@ final class AnalyseCommand extends Command
     private function buildExplicitRangesDiffResult(string $projectRoot, AnalyseCommandOptions $options, array &$diagnostics): ?DiffResult
     {
         $changedFiles = (new AnalysisFindingSupport())->normaliseRequestedPaths($projectRoot, $options->paths);
+        // User view: choose the terminal output branch for this case.
+        // User view: an empty value becomes a clear terminal output fallback.
         if ($changedFiles === []) {
             $diagnostics[] = new RunDiagnostic(
                 type:    'diff-mode-error',
@@ -484,6 +524,7 @@ final class AnalyseCommand extends Command
         }
 
         try {
+            // User view: missing data becomes a safe terminal output default.
             $ranges = $this->parseChangedRanges($options->changedRanges ?? '');
         } catch (DiffException $exception) {
             $diagnostics[] = new RunDiagnostic(
@@ -495,6 +536,7 @@ final class AnalyseCommand extends Command
         }
 
         $changedLines = [];
+        // User view: add each item that can appear in terminal output.
         foreach ($changedFiles as $changedFile) {
             $changedLines[$changedFile] = $ranges;
         }
@@ -512,6 +554,8 @@ final class AnalyseCommand extends Command
     /**
      * Parse a --changed-ranges value like "3-3,8-10" into line ranges.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string $ranges - Comma-separated 1-based line ranges.
      *
      * @return list<ChangedLineRange> - the parsed 1-based line ranges, preserving the order they appeared in the input.
@@ -521,13 +565,17 @@ final class AnalyseCommand extends Command
     {
         $parsed = [];
 
+        // User view: add each item that can appear in terminal output.
         foreach (explode(',', $ranges) as $part) {
             $part = trim($part);
+            // User view: choose the terminal output branch for this case.
+            // User view: an empty value becomes a clear terminal output fallback.
             if ($part === '') {
                 continue;
             }
 
             // Match a single line number or a "start-end" range, both 1-based.
+            // User view: choose the terminal output branch for this case.
             if (!preg_match('/^(\d+)(?:-(\d+))?$/', $part, $matches)) {
                 throw new DiffException(sprintf('Invalid --changed-ranges value "%s". Use ranges like "3-3,8-10".', $ranges));
             }
@@ -535,6 +583,7 @@ final class AnalyseCommand extends Command
             $startLine = (int)$matches[1];
             $endLine   = isset($matches[2]) ? (int)$matches[2] : $startLine;
 
+            // User view: choose the terminal output branch for this case.
             if ($startLine < 1 || $endLine < $startLine) {
                 throw new DiffException(sprintf('Invalid --changed-ranges value "%s". Use ranges like "3-3,8-10".', $ranges));
             }
@@ -542,6 +591,8 @@ final class AnalyseCommand extends Command
             $parsed[] = new ChangedLineRange($startLine, $endLine);
         }
 
+        // User view: choose the terminal output branch for this case.
+        // User view: an empty value becomes a clear terminal output fallback.
         if ($parsed === []) {
             throw new DiffException('--changed-ranges requires at least one range like "3-3,8-10".');
         }
@@ -555,6 +606,8 @@ final class AnalyseCommand extends Command
      * The final changed-only branch reads the review diff directly: the guard at the top of this
      * method already returned when that diff was null on the changed-only path.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string                $projectRoot - Project root the requested and changed paths resolve against.
      * @param AnalyseCommandOptions $options - Effective CLI options, including changed-only and requested-path flags.
      * @param DiffResult|null       $reviewDiff - --diff-vs review diff; null when it failed or carries no changed files.
@@ -569,18 +622,26 @@ final class AnalyseCommand extends Command
         ?DiffResult           $reviewDiff,
         ?DiffResult           $changedRegionDiff,
     ): ?array {
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
+        // User view: an empty value becomes a clear terminal output fallback.
         if ($options->isChangedOnly && $options->paths === [] && $reviewDiff === null) {
             return null;
         }
 
         $findingSupport = new AnalysisFindingSupport();
 
+        // User view: choose the terminal output branch for this case.
         if ($options->usesChangedFilesForDiscovery() && $changedRegionDiff instanceof DiffResult && $changedRegionDiff->active) {
             $changedFiles = $findingSupport->existingChangedFiles($projectRoot, $changedRegionDiff->changedFiles);
+            // User view: choose the terminal output branch for this case.
+            // User view: an empty value becomes a clear terminal output fallback.
             if ($changedFiles === []) {
                 return null;
             }
 
+            // User view: choose the terminal output branch for this case.
+            // User view: an empty value becomes a clear terminal output fallback.
             if ($options->paths === []) {
                 return $changedFiles;
             }
@@ -592,13 +653,18 @@ final class AnalyseCommand extends Command
                                            ));
             sort($analysisPaths, SORT_STRING);
 
+            // User view: an empty value becomes a clear terminal output fallback.
             return $analysisPaths === [] ? null : $analysisPaths;
         }
 
+        // User view: choose the terminal output branch for this case.
+        // User view: an empty value becomes a clear terminal output fallback.
         if (!$options->isChangedOnly || $options->paths !== []) {
             return $options->paths;
         }
 
+        // User view: choose the terminal output branch for this case.
+        // User view: an empty value becomes a clear terminal output fallback.
         if (!$reviewDiff instanceof DiffResult || $reviewDiff->changedFiles === []) {
             return null;
         }
@@ -609,6 +675,8 @@ final class AnalyseCommand extends Command
     /**
      * Filter source diagnostics for the current analysis scope.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param list<RunDiagnostic>   $diagnostics - Source-discovery diagnostics gathered before scope narrowing.
      * @param string                $projectRoot - Project root each diagnostic path is normalised against.
      * @param AnalyseCommandOptions $options - Effective CLI options; only changed-only review runs trigger filtering.
@@ -623,6 +691,8 @@ final class AnalyseCommand extends Command
         AnalyseCommandOptions $options,
         ?DiffResult           $reviewDiff,
     ): array {
+        // User view: choose the terminal output branch for this case.
+        // User view: an empty value becomes a clear terminal output fallback.
         if (!$options->isChangedOnly || !$reviewDiff instanceof DiffResult || $reviewDiff->changedFiles === []) {
             return $diagnostics;
         }
@@ -632,16 +702,22 @@ final class AnalyseCommand extends Command
         return array_values(array_filter(
                                 $diagnostics,
                                 function (RunDiagnostic $diagnostic) use ($projectRoot, $reviewDiff, $findingSupport): bool {
+                                    // User view: choose the terminal output branch for this case.
+                                    // User view: missing data becomes the expected terminal output state.
                                     if ($diagnostic->type !== 'missing-path' || $diagnostic->path === null) {
                                         return true;
                                     }
 
                                     $requestedPaths = $findingSupport->normaliseRequestedPaths($projectRoot, [$diagnostic->path]);
+                                    // User view: choose the terminal output branch for this case.
+                                    // User view: an empty value becomes a clear terminal output fallback.
                                     if ($requestedPaths === []) {
                                         return true;
                                     }
 
+                                    // User view: add each item that can appear in terminal output.
                                     foreach ($reviewDiff->changedFiles as $changedFile) {
+                                        // User view: choose the terminal output branch for this case.
                                         if ($findingSupport->matchesRequestedPath($changedFile, $requestedPaths)) {
                                             return false;
                                         }
@@ -655,6 +731,8 @@ final class AnalyseCommand extends Command
     /**
      * Decide the command exit code from run diagnostics and whether any fail threshold tripped.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param list<RunDiagnostic>             $diagnostics - Run diagnostics; any present force INVALID ahead of findings.
      * @param list<\GruffPhp\Results\Finding\Finding> $findings - Post-baseline finding set the all-findings gate inspects.
      * @param list<\GruffPhp\Results\Finding\Finding> $newFindings - Change-introduced subset the new-findings gate inspects.
@@ -664,6 +742,8 @@ final class AnalyseCommand extends Command
      */
     private function resolveExitCode(array $diagnostics, array $findings, array $newFindings, FailThresholds $failThresholds): array
     {
+        // User view: choose the terminal output branch for this case.
+        // User view: an empty value becomes a clear terminal output fallback.
         if ($diagnostics !== []) {
             return ['exitCode' => Command::INVALID, 'trip' => null];
         }
@@ -684,6 +764,8 @@ final class AnalyseCommand extends Command
      * findings); otherwise the post-baseline finding set is the baseline-new set.
      * The setup builder guarantees a reference point exists before this runs.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param list<\GruffPhp\Results\Finding\Finding> $findings - Post-baseline findings for the run.
      * @param BranchReviewResult|null         $review - Branch-review result when --diff-vs is active.
      * @param BaselineReport|null             $baseline - Baseline application result, when a baseline ran.
@@ -692,10 +774,12 @@ final class AnalyseCommand extends Command
      */
     private function newFindingsForGate(array $findings, ?BranchReviewResult $review, ?BaselineReport $baseline): array
     {
+        // User view: choose the terminal output branch for this case.
         if ($review instanceof BranchReviewResult) {
             return $review->introduced;
         }
 
+        // User view: choose the terminal output branch for this case.
         if ($baseline instanceof BaselineReport && !$baseline->generated) {
             return $findings;
         }
@@ -706,6 +790,8 @@ final class AnalyseCommand extends Command
     /**
      * Render the report with the reporter selected by output format.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param AnalysisReport  $report - Completed analysis result the chosen reporter serialises.
      * @param OutputFormat    $format - Output format that selects which reporter renders the result.
      * @param OutputInterface $output - Stream the rendered report is written to, raw and unformatted.
@@ -725,6 +811,7 @@ final class AnalyseCommand extends Command
     ): void {
         $renderer = match ($format) {
             OutputFormat::Json => new JsonReporter(),
+            // User view: missing data becomes a safe terminal output default.
             OutputFormat::Html => new HtmlReporter($projectRoot ?? '', $reportEditorLink, $isReportInteractive),
             OutputFormat::Markdown => new MarkdownReporter(),
             OutputFormat::Github => new GithubAnnotationsReporter(),
@@ -740,6 +827,8 @@ final class AnalyseCommand extends Command
     /**
      * Append a score-trend entry to the history file when one is configured.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string                $projectRoot - Project root the history file resolves against.
      * @param AnalyseCommandOptions $options - Effective CLI options carrying the history-file path.
      * @param ScoreReport           $score - Composite score recorded for this run.
@@ -756,6 +845,8 @@ final class AnalyseCommand extends Command
         int                   $findingCount,
         array                 &$diagnostics,
     ): ?TrendReport {
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($options->historyFile === null) {
             return null;
         }

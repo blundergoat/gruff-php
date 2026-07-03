@@ -15,6 +15,8 @@ final readonly class SummaryReportData
     /**
      * Capture source, score, and aggregate finding data for summary rendering.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param list<string>                                                                                     $paths - Paths requested by the summary command.
      * @param string|null                                                                                      $configPath - Effective config path used for analysis.
      * @param int                                                                                              $sourcesDiscovered - Number of files discovered before parsing.

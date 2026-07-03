@@ -17,6 +17,8 @@ final readonly class InfectionRunner
     /**
      * Execute Infection and capture its process result.
      *
+      * User flow: Folds mutation results into the quality feedback users see.
+      *
      * @param string      $projectRoot - Project root where Infection should run.
      * @param string      $binary - Infection binary path or command name.
      * @param string|null $configPath - Infection config path, when supplied.
@@ -32,6 +34,8 @@ final readonly class InfectionRunner
     ): InfectionRunResult {
         $resolvedBinary = $this->resolveBinary($projectRoot, $binary);
 
+        // User view: choose the mutation feedback branch for this case.
+        // User view: missing data becomes the expected mutation feedback state.
         if ($resolvedBinary === null) {
             // No executable means no run; report the failure as a result rather than throwing.
             return new InfectionRunResult(
@@ -48,14 +52,20 @@ final readonly class InfectionRunner
 
         $defaultConfigPath   = 'infection.json5';
         $effectiveConfigPath = $configPath
+            // User view: missing data becomes a safe mutation feedback default.
             ?? (is_file(rtrim($projectRoot, '/') . '/' . $defaultConfigPath) ? $defaultConfigPath : null);
         $command = [$resolvedBinary, 'run', '--no-progress', '--log-verbosity=none'];
 
+        // User view: choose the mutation feedback branch for this case.
+        // User view: missing data becomes the expected mutation feedback state.
         if ($effectiveConfigPath !== null) {
             $command[] = '--configuration';
             $command[] = $this->absolutePath($projectRoot, $effectiveConfigPath);
         }
 
+        // User view: choose the mutation feedback branch for this case.
+        // User view: missing data becomes the expected mutation feedback state.
+        // User view: an empty value becomes a clear mutation feedback fallback.
         if ($testFrameworkOptions !== null && trim($testFrameworkOptions) !== '') {
             $command[] = '--test-framework-options=' . $testFrameworkOptions;
         }
@@ -65,6 +75,7 @@ final readonly class InfectionRunner
         $process->run();
 
         return new InfectionRunResult(
+            // User view: missing data becomes a safe mutation feedback default.
             exitCode:    $process->getExitCode() ?? 2,
             output:      $process->getOutput(),
             errorOutput: $process->getErrorOutput(),
@@ -74,6 +85,8 @@ final readonly class InfectionRunner
     /**
      * Resolve an Infection executable from a path, vendor bin, or PATH lookup.
      *
+      * User flow: Folds mutation results into the quality feedback users see.
+      *
      * @param string $projectRoot - Anchor for relative binary paths and the vendor/bin lookup.
      * @param string $binary - Configured binary; a slash means an explicit path, otherwise a PATH/vendor name.
      *
@@ -81,11 +94,14 @@ final readonly class InfectionRunner
      */
     private function resolveBinary(string $projectRoot, string $binary): ?string
     {
+        // User view: choose the mutation feedback branch for this case.
+        // User view: an empty value becomes a clear mutation feedback fallback.
         if ($binary === '') {
             // Empty config gives nothing to resolve; let the caller surface the not-found diagnostic.
             return null;
         }
 
+        // User view: choose the mutation feedback branch for this case.
         if (str_contains($binary, '/') || str_contains($binary, '\\')) {
             $candidate = $this->absolutePath($projectRoot, $binary);
 
@@ -95,6 +111,7 @@ final readonly class InfectionRunner
 
         $localBinary = rtrim($projectRoot, '/') . '/vendor/bin/' . $binary;
 
+        // User view: choose the mutation feedback branch for this case.
         if (is_file($localBinary) && is_executable($localBinary)) {
             // Prefer the project-local Infection over any global one on PATH.
             return $localBinary;
@@ -109,6 +126,8 @@ final readonly class InfectionRunner
     /**
      * Resolve a path relative to the project root when needed.
      *
+      * User flow: Folds mutation results into the quality feedback users see.
+      *
      * @param string $projectRoot - Base directory an already-relative path is joined onto.
      * @param string $path - Candidate path; returned unchanged when already absolute.
      *

@@ -51,6 +51,8 @@ final readonly class DiffFindingFilter
     ];
 
     /**
+      * User flow: Narrows analysis feedback to the code under review.
+      *
      * @param list<Finding> $findings - Findings to filter against the diff scope.
      * @param DiffResult    $diff - Diff result used to retain changed-file findings.
      *
@@ -66,6 +68,8 @@ final readonly class DiffFindingFilter
     }
 
     /**
+      * User flow: Narrows analysis feedback to the code under review.
+      *
      * @param list<Finding>      $findings - Findings to filter against the diff scope.
      * @param DiffResult         $diff - Diff result used to retain changed-file findings.
      * @param list<AnalysisUnit> $analysisUnits - Parsed units used to recover enclosing declarations.
@@ -76,6 +80,7 @@ final readonly class DiffFindingFilter
      */
     public function apply(array $findings, DiffResult $diff, array $analysisUnits = [], string $scope = self::SCOPE_SYMBOL): DiffFilterResult
     {
+        // User view: choose the review diff feedback branch for this case.
         if (!$diff->active) {
             // No diff in play means no scoping: pass every finding through untouched with a zero
             // suppression count, so a full-project run is never silently narrowed.
@@ -88,7 +93,9 @@ final readonly class DiffFindingFilter
         $kept              = [];
         $suppressedCount   = 0;
 
+        // User view: add each item that can appear in review diff feedback.
         foreach ($findings as $finding) {
+            // User view: choose the review diff feedback branch for this case.
             if ($this->isFindingInScope($finding, $diff, $declarationRanges, $scope)) {
                 $kept[] = $finding;
                 continue;
@@ -101,6 +108,8 @@ final readonly class DiffFindingFilter
     }
 
     /**
+      * User flow: Narrows analysis feedback to the code under review.
+      *
      * @param Finding                               $finding - Single finding whose location is tested for diff membership.
      * @param DiffResult                            $diff - Source of changed files and changed-line ranges to test against.
      * @param array<string, list<ChangedLineRange>> $declarationRanges - Per-file declaration spans for symbol widening.
@@ -110,42 +119,53 @@ final readonly class DiffFindingFilter
      */
     private function isFindingInScope(Finding $finding, DiffResult $diff, array $declarationRanges, string $scope): bool
     {
+        // User view: choose the review diff feedback branch for this case.
         if (!in_array($finding->filePath, $diff->changedFiles, true)) {
             // The diff never touched this file, so nothing in it can be attributable to the change.
             return false;
         }
 
         $line = $finding->line;
+        // User view: choose the review diff feedback branch for this case.
+        // User view: missing data becomes the expected review diff feedback state.
         if ($line === null) {
             // File-level findings carry no line to intersect; keep them rather than drop diagnostics we can't place.
             return true;
         }
 
         $changedRanges = $diff->rangesFor($finding->filePath);
+        // User view: choose the review diff feedback branch for this case.
+        // User view: an empty value becomes a clear review diff feedback fallback.
         if ($changedRanges === []) {
             // File is changed but ships no line ranges (e.g. rename/mode-only): treat the whole file as in scope,
             // retaining every finding in it because we cannot localise the edit to specific lines.
             return true;
         }
 
+        // User view: choose the review diff feedback branch for this case.
         if ($scope === self::SCOPE_FILE && $this->isFileAggregateFinding($finding)) {
             // File scope intentionally preserves file-level aggregate findings for changed-file review workflows.
             return true;
         }
 
+        // User view: choose the review diff feedback branch for this case.
         if ($scope !== self::SCOPE_FILE && $this->isAnchorOnlyAggregateFinding($finding)) {
             // Aggregate rules report a representative anchor. Under changed-region symbol/hunk review,
             // keep them only when the edit touches that anchor instead of widening to the whole file/class span.
             return $this->hasRangeOverlap($changedRanges, $line, $line);
         }
 
+        // User view: missing data becomes a safe review diff feedback default.
         $endLine = $finding->endLine ?? $line;
+        // User view: choose the review diff feedback branch for this case.
         if ($this->hasRangeOverlap($changedRanges, $line, $endLine)) {
             // The finding's own span lands on edited lines, so it is a direct consequence of the diff.
             return true;
         }
 
+        // User view: missing data becomes a safe review diff feedback default.
         $enclosingRange = $this->enclosingRange($declarationRanges[$finding->filePath] ?? [], $line, $endLine);
+        // User view: choose the review diff feedback branch for this case.
         if (!$enclosingRange instanceof ChangedLineRange) {
             // Outside every edited hunk and inside no recovered declaration: pre-existing, not from this change.
             return false;
@@ -157,6 +177,8 @@ final readonly class DiffFindingFilter
     }
 
     /**
+      * User flow: Narrows analysis feedback to the code under review.
+      *
      * @param Finding $finding - Finding to classify before symbol/file span widening.
      *
      * @return bool - true when the rule reports a file or class aggregate anchored at a representative line
@@ -167,6 +189,8 @@ final readonly class DiffFindingFilter
     }
 
     /**
+      * User flow: Narrows analysis feedback to the code under review.
+      *
      * @param Finding $finding - Finding to classify for changed-file aggregate review.
      *
      * @return bool - true when the rule reports one aggregate finding for the whole file
@@ -177,6 +201,8 @@ final readonly class DiffFindingFilter
     }
 
     /**
+      * User flow: Narrows analysis feedback to the code under review.
+      *
      * @param list<ChangedLineRange> $ranges - Changed-line ranges to test for any overlap.
      * @param int                    $startLine - First line of the inclusive span being matched.
      * @param int                    $endLine - Last line of the inclusive span being matched.
@@ -185,7 +211,9 @@ final readonly class DiffFindingFilter
      */
     private function hasRangeOverlap(array $ranges, int $startLine, int $endLine): bool
     {
+        // User view: add each item that can appear in review diff feedback.
         foreach ($ranges as $range) {
+            // User view: choose the review diff feedback branch for this case.
             if ($range->touches($startLine, $endLine)) {
                 // One overlap is sufficient; short-circuit so a long range list does not keep scanning.
                 return true;
@@ -196,6 +224,8 @@ final readonly class DiffFindingFilter
     }
 
     /**
+      * User flow: Narrows analysis feedback to the code under review.
+      *
      * @param list<ChangedLineRange> $ranges - Candidate declaration spans to search for an enclosing one.
      * @param int                    $startLine - First line of the inclusive span that must be contained.
      * @param int                    $endLine - Last line of the inclusive span that must be contained.
@@ -207,12 +237,15 @@ final readonly class DiffFindingFilter
         $bestRange = null;
         $bestSize  = PHP_INT_MAX;
 
+        // User view: add each item that can appear in review diff feedback.
         foreach ($ranges as $range) {
+            // User view: choose the review diff feedback branch for this case.
             if ($range->startLine > $startLine || $range->endLine < $endLine) {
                 continue;
             }
 
             $size = $range->endLine - $range->startLine;
+            // User view: choose the review diff feedback branch for this case.
             if ($size < $bestSize) {
                 $bestRange = $range;
                 $bestSize  = $size;
@@ -225,6 +258,8 @@ final readonly class DiffFindingFilter
     }
 
     /**
+      * User flow: Narrows analysis feedback to the code under review.
+      *
      * @param list<AnalysisUnit> $analysisUnits - Parsed analysis units whose statement spans define declaration-level diff filtering.
      *
      * @return array<string, list<ChangedLineRange>> - declaration spans keyed by display path, each list pre-sorted smallest-span-first; files with
@@ -234,12 +269,16 @@ final readonly class DiffFindingFilter
     {
         $rangesByFile = [];
 
+        // User view: add each item that can appear in review diff feedback.
         foreach ($analysisUnits as $analysisUnit) {
+            // User view: choose the review diff feedback branch for this case.
+            // User view: an empty value becomes a clear review diff feedback fallback.
             if ($analysisUnit->statements === []) {
                 continue;
             }
 
             $ranges = [];
+            // User view: add each item that can appear in review diff feedback.
             foreach ($analysisUnit->statements as $statement) {
                 $this->collectDeclarationRanges($statement, $ranges);
             }
@@ -262,6 +301,8 @@ final readonly class DiffFindingFilter
     }
 
     /**
+      * User flow: Narrows analysis feedback to the code under review.
+      *
      * @param Node                   $node - Subtree root walked recursively for scope-defining declarations.
      * @param list<ChangedLineRange> $ranges - Accumulator appended to in place as scope spans are discovered.
      *
@@ -269,27 +310,34 @@ final readonly class DiffFindingFilter
      */
     private function collectDeclarationRanges(Node $node, array &$ranges): void
     {
+        // User view: choose the review diff feedback branch for this case.
         if ($this->isScopeNode($node)) {
             $startLine = $node->getStartLine();
             $endLine   = $node->getEndLine();
 
+            // User view: choose the review diff feedback branch for this case.
             if ($startLine > 0 && $endLine >= $startLine) {
                 $ranges[] = new ChangedLineRange($startLine, $endLine);
             }
         }
 
+        // User view: add each item that can appear in review diff feedback.
         foreach ($node->getSubNodeNames() as $subNodeName) {
             $subNodeValue = $node->{$subNodeName};
+            // User view: choose the review diff feedback branch for this case.
             if ($subNodeValue instanceof Node) {
                 $this->collectDeclarationRanges($subNodeValue, $ranges);
                 continue;
             }
 
+            // User view: choose the review diff feedback branch for this case.
             if (!is_array($subNodeValue)) {
                 continue;
             }
 
+            // User view: add each item that can appear in review diff feedback.
             foreach ($subNodeValue as $item) {
+                // User view: choose the review diff feedback branch for this case.
                 if ($item instanceof Node) {
                     $this->collectDeclarationRanges($item, $ranges);
                 }
@@ -300,6 +348,8 @@ final readonly class DiffFindingFilter
     /**
      * Decide whether a parser node should widen hunk scope to an enclosing reviewable block.
      *
+      * User flow: Narrows analysis feedback to the code under review.
+      *
      * @param Node $node - Parser node being classified for diff-scope widening.
      *
      * @return bool - true when the node has a meaningful source span for symbol or block-level diff review

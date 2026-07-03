@@ -29,6 +29,8 @@ final readonly class EmptyClassRule implements RuleInterface
     /**
      * Describe the empty class rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -47,6 +49,8 @@ final readonly class EmptyClassRule implements RuleInterface
     /**
      * Find concrete classes that declare no members and are not exception markers.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -59,19 +63,25 @@ final readonly class EmptyClassRule implements RuleInterface
 
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach ($classes as $class) {
+            // User view: choose the findings list branch for this case.
             if ($class->isAbstract() || $class->isAnonymous()) {
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
+            // User view: an empty value becomes a clear findings list fallback.
             if ($class->stmts !== []) {
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
             if ($this->isEmptyExceptionMarker($class)) {
                 continue;
             }
 
+            // User view: missing data becomes a safe findings list default.
             $symbol = $class->name?->toString() ?? sprintf('class@anonymous:%d', $class->getStartLine());
 
             $findings[] = new Finding(
@@ -95,12 +105,16 @@ final readonly class EmptyClassRule implements RuleInterface
     /**
      * Allow empty classes that exist as exception marker types.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Class_ $class - Class declaration to test; only a parent type can make an empty body legitimate.
      *
      * @return bool - True when the class extends an exception/throwable type.
      */
     private function isEmptyExceptionMarker(Class_ $class): bool
     {
+        // User view: choose the findings list branch for this case.
+        // User view: missing data becomes the expected findings list state.
         if ($class->extends === null) {
             // No parent means it cannot be a marker subtype, so an empty body is not excused.
             return false;

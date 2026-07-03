@@ -26,6 +26,8 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
     /**
      * List the regex patterns enforced by this rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return list<array{name: string, pattern: string}> - each entry pairs a provider label with its detection regex; ordering is the scan order
      *                          applied per source unit
      */
@@ -51,6 +53,8 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
     /**
      * Describe the API key pattern sensitive-data rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - identity, pillar, tier, and the Warning/High defaults the engine applies unless a config override raises or silences
      *                        this rule
      */
@@ -70,6 +74,8 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
     /**
      * Find string literals that resemble hardcoded API keys.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -83,6 +89,7 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
         // Fast bail: real API keys for the supported providers all contain one
         // of these distinctive prefixes. Skipping the per-pattern regex when
         // none are present makes this rule near-free for the common case.
+        // User view: choose the findings list branch for this case.
         if (preg_match('/sk_live_|ghp_|github_pat_|gh[ours]_|sk-proj-|sk-ant-|xox[baprs]-|hooks\.slack\.com\/services|npm_|AIza|[?&]sv=|glpat-/i', $analysisUnit->source) !== 1) {
             // No supported prefix in the source means no provider pattern can match, so skip the per-pattern scan.
             return [];
@@ -90,15 +97,19 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
 
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
 
+        // User view: add each item that can appear in findings list.
         foreach ($this->patterns() as $definition) {
             preg_match_all($definition['pattern'], $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
+            // User view: add each item that can appear in findings list.
             foreach ($matches[0] as $match) {
                 [$candidateSecret, $offset] = $match;
+                // User view: choose the findings list branch for this case.
                 if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
                     continue;
                 }
 
+                // User view: choose the findings list branch for this case.
                 if (SecretScannerHelper::isLikelyDummyValue($candidateSecret)) {
                     continue;
                 }

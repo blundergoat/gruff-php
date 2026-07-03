@@ -40,6 +40,8 @@ final class AnalysisPipeline
     private readonly Closure $projectContextUnitsResolver;
 
     /**
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param RuleRegistry                                                                                                             $registry - Registry used to execute enabled rules.
      * @param Closure(string, AnalyseCommandOptions, AnalysisConfig, RuleRegistry, ?DiffResult, AnalysisSourceSet): list<AnalysisUnit> $closure - Resolves full project context units for legacy review analysis.
      */
@@ -53,6 +55,8 @@ final class AnalysisPipeline
     /**
      * Run the right pipeline for this CLI invocation.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string                  $projectRoot - Project root used for discovery and parsing.
      * @param AnalyseCommandOptions   $options - Effective CLI analysis options.
      * @param AnalysisConfig          $config - Effective rule and path configuration.
@@ -81,6 +85,8 @@ final class AnalysisPipeline
         int                   $discoverStart,
         ?RuleRunnerObserver   $ruleRunnerObserver,
     ): array {
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($analysisPaths === null) {
             // Setup failed upstream, so emit an empty result that still carries the discovery timing measured so far.
             return [
@@ -92,6 +98,7 @@ final class AnalysisPipeline
             ];
         }
 
+        // User view: choose the terminal output branch for this case.
         if ($this->canStream($projectRoot, $options, $reviewDiff, $ruleContext)) {
             // Streaming is safe here, so take the low-peak-memory path that releases each unit after analysis.
             return $this->runStreaming(
@@ -121,6 +128,8 @@ final class AnalysisPipeline
     /**
      * Decide whether streaming parse → analyse → release is safe for this run.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string                $projectRoot - Project root requested paths resolve against.
      * @param AnalyseCommandOptions $options - CLI options; changed-region and diff modes force the legacy path.
      * @param DiffResult|null       $reviewDiff - Review diff metadata; an active review keeps the base snapshot.
@@ -139,13 +148,16 @@ final class AnalysisPipeline
         // tree, so it can stream like a bare invocation; only a genuinely narrower path needs the legacy
         // load-all flow that pulls whole-tree project context separately from the requested files.
         $requestedPaths              = (new AnalysisFindingSupport())->normaliseRequestedPaths($projectRoot, $options->paths);
+        // User view: an empty value becomes a clear terminal output fallback.
         $hasNarrowProjectRuleContext = $requestedPaths !== [] && $requestedPaths !== ['.']
             && $this->registry->hasEnabledProjectRules($ruleContext->config);
 
         // Stream only when no review/diff retains the base snapshot and every enabled rule tolerates per-unit release.
+        // User view: missing data becomes the expected terminal output state.
         return ($reviewDiff === null || !$reviewDiff->active)
                && !$options->hasChangedRegionMode()
                && !$hasNarrowProjectRuleContext
+               // User view: missing data becomes the expected terminal output state.
                && $options->diffVs === null
                && $this->registry->supportsStreaming($ruleContext);
     }
@@ -154,6 +166,8 @@ final class AnalysisPipeline
      * Streaming pipeline: each unit's AST is freed as soon as its per-unit
      * and accumulator passes complete, keeping peak memory near one file.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string                  $projectRoot - Root for discovery, parsing, and the per-project result cache.
      * @param AnalyseCommandOptions   $options - CLI options; gate the cache and whether ignored files load.
      * @param AnalysisConfig          $config - Ignore patterns plus the inputs to the cache fingerprint.
@@ -209,13 +223,18 @@ final class AnalysisPipeline
         $parsedCount  = 0;
         $analyseStart = hrtime(true);
 
+        // User view: add each item that can appear in terminal output.
         foreach ($discoveryResult->files as $file) {
             $cacheKey = null;
+            // User view: choose the terminal output branch for this case.
             if ($cache instanceof ResultCache && $fingerprint instanceof AnalysisFingerprint && is_readable($file->absolutePath)) {
                 $contents = file_get_contents($file->absolutePath);
+                // User view: choose the terminal output branch for this case.
                 if (is_string($contents)) {
                     $cacheKey       = $fingerprint->forFile($file->displayPath, $contents);
                     $cachedFindings = $cache->get($cacheKey);
+                    // User view: choose the terminal output branch for this case.
+                    // User view: missing data becomes the expected terminal output state.
                     if ($cachedFindings !== null) {
                         array_push($findings, ...$cachedFindings);
                         $parsedCount++;
@@ -225,9 +244,11 @@ final class AnalysisPipeline
             }
 
             $unit = $phpFileParser->parse($file);
+            // User view: choose the terminal output branch for this case.
             if (!$unit->hasParseErrors()) {
                 $parsedCount++;
             }
+            // User view: add each item that can appear in terminal output.
             foreach ($unit->diagnostics as $diagnostic) {
                 $sourceDiagnostics[] = new RunDiagnostic(
                     type:     'parse-error',
@@ -239,6 +260,8 @@ final class AnalysisPipeline
 
             $unitFindings = $this->registry->analyseUnit($unit, $ruleContext, $ruleRunnerObserver);
             array_push($findings, ...$unitFindings);
+            // User view: choose the terminal output branch for this case.
+            // User view: missing data becomes the expected terminal output state.
             if ($cache instanceof ResultCache && $cacheKey !== null && !$unit->hasParseErrors()) {
                 $cache->put($cacheKey, $unitFindings);
             }
@@ -268,6 +291,8 @@ final class AnalysisPipeline
      * Legacy load-all-then-analyse pipeline. Still used for diff/review flows
      * that need both the current changed-only set and a base snapshot.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string                  $projectRoot - Root for discovery and parsing of the changed-only set.
      * @param AnalyseCommandOptions   $options - CLI options forwarded to discovery and the context resolver.
      * @param AnalysisConfig          $config - Effective config supplying ignore patterns and rule selection.

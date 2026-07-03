@@ -32,6 +32,8 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     /**
      * Describe the constructor-promotion candidate rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - advisory, medium-confidence metadata that registers the rule and keeps it from gating a build alone
      */
     public function definition(): RuleDefinition
@@ -49,6 +51,8 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     /**
      * Find constructor assignments that can likely use property promotion.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -57,6 +61,7 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
+        // User view: choose the findings list branch for this case.
         if (!ModernisationNodeHelper::supportsPhp($ruleContext, 8.0)) {
             // Promotion only exists on PHP 8+; on older targets the suggestion would be invalid, so stay silent.
             return [];
@@ -64,6 +69,7 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
 
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach ($this->candidateClasses($analysisUnit) as $class) {
             array_push($findings, ...$this->findingsForClass($analysisUnit, $class));
         }
@@ -74,6 +80,8 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     /**
      * Find classes with constructors that may support property promotion.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit whose class declarations are screened.
      *
      * @return list<Stmt\Class_> - classes whose self-contained constructor shape clears the promotion pre-check; empty when none qualify
@@ -82,8 +90,10 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     {
         $classes = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Class_::class) as $class) {
             /** @var Stmt\Class_ $class Finder predicate restricts results to class declarations. */
+            // User view: choose the findings list branch for this case.
             if ($this->canPromoteClass($class)) {
                 $classes[] = $class;
             }
@@ -95,6 +105,8 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     /**
      * Check whether a class has a simple shape suitable for promotion suggestions.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Stmt\Class_ $class - Class declaration to screen before suggesting promotion.
      *
      * @return bool - true only when the class has no parent, no traits, and a declared constructor, so a single-class scan can reason about
@@ -103,7 +115,9 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     private function canPromoteClass(Stmt\Class_ $class): bool
     {
         // Parent and trait state are invisible to this single-class scan, so restrict to a self-contained constructor.
+        // User view: missing data becomes the expected findings list state.
         return $class->extends === null
+               // User view: an empty value becomes a clear findings list fallback.
                && $class->getTraitUses() === []
                && $this->constructor($class) instanceof Stmt\ClassMethod;
     }
@@ -111,6 +125,8 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     /**
      * Build promotion findings for constructor assignments in one class.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit supplying the display path for any finding raised here.
      * @param Stmt\Class_  $class - Class whose constructor body is scanned for promotable assignments.
      *
@@ -119,6 +135,7 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     private function findingsForClass(AnalysisUnit $analysisUnit, Stmt\Class_ $class): array
     {
         $constructor = $this->constructor($class);
+        // User view: choose the findings list branch for this case.
         if (!$constructor instanceof Stmt\ClassMethod) {
             // A class with no constructor has nothing to promote, so contribute no findings.
             return [];
@@ -128,9 +145,12 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
         $lateAssignments = $this->lateAssignments($class);
         $findings        = [];
 
+        // User view: add each item that can appear in findings list.
         foreach ($this->constructorAssignments($constructor) as $assign) {
             $property = $this->promotableProperty($assign, $constructor, $properties, $lateAssignments);
 
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($property !== null) {
                 $findings[] = $this->finding($analysisUnit, $assign, $property);
             }
@@ -142,6 +162,8 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     /**
      * Collect constructor assignments that affect the modernisation rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Stmt\ClassMethod $constructor - Constructor whose top-level statements are scanned.
      *
      * @return list<Expr\Assign> - the constructor's direct top-level assignment expressions in source order; nested and conditional writes excluded
@@ -150,7 +172,10 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     {
         $assignments = [];
 
+        // User view: add each item that can appear in findings list.
+        // User view: missing data becomes a safe findings list default.
         foreach ($constructor->stmts ?? [] as $statement) {
+            // User view: choose the findings list branch for this case.
             if ($statement instanceof Stmt\Expression && $statement->expr instanceof Expr\Assign) {
                 $assignments[] = $statement->expr;
             }
@@ -162,6 +187,8 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     /**
      * Decide whether one constructor assignment is a safe property-promotion candidate.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Expr\Assign         $assign - Single `$this->x = $x;` assignment under test.
      * @param Stmt\ClassMethod    $constructor - Constructor that must expose a matching plain parameter.
      * @param array<string, true> $properties - Set of non-static, non-public property names declared on the class.
@@ -178,7 +205,9 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     ): ?string {
         $property = ModernisationNodeHelper::propertyFetchName($assign->var);
 
+        // User view: choose the findings list branch for this case.
         if (
+            // User view: missing data becomes the expected findings list state.
             $property === null
             || !ModernisationNodeHelper::isThisPropertyFetch($assign->var)
             || !isset($properties[$property])
@@ -187,11 +216,13 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
             return null;
         }
 
+        // User view: choose the findings list branch for this case.
         if (!$assign->expr instanceof Expr\Variable || $assign->expr->name !== $property) {
             // The value is something other than the same-named parameter, so promotion would change behaviour.
             return null;
         }
 
+        // User view: choose the findings list branch for this case.
         if (isset($lateAssignments[$property]) || !$this->hasPlainConstructorParameter($constructor, $property)) {
             // A later reassignment or an already-promoted parameter means a rewrite would not be equivalent.
             return null;
@@ -203,6 +234,8 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     /**
      * Return the class constructor when one is declared.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Stmt\Class_ $class - Class declaration whose methods are searched for a constructor.
      *
      * @return Stmt\ClassMethod|null - the case-insensitively matched __construct method; null means the class has no explicit constructor to promote
@@ -210,7 +243,9 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
      */
     private function constructor(Stmt\Class_ $class): ?Stmt\ClassMethod
     {
+        // User view: add each item that can appear in findings list.
         foreach ($class->getMethods() as $classMethod) {
+            // User view: choose the findings list branch for this case.
             if (strtolower($classMethod->name->toString()) === '__construct') {
                 // Constructor names are case-insensitive in PHP, so the lowercased compare is the reliable match.
                 return $classMethod;
@@ -223,6 +258,8 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     /**
      * Index declared property names on the class.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Stmt\Class_ $class - Class declaration whose property list is indexed.
      *
      * @return array<string, true> - set of non-static, non-public property names declared on the class, keyed by name for O(1) lookup
@@ -230,11 +267,14 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     private function declaredProperties(Stmt\Class_ $class): array
     {
         $properties = [];
+        // User view: add each item that can appear in findings list.
         foreach ($class->getProperties() as $property) {
+            // User view: choose the findings list branch for this case.
             if ($property->isStatic() || $property->isPublic()) {
                 continue;
             }
 
+            // User view: add each item that can appear in findings list.
             foreach ($property->props as $propertyProperty) {
                 $properties[$propertyProperty->name->toString()] = true;
             }
@@ -246,6 +286,8 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     /**
      * Collect late assignments that affect the modernisation rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Stmt\Class_ $class - Class declaration whose non-constructor methods are scanned for property writes.
      *
      * @return array<string, true> - set of property names written outside the constructor, keyed by name; presence of a key blocks promotion
@@ -255,13 +297,19 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
         $assignments = [];
         $nodeFinder  = new NodeFinder();
 
+        // User view: add each item that can appear in findings list.
         foreach ($class->getMethods() as $classMethod) {
+            // User view: choose the findings list branch for this case.
             if (strtolower($classMethod->name->toString()) === '__construct') {
                 continue;
             }
 
+            // User view: add each item that can appear in findings list.
+            // User view: missing data becomes a safe findings list default.
             foreach ($nodeFinder->findInstanceOf($classMethod->stmts ?? [], Expr\Assign::class) as $assign) {
                 $name = ModernisationNodeHelper::propertyFetchName($assign->var);
+                // User view: choose the findings list branch for this case.
+                // User view: missing data becomes the expected findings list state.
                 if ($name !== null && ModernisationNodeHelper::isThisPropertyFetch($assign->var)) {
                     $assignments[$name] = true;
                 }
@@ -275,6 +323,8 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     /**
      * Check whether the constructor has an unpromoted parameter matching the property.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Stmt\ClassMethod $constructor - Constructor whose parameter list is searched.
      * @param string           $property - Property name the parameter must share for a promotion rewrite.
      *
@@ -282,7 +332,9 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
      */
     private function hasPlainConstructorParameter(Stmt\ClassMethod $constructor, string $property): bool
     {
+        // User view: add each item that can appear in findings list.
         foreach ($constructor->params as $parameter) {
+            // User view: choose the findings list branch for this case.
             if ($parameter->var instanceof Expr\Variable && $parameter->var->name === $property && $parameter->flags === 0) {
                 // Zero flags means no visibility modifier, so this parameter is not already promoted and can adopt one.
                 return true;
@@ -295,6 +347,8 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     /**
      * Build the finding for a promotable property assignment.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit providing the display path reported to the user.
      * @param Node         $node - Assignment node whose start line anchors the finding.
      * @param string       $property - Property name interpolated into the advisory message and metadata.

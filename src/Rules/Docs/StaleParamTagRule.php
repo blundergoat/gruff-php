@@ -32,6 +32,8 @@ final readonly class StaleParamTagRule implements RuleInterface
     /**
      * Describe the stale @param tag rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -50,6 +52,8 @@ final readonly class StaleParamTagRule implements RuleInterface
     /**
      * Find @param tags that no longer match function parameters.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -62,10 +66,13 @@ final readonly class StaleParamTagRule implements RuleInterface
 
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
             $docComment = $node->getDocComment();
 
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($docComment === null) {
                 continue;
             }
@@ -73,13 +80,17 @@ final readonly class StaleParamTagRule implements RuleInterface
             $docText          = $docComment->getText();
             $documentedParams = MissingParamTagRule::extractParamNames($docText);
 
+            // User view: choose the findings list branch for this case.
+            // User view: an empty value becomes a clear findings list fallback.
             if ($documentedParams === []) {
                 continue;
             }
 
             $actualParams = [];
 
+            // User view: add each item that can appear in findings list.
             foreach ($node->params as $param) {
+                // User view: choose the findings list branch for this case.
                 if ($param->var instanceof Variable && is_string($param->var->name)) {
                     $actualParams[$param->var->name] = true;
                 }
@@ -87,7 +98,9 @@ final readonly class StaleParamTagRule implements RuleInterface
 
             $symbol = CyclomaticComplexityRule::resolveSymbol($node);
 
+            // User view: add each item that can appear in findings list.
             foreach ($documentedParams as $docParam) {
+                // User view: choose the findings list branch for this case.
                 if (isset($actualParams[$docParam])) {
                     continue;
                 }

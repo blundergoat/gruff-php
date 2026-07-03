@@ -15,6 +15,8 @@ use Symfony\Component\Process\Process;
 final readonly class GitArchiveSnapshot
 {
     /**
+      * User flow: Compares branch feedback for review workflows.
+      *
      * @param string       $projectRoot - Git working tree root.
      * @param string       $ref - Git ref to archive.
      * @param list<string> $paths - Optional path filters to include in the archive.
@@ -28,6 +30,7 @@ final readonly class GitArchiveSnapshot
     {
         $ref      = $this->validatedRef($ref);
         $tempRoot = rtrim(sys_get_temp_dir(), '/') . '/gruff-review-' . bin2hex(random_bytes(6));
+        // User view: choose the branch review feedback branch for this case.
         if (!mkdir($tempRoot, 0700, true) && !is_dir($tempRoot)) {
             throw new RuntimeException(sprintf('Unable to create review snapshot directory "%s".', $tempRoot));
         }
@@ -35,15 +38,20 @@ final readonly class GitArchiveSnapshot
         $archivePath = $tempRoot . '.tar';
 
         try {
+            // User view: an empty value becomes a clear branch review feedback fallback.
             $hasPathFilter = $paths !== [];
             $archivePaths  = $hasPathFilter ? $this->existingPathsInRef($projectRoot, $ref, $paths) : [];
 
+            // User view: choose the branch review feedback branch for this case.
+            // User view: an empty value becomes a clear branch review feedback fallback.
             if ($hasPathFilter && $archivePaths === []) {
                 // None of the requested paths exist at the ref, so git archive would error; yield an empty snapshot.
                 return $tempRoot;
             }
 
             $archiveCommand = ['git', 'archive', '--format=tar', '--output', $archivePath, $ref];
+            // User view: choose the branch review feedback branch for this case.
+            // User view: an empty value becomes a clear branch review feedback fallback.
             if ($archivePaths !== []) {
                 $archiveCommand[] = '--';
                 array_push($archiveCommand, ...$archivePaths);
@@ -52,7 +60,9 @@ final readonly class GitArchiveSnapshot
             $archiveProcess = new Process($archiveCommand, $projectRoot);
             $archiveProcess->run();
 
+            // User view: choose the branch review feedback branch for this case.
             if (!$archiveProcess->isSuccessful()) {
+                // User view: an empty value becomes a clear branch review feedback fallback.
                 throw new DiffException(trim($archiveProcess->getErrorOutput()) !== ''
                                             ? trim($archiveProcess->getErrorOutput())
                                             : sprintf('Unable to archive base ref "%s".', $ref));
@@ -61,7 +71,9 @@ final readonly class GitArchiveSnapshot
             $extractProcess = new Process(['tar', '-xf', $archivePath, '-C', $tempRoot]);
             $extractProcess->run();
 
+            // User view: choose the branch review feedback branch for this case.
             if (!$extractProcess->isSuccessful()) {
+                // User view: an empty value becomes a clear branch review feedback fallback.
                 throw new DiffException(trim($extractProcess->getErrorOutput()) !== ''
                                             ? trim($extractProcess->getErrorOutput())
                                             : sprintf('Unable to extract base ref "%s".', $ref));
@@ -70,6 +82,7 @@ final readonly class GitArchiveSnapshot
             // Archive and extract both succeeded; the snapshot root now holds the ref's tree for comparison.
             return $tempRoot;
         } catch (\Throwable $throwable) {
+            // User view: choose the branch review feedback branch for this case.
             if (is_file($archivePath)) {
                 unlink($archivePath);
             }
@@ -77,6 +90,7 @@ final readonly class GitArchiveSnapshot
 
             throw $throwable;
         } finally {
+            // User view: choose the branch review feedback branch for this case.
             if (is_file($archivePath)) {
                 unlink($archivePath);
             }
@@ -86,12 +100,15 @@ final readonly class GitArchiveSnapshot
     /**
      * Recursively remove a snapshot directory.
      *
+      * User flow: Compares branch feedback for review workflows.
+      *
      * @param string $path - Snapshot directory path to remove.
      *
      * @return void
      */
     public function remove(string $path): void
     {
+        // User view: choose the branch review feedback branch for this case.
         if (!is_dir($path)) {
             // Already gone or never created, so deletion is a no-op; tolerating this keeps cleanup idempotent.
             return;
@@ -102,13 +119,16 @@ final readonly class GitArchiveSnapshot
             \RecursiveIteratorIterator::CHILD_FIRST,
         );
 
+        // User view: add each item that can appear in branch review feedback.
         foreach ($recursiveIteratorIterator as $file) {
+            // User view: choose the branch review feedback branch for this case.
             if (!$file instanceof \SplFileInfo) {
                 continue;
             }
 
             $pathname = $file->getPathname();
 
+            // User view: choose the branch review feedback branch for this case.
             if ($file->isDir()) {
                 rmdir($pathname);
                 continue;
@@ -123,6 +143,8 @@ final readonly class GitArchiveSnapshot
     /**
      * List requested paths that exist at a git ref.
      *
+      * User flow: Compares branch feedback for review workflows.
+      *
      * @param string       $projectRoot - Working tree the git ls-tree runs in.
      * @param string       $ref - Git ref whose tree is queried for the requested paths.
      * @param list<string> $paths - Path filters to test; normalised to root-relative before the query.
@@ -132,6 +154,8 @@ final readonly class GitArchiveSnapshot
     private function existingPathsInRef(string $projectRoot, string $ref, array $paths): array
     {
         $candidatePaths = $this->normaliseArchivePaths($projectRoot, $paths);
+        // User view: choose the branch review feedback branch for this case.
+        // User view: an empty value becomes a clear branch review feedback fallback.
         if ($candidatePaths === []) {
             // Nothing survived normalisation, so skip the ls-tree call and report no matching paths.
             return [];
@@ -143,7 +167,9 @@ final readonly class GitArchiveSnapshot
         );
         $process->run();
 
+        // User view: choose the branch review feedback branch for this case.
         if (!$process->isSuccessful()) {
+            // User view: an empty value becomes a clear branch review feedback fallback.
             throw new DiffException(trim($process->getErrorOutput()) !== ''
                                         ? trim($process->getErrorOutput())
                                         : sprintf('Unable to list files for base ref "%s".', $ref));
@@ -151,6 +177,7 @@ final readonly class GitArchiveSnapshot
 
         $paths = array_values(array_filter(
                                   explode("\0", $process->getOutput()),
+                                  // User view: an empty value becomes a clear branch review feedback fallback.
                                   static fn(string $path): bool => $path !== '',
                               ));
         $paths = array_values(array_unique($paths));
@@ -163,6 +190,8 @@ final readonly class GitArchiveSnapshot
     /**
      * Normalise archive paths for the branch-review workflow.
      *
+      * User flow: Compares branch feedback for review workflows.
+      *
      * @param string       $projectRoot - Root that absolute inputs are made relative to; paths outside it are dropped.
      * @param list<string> $paths - Caller path filters, absolute or relative, possibly with `./` prefixes.
      *
@@ -173,17 +202,24 @@ final readonly class GitArchiveSnapshot
         $root       = rtrim(PathHelper::canonical($projectRoot), '/');
         $normalised = [];
 
+        // User view: add each item that can appear in branch review feedback.
         foreach ($paths as $path) {
             $candidate = PathHelper::normalizeSeparators($path);
+            // User view: choose the branch review feedback branch for this case.
+            // User view: an empty value becomes a clear branch review feedback fallback.
             if ($candidate === '') {
                 continue;
             }
 
+            // User view: choose the branch review feedback branch for this case.
             if (PathHelper::isAbsolute($candidate)) {
                 $candidate = rtrim(PathHelper::canonical($candidate), '/');
+                // User view: choose the branch review feedback branch for this case.
                 if ($candidate === $root) {
                     $candidate = '.';
-                } elseif (str_starts_with($candidate, $root . '/')) {
+                }
+                // User view: choose the next branch review feedback branch for this case.
+                elseif (str_starts_with($candidate, $root . '/')) {
                     $candidate = substr($candidate, strlen($root) + 1);
                 } else {
                     continue;
@@ -195,6 +231,7 @@ final readonly class GitArchiveSnapshot
             }
 
             $candidate                                        = rtrim($candidate, '/');
+            // User view: an empty value becomes a clear branch review feedback fallback.
             $normalised[$candidate === '' ? '.' : $candidate] = $candidate === '' ? '.' : $candidate;
         }
 
@@ -208,6 +245,8 @@ final readonly class GitArchiveSnapshot
     /**
      * Validate a Git ref before passing it to archive commands.
      *
+      * User flow: Compares branch feedback for review workflows.
+      *
      * @param string $ref - Untrusted caller-supplied ref name to allowlist before it reaches the command line.
      *
      * @return string - the same ref, returned unchanged once it passes the allowlist so callers can splice it unquoted
@@ -215,6 +254,8 @@ final readonly class GitArchiveSnapshot
     private function validatedRef(string $ref): string
     {
         // Allow only ref characters that can be passed to git archive without shell expansion or option confusion.
+        // User view: choose the branch review feedback branch for this case.
+        // User view: an empty value becomes a clear branch review feedback fallback.
         if ($ref === '' || str_starts_with($ref, '-') || preg_match('/^[A-Za-z0-9._\/@^~+-]+$/', $ref) !== 1) {
             throw new DiffException(sprintf('Git archive base ref "%s" is not a safe git ref name.', $ref));
         }

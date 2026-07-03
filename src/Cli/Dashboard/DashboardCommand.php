@@ -29,6 +29,8 @@ final class DashboardCommand extends Command
     /**
      * Configure the dashboard command arguments and options.
      *
+      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
+      *
      * @return void
      */
     protected function configure(): void
@@ -59,6 +61,8 @@ final class DashboardCommand extends Command
     /**
      * Validate dashboard options and start the local dashboard server.
      *
+      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
+      *
      * @param InputInterface  $input - Parsed dashboard arguments and options: paths, host, port, and scan flags.
      * @param OutputInterface $output - Destination for validation error messages shown before the server starts.
      *
@@ -68,6 +72,7 @@ final class DashboardCommand extends Command
     {
         $cwd = getcwd();
 
+        // User view: choose the dashboard view branch for this case.
         if ($cwd === false) {
             $output->writeln('<error>Unable to determine current working directory.</error>');
 
@@ -78,6 +83,8 @@ final class DashboardCommand extends Command
         $dashboardStateFactory = new DashboardStateFactory();
         $projectRoot           = $dashboardStateFactory->initialProjectRoot($input, $cwd);
 
+        // User view: choose the dashboard view branch for this case.
+        // User view: missing data becomes the expected dashboard view state.
         if ($projectRoot === null) {
             $output->writeln('<error>Initial --project/--project-root must resolve to an existing directory.</error>');
 
@@ -87,6 +94,7 @@ final class DashboardCommand extends Command
 
         $port = $this->port($input, $output);
 
+        // User view: choose the dashboard view branch for this case.
         if ($port === false) {
             // port() already reported the reason; false signals an invalid --port value, so reject as invalid usage.
             return Command::INVALID;
@@ -94,6 +102,7 @@ final class DashboardCommand extends Command
 
         $scanTimeout = $this->scanTimeout($input, $output);
 
+        // User view: choose the dashboard view branch for this case.
         if ($scanTimeout === false) {
             // scanTimeout() already reported the reason; false signals an invalid --scan-timeout, so reject as invalid.
             return Command::INVALID;
@@ -107,11 +116,14 @@ final class DashboardCommand extends Command
             explicitConfigPath: $dashboardStateFactory->optionalStringOption($input, 'config'),
             shouldSkipConfig:   (bool) $input->getOption('no-config'),
         );
+        // User view: choose the dashboard view branch for this case.
+        // User view: missing data becomes the expected dashboard view state.
         if ($promptExitCode !== null) {
             // A non-null code means the missing-config prompt resolved the run itself, so honour its exit code.
             return $promptExitCode;
         }
 
+        // User view: missing data becomes a safe dashboard view default.
         $host                    = $dashboardStateFactory->optionalStringOption($input, 'host') ?? self::DEFAULT_HOST;
         $dashboardRequestContext = new DashboardRequestContext($input, $cwd, $projectRoot, $scanTimeout, $host, $port);
         $dashboardServer         = new DashboardServer($dashboardStateFactory, $this->gruffBinary());
@@ -122,6 +134,8 @@ final class DashboardCommand extends Command
     /**
      * Parse and validate the dashboard port option.
      *
+      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
+      *
      * @param InputInterface  $input - Source of the raw --port option, expected to be a digit string.
      * @param OutputInterface $output - Destination for the validation error shown when the port is out of range.
      *
@@ -131,6 +145,7 @@ final class DashboardCommand extends Command
     {
         $rawPort = $input->getOption('port');
 
+        // User view: choose the dashboard view branch for this case.
         if (!is_string($rawPort) || !ctype_digit($rawPort)) {
             $output->writeln('<error>--port must be an integer from 1 to 65535.</error>');
 
@@ -140,6 +155,7 @@ final class DashboardCommand extends Command
 
         $port = (int) $rawPort;
 
+        // User view: choose the dashboard view branch for this case.
         if ($port < 1 || $port > 65535) {
             $output->writeln('<error>--port must be an integer from 1 to 65535.</error>');
 
@@ -153,6 +169,8 @@ final class DashboardCommand extends Command
     /**
      * Parse and validate the dashboard scan timeout option.
      *
+      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
+      *
      * @param InputInterface  $input - Source of the raw --scan-timeout option, expected to be a non-negative integer.
      * @param OutputInterface $output - Destination for the validation error shown when the timeout is invalid.
      *
@@ -162,6 +180,7 @@ final class DashboardCommand extends Command
     {
         $rawTimeout = $input->getOption('scan-timeout');
 
+        // User view: choose the dashboard view branch for this case.
         if (!is_string($rawTimeout) || !ctype_digit($rawTimeout)) {
             $output->writeln('<error>--scan-timeout must be a non-negative integer.</error>');
 
@@ -178,6 +197,8 @@ final class DashboardCommand extends Command
     /**
      * Return the package-local gruff-php executable path.
      *
+      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
+      *
      * @return string - Absolute gruff-php binary path.
      */
     private function gruffBinary(): string

@@ -36,6 +36,8 @@ final readonly class AnalysisReport
     public const SCHEMA_VERSION = 'gruff.analysis.v2';
 
     /**
+      * User flow: Moves analysis state toward the output users review.
+      *
      * @param string                      $toolVersion - Gruff version used to produce the report.
      * @param list<string>                $requestedPaths - Paths requested for analysis.
      * @param string                      $format - Output format requested for report serialization.
@@ -92,6 +94,8 @@ final readonly class AnalysisReport
     /**
      * Count findings by severity for report metadata.
      *
+      * User flow: Moves analysis state toward the output users review.
+      *
      * @return array{advisory: int, warning: int, error: int, total: int} - per-severity finding tallies plus a precomputed total; each count is zero
      *                         when no finding hit that severity
      */
@@ -104,6 +108,7 @@ final readonly class AnalysisReport
             'total'    => count($this->findings),
         ];
 
+        // User view: add each item that can appear in analysis output.
         foreach ($this->findings as $finding) {
             $counts[$finding->severity->value]++;
         }
@@ -116,6 +121,8 @@ final readonly class AnalysisReport
      * Sorted by total descending then ruleId ascending so the noisiest rules surface first
      * and ordering stays deterministic across runs.
      *
+      * User flow: Moves analysis state toward the output users review.
+      *
      * @return list<array{ruleId: string, total: int, advisory: int, warning: int, error: int}> - one row per triggered rule, ordered noisiest-first
      *                            (total descending, then ruleId ascending); empty when there are no findings
      */
@@ -123,6 +130,7 @@ final readonly class AnalysisReport
     {
         $byRule = [];
 
+        // User view: add each item that can appear in analysis output.
         foreach ($this->findings as $finding) {
             $byRule[$finding->ruleId] ??= ['total' => 0, 'advisory' => 0, 'warning' => 0, 'error' => 0];
             $byRule[$finding->ruleId]['total']++;
@@ -131,6 +139,7 @@ final readonly class AnalysisReport
 
         $rows = [];
 
+        // User view: add each item that can appear in analysis output.
         foreach ($byRule as $ruleId => $counts) {
             $rows[] = [
                 'ruleId'   => $ruleId,
@@ -153,6 +162,8 @@ final readonly class AnalysisReport
     /**
      * Count parse diagnostics emitted while loading analysed files.
      *
+      * User flow: Moves analysis state toward the output users review.
+      *
      * @return int - count of parse-error diagnostics only; other diagnostic types (e.g. baseline-error) are not tallied here, so zero means every
      *             file parsed cleanly
      */
@@ -167,6 +178,8 @@ final readonly class AnalysisReport
     /**
      * Serialize this value object into the array shape used by reports.
      *
+      * User flow: Moves analysis state toward the output users review.
+      *
      * @return array<string, ReportValue> - the report serialized to the reporter wire shape; optional sections (mutation, score, diff, etc.) are
      *                       present only when populated
      */
@@ -210,38 +223,49 @@ final readonly class AnalysisReport
             ),
         ];
 
+        // User view: choose the analysis output branch for this case.
+        // User view: missing data becomes the expected analysis output state.
         if ($this->suppressedCount !== null) {
             $report['suppressedCount'] = $this->suppressedCount;
         }
 
+        // User view: choose the analysis output branch for this case.
         if ($this->failureReason instanceof ThresholdTrip) {
             $report['failureReason'] = $this->failureReason->toArray();
         }
 
+        // User view: choose the analysis output branch for this case.
+        // User view: missing data becomes the expected analysis output state.
         if ($this->newFindingsCount !== null) {
             $report['newFindingsCount'] = $this->newFindingsCount;
         }
 
+        // User view: choose the analysis output branch for this case.
         if ($this->mutation instanceof MutationAnalysisResult) {
             $report['mutation'] = $this->mutation->toArray();
         }
 
+        // User view: choose the analysis output branch for this case.
         if ($this->score instanceof ScoreReport) {
             $report['score'] = $this->score->toArray();
         }
 
+        // User view: choose the analysis output branch for this case.
         if ($this->diff instanceof DiffResult) {
             $report['diff'] = $this->diff->toArray();
         }
 
+        // User view: choose the analysis output branch for this case.
         if ($this->trend instanceof TrendReport) {
             $report['trend'] = $this->trend->toArray();
         }
 
+        // User view: choose the analysis output branch for this case.
         if ($this->baseline instanceof BaselineReport) {
             $report['baseline'] = $this->baseline->toArray();
         }
 
+        // User view: choose the analysis output branch for this case.
         if ($this->review instanceof BranchReviewResult) {
             $report['review'] = $this->review->toArray();
         }
@@ -252,6 +276,8 @@ final readonly class AnalysisReport
     /**
      * Check whether any finding in the report matches the requested severity.
      *
+      * User flow: Moves analysis state toward the output users review.
+      *
      * @param Severity $severity - Severity level to look for in the finding list.
      *
      * @return bool - true on the first finding at the requested severity (the gate only needs one); false means nothing in the report reached that
@@ -259,7 +285,9 @@ final readonly class AnalysisReport
      */
     public function hasFindingsAtSeverity(Severity $severity): bool
     {
+        // User view: add each item that can appear in analysis output.
         foreach ($this->findings as $finding) {
+            // User view: choose the analysis output branch for this case.
             if ($finding->severity === $severity) {
                 return true;
             }

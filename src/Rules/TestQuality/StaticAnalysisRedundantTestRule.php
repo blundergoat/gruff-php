@@ -31,6 +31,8 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
     /**
      * Describe the static-analysis-redundant test rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -55,6 +57,8 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
     /**
      * Find assertion calls that restate declarations already present in the parsed unit.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -63,24 +67,32 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $declarations = $this->collectDeclarations($analysisUnit);
+        // User view: choose the findings list branch for this case.
+        // User view: an empty value becomes a clear findings list fallback.
         if ($declarations === []) {
             return [];
         }
 
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
+            // User view: add each item that can appear in findings list.
             foreach (TestQualityNodeHelper::assertionCalls($scope) as $assertionCall) {
+                // User view: choose the findings list branch for this case.
                 if (TestQualityNodeHelper::callName($assertionCall) !== 'asserttrue') {
                     continue;
                 }
 
                 $subjectCall = TestQualityNodeHelper::firstArgValue($assertionCall);
+                // User view: choose the findings list branch for this case.
                 if (!$subjectCall instanceof Expr\FuncCall) {
                     continue;
                 }
 
                 $candidate = $this->candidateFromSubjectCall($subjectCall, $declarations);
+                // User view: choose the findings list branch for this case.
+                // User view: missing data becomes the expected findings list state.
                 if ($candidate === null) {
                     continue;
                 }
@@ -113,6 +125,8 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
     /**
      * Build a same-unit declaration index keyed by resolved and short class-like names.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit whose declarations should be indexed.
      *
      * @return array<string, array{kind: string, name: string, methods: array<string, string>, properties: array<string, string>}> - Declaration index.
@@ -121,12 +135,17 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
     {
         $declarations = [];
 
+        // User view: add each item that can appear in findings list.
         foreach ($this->topLevelClassLikes($analysisUnit) as $node) {
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($node->name === null) {
                 continue;
             }
 
             $name = $this->classLikeName($node);
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($name === null) {
                 continue;
             }
@@ -138,7 +157,9 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
                 'properties' => [],
             ];
 
+            // User view: add each item that can appear in findings list.
             foreach ($node->stmts as $statement) {
+                // User view: choose the findings list branch for this case.
                 if ($statement instanceof Stmt\ClassMethod) {
                     // PHP resolves method names case-insensitively, so index by the lowercase name.
                     $methodName = $statement->name->toString();
@@ -146,7 +167,9 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
                     continue;
                 }
 
+                // User view: choose the findings list branch for this case.
                 if ($statement instanceof Stmt\Property) {
+                    // User view: add each item that can appear in findings list.
                     foreach ($statement->props as $property) {
                         // PHP property names are case-sensitive, so index by the declared name as-is.
                         $propertyName = $property->name->toString();
@@ -155,6 +178,7 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
                 }
             }
 
+            // User view: add each item that can appear in findings list.
             foreach ($this->classLikeKeys($node, $name) as $key) {
                 $declarations[$key] = $record;
             }
@@ -169,6 +193,8 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
      * blocks are only registered once that code path runs, so a static existence assertion against
      * them is not provably redundant and must be excluded from the index.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit whose top-level declarations should be collected.
      *
      * @return list<Stmt\ClassLike> - Class-like declarations at file or namespace scope, in source order.
@@ -177,9 +203,13 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
     {
         $classLikes = [];
 
+        // User view: add each item that can appear in findings list.
         foreach ($analysisUnit->statements as $statement) {
+            // User view: choose the findings list branch for this case.
             if ($statement instanceof Stmt\Namespace_) {
+                // User view: add each item that can appear in findings list.
                 foreach ($statement->stmts as $namespaceStatement) {
+                    // User view: choose the findings list branch for this case.
                     if ($namespaceStatement instanceof Stmt\ClassLike) {
                         $classLikes[] = $namespaceStatement;
                     }
@@ -187,6 +217,7 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
             if ($statement instanceof Stmt\ClassLike) {
                 $classLikes[] = $statement;
             }
@@ -198,6 +229,8 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
     /**
      * Build a candidate metadata payload when a source declaration proves the subject call.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Expr\FuncCall                                                                                  $subjectCall - Function call wrapped by assertTrue().
      * @param array<string, array{kind: string, name: string, methods: array<string, string>, properties: array<string, string>}> $declarations - Same-unit declaration index.
      *
@@ -206,22 +239,32 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
     private function candidateFromSubjectCall(Expr\FuncCall $subjectCall, array $declarations): ?array
     {
         $assertion = TestQualityNodeHelper::functionName($subjectCall);
+        // User view: choose the findings list branch for this case.
+        // User view: missing data becomes the expected findings list state.
         if ($assertion === null) {
             return null;
         }
 
         $symbolName = $this->classNameFromClassConst(TestQualityNodeHelper::firstArgValue($subjectCall));
+        // User view: choose the findings list branch for this case.
+        // User view: missing data becomes the expected findings list state.
         if ($symbolName === null) {
             return null;
         }
 
+        // User view: missing data becomes a safe findings list default.
         $declaration = $declarations[strtolower($symbolName)] ?? null;
+        // User view: choose the findings list branch for this case.
+        // User view: missing data becomes the expected findings list state.
         if ($declaration === null) {
             return null;
         }
 
         $expectedKind = $this->expectedKindForExistenceAssertion($assertion);
+        // User view: choose the findings list branch for this case.
+        // User view: missing data becomes the expected findings list state.
         if ($expectedKind !== null) {
+            // User view: choose the findings list branch for this case.
             if ($declaration['kind'] !== $expectedKind) {
                 return null;
             }
@@ -235,10 +278,12 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
             ];
         }
 
+        // User view: choose the findings list branch for this case.
         if ($assertion === 'method_exists') {
             return $this->memberCandidate($subjectCall, $declaration, 'methods', 'method');
         }
 
+        // User view: choose the findings list branch for this case.
         if ($assertion === 'property_exists') {
             return $this->memberCandidate($subjectCall, $declaration, 'properties', 'property');
         }
@@ -249,6 +294,8 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
     /**
      * Build candidate metadata for method_exists() or property_exists() assertions.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Expr\FuncCall                                                       $subjectCall - Existence check wrapped by assertTrue().
      * @param array{kind: string, name: string, methods: array<string, string>, properties: array<string, string>} $declaration - Same-unit declaration row.
      * @param 'methods'|'properties'                                             $memberBucket - Declaration member bucket to inspect.
@@ -259,6 +306,7 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
     private function memberCandidate(Expr\FuncCall $subjectCall, array $declaration, string $memberBucket, string $memberKind): ?array
     {
         $member = TestQualityNodeHelper::literalValue(TestQualityNodeHelper::argValue($subjectCall, 1));
+        // User view: choose the findings list branch for this case.
         if (!is_string($member)) {
             return null;
         }
@@ -266,7 +314,9 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
         // Methods resolve case-insensitively in PHP; properties do not. Look each up the way the
         // language resolves it so a wrong-case property_exists() is not mistaken for a proven member.
         $memberKey    = $memberKind === 'property' ? $member : strtolower($member);
+        // User view: missing data becomes a safe findings list default.
         $declaredName = $declaration[$memberBucket][$memberKey] ?? null;
+        // User view: choose the findings list branch for this case.
         if (!is_string($declaredName)) {
             return null;
         }
@@ -276,7 +326,9 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
             : sprintf('%s::%s()', $declaration['name'], $declaredName);
 
         return [
+            // User view: missing data becomes a safe findings list default.
             'variant'             => TestQualityNodeHelper::functionName($subjectCall) ?? $memberKind . '_exists',
+            // User view: missing data becomes a safe findings list default.
             'assertion'           => TestQualityNodeHelper::functionName($subjectCall) ?? $memberKind . '_exists',
             'staticFact'          => sprintf('%s %s is declared in the same parsed file', $memberKind, $evidenceSymbol),
             'evidenceSymbol'      => $evidenceSymbol,
@@ -287,6 +339,8 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
     /**
      * Map source-level existence functions to the declaration kind they prove redundantly.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $assertion - Lowercase existence function name.
      *
      * @return string|null - Expected class-like kind, or null when the function checks a member.
@@ -305,21 +359,26 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
     /**
      * Resolve a ClassName::class expression to the parser-resolved class name.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Expr|null $expr - Candidate first argument to an existence function.
      *
      * @return string|null - Resolved class name, or null when the expression is dynamic or not ::class.
      */
     private function classNameFromClassConst(?Expr $expr): ?string
     {
+        // User view: choose the findings list branch for this case.
         if (!$expr instanceof Expr\ClassConstFetch || !$expr->class instanceof Name) {
             return null;
         }
 
+        // User view: choose the findings list branch for this case.
         if ($expr->class->isSpecialClassName()) {
             return null;
         }
 
         $name = $expr->name;
+        // User view: choose the findings list branch for this case.
         if (!$name instanceof Node\Identifier || strtolower($name->toString()) !== 'class') {
             return null;
         }
@@ -332,16 +391,21 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
     /**
      * Return the resolved display name for a class-like declaration.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Stmt\ClassLike $classLike - Class-like declaration.
      *
      * @return string|null - Resolved declaration name, or null for anonymous classes.
      */
     private function classLikeName(Stmt\ClassLike $classLike): ?string
     {
+        // User view: choose the findings list branch for this case.
+        // User view: missing data becomes the expected findings list state.
         if ($classLike->name === null) {
             return null;
         }
 
+        // User view: missing data becomes a safe findings list default.
         $resolved = $classLike->namespacedName ?? null;
 
         return $resolved instanceof Name ? $resolved->toString() : $classLike->name->toString();
@@ -350,6 +414,8 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
     /**
      * Build lookup keys for resolved and short class-like names.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Stmt\ClassLike $classLike - Class-like declaration.
      * @param string         $resolvedName - Resolved class-like name.
      *
@@ -359,6 +425,8 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
     {
         $keys = [strtolower($resolvedName)];
 
+        // User view: choose the findings list branch for this case.
+        // User view: missing data becomes the expected findings list state.
         if ($classLike->name !== null) {
             $keys[] = strtolower($classLike->name->toString());
         }
@@ -369,6 +437,8 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
     /**
      * Describe which PHP declaration kind a class-like node represents.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Stmt\ClassLike $classLike - Class-like declaration.
      *
      * @return 'class'|'interface'|'trait'|'enum' - Declaration kind.

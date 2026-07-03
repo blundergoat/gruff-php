@@ -16,6 +16,8 @@ use GruffPhp\Results\Finding\Severity;
 final readonly class MutationFindingFactory
 {
     /**
+      * User flow: Folds mutation results into the quality feedback users see.
+      *
      * @param MutationAnalysisResult $result - Mutation analysis result to convert into findings.
      *
      * @return list<Finding> - findings for any survived mutants, budget breach, and MSI regression this result produced; empty when all three gate
@@ -25,6 +27,7 @@ final readonly class MutationFindingFactory
     {
         $findings = [];
 
+        // User view: add each item that can appear in mutation feedback.
         foreach ($result->report->survivedMutants() as $infectionMutant) {
             $findings[] = new Finding(
                 ruleId:      'mutation.survived-mutant',
@@ -49,6 +52,7 @@ final readonly class MutationFindingFactory
             );
         }
 
+        // User view: choose the mutation feedback branch for this case.
         if ($result->isBudgetExceeded()) {
             $findings[] = new Finding(
                 ruleId:      'mutation.budget-exceeded',
@@ -72,6 +76,8 @@ final readonly class MutationFindingFactory
         }
 
         $delta = $result->msiDelta();
+        // User view: choose the mutation feedback branch for this case.
+        // User view: missing data becomes the expected mutation feedback state.
         if ($delta !== null && $delta < 0) {
             $findings[] = new Finding(
                 ruleId:      'mutation.msi-regression',
@@ -99,6 +105,8 @@ final readonly class MutationFindingFactory
     /**
      * Render a survived-mutant message that distinguishes escaped and timed-out statuses.
      *
+      * User flow: Folds mutation results into the quality feedback users see.
+      *
      * @param InfectionMutant $infectionMutant - Survived mutant whose status selects the wording; status is the
      *                                          raw Infection label, so only 'timed out' diverges from the escaped case.
      *
@@ -106,6 +114,7 @@ final readonly class MutationFindingFactory
      */
     private function survivedMessage(InfectionMutant $infectionMutant): string
     {
+        // User view: choose the mutation feedback branch for this case.
         if ($infectionMutant->status === 'timed out') {
             // A timeout is not a clean escape: Infection ran out of time before any test verdict,
             // so the wording avoids implying the tests actually passed.
@@ -125,6 +134,8 @@ final readonly class MutationFindingFactory
     /**
      * Render remediation guidance that matches the survived-mutant status.
      *
+      * User flow: Folds mutation results into the quality feedback users see.
+      *
      * @param InfectionMutant $infectionMutant - Survived mutant whose status selects the guidance; a 'timed out'
      *                                          status points the developer at performance before test strength.
      *
@@ -132,6 +143,7 @@ final readonly class MutationFindingFactory
      */
     private function survivedRemediation(InfectionMutant $infectionMutant): string
     {
+        // User view: choose the mutation feedback branch for this case.
         if ($infectionMutant->status === 'timed out') {
             // Timeouts are usually a speed problem, not a coverage gap, so steer the reader to that first.
             return 'Investigate slow or non-terminating behavior first, then add or strengthen unit tests if the mutant should be killed; gruff-php consumes Infection output and does not generate mutants.';

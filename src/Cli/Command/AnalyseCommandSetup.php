@@ -18,6 +18,8 @@ final readonly class AnalyseCommandSetup
     /**
      * Capture resolved dependencies and options needed to execute analyse.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string                $projectRoot - Absolute project root used for path resolution.
      * @param AnalyseCommandOptions $options - Validated analyse command options.
      * @param OutputFormat          $format - Reporter format selected for output.

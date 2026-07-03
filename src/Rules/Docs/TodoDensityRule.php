@@ -29,6 +29,8 @@ final readonly class TodoDensityRule implements RuleInterface
     /**
      * Describe the TODO density rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and thresholds.
      */
     public function definition(): RuleDefinition
@@ -48,6 +50,8 @@ final readonly class TodoDensityRule implements RuleInterface
     /**
      * Count TODO-style markers in comments and report files above threshold.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -56,6 +60,7 @@ final readonly class TodoDensityRule implements RuleInterface
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         // Fast bail: most files have zero deferred-work markers; skip the per-token scan for them.
+        // User view: choose the findings list branch for this case.
         if (preg_match('/\b(?:TODO|FIXME|HACK|XXX)\b/i', $analysisUnit->source) !== 1) {
             // No marker anywhere in the raw source means nothing to count; the density rule cannot fire.
             return [];
@@ -67,13 +72,16 @@ final readonly class TodoDensityRule implements RuleInterface
         $count     = 0;
         $firstLine = null;
 
+        // User view: add each item that can appear in findings list.
         foreach ($analysisUnit->tokens as $token) {
+            // User view: choose the findings list branch for this case.
             if (!$this->isCommentToken($token)) {
                 continue;
             }
 
             $matches = preg_match_all('/\b(TODO|FIXME|HACK|XXX)\b/i', $token->text);
 
+            // User view: choose the findings list branch for this case.
             if ($matches === 0 || $matches === false) {
                 continue;
             }
@@ -83,6 +91,8 @@ final readonly class TodoDensityRule implements RuleInterface
         }
         $thresholdMatch = $settings->highValueThresholdMatch($count);
 
+        // User view: choose the findings list branch for this case.
+        // User view: missing data becomes the expected findings list state.
         if ($thresholdMatch === null) {
             // Marker count stayed at or below the configured threshold, so this file is within tolerance.
             return [];
@@ -108,6 +118,8 @@ final readonly class TodoDensityRule implements RuleInterface
     /**
      * Check whether a token is a normal comment or docblock.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Token $token - Lexer token from the parsed unit; only comment-bearing kinds can hold a marker.
      *
      * @return bool - True when the token can contain TODO markers.

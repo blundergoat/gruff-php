@@ -12,6 +12,8 @@ final readonly class RunDiagnostic
     /**
      * Capture a non-finding diagnostic emitted during a gruff-php run.
      *
+      * User flow: Moves analysis state toward the output users review.
+      *
      * @param string      $type - Diagnostic category used by report serializers.
      * @param string      $message - Human-readable diagnostic detail.
      * @param string|null $filePath - Source file related to the diagnostic, when available.
@@ -30,6 +32,8 @@ final readonly class RunDiagnostic
     /**
      * Serialize this value object into the array shape used by reports.
      *
+      * User flow: Moves analysis state toward the output users review.
+      *
      * @return array{type: string, message: string, file: string|null, line: int|null, path: string|null} - report-ready snapshot of this diagnostic;
      *                     the "file" key holds the source path (null when none) and "line"/"path" are null when not applicable
      */

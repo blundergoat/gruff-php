@@ -36,6 +36,8 @@ final readonly class PrivateReflectionRule implements RuleInterface
     /**
      * Describe the private reflection test rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -54,6 +56,8 @@ final readonly class PrivateReflectionRule implements RuleInterface
     /**
      * Find tests that use reflection or binding to reach private implementation details.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -64,20 +68,24 @@ final readonly class PrivateReflectionRule implements RuleInterface
         $nodeFinder = new NodeFinder();
         $findings   = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             $reflectionNode = null;
+            // User view: add each item that can appear in findings list.
             foreach ($nodeFinder->find(
                 $scope->statements,
                 static fn (Node $node): bool => $node instanceof Expr\New_
                     || $node instanceof Expr\MethodCall
                     || $node instanceof Expr\StaticCall,
             ) as $node) {
+                // User view: choose the findings list branch for this case.
                 if ($this->isPrivateReflectionNode($node)) {
                     $reflectionNode = $node;
                     break;
                 }
             }
 
+            // User view: choose the findings list branch for this case.
             if (!$reflectionNode instanceof Node) {
                 continue;
             }
@@ -102,17 +110,21 @@ final readonly class PrivateReflectionRule implements RuleInterface
     /**
      * Detect reflection or closure binding nodes that expose private members.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Node $node - Candidate AST node (a new-expression, static call, or method call) to classify.
      *
      * @return bool - True when the node performs private reflection access.
      */
     private function isPrivateReflectionNode(Node $node): bool
     {
+        // User view: choose the findings list branch for this case.
         if ($node instanceof Expr\New_ && $node->class instanceof Name) {
             // Constructing a Reflection* object is the entry point for reaching privates; match by class name.
             return in_array(strtolower($node->class->getLast()), self::REFLECTION_CLASSES, true);
         }
 
+        // User view: choose the findings list branch for this case.
         if ($node instanceof Expr\StaticCall && $node->class instanceof Name) {
             $name      = TestQualityNodeHelper::callName($node);
             $className = strtolower($node->class->getLast());
@@ -121,9 +133,11 @@ final readonly class PrivateReflectionRule implements RuleInterface
             return $className === 'closure' && $name === 'bind';
         }
 
+        // User view: choose the findings list branch for this case.
         if ($node instanceof Expr\MethodCall) {
             $name = TestQualityNodeHelper::callName($node);
 
+            // User view: choose the findings list branch for this case.
             if ($name === 'setaccessible'
                 && TestQualityNodeHelper::literalValue(TestQualityNodeHelper::firstArgValue($node)) === true
             ) {

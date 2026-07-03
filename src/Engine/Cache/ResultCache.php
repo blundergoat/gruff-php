@@ -37,6 +37,8 @@ final readonly class ResultCache
     public const MAX_ENTRIES = 32768;
 
     /**
+      * User flow: Moves analysis state toward the output users review.
+      *
      * @param string $cacheDir - Project-local directory holding cache entries.
      * @param int    $maxEntries - Entry cap enforced by finalizeRun(); injectable so tests exercise eviction without thousands of writes.
      */
@@ -47,6 +49,8 @@ final readonly class ResultCache
     /**
      * Build the cache rooted at the project's gitignored cache directory.
      *
+      * User flow: Moves analysis state toward the output users review.
+      *
      * @param string $projectRoot - Project root the cache lives under.
      *
      * @return self - Cache for the project.
@@ -59,6 +63,8 @@ final readonly class ResultCache
     /**
      * Return the cached findings for a key, or null on any miss or doubt.
      *
+      * User flow: Moves analysis state toward the output users review.
+      *
      * @param string $key - Cache key for a file's per-unit findings.
      *
      * @return list<Finding>|null - Reconstructed findings, or null when not cached.
@@ -66,12 +72,14 @@ final readonly class ResultCache
     public function get(string $key): ?array
     {
         $path = $this->pathFor($key);
+        // User view: choose the analysis output branch for this case.
         if (!is_file($path) || !is_readable($path)) {
             // No entry on disk for this key, or it is unreadable: a plain cache miss, so callers re-run cold.
             return null;
         }
 
         $raw = file_get_contents($path);
+        // User view: choose the analysis output branch for this case.
         if (!is_string($raw)) {
             // The entry could not be read despite existing; fail open to a miss rather than risk a stale serve.
             return null;
@@ -84,13 +92,16 @@ final readonly class ResultCache
             return null;
         }
 
+        // User view: choose the analysis output branch for this case.
         if (!is_array($decoded)) {
             // The payload decoded to a non-array, so it is not a findings list; discard it as a miss.
             return null;
         }
 
         $findings = [];
+        // User view: add each item that can appear in analysis output.
         foreach ($decoded as $entry) {
+            // User view: choose the analysis output branch for this case.
             if (!is_array($entry)) {
                 // One malformed row invalidates the whole entry; reconstructing a partial list could drop findings.
                 return null;
@@ -114,6 +125,8 @@ final readonly class ResultCache
      * warm run could reuse it, so callers skip the cache entirely for that
      * run: caching a working set that cannot fit is pure overhead.
      *
+      * User flow: Moves analysis state toward the output users review.
+      *
      * @param int $discoveredFileCount - Analysable files discovered for the run.
      *
      * @return bool - true when the whole working set fits under the entry cap, false when the run should skip the cache.
@@ -128,6 +141,8 @@ final readonly class ResultCache
      * silent, and eviction is deferred to finalizeRun() so a large run never
      * globs the cache directory per write.
      *
+      * User flow: Moves analysis state toward the output users review.
+      *
      * @param string        $key - Cache key for a file's per-unit findings.
      * @param list<Finding> $findings - Findings produced for the file.
      *
@@ -135,11 +150,13 @@ final readonly class ResultCache
      */
     public function put(string $key, array $findings): void
     {
+        // User view: choose the analysis output branch for this case.
         if (!is_dir($this->cacheDir) && !mkdir($this->cacheDir, 0775, true) && !is_dir($this->cacheDir)) {
             // Cache directory is absent and could not be created; skip persisting since the cache is best-effort.
             return;
         }
 
+        // User view: choose the analysis output branch for this case.
         if (!is_writable($this->cacheDir)) {
             // Read-only cache directory: give up silently rather than fail the run for an optional optimisation.
             return;
@@ -164,17 +181,21 @@ final readonly class ResultCache
      * eviction globbed the whole cache directory on each write, which made
      * large-repo scans I/O-bound.
      *
+      * User flow: Moves analysis state toward the output users review.
+      *
      * @return void
      */
     public function finalizeRun(): void
     {
         $entries = glob($this->cacheDir . '/*.json');
+        // User view: choose the analysis output branch for this case.
         if (!is_array($entries) || count($entries) <= $this->maxEntries) {
             // Glob failed or the cache is within its entry cap, so there is nothing to evict for this run.
             return;
         }
 
         usort($entries, static fn (string $left, string $right): int => (int) filemtime($left) <=> (int) filemtime($right));
+        // User view: add each item that can appear in analysis output.
         foreach (array_slice($entries, 0, count($entries) - $this->maxEntries) as $stale) {
             unlink($stale);
         }
@@ -183,6 +204,8 @@ final readonly class ResultCache
     /**
      * Resolve the on-disk path for a cache key.
      *
+      * User flow: Moves analysis state toward the output users review.
+      *
      * @param string $key - Cache key.
      *
      * @return string - Absolute entry path.

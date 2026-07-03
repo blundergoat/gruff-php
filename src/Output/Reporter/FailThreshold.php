@@ -34,6 +34,8 @@ enum FailThreshold: string
     /**
      * Convert a CLI fail threshold string into the matching enum case.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param string $rawInput - CLI fail-on value to parse.
      *
      * @return self|null - Matching threshold, or null for unsupported input.
@@ -53,6 +55,8 @@ enum FailThreshold: string
     /**
      * Decide whether a finding severity should fail for this threshold.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param Severity $severity - Finding severity to compare with this threshold.
      *
      * @return bool - True when the severity meets or exceeds the threshold.

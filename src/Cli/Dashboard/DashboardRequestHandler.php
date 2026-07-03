@@ -27,6 +27,8 @@ final readonly class DashboardRequestHandler
     /**
      * Create a request handler for one dashboard server context.
      *
+      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
+      *
      * @param DashboardRequestContext $dashboardRequestContext - Request context shared by dashboard routes.
      * @param DashboardStateFactory   $stateFactory - Factory used to build dashboard state.
      * @param DashboardScanRunner     $scanRunner - Runner used for scan requests.
@@ -43,6 +45,8 @@ final readonly class DashboardRequestHandler
     /**
      * Read, route, and write one HTTP request from a socket client.
      *
+      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
+      *
      * @param resource $client - Connected client stream to read from and write the response to.
      *
      * @return void
@@ -51,12 +55,15 @@ final readonly class DashboardRequestHandler
     {
         $request = $this->request($client);
 
+        // User view: choose the dashboard view branch for this case.
+        // User view: missing data becomes the expected dashboard view state.
         if ($request === null) {
             $this->responder->write($client, new DashboardHttpResponse(400, 'Bad Request', 'Bad Request', 'text/plain; charset=UTF-8'), false);
 
             return;
         }
 
+        // User view: choose the dashboard view branch for this case.
         if ($request instanceof DashboardHttpResponse) {
             $this->responder->write($client, $request, false);
 
@@ -73,6 +80,8 @@ final readonly class DashboardRequestHandler
     /**
      * Read one dashboard HTTP request from the client socket.
      *
+      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
+      *
      * @param resource $client - Connected client stream positioned at the request line.
      *
      * @return array{method: string, target: string, headers: array<string, string>}|DashboardHttpResponse|null - the parsed request (method, target, headers) when well-formed; a DashboardHttpResponse to send verbatim when a size limit or duplicate Host was hit; null when the connection dropped or the request line was malformed
@@ -81,25 +90,31 @@ final readonly class DashboardRequestHandler
     {
         $requestLine = fgets($client, self::MAX_REQUEST_LINE_BYTES + 2);
 
+        // User view: choose the dashboard view branch for this case.
         if (!is_string($requestLine)) {
             return null;
         }
 
+        // User view: choose the dashboard view branch for this case.
         if (strlen($requestLine) > self::MAX_REQUEST_LINE_BYTES) {
             return $this->tooLargeResponse();
         }
 
         // Parse the HTTP request line into method, target, and protocol version.
+        // User view: choose the dashboard view branch for this case.
         if (!preg_match('/^([A-Z]+)\s+(\S+)\s+HTTP\/\d(?:\.\d)?\r?\n$/', $requestLine, $matches)) {
             return null;
         }
 
         $headers = $this->headers($client);
 
+        // User view: choose the dashboard view branch for this case.
+        // User view: missing data becomes the expected dashboard view state.
         if ($headers === null) {
             return null;
         }
 
+        // User view: choose the dashboard view branch for this case.
         if ($headers instanceof DashboardHttpResponse) {
             return $headers;
         }
@@ -112,6 +127,8 @@ final readonly class DashboardRequestHandler
     }
 
     /**
+      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
+      *
      * @param string                $method - HTTP verb; only GET and HEAD are served, anything else returns 405.
      * @param string                $target - Raw request target (path plus query); parsed for the route and params.
      * @param array<string, string> $headers - Lower-cased request headers; the Host entry gates access before any route.
@@ -120,6 +137,7 @@ final readonly class DashboardRequestHandler
      */
     private function responseFor(string $method, string $target, array $headers): DashboardHttpResponse
     {
+        // User view: choose the dashboard view branch for this case.
         if ($method !== 'GET' && $method !== 'HEAD') {
             return new DashboardHttpResponse(405, 'Method Not Allowed', 'Method Not Allowed', 'text/plain; charset=UTF-8');
         }
@@ -127,6 +145,8 @@ final readonly class DashboardRequestHandler
         $path = parse_url($target, PHP_URL_PATH);
         $path = is_string($path) ? $path : '/';
 
+        // User view: choose the dashboard view branch for this case.
+        // User view: missing data becomes a safe dashboard view default.
         if ($path !== '/health' && !$this->isHostAllowed($headers['host'] ?? null)) {
             // Reject cross-origin/DNS-rebinding hosts with 421; /health stays open for liveness probes.
             return new DashboardHttpResponse(421, 'Misdirected Request', 'Misdirected Request', 'text/plain; charset=UTF-8');
@@ -144,6 +164,8 @@ final readonly class DashboardRequestHandler
     }
 
     /**
+      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
+      *
      * @param array<string, string> $query - Sanitised query params used to seed dashboard state.
      *
      * @return string - the complete HTML document for the dashboard page, with state derived from the query params already rendered in
@@ -158,6 +180,8 @@ final readonly class DashboardRequestHandler
     /**
      * Parse dashboard query parameters from the request target.
      *
+      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
+      *
      * @param string $target - Raw request target; only its query string is read, and non-scalar values are dropped.
      *
      * @return array<string, string> - scalar query params keyed by name, each stringified; empty when the target has no query string
@@ -166,6 +190,8 @@ final readonly class DashboardRequestHandler
     {
         $rawQuery = parse_url($target, PHP_URL_QUERY);
 
+        // User view: choose the dashboard view branch for this case.
+        // User view: an empty value becomes a clear dashboard view fallback.
         if (!is_string($rawQuery) || $rawQuery === '') {
             return [];
         }
@@ -173,7 +199,9 @@ final readonly class DashboardRequestHandler
         parse_str($rawQuery, $query);
         $clean = [];
 
+        // User view: add each item that can appear in dashboard view.
         foreach ($query as $key => $queryValue) {
+            // User view: choose the dashboard view branch for this case.
             if (!is_string($key) || !is_scalar($queryValue)) {
                 continue;
             }
@@ -187,6 +215,8 @@ final readonly class DashboardRequestHandler
     /**
      * Read dashboard HTTP headers until the request header block ends.
      *
+      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
+      *
      * @param resource $client - Connected client stream positioned at the first header line.
      *
      * @return array<string, string>|DashboardHttpResponse|null - lower-cased header name to value map on the blank-line terminator; a DashboardHttpResponse (431/400) when the line/byte budget overran or a duplicate Host appeared; null when the stream ended before the terminator
@@ -201,24 +231,30 @@ final readonly class DashboardRequestHandler
             $lineCount++;
             $byteCount += strlen($line);
 
+            // User view: choose the dashboard view branch for this case.
             if ($lineCount > self::MAX_HEADER_LINES || $byteCount > self::MAX_HEADER_BYTES) {
                 return $this->tooLargeResponse();
             }
 
+            // User view: choose the dashboard view branch for this case.
             if ($line === "\r\n" || $line === "\n") {
                 return $headers;
             }
 
             $separator = strpos($line, ':');
+            // User view: choose the dashboard view branch for this case.
             if ($separator === false) {
                 continue;
             }
 
             $name = strtolower(trim(substr($line, 0, $separator)));
+            // User view: choose the dashboard view branch for this case.
+            // User view: an empty value becomes a clear dashboard view fallback.
             if ($name === '') {
                 continue;
             }
 
+            // User view: choose the dashboard view branch for this case.
             if ($name === 'host' && array_key_exists('host', $headers)) {
                 // A second Host header is an ambiguity/smuggling risk; reject the request with 400.
                 return new DashboardHttpResponse(400, 'Bad Request', 'Bad Request', 'text/plain; charset=UTF-8');
@@ -233,12 +269,17 @@ final readonly class DashboardRequestHandler
     /**
      * Validate the Host header against the dashboard bind host and port.
      *
+      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
+      *
      * @param ?string $hostHeader - Raw Host header, or null when absent; missing or empty is rejected as not allowed.
      *
      * @return bool - true when the Host header's name and port match this dashboard's bind target; false denies the request as a likely cross-origin or DNS-rebinding attempt
      */
     private function isHostAllowed(?string $hostHeader): bool
     {
+        // User view: choose the dashboard view branch for this case.
+        // User view: missing data becomes the expected dashboard view state.
+        // User view: an empty value becomes a clear dashboard view fallback.
         if ($hostHeader === null || $hostHeader === '') {
             // No Host header means we cannot prove the request targets this dashboard; deny it.
             return false;
@@ -248,31 +289,38 @@ final readonly class DashboardRequestHandler
         $port = $this->dashboardRequestContext->bindPort;
 
         // Parse bracketed IPv6 host headers with optional ports.
+        // User view: choose the dashboard view branch for this case.
         if (preg_match('/^\[(?<host>[^\]]+)\](?::(?<port>\d+))?$/', $host, $matches) === 1) {
             $host = '[' . $matches['host'] . ']';
+            // User view: choose the dashboard view branch for this case.
             if (isset($matches['port'])) {
                 $port = (int) $matches['port'];
             }
         } else {
             // Parse non-IPv6 host headers with optional ports.
+            // User view: choose the dashboard view branch for this case.
             if (preg_match('/^(?<host>[^:]+)(?::(?<port>\d+))?$/', $host, $matches) === 1) {
                 $host = $matches['host'];
+                // User view: choose the dashboard view branch for this case.
                 if (isset($matches['port'])) {
                     $port = (int) $matches['port'];
                 }
             }
         }
 
+        // User view: choose the dashboard view branch for this case.
         if ($port !== $this->dashboardRequestContext->bindPort) {
             // Host header port disagrees with the port we bound; reject to block port-confusion requests.
             return false;
         }
 
+        // User view: choose the dashboard view branch for this case.
         if ($this->isBindHostLoopback()) {
             // Bound to loopback, so only the canonical loopback names are legitimate.
             return in_array($host, ['127.0.0.1', 'localhost', '[::1]'], true);
         }
 
+        // User view: choose the dashboard view branch for this case.
         if ($this->isBindHostWildcard()) {
             // Bound to all interfaces, so the host name cannot be pinned; accept any matching-port host.
             return true;
@@ -280,6 +328,7 @@ final readonly class DashboardRequestHandler
 
         $bindHost = strtolower($this->dashboardRequestContext->bindHost);
 
+        // User view: choose the dashboard view branch for this case.
         if (str_contains($bindHost, ':') && !str_starts_with($bindHost, '[')) {
             $bindHost = '[' . $bindHost . ']';
         }
@@ -290,6 +339,8 @@ final readonly class DashboardRequestHandler
     /**
      * Check whether the configured bind host is a loopback address.
      *
+      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
+      *
      * @return bool - true when the configured bind host is any loopback spelling (127.0.0.1, localhost, ::1), which narrows the allowed Host names to those
      */
     private function isBindHostLoopback(): bool
@@ -300,6 +351,8 @@ final readonly class DashboardRequestHandler
     /**
      * Check whether the configured bind host is a wildcard address.
      *
+      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
+      *
      * @return bool - true when bound to a wildcard address (0.0.0.0, ::), meaning the request Host name cannot be pinned and only its port is checked
      */
     private function isBindHostWildcard(): bool
@@ -310,6 +363,8 @@ final readonly class DashboardRequestHandler
     /**
      * Build the response used when request headers exceed dashboard limits.
      *
+      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
+      *
      * @return DashboardHttpResponse - the shared 431 Request Header Fields Too Large reply, reused for both an over-long request line and an over-budget header block
      */
     private function tooLargeResponse(): DashboardHttpResponse

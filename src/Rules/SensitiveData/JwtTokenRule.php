@@ -34,6 +34,8 @@ final readonly class JwtTokenRule implements SourceTextRuleInterface
      * Shared with the high-entropy rule so each dotted secret reports exactly once:
      * real JWTs under this rule, opaque dotted tokens under high-entropy.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $literal - Candidate string literal.
      *
      * @return bool - true when the entire literal matches the three-segment `eyJ` JWT shape this rule scans for
@@ -47,6 +49,8 @@ final readonly class JwtTokenRule implements SourceTextRuleInterface
     /**
      * Describe the JWT token sensitive-data rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -66,6 +70,8 @@ final readonly class JwtTokenRule implements SourceTextRuleInterface
     /**
      * Find string literals that resemble embedded JWT tokens.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -73,6 +79,7 @@ final readonly class JwtTokenRule implements SourceTextRuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
+        // User view: choose the findings list branch for this case.
         if (!str_contains($analysisUnit->source, 'eyJ')) {
             // Every JWT header segment begins "eyJ"; without it no token can match, so skip the scan.
             return [];
@@ -82,12 +89,15 @@ final readonly class JwtTokenRule implements SourceTextRuleInterface
 
         $findings      = [];
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
+        // User view: add each item that can appear in findings list.
         foreach ($matches[0] as $match) {
             [$candidateSecret, $offset] = $match;
+            // User view: choose the findings list branch for this case.
             if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
             if (SecretScannerHelper::isLikelyDummyValue($candidateSecret)) {
                 continue;
             }

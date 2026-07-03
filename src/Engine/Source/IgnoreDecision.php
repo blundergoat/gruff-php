@@ -10,6 +10,8 @@ namespace GruffPhp\Engine\Source;
 final readonly class IgnoreDecision
 {
     /**
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param bool        $ignored - Whether the path is excluded from analysis.
      * @param string|null $source - Reason category when ignored: config, default, generated, or gitignore.
      * @param string|null $pattern - Matching glob, directory token, filename, or git rule when ignored.
@@ -24,6 +26,8 @@ final readonly class IgnoreDecision
     /**
      * Build an "ignored" decision carrying the matched source and pattern.
      *
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param string      $source - Reason category for the exclusion.
      * @param string|null $pattern - Matching glob, directory token, filename, or git rule.
      *
@@ -38,6 +42,8 @@ final readonly class IgnoreDecision
     /**
      * Build a "not ignored" decision.
      *
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @return self - Decision indicating the path is in scope.
      */
     public static function notIgnored(): self

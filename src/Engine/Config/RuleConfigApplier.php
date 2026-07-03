@@ -21,6 +21,8 @@ final readonly class RuleConfigApplier
     /**
      * Create an applier with an optional warning receiver.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param (Closure(string): void)|null $warningSink - Receiver for one-line config warnings; null writes them to STDERR.
      */
     public function __construct(private ?Closure $warningSink = null)
@@ -28,6 +30,8 @@ final readonly class RuleConfigApplier
     }
 
     /**
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param AnalysisConfig $config - Config to update.
      * @param RuleRegistry   $registry - Rule registry used to validate rule ids.
      * @param ConfigObject   $rootConfig - Parsed root config object.
@@ -37,13 +41,16 @@ final readonly class RuleConfigApplier
      */
     public function apply(AnalysisConfig $config, RuleRegistry $registry, array $rootConfig): AnalysisConfig
     {
+        // User view: choose the configured analysis run branch for this case.
         if (!isset($rootConfig['rules'])) {
             return $config;
         }
 
         $rulesConfig = $this->requireObject($rootConfig['rules'], 'Config key "rules" must be an object.');
 
+        // User view: add each item that can appear in configured analysis run.
         foreach ($rulesConfig as $ruleId => $ruleConfigValue) {
+            // User view: choose the configured analysis run branch for this case.
             if (!$registry->has($ruleId)) {
                 // Warn-and-ignore keeps configs that still carry blocks for retired rules working after an upgrade.
                 $this->warnUnknownRuleId($ruleId);
@@ -69,6 +76,8 @@ final readonly class RuleConfigApplier
      * keep working; `selection:` entries stay strict because they change which
      * rules run.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param string $ruleId - Unknown rule id named by the config block.
      *
      * @return void
@@ -81,6 +90,8 @@ final readonly class RuleConfigApplier
             $ruleId,
         );
 
+        // User view: choose the configured analysis run branch for this case.
+        // User view: missing data becomes the expected configured analysis run state.
         if ($this->warningSink !== null) {
             ($this->warningSink)($line);
 
@@ -91,6 +102,8 @@ final readonly class RuleConfigApplier
     }
 
     /**
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param AnalysisConfig $config - Config being threaded through the loop; carries prior rules' overrides.
      * @param RuleRegistry   $registry - Registry consulted for each rule's default thresholds, options, and rubric.
      * @param string         $ruleId - Already-validated rule id this override block belongs to.
@@ -106,6 +119,7 @@ final readonly class RuleConfigApplier
     ): AnalysisConfig {
         $this->assertKnownRuleKeys($ruleId, $ruleConfig);
 
+        // User view: choose the configured analysis run branch for this case.
         if (array_key_exists('severity', $ruleConfig) && !array_key_exists('threshold', $ruleConfig)) {
             throw new ConfigException(sprintf('Config key "rules.%s.severity" requires "threshold".', $ruleId));
         }
@@ -113,6 +127,7 @@ final readonly class RuleConfigApplier
         $settings         = $config->ruleSettings($ruleId);
         $definitionSingle = $registry->get($ruleId)->definition()->severityThreshold;
 
+        // User view: choose the configured analysis run branch for this case.
         if ($definitionSingle instanceof SeverityThreshold && array_key_exists('thresholds', $ruleConfig)) {
             throw new ConfigException(sprintf(
                                           'Config key "rules.%s.thresholds" is not supported; this rule uses a single threshold and severity.',
@@ -121,6 +136,7 @@ final readonly class RuleConfigApplier
         }
 
         $severityThreshold = $this->severityThreshold($ruleId, $ruleConfig, $registry)
+                             // User view: missing data becomes a safe configured analysis run default.
                              ?? $settings->severityThreshold;
 
         return $config->withRuleSettings($ruleId, new RuleSettings(
@@ -137,6 +153,8 @@ final readonly class RuleConfigApplier
     /**
      * Reject unknown keys before applying a per-rule override.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param string       $ruleId - Rule id named in the thrown error so the user can locate the bad key.
      * @param ConfigObject $ruleConfig - One rule's override block; only its top-level keys are checked here.
      *
@@ -144,7 +162,9 @@ final readonly class RuleConfigApplier
      */
     private function assertKnownRuleKeys(string $ruleId, array $ruleConfig): void
     {
+        // User view: add each item that can appear in configured analysis run.
         foreach (array_keys($ruleConfig) as $key) {
+            // User view: choose the configured analysis run branch for this case.
             if (!in_array($key, ['enabled', 'threshold', 'severity', 'thresholds', 'options', 'excludeFromScore'], true)) {
                 throw new ConfigException(sprintf('Unknown config key "rules.%s.%s".', $ruleId, $key));
             }
@@ -152,6 +172,8 @@ final readonly class RuleConfigApplier
     }
 
     /**
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param string       $ruleId - Rule id named in the type-error message when the value is non-boolean.
      * @param ConfigObject $ruleConfig - One rule's override block; read for an optional excludeFromScore key.
      * @param bool         $isExcludedByDefault - Current flag used when the override omits excludeFromScore.
@@ -160,10 +182,12 @@ final readonly class RuleConfigApplier
      */
     private function excludeFromScore(string $ruleId, array $ruleConfig, bool $isExcludedByDefault): bool
     {
+        // User view: choose the configured analysis run branch for this case.
         if (!array_key_exists('excludeFromScore', $ruleConfig)) {
             return $isExcludedByDefault;
         }
 
+        // User view: choose the configured analysis run branch for this case.
         if (!is_bool($ruleConfig['excludeFromScore'])) {
             throw new ConfigException(sprintf('Config key "rules.%s.excludeFromScore" must be boolean.', $ruleId));
         }
@@ -172,6 +196,8 @@ final readonly class RuleConfigApplier
     }
 
     /**
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param string       $ruleId - Rule id named in the type-error message when the value is non-boolean.
      * @param ConfigObject $ruleConfig - One rule's override block; read for an optional enabled key.
      * @param bool         $isEnabledByDefault - Current enabled state used when the override omits enabled.
@@ -180,10 +206,12 @@ final readonly class RuleConfigApplier
      */
     private function isEnabled(string $ruleId, array $ruleConfig, bool $isEnabledByDefault): bool
     {
+        // User view: choose the configured analysis run branch for this case.
         if (!array_key_exists('enabled', $ruleConfig)) {
             return $isEnabledByDefault;
         }
 
+        // User view: choose the configured analysis run branch for this case.
         if (!is_bool($ruleConfig['enabled'])) {
             throw new ConfigException(sprintf('Config key "rules.%s.enabled" must be boolean.', $ruleId));
         }
@@ -194,6 +222,8 @@ final readonly class RuleConfigApplier
     /**
      * Merge configured thresholds with rule defaults.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param string                   $ruleId - Rule id used in error messages and to look up its allowed thresholds.
      * @param ConfigObject             $ruleConfig - One rule's override block; read for an optional thresholds map.
      * @param RuleRegistry             $registry - Registry queried for the rule's set of valid threshold names.
@@ -207,10 +237,12 @@ final readonly class RuleConfigApplier
         RuleRegistry $registry,
         array        $defaultThresholds,
     ): array {
+        // User view: choose the configured analysis run branch for this case.
         if (array_key_exists('severity', $ruleConfig)) {
             throw new ConfigException(sprintf('Config key "rules.%s.severity" requires "threshold".', $ruleId));
         }
 
+        // User view: choose the configured analysis run branch for this case.
         if (!array_key_exists('thresholds', $ruleConfig)) {
             return $defaultThresholds;
         }
@@ -222,6 +254,7 @@ final readonly class RuleConfigApplier
         );
         $allowedThresholds = $registry->get($ruleId)->definition()->defaultThresholds;
 
+        // User view: add each item that can appear in configured analysis run.
         foreach ($thresholdConfig as $thresholdName => $thresholdValue) {
             $thresholds[$thresholdName] = $this->thresholdValue(
                 $ruleId,
@@ -235,6 +268,8 @@ final readonly class RuleConfigApplier
     }
 
     /**
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param string       $ruleId - Rule id used in error messages and to look up the rule's rubric and defaults.
      * @param ConfigObject $ruleConfig - One rule's override block; read for the single-value threshold/severity pair.
      * @param RuleRegistry $registry - Registry queried for the rule's definition to validate the single-threshold form.
@@ -246,15 +281,18 @@ final readonly class RuleConfigApplier
         array        $ruleConfig,
         RuleRegistry $registry,
     ): ?SeverityThreshold {
+        // User view: choose the configured analysis run branch for this case.
         if (!array_key_exists('threshold', $ruleConfig)) {
             return null;
         }
 
+        // User view: choose the configured analysis run branch for this case.
         if (array_key_exists('thresholds', $ruleConfig)) {
             throw new ConfigException(sprintf('Config key "rules.%s" cannot combine "threshold" and "thresholds".', $ruleId));
         }
 
         $thresholdValue    = $ruleConfig['threshold'];
+        // User view: missing data becomes a safe configured analysis run default.
         $severityValue     = $ruleConfig['severity'] ?? null;
         $definition        = $registry->get($ruleId)->definition();
         $defaultThresholds = $definition->defaultThresholds;
@@ -263,14 +301,17 @@ final readonly class RuleConfigApplier
                              && array_key_exists('error', $defaultThresholds)
                              && count($defaultThresholds) === 2;
 
+        // User view: choose the configured analysis run branch for this case.
         if (!$hasSingleDefault && !$hasTieredDefault) {
             throw new ConfigException(sprintf('Config key "rules.%s.threshold" is only supported for rules with a threshold/severity rubric.', $ruleId));
         }
 
+        // User view: choose the configured analysis run branch for this case.
         if (!is_int($thresholdValue) && !is_float($thresholdValue)) {
             throw new ConfigException(sprintf('Config key "rules.%s.threshold" must be numeric.', $ruleId));
         }
 
+        // User view: choose the configured analysis run branch for this case.
         if (!is_string($severityValue) || !in_array($severityValue, [Severity::Advisory->value, Severity::Warning->value, Severity::Error->value], true)) {
             throw new ConfigException(sprintf('Config key "rules.%s.severity" must be "advisory", "warning", or "error".', $ruleId));
         }
@@ -279,6 +320,8 @@ final readonly class RuleConfigApplier
     }
 
     /**
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param string                   $ruleId - Rule id used to build the error path when the value is rejected.
      * @param string                   $thresholdName - Configured threshold key; must be one the rule declares.
      * @param mixed                    $thresholdValue - Raw configured value, accepted only when numeric.
@@ -292,10 +335,12 @@ final readonly class RuleConfigApplier
         mixed  $thresholdValue,
         array  $allowedThresholds,
     ): int|float {
+        // User view: choose the configured analysis run branch for this case.
         if (!array_key_exists($thresholdName, $allowedThresholds)) {
             throw new ConfigException(sprintf('Unknown threshold "rules.%s.thresholds.%s".', $ruleId, $thresholdName));
         }
 
+        // User view: choose the configured analysis run branch for this case.
         if (!is_int($thresholdValue) && !is_float($thresholdValue)) {
             throw new ConfigException(sprintf('Threshold "rules.%s.thresholds.%s" must be numeric.', $ruleId, $thresholdName));
         }
@@ -306,6 +351,8 @@ final readonly class RuleConfigApplier
     /**
      * Merge configured rule options with rule defaults.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param string                         $ruleId - Rule id used in error messages and to look up its allowed options.
      * @param ConfigObject                   $ruleConfig - One rule's override block; read for an optional options map.
      * @param RuleRegistry                   $registry - Registry queried for the rule's allowed option names and default types.
@@ -319,6 +366,7 @@ final readonly class RuleConfigApplier
         RuleRegistry $registry,
         array        $defaultOptions,
     ): array {
+        // User view: choose the configured analysis run branch for this case.
         if (!array_key_exists('options', $ruleConfig)) {
             return $defaultOptions;
         }
@@ -330,7 +378,9 @@ final readonly class RuleConfigApplier
         );
         $allowedOptions = $registry->get($ruleId)->definition()->defaultOptions;
 
+        // User view: add each item that can appear in configured analysis run.
         foreach ($optionsConfig as $optionName => $optionValue) {
+            // User view: choose the configured analysis run branch for this case.
             if (!array_key_exists($optionName, $allowedOptions)) {
                 throw new ConfigException(sprintf('Unknown option "rules.%s.options.%s".', $ruleId, $optionName));
             }
@@ -344,6 +394,8 @@ final readonly class RuleConfigApplier
     /**
      * Validate and normalize a configured rule option against its default type.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param string          $ruleId - Rule id used to build the error path when validation fails.
      * @param string          $optionName - Option key used to build the error path when validation fails.
      * @param mixed           $optionValue - Raw configured value, validated against the default's shape.
@@ -355,26 +407,31 @@ final readonly class RuleConfigApplier
     {
         // The default's runtime type is the contract: each branch picks the validator whose accepted type
         // matches it, so an override can only widen/narrow within that one default-declared shape.
+        // User view: choose the configured analysis run branch for this case.
         if (is_int($defaultValue)) {
             // An int default forbids the float-tolerant numeric path; an override of 1.0 is a config error.
             return $this->integerOptionValue($ruleId, $optionName, $optionValue);
         }
 
+        // User view: choose the configured analysis run branch for this case.
         if (is_float($defaultValue)) {
             // A float default tolerates an int override (3 for 3.0); both coerce to the same option type.
             return $this->numericOptionValue($ruleId, $optionName, $optionValue);
         }
 
+        // User view: choose the configured analysis run branch for this case.
         if (is_bool($defaultValue)) {
             // Bool is checked before the array branches so true/false never reach list/map shape validation.
             return $this->isBooleanOptionValue($ruleId, $optionName, $optionValue);
         }
 
+        // User view: choose the configured analysis run branch for this case.
         if (is_string($defaultValue)) {
             // String defaults exclude numeric coercion: "8" must stay a string, not become the int 8.
             return $this->stringOptionValue($ruleId, $optionName, $optionValue);
         }
 
+        // User view: choose the configured analysis run branch for this case.
         if (array_is_list($defaultValue)) {
             // List must precede the map fall-through: an empty default array also satisfies array_is_list,
             // so map is only safely distinguishable as the residual once list is ruled out here.
@@ -388,6 +445,8 @@ final readonly class RuleConfigApplier
     /**
      * Validate an integer option value.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param string $ruleId - Rule id used to build the error path when the value is not an integer.
      * @param string $optionName - Option key used to build the error path when the value is not an integer.
      * @param mixed  $optionValue - Raw configured value; accepted only when it is an int.
@@ -396,6 +455,7 @@ final readonly class RuleConfigApplier
      */
     private function integerOptionValue(string $ruleId, string $optionName, mixed $optionValue): int
     {
+        // User view: choose the configured analysis run branch for this case.
         if (!is_int($optionValue)) {
             throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be an integer.', $ruleId, $optionName));
         }
@@ -406,6 +466,8 @@ final readonly class RuleConfigApplier
     /**
      * Validate a numeric option value.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param string $ruleId - Rule id used to build the error path when the value is not numeric.
      * @param string $optionName - Option key used to build the error path when the value is not numeric.
      * @param mixed  $optionValue - Raw configured value; accepted when it is an int or a float.
@@ -414,6 +476,7 @@ final readonly class RuleConfigApplier
      */
     private function numericOptionValue(string $ruleId, string $optionName, mixed $optionValue): int|float
     {
+        // User view: choose the configured analysis run branch for this case.
         if (!is_int($optionValue) && !is_float($optionValue)) {
             throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be numeric.', $ruleId, $optionName));
         }
@@ -424,6 +487,8 @@ final readonly class RuleConfigApplier
     /**
      * Validate a boolean option value.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param string $ruleId - Rule id used to build the error path when the value is not boolean.
      * @param string $optionName - Option key used to build the error path when the value is not boolean.
      * @param mixed  $optionValue - Raw configured value; accepted only when it is a bool.
@@ -432,6 +497,7 @@ final readonly class RuleConfigApplier
      */
     private function isBooleanOptionValue(string $ruleId, string $optionName, mixed $optionValue): bool
     {
+        // User view: choose the configured analysis run branch for this case.
         if (!is_bool($optionValue)) {
             throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be boolean.', $ruleId, $optionName));
         }
@@ -442,6 +508,8 @@ final readonly class RuleConfigApplier
     /**
      * Validate a string option value.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param string $ruleId - Rule id used to build the error path when the value is not a string.
      * @param string $optionName - Option key used to build the error path when the value is not a string.
      * @param mixed  $optionValue - Raw configured value; accepted only when it is a string.
@@ -450,6 +518,7 @@ final readonly class RuleConfigApplier
      */
     private function stringOptionValue(string $ruleId, string $optionName, mixed $optionValue): string
     {
+        // User view: choose the configured analysis run branch for this case.
         if (!is_string($optionValue)) {
             throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be a string.', $ruleId, $optionName));
         }
@@ -460,6 +529,8 @@ final readonly class RuleConfigApplier
     /**
      * Validate a list option value and its item type when the default list is typed.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param string                      $ruleId - Rule id used to build the error path when validation fails.
      * @param string                      $optionName - Option key used to build the error path when validation fails.
      * @param mixed                       $optionValue - Raw configured value; must be a list of scalars.
@@ -469,21 +540,29 @@ final readonly class RuleConfigApplier
      */
     private function listOptionValue(string $ruleId, string $optionName, mixed $optionValue, array $defaultValue): array
     {
+        // User view: choose the configured analysis run branch for this case.
         if (!is_array($optionValue) || !array_is_list($optionValue)) {
             throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be a list.', $ruleId, $optionName));
         }
 
         $result = [];
+        // User view: missing data becomes a safe configured analysis run default.
         $sample = $defaultValue[0] ?? null;
+        // User view: add each item that can appear in configured analysis run.
         foreach ($optionValue as $index => $optionItem) {
+            // User view: choose the configured analysis run branch for this case.
             if (!is_int($optionItem) && !is_float($optionItem) && !is_bool($optionItem) && !is_string($optionItem)) {
                 throw new ConfigException(sprintf('Option "rules.%s.options.%s.%d" must be a scalar value.', $ruleId, $optionName, $index));
             }
 
+            // User view: choose the configured analysis run branch for this case.
+            // User view: missing data becomes the expected configured analysis run state.
             if ($sample === null && !is_string($optionItem)) {
                 throw new ConfigException(sprintf('Option "rules.%s.options.%s.%d" must be a string.', $ruleId, $optionName, $index));
             }
 
+            // User view: choose the configured analysis run branch for this case.
+            // User view: missing data becomes the expected configured analysis run state.
             if ($sample !== null) {
                 $this->assertListItemType(
                     ruleId:     $ruleId,
@@ -503,6 +582,8 @@ final readonly class RuleConfigApplier
     /**
      * Validate one configured list item against the default list sample type.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param string $ruleId - Rule id used to build the error path when an item's type is wrong.
      * @param string $optionName - Option key used to build the error path when an item's type is wrong.
      * @param int    $index - Zero-based item position, surfaced in the error path to point at the bad entry.
@@ -518,10 +599,12 @@ final readonly class RuleConfigApplier
         mixed  $optionItem,
         mixed  $sample,
     ): void {
+        // User view: choose the configured analysis run branch for this case.
         if (is_string($sample) && !is_string($optionItem)) {
             throw new ConfigException(sprintf('Option "rules.%s.options.%s.%d" must be a string.', $ruleId, $optionName, $index));
         }
 
+        // User view: choose the configured analysis run branch for this case.
         if (is_int($sample) && !is_int($optionItem)) {
             throw new ConfigException(sprintf('Option "rules.%s.options.%s.%d" must be an integer.', $ruleId, $optionName, $index));
         }
@@ -530,6 +613,8 @@ final readonly class RuleConfigApplier
     /**
      * Validate an associative option map with scalar values.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param string                                  $ruleId - Rule id used to build the error path when validation fails.
      * @param string                                  $optionName - Option key used to build the error path when validation fails.
      * @param mixed                                   $optionValue - Raw configured value; must be a string-keyed map of scalars.
@@ -539,21 +624,26 @@ final readonly class RuleConfigApplier
      */
     private function mapOptionValue(string $ruleId, string $optionName, mixed $optionValue, array $defaultValue): array
     {
+        // User view: choose the configured analysis run branch for this case.
         if (!is_array($optionValue) || array_is_list($optionValue)) {
             throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be an object.', $ruleId, $optionName));
         }
 
         $result = [];
         $sample = reset($defaultValue);
+        // User view: add each item that can appear in configured analysis run.
         foreach ($optionValue as $key => $configuredValue) {
+            // User view: choose the configured analysis run branch for this case.
             if (!is_string($key)) {
                 throw new ConfigException(sprintf('Option "rules.%s.options.%s" keys must be strings.', $ruleId, $optionName));
             }
 
+            // User view: choose the configured analysis run branch for this case.
             if (!is_int($configuredValue) && !is_float($configuredValue) && !is_bool($configuredValue) && !is_string($configuredValue)) {
                 throw new ConfigException(sprintf('Option "rules.%s.options.%s.%s" must be a scalar value.', $ruleId, $optionName, $key));
             }
 
+            // User view: choose the configured analysis run branch for this case.
             if ($sample !== false) {
                 $this->assertMapItemType(
                     ruleId:     $ruleId,
@@ -573,6 +663,8 @@ final readonly class RuleConfigApplier
     /**
      * Validate one configured map item against the default map sample type.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param string $ruleId - Rule id used to build the error path when an item's type is wrong.
      * @param string $optionName - Option key used to build the error path when an item's type is wrong.
      * @param string $key - Configured map key, surfaced in the error path to point at the bad entry.
@@ -588,18 +680,22 @@ final readonly class RuleConfigApplier
         mixed  $optionItem,
         mixed  $sample,
     ): void {
+        // User view: choose the configured analysis run branch for this case.
         if (is_string($sample) && !is_string($optionItem)) {
             throw new ConfigException(sprintf('Option "rules.%s.options.%s.%s" must be a string.', $ruleId, $optionName, $key));
         }
 
+        // User view: choose the configured analysis run branch for this case.
         if (is_int($sample) && !is_int($optionItem)) {
             throw new ConfigException(sprintf('Option "rules.%s.options.%s.%s" must be an integer.', $ruleId, $optionName, $key));
         }
 
+        // User view: choose the configured analysis run branch for this case.
         if (is_float($sample) && !is_int($optionItem) && !is_float($optionItem)) {
             throw new ConfigException(sprintf('Option "rules.%s.options.%s.%s" must be numeric.', $ruleId, $optionName, $key));
         }
 
+        // User view: choose the configured analysis run branch for this case.
         if (is_bool($sample) && !is_bool($optionItem)) {
             throw new ConfigException(sprintf('Option "rules.%s.options.%s.%s" must be boolean.', $ruleId, $optionName, $key));
         }
@@ -608,6 +704,8 @@ final readonly class RuleConfigApplier
     /**
      * Validate that a decoded rule config value is an object-like array.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param mixed  $decodedValue - Decoded YAML/JSON value; must be a string-keyed (non-list) array.
      * @param string $message - Caller-supplied error text thrown when the value is not object-like.
      *
@@ -615,13 +713,17 @@ final readonly class RuleConfigApplier
      */
     private function requireObject(mixed $decodedValue, string $message): array
     {
+        // User view: choose the configured analysis run branch for this case.
+        // User view: an empty value becomes a clear configured analysis run fallback.
         if (!is_array($decodedValue) || ($decodedValue !== [] && array_is_list($decodedValue))) {
             throw new ConfigException($message);
         }
 
         $normalizedRuleConfig = [];
 
+        // User view: add each item that can appear in configured analysis run.
         foreach ($decodedValue as $key => $decodedItem) {
+            // User view: choose the configured analysis run branch for this case.
             if (!is_string($key)) {
                 throw new ConfigException($message);
             }
@@ -635,12 +737,15 @@ final readonly class RuleConfigApplier
     /**
      * Normalise one decoded rule config value into the supported value set.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param mixed $decodedValue - One decoded YAML/JSON value, either a nested array or a scalar.
      *
      * @return ConfigValue - the value normalised into the supported shape: a depth-bounded nested array or a validated scalar
      */
     private function configValue(mixed $decodedValue): array|bool|float|int|object|string|null
     {
+        // User view: choose the configured analysis run branch for this case.
         if (is_array($decodedValue)) {
             return $this->configArray($decodedValue);
         }
@@ -651,12 +756,16 @@ final readonly class RuleConfigApplier
     /**
      * Validate scalar rule config values after YAML decoding.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param mixed $decodedValue - One decoded leaf value to confirm is a supported scalar (or null/object).
      *
      * @return ConfigScalar - the same value passed through unchanged once confirmed to be a supported scalar, null, or object
      */
     private function configScalar(mixed $decodedValue): bool|float|int|object|string|null
     {
+        // User view: choose the configured analysis run branch for this case.
+        // User view: missing data becomes the expected configured analysis run state.
         if (is_bool($decodedValue) || is_float($decodedValue) || is_int($decodedValue) || is_object($decodedValue) || is_string($decodedValue) || $decodedValue === null) {
             return $decodedValue;
         }
@@ -667,6 +776,8 @@ final readonly class RuleConfigApplier
     /**
      * Keep decoded configuration values within the supported nested scalar shape.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param array<array-key, mixed> $decodedRuleValues - Top-level decoded array; nested arrays recurse one level deeper.
      *
      * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>>> - the
@@ -676,6 +787,7 @@ final readonly class RuleConfigApplier
     {
         $normalizedRuleValues = [];
 
+        // User view: add each item that can appear in configured analysis run.
         foreach ($decodedRuleValues as $key => $decodedItem) {
             $normalizedRuleValues[$key] = is_array($decodedItem) ? $this->configArrayDepth2($decodedItem) : $this->configScalar($decodedItem);
         }
@@ -686,6 +798,8 @@ final readonly class RuleConfigApplier
     /**
      * Keep second-level configuration values within the supported scalar shape.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param array<array-key, mixed> $decodedRuleValues - Second-level decoded array; nested arrays recurse one level deeper.
      *
      * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>> - the level-2 array with scalars
@@ -695,6 +809,7 @@ final readonly class RuleConfigApplier
     {
         $normalizedRuleValues = [];
 
+        // User view: add each item that can appear in configured analysis run.
         foreach ($decodedRuleValues as $key => $decodedItem) {
             $normalizedRuleValues[$key] = is_array($decodedItem) ? $this->configArrayDepth3($decodedItem) : $this->configScalar($decodedItem);
         }
@@ -705,6 +820,8 @@ final readonly class RuleConfigApplier
     /**
      * Keep third-level configuration values within the supported scalar shape.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param array<array-key, mixed> $decodedRuleValues - Third-level decoded array; nested arrays recurse one level deeper.
      *
      * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar>> - the level-3 array with scalars validated and nested arrays normalised
@@ -714,6 +831,7 @@ final readonly class RuleConfigApplier
     {
         $normalizedRuleValues = [];
 
+        // User view: add each item that can appear in configured analysis run.
         foreach ($decodedRuleValues as $key => $decodedItem) {
             $normalizedRuleValues[$key] = is_array($decodedItem) ? $this->configArrayDepth4($decodedItem) : $this->configScalar($decodedItem);
         }
@@ -724,6 +842,8 @@ final readonly class RuleConfigApplier
     /**
      * Keep fourth-level configuration values as scalar config values.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param array<array-key, mixed> $decodedRuleValues - Fourth-level decoded array; a further nested array is rejected as too deep.
      *
      * @return array<array-key, ConfigScalar> - the deepest allowed level with every item confirmed to be a supported scalar
@@ -732,7 +852,9 @@ final readonly class RuleConfigApplier
     {
         $normalizedRuleValues = [];
 
+        // User view: add each item that can appear in configured analysis run.
         foreach ($decodedRuleValues as $key => $decodedItem) {
+            // User view: choose the configured analysis run branch for this case.
             if (is_array($decodedItem)) {
                 throw new ConfigException('Config value nesting is deeper than supported.');
             }

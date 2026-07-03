@@ -26,16 +26,21 @@ final readonly class PhpFileParser
     /**
      * Create a parser using the supplied nikic/php-parser instance or default.
      *
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param Parser|null $parser - Parser override used by tests, or null for the default parser.
      */
     public function __construct(?Parser $parser = null)
     {
+        // User view: missing data becomes a safe source analysis default.
         $this->parser = $parser ?? (new ParserFactory())->createForNewestSupportedVersion();
     }
 
     /**
      * Parse a source file into statements, tokens, and diagnostics for rules.
      *
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param SourceFile $file - File descriptor to parse.
      *
      * @return AnalysisUnit - Parsed source representation consumed by rules.
@@ -44,6 +49,7 @@ final readonly class PhpFileParser
     {
         $source = file_get_contents($file->absolutePath);
 
+        // User view: choose the source analysis branch for this case.
         if ($source === false) {
             // Unreadable file is surfaced as a diagnostic, not an exception, so one bad file
             // does not abort the whole run; downstream rules see an empty unit carrying the error.
@@ -56,12 +62,14 @@ final readonly class PhpFileParser
             );
         }
 
+        // User view: choose the source analysis branch for this case.
         if (!$file->isPhp()) {
             // Non-PHP sources keep their text for raw-content rules but skip AST/token work.
             return new AnalysisUnit($file, $source, [], [], []);
         }
 
         try {
+            // User view: missing data becomes a safe source analysis default.
             $statements = array_values($this->parser->parse($source) ?? []);
 
             $nodeTraverser = new NodeTraverser();
@@ -74,7 +82,9 @@ final readonly class PhpFileParser
             // scanner comment ranges). Keeping the full token stream is the dominant per-file
             // memory cost at scale (~4-5GB peak on large PHP projects).
             $commentTokens = [];
+            // User view: add each item that can appear in source analysis.
             foreach ($this->parser->getTokens() as $token) {
+                // User view: choose the source analysis branch for this case.
                 if ($token->id === T_COMMENT || $token->id === T_DOC_COMMENT) {
                     $commentTokens[] = $token;
                 }

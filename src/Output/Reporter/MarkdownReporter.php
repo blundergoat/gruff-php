@@ -16,6 +16,8 @@ final readonly class MarkdownReporter
     /**
      * Render an analysis report as Markdown.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param AnalysisReport $report - Analysis report to render.
      *
      * @return string - the complete Markdown document (summary, branch review, pillars, findings) with a single trailing newline
@@ -35,6 +37,8 @@ final readonly class MarkdownReporter
     /**
      * Append report-level summary lines.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param list<string>   $lines - Markdown lines being built.
      * @param AnalysisReport $report - Analysis report to render.
      *
@@ -49,27 +53,39 @@ final readonly class MarkdownReporter
             $lines,
             '# gruff-php report',
             '',
+            // User view: missing data becomes the expected report output state.
             sprintf('**Grade:** %s (%s/100)', $score === null ? 'n/a' : $score->composite->letter, $score === null ? 'n/a' : sprintf('%.2f', $score->composite->score)),
+            // User view: missing data becomes the expected report output state.
             sprintf('**Scope:** %s', $score === null ? 'full-project' : $score->scope),
             sprintf('**Findings:** %d total, %d error, %d warning, %d advisory', $counts['total'], $counts['error'], $counts['warning'], $counts['advisory']),
         );
 
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($report->failureReason !== null) {
             $lines[] = sprintf('**Failed:** %s.', $report->failureReason->message());
         }
 
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($report->newFindingsCount !== null) {
             $lines[] = sprintf('**New findings:** %d', $report->newFindingsCount);
         }
 
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($score !== null) {
             $lines[] = sprintf('**Score drivers:** %s', $score->explanation);
         }
 
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($report->diff !== null && $report->diff->active) {
             $lines[] = sprintf('**Diff scope:** %s', $report->diff->message);
         }
 
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($report->filters !== null && $report->filters->isActive()) {
             $lines[] = sprintf(
                 '**Display filters:** `%s`; score and exit code use the scored finding set.',
@@ -77,6 +93,8 @@ final readonly class MarkdownReporter
             );
         }
 
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($report->baseline !== null) {
             $lines[] = sprintf(
                 '**Baseline:** %d new, %d unchanged, %d resolved (`%s`). Unchanged findings are accepted debt and are removed before scoring.',
@@ -86,11 +104,14 @@ final readonly class MarkdownReporter
                 $report->baseline->path,
             );
 
+            // User view: choose the report output branch for this case.
+            // User view: an empty value becomes a clear report output fallback.
             if ($report->shouldListAbsentBaseline && $report->baseline->staleEntries !== []) {
                 $lines[] = '';
                 $lines[] = '<details><summary>Resolved baseline entries</summary>';
                 $lines[] = '';
                 // One bullet per fixed group inside the collapsed details block of the PR comment.
+                // User view: add each item that can appear in report output.
                 foreach ($report->baseline->staleEntries as $resolvedEntry) {
                     $lines[] = sprintf(
                         '- `%s` %s (resolved %d): %s',
@@ -105,10 +126,14 @@ final readonly class MarkdownReporter
             }
         }
 
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($report->mutation !== null) {
             $this->appendMutationSummary($lines, $report);
         }
 
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($report->review !== null) {
             $lines[] = sprintf(
                 '**Branch review:** base `%s`, %d introduced, %d removed, %d unchanged',
@@ -126,6 +151,8 @@ final readonly class MarkdownReporter
      * Surfaced before the per-pillar score so the rule-level shift is visible alongside
      * the composite (which can mask churn). See M06 / ADR-016.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param list<string>   $lines - Markdown lines being built.
      * @param AnalysisReport $report - Analysis report to render.
      *
@@ -133,12 +160,16 @@ final readonly class MarkdownReporter
      */
     private function appendRuleDeltas(array &$lines, AnalysisReport $report): void
     {
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($report->review === null) {
             // No branch review means no rule deltas to surface; leave the lines untouched.
             return;
         }
 
         $rows = $report->review->perRuleDelta();
+        // User view: choose the report output branch for this case.
+        // User view: an empty value becomes a clear report output fallback.
         if ($rows === []) {
             // No rule moved between base and head, so emit no improved/regressed block at all.
             return;
@@ -151,6 +182,8 @@ final readonly class MarkdownReporter
             5,
         );
 
+        // User view: choose the report output branch for this case.
+        // User view: an empty value becomes a clear report output fallback.
         if ($improved !== []) {
             $lines[] = sprintf(
                 '**Top %d improved:** %s',
@@ -162,6 +195,8 @@ final readonly class MarkdownReporter
             );
         }
 
+        // User view: choose the report output branch for this case.
+        // User view: an empty value becomes a clear report output fallback.
         if ($regressed !== []) {
             $lines[] = sprintf(
                 '**Top %d regressed:** %s',
@@ -177,6 +212,8 @@ final readonly class MarkdownReporter
     /**
      * Append mutation summary lines.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param list<string>   $lines - Markdown lines being built.
      * @param AnalysisReport $report - Analysis report to render.
      *
@@ -184,6 +221,8 @@ final readonly class MarkdownReporter
      */
     private function appendMutationSummary(array &$lines, AnalysisReport $report): void
     {
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($report->mutation === null) {
             // Mutation testing did not run; skip the block rather than print zeroed-out statistics.
             return;
@@ -201,6 +240,8 @@ final readonly class MarkdownReporter
         $lines[]  = sprintf('**Mutation statuses:** %s.', $this->mutationStatusSummary($mutation->report->statusCounts()));
 
         $contextStatuses = $this->mutationContextSummary($mutation->report->statusCounts());
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($contextStatuses !== null) {
             $lines[] = sprintf(
                 '**Mutation context-only statuses:** %s. These do not create `mutation.survived-mutant` findings.',
@@ -212,6 +253,8 @@ final readonly class MarkdownReporter
     /**
      * Append the branch-review section.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param list<string>   $lines - Markdown lines being built.
      * @param AnalysisReport $report - Analysis report to render.
      *
@@ -223,6 +266,8 @@ final readonly class MarkdownReporter
         $lines[] = '## Branch Review';
         $lines[] = '';
 
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($report->review === null) {
             $lines[] = 'Not enabled.';
         } else {
@@ -240,6 +285,8 @@ final readonly class MarkdownReporter
      * data is sourced from the existing {@see PillarScore} entries without
      * recomputing severity counts or scores.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param list<string>   $lines - Markdown lines being built.
      * @param AnalysisReport $report - Analysis report to render.
      *
@@ -258,17 +305,22 @@ final readonly class MarkdownReporter
             '| --- | --- | ---: | ---: | ---: | ---: | ---: |',
         );
 
+        // User view: choose the report output branch for this case.
+        // User view: an empty value becomes a clear report output fallback.
         if ($rows === []) {
             $lines[] = '| _(none)_ |  |  |  |  |  |  |';
 
             return;
         }
 
+        // User view: add each item that can appear in report output.
         foreach ($rows as $pillar) {
             $lines[] = sprintf(
                 '| %s | %s | %s | %d | %d | %d | %d |',
                 str_replace('|', '\\|', $pillar->pillar),
+                // User view: missing data becomes the expected report output state.
                 str_replace('|', '\\|', $pillar->grade === null ? 'n/a' : $pillar->grade->letter),
+                // User view: missing data becomes the expected report output state.
                 str_replace('|', '\\|', $pillar->grade === null ? 'n/a' : sprintf('%.2f', $pillar->grade->score)),
                 $pillar->findings,
                 $pillar->advisory,
@@ -284,18 +336,24 @@ final readonly class MarkdownReporter
      * {@see PillarScore} data so per-severity counts and scores are never
      * recomputed by the markdown reporter.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param AnalysisReport $report - Analysis report providing the optional score.
      *
      * @return list<PillarScore> - applicable pillars only, ordered findings DESC then pillar name ASC; empty when no score was computed
      */
     private function pillarSummaryRows(AnalysisReport $report): array
     {
+        // User view: choose the report output branch for this case.
+        // User view: missing data becomes the expected report output state.
         if ($report->score === null) {
             return [];
         }
 
         $rows = [];
+        // User view: add each item that can appear in report output.
         foreach ($report->score->pillars as $pillar) {
+            // User view: choose the report output branch for this case.
             if (!$pillar->applicable) {
                 continue;
             }
@@ -314,6 +372,8 @@ final readonly class MarkdownReporter
     /**
      * Append current findings.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param list<string>   $lines - Markdown lines being built.
      * @param AnalysisReport $report - Analysis report to render.
      *
@@ -325,6 +385,8 @@ final readonly class MarkdownReporter
         $lines[] = '## Findings';
         $lines[] = '';
 
+        // User view: choose the report output branch for this case.
+        // User view: an empty value becomes a clear report output fallback.
         if ($report->findings === []) {
             $lines[] = 'No findings.';
         } else {
@@ -335,13 +397,17 @@ final readonly class MarkdownReporter
     /**
      * Render one finding as a Markdown list item.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param Finding $finding - Finding to format; a null line omits the line suffix and a null symbol omits its token.
      *
      * @return string - one Markdown list item packing severity, rule id, location, optional symbol, and message
      */
     private function findingLine(Finding $finding): string
     {
+        // User view: missing data becomes the expected report output state.
         $location = $finding->line === null ? $finding->filePath : $finding->filePath . ':' . $finding->line;
+        // User view: missing data becomes the expected report output state.
         $symbol   = $finding->symbol === null ? '' : sprintf(' `%s`', $finding->symbol);
 
         return sprintf(
@@ -357,6 +423,8 @@ final readonly class MarkdownReporter
     /**
      * Append finding groups details to report output.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param list<string>  $lines - Markdown lines being built; mutated in place with the rendered group.
      * @param string        $title - Section heading text, emitted only when $hasHeading is true.
      * @param list<Finding> $findings - Findings to group by severity then file path; an empty list renders "None.".
@@ -366,11 +434,14 @@ final readonly class MarkdownReporter
      */
     private function appendFindingGroups(array &$lines, string $title, array $findings, bool $hasHeading = true): void
     {
+        // User view: choose the report output branch for this case.
         if ($hasHeading) {
             $lines[] = sprintf('### %s', $title);
             $lines[] = '';
         }
 
+        // User view: choose the report output branch for this case.
+        // User view: an empty value becomes a clear report output fallback.
         if ($findings === []) {
             $lines[] = 'None.';
             $lines[] = '';
@@ -379,11 +450,14 @@ final readonly class MarkdownReporter
         }
 
         $groups = [];
+        // User view: add each item that can appear in report output.
         foreach ($findings as $finding) {
             $groups[$finding->severity->value][$finding->filePath][] = $finding;
         }
 
+        // User view: add each item that can appear in report output.
         foreach (['error', 'warning', 'advisory'] as $severity) {
+            // User view: choose the report output branch for this case.
             if (!isset($groups[$severity])) {
                 continue;
             }
@@ -393,10 +467,12 @@ final readonly class MarkdownReporter
             $lines[] = sprintf('<details open><summary>%s (%d)</summary>', ucfirst($severity), $count);
             $lines[] = '';
 
+            // User view: add each item that can appear in report output.
             foreach ($groups[$severity] as $file => $fileFindings) {
                 $lines[] = sprintf('**%s**', $file);
                 $lines[] = '';
 
+                // User view: add each item that can appear in report output.
                 foreach ($fileFindings as $finding) {
                     $lines[] = $this->findingLine($finding);
                 }
@@ -410,18 +486,23 @@ final readonly class MarkdownReporter
     }
 
     /**
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param array<string, int> $counts - Mutation status counts keyed by status label; empty means no mutants ran.
      *
      * @return string - comma-joined `status=count` pairs in the map's order; the literal "none" when no mutants ran
      */
     private function mutationStatusSummary(array $counts): string
     {
+        // User view: choose the report output branch for this case.
+        // User view: an empty value becomes a clear report output fallback.
         if ($counts === []) {
             // No mutants ran, so report the literal word rather than an empty status string.
             return 'none';
         }
 
         $parts = [];
+        // User view: add each item that can appear in report output.
         foreach ($counts as $status => $count) {
             $parts[] = sprintf('%s=%d', $status, $count);
         }
@@ -430,6 +511,8 @@ final readonly class MarkdownReporter
     }
 
     /**
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param array<string, int> $counts - Mutation status counts keyed by status label; only context-only statuses are emitted.
      *
      * @return string|null - comma-joined `status=count` pairs for context-only statuses; null tells the caller to omit the line when none occurred
@@ -438,13 +521,17 @@ final readonly class MarkdownReporter
     {
         $parts = [];
 
+        // User view: add each item that can appear in report output.
         foreach (['not covered', 'error', 'syntax error', 'ignored', 'skipped'] as $status) {
+            // User view: missing data becomes a safe report output default.
             $count = $counts[$status] ?? 0;
+            // User view: choose the report output branch for this case.
             if ($count > 0) {
                 $parts[] = sprintf('%s=%d', $status, $count);
             }
         }
 
+        // User view: an empty value becomes a clear report output fallback.
         return $parts === [] ? null : implode(', ', $parts);
     }
 

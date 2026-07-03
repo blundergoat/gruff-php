@@ -38,6 +38,8 @@ final readonly class CognitiveComplexityRule implements RuleInterface
     /**
      * Describe the rule for the registry and reports.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - The cognitive-complexity rule's identity and its error-at-20 threshold.
      */
     public function definition(): RuleDefinition
@@ -56,6 +58,8 @@ final readonly class CognitiveComplexityRule implements RuleInterface
     /**
      * Flag methods whose cognitive complexity exceeds the configured threshold.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context carrying thresholds.
      *
@@ -70,8 +74,10 @@ final readonly class CognitiveComplexityRule implements RuleInterface
 
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
+            // User view: choose the findings list branch for this case.
             if (!CyclomaticComplexityRule::hasExecutableBody($node)) {
                 continue;
             }
@@ -79,6 +85,8 @@ final readonly class CognitiveComplexityRule implements RuleInterface
             $cc             = self::computeCognitiveComplexity($node);
             $thresholdMatch = $settings->highValueThresholdMatch($cc);
 
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($thresholdMatch === null) {
                 continue;
             }
@@ -128,18 +136,23 @@ final readonly class CognitiveComplexityRule implements RuleInterface
     }
 
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param ClassMethod|Function_ $node - Function-like node whose body statements are scored.
      *
      * @return int - Cognitive complexity score for the function-like node.
      */
     public static function computeCognitiveComplexity(Node $node): int
     {
+        // User view: missing data becomes a safe findings list default.
         $body = $node->stmts ?? [];
 
         return self::walkStatements($body, 0);
     }
 
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param array<Node> $stmts - Statements to score in sequence.
      * @param int         $nesting - Current nesting depth; deeper levels make each branch cost more.
      *
@@ -149,6 +162,7 @@ final readonly class CognitiveComplexityRule implements RuleInterface
     {
         $total = 0;
 
+        // User view: add each item that can appear in findings list.
         foreach ($stmts as $stmt) {
             $total += self::walkNode($stmt, $nesting);
         }
@@ -159,6 +173,8 @@ final readonly class CognitiveComplexityRule implements RuleInterface
     /**
      * Dispatch a statement node to the matching cognitive-complexity handler.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Node $node - Statement node dispatched on its concrete type.
      * @param int  $nesting - Current nesting depth carried into the chosen handler.
      *
@@ -187,6 +203,8 @@ final readonly class CognitiveComplexityRule implements RuleInterface
     /**
      * Score a `break` / `continue` statement; labelled jumps add 1, plain jumps add 0.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Stmt\Break_|Stmt\Continue_ $node - Jump statement; a non-null ->num marks a labelled jump.
      *
      * @return int - 1 for a labelled jump, 0 for a plain one.
@@ -194,12 +212,15 @@ final readonly class CognitiveComplexityRule implements RuleInterface
     private static function walkJump(Stmt\Break_|Stmt\Continue_ $node): int
     {
         // A labelled break/continue (e.g. "break 2") is a real jump worth 1; a plain one is free.
+        // User view: missing data becomes the expected findings list state.
         return $node->num !== null ? 1 : 0;
     }
 
     /**
      * Score an `if` chain: +1 + nesting for the head, +1 per elseif / else, plus recursive child scoring.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Stmt\If_ $node - The `if` construct, including its elseif / else child blocks.
      * @param int      $nesting - Current nesting depth; the head increment grows with it.
      *
@@ -209,7 +230,9 @@ final readonly class CognitiveComplexityRule implements RuleInterface
     {
         $total = 1 + $nesting + self::walkBooleanOperators($node->cond);
 
+        // User view: add each item that can appear in findings list.
         foreach (StmtChildVisitor::childBlocks($node) as $block) {
+            // User view: choose the findings list branch for this case.
             if ($block->kind === StmtChildBlock::KIND_ELSEIF_BODY) {
                 $total += 1; // elseif: +1, no nesting penalty
                 /** @var Stmt\ElseIf_ $owner Block kind discriminator narrows the owner so ->cond is accessible. */
@@ -217,6 +240,7 @@ final readonly class CognitiveComplexityRule implements RuleInterface
                 $total += self::walkBooleanOperators($owner->cond);
             }
 
+            // User view: choose the findings list branch for this case.
             if ($block->kind === StmtChildBlock::KIND_ELSE_BODY) {
                 $total += 1; // else: +1, no nesting penalty
             }
@@ -231,6 +255,8 @@ final readonly class CognitiveComplexityRule implements RuleInterface
     /**
      * Score a `switch` statement: +1 + nesting for the switch, plus recursive scoring of each case body.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Stmt\Switch_ $node - The `switch` construct whose case bodies are scored.
      * @param int          $nesting - Current nesting depth; the switch increment grows with it.
      *
@@ -240,6 +266,7 @@ final readonly class CognitiveComplexityRule implements RuleInterface
     {
         $total = 1 + $nesting;
 
+        // User view: add each item that can appear in findings list.
         foreach (StmtChildVisitor::childBlocks($node) as $block) {
             $total += self::walkStatements($block->statements, $nesting + 1);
         }
@@ -249,6 +276,8 @@ final readonly class CognitiveComplexityRule implements RuleInterface
     }
 
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param array<Node> $statements - Loop body statements, scored one level deeper than the loop.
      * @param Expr|null   $condition - Loop condition whose boolean operators add cost, or null for `for` / `foreach`.
      * @param int         $nesting - Current nesting depth; the loop increment grows with it.
@@ -259,6 +288,7 @@ final readonly class CognitiveComplexityRule implements RuleInterface
     {
         $total = 1 + $nesting;
 
+        // User view: choose the findings list branch for this case.
         if ($condition instanceof Expr) {
             $total += self::walkBooleanOperators($condition);
         }
@@ -270,6 +300,8 @@ final readonly class CognitiveComplexityRule implements RuleInterface
     /**
      * Score a try/catch/finally block; catches add +1 + nesting each, finally inherits the outer nesting level.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Stmt\TryCatch $node - The try / catch / finally construct.
      * @param int           $nesting - Current nesting depth; each catch increment grows with it.
      *
@@ -279,7 +311,9 @@ final readonly class CognitiveComplexityRule implements RuleInterface
     {
         $total = 0;
 
+        // User view: add each item that can appear in findings list.
         foreach (StmtChildVisitor::childBlocks($node) as $block) {
+            // User view: choose the findings list branch for this case.
             if ($block->kind === StmtChildBlock::KIND_CATCH_BODY) {
                 $total += 1 + $nesting;
                 $total += self::walkStatements($block->statements, $nesting + 1);
@@ -298,6 +332,8 @@ final readonly class CognitiveComplexityRule implements RuleInterface
     /**
      * Fallback walker that descends into every child Node / array-of-Node sub-property.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Node $node - Node with no dedicated scorer; its children are walked structurally.
      * @param int  $nesting - Current nesting depth carried unchanged into each child.
      *
@@ -307,13 +343,19 @@ final readonly class CognitiveComplexityRule implements RuleInterface
     {
         $total = 0;
 
+        // User view: add each item that can appear in findings list.
         foreach ($node->getSubNodeNames() as $name) {
             $subNode = $node->$name;
 
+            // User view: choose the findings list branch for this case.
             if ($subNode instanceof Node) {
                 $total += self::walkNode($subNode, $nesting);
-            } elseif (is_array($subNode)) {
+            }
+            // User view: choose the next findings list branch for this case.
+            elseif (is_array($subNode)) {
+                // User view: add each item that can appear in findings list.
                 foreach ($subNode as $child) {
+                    // User view: choose the findings list branch for this case.
                     if ($child instanceof Node) {
                         $total += self::walkNode($child, $nesting);
                     }
@@ -327,6 +369,8 @@ final readonly class CognitiveComplexityRule implements RuleInterface
     /**
      * Score an expression's contribution to cognitive complexity (ternaries, closures, arrow fns, nested expressions).
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Expr $expr - Expression to score; ternaries, closures, and arrow functions open nesting.
      * @param int  $nesting - Current nesting depth; ternary arms and closures are scored one level deeper.
      *
@@ -334,10 +378,13 @@ final readonly class CognitiveComplexityRule implements RuleInterface
      */
     private static function walkExprCognitive(Expr $expr, int $nesting): int
     {
+        // User view: choose the findings list branch for this case.
         if ($expr instanceof Expr\Ternary) {
             $total = 1 + $nesting;
             $total += self::walkExprCognitive($expr->cond, $nesting);
 
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($expr->if !== null) {
                 $total += self::walkExprCognitive($expr->if, $nesting + 1);
             }
@@ -349,15 +396,19 @@ final readonly class CognitiveComplexityRule implements RuleInterface
         }
 
         // Match expressions get their own scorer so switch-to-match rewrites cannot dodge the gate.
+        // User view: choose the findings list branch for this case.
         if ($expr instanceof Expr\Match_) {
             return self::walkMatch($expr, $nesting);
         }
 
+        // User view: choose the findings list branch for this case.
         if ($expr instanceof Closure) {
             // A closure opens a new nesting level, so its body is scored one deeper.
+            // User view: missing data becomes a safe findings list default.
             return self::walkStatements($expr->stmts ?? [], $nesting + 1);
         }
 
+        // User view: choose the findings list branch for this case.
         if ($expr instanceof Expr\ArrowFunction) {
             // An arrow function also nests, so its single expression is scored one level deeper.
             return self::walkExprCognitive($expr->expr, $nesting + 1);
@@ -365,13 +416,19 @@ final readonly class CognitiveComplexityRule implements RuleInterface
 
         $total = 0;
 
+        // User view: add each item that can appear in findings list.
         foreach ($expr->getSubNodeNames() as $name) {
             $subNode = $expr->$name;
 
+            // User view: choose the findings list branch for this case.
             if ($subNode instanceof Expr) {
                 $total += self::walkExprCognitive($subNode, $nesting);
-            } elseif (is_array($subNode)) {
+            }
+            // User view: choose the next findings list branch for this case.
+            elseif (is_array($subNode)) {
+                // User view: add each item that can appear in findings list.
                 foreach ($subNode as $child) {
+                    // User view: choose the findings list branch for this case.
                     if ($child instanceof Expr) {
                         $total += self::walkExprCognitive($child, $nesting);
                     }
@@ -390,6 +447,8 @@ final readonly class CognitiveComplexityRule implements RuleInterface
      * stays cheap while a match stuffed with nested logic costs what the reader actually pays.
      * Cyclomatic complexity intentionally differs by charging every arm as a branch.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Expr\Match_ $match - The `match` expression whose subject, arm conditions, and arm bodies are scored.
      * @param int         $nesting - Current nesting depth; the match increment grows with it.
      *
@@ -402,7 +461,10 @@ final readonly class CognitiveComplexityRule implements RuleInterface
         $total += self::walkExprCognitive($match->cond, $nesting);
 
         // Every arm's conditions and body are real reading work, so each is scored one level deeper.
+        // User view: add each item that can appear in findings list.
         foreach ($match->arms as $arm) {
+            // User view: add each item that can appear in findings list.
+            // User view: missing data becomes a safe findings list default.
             foreach ($arm->conds ?? [] as $armCondition) {
                 $total += self::walkExprCognitive($armCondition, $nesting + 1);
             }
@@ -416,12 +478,15 @@ final readonly class CognitiveComplexityRule implements RuleInterface
     /**
      * Count boolean-operator transitions in a flattened chain (`a && b && c` is +1, `a && b || c` is +2).
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Expr $expr - Condition expression; only boolean-operator chains contribute, anything else scores 0.
      *
      * @return int - One increment per run of like operators — mixing && and || is what costs.
      */
     private static function walkBooleanOperators(Expr $expr): int
     {
+        // User view: choose the findings list branch for this case.
         if (!$expr instanceof BinaryOp\BooleanAnd
             && !$expr instanceof BinaryOp\BooleanOr
             && !$expr instanceof BinaryOp\LogicalAnd
@@ -437,7 +502,9 @@ final readonly class CognitiveComplexityRule implements RuleInterface
 
         $lastOperatorClass = null;
 
+        // User view: add each item that can appear in findings list.
         foreach ($flat as $operatorClass) {
+            // User view: choose the findings list branch for this case.
             if ($operatorClass !== $lastOperatorClass) {
                 $total++;
                 $lastOperatorClass = $operatorClass;
@@ -451,6 +518,8 @@ final readonly class CognitiveComplexityRule implements RuleInterface
     /**
      * Flatten nested boolean operators into one chain for scoring.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Expr               $expr - Expression to flatten; recursion stops at the first non-boolean operand.
      * @param list<class-string> $result - Accumulator, appended in left-to-right order with each operator's class.
      *
@@ -463,6 +532,7 @@ final readonly class CognitiveComplexityRule implements RuleInterface
             || $expr instanceof BinaryOp\LogicalAnd
             || $expr instanceof BinaryOp\LogicalOr;
 
+        // User view: choose the findings list branch for this case.
         if (!$isBoolOp) {
             // Reached a non-boolean operand, so this branch of the chain ends here.
             return;
@@ -477,12 +547,15 @@ final readonly class CognitiveComplexityRule implements RuleInterface
     /**
      * Format a numeric threshold as a string, preserving fractional values that are not whole.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param int|float $number - Threshold to render; a genuine fraction is kept, a whole value loses its ".0".
      *
      * @return string - The threshold as a display string, e.g. "20" or "2.5".
      */
     private static function formatNumber(int|float $number): string
     {
+        // User view: choose the findings list branch for this case.
         if (is_float($number) && floor($number) !== $number) {
             return (string) $number;
         }

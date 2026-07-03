@@ -47,6 +47,8 @@ final class HookCommand extends Command
     /**
      * Configure the hook command.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @return void
      */
     protected function configure(): void
@@ -73,6 +75,8 @@ final class HookCommand extends Command
     /**
      * Execute the hook command.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface  $input  - Console input.
      * @param OutputInterface $output - Console output.
      *
@@ -81,6 +85,7 @@ final class HookCommand extends Command
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        // User view: choose the terminal output branch for this case.
         if ((bool)$input->getOption('capabilities')) {
             $this->writeJson($output, $this->capabilities());
 
@@ -88,6 +93,7 @@ final class HookCommand extends Command
         }
 
         $format = $input->getOption('format');
+        // User view: choose the terminal output branch for this case.
         if ($format !== 'json') {
             $this->writeJson($output, $this->emptyReport(false, 'hook supports only --format json.'));
 
@@ -95,12 +101,15 @@ final class HookCommand extends Command
         }
 
         $projectRoot = getcwd();
+        // User view: choose the terminal output branch for this case.
         if ($projectRoot === false) {
             throw new RuntimeException('Unable to determine the current working directory.');
         }
 
         $paths        = $this->paths($input);
+        // User view: missing data becomes a safe terminal output default.
         $changedScope = $this->stringOption($input, 'changed-scope') ?? 'symbol';
+        // User view: choose the terminal output branch for this case.
         if ($changedScope !== 'symbol') {
             $this->writeJson($output, $this->emptyReport(false, 'hook supports only --changed-scope symbol.'));
 
@@ -132,11 +141,14 @@ final class HookCommand extends Command
             $baseStableIdentities = $this->baseStableIdentities(
                 input:                $input,
                 projectRoot:          $projectRoot,
+                // User view: missing data becomes a safe terminal output default.
                 paths:                $analysisPaths ?? $paths,
                 shouldIncludeIgnored: (bool)$input->getOption('include-ignored'),
                 config:               $config,
             );
+            // User view: missing data becomes the expected terminal output state.
             $hasNewOnlySource = $baseStableIdentities !== null;
+            // User view: missing data becomes a safe terminal output default.
             $filterResult     = (new HookFindingFilter())->apply($findings, $diff, $baseStableIdentities ?? [], $hasNewOnlySource);
 
             $this->writeJson(
@@ -162,6 +174,8 @@ final class HookCommand extends Command
     /**
      * Return the hook capability payload.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @return array<string, mixed> - JSON-ready capabilities.
      */
     private function capabilities(): array
@@ -194,6 +208,8 @@ final class HookCommand extends Command
     /**
      * Load the effective analysis config for hook mode.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface $input       - Console input.
      * @param string         $projectRoot - Project root.
      * @param RuleRegistry   $registry    - Rule registry.
@@ -203,6 +219,8 @@ final class HookCommand extends Command
     private function config(InputInterface $input, string $projectRoot, RuleRegistry $registry): AnalysisConfig
     {
         $configPath = $this->stringOption($input, 'config');
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ((bool)$input->getOption('no-config') && $configPath !== null) {
             throw new ConfigException('--no-config cannot be combined with --config.');
         }
@@ -214,9 +232,13 @@ final class HookCommand extends Command
         $includeRules = $this->stringListOption($input, 'include-rule');
         $excludeRules = $this->stringListOption($input, 'exclude-rule');
         $ruleFilterError = $this->ruleFilterError($registry, $includeRules, $excludeRules);
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($ruleFilterError !== null) {
             throw new ConfigException($ruleFilterError);
         }
+        // User view: choose the terminal output branch for this case.
+        // User view: an empty value becomes a clear terminal output fallback.
         if ($includeRules !== [] || $excludeRules !== []) {
             $config = $config->withRuleSelection($this->refinedSelection($config->ruleSelection(), $includeRules, $excludeRules));
         }
@@ -233,6 +255,8 @@ final class HookCommand extends Command
      * selection and only drops the named rules, so a configured selection.rules narrowing is not
      * widened to the whole rule set (an empty include list means "all rules").
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param RuleSelection $existing     - Selection already resolved from the project config.
      * @param list<string>  $includeRules - Hook --include-rule ids; when non-empty they focus the run.
      * @param list<string>  $excludeRules - Hook --exclude-rule ids dropped on top of the existing selection.
@@ -241,6 +265,8 @@ final class HookCommand extends Command
      */
     private function refinedSelection(RuleSelection $existing, array $includeRules, array $excludeRules): RuleSelection
     {
+        // User view: choose the terminal output branch for this case.
+        // User view: an empty value becomes a clear terminal output fallback.
         if ($includeRules !== []) {
             return new RuleSelection(rules: $includeRules, excludeRules: $excludeRules);
         }
@@ -257,6 +283,8 @@ final class HookCommand extends Command
     /**
      * Validate hook rule filters before they can focus execution to zero rules.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param RuleRegistry $registry - Registry whose ids define valid hook rule filters.
      * @param list<string> $includeRules - Rule ids from --include-rule.
      * @param list<string> $excludeRules - Rule ids from --exclude-rule.
@@ -265,8 +293,11 @@ final class HookCommand extends Command
      */
     private function ruleFilterError(RuleRegistry $registry, array $includeRules, array $excludeRules): ?string
     {
+        // User view: add each item that can appear in terminal output.
         foreach (['--include-rule' => $includeRules, '--exclude-rule' => $excludeRules] as $option => $ruleIds) {
             $unknownRuleIds = $registry->unknownRuleIds($ruleIds);
+            // User view: choose the terminal output branch for this case.
+            // User view: an empty value becomes a clear terminal output fallback.
             if ($unknownRuleIds !== []) {
                 return sprintf('Unknown rule id "%s" for %s.', $unknownRuleIds[0], $option);
             }
@@ -278,6 +309,8 @@ final class HookCommand extends Command
     /**
      * Analyse a project root without legacy diff or baseline filtering.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string            $projectRoot          - Project root.
      * @param list<string>|null $paths                - Paths to analyse, or null to analyse nothing.
      * @param bool              $shouldIncludeIgnored - Whether ignored files should be included.
@@ -294,6 +327,7 @@ final class HookCommand extends Command
         RuleRegistry $registry,
     ): array {
         $options = new AnalyseCommandOptions(
+            // User view: missing data becomes a safe terminal output default.
             paths:                         $paths ?? [],
             shouldIncludeIgnored:          $shouldIncludeIgnored,
             configPath:                    null,
@@ -354,6 +388,8 @@ final class HookCommand extends Command
     /**
      * Resolve changed-region input from hook flags.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface $input       - Console input.
      * @param string         $projectRoot - Project root.
      * @param list<string>   $paths       - Requested paths.
@@ -363,13 +399,18 @@ final class HookCommand extends Command
     private function changedRegion(InputInterface $input, string $projectRoot, array $paths): ?DiffResult
     {
         $changedRanges = $this->stringOption($input, 'changed-ranges');
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($changedRanges !== null) {
             $changedFiles = (new AnalysisFindingSupport())->normaliseRequestedPaths($projectRoot, $paths);
+            // User view: choose the terminal output branch for this case.
+            // User view: an empty value becomes a clear terminal output fallback.
             if ($changedFiles === []) {
                 throw new DiffException('--changed-ranges requires at least one file path.');
             }
 
             $changedLines = [];
+            // User view: add each item that can appear in terminal output.
             foreach ($changedFiles as $changedFile) {
                 $changedLines[$changedFile] = $this->parseChangedRanges($changedRanges);
             }
@@ -385,17 +426,23 @@ final class HookCommand extends Command
         }
 
         $since = $this->stringOption($input, 'since');
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($since !== null) {
             return (new GitDiffProvider())->changedLines($projectRoot, $since);
         }
 
         $diffMode = $this->diffMode($input);
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($diffMode === null) {
             return null;
         }
 
+        // User view: choose the terminal output branch for this case.
         if ($diffMode === '-') {
             $patch = stream_get_contents(STDIN);
+            // User view: choose the terminal output branch for this case.
             if ($patch === false) {
                 throw new DiffException('Unable to read unified diff from stdin.');
             }
@@ -418,6 +465,8 @@ final class HookCommand extends Command
     /**
      * Resolve paths the current analysis pass should scan.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string          $projectRoot - Project root.
      * @param list<string>    $paths       - Requested paths.
      * @param DiffResult|null $diff        - Changed-region data.
@@ -426,22 +475,28 @@ final class HookCommand extends Command
      */
     private function analysisPaths(string $projectRoot, array $paths, ?DiffResult $diff): ?array
     {
+        // User view: choose the terminal output branch for this case.
+        // User view: an empty value becomes a clear terminal output fallback.
         if ($paths !== []) {
             return $paths;
         }
 
+        // User view: choose the terminal output branch for this case.
         if (!$diff instanceof DiffResult || !$diff->active) {
             return [];
         }
 
         $changedFiles = (new AnalysisFindingSupport())->existingChangedFiles($projectRoot, $diff->changedFiles);
 
+        // User view: an empty value becomes a clear terminal output fallback.
         return $changedFiles === [] ? null : $changedFiles;
     }
 
     /**
      * Build the base stable-identity set from --baseline and/or --diff.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface $input                - Console input.
      * @param string         $projectRoot          - Project root.
      * @param list<string>   $paths                - Paths to compare against the base.
@@ -460,11 +515,15 @@ final class HookCommand extends Command
         $identities = null;
 
         $baselinePath = $this->stringOption($input, 'baseline');
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($baselinePath !== null) {
             $identities = $this->baselineIdentities($projectRoot, $baselinePath);
         }
 
         $baseRef = $this->baseRef($input);
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($baseRef !== null) {
             $baseIdentities = $this->baseRefIdentities(
                 projectRoot:          $projectRoot,
@@ -473,6 +532,7 @@ final class HookCommand extends Command
                 shouldIncludeIgnored: $shouldIncludeIgnored,
                 config:               $config,
             );
+            // User view: missing data becomes the expected terminal output state.
             $identities = $identities === null ? $baseIdentities : $identities + $baseIdentities;
         }
 
@@ -482,6 +542,8 @@ final class HookCommand extends Command
     /**
      * Read stable identities from a hook JSON baseline report.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string $projectRoot  - Project root.
      * @param string $baselinePath - Baseline path.
      *
@@ -490,11 +552,13 @@ final class HookCommand extends Command
     private function baselineIdentities(string $projectRoot, string $baselinePath): array
     {
         $path = PathHelper::resolveAgainst($projectRoot, $baselinePath);
+        // User view: choose the terminal output branch for this case.
         if (!is_file($path)) {
             throw new RuntimeException(sprintf('Hook baseline not found: %s', $baselinePath));
         }
 
         $contents = file_get_contents($path);
+        // User view: choose the terminal output branch for this case.
         if (!is_string($contents)) {
             throw new RuntimeException(sprintf('Unable to read hook baseline: %s', $baselinePath));
         }
@@ -506,22 +570,30 @@ final class HookCommand extends Command
             throw new RuntimeException(sprintf('Hook baseline is not valid JSON: %s', $baselinePath), 0, $exception);
         }
 
+        // User view: choose the terminal output branch for this case.
         if (!is_array($decoded)) {
             throw new RuntimeException(sprintf('Hook baseline is not a JSON object: %s', $baselinePath));
         }
 
+        // User view: missing data becomes a safe terminal output default.
         $rows = $decoded['findings'] ?? [];
+        // User view: choose the terminal output branch for this case.
         if (!is_array($rows)) {
             throw new RuntimeException(sprintf('Hook baseline findings must be an array: %s', $baselinePath));
         }
 
         $identities = [];
+        // User view: add each item that can appear in terminal output.
         foreach ($rows as $row) {
+            // User view: choose the terminal output branch for this case.
             if (!is_array($row)) {
                 continue;
             }
 
+            // User view: missing data becomes a safe terminal output default.
             $identity = $row['stableIdentity'] ?? null;
+            // User view: choose the terminal output branch for this case.
+            // User view: an empty value becomes a clear terminal output fallback.
             if (is_string($identity) && $identity !== '') {
                 $identities[$identity] = true;
             }
@@ -533,6 +605,8 @@ final class HookCommand extends Command
     /**
      * Analyse a git base ref and build hook stable identities from its findings.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string         $projectRoot          - Project root.
      * @param string         $baseRef              - Git base ref.
      * @param list<string>   $paths                - Paths to analyse in the base snapshot.
@@ -554,6 +628,8 @@ final class HookCommand extends Command
         try {
             $snapshotRoot  = $snapshot->create($projectRoot, $baseRef, $paths);
             $snapshotPaths = (new AnalysisFindingSupport())->existingSnapshotPaths($snapshotRoot, $paths);
+            // User view: choose the terminal output branch for this case.
+            // User view: an empty value becomes a clear terminal output fallback.
             if ($snapshotPaths === []) {
                 return [];
             }
@@ -568,12 +644,15 @@ final class HookCommand extends Command
             );
 
             $identities = [];
+            // User view: add each item that can appear in terminal output.
             foreach (HookFindingIdentity::forFindings($analysis['findings']) as $identity) {
                 $identities[$identity] = true;
             }
 
             return $identities;
         } finally {
+            // User view: choose the terminal output branch for this case.
+            // User view: missing data becomes the expected terminal output state.
             if ($snapshotRoot !== null) {
                 $snapshot->remove($snapshotRoot);
             }
@@ -583,6 +662,8 @@ final class HookCommand extends Command
     /**
      * Resolve the git ref used for new-only filtering from diff/since flags.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface $input - Console input.
      *
      * @return string|null - Base ref, or null when no comparable diff base exists.
@@ -590,11 +671,15 @@ final class HookCommand extends Command
     private function baseRef(InputInterface $input): ?string
     {
         $since = $this->stringOption($input, 'since');
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($since !== null) {
             return $since;
         }
 
         $diffMode = $this->diffMode($input);
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($diffMode === null || $diffMode === '-') {
             return null;
         }
@@ -605,6 +690,8 @@ final class HookCommand extends Command
     /**
      * Build the hook report.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param list<Finding>     $findings        - Findings to render.
      * @param int               $suppressedCount - Hook suppression count.
      * @param list<IgnoredPath>  $ignoredPathRows - Ignored path records.
@@ -624,8 +711,10 @@ final class HookCommand extends Command
     ): array {
         $presenter = new HookFindingPresenter();
         $rows      = [];
+        // User view: add each item that can appear in terminal output.
         foreach ($findings as $finding) {
             $stableIdentity = $identities[spl_object_id($finding)]
+                // User view: missing data becomes a safe terminal output default.
                 ?? HookFindingIdentity::forFinding($finding, HookFindingScope::classify($finding));
             $rows[]         = $presenter->toArray($finding, $stableIdentity);
         }
@@ -656,6 +745,8 @@ final class HookCommand extends Command
     /**
      * Build an empty hook report, usually for an operational/config error before analysis.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param bool        $isConfigSchemaOk - Config status.
      * @param string|null $configError    - Error message.
      *
@@ -686,6 +777,8 @@ final class HookCommand extends Command
     /**
      * Write JSON to the output stream.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param OutputInterface      $output  - Console output.
      * @param array<string, mixed> $payload - Payload to encode.
      *
@@ -701,6 +794,8 @@ final class HookCommand extends Command
     /**
      * Parse changed line ranges.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string $ranges - Comma-separated 1-based line ranges.
      *
      * @return list<ChangedLineRange> - Parsed ranges.
@@ -709,13 +804,17 @@ final class HookCommand extends Command
     {
         $parsed = [];
 
+        // User view: add each item that can appear in terminal output.
         foreach (explode(',', $ranges) as $part) {
             $part = trim($part);
+            // User view: choose the terminal output branch for this case.
+            // User view: an empty value becomes a clear terminal output fallback.
             if ($part === '') {
                 continue;
             }
 
             // Accept a single 1-based line ("8") or an inclusive range ("3-8"); group 2 holds the optional end bound.
+            // User view: choose the terminal output branch for this case.
             if (!preg_match('/^(\d+)(?:-(\d+))?$/', $part, $matches)) {
                 throw new DiffException(sprintf('Invalid --changed-ranges value "%s". Use ranges like "3-3,8-10".', $ranges));
             }
@@ -723,6 +822,7 @@ final class HookCommand extends Command
             $startLine = (int)$matches[1];
             $endLine   = isset($matches[2]) ? (int)$matches[2] : $startLine;
 
+            // User view: choose the terminal output branch for this case.
             if ($startLine < 1 || $endLine < $startLine) {
                 throw new DiffException(sprintf('Invalid --changed-ranges value "%s". Use ranges like "3-3,8-10".', $ranges));
             }
@@ -730,6 +830,8 @@ final class HookCommand extends Command
             $parsed[] = new ChangedLineRange($startLine, $endLine);
         }
 
+        // User view: choose the terminal output branch for this case.
+        // User view: an empty value becomes a clear terminal output fallback.
         if ($parsed === []) {
             throw new DiffException('--changed-ranges requires at least one range like "3-3,8-10".');
         }
@@ -740,6 +842,8 @@ final class HookCommand extends Command
     /**
      * Read positional and repeated file paths.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface $input - Console input.
      *
      * @return list<string> - Requested paths.
@@ -748,6 +852,7 @@ final class HookCommand extends Command
     {
         /** @var list<string> $paths The paths argument is declared variadic, so the console returns a list of strings. */
         $paths = $input->getArgument('paths');
+        // User view: add each item that can appear in terminal output.
         foreach ($this->stringListOption($input, 'file') as $filePath) {
             $paths[] = $filePath;
         }
@@ -758,24 +863,30 @@ final class HookCommand extends Command
     /**
      * Parse --diff while distinguishing absent from bare.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface $input - Console input.
      *
      * @return string|null - Diff mode/base ref or null when absent.
      */
     private function diffMode(InputInterface $input): ?string
     {
+        // User view: choose the terminal output branch for this case.
         if (!$input->hasParameterOption('--diff', true)) {
             return null;
         }
 
         $diffOption = $input->getOption('diff');
 
+        // User view: an empty value becomes a clear terminal output fallback.
         return is_string($diffOption) && $diffOption !== '' ? $diffOption : 'working-tree';
     }
 
     /**
      * Read a string option.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface $input - Console input.
      * @param string         $name  - Option name.
      *
@@ -785,12 +896,15 @@ final class HookCommand extends Command
     {
         $rawOption = $input->getOption($name);
 
+        // User view: an empty value becomes a clear terminal output fallback.
         return is_string($rawOption) && $rawOption !== '' ? $rawOption : null;
     }
 
     /**
      * Read a repeatable string option and comma-expand each occurrence.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface $input - Console input.
      * @param string         $name  - Option name.
      *
@@ -799,18 +913,24 @@ final class HookCommand extends Command
     private function stringListOption(InputInterface $input, string $name): array
     {
         $values = $input->getOption($name);
+        // User view: choose the terminal output branch for this case.
         if (!is_array($values)) {
             return [];
         }
 
         $items = [];
+        // User view: add each item that can appear in terminal output.
         foreach ($values as $value) {
+            // User view: choose the terminal output branch for this case.
             if (!is_string($value)) {
                 continue;
             }
 
+            // User view: add each item that can appear in terminal output.
             foreach (explode(',', $value) as $part) {
                 $part = trim($part);
+                // User view: choose the terminal output branch for this case.
+                // User view: an empty value becomes a clear terminal output fallback.
                 if ($part !== '') {
                     $items[] = $part;
                 }

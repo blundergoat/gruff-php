@@ -15,6 +15,8 @@ final readonly class HotspotReporter
     /**
      * Render top file offenders as a hotspot JSON payload.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param AnalysisReport $report - Analysis report to render.
      *
      * @return string - Pretty-printed hotspot JSON document.
@@ -26,9 +28,11 @@ final readonly class HotspotReporter
             'schemaVersion' => AnalysisReport::SCHEMA_VERSION,
             'type' => 'hotspot-map',
             'limitations' => 'v0.1 hotspot ranking uses finding density and available metrics; git churn weighting is not available unless a later history layer provides it.',
+            // User view: missing data becomes the expected report output state.
             'scope' => $score === null ? 'full-project' : $score->scope,
             'hotspots' => array_map(
                 static fn (FileScore $file): array => $file->toArray(),
+                // User view: missing data becomes the expected report output state.
                 $score === null ? [] : $score->topOffenders,
             ),
         ];

@@ -63,6 +63,8 @@ final readonly class RegexCommentRule implements RuleInterface
     /**
      * Describe the regex-comment rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -83,6 +85,8 @@ final readonly class RegexCommentRule implements RuleInterface
     /**
      * Find configured regex matcher calls that lack a preceding comment.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for configured regex functions.
      *
@@ -96,20 +100,26 @@ final readonly class RegexCommentRule implements RuleInterface
         $regexCallNodes = NodeIndex::nodesOf($analysisUnit, FuncCall::class);
         $findings       = [];
 
+        // User view: add each item that can appear in findings list.
         foreach ($regexCallNodes as $regexCallNode) {
             $functionName = $this->functionName($regexCallNode);
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($functionName === null || !in_array($functionName, $functionNames, true)) {
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
             if ($this->hasImmediateCommentAbove($sourceLines, $regexCallNode->getStartLine())) {
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
             if ($this->isInsideStringLabelledMatchArm($regexCallNode)) {
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
             if ($this->hasEnclosingFunctionDocReferencingRegex($regexCallNode, $functionName)) {
                 continue;
             }
@@ -133,6 +143,8 @@ final readonly class RegexCommentRule implements RuleInterface
     }
 
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param list<string> $sourceLines - Whole-file source split on newlines, indexed from zero.
      * @param int          $regexCallLine - 1-based line of the regex call whose preceding line is checked.
      *
@@ -140,7 +152,10 @@ final readonly class RegexCommentRule implements RuleInterface
      */
     private function hasImmediateCommentAbove(array $sourceLines, int $regexCallLine): bool
     {
+        // User view: missing data becomes a safe findings list default.
         $previousLine = $sourceLines[$regexCallLine - 2] ?? null;
+        // User view: choose the findings list branch for this case.
+        // User view: missing data becomes the expected findings list state.
         if ($previousLine === null) {
             // Call sits on the first line, so there is no line above it to carry an explanation.
             return false;
@@ -155,12 +170,15 @@ final readonly class RegexCommentRule implements RuleInterface
     }
 
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param FuncCall $funcCall - Call node whose callee name is being resolved for the configured-function check.
      *
      * @return string|null - Lowercase function name, or null for dynamic calls.
      */
     private function functionName(FuncCall $funcCall): ?string
     {
+        // User view: choose the findings list branch for this case.
         if (!$funcCall->name instanceof Name) {
             // A variable or expression callee has no static name to compare against the configured list.
             return null;
@@ -171,6 +189,8 @@ final readonly class RegexCommentRule implements RuleInterface
     }
 
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Node $node - Regex call node; the walk starts here and climbs parents to find its enclosing callable.
      *
      * @return string|null - Function or method symbol containing the regex call.
@@ -180,6 +200,7 @@ final readonly class RegexCommentRule implements RuleInterface
         $parent = $node->getAttribute('parent');
 
         while ($parent instanceof Node) {
+            // User view: choose the findings list branch for this case.
             if ($parent instanceof ClassMethod || $parent instanceof Function_) {
                 // First enclosing callable found; its resolved symbol names the finding's location for the reader.
                 return CyclomaticComplexityRule::resolveSymbol($parent);
@@ -197,6 +218,8 @@ final readonly class RegexCommentRule implements RuleInterface
      * label. The string literal already acts as the human-readable explanation, so per-call comments
      * would duplicate it. Requires at least one literal-string arm condition reachable from the call.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param FuncCall $regexCallNode - Regex call under inspection; its ancestor match arms are scanned for a label.
      *
      * @return bool - True when the call sits inside a string-labelled match arm.
@@ -206,8 +229,12 @@ final readonly class RegexCommentRule implements RuleInterface
         $parent = $regexCallNode->getAttribute('parent');
 
         while ($parent instanceof Node) {
+            // User view: choose the findings list branch for this case.
             if ($parent instanceof MatchArm) {
+                // User view: add each item that can appear in findings list.
+                // User view: missing data becomes a safe findings list default.
                 foreach ($parent->conds ?? [] as $condition) {
+                    // User view: choose the findings list branch for this case.
                     if ($this->containsRegexCall($condition, $regexCallNode) && $parent->body instanceof Scalar\String_) {
                         // The arm owning this call yields a string-literal label, which already names the regex.
                         return true;
@@ -226,6 +253,8 @@ final readonly class RegexCommentRule implements RuleInterface
      * Determine whether a node subtree contains the target regex call. Used to confirm the
      * surrounding match-arm condition actually owns the call we're about to emit a finding for.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Node     $condition - Match-arm condition subtree to search for the target call.
      * @param FuncCall $regexCallNode - Exact call node being matched by identity, not by structural equality.
      *
@@ -233,6 +262,7 @@ final readonly class RegexCommentRule implements RuleInterface
      */
     private function containsRegexCall(Node $condition, FuncCall $regexCallNode): bool
     {
+        // User view: choose the findings list branch for this case.
         if ($condition === $regexCallNode) {
             // The condition is the call itself, so no subtree walk is needed to confirm ownership.
             return true;
@@ -252,6 +282,8 @@ final readonly class RegexCommentRule implements RuleInterface
      * wording. `match` was previously included but proved too broad — see the FUNCTION_DOC_KEYWORDS
      * docblock for the rationale.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param FuncCall $regexCallNode - Regex call whose nearest enclosing callable docblock is examined.
      * @param string   $functionName - Lowercased call name, added as a keyword so a doc naming it counts as coverage.
      *
@@ -262,8 +294,11 @@ final readonly class RegexCommentRule implements RuleInterface
         $parent = $regexCallNode->getAttribute('parent');
 
         while ($parent instanceof Node) {
+            // User view: choose the findings list branch for this case.
             if ($parent instanceof ClassMethod || $parent instanceof Function_) {
                 $docComment = $parent->getDocComment();
+                // User view: choose the findings list branch for this case.
+                // User view: missing data becomes the expected findings list state.
                 if ($docComment === null) {
                     // The nearest callable has no docblock at all, so it cannot satisfy the exemption.
                     return false;
@@ -271,7 +306,9 @@ final readonly class RegexCommentRule implements RuleInterface
 
                 $docText  = strtolower($docComment->getText());
                 $keywords = array_merge(self::FUNCTION_DOC_KEYWORDS, [$functionName]);
+                // User view: add each item that can appear in findings list.
                 foreach ($keywords as $keyword) {
+                    // User view: choose the findings list branch for this case.
                     if (str_contains($docText, $keyword)) {
                         // Docblock mentions a regex keyword or the call name, so the per-call comment is redundant.
                         return true;
@@ -290,6 +327,8 @@ final readonly class RegexCommentRule implements RuleInterface
     }
 
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param list<string> $functionNames - Configured regex function names.
      *
      * @return list<string> - Lowercase regex function names.

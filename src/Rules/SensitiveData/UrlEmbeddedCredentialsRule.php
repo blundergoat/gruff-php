@@ -28,6 +28,8 @@ final readonly class UrlEmbeddedCredentialsRule implements SourceTextRuleInterfa
     /**
      * Describe the URL-embedded-credentials rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -47,6 +49,8 @@ final readonly class UrlEmbeddedCredentialsRule implements SourceTextRuleInterfa
     /**
      * Find http(s) URLs that embed a password credential.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -55,6 +59,7 @@ final readonly class UrlEmbeddedCredentialsRule implements SourceTextRuleInterfa
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         // Fast bail: needs https?://user:pass@ before scanning.
+        // User view: choose the findings list branch for this case.
         if (preg_match('#https?://[^:\s/@]+:[^@\s"\']+@#i', $analysisUnit->source) !== 1) {
             // Without the credential delimiter shape, no URL credential can be present.
             return [];
@@ -69,18 +74,22 @@ final readonly class UrlEmbeddedCredentialsRule implements SourceTextRuleInterfa
 
         $findings      = [];
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
+        // User view: add each item that can appear in findings list.
         foreach ($matches[0] as $index => $match) {
             [$credentialUrl, $offset] = $match;
+            // User view: choose the findings list branch for this case.
             if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
                 continue;
             }
 
             $password = $matches['password'][$index][0];
+            // User view: choose the findings list branch for this case.
             if (SecretScannerHelper::isLikelyDummyValue($password)) {
                 continue;
             }
 
             $preview = preg_replace('#:' . preg_quote($password, '#') . '@#', ':<redacted:' . strlen($password) . ' chars>@', $credentialUrl);
+            // User view: choose the findings list branch for this case.
             if (!is_string($preview)) {
                 $preview = '<redacted URL credential>';
             }

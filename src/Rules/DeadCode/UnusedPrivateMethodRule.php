@@ -45,6 +45,8 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     /**
      * Describe the unused private method rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - id, name, pillar, tier, and the default Warning severity callers apply to each finding
      */
     public function definition(): RuleDefinition
@@ -64,6 +66,8 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     /**
      * Find private methods that are not referenced inside their class-like scope.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -77,16 +81,20 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
 
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach ($classLikes as $classLike) {
             /** @var Class_|Trait_|Enum_ $classLike NodeIndex query is constrained to class-like classes. */
             $privateMethods = $this->privateMethods($classLike);
 
+            // User view: choose the findings list branch for this case.
+            // User view: an empty value becomes a clear findings list fallback.
             if ($privateMethods === []) {
                 continue;
             }
 
             // Computed same-class dispatch may reach any private method here, so telling the user to
             // delete one would be unsafe advice; accepted trade-off: skip this whole class-like.
+            // User view: choose the findings list branch for this case.
             if ($this->hasUnresolvableDynamicDispatch($nodeFinder, $classLike)) {
                 continue;
             }
@@ -110,6 +118,8 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     /**
      * Collect private methods declared on a class-like node.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Class_|Trait_|Enum_ $classLike - Class-like declaration whose private methods are collected.
      *
      * @return array<string, Stmt\ClassMethod> - candidate private declarations keyed by method name; empty when the class-like declares none
@@ -118,12 +128,15 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     {
         $privateMethods = [];
 
+        // User view: add each item that can appear in findings list.
         foreach ($classLike->stmts as $stmt) {
+            // User view: choose the findings list branch for this case.
             if (!$stmt instanceof Stmt\ClassMethod || !$stmt->isPrivate()) {
                 continue;
             }
 
             $name = $stmt->name->toString();
+            // User view: choose the findings list branch for this case.
             if (!in_array($name, self::MAGIC_METHODS, true)) {
                 $privateMethods[$name] = $stmt;
             }
@@ -135,6 +148,8 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     /**
      * Collect private method calls made inside a class-like node.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param NodeFinder          $nodeFinder - Reused tree walker that enumerates every node under the class-like body.
      * @param Class_|Trait_|Enum_ $classLike - Class-like declaration whose body is searched for private method calls.
      *
@@ -145,9 +160,13 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
         $calledNames = [];
         $allNodes    = $nodeFinder->find($classLike->stmts, static fn(): bool => true);
 
+        // User view: add each item that can appear in findings list.
         foreach ($allNodes as $node) {
+            // User view: missing data becomes a safe findings list default.
             $name = $this->calledMethodName($node) ?? $this->callableArrayName($node, $classLike);
 
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($name !== null) {
                 $calledNames[$name] = true;
             }
@@ -159,36 +178,44 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     /**
      * Extract a private method name from `$this` or self/static calls.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Node $node - Arbitrary node from the class-like body; only `$this`/self/static method calls yield a name.
      *
      * @return string|null - method name from a `$this->`/self/static call, or null when no such call shape matches
      */
     private function calledMethodName(Node $node): ?string
     {
+        // User view: choose the findings list branch for this case.
         if ($node instanceof Expr\MethodCall
             && $node->var instanceof Expr\Variable
             && $node->var->name === 'this'
         ) {
+            // User view: choose the findings list branch for this case.
             if ($node->name instanceof Node\Identifier) {
                 // A literal `$this->name()` call counts as a use of that private method.
                 return $node->name->toString();
             }
 
+            // User view: choose the findings list branch for this case.
             if ($node->name instanceof Node\Scalar\String_) {
                 // `$this->{'name'}()` resolves exactly like the literal call, so count it precisely.
                 return $node->name->value;
             }
         }
 
+        // User view: choose the findings list branch for this case.
         if ($node instanceof Expr\StaticCall
             && ($node->class instanceof Node\Name)
             && in_array($node->class->toString(), ['self', 'static'], true)
         ) {
+            // User view: choose the findings list branch for this case.
             if ($node->name instanceof Node\Identifier) {
                 // A `self::name()` or `static::name()` call counts as a use of that private method.
                 return $node->name->toString();
             }
 
+            // User view: choose the findings list branch for this case.
             if ($node->name instanceof Node\Scalar\String_) {
                 // `self::{'name'}()` resolves exactly like the literal call, so count it precisely.
                 return $node->name->value;
@@ -201,6 +228,8 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     /**
      * Detect same-class dynamic dispatch whose target name cannot be resolved statically.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param NodeFinder          $nodeFinder - Reused tree walker over the class-like body.
      * @param Class_|Trait_|Enum_ $classLike - Class-like declaration whose body is searched for dynamic dispatch.
      *
@@ -210,8 +239,10 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     private function hasUnresolvableDynamicDispatch(NodeFinder $nodeFinder, Class_|Trait_|Enum_ $classLike): bool
     {
         // Scan the whole class-like body: one computed dispatch anywhere makes every candidate unsafe to report.
+        // User view: add each item that can appear in findings list.
         foreach ($nodeFinder->find($classLike->stmts, static fn(): bool => true) as $node) {
             // A computed instance call on the object itself: the target name is unknowable statically.
+            // User view: choose the findings list branch for this case.
             if ($node instanceof Expr\MethodCall
                 && $node->var instanceof Expr\Variable
                 && $node->var->name === 'this'
@@ -222,6 +253,7 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
             }
 
             // The static-call twin of the same shape, reached through self or static.
+            // User view: choose the findings list branch for this case.
             if ($node instanceof Expr\StaticCall
                 && $node->class instanceof Node\Name
                 && in_array($node->class->toString(), ['self', 'static'], true)
@@ -232,6 +264,7 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
             }
 
             // A same-class callable array whose method slot is computed can invoke any private method here.
+            // User view: choose the findings list branch for this case.
             if ($node instanceof Expr\Array_
                 && count($node->items) === 2
                 && !$node->items[1]->value instanceof Node\Scalar\String_
@@ -247,6 +280,8 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     /**
      * Extract a method name from callable-array syntax.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Node                $node - Arbitrary node from the class-like body; only callable arrays yield a name.
      * @param Class_|Trait_|Enum_ $classLike - Declaring scope used to match `ClassName::class` callable targets.
      *
@@ -254,11 +289,13 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
      */
     private function callableArrayName(Node $node, Class_|Trait_|Enum_ $classLike): ?string
     {
+        // User view: choose the findings list branch for this case.
         if (!$node instanceof Expr\Array_) {
             // Only array literals can spell callable-array syntax; nothing else qualifies.
             return null;
         }
 
+        // User view: choose the findings list branch for this case.
         if ($this->isCallableReference($node, $classLike)) {
             return $this->extractCallableName($node);
         }
@@ -269,6 +306,8 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     /**
      * Build findings for unused methods in the dead-code rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit                    $analysisUnit - Supplies the display path stamped on each finding; the
      *                                                         line span comes from each method node, not this unit.
      * @param RuleDefinition                  $definition - Supplies the rule id, severity, pillar, and tier copied into every finding.
@@ -288,7 +327,9 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
         $findings  = [];
         $className = $this->resolveClassName($classLike);
 
+        // User view: add each item that can appear in findings list.
         foreach ($privateMethods as $name => $classMethod) {
+            // User view: choose the findings list branch for this case.
             if (isset($calledNames[$name])) {
                 continue;
             }
@@ -315,6 +356,8 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     /**
      * Check whether an expression is a same-class callable-array reference.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Expr                $expr - Candidate expression to test for the callable pair.
      * @param Class_|Trait_|Enum_ $classLike - Declaring scope used to match explicit class-name callables.
      *
@@ -322,11 +365,13 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
      */
     private function isCallableReference(Expr $expr, Class_|Trait_|Enum_ $classLike): bool
     {
+        // User view: choose the findings list branch for this case.
         if (!$expr instanceof Expr\Array_ || count($expr->items) !== 2) {
             // Only a two-element array can be the `[$this, 'method']` pair; anything else is not a reference.
             return false;
         }
 
+        // User view: choose the findings list branch for this case.
         if (!$expr->items[1]->value instanceof Node\Scalar\String_) {
             return false;
         }
@@ -337,6 +382,8 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     /**
      * Check whether a callable-array first element targets the declaring class.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Expr                $first - First element of a two-item array literal.
      * @param Class_|Trait_|Enum_ $classLike - Declaring scope used to match explicit class-name callables.
      *
@@ -346,16 +393,19 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     private function isSameClassCallableTarget(Expr $first, Class_|Trait_|Enum_ $classLike): bool
     {
         // The object itself is always the defining class.
+        // User view: choose the findings list branch for this case.
         if ($first instanceof Expr\Variable && $first->name === 'this') {
             return true;
         }
 
         // `[__CLASS__, 'method']` names the defining class, the same as `[self::class, 'method']`.
+        // User view: choose the findings list branch for this case.
         if ($first instanceof Node\Scalar\MagicConst\Class_) {
             return true;
         }
 
         // Beyond those two shapes, only a `SomeName::class` constant can still target this class.
+        // User view: choose the findings list branch for this case.
         if (!$first instanceof Expr\ClassConstFetch
             || !$first->name instanceof Node\Identifier
             || strtolower($first->name->toString()) !== 'class'
@@ -364,12 +414,14 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
         }
 
         // Dynamic class expressions carry no name to compare against.
+        // User view: choose the findings list branch for this case.
         if (!$first->class instanceof Node\Name) {
             return false;
         }
 
         $shortName = strtolower($first->class->getLast());
         // self::class and static::class resolve to the defining class by definition.
+        // User view: choose the findings list branch for this case.
         if ($shortName === 'self' || $shortName === 'static') {
             return true;
         }
@@ -381,6 +433,8 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     /**
      * Resolve a class reference to its fully-qualified name.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Node\Name $name - Class name node from a callable-array target.
      *
      * @return string - Resolved fully-qualified name, or the written name when no resolution is attached.
@@ -395,12 +449,15 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     /**
      * Resolve the fully-qualified name of a class-like declaration.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Class_|Trait_|Enum_ $classLike - Declaring scope whose qualified name anchors callable comparisons.
      *
      * @return string - Fully-qualified declaration name, or the short name when no namespace is resolved.
      */
     private function declaringClassName(Class_|Trait_|Enum_ $classLike): string
     {
+        // User view: missing data becomes a safe findings list default.
         $namespacedName = $classLike->namespacedName ?? null;
 
         return $namespacedName instanceof Node\Name ? $namespacedName->toString() : $this->resolveClassName($classLike);
@@ -409,12 +466,15 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     /**
      * Extract the method name from a supported callable-array expression.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Expr $expr - Callable-array value already vetted by isCallableReference for the `[$this, 'method']` shape.
      *
      * @return string|null - the string in the array's second slot, or null when that slot is not a string literal
      */
     private function extractCallableName(Expr $expr): ?string
     {
+        // User view: choose the findings list branch for this case.
         if (!$expr instanceof Expr\Array_ || count($expr->items) !== 2) {
             // Guard against callers that skipped the shape check; only a two-element array carries a name.
             return null;
@@ -428,16 +488,21 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     /**
      * Resolve a display name for a class-like node.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Class_|Trait_|Enum_ $node - Class-like declaration whose display symbol is needed for finding text.
      *
      * @return string - declared class/trait/enum name, or an `@anonymous`/`unknown@line` placeholder when unnamed
      */
     private function resolveClassName(Node $node): string
     {
+        // User view: choose the findings list branch for this case.
         if ($node instanceof Class_) {
+            // User view: missing data becomes a safe findings list default.
             return $node->name?->toString() ?? 'class@anonymous';
         }
 
+        // User view: missing data becomes a safe findings list default.
         return $node->name?->toString() ?? sprintf('unknown@%d', $node->getStartLine());
     }
 }

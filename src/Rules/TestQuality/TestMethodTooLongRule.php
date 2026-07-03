@@ -27,6 +27,8 @@ final readonly class TestMethodTooLongRule implements RuleInterface
     /**
      * Describe the test method too long rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - immutable metadata, default Advisory severity, and the maxMeaningfulLines threshold callers tune via config
      */
     public function definition(): RuleDefinition
@@ -47,6 +49,8 @@ final readonly class TestMethodTooLongRule implements RuleInterface
     /**
      * Find test methods whose line count exceeds configured thresholds.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -64,13 +68,17 @@ final readonly class TestMethodTooLongRule implements RuleInterface
         $sourceLines = explode("\n", $analysisUnit->source);
         $findings    = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($scope->endLine === null) {
                 continue;
             }
 
             $count = $this->countMeaningfulLines($sourceLines, $scope->line, $scope->endLine);
 
+            // User view: choose the findings list branch for this case.
             if ($count <= $threshold) {
                 continue;
             }
@@ -102,6 +110,8 @@ final readonly class TestMethodTooLongRule implements RuleInterface
     /**
      * Count the meaningful body lines of a test method, skipping blanks, comments, and lone brackets.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param list<string> $sourceLines - All source lines of the unit, indexed from zero (line N is index N-1).
      * @param int          $startLine - First source line of the test scope, inclusive (1-based).
      * @param int          $endLine - Last source line of the test scope, inclusive (1-based).
@@ -114,24 +124,30 @@ final readonly class TestMethodTooLongRule implements RuleInterface
 
         for ($lineNumber = $startLine; $lineNumber <= $endLine; $lineNumber++) {
             $index = $lineNumber - 1;
+            // User view: choose the findings list branch for this case.
             if (!isset($sourceLines[$index])) {
                 continue;
             }
 
             $line = trim($sourceLines[$index]);
 
+            // User view: choose the findings list branch for this case.
+            // User view: an empty value becomes a clear findings list fallback.
             if ($line === '') {
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
             if (in_array($line, ['{', '}', '},', ');', '];', '),', ',', ');'], true)) {
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
             if (str_starts_with($line, '//') || str_starts_with($line, '#')) {
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
             if (str_starts_with($line, '*') || str_starts_with($line, '/*') || str_starts_with($line, '*/')) {
                 continue;
             }
@@ -145,6 +161,8 @@ final readonly class TestMethodTooLongRule implements RuleInterface
     /**
      * Resolve a path-specific threshold override when configured.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string                                                        $displayPath - File path matched against each override glob;
      *                                                                                        backslashes normalised to slashes first.
      * @param int                                                           $defaultThreshold - Threshold applied when no override pattern matches this
@@ -155,21 +173,26 @@ final readonly class TestMethodTooLongRule implements RuleInterface
      */
     private function thresholdForPath(string $displayPath, int $defaultThreshold, int|float|bool|string|array $pathOverrides): int
     {
+        // User view: choose the findings list branch for this case.
         if (!is_array($pathOverrides)) {
             // Malformed config (not a map): ignore it and apply the default rather than throwing.
             return $defaultThreshold;
         }
 
         $normalizedPath = str_replace('\\', '/', $displayPath);
+        // User view: add each item that can appear in findings list.
         foreach ($pathOverrides as $pattern => $threshold) {
+            // User view: choose the findings list branch for this case.
             if (is_int($pattern) && is_string($threshold)) {
                 [$pattern, $threshold] = $this->parsePathOverride($threshold);
             }
 
+            // User view: choose the findings list branch for this case.
             if (!is_string($pattern) || (!is_int($threshold) && !is_float($threshold))) {
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
             if (fnmatch($pattern, $normalizedPath, FNM_NOESCAPE)) {
                 // First matching glob wins; floor at 1 so a zero or negative override can never disable the rule.
                 return max(1, (int)$threshold);
@@ -182,6 +205,8 @@ final readonly class TestMethodTooLongRule implements RuleInterface
     /**
      * Parse a compact `glob=threshold` override entry from config.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $pathOverride - Single override in `glob=threshold` form, e.g. `tests/Integration/*=60`.
      *
      * @return array{0: string, 1: int|float|string} - glob pattern and its parsed numeric threshold; both empty strings when the entry is not a
@@ -190,6 +215,7 @@ final readonly class TestMethodTooLongRule implements RuleInterface
     private function parsePathOverride(string $pathOverride): array
     {
         $parts = explode('=', $pathOverride, 2);
+        // User view: choose the findings list branch for this case.
         if (count($parts) !== 2 || !is_numeric($parts[1])) {
             // Not a parseable `glob=number` entry: return empty parts so the caller skips it.
             return ['', ''];

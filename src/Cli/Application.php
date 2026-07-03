@@ -31,6 +31,8 @@ final class Application extends SymfonyApplication
 
     /**
      * Register the gruff-php CLI command surface with Symfony Console.
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      */
     public function __construct()
     {

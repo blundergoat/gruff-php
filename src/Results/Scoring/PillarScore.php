@@ -12,6 +12,8 @@ final readonly class PillarScore
     /**
      * Capture score and finding totals for one quality pillar.
      *
+      * User flow: Turns findings into score and trend signals users track.
+      *
      * @param string     $pillar - Pillar identifier represented by this score.
      * @param bool       $applicable - Whether the pillar had any applicable inputs.
      * @param Grade|null $grade - Letter grade and numeric score, when applicable.
@@ -34,6 +36,8 @@ final readonly class PillarScore
     }
 
     /**
+      * User flow: Turns findings into score and trend signals users track.
+      *
      * @return array{
      *     pillar: string,
      *     applicable: bool,

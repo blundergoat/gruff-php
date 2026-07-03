@@ -37,6 +37,8 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     /**
      * List the regex patterns enforced by this rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return list<array{name: string, pattern: string}> - one entry per PII family, each a detector name paired with its match regex; order is the
      *                          scan order
      */
@@ -54,6 +56,8 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     /**
      * Describe the PII test fixture rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - id, name, pillar, tier, and the warning/medium defaults a caller applies unless overridden
      */
     public function definition(): RuleDefinition
@@ -82,6 +86,8 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     /**
      * Find realistic PII-like values inside test fixture files.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -90,6 +96,7 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
+        // User view: choose the findings list branch for this case.
         if (!SecretScannerHelper::isTestPath($analysisUnit->file->displayPath)) {
             // This rule only governs fixtures, so production paths produce nothing.
             return [];
@@ -97,15 +104,19 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
 
         $findings      = [];
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
+        // User view: add each item that can appear in findings list.
         foreach ($this->patterns() as $definition) {
             preg_match_all($definition['pattern'], $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
+            // User view: add each item that can appear in findings list.
             foreach ($matches[0] as $match) {
                 [$candidateFixture, $offset] = $match;
+                // User view: choose the findings list branch for this case.
                 if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
                     continue;
                 }
 
+                // User view: choose the findings list branch for this case.
                 if ($this->isSuppressedMatch($definition['name'], $candidateFixture, $analysisUnit->source, $offset)) {
                     continue;
                 }
@@ -132,6 +143,8 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     /**
      * Decide whether a PII match falls under one of the rule's built-in allowances.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $detectorName - Detector family of the match (email, phone, or address); gates the
      *                             detector-specific allowances.
      * @param string $candidateFixture - Matched fixture text under test.
@@ -143,10 +156,12 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
      */
     private function isSuppressedMatch(string $detectorName, string $candidateFixture, string $source, int $offset): bool
     {
+        // User view: choose the findings list branch for this case.
         if ($this->isAllowedExample($candidateFixture)) {
             return true;
         }
 
+        // User view: choose the findings list branch for this case.
         if ($detectorName === 'email') {
             // Maintainer attribution lines and undeliverable reserved-zone domains are not fixture PII.
             return $this->isAttributionEmail($source, $offset) || $this->isReservedDomainEmail($candidateFixture);
@@ -159,6 +174,8 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     /**
      * Allow clearly synthetic example values.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $candidateFixture - Matched fixture text, lower-cased here before substring checks.
      *
      * @return bool - true to suppress the match as a known-synthetic example (reserved domain or 555-010x phone block); false lets it be flagged
@@ -178,6 +195,8 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     /**
      * Ignore email addresses that appear in attribution or copyright lines.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $source - Full unit source, used to recover the physical line around the match.
      * @param int    $offset - Byte offset of the email match within the source.
      *
@@ -195,6 +214,8 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     /**
      * Allow email addresses whose domain ends in a reserved special-use suffix.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $candidateFixture - Matched email text; only the domain part after the last `@` is examined.
      *
      * @return bool - true when the domain ends in a reserved suffix (.local, .test, .invalid, .localhost, .example), so the address is
@@ -203,6 +224,7 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     private function isReservedDomainEmail(string $candidateFixture): bool
     {
         $atPosition = strrpos($candidateFixture, '@');
+        // User view: choose the findings list branch for this case.
         if ($atPosition === false) {
             // Without an @ there is no domain to classify, so the match stays eligible for flagging.
             return false;
@@ -210,7 +232,9 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
 
         $domain = strtolower(substr($candidateFixture, $atPosition + 1));
 
+        // User view: add each item that can appear in findings list.
         foreach (self::RESERVED_DOMAIN_SUFFIXES as $reservedSuffix) {
+            // User view: choose the findings list branch for this case.
             if (str_ends_with($domain, $reservedSuffix)) {
                 // The suffix's leading dot enforces a label boundary, so only true reserved-zone domains pass.
                 return true;
@@ -224,6 +248,8 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     /**
      * Allow addresses whose matched tokens or surrounding line carry a synthetic marker word.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $source - Full unit source, used to recover the physical line around the match.
      * @param int    $offset - Byte offset of the address match within the source.
      * @param string $candidateFixture - Matched address text, scanned alongside the line.
@@ -246,6 +272,8 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     /**
      * Recover the lower-cased physical line that contains a byte offset.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $source - Full unit source being scanned.
      * @param int    $offset - Byte offset inside the source.
      *

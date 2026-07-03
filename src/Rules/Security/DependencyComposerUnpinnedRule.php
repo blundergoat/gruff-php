@@ -34,6 +34,8 @@ final class DependencyComposerUnpinnedRule implements SourceTextRuleInterface
     /**
      * Describe the unpinned Composer constraint rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -52,6 +54,8 @@ final class DependencyComposerUnpinnedRule implements SourceTextRuleInterface
     /**
      * Find `require`/`require-dev` constraints that are unbounded or wildcarded.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -59,24 +63,31 @@ final class DependencyComposerUnpinnedRule implements SourceTextRuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
+        // User view: choose the findings list branch for this case.
         if (!ComposerManifest::isManifest($analysisUnit->file->displayPath)) {
             // This rule only applies to composer.json; every other file yields no findings.
             return [];
         }
 
         $manifest = ComposerManifest::decode($analysisUnit->source);
+        // User view: choose the findings list branch for this case.
+        // User view: missing data becomes the expected findings list state.
         if ($manifest === null) {
             // Unparseable manifest means there are no declared constraints to inspect.
             return [];
         }
 
         $findings = [];
+        // User view: add each item that can appear in findings list.
         foreach (self::REQUIRE_SECTIONS as $section) {
+            // User view: choose the findings list branch for this case.
             if (!isset($manifest[$section]) || !is_array($manifest[$section])) {
                 continue;
             }
 
+            // User view: add each item that can appear in findings list.
             foreach ($manifest[$section] as $package => $constraint) {
+                // User view: choose the findings list branch for this case.
                 if (!is_string($package) || !is_string($constraint) || !$this->isUnpinned($constraint)) {
                     continue;
                 }
@@ -105,6 +116,8 @@ final class DependencyComposerUnpinnedRule implements SourceTextRuleInterface
     /**
      * Decide whether a version constraint is unpinned (wildcard, branch, or unbounded).
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $constraint - Raw Composer version constraint.
      *
      * @return bool - True when the constraint allows unbounded or non-reproducible upgrades.
@@ -113,7 +126,9 @@ final class DependencyComposerUnpinnedRule implements SourceTextRuleInterface
     {
         $normalized = strtolower(trim($constraint));
 
+        // User view: add each item that can appear in findings list.
         foreach (preg_split('/\s*\|\|?\s*/', $normalized) ?: [$normalized] as $alternative) {
+            // User view: choose the findings list branch for this case.
             if ($this->isUnpinnedAlternative($alternative)) {
                 return true;
             }
@@ -125,6 +140,8 @@ final class DependencyComposerUnpinnedRule implements SourceTextRuleInterface
     /**
      * Decide whether a single Composer constraint alternative is unpinned.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $constraint - One OR-separated Composer version alternative.
      *
      * @return bool - True when the alternative is wildcarded, branch-based, or missing an upper bound.
@@ -133,15 +150,19 @@ final class DependencyComposerUnpinnedRule implements SourceTextRuleInterface
     {
         $normalized = trim($constraint);
 
+        // User view: choose the findings list branch for this case.
+        // User view: an empty value becomes a clear findings list fallback.
         if ($normalized === '*' || $normalized === '') {
             // A wildcard or empty constraint accepts any published version, so the install is non-reproducible.
             return true;
         }
 
+        // User view: choose the findings list branch for this case.
         if (str_contains($normalized, '*')) {
             return true;
         }
 
+        // User view: choose the findings list branch for this case.
         if (str_starts_with($normalized, 'dev-') || str_ends_with($normalized, '@dev')) {
             // A dev- branch tracks a moving HEAD, not a release, so resolved code can change silently.
             return true;
@@ -149,6 +170,7 @@ final class DependencyComposerUnpinnedRule implements SourceTextRuleInterface
 
         // An open lower bound with no upper bound (">=1.0" / ">1.0") is non-reproducible;
         // a bounded range ("<2.0" present) or caret/tilde operator is considered pinned.
+        // User view: choose the findings list branch for this case.
         if ((str_contains($normalized, '>=') || str_contains($normalized, '>')) && !str_contains($normalized, '<')) {
             // Future major releases satisfy this constraint, so an upgrade can pull breaking or unvetted code.
             return true;

@@ -53,6 +53,8 @@ final class VariableIncludeRule implements RuleInterface
     /**
      * Describe the variable include security rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -89,6 +91,8 @@ final class VariableIncludeRule implements RuleInterface
     /**
      * Find include and require expressions using dynamic paths.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -101,6 +105,7 @@ final class VariableIncludeRule implements RuleInterface
         $dynamicConstantNames        = $settings->stringListOption('dynamicPathConstants');
         $findings                    = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\Include_::class) as $include) {
             $isFixedPath = $this->isFixedIncludeExpression(
                 expression:                  $include->expr,
@@ -109,6 +114,7 @@ final class VariableIncludeRule implements RuleInterface
                 dynamicConstantNames:        $dynamicConstantNames,
                 canFollowAssignments:        true,
             );
+            // User view: choose the findings list branch for this case.
             if ($isFixedPath) {
                 continue;
             }
@@ -132,6 +138,8 @@ final class VariableIncludeRule implements RuleInterface
     /**
      * Treat literal paths and paths derived only from compile-time constants as fixed bootstrap includes.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Expr         $expression - Include/require path expression, recursed into for concatenation and dirname() wrappers.
      * @param AnalysisUnit $analysisUnit - Unit owning the include, used for same-scope assignment propagation.
      * @param bool         $shouldTreatConstantsAsFixed - Whether ALL-CAPS global constants count as fixed segments.
@@ -147,16 +155,19 @@ final class VariableIncludeRule implements RuleInterface
         array        $dynamicConstantNames,
         bool         $canFollowAssignments,
     ): bool {
+        // User view: choose the findings list branch for this case.
         if (SecurityNodeHelper::isStringLiteral($expression) || $expression instanceof Scalar\MagicConst\Dir || $expression instanceof Scalar\MagicConst\File) {
             // String literals and __DIR__/__FILE__ resolve at compile time, so the path is fixed and attacker-proof.
             return true;
         }
 
+        // User view: choose the findings list branch for this case.
         if ($expression instanceof Expr\ConstFetch) {
             // ALL-CAPS deployment constants (ABSPATH, JETPACK_DIR, ...) are defined once at bootstrap; anything else stays dynamic.
             return $shouldTreatConstantsAsFixed && $this->isFixedGlobalConstant($expression, $dynamicConstantNames);
         }
 
+        // User view: choose the findings list branch for this case.
         if ($expression instanceof Expr\BinaryOp\Concat) {
             // A concatenation is only as fixed as its parts, so both sides must independently resolve to fixed paths.
             return $this->isFixedIncludeExpression(
@@ -175,6 +186,7 @@ final class VariableIncludeRule implements RuleInterface
                    );
         }
 
+        // User view: choose the findings list branch for this case.
         if ($expression instanceof Expr\FuncCall && SecurityNodeHelper::globalFunctionName($expression) === 'dirname') {
             return $this->isFixedDirnameCall(
                 call:                        $expression,
@@ -185,6 +197,7 @@ final class VariableIncludeRule implements RuleInterface
             );
         }
 
+        // User view: choose the findings list branch for this case.
         if ($canFollowAssignments && $expression instanceof Expr\Variable) {
             // A local is fixed only when every same-scope assignment to it is itself a provably fixed path.
             return $this->isVariableWithOnlyFixedAssignments($expression, $analysisUnit, $shouldTreatConstantsAsFixed, $dynamicConstantNames);
@@ -197,6 +210,8 @@ final class VariableIncludeRule implements RuleInterface
     /**
      * Decide whether a dirname() wrapper preserves a fixed include path.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Expr\FuncCall $call - dirname() call to inspect.
      * @param AnalysisUnit  $analysisUnit - Unit owning the include, used for same-scope assignment propagation.
      * @param bool          $shouldTreatConstantsAsFixed - Whether ALL-CAPS global constants count as fixed segments.
@@ -220,6 +235,7 @@ final class VariableIncludeRule implements RuleInterface
             dynamicConstantNames:        $dynamicConstantNames,
             canFollowAssignments:        $canFollowAssignments,
         );
+        // User view: choose the findings list branch for this case.
         if (!$isFixedInnerPath) {
             // dirname() of a dynamic path is still dynamic, so the whole expression is not a fixed include.
             return false;
@@ -228,12 +244,15 @@ final class VariableIncludeRule implements RuleInterface
         $levels = SecurityNodeHelper::argumentValue($call->args, 1);
 
         // dirname() stays fixed only when the optional levels arg is omitted or an int literal, never a variable.
+        // User view: missing data becomes the expected findings list state.
         return $levels === null || $levels instanceof Scalar\Int_;
     }
 
     /**
      * Decide whether a bare constant fetch names a fixed deployment-path constant.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Expr\ConstFetch $constant - Constant fetch inside the include path.
      * @param list<string>    $dynamicConstantNames - Constant names configured to stay dynamic.
      *
@@ -242,12 +261,14 @@ final class VariableIncludeRule implements RuleInterface
     private function isFixedGlobalConstant(Expr\ConstFetch $constant, array $dynamicConstantNames): bool
     {
         $parts = $constant->name->getParts();
+        // User view: choose the findings list branch for this case.
         if (count($parts) !== 1) {
             // Namespaced constants are outside the bootstrap define() convention, so stay conservative and flag.
             return false;
         }
 
         $name = $parts[0];
+        // User view: choose the findings list branch for this case.
         if (in_array($name, $dynamicConstantNames, true)) {
             // The project re-listed this constant as dynamic, so it never counts as fixed.
             return false;
@@ -266,6 +287,8 @@ final class VariableIncludeRule implements RuleInterface
      * compound assignment, by-reference use, call argument, foreach binding, global/static declaration,
      * or destructuring) disqualifies the variable because its value can no longer be proven fixed.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Expr\Variable $variable - Variable used as (part of) the include path.
      * @param AnalysisUnit  $analysisUnit - Unit owning the include.
      * @param bool          $shouldTreatConstantsAsFixed - Whether ALL-CAPS global constants count as fixed segments.
@@ -280,24 +303,29 @@ final class VariableIncludeRule implements RuleInterface
         array         $dynamicConstantNames,
     ): bool {
         $name = $variable->name;
+        // User view: choose the findings list branch for this case.
         if (!is_string($name)) {
             // A variable-variable target cannot be traced, so it is never provably fixed.
             return false;
         }
 
         $sinkPosition = $variable->getStartFilePos();
+        // User view: choose the findings list branch for this case.
         if ($sinkPosition < 0) {
             // A missing byte offset means assignments cannot be ordered against the include; stay safe and flag.
             return false;
         }
 
         $scope      = SecurityNodeHelper::enclosingFunctionLike($variable);
+        // User view: missing data becomes a safe findings list default.
         $statements = $scope instanceof FunctionLike ? ($scope->getStmts() ?? []) : $analysisUnit->statements;
+        // User view: choose the findings list branch for this case.
         if ($this->hasUnprovableWrite($name, array_values($statements), $scope, $sinkPosition)) {
             return false;
         }
 
         $hasReachingAssignment = false;
+        // User view: add each item that can appear in findings list.
         foreach ($this->plainAssignmentsTo($name, array_values($statements), $scope) as $assignment) {
             $isFixedAssignment = $this->isFixedIncludeExpression(
                 expression:                  $assignment->expr,
@@ -306,11 +334,13 @@ final class VariableIncludeRule implements RuleInterface
                 dynamicConstantNames:        $dynamicConstantNames,
                 canFollowAssignments:        false,
             );
+            // User view: choose the findings list branch for this case.
             if (!$isFixedAssignment) {
                 // One non-fixed assignment can reach the include (directly or via a loop), so the variable stays dynamic.
                 return false;
             }
 
+            // User view: choose the findings list branch for this case.
             if ($assignment->getStartFilePos() >= 0 && $assignment->getStartFilePos() < $sinkPosition) {
                 $hasReachingAssignment = true;
             }
@@ -323,6 +353,8 @@ final class VariableIncludeRule implements RuleInterface
     /**
      * List plain same-scope assignments to a variable name.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string            $name - Variable name without the leading `$`.
      * @param list<Stmt>        $statements - Statements of the owning scope.
      * @param FunctionLike|null $scope - Owning function-like scope, or null for file scope.
@@ -334,11 +366,14 @@ final class VariableIncludeRule implements RuleInterface
         $assignments = [];
         $nodeFinder  = new NodeFinder();
 
+        // User view: add each item that can appear in findings list.
         foreach ($nodeFinder->find($statements, static fn(Node $candidate): bool => $candidate instanceof Expr\Assign) as $assignment) {
+            // User view: choose the findings list branch for this case.
             if (!$assignment instanceof Expr\Assign || !$assignment->var instanceof Expr\Variable || $assignment->var->name !== $name) {
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
             if (SecurityNodeHelper::enclosingFunctionLike($assignment) !== $scope) {
                 continue;
             }
@@ -352,6 +387,8 @@ final class VariableIncludeRule implements RuleInterface
     /**
      * Detect writes to a variable that defeat the fixed-assignment proof.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string            $name - Variable name without the leading `$`.
      * @param list<Stmt>        $statements - Statements of the owning scope.
      * @param FunctionLike|null $scope - Owning function-like scope, or null for file scope.
@@ -361,6 +398,7 @@ final class VariableIncludeRule implements RuleInterface
      */
     private function hasUnprovableWrite(string $name, array $statements, ?FunctionLike $scope, int $sinkPosition): bool
     {
+        // User view: choose the findings list branch for this case.
         if ($scope instanceof FunctionLike && $this->isParameterName($name, $scope)) {
             // A parameter carries caller-controlled data the assignment walk cannot see, so the variable is unprovable.
             return true;
@@ -378,6 +416,8 @@ final class VariableIncludeRule implements RuleInterface
     /**
      * Check whether a candidate can affect the include expression by source order.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Node $candidate - Candidate write or call node.
      * @param int  $sinkPosition - Byte offset of the include-path variable.
      *
@@ -393,6 +433,8 @@ final class VariableIncludeRule implements RuleInterface
     /**
      * Check whether a name is bound as a parameter of the given scope.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string       $name - Variable name without the leading `$`.
      * @param FunctionLike $scope - Function-like scope owning the include.
      *
@@ -400,7 +442,9 @@ final class VariableIncludeRule implements RuleInterface
      */
     private function isParameterName(string $name, FunctionLike $scope): bool
     {
+        // User view: add each item that can appear in findings list.
         foreach ($scope->getParams() as $parameter) {
+            // User view: choose the findings list branch for this case.
             if ($parameter->var instanceof Expr\Variable && $parameter->var->name === $name) {
                 return true;
             }
@@ -412,6 +456,8 @@ final class VariableIncludeRule implements RuleInterface
     /**
      * Classify a node as a write that defeats the fixed-assignment proof for a variable name.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Node   $candidate - Node to classify.
      * @param string $name - Variable name without the leading `$`.
      *
@@ -420,6 +466,7 @@ final class VariableIncludeRule implements RuleInterface
      */
     private function isUnprovableWriteNode(Node $candidate, string $name): bool
     {
+        // User view: choose the findings list branch for this case.
         if (($candidate instanceof Expr\AssignOp || $candidate instanceof Expr\AssignRef)
             && $candidate->var instanceof Expr\Variable
             && $candidate->var->name === $name
@@ -427,21 +474,26 @@ final class VariableIncludeRule implements RuleInterface
             return true;
         }
 
+        // User view: choose the findings list branch for this case.
         if ($candidate instanceof Expr\FuncCall || $candidate instanceof Expr\MethodCall || $candidate instanceof Expr\StaticCall) {
+            // User view: choose the findings list branch for this case.
             if ($this->doesPassNameAsDirectMutableArgument($candidate, $name)) {
                 return true;
             }
         }
 
+        // User view: choose the findings list branch for this case.
         if ($candidate instanceof Stmt\Foreach_ && ($this->doesBindName($candidate->valueVar, $name) || ($candidate->keyVar instanceof Expr && $this->doesBindName($candidate->keyVar, $name)))) {
             return true;
         }
 
+        // User view: choose the findings list branch for this case.
         if ($candidate instanceof Stmt\Global_ || $candidate instanceof Stmt\Static_) {
             // Global/static declarations splice in cross-scope state the walk cannot order, so the name is unprovable.
             return $this->doesDeclareName($candidate, $name);
         }
 
+        // User view: choose the findings list branch for this case.
         if ($candidate instanceof Node\ClosureUse && $candidate->byRef && $candidate->var->name === $name) {
             // A by-ref capture lets a nested closure rewrite the variable after the walk, so the name is unprovable.
             return true;
@@ -456,6 +508,8 @@ final class VariableIncludeRule implements RuleInterface
     /**
      * Detect calls that hand the include-path local to code that may mutate it before the include.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Call node whose arguments are inspected.
      * @param string                                        $name - Variable name without the leading `$`.
      *
@@ -463,11 +517,14 @@ final class VariableIncludeRule implements RuleInterface
      */
     private function doesPassNameAsDirectMutableArgument(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call, string $name): bool
     {
+        // User view: add each item that can appear in findings list.
         foreach ($call->args as $argument) {
+            // User view: choose the findings list branch for this case.
             if (!$argument instanceof Node\Arg) {
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
             if ($argument->value instanceof Expr\Variable && $argument->value->name === $name) {
                 return $argument->byRef || !$this->isKnownNonMutatingPathFunction($call);
             }
@@ -479,12 +536,15 @@ final class VariableIncludeRule implements RuleInterface
     /**
      * Check whether a direct argument is being read by a known path guard instead of handed to unknown code.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Call node carrying the argument.
      *
      * @return bool - True for global built-ins that inspect path strings without mutating their arguments.
      */
     private function isKnownNonMutatingPathFunction(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
     {
+        // User view: choose the findings list branch for this case.
         if (!$call instanceof Expr\FuncCall) {
             // Method/static calls can be userland code with by-reference parameters, so remain unprovable.
             return false;
@@ -492,12 +552,15 @@ final class VariableIncludeRule implements RuleInterface
 
         $functionName = SecurityNodeHelper::globalFunctionName($call);
 
+        // User view: missing data becomes the expected findings list state.
         return $functionName !== null && isset(self::NON_MUTATING_PATH_FUNCTIONS[$functionName]);
     }
 
     /**
      * Check whether a binding expression (variable, list, or array pattern) binds a name.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Expr   $binding - Foreach value/key var or destructuring target.
      * @param string $name - Variable name without the leading `$`.
      *
@@ -516,6 +579,8 @@ final class VariableIncludeRule implements RuleInterface
     /**
      * Check whether a global or static statement declares a name.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Stmt\Global_|Stmt\Static_ $declaration - Declaration statement to inspect.
      * @param string                    $name - Variable name without the leading `$`.
      *
@@ -523,8 +588,11 @@ final class VariableIncludeRule implements RuleInterface
      */
     private function doesDeclareName(Stmt\Global_|Stmt\Static_ $declaration, string $name): bool
     {
+        // User view: choose the findings list branch for this case.
         if ($declaration instanceof Stmt\Global_) {
+            // User view: add each item that can appear in findings list.
             foreach ($declaration->vars as $declared) {
+                // User view: choose the findings list branch for this case.
                 if ($declared instanceof Expr\Variable && $declared->name === $name) {
                     return true;
                 }
@@ -533,7 +601,9 @@ final class VariableIncludeRule implements RuleInterface
             return false;
         }
 
+        // User view: add each item that can appear in findings list.
         foreach ($declaration->vars as $staticVar) {
+            // User view: choose the findings list branch for this case.
             if ($staticVar->var->name === $name) {
                 return true;
             }

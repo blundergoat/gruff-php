@@ -12,6 +12,8 @@ namespace GruffPhp\Results\Trend;
 final readonly class TrendReport
 {
     /**
+      * User flow: Turns findings into score and trend signals users track.
+      *
      * @param string           $path - Trend history file path.
      * @param string           $scope - Score scope this snapshot and its delta belong to ('full-project' or 'diff').
      * @param float            $currentScore - Current composite score.
@@ -30,6 +32,8 @@ final readonly class TrendReport
     }
 
     /**
+      * User flow: Turns findings into score and trend signals users track.
+      *
      * @return array{
      *     path: string,
      *     scope: string,

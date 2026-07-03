@@ -50,6 +50,8 @@ enum OutputFormat: string
      * Machine-readable output suppresses interactive chatter such as the
      * missing-config init offer so the payload stays parseable.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @return bool - True for every format except the human-oriented text report.
      */
     public function isMachineReadable(): bool
@@ -61,6 +63,8 @@ enum OutputFormat: string
     /**
      * Convert a CLI format string into the matching output format.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param string $rawInput - CLI format value to parse.
      *
      * @return self|null - Matching format, or null for unsupported input.

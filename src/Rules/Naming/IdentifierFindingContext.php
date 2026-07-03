@@ -15,6 +15,8 @@ final readonly class IdentifierFindingContext
     /**
      * Capture rule metadata, parsed unit, tokenizer, and configured identifier lists.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param RuleDefinition      $definition - Rule metadata used on emitted findings.
      * @param AnalysisUnit        $analysisUnit - Parsed unit being inspected.
      * @param IdentifierTokenizer $tokenizer - Tokenizer used to split identifier names.

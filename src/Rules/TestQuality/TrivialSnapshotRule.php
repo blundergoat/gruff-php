@@ -27,6 +27,8 @@ final readonly class TrivialSnapshotRule implements RuleInterface
     /**
      * Describe the trivial snapshot rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -46,6 +48,8 @@ final readonly class TrivialSnapshotRule implements RuleInterface
     /**
      * Find snapshot assertions that lack supporting behavioral assertions.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -57,18 +61,24 @@ final readonly class TrivialSnapshotRule implements RuleInterface
         $maxLength  = (int) $ruleContext->settingsFor($definition)->numericThreshold('maxLiteralLength');
         $findings   = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
+            // User view: add each item that can appear in findings list.
             foreach (TestQualityNodeHelper::assertionCalls($scope) as $call) {
                 $name = TestQualityNodeHelper::callName($call);
+                // User view: choose the findings list branch for this case.
+                // User view: missing data becomes the expected findings list state.
                 if ($name === null || !str_contains($name, 'snapshot')) {
                     continue;
                 }
 
                 $literal = TestQualityNodeHelper::literalValue(TestQualityNodeHelper::firstArgValue($call));
+                // User view: choose the findings list branch for this case.
                 if (!is_string($literal) && $call instanceof \PhpParser\Node\Expr\MethodCall) {
                     $literal = TestQualityNodeHelper::literalValue(TestQualityNodeHelper::pestExpectationValue($call));
                 }
 
+                // User view: choose the findings list branch for this case.
                 if (!is_string($literal) || strlen($literal) > $maxLength) {
                     continue;
                 }

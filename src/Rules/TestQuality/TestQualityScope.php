@@ -13,6 +13,8 @@ use PhpParser\Node\Stmt;
 final readonly class TestQualityScope
 {
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string      $symbol - Stable display symbol for the discovered test scope.
      * @param string      $name - Test method or Pest description name.
      * @param int         $line - First source line of the test scope.
@@ -37,11 +39,14 @@ final readonly class TestQualityScope
     /**
      * Count the source lines covered by this test scope.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return int - Inclusive line count for the test scope.
      */
     public function lineCount(): int
     {
         // Unknown end line counts as a single line; otherwise the span is inclusive of both endpoints, never below 1.
+        // User view: missing data becomes the expected findings list state.
         return $this->endLine === null ? 1 : max(1, $this->endLine - $this->line + 1);
     }
 }

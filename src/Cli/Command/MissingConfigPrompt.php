@@ -37,6 +37,8 @@ final readonly class MissingConfigPrompt
      * non-CWD root (notably `dashboard --project ...`) write the new config in
      * the right directory.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface          $input - Console input for the calling command.
      * @param OutputInterface         $output - Console output for the calling command.
      * @param SymfonyApplication|null $symfonyApplication - Console application used to dispatch the init command.
@@ -58,34 +60,42 @@ final readonly class MissingConfigPrompt
         bool $isMachineReadableFormat = false,
         ?callable $stdinTtyProbe = null,
     ): ?int {
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($shouldSkipConfig || $explicitConfigPath !== null) {
             // Caller already chose a config path (or opted out), so offering init would override their intent.
             return null;
         }
+        // User view: choose the terminal output branch for this case.
         if ($isMachineReadableFormat) {
             // The run feeds a parser or artifact store, so never mix an interactive offer into it.
             return null;
         }
+        // User view: choose the terminal output branch for this case.
         if (!$input->isInteractive()) {
             // The caller opted out of interaction (-n/--quiet), so never block a piped or CI run on a prompt.
             return null;
         }
+        // User view: choose the terminal output branch for this case.
         if (!self::hasAnswerableInput($input, $stdinTtyProbe)) {
             // Symfony's interactive flag stays true for piped stdin without -n; with no TTY and no explicit
             // stream nobody can answer, so skip instead of blocking in the question helper (or consuming
             // piped data such as a file list starting with "y" as consent).
             return null;
         }
+        // User view: choose the terminal output branch for this case.
         if (ConfigLoader::hasProjectConfig($projectRoot)) {
             // A project config already exists; init has nothing to scaffold here.
             return null;
         }
+        // User view: choose the terminal output branch for this case.
         if (!$symfonyApplication instanceof SymfonyApplication) {
             // Without the application we cannot locate and dispatch the init command, so stay silent.
             return null;
         }
 
         $questionHelper = $symfonyApplication->getHelperSet()->get('question');
+        // User view: choose the terminal output branch for this case.
         if (!$questionHelper instanceof QuestionHelper) {
             // No question helper registered means we cannot ask, so skip rather than guess consent.
             return null;
@@ -98,6 +108,7 @@ final readonly class MissingConfigPrompt
             $promptOutput,
             new ConfirmationQuestion(self::PROMPT_TEXT, false),
         );
+        // User view: choose the terminal output branch for this case.
         if (!$accepted) {
             // User declined the offer, so let the original command continue without scaffolding config.
             return null;
@@ -126,6 +137,8 @@ final readonly class MissingConfigPrompt
      * mintty) lose the init offer; the machine-readable-format skip is the
      * primary guard precisely because this probe cannot see them.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface          $input - Console input for the calling command.
      * @param (callable(): bool)|null $stdinTtyProbe - Test seam overriding the real-STDIN TTY probe; null probes STDIN itself.
      *
@@ -133,11 +146,15 @@ final readonly class MissingConfigPrompt
      */
     private static function hasAnswerableInput(InputInterface $input, ?callable $stdinTtyProbe): bool
     {
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($input instanceof StreamableInputInterface && $input->getStream() !== null) {
             // An explicitly set stream is an intentional answer source (QuestionHelper reads it), so honour it.
             return true;
         }
 
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($stdinTtyProbe !== null) {
             // A test supplied its own probe, so consult it instead of the process's real STDIN.
             return $stdinTtyProbe();
@@ -149,16 +166,20 @@ final readonly class MissingConfigPrompt
     /**
      * Probe whether the process's real STDIN is attached to a terminal.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @return bool - True when STDIN exists and is a TTY.
      */
     private static function isStdinTty(): bool
     {
+        // User view: choose the terminal output branch for this case.
         if (!defined('STDIN')) {
             // Non-CLI SAPIs expose no STDIN constant; treat that as non-interactive rather than guessing.
             return false;
         }
 
         $stdin = constant('STDIN');
+        // User view: choose the terminal output branch for this case.
         if (!is_resource($stdin)) {
             // A closed or detached descriptor cannot answer a prompt, and probing it would raise a warning.
             return false;
@@ -174,12 +195,15 @@ final readonly class MissingConfigPrompt
      * error stream so JSON, SARIF, and HTML payloads written to STDOUT stay
      * uncorrupted.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param OutputInterface $output - Console output supplied by the caller.
      *
      * @return OutputInterface - Error stream when available; otherwise the supplied output.
      */
     private static function promptOutput(OutputInterface $output): OutputInterface
     {
+        // User view: choose the terminal output branch for this case.
         if ($output instanceof ConsoleOutputInterface) {
             // Prefer STDERR so prompt and init chatter never corrupt machine-readable STDOUT payloads.
             return $output->getErrorOutput();

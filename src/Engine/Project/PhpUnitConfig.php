@@ -14,6 +14,8 @@ final readonly class PhpUnitConfig
     /**
      * Capture a discovered PHPUnit configuration file and loaded XML root.
      *
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param string           $absolutePath - Absolute path to the PHPUnit config file.
      * @param string           $displayPath - Project-relative display path for the config file.
      * @param SimpleXMLElement $root - Parsed PHPUnit XML root element.

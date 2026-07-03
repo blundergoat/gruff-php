@@ -31,6 +31,8 @@ final readonly class FileLengthRule implements RuleInterface
     /**
      * Describe the file length rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and thresholds.
      */
     public function definition(): RuleDefinition
@@ -49,6 +51,8 @@ final readonly class FileLengthRule implements RuleInterface
     /**
      * Find files whose line count exceeds configured thresholds.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -61,6 +65,8 @@ final readonly class FileLengthRule implements RuleInterface
         $lineCount      = $analysisUnit->lineCount();
         $thresholdMatch = $settings->highValueThresholdMatch($lineCount);
 
+        // User view: choose the findings list branch for this case.
+        // User view: missing data becomes the expected findings list state.
         if ($thresholdMatch === null) {
             return [];
         }
@@ -95,12 +101,15 @@ final readonly class FileLengthRule implements RuleInterface
     /**
      * Format threshold numbers without unnecessary decimal places.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param int|float $number - Threshold value to render; whole values are shown without a trailing decimal.
      *
      * @return string - Human-readable threshold value with fractional values preserved and whole values stripped.
      */
     private function formatNumber(int|float $number): string
     {
+        // User view: choose the findings list branch for this case.
         if (is_float($number) && floor($number) !== $number) {
             return (string) $number;
         }

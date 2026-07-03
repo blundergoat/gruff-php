@@ -29,6 +29,8 @@ final readonly class PublicPropertyRule implements RuleInterface
     /**
      * Describe the public property modernisation rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -46,6 +48,8 @@ final readonly class PublicPropertyRule implements RuleInterface
     /**
      * Find mutable public properties that expose object state directly.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -55,16 +59,21 @@ final readonly class PublicPropertyRule implements RuleInterface
     {
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Class_::class) as $class) {
+            // User view: choose the findings list branch for this case.
             if (ModernisationNodeHelper::isDtoClass($class)) {
                 continue;
             }
 
+            // User view: add each item that can appear in findings list.
             foreach ($class->getProperties() as $property) {
+                // User view: choose the findings list branch for this case.
                 if (!$property->isPublic() || $property->isStatic() || $property->isReadonly()) {
                     continue;
                 }
 
+                // User view: add each item that can appear in findings list.
                 foreach ($property->props as $propertyProperty) {
                     $name       = $propertyProperty->name->toString();
                     $findings[] = new Finding(

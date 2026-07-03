@@ -15,11 +15,15 @@ interface ProjectRuleInterface
     /**
      * Describe this project-level rule for configuration and reporting.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - identity, configurable defaults, and severity the analyser uses to load and report this rule
      */
     public function definition(): RuleDefinition;
 
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param list<AnalysisUnit> $units - Parsed units available to the project-level rule.
      * @param RuleContext        $ruleContext - Project-level rule context for this analysis pass.
      *

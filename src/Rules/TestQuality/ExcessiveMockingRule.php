@@ -27,6 +27,8 @@ final readonly class ExcessiveMockingRule implements RuleInterface
     /**
      * Describe the excessive mocking rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -46,6 +48,8 @@ final readonly class ExcessiveMockingRule implements RuleInterface
     /**
      * Find tests that create more mocks than the configured threshold.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -57,14 +61,18 @@ final readonly class ExcessiveMockingRule implements RuleInterface
         $maxMocks   = (int) $ruleContext->settingsFor($definition)->numericThreshold('maxMocks');
         $findings   = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             $mockCount = 0;
+            // User view: add each item that can appear in findings list.
             foreach (TestQualityNodeHelper::calls($scope) as $call) {
+                // User view: choose the findings list branch for this case.
                 if (TestQualityNodeHelper::isMockCreationCall($call)) {
                     $mockCount++;
                 }
             }
 
+            // User view: choose the findings list branch for this case.
             if ($mockCount <= $maxMocks) {
                 continue;
             }

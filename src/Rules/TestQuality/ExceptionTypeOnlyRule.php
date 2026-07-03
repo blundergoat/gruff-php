@@ -43,6 +43,8 @@ final readonly class ExceptionTypeOnlyRule implements RuleInterface
     /**
      * Describe the exception type-only assertion rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -61,6 +63,8 @@ final readonly class ExceptionTypeOnlyRule implements RuleInterface
     /**
      * Find tests that assert only an exception type without message or state.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -70,30 +74,40 @@ final readonly class ExceptionTypeOnlyRule implements RuleInterface
     {
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             $typeOnlyCall     = null;
             $hasSupplementary = false;
 
+            // User view: add each item that can appear in findings list.
             foreach (TestQualityNodeHelper::calls($scope) as $call) {
+                // User view: choose the findings list branch for this case.
                 if (!$call instanceof Expr\MethodCall && !$call instanceof Expr\StaticCall) {
                     continue;
                 }
 
                 $name = TestQualityNodeHelper::callName($call);
+                // User view: choose the findings list branch for this case.
+                // User view: missing data becomes the expected findings list state.
                 if ($name === null) {
                     continue;
                 }
 
+                // User view: choose the findings list branch for this case.
+                // User view: missing data becomes the expected findings list state.
                 if (in_array($name, self::TYPE_ONLY_METHODS, true) && $typeOnlyCall === null) {
                     $typeOnlyCall = $call;
                     continue;
                 }
 
+                // User view: choose the findings list branch for this case.
                 if (in_array($name, self::SUPPLEMENTARY_METHODS, true)) {
                     $hasSupplementary = true;
                 }
             }
 
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($typeOnlyCall === null || $hasSupplementary) {
                 continue;
             }

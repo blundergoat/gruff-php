@@ -34,6 +34,8 @@ final class InsecureRandomRule implements RuleInterface
     /**
      * Describe the insecure random security rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -52,6 +54,8 @@ final class InsecureRandomRule implements RuleInterface
     /**
      * Find random APIs that are unsuitable for security-sensitive values.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -61,8 +65,11 @@ final class InsecureRandomRule implements RuleInterface
     {
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
             $name = SecurityNodeHelper::globalFunctionName($call);
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($name === null || !in_array($name, self::INSECURE_RANDOM_FUNCTIONS, true)) {
                 continue;
             }

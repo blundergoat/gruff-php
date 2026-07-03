@@ -17,6 +17,8 @@ final readonly class AnalysisFindingSupport
     /**
      * Drop sensitive-data findings whose preview is on the config allowlist.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param list<Finding> $findings - Findings produced for the run.
      * @param AnalysisConfig $config - Effective config supplying the secret-preview allowlist.
      *
@@ -25,6 +27,8 @@ final readonly class AnalysisFindingSupport
     public function filterAllowedSecretPreviews(array $findings, AnalysisConfig $config): array
     {
         $allowedPreviews = $config->allowedSecretPreviews();
+        // User view: choose the terminal output branch for this case.
+        // User view: an empty value becomes a clear terminal output fallback.
         if ($allowedPreviews === []) {
             return $findings;
         }
@@ -32,6 +36,7 @@ final readonly class AnalysisFindingSupport
         return array_values(array_filter(
             $findings,
             static function (Finding $finding) use ($allowedPreviews): bool {
+                // User view: missing data becomes a safe terminal output default.
                 $preview = $finding->metadata['preview'] ?? null;
 
                 // Keep the finding unless it is a sensitive-data hit whose string preview is on the allowlist.
@@ -45,6 +50,8 @@ final readonly class AnalysisFindingSupport
     /**
      * Keep only findings whose file is in the changed-files set.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param list<Finding> $findings - Findings to filter.
      * @param list<string>  $changedFiles - Project-relative paths considered changed.
      *
@@ -52,6 +59,8 @@ final readonly class AnalysisFindingSupport
      */
     public function filterFindingsToChangedFiles(array $findings, array $changedFiles): array
     {
+        // User view: choose the terminal output branch for this case.
+        // User view: an empty value becomes a clear terminal output fallback.
         if ($changedFiles === []) {
             // An empty changed set means nothing changed, so no finding qualifies; this is an intentional drop-all.
             return [];
@@ -68,6 +77,8 @@ final readonly class AnalysisFindingSupport
     /**
      * Keep project-rule findings inside the files requested by this invocation.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param list<Finding> $findings - Findings to filter.
      * @param list<string>  $projectRuleIds - Rule ids whose output came from project-wide context.
      * @param list<string>  $filePaths - Project-relative display paths in the requested source set; an empty set drops every project-rule finding.
@@ -76,12 +87,16 @@ final readonly class AnalysisFindingSupport
      */
     public function filterProjectRuleFindingsToFiles(array $findings, array $projectRuleIds, array $filePaths): array
     {
+        // User view: choose the terminal output branch for this case.
+        // User view: an empty value becomes a clear terminal output fallback.
         if ($projectRuleIds === []) {
             return $findings;
         }
 
         $projectRules = array_fill_keys($projectRuleIds, true);
 
+        // User view: choose the terminal output branch for this case.
+        // User view: an empty value becomes a clear terminal output fallback.
         if ($filePaths === []) {
             // The invocation requested files but discovered none, so nothing is in scope. Drop every
             // project-rule finding rather than leaking the whole-project context this run never loaded.
@@ -103,6 +118,8 @@ final readonly class AnalysisFindingSupport
     /**
      * Rewrite absolute finding paths to be relative to the requested base directory.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param list<Finding> $findings - Findings whose paths may need normalising.
      * @param string|null   $pathsRelativeTo - Base directory for relative paths, or null to leave paths untouched.
      *
@@ -110,11 +127,14 @@ final readonly class AnalysisFindingSupport
      */
     public function normalizeFindingPaths(array $findings, ?string $pathsRelativeTo): array
     {
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($pathsRelativeTo === null) {
             return $findings;
         }
 
         $realRoot = realpath($pathsRelativeTo);
+        // User view: choose the terminal output branch for this case.
         if ($realRoot === false) {
             return $findings;
         }
@@ -122,8 +142,10 @@ final readonly class AnalysisFindingSupport
         $root       = rtrim(PathHelper::normalizeSeparators($realRoot), '/');
         $normalized = [];
 
+        // User view: add each item that can appear in terminal output.
         foreach ($findings as $finding) {
             $path = PathHelper::normalizeSeparators($finding->filePath);
+            // User view: choose the terminal output branch for this case.
             if (!PathHelper::isAbsolute($path)) {
                 $normalized[] = $finding;
                 continue;
@@ -154,6 +176,8 @@ final readonly class AnalysisFindingSupport
     /**
      * Normalise user-supplied path arguments to project-relative paths sorted for stable matching.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string       $projectRoot - Project root requested paths resolve against.
      * @param list<string> $paths - User-supplied path arguments.
      *
@@ -164,17 +188,24 @@ final readonly class AnalysisFindingSupport
         $root       = rtrim(PathHelper::canonical($projectRoot), '/');
         $normalised = [];
 
+        // User view: add each item that can appear in terminal output.
         foreach ($paths as $path) {
             $candidate = PathHelper::normalizeSeparators($path);
+            // User view: choose the terminal output branch for this case.
+            // User view: an empty value becomes a clear terminal output fallback.
             if ($candidate === '') {
                 continue;
             }
 
+            // User view: choose the terminal output branch for this case.
             if (PathHelper::isAbsolute($candidate)) {
                 $candidate = rtrim(PathHelper::canonical($candidate), '/');
+                // User view: choose the terminal output branch for this case.
                 if ($candidate === $root) {
                     $candidate = '.';
-                } elseif (str_starts_with($candidate, $root . '/')) {
+                }
+                // User view: choose the next terminal output branch for this case.
+                elseif (str_starts_with($candidate, $root . '/')) {
                     $candidate = substr($candidate, strlen($root) + 1);
                 } else {
                     continue;
@@ -186,6 +217,7 @@ final readonly class AnalysisFindingSupport
             }
 
             $candidate                                        = rtrim($candidate, '/');
+            // User view: an empty value becomes a clear terminal output fallback.
             $normalised[$candidate === '' ? '.' : $candidate] = $candidate === '' ? '.' : $candidate;
         }
 
@@ -198,6 +230,8 @@ final readonly class AnalysisFindingSupport
     /**
      * Report whether a changed file is inside the requested path set.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string       $changedFile - Project-relative changed file path.
      * @param list<string> $requestedPaths - Normalised requested paths to match against.
      *
@@ -207,12 +241,15 @@ final readonly class AnalysisFindingSupport
     {
         $changedFile = PathHelper::normalizeSeparators($changedFile);
 
+        // User view: add each item that can appear in terminal output.
         foreach ($requestedPaths as $requestedPath) {
+            // User view: choose the terminal output branch for this case.
             if ($requestedPath === '.') {
                 // '.' means the whole project was requested, so every changed file is in scope.
                 return true;
             }
 
+            // User view: choose the terminal output branch for this case.
             if ($changedFile === $requestedPath || str_starts_with($changedFile, $requestedPath . '/')) {
                 // A requested path scopes itself and everything under it as a directory; the trailing '/' is the
                 // boundary that stops a request for 'src/Foo' matching the sibling file 'src/FooBar.php'.
@@ -226,6 +263,8 @@ final readonly class AnalysisFindingSupport
     /**
      * Keep the changed paths that exist on disk under the project root.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string       $projectRoot - Project root the changed paths resolve against.
      * @param list<string> $changedFiles - Project-relative paths from a diff.
      *
@@ -235,7 +274,9 @@ final readonly class AnalysisFindingSupport
     {
         $existing = [];
 
+        // User view: add each item that can appear in terminal output.
         foreach ($changedFiles as $changedFile) {
+            // User view: choose the terminal output branch for this case.
             if (file_exists(PathHelper::resolveAgainst($projectRoot, $changedFile))) {
                 $existing[] = $changedFile;
             }
@@ -249,6 +290,8 @@ final readonly class AnalysisFindingSupport
     /**
      * Keep requested paths that exist in the base snapshot.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string       $baseRoot - Base-snapshot root the paths resolve against.
      * @param list<string> $paths - Requested project-relative paths.
      *
@@ -256,16 +299,21 @@ final readonly class AnalysisFindingSupport
      */
     public function existingSnapshotPaths(string $baseRoot, array $paths): array
     {
+        // User view: an empty value becomes a clear terminal output fallback.
         $requested = $paths === [] ? ['.'] : $paths;
         $existing  = [];
 
+        // User view: add each item that can appear in terminal output.
         foreach ($requested as $path) {
             $absolute = PathHelper::resolveAgainst($baseRoot, $path);
+            // User view: choose the terminal output branch for this case.
             if (file_exists($absolute)) {
+                // User view: missing data becomes a safe terminal output default.
                 $existing[] = PathHelper::relativeToRoot($absolute, $baseRoot) ?? $path;
             }
         }
 
+        // User view: an empty value becomes a clear terminal output fallback.
         return $existing === [] ? [] : $existing;
     }
 }

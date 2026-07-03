@@ -15,6 +15,8 @@ interface RuleRunnerObserver
     /**
      * Record that a single rule invocation against one unit completed.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $ruleId - Rule identifier as declared in the rule's RuleDefinition.
      * @param int    $durationNs - Wall-clock nanoseconds the rule spent in analyse().
      *

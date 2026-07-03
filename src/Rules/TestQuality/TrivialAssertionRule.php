@@ -27,6 +27,8 @@ final readonly class TrivialAssertionRule implements RuleInterface
     /**
      * Describe the trivial assertion rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -45,6 +47,8 @@ final readonly class TrivialAssertionRule implements RuleInterface
     /**
      * Find assertions that can pass without checking meaningful behavior.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -54,8 +58,11 @@ final readonly class TrivialAssertionRule implements RuleInterface
     {
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
+            // User view: add each item that can appear in findings list.
             foreach (TestQualityNodeHelper::assertionCalls($scope) as $call) {
+                // User view: choose the findings list branch for this case.
                 if (!TestQualityNodeHelper::isTrivialAssertion($call)) {
                     continue;
                 }

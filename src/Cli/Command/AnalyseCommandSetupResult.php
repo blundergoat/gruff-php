@@ -16,6 +16,8 @@ final readonly class AnalyseCommandSetupResult
     /**
      * Create a setup result variant.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param AnalyseCommandSetup|null $setup - Ready setup payload, when setup succeeded.
      * @param AnalysisReport|null      $report - Report-formatted setup error payload, when available.
      * @param OutputFormat|null        $format - Output format for a report-formatted setup error.
@@ -34,6 +36,8 @@ final readonly class AnalyseCommandSetupResult
     /**
      * Build a successful setup result.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param AnalyseCommandSetup $setup - Ready setup payload.
      *
      * @return self - Ready setup result.
@@ -47,6 +51,8 @@ final readonly class AnalyseCommandSetupResult
     /**
      * Build a plain console error result.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string $message - Plain error message for console output.
      * @param int    $exitCode - Symfony command exit code for the failure.
      *
@@ -61,6 +67,8 @@ final readonly class AnalyseCommandSetupResult
     /**
      * Build an early exit result after another component already wrote output.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param int $exitCode - Symfony command exit code for the early exit.
      *
      * @return self - Early exit setup result.
@@ -74,6 +82,8 @@ final readonly class AnalyseCommandSetupResult
     /**
      * Build a report-formatted setup error result.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param AnalysisReport $report - Report payload describing the setup failure.
      * @param OutputFormat   $format - Output format selected for the report.
      *

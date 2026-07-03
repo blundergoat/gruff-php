@@ -21,6 +21,8 @@ final readonly class AnalysisSourceSet
     private ?int $explicitParsedFileCount;
 
     /**
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param SourceDiscoveryResult $discovery - Discovery result for the requested paths.
      * @param list<AnalysisUnit>    $analysisUnits - Parsed analysis units, possibly released.
      * @param list<RunDiagnostic>   $diagnostics - Diagnostics emitted while loading sources.
@@ -38,6 +40,8 @@ final readonly class AnalysisSourceSet
     /**
      * List the project-relative display paths of the discovered source files.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @return list<string> - Project-relative source file paths in discovery order.
      */
     public function displayPaths(): array
@@ -51,10 +55,14 @@ final readonly class AnalysisSourceSet
     /**
      * Count successfully parsed analysis units in the loaded source set.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @return int - Number of units without parse diagnostics.
      */
     public function parsedFileCount(): int
     {
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($this->explicitParsedFileCount !== null) {
             // Streaming flows release each unit's AST before constructing the set, so the
             // live units are no longer countable; trust the count captured at parse time.

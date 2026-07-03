@@ -69,6 +69,8 @@ final readonly class PathIgnoreResolver
     ];
 
     /**
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param string $projectRoot - Project root used to evaluate Git ignore rules.
      */
     public function __construct(private string $projectRoot)
@@ -82,6 +84,8 @@ final readonly class PathIgnoreResolver
      * files are otherwise included; default and generated exclusions are skipped
      * when ignored files are requested.
      *
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param string       $displayPath - Project-relative display path used for glob and directory matching.
      * @param string       $absolutePath - Absolute path used for filename matching.
      * @param list<string> $configuredPatterns - Configured paths.ignore glob patterns.
@@ -96,23 +100,30 @@ final readonly class PathIgnoreResolver
         bool $shouldIncludeIgnored,
     ): IgnoreDecision {
         $configuredPattern = $this->matchedConfiguredPattern($displayPath, $configuredPatterns);
+        // User view: choose the source analysis branch for this case.
+        // User view: missing data becomes the expected source analysis state.
         if ($configuredPattern !== null) {
             // Configured paths.ignore wins first and unconditionally, even when ignored files are requested.
             return IgnoreDecision::ignored(self::SOURCE_CONFIG, $configuredPattern);
         }
 
+        // User view: choose the source analysis branch for this case.
         if ($shouldIncludeIgnored) {
             // Requesting ignored files bypasses only the built-in default/generated exclusions below.
             return IgnoreDecision::notIgnored();
         }
 
         $defaultDirectory = $this->matchedDefaultDirectory($displayPath);
+        // User view: choose the source analysis branch for this case.
+        // User view: missing data becomes the expected source analysis state.
         if ($defaultDirectory !== null) {
             // A built-in tool/vendor directory match is the next exclusion source after config.
             return IgnoreDecision::ignored(self::SOURCE_DEFAULT, $defaultDirectory);
         }
 
         $generatedFilename = $this->matchedGeneratedFilename($absolutePath);
+        // User view: choose the source analysis branch for this case.
+        // User view: missing data becomes the expected source analysis state.
         if ($generatedFilename !== null) {
             // A known generated/lock filename is the last built-in exclusion before falling through.
             return IgnoreDecision::ignored(self::SOURCE_GENERATED, $generatedFilename);
@@ -124,6 +135,8 @@ final readonly class PathIgnoreResolver
     /**
      * Return the configured ignore glob that matches the path, or null when none match.
      *
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param string       $displayPath - Project-relative display path being tested.
      * @param list<string> $patterns - Configured paths.ignore glob patterns.
      *
@@ -133,7 +146,9 @@ final readonly class PathIgnoreResolver
     {
         $normalizedDisplayPath = str_replace('\\', '/', $displayPath);
 
+        // User view: add each item that can appear in source analysis.
         foreach ($patterns as $pattern) {
+            // User view: choose the source analysis branch for this case.
             if ($this->matchesPathPattern($normalizedDisplayPath, $pattern)) {
                 // First matching glob wins; return it verbatim so callers can report which rule excluded the path.
                 return $pattern;
@@ -146,6 +161,8 @@ final readonly class PathIgnoreResolver
     /**
      * Return the built-in ignored directory token that matches the path, or null when none match.
      *
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param string $displayPath - Project-relative display path being tested.
      *
      * @return string|null - Matching directory token, or null when the path is not default-ignored.
@@ -155,11 +172,13 @@ final readonly class PathIgnoreResolver
         $normalizedDisplayPath = str_replace('\\', '/', $displayPath);
         $segments              = explode('/', trim($normalizedDisplayPath, '/'));
 
+        // User view: add each item that can appear in source analysis.
         foreach (self::IGNORED_DIRECTORIES as $ignoredDirectory) {
             $ignoredSegments = explode('/', $ignoredDirectory);
             $ignoredCount    = count($ignoredSegments);
 
             for ($i = 0, $max = count($segments) - $ignoredCount; $i <= $max; $i++) {
+                // User view: choose the source analysis branch for this case.
                 if (array_slice($segments, $i, $ignoredCount) === $ignoredSegments) {
                     // A matched directory token anywhere in the path excludes it; return the token that matched.
                     return $ignoredDirectory;
@@ -173,6 +192,8 @@ final readonly class PathIgnoreResolver
     /**
      * Return the built-in generated/lock filename that matches the path, or null when none match.
      *
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param string $absolutePath - Absolute filesystem path being tested.
      *
      * @return string|null - Matching filename, or null when the path is not a known generated artifact.
@@ -188,6 +209,8 @@ final readonly class PathIgnoreResolver
     /**
      * Return the Git ignore rule that excludes the pathspec, or null when Git does not ignore it.
      *
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param string $pathspec - Project-relative pathspec to test against Git ignore rules.
      *
      * @return string|null - Matching git rule (or the pathspec when no rule text is reported), or null when not ignored.
@@ -197,12 +220,15 @@ final readonly class PathIgnoreResolver
         $process = new Process(['git', 'check-ignore', '--verbose', '--', $pathspec], $this->projectRoot);
         $process->run();
 
+        // User view: choose the source analysis branch for this case.
         if ($process->getExitCode() !== 0) {
             // Non-zero exit is git's "not ignored" signal; report no rule rather than treating it as an error.
             return null;
         }
 
         $output = trim($process->getOutput());
+        // User view: choose the source analysis branch for this case.
+        // User view: an empty value becomes a clear source analysis fallback.
         if ($output === '') {
             // Git confirmed the ignore but gave no rule text, so fall back to the pathspec as the rule label.
             return $pathspec;
@@ -214,12 +240,15 @@ final readonly class PathIgnoreResolver
         $patternText = trim((string) end($rule));
 
         // Prefer the parsed pattern; fall back to the pathspec when parsing yielded an empty rule.
+        // User view: an empty value becomes a clear source analysis fallback.
         return $patternText === '' ? $pathspec : $patternText;
     }
 
     /**
      * Detect whether the display path matches a glob-style pattern (`*`, `**`, `?` supported).
      *
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param string $displayPath - Project-relative path to test; backslashes and edge slashes are normalized here.
      * @param string $pattern - Glob with `*` (within a segment), `**` (across segments), and `?` placeholders.
      *
@@ -230,13 +259,17 @@ final readonly class PathIgnoreResolver
         $normalizedPattern = trim(str_replace('\\', '/', $pattern), '/');
         $normalizedPath    = trim($displayPath, '/');
 
+        // User view: choose the source analysis branch for this case.
         if (str_ends_with($normalizedPattern, '/**')) {
             $directoryPrefix = substr($normalizedPattern, 0, -3);
+            // User view: choose the source analysis branch for this case.
+            // User view: an empty value becomes a clear source analysis fallback.
             if ($directoryPrefix !== '' && ($normalizedPath === $directoryPrefix || str_starts_with($normalizedPath, $directoryPrefix . '/'))) {
                 return true;
             }
         }
 
+        // User view: choose the source analysis branch for this case.
         if ($normalizedPattern === $normalizedPath || str_starts_with($normalizedPath, $normalizedPattern . '/')) {
             // A literal or directory-prefix match needs no glob, so short-circuit before building the regex.
             return true;

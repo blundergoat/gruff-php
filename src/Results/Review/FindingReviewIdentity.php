@@ -21,6 +21,8 @@ final readonly class FindingReviewIdentity
      * with a symbol key on (file, ruleId, symbol, message); symbol-less ones reuse the
      * baseline group key so review and baselines share one line-insensitive identity.
      *
+      * User flow: Compares branch feedback for review workflows.
+      *
      * @param Finding $finding - Finding to identify for branch review comparison.
      *
      * @return string - null-delimited identity key that survives unrelated edits shifting line numbers
@@ -28,6 +30,9 @@ final readonly class FindingReviewIdentity
     public function key(Finding $finding): string
     {
         // No symbol to anchor on: fall back to the shared (file, ruleId, message) baseline key.
+        // User view: choose the branch review feedback branch for this case.
+        // User view: missing data becomes the expected branch review feedback state.
+        // User view: an empty value becomes a clear branch review feedback fallback.
         if ($finding->symbol === null || $finding->symbol === '') {
             return BaselineEntry::groupKeyForFinding($finding);
         }

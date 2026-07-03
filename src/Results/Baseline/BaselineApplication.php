@@ -16,6 +16,8 @@ final readonly class BaselineApplication
     /**
      * Apply an existing baseline file without building report metadata.
      *
+      * User flow: Keeps known findings separate from new feedback in reports.
+      *
      * @param string        $projectRoot - Project root used to resolve the baseline path.
      * @param string        $baselinePath - Baseline path to read.
      * @param list<Finding> $findings - Findings to filter.
@@ -31,6 +33,8 @@ final readonly class BaselineApplication
     }
 
     /**
+      * User flow: Keeps known findings separate from new feedback in reports.
+      *
      * @param string                     $projectRoot - Project root used to resolve baseline paths.
      * @param BaselineApplicationOptions $options - Baseline application options selected for this run.
      * @param list<Finding>              $findings - Findings to generate from or filter in place.
@@ -50,11 +54,15 @@ final readonly class BaselineApplication
     ): ?BaselineReport {
         $baselineStore = new BaselineStore($projectRoot);
 
+        // User view: choose the baseline feedback branch for this case.
+        // User view: missing data becomes the expected baseline feedback state.
         if ($options->generateBaselinePath !== null) {
             // Generate mode takes precedence: write a fresh baseline rather than filter against one.
             return $this->generate($baselineStore, $options->generateBaselinePath, $findings, $diagnostics);
         }
 
+        // User view: choose the baseline feedback branch for this case.
+        // User view: missing data becomes the expected baseline feedback state.
         if ($options->baselinePath === null) {
             // No baseline configured, so the run carries no baseline report.
             return null;
@@ -72,6 +80,8 @@ final readonly class BaselineApplication
     }
 
     /**
+      * User flow: Keeps known findings separate from new feedback in reports.
+      *
      * @param BaselineStore       $store - Store that writes and locates the baseline file.
      * @param string              $generateBaselinePath - Destination path to write the new baseline to.
      * @param list<Finding>       $findings - Findings to record as the new baseline snapshot.
@@ -111,6 +121,8 @@ final readonly class BaselineApplication
     }
 
     /**
+      * User flow: Keeps known findings separate from new feedback in reports.
+      *
      * @param BaselineStore              $store - Store that reads the baseline file from disk.
      * @param BaselineApplicationOptions $options - Baseline path plus whether it was explicitly set or defaulted.
      * @param list<Finding>              $findings - Filtered in place; replaced with the surviving (unmatched) set.
@@ -129,6 +141,7 @@ final readonly class BaselineApplication
         bool $hasPartialScope,
     ): ?BaselineReport {
         try {
+            // User view: missing data becomes a safe baseline feedback default.
             $baseline    = $store->read($options->baselinePath ?? '');
             $application = (new BaselineFilter())->apply($baseline, $findings, $hasPartialScope || ($diff instanceof DiffResult && $diff->active));
         } catch (BaselineException $exception) {

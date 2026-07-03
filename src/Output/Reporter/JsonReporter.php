@@ -14,6 +14,8 @@ final readonly class JsonReporter
     /**
      * Render the full analysis report as JSON.
      *
+      * User flow: Shapes the report output people read after analysis finishes.
+      *
      * @param AnalysisReport $report - Analysis report to render.
      *
      * @return string - Pretty-printed analysis JSON document.

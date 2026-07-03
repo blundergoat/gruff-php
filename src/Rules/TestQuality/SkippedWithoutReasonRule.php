@@ -27,6 +27,8 @@ final readonly class SkippedWithoutReasonRule implements RuleInterface
     /**
      * Describe the skipped test without reason rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -45,6 +47,8 @@ final readonly class SkippedWithoutReasonRule implements RuleInterface
     /**
      * Find skipped or incomplete tests without an explanatory reason.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -54,13 +58,18 @@ final readonly class SkippedWithoutReasonRule implements RuleInterface
     {
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
+            // User view: add each item that can appear in findings list.
             foreach (TestQualityNodeHelper::calls($scope) as $call) {
+                // User view: choose the findings list branch for this case.
                 if (TestQualityNodeHelper::callName($call) !== 'marktestskipped') {
                     continue;
                 }
 
                 $reason = TestQualityNodeHelper::literalValue(TestQualityNodeHelper::firstArgValue($call));
+                // User view: choose the findings list branch for this case.
+                // User view: an empty value becomes a clear findings list fallback.
                 if (is_string($reason) && trim($reason) !== '') {
                     continue;
                 }

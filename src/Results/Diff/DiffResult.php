@@ -10,6 +10,8 @@ namespace GruffPhp\Results\Diff;
 final readonly class DiffResult
 {
     /**
+      * User flow: Narrows analysis feedback to the code under review.
+      *
      * @param bool                                  $active - Whether diff filtering is active.
      * @param string                                $mode - Diff mode used to produce the result.
      * @param string|null                           $base - Base ref or description for the diff, when active.
@@ -32,6 +34,8 @@ final readonly class DiffResult
     /**
      * Create a result object representing a full-project run without diff mode.
      *
+      * User flow: Narrows analysis feedback to the code under review.
+      *
      * @return self - inactive result (active=false) with empty changed-file/line sets; downstream filters read
      *   this as "keep every finding", not "nothing changed"
      */
@@ -45,6 +49,8 @@ final readonly class DiffResult
     /**
      * Return a copy carrying the changed-region suppression count.
      *
+      * User flow: Narrows analysis feedback to the code under review.
+      *
      * @param int $suppressedCount - Findings excluded by changed-region filtering.
      *
      * @return self - Diff metadata with the count attached for report serialization.
@@ -65,6 +71,8 @@ final readonly class DiffResult
     /**
      * Return changed line ranges for a display path.
      *
+      * User flow: Narrows analysis feedback to the code under review.
+      *
      * @param string $filePath - Display path to look up.
      *
      * @return list<ChangedLineRange> - changed ranges for the path; empty list when the path has no entry
@@ -74,10 +82,13 @@ final readonly class DiffResult
     {
         // An unmapped path is an expected miss, not an error: a file with no entry simply has no
         // changed lines, so empty here lets callers treat the whole file as in-scope rather than skipped.
+        // User view: missing data becomes a safe review diff feedback default.
         return $this->changedLines[$filePath] ?? [];
     }
 
     /**
+      * User flow: Narrows analysis feedback to the code under review.
+      *
      * @return array{
      *     active: bool,
      *     mode: string,
@@ -92,6 +103,7 @@ final readonly class DiffResult
     {
         $files = [];
 
+        // User view: add each item that can appear in review diff feedback.
         foreach ($this->changedFiles as $filePath) {
             $files[] = [
                 'file'   => $filePath,
@@ -113,6 +125,8 @@ final readonly class DiffResult
             'files'        => $files,
         ];
 
+        // User view: choose the review diff feedback branch for this case.
+        // User view: missing data becomes the expected review diff feedback state.
         if ($this->suppressedCount !== null) {
             $payload['suppressedCount'] = $this->suppressedCount;
         }

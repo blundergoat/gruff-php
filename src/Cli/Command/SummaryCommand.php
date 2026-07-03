@@ -38,6 +38,8 @@ final class SummaryCommand extends Command
     /**
      * Register summary CLI arguments, options, and command metadata.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @return void
      */
     protected function configure(): void
@@ -56,6 +58,8 @@ final class SummaryCommand extends Command
     /**
      * Run analysis once and render a compact project summary.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface  $input - Parsed console arguments and options for this summary invocation.
      * @param OutputInterface $output - Destination for the rendered summary and any usage or config errors.
      *
@@ -64,22 +68,29 @@ final class SummaryCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $projectRoot = $this->projectRoot($output);
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($projectRoot === null) {
             return Command::FAILURE;
         }
 
         $format = $this->summaryFormat($input, $output);
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($format === null) {
             return Command::INVALID;
         }
 
         $topLimit = $this->topLimit($input, $output);
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($topLimit === null) {
             return Command::INVALID;
         }
 
         $configPath = $this->configPath($input);
         $noConfig   = (bool)$input->getOption('no-config');
+        // User view: choose the terminal output branch for this case.
         if ($this->hasConfigConflict($noConfig, $configPath, $output)) {
             return Command::INVALID;
         }
@@ -93,6 +104,8 @@ final class SummaryCommand extends Command
             shouldSkipConfig:        $noConfig,
             isMachineReadableFormat: $format === 'json',
         );
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($promptExitCode !== null) {
             return $promptExitCode;
         }
@@ -106,6 +119,7 @@ final class SummaryCommand extends Command
             configLoader: $configLoader,
             output:       $output,
         );
+        // User view: choose the terminal output branch for this case.
         if (!$config instanceof AnalysisConfig) {
             return Command::INVALID;
         }
@@ -117,6 +131,7 @@ final class SummaryCommand extends Command
                                    projectRoot:          $projectRoot,
                                    paths:                $this->paths($input),
                                    shouldIncludeIgnored: (bool)$input->getOption('include-ignored'),
+                                   // User view: missing data becomes a safe terminal output default.
                                    effectiveConfigPath:  $noConfig ? null : ($configPath ?? $configLoader->resolveConfigPath(null)),
                                    config:               $config,
                                    registry:             $registry,
@@ -128,6 +143,8 @@ final class SummaryCommand extends Command
     /**
      * Resolve the current project root or emit an error when it cannot be read.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param OutputInterface $output - Destination for the error shown when the working directory is unreadable.
      *
      * @return string|null - Project root path, or null when unavailable.
@@ -135,6 +152,7 @@ final class SummaryCommand extends Command
     private function projectRoot(OutputInterface $output): ?string
     {
         $projectRoot = getcwd();
+        // User view: choose the terminal output branch for this case.
         if ($projectRoot === false) {
             $output->writeln('<error>Unable to determine current working directory.</error>');
 
@@ -147,6 +165,8 @@ final class SummaryCommand extends Command
     /**
      * Parse and validate the requested summary output format.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface  $input - Console input carrying the optional --format value.
      * @param OutputInterface $output - Destination for the usage error shown when the format is unrecognised.
      *
@@ -155,6 +175,7 @@ final class SummaryCommand extends Command
     private function summaryFormat(InputInterface $input, OutputInterface $output): ?string
     {
         $format = $input->getOption('format');
+        // User view: choose the terminal output branch for this case.
         if (is_string($format) && in_array($format, ['text', 'json'], true)) {
             return $format;
         }
@@ -170,6 +191,8 @@ final class SummaryCommand extends Command
     /**
      * Parse and validate the top-N summary limit.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface  $input - Console input carrying the optional --top value.
      * @param OutputInterface $output - Destination for the usage error shown when --top is not a non-negative integer.
      *
@@ -179,6 +202,7 @@ final class SummaryCommand extends Command
     {
         $topRaw = $input->getOption('top');
         // Accept only unsigned decimal digits for the summary row limit.
+        // User view: choose the terminal output branch for this case.
         if (is_string($topRaw) && preg_match('/^\d+$/', $topRaw) === 1) {
             return (int)$topRaw;
         }
@@ -191,6 +215,8 @@ final class SummaryCommand extends Command
     /**
      * Read the optional config path from console input.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface $input - Console input carrying the optional --config value.
      *
      * @return string|null - Config path, or null when omitted.
@@ -199,12 +225,15 @@ final class SummaryCommand extends Command
     {
         $configPath = $input->getOption('config');
 
+        // User view: an empty value becomes a clear terminal output fallback.
         return is_string($configPath) && $configPath !== '' ? $configPath : null;
     }
 
     /**
      * Emit and report whether mutually exclusive config flags were supplied.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param bool            $noConfig - Whether --no-config was requested.
      * @param string|null     $configPath - Explicit --config path, or null when none was given.
      * @param OutputInterface $output - Destination for the usage error shown when both flags are present.
@@ -213,6 +242,8 @@ final class SummaryCommand extends Command
      */
     private function hasConfigConflict(bool $noConfig, ?string $configPath, OutputInterface $output): bool
     {
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if (!$noConfig || $configPath === null) {
             return false;
         }
@@ -225,6 +256,8 @@ final class SummaryCommand extends Command
     /**
      * Return normalized path arguments from console input.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface $input - Console input carrying the variadic paths argument.
      *
      * @return list<string> - Project-relative paths requested by the summary command.
@@ -232,6 +265,7 @@ final class SummaryCommand extends Command
     private function paths(InputInterface $input): array
     {
         $paths = $input->getArgument('paths');
+        // User view: choose the terminal output branch for this case.
         if (!is_array($paths)) {
             return [];
         }
@@ -242,6 +276,8 @@ final class SummaryCommand extends Command
     /**
      * Load analysis configuration or emit a config error.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param bool            $noConfig - When true, skip the YAML file and build defaults straight from the registry.
      * @param string|null     $configPath - Explicit config file to load, or null to let the loader resolve the default.
      * @param RuleRegistry    $registry - Rule set used to seed defaults and validate configured rule ids.
@@ -272,6 +308,8 @@ final class SummaryCommand extends Command
     /**
      * Build summary render data from one analysis pass.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string         $projectRoot - Absolute project root that anchors source discovery.
      * @param list<string>   $paths - Project-relative paths requested by the summary command.
      * @param bool           $shouldIncludeIgnored - When true, scan ignored files via filesystem traversal instead of Git/default ignores.
@@ -322,6 +360,8 @@ final class SummaryCommand extends Command
     /**
      * Write text or JSON summary output.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param OutputInterface   $output - Destination for the rendered summary or an encode-failure error.
      * @param string            $format - Validated output format, either 'text' or 'json'.
      * @param SummaryReportData $summaryReportData - Aggregated run data to render.
@@ -330,6 +370,7 @@ final class SummaryCommand extends Command
      */
     private function writeSummary(OutputInterface $output, string $format, SummaryReportData $summaryReportData): int
     {
+        // User view: choose the terminal output branch for this case.
         if ($format === 'json') {
             try {
                 // Raw output keeps the JSON payload free of console style markup.
@@ -351,6 +392,8 @@ final class SummaryCommand extends Command
     /**
      * Build a lookup table from rule ID to pillar value.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param RuleRegistry $registry - Rule set whose definitions supply the rule-id-to-pillar mapping.
      *
      * @return array<string, string> - Pillar values keyed by rule ID.
@@ -358,6 +401,7 @@ final class SummaryCommand extends Command
     private function pillarLookup(RuleRegistry $registry): array
     {
         $pillarLookup = [];
+        // User view: add each item that can appear in terminal output.
         foreach ($registry->all() as $rule) {
             $definition                    = $rule->definition();
             $pillarLookup[$definition->id] = $definition->pillar->value;
@@ -369,6 +413,8 @@ final class SummaryCommand extends Command
     /**
      * Group summary findings by rule identifier and severity.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param list<Finding>         $findings - Findings to aggregate into per-rule summary rows.
      * @param array<string, string> $pillarLookup - Rule-id to pillar map from the registry; findings fall back to their own pillar when absent.
      *
@@ -378,8 +424,10 @@ final class SummaryCommand extends Command
     private function aggregateByRule(array $findings, array $pillarLookup): array
     {
         $aggregates = [];
+        // User view: add each item that can appear in terminal output.
         foreach ($findings as $finding) {
             $ruleId = $finding->ruleId;
+            // User view: choose the terminal output branch for this case.
             if (!isset($aggregates[$ruleId])) {
                 $aggregates[$ruleId] = [
                     'ruleId'   => $ruleId,
@@ -387,6 +435,7 @@ final class SummaryCommand extends Command
                     'advisory' => 0,
                     'warning'  => 0,
                     'error'    => 0,
+                    // User view: missing data becomes a safe terminal output default.
                     'pillar'   => $pillarLookup[$ruleId] ?? $finding->pillar->value,
                 ];
             }
@@ -398,6 +447,7 @@ final class SummaryCommand extends Command
         $rows = array_values($aggregates);
         usort($rows, static function (array $left, array $right): int {
             $countDelta = $right['count'] <=> $left['count'];
+            // User view: choose the terminal output branch for this case.
             if ($countDelta !== 0) {
                 return $countDelta;
             }
@@ -411,6 +461,8 @@ final class SummaryCommand extends Command
     /**
      * Count findings by severity for summary output.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param list<Finding> $findings - Findings to count by severity; empty input keeps every bucket at zero.
      *
      * @return array{advisory: int, warning: int, error: int, total: int} - per-severity finding counts plus the grand total; every key is zero when
@@ -419,6 +471,7 @@ final class SummaryCommand extends Command
     private function severityTotals(array $findings): array
     {
         $totals = ['advisory' => 0, 'warning' => 0, 'error' => 0, 'total' => count($findings)];
+        // User view: add each item that can appear in terminal output.
         foreach ($findings as $finding) {
             $totals[$finding->severity->value]++;
         }
@@ -427,6 +480,8 @@ final class SummaryCommand extends Command
     }
 
     /**
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param list<\GruffPhp\Engine\Analysis\RunDiagnostic> $diagnostics - Run diagnostics to scan; only parse-error entries are counted.
      *
      * @return int - Number of parse-error diagnostics in the source set.
@@ -434,7 +489,9 @@ final class SummaryCommand extends Command
     private function parseErrorCount(array $diagnostics): int
     {
         $count = 0;
+        // User view: add each item that can appear in terminal output.
         foreach ($diagnostics as $diagnostic) {
+            // User view: choose the terminal output branch for this case.
             if ($diagnostic->type === 'parse-error') {
                 $count++;
             }
@@ -446,6 +503,8 @@ final class SummaryCommand extends Command
     /**
      * Render a human-readable summary report.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param SummaryReportData $summaryReportData - Aggregated run data to format as aligned console text.
      *
      * @return string - Human-readable summary report.
@@ -455,7 +514,9 @@ final class SummaryCommand extends Command
         $lines   = [];
         $lines[] = sprintf('%s %s summary', Application::NAME, Application::VERSION);
         $lines[] = '';
+        // User view: an empty value becomes a clear terminal output fallback.
         $lines[] = sprintf('Paths     %s', $summaryReportData->paths === [] ? '(none)' : implode(', ', $summaryReportData->paths));
+        // User view: missing data becomes a safe terminal output default.
         $lines[] = sprintf('Config    %s', $summaryReportData->configPath ?? '(none)');
         $lines[] = sprintf(
             'Files     %d discovered, %d parsed, %d ignored, %d missing, %d parse errors',
@@ -485,8 +546,11 @@ final class SummaryCommand extends Command
         });
 
         $pillarWidth = $this->columnWidth(array_map(static fn($pillar): string => $pillar->pillar, $sortedPillars), 14);
+        // User view: add each item that can appear in terminal output.
         foreach ($sortedPillars as $pillar) {
+            // User view: missing data becomes the expected terminal output state.
             $grade     = $pillar->grade === null ? 'n/a' : $pillar->grade->letter;
+            // User view: missing data becomes the expected terminal output state.
             $scoreText = $pillar->grade === null ? '  n/a ' : sprintf('%6.2f', $pillar->grade->score);
             $lines[]   = sprintf(
                 '  %-' . $pillarWidth . 's %s %s findings=%-5d advisory=%-5d warning=%-5d error=%-5d',
@@ -500,10 +564,13 @@ final class SummaryCommand extends Command
             );
         }
 
+        // User view: choose the terminal output branch for this case.
+        // User view: an empty value becomes a clear terminal output fallback.
         if ($summaryReportData->topRules !== []) {
             $lines[] = '';
             $lines[] = sprintf('Top %d rules by finding count', count($summaryReportData->topRules));
             $idWidth = $this->columnWidth(array_map(static fn(array $ruleSummary): string => $ruleSummary['ruleId'], $summaryReportData->topRules), 30);
+            // User view: add each item that can appear in terminal output.
             foreach ($summaryReportData->topRules as $ruleSummary) {
                 $lines[] = sprintf(
                     '  %5d  %-' . $idWidth . 's  %s  a=%d w=%d e=%d',
@@ -517,10 +584,13 @@ final class SummaryCommand extends Command
             }
         }
 
+        // User view: choose the terminal output branch for this case.
+        // User view: an empty value becomes a clear terminal output fallback.
         if ($summaryReportData->topOffenders !== []) {
             $lines[]   = '';
             $lines[]   = sprintf('Top %d file offenders', count($summaryReportData->topOffenders));
             $fileWidth = $this->columnWidth(array_map(static fn($file): string => $file->filePath, $summaryReportData->topOffenders), 30);
+            // User view: add each item that can appear in terminal output.
             foreach ($summaryReportData->topOffenders as $file) {
                 $lines[] = sprintf(
                     '  %s  %6.2f  %-' . $fileWidth . 's  findings=%-4d a=%d w=%d e=%d',
@@ -535,6 +605,7 @@ final class SummaryCommand extends Command
             }
         }
 
+        // User view: choose the terminal output branch for this case.
         if ($summaryReportData->totals['total'] > 0) {
             $lines[] = '';
             $lines[] = 'Baseline  After review, `gruff-php analyse --generate-baseline` records current findings as known debt.';
@@ -547,6 +618,8 @@ final class SummaryCommand extends Command
     /**
      * Render a JSON-encoded summary report.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param SummaryReportData $summaryReportData - Aggregated run data to serialise under the gruff.summary schema.
      *
      * @return string - JSON-encoded summary report.
@@ -579,6 +652,8 @@ final class SummaryCommand extends Command
     }
 
     /**
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param list<string> $columnTexts - Rendered cell text for one summary column.
      * @param int          $minimum - Floor width applied when every value is shorter, keeping columns from collapsing.
      *
@@ -587,8 +662,10 @@ final class SummaryCommand extends Command
     private function columnWidth(array $columnTexts, int $minimum): int
     {
         $maximum = $minimum;
+        // User view: add each item that can appear in terminal output.
         foreach ($columnTexts as $columnText) {
             $length = strlen($columnText);
+            // User view: choose the terminal output branch for this case.
             if ($length > $maximum) {
                 $maximum = $length;
             }

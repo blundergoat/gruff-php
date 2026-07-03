@@ -53,6 +53,8 @@ final readonly class NegativeBooleanRule implements RuleInterface
     /**
      * Describe the negative boolean rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -72,6 +74,8 @@ final readonly class NegativeBooleanRule implements RuleInterface
     /**
      * Find bool properties and parameters that use negative flag names.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for CLI mirror allowlist.
      *
@@ -83,11 +87,14 @@ final readonly class NegativeBooleanRule implements RuleInterface
         $allowlist  = $ruleContext->settingsFor($definition)->stringListOption('cliMirrorAllowlist');
         $findings   = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (NodeIndex::nodesOf($analysisUnit, Property::class) as $property) {
+            // User view: choose the findings list branch for this case.
             if (!$this->isBoolType($property->type)) {
                 continue;
             }
 
+            // User view: add each item that can appear in findings list.
             foreach ($property->props as $prop) {
                 $finding = $this->propertyFinding(
                     definition:       $definition,
@@ -95,13 +102,16 @@ final readonly class NegativeBooleanRule implements RuleInterface
                     propertyProperty: $prop,
                     allowlist:        $allowlist,
                 );
+                // User view: choose the findings list branch for this case.
                 if ($finding instanceof Finding) {
                     $findings[] = $finding;
                 }
             }
         }
 
+        // User view: add each item that can appear in findings list.
         foreach ((new FunctionLikeScopeWalker())->scopes($analysisUnit->statements) as $scope) {
+            // User view: add each item that can appear in findings list.
             foreach ($scope->node->params as $param) {
                 $finding = $this->parameterFinding(
                     definition:   $definition,
@@ -110,6 +120,7 @@ final readonly class NegativeBooleanRule implements RuleInterface
                     param:        $param,
                     allowlist:    $allowlist,
                 );
+                // User view: choose the findings list branch for this case.
                 if ($finding instanceof Finding) {
                     $findings[] = $finding;
                 }
@@ -120,6 +131,8 @@ final readonly class NegativeBooleanRule implements RuleInterface
     }
 
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param RuleDefinition   $definition - Rule metadata threaded into any emitted finding.
      * @param AnalysisUnit     $analysisUnit - Parsed unit supplying the display path and line for the finding.
      * @param PropertyProperty $propertyProperty - Single declared property whose name is tested for a negative prefix.
@@ -137,6 +150,8 @@ final readonly class NegativeBooleanRule implements RuleInterface
         $prefix       = self::negativeFlagPrefix($name);
         $allowlistKey = $this->propertyAllowlistKey($propertyProperty);
 
+        // User view: choose the findings list branch for this case.
+        // User view: missing data becomes the expected findings list state.
         if ($prefix === null || ($allowlistKey !== null && in_array($allowlistKey, $allowlist, true))) {
             return null;
         }
@@ -154,6 +169,8 @@ final readonly class NegativeBooleanRule implements RuleInterface
     }
 
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param RuleDefinition    $definition - Rule metadata threaded into any emitted finding.
      * @param AnalysisUnit      $analysisUnit - Parsed unit supplying the display path and line for the finding.
      * @param FunctionLikeScope $scope - Enclosing function-like scope, used to build the symbol and allowlist key.
@@ -169,6 +186,7 @@ final readonly class NegativeBooleanRule implements RuleInterface
         Param $param,
         array $allowlist,
     ): ?Finding {
+        // User view: choose the findings list branch for this case.
         if (!$this->isBoolType($param->type) || !$param->var instanceof Variable || !is_string($param->var->name)) {
             return null;
         }
@@ -177,6 +195,8 @@ final readonly class NegativeBooleanRule implements RuleInterface
         $prefix       = self::negativeFlagPrefix($name);
         $allowlistKey = $this->parameterAllowlistKey($scope, $param);
 
+        // User view: choose the findings list branch for this case.
+        // User view: missing data becomes the expected findings list state.
         if ($prefix === null || ($allowlistKey !== null && in_array($allowlistKey, $allowlist, true))) {
             return null;
         }
@@ -196,6 +216,8 @@ final readonly class NegativeBooleanRule implements RuleInterface
     /**
      * Build a negative boolean finding.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param RuleDefinition $definition - Source of the rule id, severity, pillar, tier, and confidence on the finding.
      * @param AnalysisUnit   $analysisUnit - Parsed unit supplying the display path reported as the finding location.
      * @param Node           $node - Declaration node whose start line locates the finding.
@@ -244,6 +266,8 @@ final readonly class NegativeBooleanRule implements RuleInterface
      * owned by exactly one rule; `north`/`normalised`-style words never match because
      * the prefix must end at an uppercase letter or underscore boundary.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $name - Identifier to test, without its leading sigil.
      *
      * @return string|null - Matched prefix, or null when the name is acceptable.
@@ -251,14 +275,17 @@ final readonly class NegativeBooleanRule implements RuleInterface
     public static function negativeFlagPrefix(string $name): ?string
     {
         // Try each known negative word against the front of the identifier.
+        // User view: add each item that can appear in findings list.
         foreach (self::NEGATIVE_PREFIXES as $prefix) {
             // The prefix must start the name and leave at least one character after it.
+            // User view: choose the findings list branch for this case.
             if (!str_starts_with($name, $prefix) || strlen($name) <= strlen($prefix)) {
                 continue;
             }
 
             $nextChar = $name[strlen($prefix)];
             // Only a word boundary counts, so plain words like "north" never read as negatives.
+            // User view: choose the findings list branch for this case.
             if (($nextChar >= 'A' && $nextChar <= 'Z') || $nextChar === '_') {
                 return $prefix;
             }
@@ -270,6 +297,8 @@ final readonly class NegativeBooleanRule implements RuleInterface
     /**
      * Build the allowlist key for a property when its declaring class is known.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param PropertyProperty $propertyProperty - Declared property whose fully qualified key is being built.
      *
      * @return string|null - Fully qualified property key.
@@ -279,12 +308,15 @@ final readonly class NegativeBooleanRule implements RuleInterface
         $class = $this->enclosingClassLike($propertyProperty);
         $fqn   = $class instanceof ClassLike ? $this->classLikeFqn($class) : null;
 
+        // User view: missing data becomes the expected findings list state.
         return $fqn === null ? null : sprintf('%s::%s', $fqn, $propertyProperty->name->toString());
     }
 
     /**
      * Build the allowlist key for a parameter or promoted property.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param FunctionLikeScope $scope - Enclosing scope whose node resolves the declaring class and method name.
      * @param Param             $param - Parameter whose name and promotion flags shape the key.
      *
@@ -292,20 +324,25 @@ final readonly class NegativeBooleanRule implements RuleInterface
      */
     private function parameterAllowlistKey(FunctionLikeScope $scope, Param $param): ?string
     {
+        // User view: choose the findings list branch for this case.
         if (!$param->var instanceof Variable || !is_string($param->var->name)) {
             return null;
         }
 
         $class = $this->enclosingClassLike($scope->node);
         $fqn   = $class instanceof ClassLike ? $this->classLikeFqn($class) : null;
+        // User view: choose the findings list branch for this case.
+        // User view: missing data becomes the expected findings list state.
         if ($fqn === null) {
             return null;
         }
 
+        // User view: choose the findings list branch for this case.
         if ($param->flags !== 0) {
             return sprintf('%s::%s', $fqn, $param->var->name);
         }
 
+        // User view: choose the findings list branch for this case.
         if (!$scope->node instanceof ClassMethod) {
             return null;
         }
@@ -316,12 +353,16 @@ final readonly class NegativeBooleanRule implements RuleInterface
     /**
      * Resolve a class-like node to its namespace-qualified name.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param ClassLike $class - Class, interface, trait, or enum node being qualified.
      *
      * @return string|null - Fully qualified class-like name.
      */
     private function classLikeFqn(ClassLike $class): ?string
     {
+        // User view: choose the findings list branch for this case.
+        // User view: missing data becomes the expected findings list state.
         if ($class->name === null) {
             return null;
         }
@@ -337,6 +378,8 @@ final readonly class NegativeBooleanRule implements RuleInterface
     /**
      * Walk parent attributes to find the enclosing class-like declaration.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Node $node - Starting node whose ancestors are walked; relies on the parent attribute being set.
      *
      * @return ClassLike|null - Enclosing class, interface, trait, or enum.
@@ -346,6 +389,7 @@ final readonly class NegativeBooleanRule implements RuleInterface
         $parent = $node->getAttribute('parent');
 
         while ($parent instanceof Node) {
+            // User view: choose the findings list branch for this case.
             if ($parent instanceof ClassLike) {
                 return $parent;
             }
@@ -359,6 +403,8 @@ final readonly class NegativeBooleanRule implements RuleInterface
     /**
      * Walk parent attributes to find the enclosing namespace.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Node $node - Starting node whose ancestors are walked; relies on the parent attribute being set.
      *
      * @return Namespace_|null - Enclosing namespace node.
@@ -368,6 +414,7 @@ final readonly class NegativeBooleanRule implements RuleInterface
         $parent = $node->getAttribute('parent');
 
         while ($parent instanceof Node) {
+            // User view: choose the findings list branch for this case.
             if ($parent instanceof Namespace_) {
                 return $parent;
             }
@@ -381,24 +428,30 @@ final readonly class NegativeBooleanRule implements RuleInterface
     /**
      * Check whether a declaration type is bool or nullable bool.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Node|null $type - Declared type node, or null for an untyped declaration the rule ignores.
      *
      * @return bool - True when the type resolves to bool, including ?bool and bool|null.
      */
     private function isBoolType(?Node $type): bool
     {
+        // User view: choose the findings list branch for this case.
         if ($type instanceof NullableType) {
             return $this->isBoolType($type->type);
         }
 
+        // User view: choose the findings list branch for this case.
         if ($type instanceof Identifier) {
             return $type->toLowerString() === 'bool';
         }
 
+        // User view: choose the findings list branch for this case.
         if ($type instanceof Name) {
             return strtolower($type->toString()) === 'bool';
         }
 
+        // User view: choose the findings list branch for this case.
         if ($type instanceof UnionType) {
             $nonNull = array_values(array_filter(
                 $type->types,
@@ -414,12 +467,15 @@ final readonly class NegativeBooleanRule implements RuleInterface
     /**
      * Resolve the human-readable symbol for a function-like scope.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param FunctionLikeScope $scope - Scope whose node names the finding; named callables and closures differ.
      *
      * @return string - Named callable symbol or synthetic closure/arrow label.
      */
     private function symbol(FunctionLikeScope $scope): string
     {
+        // User view: choose the findings list branch for this case.
         if ($scope->node instanceof ClassMethod || $scope->node instanceof Function_) {
             return CyclomaticComplexityRule::resolveSymbol($scope->node);
         }

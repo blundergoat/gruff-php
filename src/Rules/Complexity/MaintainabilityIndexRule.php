@@ -32,6 +32,8 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
     /**
      * Describe the maintainability index rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and thresholds.
      */
     public function definition(): RuleDefinition
@@ -53,6 +55,8 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
     /**
      * Find function-like declarations whose maintainability index falls below thresholds.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context carrying thresholds.
      *
@@ -67,11 +71,14 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
 
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node NodeIndex query is constrained to function-like classes. */
             $mi             = self::computeMaintainabilityIndex($node, $analysisUnit);
             $thresholdMatch = $settings->lowValueThresholdMatch($mi);
 
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($thresholdMatch === null) {
                 continue;
             }
@@ -109,6 +116,8 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
     }
 
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param ClassMethod|Function_ $node - Function-like node to score.
      * @param AnalysisUnit          $analysisUnit - Parsed unit that owns the node.
      *
@@ -119,6 +128,7 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
         $startLine = $node->getStartLine();
         $endLine   = $node->getEndLine();
 
+        // User view: choose the findings list branch for this case.
         if ($startLine < 0 || $endLine < 0) {
             // No line info to measure (synthetic node), so award a perfect score rather than penalise on no evidence.
             return 100.0;
@@ -138,12 +148,15 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
     /**
      * Format threshold numbers without unnecessary decimal places.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param int|float $number - Configured maintainability threshold; an integral float drops its ".0" tail.
      *
      * @return string - Human-readable threshold value with fractional values preserved and whole values stripped.
      */
     private static function formatNumber(int|float $number): string
     {
+        // User view: choose the findings list branch for this case.
         if (is_float($number) && floor($number) !== $number) {
             return (string) $number;
         }

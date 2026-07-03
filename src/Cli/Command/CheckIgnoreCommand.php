@@ -30,6 +30,8 @@ final class CheckIgnoreCommand extends Command
     /**
      * Register check-ignore CLI arguments and options.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @return void
      */
     protected function configure(): void
@@ -46,6 +48,8 @@ final class CheckIgnoreCommand extends Command
     /**
      * Resolve each path's ignore decision and render it as text or JSON.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface  $input - Parsed invocation supplying the paths argument and format/config options.
      * @param OutputInterface $output - Console stream that receives the rendered report and any error lines.
      *
@@ -54,6 +58,7 @@ final class CheckIgnoreCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $format = $input->getOption('format');
+        // User view: choose the terminal output branch for this case.
         if (!is_string($format) || !in_array($format, ['text', 'json'], true)) {
             $output->writeln('<error>USAGE-ERROR Unsupported check-ignore format. Use text or json.</error>');
 
@@ -63,8 +68,11 @@ final class CheckIgnoreCommand extends Command
         }
 
         $configPath = $input->getOption('config');
+        // User view: an empty value becomes a clear terminal output fallback.
         $configPath = is_string($configPath) && $configPath !== '' ? $configPath : null;
         $noConfig   = (bool) $input->getOption('no-config');
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($noConfig && $configPath !== null) {
             $output->writeln('<error>USAGE-ERROR --no-config cannot be combined with --config.</error>');
 
@@ -77,6 +85,7 @@ final class CheckIgnoreCommand extends Command
         $paths = $input->getArgument('paths');
 
         $projectRoot = getcwd();
+        // User view: choose the terminal output branch for this case.
         if ($projectRoot === false) {
             $output->writeln('<error>Unable to determine the current working directory.</error>');
 
@@ -86,6 +95,8 @@ final class CheckIgnoreCommand extends Command
         }
 
         $patterns = $this->ignorePatterns($projectRoot, $configPath, $noConfig, $output);
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($patterns === null) {
             // ignorePatterns() already reported the config error; propagate the usage exit code so
             // the failure is not masked by a later "nothing ignored" result.
@@ -96,6 +107,7 @@ final class CheckIgnoreCommand extends Command
         $results  = [];
         $anyIgnored = false;
 
+        // User view: add each item that can appear in terminal output.
         foreach ($paths as $path) {
             $decision = $this->decideForPath($resolver, $projectRoot, $patterns, $path);
             $anyIgnored = $anyIgnored || $decision->ignored;
@@ -115,6 +127,8 @@ final class CheckIgnoreCommand extends Command
             return Command::INVALID;
         }
 
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($rendered !== null) {
             $output->write($rendered, false, OutputInterface::OUTPUT_RAW);
         }
@@ -127,6 +141,8 @@ final class CheckIgnoreCommand extends Command
     /**
      * Resolve the configured ignore patterns, mirroring analyse config resolution.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string          $projectRoot - Absolute project root that anchors config discovery and relative patterns.
      * @param string|null     $configPath - Explicit config file to load, or null to auto-discover the default file.
      * @param bool            $noConfig - When true, skip file discovery entirely and use only built-in defaults.
@@ -138,6 +154,7 @@ final class CheckIgnoreCommand extends Command
     {
         $registry = RuleRegistry::defaults();
 
+        // User view: choose the terminal output branch for this case.
         if ($noConfig) {
             // --no-config means "ignore on-disk config": resolve patterns from registry defaults
             // alone so the result is identical to analyse running with the same flag.
@@ -163,6 +180,8 @@ final class CheckIgnoreCommand extends Command
      * Decide whether a single path is ignored, consulting Git only when the
      * configured and built-in rules do not already exclude it.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param PathIgnoreResolver $resolver - Engine that evaluates config/built-in patterns and the Git fallback.
      * @param string             $projectRoot - Absolute root the path is made relative to before matching.
      * @param list<string>       $patterns - Configured paths.ignore glob patterns.
@@ -173,9 +192,11 @@ final class CheckIgnoreCommand extends Command
     private function decideForPath(PathIgnoreResolver $resolver, string $projectRoot, array $patterns, string $path): IgnoreDecision
     {
         $absolutePath = PathHelper::resolveAgainst($projectRoot, $path);
+        // User view: missing data becomes a safe terminal output default.
         $displayPath  = PathHelper::relativeToRoot($absolutePath, $projectRoot) ?? PathHelper::normalizeSeparators($path);
 
         $decision = $resolver->decide($displayPath, $absolutePath, $patterns, false);
+        // User view: choose the terminal output branch for this case.
         if ($decision->ignored) {
             // Config/built-in rules already exclude the path; return their decision so its reported
             // source and pattern win and the slower Git lookup is skipped.
@@ -183,6 +204,8 @@ final class CheckIgnoreCommand extends Command
         }
 
         $gitRule = $resolver->gitIgnoreRule($displayPath);
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($gitRule !== null) {
             // Not excluded by gruff config, but .gitignore covers it: report the Git match so the
             // path is treated as ignored with .gitignore as the attributed source.
@@ -196,6 +219,8 @@ final class CheckIgnoreCommand extends Command
     /**
      * Render the per-path results as text (ignored paths only) or JSON (all paths).
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param list<array{path: string, ignored: bool, source: string|null, pattern: string|null}> $results - One entry per requested path, in request order, each carrying its ignore decision.
      * @param string $format - Already-validated output format, either `json` or `text`.
      * @param bool   $isVerbose - When true, text output appends the matching source and pattern per path.
@@ -205,6 +230,7 @@ final class CheckIgnoreCommand extends Command
      */
     private function render(array $results, string $format, bool $isVerbose): ?string
     {
+        // User view: choose the terminal output branch for this case.
         if ($format === 'json') {
             // JSON mode reports every path (ignored or not) so machine consumers get the full
             // decision set; pretty-print with unescaped slashes to keep paths human-readable.
@@ -212,7 +238,9 @@ final class CheckIgnoreCommand extends Command
         }
 
         $lines = [];
+        // User view: add each item that can appear in terminal output.
         foreach ($results as $result) {
+            // User view: choose the terminal output branch for this case.
             if (!$result['ignored']) {
                 continue;
             }
@@ -224,6 +252,7 @@ final class CheckIgnoreCommand extends Command
 
         // Text mode lists only ignored paths (like `git check-ignore`); return null for an empty set
         // so the caller writes nothing instead of a stray trailing newline.
+        // User view: an empty value becomes a clear terminal output fallback.
         return $lines === [] ? null : implode(PHP_EOL, $lines) . PHP_EOL;
     }
 }

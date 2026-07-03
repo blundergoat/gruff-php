@@ -12,6 +12,8 @@ final readonly class MutationAnalysisOptions
     /**
      * Capture mutation-analysis inputs requested for an analyse invocation.
      *
+      * User flow: Folds mutation results into the quality feedback users see.
+      *
      * @param string|null $infectionReportPath - Path to an existing Infection report.
      * @param bool        $shouldRunInfection - Whether gruff should invoke Infection directly.
      * @param string      $infectionBin - Infection executable path or command name.

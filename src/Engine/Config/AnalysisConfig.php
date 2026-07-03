@@ -32,6 +32,8 @@ final readonly class AnalysisConfig
     ];
 
     /**
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param array<string, RuleSettings>  $rules - Effective settings keyed by rule id.
      * @param float                        $minimumPhpVersion - Minimum PHP version used by version-sensitive rules.
      * @param RuleSelection                $ruleSelection - Include/exclude rule selection for the run.
@@ -53,6 +55,7 @@ final readonly class AnalysisConfig
         private array           $minimumSeverity = [],
         private ?FailThresholds $failureConditions = null,
     ) {
+        // User view: choose the configured analysis run branch for this case.
         if ($this->minimumPhpVersion < 7.4) {
             throw new InvalidArgumentException('Minimum PHP version must be at least 7.4.');
         }
@@ -61,6 +64,8 @@ final readonly class AnalysisConfig
     /**
      * Build default settings for every rule in the registry.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param RuleRegistry $registry - Rule registry supplying default rule definitions.
      *
      * @return self - Config initialised with registry defaults.
@@ -69,6 +74,7 @@ final readonly class AnalysisConfig
     {
         $rules = [];
 
+        // User view: add each item that can appear in configured analysis run.
         foreach ($registry->all() as $rule) {
             $definition             = $rule->definition();
             $rules[$definition->id] = new RuleSettings(
@@ -85,6 +91,8 @@ final readonly class AnalysisConfig
     /**
      * Return the configured settings for a known rule id.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param string $ruleId - Rule identifier to read.
      *
      * @return RuleSettings - effective settings for the rule; never null since an unknown id throws instead
@@ -93,12 +101,15 @@ final readonly class AnalysisConfig
     public function ruleSettings(string $ruleId): RuleSettings
     {
         return $this->rules[$ruleId]
+               // User view: missing data becomes a safe configured analysis run default.
                ?? throw new InvalidArgumentException(sprintf('Unknown rule id "%s".', $ruleId));
     }
 
     /**
      * Return a copy with one rule's settings replaced.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param string       $ruleId - Rule identifier to replace.
      * @param RuleSettings $settings - New settings for the rule.
      *
@@ -107,6 +118,7 @@ final readonly class AnalysisConfig
      */
     public function withRuleSettings(string $ruleId, RuleSettings $settings): self
     {
+        // User view: choose the configured analysis run branch for this case.
         if (!isset($this->rules[$ruleId])) {
             throw new InvalidArgumentException(sprintf('Unknown rule id "%s".', $ruleId));
         }
@@ -129,6 +141,8 @@ final readonly class AnalysisConfig
     /**
      * Return the minimum PHP version used by version-sensitive rules.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @return float - PHP version floor gating version-sensitive rules; always >= 7.4 per the constructor guard
      */
     public function minimumPhpVersion(): float
@@ -139,6 +153,8 @@ final readonly class AnalysisConfig
     /**
      * Return a copy with a different minimum PHP version.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param float $minimumPhpVersion - New minimum PHP version floor.
      *
      * @return self - Config carrying the updated PHP version floor.
@@ -160,6 +176,8 @@ final readonly class AnalysisConfig
     /**
      * Expose rule settings keyed by rule identifier.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @return array<string, RuleSettings> - every rule's effective settings keyed by rule id; never empty since the registry seeds one entry per rule
      */
     public function rules(): array
@@ -170,6 +188,8 @@ final readonly class AnalysisConfig
     /**
      * Return the rule include/exclude selection for this analysis run.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @return RuleSelection - include/exclude filters over the rule map; an empty selection runs every enabled rule
      */
     public function ruleSelection(): RuleSelection
@@ -180,6 +200,8 @@ final readonly class AnalysisConfig
     /**
      * Return a copy with a different rule selection.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param RuleSelection $ruleSelection - Rule include/exclude selection to apply.
      *
      * @return self - Config carrying the updated rule selection.
@@ -201,6 +223,8 @@ final readonly class AnalysisConfig
     /**
      * Expose configured path ignore patterns.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @return list<string> - glob patterns discovery skips; empty means scan every path the discovery roots reach
      */
     public function ignoredPathPatterns(): array
@@ -209,6 +233,8 @@ final readonly class AnalysisConfig
     }
 
     /**
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param list<string> $ignoredPathPatterns - Path patterns skipped during discovery.
      *
      * @return self - Config carrying the updated ignored path patterns.
@@ -230,6 +256,8 @@ final readonly class AnalysisConfig
     /**
      * Expose identifier abbreviations allowed by naming rules.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @return list<string> - abbreviations naming rules treat as words; the single stored list (built-in seed or the user's wholesale replacement),
      *                      never a merge of both
      */
@@ -239,6 +267,8 @@ final readonly class AnalysisConfig
     }
 
     /**
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param list<string> $acceptedAbbreviations - Abbreviations accepted by naming rules.
      *
      * @return self - Config carrying the updated accepted abbreviation list.
@@ -260,6 +290,8 @@ final readonly class AnalysisConfig
     /**
      * Expose redacted secret previews allowed by sensitive-data rules.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @return list<string> - redacted secret previews cleared as false positives; sensitive-data rules suppress findings matching these, empty means
      *                      suppress none
      */
@@ -269,6 +301,8 @@ final readonly class AnalysisConfig
     }
 
     /**
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param list<string> $allowedSecretPreviews - Secret previews explicitly allowed by config.
      *
      * @return self - Config carrying the updated allowed secret preview list.
@@ -290,16 +324,21 @@ final readonly class AnalysisConfig
     /**
      * Return the per-command exit-code threshold for the named gating command.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param string $command - Gating command name (analyse, report, dashboard).
      *
      * @return FailThreshold|null - Configured threshold for the command, or null when unset.
      */
     public function failThresholdFor(string $command): ?FailThreshold
     {
+        // User view: missing data becomes a safe configured analysis run default.
         return $this->minimumSeverity[$command] ?? null;
     }
 
     /**
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param array<string, FailThreshold> $minimumSeverity - Per-command exit-code thresholds keyed by command name.
      *
      * @return self - Config carrying the updated minimumSeverity map.
@@ -321,6 +360,8 @@ final readonly class AnalysisConfig
     /**
      * Return the severity-bucketed count gate from failureConditions config, when set.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @return FailThresholds|null - Configured failure-condition thresholds, or null when unset.
      */
     public function failureConditions(): ?FailThresholds
@@ -329,6 +370,8 @@ final readonly class AnalysisConfig
     }
 
     /**
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param FailThresholds|null $failureConditions - Severity-bucketed count gate to apply, or null to clear it.
      *
      * @return self - Config carrying the updated failure conditions.

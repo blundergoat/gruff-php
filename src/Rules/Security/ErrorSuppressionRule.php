@@ -29,6 +29,8 @@ final class ErrorSuppressionRule implements RuleInterface
     /**
      * Describe the error suppression security rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -48,6 +50,8 @@ final class ErrorSuppressionRule implements RuleInterface
     /**
      * Find uses of PHP error suppression that can hide failures.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -57,6 +61,7 @@ final class ErrorSuppressionRule implements RuleInterface
     {
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\ErrorSuppress::class) as $node) {
             $findings[] = new Finding(
                 ruleId:           self::ID,

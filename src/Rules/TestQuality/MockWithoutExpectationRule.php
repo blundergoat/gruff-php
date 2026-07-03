@@ -39,6 +39,8 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     /**
      * Describe the mock-without-expectation rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - id, name, pillar, tier and the default Warning/Medium severity the engine reads
      */
     public function definition(): RuleDefinition
@@ -56,6 +58,8 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     /**
      * Find mocks that are read without any verification call.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -65,6 +69,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     {
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             $findings = array_merge($findings, $this->findingsForScope($analysisUnit, $scope));
         }
@@ -75,6 +80,8 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     /**
      * Build mock-expectation findings for one test scope.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit     $analysisUnit - Parsed unit supplying the display path recorded on each finding.
      * @param TestQualityScope $scope - Single test method or function whose mock usage is examined.
      *
@@ -85,6 +92,8 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
         $assignedVarObjectIds = [];
         $mockAssignments      = $this->mockAssignments($scope, $assignedVarObjectIds);
 
+        // User view: choose the findings list branch for this case.
+        // User view: an empty value becomes a clear findings list fallback.
         if ($mockAssignments === []) {
             // No mocks were created in this scope, so there is nothing to verify expectations against.
             return [];
@@ -93,6 +102,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
         $reads    = $this->variableReads($scope, $assignedVarObjectIds);
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach ($mockAssignments as $varName => $assignment) {
             $finding = $this->findingForMock(
                 analysisUnit: $analysisUnit,
@@ -102,6 +112,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
                 reads:        $reads,
             );
 
+            // User view: choose the findings list branch for this case.
             if ($finding instanceof Finding) {
                 $findings[] = $finding;
             }
@@ -113,6 +124,8 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     /**
      * Collect mock variables created in the test scope.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param TestQualityScope $scope - Test scope whose assignments are scanned for mock creation.
      * @param array<int, true> $assignedVarObjectIds - Out-param: records the object id of every assigned variable
      *                                                 node so {@see variableReads()} can exclude the write side and
@@ -129,13 +142,16 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
         $mockAssignments = [];
         $assignments     = NodeIndex::descendantsOfAny($scope->node, [Expr\Assign::class]);
 
+        // User view: add each item that can appear in findings list.
         foreach ($assignments as $assign) {
+            // User view: choose the findings list branch for this case.
             if (!$assign->var instanceof Expr\Variable || !is_string($assign->var->name)) {
                 continue;
             }
 
             $assignedVarObjectIds[spl_object_id($assign->var)] = true;
 
+            // User view: choose the findings list branch for this case.
             if (!$this->isMockCreationExpression($assign->expr)) {
                 continue;
             }
@@ -153,6 +169,8 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     /**
      * Collect reads of variables created as mocks.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param TestQualityScope $scope - Test scope whose variable nodes are walked.
      * @param array<int, true> $assignedVarObjectIds - Object ids of assignment-target nodes, used to skip the write
      *                                                 side so a mock that is only assigned and never read is treated
@@ -166,11 +184,14 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     {
         $reads = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (NodeIndex::descendantsOfAny($scope->node, [Expr\Variable::class]) as $var) {
+            // User view: choose the findings list branch for this case.
             if (!is_string($var->name)) {
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
             if (isset($assignedVarObjectIds[spl_object_id($var)])) {
                 continue;
             }
@@ -185,6 +206,8 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     /**
      * Decide whether one mock variable lacks a verifying call and build the finding if so.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit                       $analysisUnit - Parsed unit supplying the display path for the finding.
      * @param TestQualityScope                   $scope - Test scope the mock lives in; its symbol labels findings.
      * @param string                             $varName - Mock variable name without the leading sigil.
@@ -202,12 +225,14 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
         array            $assignment,
         array            $reads,
     ): ?Finding {
+        // User view: choose the findings list branch for this case.
         if (!isset($reads[$varName])) {
             // Assigned but never read: that is dead-mock territory for a different rule, not ours.
             return null;
         }
 
         $methodNames = $this->methodNamesCalledOnVariable($scope, $varName);
+        // User view: choose the findings list branch for this case.
         if ($this->hasAnyIntersection($methodNames, self::VERIFICATION_METHODS)) {
             // An explicit expectation (expects/shouldReceive) proves intent, so the mock is fine.
             return null;
@@ -235,6 +260,8 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     /**
      * Build the finding message for a mock variable.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $symbol - Enclosing test symbol named in the message so the reader can locate the mock.
      * @param string $varName - Mock variable name without the sigil; rendered as $name in the message.
      * @param bool   $hasStub - True selects the stub-only wording (has return setup), false the bare-mock wording.
@@ -243,6 +270,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
      */
     private function mockMessage(string $symbol, string $varName, bool $hasStub): string
     {
+        // User view: choose the findings list branch for this case.
         if ($hasStub) {
             // Stub-only: return values are wired but no call is asserted, so the wording names that gap.
             return sprintf('%s sets up mock $%s with stub return values but never verifies any call.', $symbol, $varName);
@@ -255,17 +283,21 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     /**
      * Detect whether an expression creates a mock directly or through a method chain.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Expr $expr - Right-hand side of an assignment being classified as mock creation or not.
      *
      * @return bool - true when the expression is a recognised mock creator (direct call or builder chain), false otherwise
      */
     private function isMockCreationExpression(Expr $expr): bool
     {
+        // User view: choose the findings list branch for this case.
         if ($expr instanceof Expr\FuncCall || $expr instanceof Expr\StaticCall) {
             // Direct call form such as createMock(...) or Mockery::mock(...) is decided in one hop.
             return TestQualityNodeHelper::isMockCreationCall($expr);
         }
 
+        // User view: choose the findings list branch for this case.
         if (!$expr instanceof Expr\MethodCall) {
             // Only call expressions can create a mock; anything else (literal, variable) cannot.
             return false;
@@ -278,12 +310,15 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     /**
      * Walk a method-call chain to see whether it originates at mock creation.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Expr\MethodCall $call - Outermost call of a builder chain (e.g. ...->getMock()) to trace back to its root.
      *
      * @return bool - true when the outermost call or any receiver back to the chain root is a mock creator
      */
     private function isMockCreationCallChain(Expr\MethodCall $call): bool
     {
+        // User view: choose the findings list branch for this case.
         if (TestQualityNodeHelper::isMockCreationCall($call)) {
             // The outermost call is itself the creator; no need to unwind the receiver.
             return true;
@@ -291,6 +326,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
 
         $receiver = $call->var;
         while ($receiver instanceof Expr\MethodCall) {
+            // User view: choose the findings list branch for this case.
             if (TestQualityNodeHelper::isMockCreationCall($receiver)) {
                 // A mid-chain builder step (getMockBuilder()->...) is the creator we were after.
                 return true;
@@ -307,6 +343,8 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     /**
      * List method names called on a specific variable.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param TestQualityScope $scope - Test scope searched for calls rooted at the variable.
      * @param string           $varName - Variable whose method calls are collected, without the sigil.
      *
@@ -317,12 +355,16 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     {
         $names = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (NodeIndex::descendantsOfAny($scope->node, [Expr\MethodCall::class]) as $call) {
+            // User view: choose the findings list branch for this case.
             if (!$this->isChainRootedAtVariable($call, $varName)) {
                 continue;
             }
 
             $name = TestQualityNodeHelper::callName($call);
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($name !== null) {
                 $names[] = $name;
             }
@@ -334,6 +376,8 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     /**
      * Check whether a method-call chain starts at the target variable.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Expr\MethodCall $call - Call whose receiver chain is unwound to find its base expression.
      * @param string          $varName - Variable name the chain must bottom out at to count as rooted there.
      *
@@ -355,6 +399,8 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     /**
      * Check whether two normalised method-name lists overlap.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param list<string> $names - Normalised method names collected from the test body.
      * @param list<string> $needles - Normalised expectation method names to look for.
      *
@@ -362,7 +408,9 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
      */
     private function hasAnyIntersection(array $names, array $needles): bool
     {
+        // User view: add each item that can appear in findings list.
         foreach ($names as $name) {
+            // User view: choose the findings list branch for this case.
             if (in_array($name, $needles, true)) {
                 // First shared entry is enough to confirm overlap; stop scanning.
                 return true;

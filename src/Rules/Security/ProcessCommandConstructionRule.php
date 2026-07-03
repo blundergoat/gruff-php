@@ -30,6 +30,8 @@ final class ProcessCommandConstructionRule implements RuleInterface
     /**
      * Describe the process command construction rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -48,6 +50,8 @@ final class ProcessCommandConstructionRule implements RuleInterface
     /**
      * Find process commands that include request-controlled expressions.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -57,24 +61,32 @@ final class ProcessCommandConstructionRule implements RuleInterface
     {
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\ShellExec::class) as $shellExec) {
+            // User view: choose the findings list branch for this case.
             if (SecurityNodeHelper::containsUserInput($shellExec)) {
                 $findings[] = $this->finding($analysisUnit, $shellExec, 'shell-exec');
             }
         }
 
+        // User view: add each item that can appear in findings list.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\New_::class) as $new) {
+            // User view: choose the findings list branch for this case.
             if (!SecurityNodeHelper::hasMatchingClassName($new->class, ['Symfony\Component\Process\Process', 'Process'])) {
                 continue;
             }
 
             $firstArg = SecurityNodeHelper::argumentValue($new->args, 0);
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($firstArg !== null && SecurityNodeHelper::containsUserInput($firstArg)) {
                 $findings[] = $this->finding($analysisUnit, $new, 'symfony-process');
             }
         }
 
+        // User view: add each item that can appear in findings list.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\StaticCall::class) as $staticCall) {
+            // User view: choose the findings list branch for this case.
             if (
                 !SecurityNodeHelper::hasMatchingClassName($staticCall->class, ['Symfony\Component\Process\Process', 'Process'])
                 || SecurityNodeHelper::methodName($staticCall) !== 'fromshellcommandline'
@@ -83,6 +95,8 @@ final class ProcessCommandConstructionRule implements RuleInterface
             }
 
             $firstArg = SecurityNodeHelper::argumentValue($staticCall->args, 0);
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($firstArg !== null && SecurityNodeHelper::containsUserInput($firstArg)) {
                 $findings[] = $this->finding($analysisUnit, $staticCall, 'process-shell-commandline');
             }
@@ -94,6 +108,8 @@ final class ProcessCommandConstructionRule implements RuleInterface
     /**
      * Build the process command finding.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Unit being scanned; supplies the display path reported to the reviewer.
      * @param Node         $node - Tainted sink node whose start line anchors the finding for the reviewer.
      * @param string       $sink - Sink discriminator (shell-exec, symfony-process, process-shell-commandline)

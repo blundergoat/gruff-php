@@ -29,6 +29,8 @@ final class SilentCatchRule implements RuleInterface
     /**
      * Describe the silent catch rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -46,6 +48,8 @@ final class SilentCatchRule implements RuleInterface
     /**
      * Find catch blocks that only contain no-op statements.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -55,7 +59,9 @@ final class SilentCatchRule implements RuleInterface
     {
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Catch_::class) as $catch) {
+            // User view: choose the findings list branch for this case.
             if (!$this->isSilent($catch)) {
                 continue;
             }
@@ -79,13 +85,17 @@ final class SilentCatchRule implements RuleInterface
     /**
      * Check whether a catch block has no executable handling statements.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Stmt\Catch_ $catch - Parsed catch block whose body statements are inspected for any real handling.
      *
      * @return bool - True when the catch body is silent.
      */
     private function isSilent(Stmt\Catch_ $catch): bool
     {
+        // User view: add each item that can appear in findings list.
         foreach ($catch->stmts as $statement) {
+            // User view: choose the findings list branch for this case.
             if (!$statement instanceof Stmt\Nop) {
                 // A non-Nop statement is real handling, so the catch is not silent.
                 return false;

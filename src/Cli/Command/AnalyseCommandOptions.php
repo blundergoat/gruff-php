@@ -29,6 +29,8 @@ final readonly class AnalyseCommandOptions
     private const PROFILE_SECURITY = 'security';
 
     /**
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param list<string>               $paths - Paths requested for analysis.
      * @param bool                       $shouldIncludeIgnored - Whether ignored files should be included.
      * @param string|null                $configPath - Explicit config path supplied by the CLI.
@@ -91,6 +93,8 @@ final readonly class AnalyseCommandOptions
     /**
      * Build an options object from the Symfony Console InputInterface, recording any usage errors found.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface $input - Console input to normalize into analyse options.
      *
      * @return self - fully populated options bag whose optionError carries the first usage error, if any.
@@ -103,19 +107,23 @@ final readonly class AnalyseCommandOptions
         $configPath          = $input->getOption('config');
         $baselineFlagPresent = $input->hasParameterOption('--baseline', true);
         $generateFlagPresent = $input->hasParameterOption('--generate-baseline', true);
+        // User view: missing data becomes a safe terminal output default.
         $reportEditorLink    = self::optionalStringOption($input, 'report-editor-link') ?? 'none';
         $isReportInteractive = self::reportInteractive($input);
         $optionError         = null;
 
+        // User view: choose the terminal output branch for this case.
         if (is_string($filePaths)) {
             $optionError = $filePaths;
             $filePaths   = [];
         }
 
+        // User view: choose the terminal output branch for this case.
         if (!in_array($reportEditorLink, ['none', 'vscode', 'phpstorm'], true)) {
             $optionError = '--report-editor-link must be one of: vscode, phpstorm, none.';
         }
 
+        // User view: choose the terminal output branch for this case.
         if (is_string($isReportInteractive)) {
             $optionError         = $isReportInteractive;
             $isReportInteractive = false;
@@ -123,6 +131,7 @@ final readonly class AnalyseCommandOptions
 
         $paths    = array_merge($paths, $filePaths);
         $diffMode = self::diffMode($input, $paths);
+        // User view: choose the terminal output branch for this case.
         if ($diffMode === '-') {
             $paths = array_values(array_filter(
                                       $paths,
@@ -133,13 +142,16 @@ final readonly class AnalyseCommandOptions
         return new self(
             paths:                $paths,
             shouldIncludeIgnored: (bool)$input->getOption('include-ignored'),
+            // User view: an empty value becomes a clear terminal output fallback.
             configPath:           is_string($configPath) && $configPath !== '' ? $configPath : null,
             noConfig:             (bool)$input->getOption('no-config'),
             noCache:              (bool)$input->getOption('no-cache'),
+            // User view: missing data becomes a safe terminal output default.
             profile:              self::optionalStringOption($input, 'profile') ?? self::PROFILE_DEFAULT,
             mutation:             new MutationAnalysisOptions(
                                       infectionReportPath:           self::optionalStringOption($input, 'infection-report'),
                                       shouldRunInfection:            (bool)$input->getOption('infection-run'),
+                                      // User view: missing data becomes a safe terminal output default.
                                       infectionBin:                  self::optionalStringOption($input, 'infection-bin') ?? 'infection',
                                       infectionConfigPath:           self::optionalStringOption($input, 'infection-config'),
                                       infectionTestFrameworkOptions: self::optionalStringOption($input, 'infection-test-framework-options'),
@@ -149,6 +161,7 @@ final readonly class AnalyseCommandOptions
             diffMode:             $diffMode,
             since:                self::optionalStringOption($input, 'since'),
             changedRanges:        self::optionalStringOption($input, 'changed-ranges'),
+            // User view: missing data becomes a safe terminal output default.
             changedScope:         self::optionalStringOption($input, 'changed-scope') ?? 'symbol',
             diffVs:               self::optionalStringOption($input, 'diff-vs'),
             isChangedOnly:        (bool)$input->getOption('changed-only'),
@@ -156,10 +169,12 @@ final readonly class AnalyseCommandOptions
             noBaseline:           (bool)$input->getOption('no-baseline'),
             baseline:             new BaselineApplicationOptions(
                                       baselinePath:         $baselineFlagPresent
+                                                                // User view: missing data becomes a safe terminal output default.
                                                                 ? (self::optionalStringOption($input, 'baseline') ?? BaselineStore::DEFAULT_FILENAME)
                                                                 : null,
                                       isBaselineExplicit:   $baselineFlagPresent,
                                       generateBaselinePath: $generateFlagPresent
+                                                                // User view: missing data becomes a safe terminal output default.
                                                                 ? (self::optionalStringOption($input, 'generate-baseline') ?? BaselineStore::DEFAULT_FILENAME)
                                                                 : null,
                                   ),
@@ -178,6 +193,8 @@ final readonly class AnalyseCommandOptions
     /**
      * Return a copy with the mutation budget set (used after parsing the `--mutation-budget` value).
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param int|null $mutationBudget - Mutation score budget, or null when unset.
      *
      * @return self - a new options bag identical to this one but with the mutation budget swapped in.
@@ -224,14 +241,19 @@ final readonly class AnalyseCommandOptions
     /**
      * Return a copy that auto-applies the project's default baseline when one exists and no other baseline flag is set.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string $projectRoot - Project root used to look for the default baseline file.
      *
      * @return self - a copy with the implicit default baseline applied, or this same instance unchanged when it cannot apply.
      */
     public function withDefaultBaseline(string $projectRoot): self
     {
+        // User view: choose the terminal output branch for this case.
         if (
+            // User view: missing data becomes the expected terminal output state.
             $this->baseline->baselinePath !== null
+            // User view: missing data becomes the expected terminal output state.
             || $this->baseline->generateBaselinePath !== null
             || $this->noBaseline
             || !is_file(rtrim($projectRoot, '/') . '/' . BaselineStore::DEFAULT_FILENAME)
@@ -275,17 +297,26 @@ final readonly class AnalyseCommandOptions
     /**
      * Return the first usage-error message the input produced, or null when the combination is valid.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @return string|null - the first failing check's message, or null when every flag combination validated and the run may proceed.
      */
     public function usageError(): ?string
     {
         return $this->optionError
+               // User view: missing data becomes a safe terminal output default.
                ?? $this->configUsageError()
+                  // User view: missing data becomes a safe terminal output default.
                   ?? self::profileUsageErrorFor($this->profile)
+                     // User view: missing data becomes a safe terminal output default.
                      ?? $this->baselineUsageError()
+                        // User view: missing data becomes a safe terminal output default.
                         ?? $this->diffUsageError()
+                           // User view: missing data becomes a safe terminal output default.
                            ?? $this->changedOnlyUsageError()
+                              // User view: missing data becomes a safe terminal output default.
                               ?? $this->noBaselineUsageError()
+                                 // User view: missing data becomes a safe terminal output default.
                                  ?? $this->displayFilterError();
     }
 
@@ -295,11 +326,14 @@ final readonly class AnalyseCommandOptions
      * The rule lists are already enforced at execution level via the run's RuleSelection;
      * they ride along here so report metadata (run.filters) names every active filter.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @return FindingDisplayFilter - the enum-typed filter the reporter applies to decide which findings to display.
      */
     public function displayFilter(): FindingDisplayFilter
     {
         return new FindingDisplayFilter(
+            // User view: missing data becomes the expected terminal output state.
             minSeverity:    $this->minSeverity === null ? null : Severity::from($this->minSeverity),
             includePillars: array_map(static fn(string $optionValue): Pillar => Pillar::from($optionValue), $this->includePillars),
             excludePillars: array_map(static fn(string $optionValue): Pillar => Pillar::from($optionValue), $this->excludePillars),
@@ -311,11 +345,14 @@ final readonly class AnalyseCommandOptions
     /**
      * Build the execution selection implied by the requested profile, or null for normal configured selection.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @return RuleSelection|null - selection narrowing execution to security pillars under the security profile, or null to keep the configured rule
      *                            set.
      */
     public function profileRuleSelection(): ?RuleSelection
     {
+        // User view: choose the terminal output branch for this case.
         if ($this->profile !== self::PROFILE_SECURITY) {
             return null;
         }
@@ -329,6 +366,8 @@ final readonly class AnalyseCommandOptions
     /**
      * Return the pillar set that should contribute to composite scoring for the requested profile.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @return list<Pillar>|null - the pillars that count toward the composite grade under the security profile, or null to score every pillar.
      */
     public function profileScorePillars(): ?array
@@ -342,12 +381,15 @@ final readonly class AnalyseCommandOptions
      * Static so commands that forward analyse options (report) can validate profile/include
      * coherence against the same pillar set before any prompt or subprocess runs.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string $profile - Requested profile name.
      *
      * @return list<Pillar>|null - the pillars the security profile scores, or null when the profile scores every pillar
      */
     public static function scorePillarsForProfile(string $profile): ?array
     {
+        // User view: choose the terminal output branch for this case.
         if ($profile !== self::PROFILE_SECURITY) {
             return null;
         }
@@ -360,12 +402,15 @@ final readonly class AnalyseCommandOptions
      *
      * Shared with report so forwarded profile errors are rejected before report-only side effects.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string $profile - Requested profile name.
      *
      * @return string|null - the message naming the unrecognised profile, or null when the profile is supported
      */
     public static function profileUsageErrorFor(string $profile): ?string
     {
+        // User view: choose the terminal output branch for this case.
         if (in_array($profile, [self::PROFILE_DEFAULT, self::PROFILE_SECURITY], true)) {
             return null;
         }
@@ -377,48 +422,64 @@ final readonly class AnalyseCommandOptions
     /**
      * Report whether an opt-in changed-region analysis mode is active.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @return bool - true when any changed-region opt-in (--diff, --since, or --changed-ranges) is active, so discovery should be scoped.
      */
     public function hasChangedRegionMode(): bool
     {
+        // User view: missing data becomes the expected terminal output state.
         return $this->diffMode !== null
+               // User view: missing data becomes the expected terminal output state.
                || $this->since !== null
+               // User view: missing data becomes the expected terminal output state.
                || $this->changedRanges !== null;
     }
 
     /**
      * Report whether changed file paths can be used to scope discovery.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @return bool - true only for --diff and --since, which yield a concrete file list; --changed-ranges names paths the caller already gave.
      */
     public function usesChangedFilesForDiscovery(): bool
     {
+        // User view: missing data becomes the expected terminal output state.
         return $this->diffMode !== null || $this->since !== null;
     }
 
     /**
      * Parse the `--report-interactive` option; returns true/false or a usage-error message string.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface $input - Console input whose `--report-interactive` flag and value are inspected.
      *
      * @return bool|string - the resolved interactive flag when well-formed, or a usage-error message string when the value is unrecognised.
      */
     private static function reportInteractive(InputInterface $input): bool|string
     {
+        // User view: choose the terminal output branch for this case.
         if (!$input->hasParameterOption('--report-interactive', true)) {
             return false;
         }
 
         $optionValue = $input->getOption('report-interactive');
 
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
+        // User view: an empty value becomes a clear terminal output fallback.
         if ($optionValue === null || $optionValue === true || $optionValue === '') {
             return true;
         }
 
+        // User view: choose the terminal output branch for this case.
         if (is_bool($optionValue)) {
             return $optionValue;
         }
 
+        // User view: choose the terminal output branch for this case.
         if (!is_string($optionValue)) {
             return '--report-interactive must be true or false.';
         }
@@ -434,6 +495,8 @@ final readonly class AnalyseCommandOptions
     /**
      * Read a string option and return it only when non-empty; otherwise null.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface $input - Console input the option is read from.
      * @param string         $name - Option name without the leading dashes.
      *
@@ -444,12 +507,15 @@ final readonly class AnalyseCommandOptions
     {
         $optionValue = $input->getOption($name);
 
+        // User view: an empty value becomes a clear terminal output fallback.
         return is_string($optionValue) && $optionValue !== '' ? $optionValue : null;
     }
 
     /**
      * Read a repeatable string option without comma expansion.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface $input - Console input the repeated option is read from.
      * @param string         $name - Option name without the leading dashes; named in the error on a blank entry.
      *
@@ -460,13 +526,17 @@ final readonly class AnalyseCommandOptions
     {
         $values = $input->getOption($name);
 
+        // User view: choose the terminal output branch for this case.
         if (!is_array($values)) {
             return [];
         }
 
         $items = [];
 
+        // User view: add each item that can appear in terminal output.
         foreach ($values as $optionValue) {
+            // User view: choose the terminal output branch for this case.
+            // User view: an empty value becomes a clear terminal output fallback.
             if (!is_string($optionValue) || $optionValue === '') {
                 // A blank occurrence is rejected outright rather than silently dropped, surfacing the mistake.
                 return sprintf('--%s requires a non-empty value.', $name);
@@ -481,6 +551,8 @@ final readonly class AnalyseCommandOptions
     /**
      * Read a repeatable CLI option as a list of strings.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface $input - Console input the repeated option is read from.
      * @param string         $name - Option name without the leading dashes; each occurrence is comma-split and trimmed.
      *
@@ -490,19 +562,26 @@ final readonly class AnalyseCommandOptions
     {
         $values = $input->getOption($name);
 
+        // User view: choose the terminal output branch for this case.
         if (!is_array($values)) {
             return [];
         }
 
         $items = [];
 
+        // User view: add each item that can appear in terminal output.
         foreach ($values as $optionValue) {
+            // User view: choose the terminal output branch for this case.
+            // User view: an empty value becomes a clear terminal output fallback.
             if (!is_string($optionValue) || $optionValue === '') {
                 continue;
             }
 
+            // User view: add each item that can appear in terminal output.
             foreach (explode(',', $optionValue) as $optionPart) {
                 $trimmedOptionPart = trim($optionPart);
+                // User view: choose the terminal output branch for this case.
+                // User view: an empty value becomes a clear terminal output fallback.
                 if ($trimmedOptionPart !== '') {
                     $items[] = $trimmedOptionPart;
                 }
@@ -515,6 +594,8 @@ final readonly class AnalyseCommandOptions
     /**
      * Parse the `--diff` option: null when absent, "working-tree" when bare, or the explicit value.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface $input - Console input whose `--diff` flag and value are inspected.
      * @param list<string>   $paths - Parsed positional and --file paths; a bare "-" entry selects stdin diff mode.
      *
@@ -522,25 +603,32 @@ final readonly class AnalyseCommandOptions
      */
     private static function diffMode(InputInterface $input, array $paths): ?string
     {
+        // User view: choose the terminal output branch for this case.
         if (!$input->hasParameterOption('--diff', true)) {
             return null;
         }
 
         $optionValue = $input->getOption('diff');
+        // User view: choose the terminal output branch for this case.
         if (in_array('-', $paths, true)) {
             return '-';
         }
 
+        // User view: an empty value becomes a clear terminal output fallback.
         return is_string($optionValue) && $optionValue !== '' ? $optionValue : 'working-tree';
     }
 
     /**
      * Return the usage error for mutually exclusive config flags.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @return string|null - the message when --no-config and --config are both set, or null when the config flags do not conflict.
      */
     private function configUsageError(): ?string
     {
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if (!$this->noConfig || $this->configPath === null) {
             return null;
         }
@@ -551,10 +639,14 @@ final readonly class AnalyseCommandOptions
     /**
      * Return the usage error for mutually exclusive baseline modes.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @return string|null - the message when --baseline and --generate-baseline both target the same file, or null when at most one is set.
      */
     private function baselineUsageError(): ?string
     {
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($this->baseline->baselinePath === null || $this->baseline->generateBaselinePath === null) {
             return null;
         }
@@ -566,6 +658,8 @@ final readonly class AnalyseCommandOptions
     /**
      * Return the usage error for mutually exclusive diff modes.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @return string|null - the first message for stacked changed-region modes, a bad --changed-scope, or ranges without a path, or null when all
      *                     hold.
      */
@@ -575,23 +669,32 @@ final readonly class AnalyseCommandOptions
                                          $this->diffMode,
                                          $this->since,
                                          $this->changedRanges,
+                                     // User view: missing data becomes the expected terminal output state.
                                      ], static fn(?string $mode): bool => $mode !== null);
 
+        // User view: choose the terminal output branch for this case.
         if (count($changedModes) > 1) {
             // Each mode derives the changed region differently; combining them has no coherent meaning.
             return '--diff, --since, and --changed-ranges are mutually exclusive.';
         }
 
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
+        // User view: an empty value becomes a clear terminal output fallback.
         if ($this->diffVs !== null && $changedModes !== []) {
             // --diff-vs is its own comparison mode and cannot stack on top of a changed-region mode.
             return '--diff, --since, --changed-ranges, and --diff-vs are mutually exclusive.';
         }
 
+        // User view: choose the terminal output branch for this case.
         if (!in_array($this->changedScope, ['symbol', 'hunk', 'file'], true)) {
             // Scope drives how ranges map to findings; an unknown value would silently mis-scope, so reject it.
             return '--changed-scope must be one of: symbol, hunk, file.';
         }
 
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
+        // User view: an empty value becomes a clear terminal output fallback.
         if ($this->changedRanges !== null && $this->paths === []) {
             // Ranges are line spans within files, so they are meaningless without at least one target path.
             return '--changed-ranges requires at least one file path.';
@@ -603,10 +706,14 @@ final readonly class AnalyseCommandOptions
     /**
      * Return the usage error for changed-only analysis without a comparison ref.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @return string|null - the message when --changed-only is set without the --diff-vs comparison ref it needs, or null otherwise.
      */
     private function changedOnlyUsageError(): ?string
     {
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if (!$this->isChangedOnly || $this->diffVs !== null) {
             return null;
         }
@@ -618,10 +725,14 @@ final readonly class AnalyseCommandOptions
     /**
      * Return the usage error for disabling and applying a baseline together.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @return string|null - the message when --no-baseline is combined with an applied --baseline, or null when the two do not conflict.
      */
     private function noBaselineUsageError(): ?string
     {
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if (!$this->noBaseline || $this->baseline->baselinePath === null) {
             return null;
         }
@@ -633,17 +744,25 @@ final readonly class AnalyseCommandOptions
     /**
      * Validate the display-filter inputs (min-severity, include/exclude pillars); return the first error or null.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @return string|null - message for the first invalid severity or pillar, or null when all display inputs resolve.
      */
     private function displayFilterError(): ?string
     {
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($this->minSeverity !== null && Severity::tryFrom($this->minSeverity) === null) {
             // Catch the bad value here, before displayFilter() would hard-fail on Severity::from().
             return sprintf('Unsupported min severity "%s". Use advisory, warning, or error.', $this->minSeverity);
         }
 
+        // User view: add each item that can appear in terminal output.
         foreach (['--include-pillar' => $this->includePillars, '--exclude-pillar' => $this->excludePillars] as $option => $values) {
+            // User view: add each item that can appear in terminal output.
             foreach ($values as $optionValue) {
+                // User view: choose the terminal output branch for this case.
+                // User view: missing data becomes the expected terminal output state.
                 if (Pillar::tryFrom($optionValue) === null) {
                     // First unrecognised pillar wins; reporting which option it came from aids the fix.
                     return sprintf('Unsupported pillar "%s" for %s.', $optionValue, $option);

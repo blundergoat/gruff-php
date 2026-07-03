@@ -36,6 +36,8 @@ final readonly class MissingThrowsTagRule implements RuleInterface
     /**
      * Describe the missing @throws tag rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -54,6 +56,8 @@ final readonly class MissingThrowsTagRule implements RuleInterface
     /**
      * Find documented public functions that throw without an @throws tag.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -67,26 +71,34 @@ final readonly class MissingThrowsTagRule implements RuleInterface
 
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
+            // User view: choose the findings list branch for this case.
             if ($node instanceof ClassMethod && !$node->isPublic()) {
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes a safe findings list default.
             if (!$this->hasDirectThrow($node->stmts ?? [])) {
                 continue;
             }
 
             $docComment = $node->getDocComment();
 
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($docComment === null) {
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
             if (str_contains($docComment->getText(), '@throws')) {
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
             if ($node instanceof ClassMethod && (new DocsInheritanceHelper())->hasInheritedContractDoc($node, $analysisUnit->statements, $nodeFinder)) {
                 continue;
             }
@@ -113,6 +125,8 @@ final readonly class MissingThrowsTagRule implements RuleInterface
     /**
      * Check whether a statement list throws in its own lexical scope.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param array<Node> $statements - Function-like body statements to search.
      *
      * @return bool - true when a `throw` sits directly in this scope; throws inside nested closures, arrow
@@ -121,7 +135,9 @@ final readonly class MissingThrowsTagRule implements RuleInterface
     private function hasDirectThrow(array $statements): bool
     {
         // One direct throw anywhere in the body is enough to require an @throws tag on the docblock.
+        // User view: add each item that can appear in findings list.
         foreach ($statements as $statement) {
+            // User view: choose the findings list branch for this case.
             if ($this->containsDirectThrow($statement)) {
                 return true;
             }
@@ -137,6 +153,8 @@ final readonly class MissingThrowsTagRule implements RuleInterface
      * outer method. Immediately invoked closures are pruned too: their throw
      * propagates like any called function's, and this rule documents lexical throws only.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Node $node - Node to inspect.
      *
      * @return bool - true when the node is or directly contains a throw before any nested scope boundary
@@ -144,28 +162,35 @@ final readonly class MissingThrowsTagRule implements RuleInterface
     private function containsDirectThrow(Node $node): bool
     {
         // Found a throw that belongs to this method's own contract.
+        // User view: choose the findings list branch for this case.
         if ($node instanceof Throw_) {
             return true;
         }
 
         // Scope boundary: closures, arrow functions, nested functions, and (anonymous) class
         // bodies own their throws; they are not part of the enclosing method's contract.
+        // User view: choose the findings list branch for this case.
         if ($node instanceof FunctionLike || $node instanceof ClassLike) {
             return false;
         }
 
         // Keep descending through ordinary statements and expressions.
+        // User view: add each item that can appear in findings list.
         foreach ($node->getSubNodeNames() as $name) {
             $subNode = $node->$name;
 
             // Single child node: recurse straight into it.
+            // User view: choose the findings list branch for this case.
             if ($subNode instanceof Node && $this->containsDirectThrow($subNode)) {
                 return true;
             }
 
             // Child lists (statement bodies, argument lists): recurse into each node they hold.
+            // User view: choose the findings list branch for this case.
             if (is_array($subNode)) {
+                // User view: add each item that can appear in findings list.
                 foreach ($subNode as $child) {
+                    // User view: choose the findings list branch for this case.
                     if ($child instanceof Node && $this->containsDirectThrow($child)) {
                         return true;
                     }

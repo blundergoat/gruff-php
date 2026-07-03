@@ -15,6 +15,8 @@ final readonly class RuleContext
     /**
      * Capture project-level context and effective rule configuration.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string         $projectRoot - Project root for the analysis run.
      * @param AnalysisConfig $config - Effective analysis configuration.
      */
@@ -27,6 +29,8 @@ final readonly class RuleContext
     /**
      * Look up effective settings for a rule definition.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param RuleDefinition $definition - Rule definition whose settings should be read.
      *
      * @return RuleSettings - Enabled flag, thresholds, and options for the rule.

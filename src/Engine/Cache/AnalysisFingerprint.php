@@ -21,6 +21,8 @@ use JsonException;
 final readonly class AnalysisFingerprint
 {
     /**
+      * User flow: Moves analysis state toward the output users review.
+      *
      * @param string $runDigest - Digest of every analysis input shared across files in a run.
      */
     private function __construct(private string $runDigest)
@@ -30,6 +32,8 @@ final readonly class AnalysisFingerprint
     /**
      * Build the run fingerprint from the resolved config, enabled rules, and tool version.
      *
+      * User flow: Moves analysis state toward the output users review.
+      *
      * @param RuleRegistry   $registry - Registry whose enabled-rule set is part of the key.
      * @param AnalysisConfig $config - Resolved configuration whose settings affect findings.
      * @param string         $toolVersion - gruff version string folded into the key.
@@ -40,6 +44,7 @@ final readonly class AnalysisFingerprint
     public static function forRun(RuleRegistry $registry, AnalysisConfig $config, string $toolVersion): self
     {
         $rules = [];
+        // User view: add each item that can appear in analysis output.
         foreach ($registry->enabledRules($config) as $rule) {
             $ruleId         = $rule->definition()->id;
             $settings       = $config->ruleSettings($ruleId);
@@ -77,6 +82,8 @@ final readonly class AnalysisFingerprint
      * The display path is part of the key because it is part of every finding's
      * identity, so two byte-identical files at different paths never share an entry.
      *
+      * User flow: Moves analysis state toward the output users review.
+      *
      * @param string $displayPath - Project-relative display path.
      * @param string $contents - Raw file bytes.
      *

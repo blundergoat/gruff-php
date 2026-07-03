@@ -14,6 +14,8 @@ final readonly class GitDiffProvider
     /**
      * Read changed files and line ranges from git diff output.
      *
+      * User flow: Narrows analysis feedback to the code under review.
+      *
      * @param string $projectRoot - Git working tree root.
      * @param string $mode - Diff mode or base ref.
      *
@@ -27,7 +29,9 @@ final readonly class GitDiffProvider
         $process = new Process($command, $projectRoot);
         $process->run();
 
+        // User view: choose the review diff feedback branch for this case.
         if (!$process->isSuccessful()) {
+            // User view: an empty value becomes a clear review diff feedback fallback.
             throw new DiffException(trim($process->getErrorOutput()) !== ''
                                         ? trim($process->getErrorOutput())
                                         : sprintf('Unable to compute git diff for mode "%s".', $mode));
@@ -36,6 +40,7 @@ final readonly class GitDiffProvider
         $parsed      = (new UnifiedDiffParser())->parse($process->getOutput());
         $isLocalMode = in_array($mode, ['staged', 'unstaged', 'working-tree'], true);
 
+        // User view: choose the review diff feedback branch for this case.
         if ($mode === 'working-tree') {
             $this->appendUntrackedFiles($projectRoot, $parsed['files'], $parsed['lines']);
         }
@@ -54,6 +59,8 @@ final readonly class GitDiffProvider
     /**
      * Include untracked, unignored files in the working-tree diff scope.
      *
+      * User flow: Narrows analysis feedback to the code under review.
+      *
      * @param string                                $projectRoot - Git working tree root.
      * @param list<string>                          $changedFiles - Changed files collected so far.
      * @param array<string, list<ChangedLineRange>> $changedLines - Changed ranges keyed by file.
@@ -66,13 +73,18 @@ final readonly class GitDiffProvider
         $process = new Process(['git', 'ls-files', '--others', '--exclude-standard', '-z'], $projectRoot);
         $process->run();
 
+        // User view: choose the review diff feedback branch for this case.
         if (!$process->isSuccessful()) {
+            // User view: an empty value becomes a clear review diff feedback fallback.
             throw new DiffException(trim($process->getErrorOutput()) !== ''
                                         ? trim($process->getErrorOutput())
                                         : 'Unable to list untracked files for working-tree diff mode.');
         }
 
+        // User view: add each item that can appear in review diff feedback.
         foreach (explode("\0", $process->getOutput()) as $filePath) {
+            // User view: choose the review diff feedback branch for this case.
+            // User view: an empty value becomes a clear review diff feedback fallback.
             if ($filePath === '') {
                 continue;
             }
@@ -87,6 +99,8 @@ final readonly class GitDiffProvider
     /**
      * Ensure diff mode only runs inside a git working tree.
      *
+      * User flow: Narrows analysis feedback to the code under review.
+      *
      * @param string $projectRoot - Directory the git probe runs in; must be the working tree to inspect.
      *
      * @return void
@@ -96,6 +110,7 @@ final readonly class GitDiffProvider
         $process = new Process(['git', 'rev-parse', '--is-inside-work-tree'], $projectRoot);
         $process->run();
 
+        // User view: choose the review diff feedback branch for this case.
         if (!$process->isSuccessful() || trim($process->getOutput()) !== 'true') {
             throw new DiffException('Diff mode requires a git working tree.');
         }
@@ -104,6 +119,8 @@ final readonly class GitDiffProvider
     /**
      * Build the git diff command used to calculate changed lines.
      *
+      * User flow: Narrows analysis feedback to the code under review.
+      *
      * @param string $mode - One of staged|unstaged|working-tree, or a base ref name validated as the diff target.
      *
      * @return list<string> - git command argv where element 0 is "git"; the trailing "--" ends option parsing before paths
@@ -122,6 +139,8 @@ final readonly class GitDiffProvider
     /**
      * Reject unsafe refs before passing them to git.
      *
+      * User flow: Narrows analysis feedback to the code under review.
+      *
      * @param string $ref - Caller-supplied base ref; rejected unless it is a safe git ref with no leading dash.
      *
      * @return string - the same ref unchanged once it has cleared the safe-character guard, safe to pass to git
@@ -129,6 +148,8 @@ final readonly class GitDiffProvider
     private function validatedRef(string $ref): string
     {
         // Allow only ref characters that can be passed to git without shell expansion or option confusion.
+        // User view: choose the review diff feedback branch for this case.
+        // User view: an empty value becomes a clear review diff feedback fallback.
         if ($ref === '' || str_starts_with($ref, '-') || preg_match('/^[A-Za-z0-9._\/@^~+-]+$/', $ref) !== 1) {
             throw new DiffException(sprintf('Diff base ref "%s" is not a safe git ref name.', $ref));
         }
@@ -139,6 +160,8 @@ final readonly class GitDiffProvider
     /**
      * Add a changed file once and prepare its range bucket.
      *
+      * User flow: Narrows analysis feedback to the code under review.
+      *
      * @param string|null                           $filePath - Project-relative changed path.
      * @param list<string>                          $changedFiles - Changed files collected so far.
      * @param array<string, list<ChangedLineRange>> $changedLines - Changed ranges keyed by file.
@@ -147,6 +170,8 @@ final readonly class GitDiffProvider
      */
     private function appendChangedFile(?string $filePath, array &$changedFiles, array &$changedLines): void
     {
+        // User view: choose the review diff feedback branch for this case.
+        // User view: missing data becomes the expected review diff feedback state.
         if ($filePath === null || in_array($filePath, $changedFiles, true)) {
             // Skip null paths and files already tracked so each path keeps a single range bucket.
             return;

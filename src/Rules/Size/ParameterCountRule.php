@@ -42,6 +42,8 @@ final readonly class ParameterCountRule implements RuleInterface
     /**
      * Describe the parameter-count rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and thresholds.
      */
     public function definition(): RuleDefinition
@@ -61,6 +63,8 @@ final readonly class ParameterCountRule implements RuleInterface
     /**
      * Find functions, methods, and closures with too many parameters.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -77,11 +81,14 @@ final readonly class ParameterCountRule implements RuleInterface
 
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_|Closure|ArrowFunction $node Finder predicate restricts results to parameter-bearing function-like nodes. */
             $paramCount = count($node->params);
 
+            // User view: choose the findings list branch for this case.
             if ($node instanceof ClassMethod && $this->isPromotedValueObjectConstructor($node)) {
+                // User view: choose the findings list branch for this case.
                 if ($paramCount <= $promotedCeiling) {
                     continue;
                 }
@@ -119,6 +126,8 @@ final readonly class ParameterCountRule implements RuleInterface
 
             $thresholdMatch = $this->thresholdMatch($node, $paramCount, $constructorMax, $settings);
 
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($thresholdMatch === null) {
                 continue;
             }
@@ -131,6 +140,7 @@ final readonly class ParameterCountRule implements RuleInterface
                 'thresholdType' => $thresholdMatch->severity->value,
             ];
 
+            // User view: choose the findings list branch for this case.
             if ($constructorThreshold) {
                 $metadata['constructorMaxParameters'] = $constructorMax;
                 $metadata['findingKind']              = 'constructor-threshold';
@@ -175,6 +185,8 @@ final readonly class ParameterCountRule implements RuleInterface
      * Constructor-specific configuration is opt-in: zero means the constructor
      * inherits the main rule threshold.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param ClassMethod|Function_|Closure|ArrowFunction $node - Callable judged; only its constructor-ness matters.
      * @param int $paramCount - Declared parameter count, compared against the chosen threshold.
      * @param int $constructorMax - Constructor-specific cap; zero disables it and defers to the main threshold.
@@ -188,6 +200,7 @@ final readonly class ParameterCountRule implements RuleInterface
         int $constructorMax,
         RuleSettings $settings,
     ): ?ThresholdMatch {
+        // User view: choose the findings list branch for this case.
         if ($this->usesConstructorThreshold($node, $paramCount, $constructorMax)) {
             // Constructor breached its opt-in cap; judge it by that cap, not the general ladder.
             return new ThresholdMatch(
@@ -196,6 +209,7 @@ final readonly class ParameterCountRule implements RuleInterface
             );
         }
 
+        // User view: choose the findings list branch for this case.
         if ($node instanceof ClassMethod && $this->isConstructor($node) && $constructorMax > 0) {
             // A configured constructor under its cap is exempt from the main ladder, so it never double-fires.
             return null;
@@ -208,6 +222,8 @@ final readonly class ParameterCountRule implements RuleInterface
     /**
      * Use the configured rule severity for constructor-specific threshold hits.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param RuleSettings $settings - Effective settings whose explicit severity, when set, wins outright.
      * @param int          $constructorMax - Configured cap; probed one above to read the ladder's severity for that band.
      *
@@ -215,6 +231,7 @@ final readonly class ParameterCountRule implements RuleInterface
      */
     private function constructorThresholdSeverity(RuleSettings $settings, int $constructorMax): Severity
     {
+        // User view: choose the findings list branch for this case.
         if ($settings->severityThreshold instanceof SeverityThreshold) {
             // An explicitly configured severity overrides whatever the high-value ladder would pick.
             return $settings->severityThreshold->severity;
@@ -229,31 +246,41 @@ final readonly class ParameterCountRule implements RuleInterface
     /**
      * Exclude final readonly value-object constructors that use property promotion.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param ClassMethod $node - Method node tested for the final-readonly, fully-promoted constructor shape.
      *
      * @return bool - True when the constructor shape is an accepted value object.
      */
     private function isPromotedValueObjectConstructor(ClassMethod $node): bool
     {
+        // User view: choose the findings list branch for this case.
+        // User view: an empty value becomes a clear findings list fallback.
         if (!$this->isConstructor($node) || $node->params === []) {
             // Only a non-empty constructor can be a value object; anything else is judged normally.
             return false;
         }
 
         $parent = $node->getAttribute('parent');
+        // User view: choose the findings list branch for this case.
         if (!$parent instanceof Node\Stmt\Class_ || !$parent->isFinal() || !$parent->isReadonly()) {
             // The immutability guarantee relies on the enclosing class being final and readonly.
             return false;
         }
 
+        // User view: add each item that can appear in findings list.
         foreach ($node->params as $param) {
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($param->flags === 0 || $param->type === null) {
                 // A bare or untyped parameter means this is a plain constructor, not a typed value object.
                 return false;
             }
         }
 
+        // User view: add each item that can appear in findings list.
         foreach ($parent->getMethods() as $method) {
+            // User view: choose the findings list branch for this case.
             if ($method->name->toString() === '__construct') {
                 continue;
             }
@@ -261,6 +288,7 @@ final readonly class ParameterCountRule implements RuleInterface
             // A value object answers questions about its own state (accessors, `with*()` copies, `equals()`),
             // which all return a value; a method that returns nothing or is untyped is a command, so the class
             // is a behaviour-carrying service and its constructor stays on the normal threshold.
+            // User view: choose the findings list branch for this case.
             if ($this->isBehaviourMethod($method)) {
                 return false;
             }
@@ -273,6 +301,8 @@ final readonly class ParameterCountRule implements RuleInterface
     /**
      * Decide whether a non-constructor method performs behaviour rather than expose state.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param ClassMethod $method - Non-constructor method to classify.
      *
      * @return bool - True when the method returns nothing or is untyped, so it acts rather than accesses state.
@@ -281,6 +311,8 @@ final readonly class ParameterCountRule implements RuleInterface
     {
         $returnType = $method->returnType;
 
+        // User view: choose the findings list branch for this case.
+        // User view: missing data becomes the expected findings list state.
         if ($returnType === null) {
             return true;
         }
@@ -290,6 +322,8 @@ final readonly class ParameterCountRule implements RuleInterface
     }
 
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param ClassMethod $node - Method node whose name decides whether it is the constructor.
      *
      * @return bool - True when the node is a PHP constructor.
@@ -300,6 +334,8 @@ final readonly class ParameterCountRule implements RuleInterface
     }
 
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param ClassMethod|Function_|Closure|ArrowFunction $node - Callable being judged; only a constructor can qualify.
      * @param int $paramCount - Declared parameter count, compared against the constructor cap.
      * @param int $constructorMax - Configured constructor cap; must be above zero for the opt-in path to apply.
@@ -318,6 +354,8 @@ final readonly class ParameterCountRule implements RuleInterface
     }
 
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options - Effective rule options keyed by option name.
      * @param string $name - Option key to read out of the bag.
      * @param int $default - Fallback used when the key is absent or not an integer.
@@ -326,6 +364,7 @@ final readonly class ParameterCountRule implements RuleInterface
      */
     private function integerOption(array $options, string $name, int $default): int
     {
+        // User view: missing data becomes a safe findings list default.
         $optionValue = $options[$name] ?? $default;
 
         return is_int($optionValue) ? max(0, $optionValue) : $default;
@@ -334,26 +373,32 @@ final readonly class ParameterCountRule implements RuleInterface
     /**
      * Build a display symbol for a callable node.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Node $node - Callable node (method, function, or closure) to render as a finding symbol.
      *
      * @return string - Callable display symbol.
      */
     private function resolveSymbol(Node $node): string
     {
+        // User view: choose the findings list branch for this case.
         if ($node instanceof ClassMethod) {
             $parent    = $node->getAttribute('parent');
             $className = $parent instanceof Node\Stmt\Class_
                 || $parent instanceof Node\Stmt\Trait_
                 || $parent instanceof Node\Stmt\Enum_
+                // User view: missing data becomes a safe findings list default.
                 ? ($parent->name?->toString() ?? 'class@anonymous')
                 : null;
 
             // Qualify with the owning type when known; an anonymous class leaves just the bare method name.
+            // User view: missing data becomes the expected findings list state.
             return $className !== null
                 ? sprintf('%s::%s()', $className, $node->name->toString())
                 : $node->name->toString() . '()';
         }
 
+        // User view: choose the findings list branch for this case.
         if ($node instanceof Function_) {
             return $node->name->toString() . '()';
         }
@@ -364,12 +409,15 @@ final readonly class ParameterCountRule implements RuleInterface
     /**
      * Format threshold numbers without unnecessary decimal places.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param int|float $number - Threshold value to render; whole values are shown without a trailing decimal.
      *
      * @return string - Human-readable threshold value with fractional values preserved and whole values stripped.
      */
     private function formatNumber(int|float $number): string
     {
+        // User view: choose the findings list branch for this case.
         if (is_float($number) && floor($number) !== $number) {
             return (string) $number;
         }

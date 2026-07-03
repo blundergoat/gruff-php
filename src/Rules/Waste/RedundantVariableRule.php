@@ -33,6 +33,8 @@ final readonly class RedundantVariableRule implements RuleInterface
     /**
      * Describe the redundant variable waste rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -52,6 +54,8 @@ final readonly class RedundantVariableRule implements RuleInterface
     /**
      * Find temporary variables that are immediately returned.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -63,8 +67,10 @@ final readonly class RedundantVariableRule implements RuleInterface
         $findings   = [];
         $functions  = NodeIndex::nodesOfAny($analysisUnit, [Stmt\ClassMethod::class, Stmt\Function_::class, Closure::class]);
 
+        // User view: add each item that can appear in findings list.
         foreach ($functions as $function) {
             /** @var Stmt\ClassMethod|Stmt\Function_|Closure $function Finder predicate restricts results to function-like nodes. */
+            // User view: missing data becomes a safe findings list default.
             $this->checkBlock($function->stmts ?? [], $analysisUnit, $definition, $findings);
         }
 
@@ -78,6 +84,8 @@ final readonly class RedundantVariableRule implements RuleInterface
      * statements (count === 2); a variable used more than once first is not redundant. Recursion still
      * visits nested blocks so the same two-statement shape inside an inner scope is caught.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param array<Stmt>    $statements - Sibling statements of one block, in source order.
      * @param AnalysisUnit   $analysisUnit - Unit supplying the display path stamped onto any finding.
      * @param RuleDefinition $definition - Pre-resolved metadata reused for every finding this pass.
@@ -89,6 +97,7 @@ final readonly class RedundantVariableRule implements RuleInterface
     {
         $statements = array_values($statements);
 
+        // User view: choose the findings list branch for this case.
         if (count($statements) === 2) {
             $this->flagRedundantPair(
                 assignment:      $statements[0],
@@ -99,6 +108,7 @@ final readonly class RedundantVariableRule implements RuleInterface
             );
         }
 
+        // User view: add each item that can appear in findings list.
         foreach ($statements as $statement) {
             $this->checkChildBlocks($statement, $analysisUnit, $definition, $findings);
         }
@@ -112,6 +122,8 @@ final readonly class RedundantVariableRule implements RuleInterface
      * A `@var`/`@phpstan-var` narrowing docblock on either statement is treated as load-bearing and
      * suppresses the finding, because inlining the return would drop that type contract.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Stmt           $assignment - First statement; must be an expression wrapping an assignment.
      * @param Stmt           $returnStatement - Second statement; must return the same bare variable.
      * @param AnalysisUnit   $analysisUnit - Unit supplying the display path stamped onto the finding.
@@ -122,28 +134,33 @@ final readonly class RedundantVariableRule implements RuleInterface
      */
     private function flagRedundantPair(Stmt $assignment, Stmt $returnStatement, AnalysisUnit $analysisUnit, RuleDefinition $definition, array &$findings): void
     {
+        // User view: choose the findings list branch for this case.
         if (!$assignment instanceof Stmt\Expression || !$assignment->expr instanceof Assign) {
             // Not an assignment statement, so there is no temporary variable to collapse.
             return;
         }
 
         $assignedVariable = $assignment->expr->var;
+        // User view: choose the findings list branch for this case.
         if (!$assignedVariable instanceof Variable || !is_string($assignedVariable->name)) {
             // Assigning to a property/array element/etc., not a plain `$name`, so the pattern does not apply.
             return;
         }
 
+        // User view: choose the findings list branch for this case.
         if (!$returnStatement instanceof Stmt\Return_ || !$returnStatement->expr instanceof Variable) {
             // Second statement is not `return <variable>`, so it cannot be returning the just-assigned temp.
             return;
         }
 
         $returnedVariable = $returnStatement->expr;
+        // User view: choose the findings list branch for this case.
         if (!is_string($returnedVariable->name) || $returnedVariable->name !== $assignedVariable->name) {
             // Returns a different variable than the one assigned, so neither line is redundant.
             return;
         }
 
+        // User view: choose the findings list branch for this case.
         if ($this->hasPhpStanNarrowingTag($assignment, $returnStatement, $assignedVariable->name)) {
             // A type-narrowing docblock makes the temp load-bearing; inlining would lose the pinned type.
             return;
@@ -169,6 +186,8 @@ final readonly class RedundantVariableRule implements RuleInterface
      * Re-run the block check on each nested block a statement contains (if/else arms, loop and try
      * bodies), so the assign-then-return pattern is detected at every depth, not just top level.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Stmt           $statement - Statement whose child blocks (via StmtChildVisitor) get scanned.
      * @param AnalysisUnit   $analysisUnit - Unit forwarded unchanged so nested findings carry the same path.
      * @param RuleDefinition $definition - Pre-resolved metadata forwarded to the recursive check.
@@ -178,6 +197,7 @@ final readonly class RedundantVariableRule implements RuleInterface
      */
     private function checkChildBlocks(Stmt $statement, AnalysisUnit $analysisUnit, RuleDefinition $definition, array &$findings): void
     {
+        // User view: add each item that can appear in findings list.
         foreach (StmtChildVisitor::childBlocks($statement) as $block) {
             $this->checkBlock($block->statements, $analysisUnit, $definition, $findings);
         }
@@ -189,6 +209,8 @@ final readonly class RedundantVariableRule implements RuleInterface
      * carries a type-system contract that bare return-of-expression would lose, so
      * the redundant-variable finding must be suppressed for that assign.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Stmt   $assignment - Statement holding the assignment expression.
      * @param Stmt   $returnStatement - Following return statement.
      * @param string $variableName - Bare variable name being assigned and returned.
@@ -199,9 +221,12 @@ final readonly class RedundantVariableRule implements RuleInterface
     {
         $pattern = '/@(?:var|phpstan-var|psalm-var)\s+\S+\s+\$' . preg_quote($variableName, '/') . '\b/';
 
+        // User view: add each item that can appear in findings list.
         foreach ([$returnStatement, $assignment] as $statement) {
             $docComment = $statement->getDocComment();
             // Match a narrowing PHPDoc tag for the exact temporary variable, not another variable with the same prefix.
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($docComment !== null && preg_match($pattern, $docComment->getText()) === 1) {
                 // Found a `@var $name` narrowing on this statement, so the temp carries a real type contract.
                 return true;

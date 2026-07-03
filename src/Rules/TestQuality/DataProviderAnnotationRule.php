@@ -28,6 +28,8 @@ final readonly class DataProviderAnnotationRule implements RuleInterface
     /**
      * Describe the data provider annotation rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -46,6 +48,8 @@ final readonly class DataProviderAnnotationRule implements RuleInterface
     /**
      * Find legacy data provider annotations in PHPUnit tests.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -55,12 +59,16 @@ final readonly class DataProviderAnnotationRule implements RuleInterface
     {
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
+            // User view: choose the findings list branch for this case.
             if (!$scope->node instanceof Stmt\ClassMethod) {
                 continue;
             }
 
+            // User view: missing data becomes a safe findings list default.
             $comment = $scope->node->getDocComment()?->getText() ?? '';
+            // User view: choose the findings list branch for this case.
             if (!str_contains($comment, '@dataProvider')) {
                 continue;
             }

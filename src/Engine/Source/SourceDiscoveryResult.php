@@ -12,6 +12,8 @@ final readonly class SourceDiscoveryResult
     /**
      * Store discovered files plus missing and ignored path diagnostics.
      *
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @param list<SourceFile>  $files - Discovered source files in deterministic analysis order.
      * @param list<string>      $missingPaths - Requested paths that could not be resolved.
      * @param list<string>      $ignoredPaths - Project-relative ignored paths (compatibility surface).
@@ -28,11 +30,14 @@ final readonly class SourceDiscoveryResult
     /**
      * Report whether any requested source path could not be resolved.
      *
+      * User flow: Prepares source files so findings point at the right code.
+      *
      * @return bool - True when discovery recorded missing input paths.
      */
     public function hasInputErrors(): bool
     {
         // Any unresolved requested path is a caller-facing input error, distinct from a clean empty result.
+        // User view: an empty value becomes a clear source analysis fallback.
         return $this->missingPaths !== [];
     }
 }

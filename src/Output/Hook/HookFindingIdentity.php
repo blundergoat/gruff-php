@@ -39,6 +39,8 @@ final readonly class HookFindingIdentity
     /**
      * Build a hook-contract stable identity for a finding.
      *
+      * User flow: Shapes hook feedback before a developer continues their workflow.
+      *
      * @param Finding $finding - Native finding.
      * @param string  $scope   - Hook scope for the finding.
      *
@@ -69,6 +71,8 @@ final readonly class HookFindingIdentity
      * the ordinals (and identities) stable. Reordering one duplicate above another only swaps ordinals,
      * which surfaces a pre-existing finding rather than hiding a new one - the safe direction.
      *
+      * User flow: Shapes hook feedback before a developer continues their workflow.
+      *
      * @param list<Finding> $findings - Findings identified together (current run or base snapshot).
      *
      * @return array<int, string> - Disambiguated identity keyed by spl_object_id($finding).
@@ -78,18 +82,23 @@ final readonly class HookFindingIdentity
     {
         /** @var array<string, list<int>> $groups Finding indices grouped by value-independent base identity. */
         $groups = [];
+        // User view: add each item that can appear in hook output.
         foreach ($findings as $index => $finding) {
             $groups[self::forFinding($finding, HookFindingScope::classify($finding))][] = $index;
         }
 
         $identities = [];
+        // User view: add each item that can appear in hook output.
         foreach ($groups as $baseIdentity => $indices) {
             usort(
                 $indices,
+                // User view: missing data becomes a safe hook output default.
                 static fn(int $left, int $right): int => [$findings[$left]->line ?? PHP_INT_MAX, $findings[$left]->column ?? PHP_INT_MAX, $left]
+                    // User view: missing data becomes a safe hook output default.
                     <=> [$findings[$right]->line ?? PHP_INT_MAX, $findings[$right]->column ?? PHP_INT_MAX, $right],
             );
 
+            // User view: add each item that can appear in hook output.
             foreach ($indices as $ordinal => $index) {
                 $identities[spl_object_id($findings[$index])] = $baseIdentity . ':' . $ordinal;
             }
@@ -101,6 +110,8 @@ final readonly class HookFindingIdentity
     /**
      * Return a value-independent qualifier that distinguishes repeated same-rule findings where possible.
      *
+      * User flow: Shapes hook feedback before a developer continues their workflow.
+      *
      * @param Finding $finding - Native finding.
      * @param string  $scope   - Hook scope for the finding.
      *
@@ -108,21 +119,28 @@ final readonly class HookFindingIdentity
      */
     private static function qualifier(Finding $finding, string $scope): array|string|null
     {
+        // User view: choose the hook output branch for this case.
         if ($scope === HookFindingScope::FILE || $scope === HookFindingScope::PROJECT) {
             return null;
         }
 
         $qualitativeMetadata = [];
+        // User view: add each item that can appear in hook output.
         foreach ($finding->metadata as $key => $value) {
+            // User view: choose the hook output branch for this case.
             if (isset(self::VALUE_KEYS[$key])) {
                 continue;
             }
 
+            // User view: choose the hook output branch for this case.
+            // User view: missing data becomes the expected hook output state.
             if (is_scalar($value) || $value === null) {
                 $qualitativeMetadata[$key] = $value;
             }
         }
 
+        // User view: choose the hook output branch for this case.
+        // User view: an empty value becomes a clear hook output fallback.
         if ($qualitativeMetadata !== []) {
             ksort($qualitativeMetadata, SORT_STRING);
 

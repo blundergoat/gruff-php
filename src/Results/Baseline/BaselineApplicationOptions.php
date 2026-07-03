@@ -12,6 +12,8 @@ final readonly class BaselineApplicationOptions
     /**
      * Capture the effective baseline flags selected for an analysis run.
      *
+      * User flow: Keeps known findings separate from new feedback in reports.
+      *
      * @param string|null $baselinePath - Baseline file path to apply, when enabled.
      * @param bool        $isBaselineExplicit - Whether the baseline path came from an explicit flag.
      * @param string|null $generateBaselinePath - Baseline file path to write, when generation is enabled.

@@ -62,6 +62,8 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     /**
      * Describe the high entropy string rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and thresholds.
      */
     public function definition(): RuleDefinition
@@ -96,6 +98,8 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     /**
      * Find long high-entropy string literals that may be secrets.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -111,21 +115,26 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
 
         $findings      = [];
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
+        // User view: add each item that can appear in findings list.
         foreach ($matches['value'] as $match) {
             [$candidateSecret, $offset] = $match;
+            // User view: choose the findings list branch for this case.
             if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
             if (strlen($candidateSecret) < $minLength) {
                 continue;
             }
 
             $line = $this->lineText($analysisUnit->source, SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset));
+            // User view: choose the findings list branch for this case.
             if ($this->isQuotedKeyLiteral($analysisUnit->source, $candidateSecret, $offset)) {
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
             if (
                 $this->shouldSkipKnownSecretPattern($candidateSecret)
                 || $this->isPathLikeLiteral($candidateSecret)
@@ -138,11 +147,13 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
                 continue;
             }
 
+            // User view: choose the findings list branch for this case.
             if ($this->isMedicalStandardsMetadata($candidateSecret, $line)) {
                 continue;
             }
 
             $entropy = SecretScannerHelper::entropy($candidateSecret);
+            // User view: choose the findings list branch for this case.
             if ($entropy < $entropyThreshold && !(strlen($candidateSecret) >= 64 && ctype_xdigit($candidateSecret))) {
                 continue;
             }
@@ -167,6 +178,8 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     /**
      * Defer known secret formats to more specific detectors.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $candidateSecret - Literal under test; a known vendor prefix or token shape means a dedicated
      *                                rule owns it.
      *
@@ -198,6 +211,8 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     /**
      * Detect path-like literals that should not be treated as secrets.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $candidateSecret - Literal under test; file paths and route URLs trip the length heuristic but
      *                                hold no secret.
      *
@@ -205,11 +220,13 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
      */
     private function isPathLikeLiteral(string $candidateSecret): bool
     {
+        // User view: choose the findings list branch for this case.
         if (!str_contains($candidateSecret, '/') && !str_contains($candidateSecret, '\\')) {
             // No directory separator at all means it cannot be a path, so it stays eligible as a secret.
             return false;
         }
 
+        // User view: choose the findings list branch for this case.
         if ($this->isUrlOrRoutePathLiteral($candidateSecret)) {
             // A URL or route path is benign even without a file extension, so exempt it before the extension check.
             return true;
@@ -222,12 +239,15 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     /**
      * Detect URL and route literals that are long because of slugs or numeric IDs, not secret material.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $candidateSecret - Literal under test; a long public URL or route path otherwise reads as entropy.
      *
      * @return bool - True when the literal is shaped like a public URL path.
      */
     private function isUrlOrRoutePathLiteral(string $candidateSecret): bool
     {
+        // User view: choose the findings list branch for this case.
         if (str_starts_with($candidateSecret, 'https://hooks.slack.com/services/')) {
             // Slack webhook URLs are genuine secrets despite their URL shape, so never exempt them as routes.
             return false;
@@ -235,12 +255,14 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
 
         // Match URI schemes so absolute URLs can be normalized before path checks.
         $hasScheme = preg_match('#^[a-z][a-z0-9+.-]*://#i', $candidateSecret) === 1;
+        // User view: choose the findings list branch for this case.
         if (!$hasScheme && !str_starts_with($candidateSecret, '/') && !str_starts_with($candidateSecret, './') && !str_starts_with($candidateSecret, '../')) {
             // Without a scheme or a leading path marker there is no route to inspect, so treat it as a possible secret.
             return false;
         }
 
         $withoutScheme = preg_replace('#^[a-z][a-z0-9+.-]*://#i', '', $candidateSecret);
+        // User view: choose the findings list branch for this case.
         if (!is_string($withoutScheme)) {
             // A regex engine error yields null; fail closed so a malformed strip is not mistaken for a clean route.
             return false;
@@ -248,11 +270,14 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
 
         $slashOffset = strpos($withoutScheme, '/');
         $path        = $slashOffset === false ? $withoutScheme : substr($withoutScheme, $slashOffset);
+        // User view: choose the findings list branch for this case.
+        // User view: an empty value becomes a clear findings list fallback.
         if ($path === '' || $path[0] !== '/') {
             // No rooted path component means there is nothing route-shaped to whitelist.
             return false;
         }
 
+        // User view: choose the findings list branch for this case.
         if (str_contains($path, '?') || str_contains($path, '#')) {
             // Query or fragment markers signal an opaque token tail, not a clean route, so do not exempt it.
             return false;
@@ -272,12 +297,15 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     /**
      * Detect long gruff config-path strings such as `rules.<id>.excludeFromScore`.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $candidateSecret - Literal under test; dotted config keys can look high entropy but are public metadata.
      *
      * @return bool - true when the literal is a gruff configuration path rather than secret material
      */
     private function isGruffConfigPathLiteral(string $candidateSecret): bool
     {
+        // User view: choose the findings list branch for this case.
         if (
             !str_starts_with($candidateSecret, 'rules.')
             && !str_starts_with($candidateSecret, 'paths.')
@@ -296,6 +324,8 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
      * Detect identifier- and slug-shaped literals (sniff ids, class names, package slugs) that read as
      * high entropy but decompose into dictionary-like word segments no encoded credential exhibits.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $candidateSecret - Literal under test; dotted/underscored identifiers and separator-joined slugs
      *                                trip the entropy gate without holding secret material.
      *
@@ -303,6 +333,7 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
      */
     private function isIdentifierOrSlugLiteral(string $candidateSecret): bool
     {
+        // User view: choose the findings list branch for this case.
         if (str_contains($candidateSecret, '+') || str_contains($candidateSecret, '=')) {
             // Padding and token separators appear in encoded credentials but never in identifiers or slugs.
             return false;
@@ -314,6 +345,7 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
         $hasUnderscoreIdentifierShape = preg_match('/^[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+$/', $candidateSecret) === 1;
         // Match the slug shape package paths and BEM class names use: alphanumeric segments joined by one or more [/._-] separators.
         $hasSlugShape = preg_match('#^[A-Za-z0-9]+(?:[/._-]+[A-Za-z0-9]+)+$#', $candidateSecret) === 1;
+        // User view: choose the findings list branch for this case.
         if (!$hasDottedIdentifierShape && !$hasUnderscoreIdentifierShape && !$hasSlugShape) {
             // Anything outside the three identifier/slug shapes stays eligible for entropy scanning.
             return false;
@@ -331,6 +363,8 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
      * short dictionary words outvote one long random run (`config_prod_<32-char tail>`), so the census weighs
      * characters, not segments, and a single long non-word segment refuses the exemption outright.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $candidateSecret - Literal already matching an identifier/slug shape.
      *
      * @return bool - True when alpha-word characters dominate and no segment reads as a random credential tail.
@@ -339,6 +373,7 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     {
         // Split the literal into its separator-delimited segments for the word-shape census.
         $segments = preg_split('#[/._-]+#', $candidateSecret, -1, PREG_SPLIT_NO_EMPTY);
+        // User view: choose the findings list branch for this case.
         if (!is_array($segments) || count($segments) < self::IDENTIFIER_MIN_SEGMENTS) {
             // A regex engine error or an unbroken token (no separators) is not an identifier compound; fail
             // closed so single-run secrets such as 64-char hex digests stay eligible for entropy scanning.
@@ -347,7 +382,9 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
 
         $wordCharacterCount  = 0;
         $totalCharacterCount = 0;
+        // User view: add each item that can appear in findings list.
         foreach ($segments as $segment) {
+            // User view: choose the findings list branch for this case.
             if (!ctype_alnum($segment)) {
                 // A non-alphanumeric segment means the literal is not a clean identifier compound.
                 return false;
@@ -355,6 +392,7 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
 
             $segmentLength             = strlen($segment);
             $segmentWordCharacterCount = $this->wordCharacterCountForSegment($segment);
+            // User view: choose the findings list branch for this case.
             if ($segmentLength >= self::RANDOM_SEGMENT_REFUSAL_LENGTH && $segmentWordCharacterCount <= $segmentLength * self::WORD_CHARACTER_MAJORITY_RATIO) {
                 // One long non-word run is exactly the random tail of a prefixed key (`secret-key-<hex>`,
                 // `myapp/prod-keys/<hex>`); no amount of word prefix can make that an identifier.
@@ -374,18 +412,23 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     /**
      * Count dictionary-like alpha characters inside one identifier segment.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $segment - One separator-free alphanumeric segment.
      *
      * @return int - Number of characters belonging to alpha words of at least WORD_SEGMENT_MIN_LENGTH.
      */
     private function wordCharacterCountForSegment(string $segment): int
     {
+        // User view: choose the findings list branch for this case.
         if (strlen($segment) >= self::WORD_SEGMENT_MIN_LENGTH && ctype_alpha($segment)) {
             return strlen($segment);
         }
 
         $wordCharacterCount = 0;
+        // User view: add each item that can appear in findings list.
         foreach ((new IdentifierTokenizer())->tokenize($segment) as $token) {
+            // User view: choose the findings list branch for this case.
             if (strlen($token) >= self::WORD_SEGMENT_MIN_LENGTH && ctype_alpha($token)) {
                 $wordCharacterCount += strlen($token);
             }
@@ -397,6 +440,8 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     /**
      * Detect quoted identifier keys, where entropy belongs to a field name rather than a stored value.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $source - Full source text being scanned.
      * @param string $candidateSecret - Candidate literal content without its quotes.
      * @param int    $offset - Byte offset of the candidate content inside the source.
@@ -414,6 +459,8 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     /**
      * Detect parser/generator keyspace alphabets that are intentionally public.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $candidateSecret - Candidate literal under test.
      *
      * @return bool - True when the literal is a known ordered character set.
@@ -426,6 +473,8 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     /**
      * Detect framework metadata references to methods/functions, not secret values.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $candidateSecret - Candidate literal under test.
      * @param string $line - Source line carrying the literal.
      *
@@ -442,6 +491,8 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     /**
      * Detect public clinical-code metadata whose long tokens are standard identifiers.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $candidateSecret - Long token under test; clinical code systems use IDs that mimic secret entropy.
      * @param string $line - Source line of the literal; the surrounding field name is what marks it
      *                                as metadata.
@@ -451,18 +502,21 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     private function isMedicalStandardsMetadata(string $candidateSecret, string $line): bool
     {
         // Match clinical terminology field names that carry public standards metadata.
+        // User view: choose the findings list branch for this case.
         if (!preg_match('/(?:CodeSystem|ConceptCode|HL7|OID|ValueSet)/i', $line)) {
             // Without a clinical field name nearby the token is not standards metadata, so leave it for entropy checks.
             return false;
         }
 
         // Match HL7 value-set codes such as PHVS_ObservationInterpretation_HL7_V3.
+        // User view: choose the findings list branch for this case.
         if (preg_match('/^(?:PH|PHVS)_[A-Za-z0-9_]+_HL7_V\d+$/', $candidateSecret) === 1) {
             // A recognised HL7 value-set code is public metadata, never a credential.
             return true;
         }
 
         // Match dotted OID identifiers used by medical terminology systems.
+        // User view: choose the findings list branch for this case.
         if (preg_match('/^\d+(?:\.\d+){3,}$/', $candidateSecret) === 1) {
             // A dotted OID is a public terminology identifier, never a credential.
             return true;
@@ -478,6 +532,8 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     /**
      * Return source text for a 1-based line number.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $source - Full file source the literal was matched in.
      * @param int    $lineNumber - 1-based line number of the literal, as reported by the offset-to-line helper.
      *
@@ -488,6 +544,7 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
         $lines = explode("\n", $source);
 
         // Hand back the literal's own line for the metadata field-name check;
+        // User view: missing data becomes a safe findings list default.
         return $lines[$lineNumber - 1] ?? '';
     }
 }

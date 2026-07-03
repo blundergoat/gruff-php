@@ -29,6 +29,8 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
     /**
      * Describe the conditional test logic rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -48,6 +50,8 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
     /**
      * Find test cases that hide behavior behind conditionals.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -58,6 +62,7 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
         $definition = $this->definition();
         $settings   = $ruleContext->settingsFor($definition);
 
+        // User view: choose the findings list branch for this case.
         if ($this->isPathIgnored($analysisUnit->file->displayPath, $settings->stringListOption('ignoredPathPatterns'))) {
             // Project opted this path out of the rule, so emit nothing rather than reporting expected branching.
             return [];
@@ -65,7 +70,9 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
 
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
+            // User view: add each item that can appear in findings list.
             foreach (NodeIndex::descendantsOfAny($scope->node, [Stmt\If_::class]) as $conditional) {
                 $findings[] = new Finding(
                     ruleId:      self::ID,
@@ -88,6 +95,8 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
     /**
      * Check whether a project-configured path exemption applies.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string       $displayPath - Repository-relative path of the analysed file, used as the fnmatch subject.
      * @param list<string> $patterns - Glob patterns the caller configured to exempt known matrix-style test paths.
      *
@@ -97,7 +106,9 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
     {
         $normalizedPath = str_replace('\\', '/', $displayPath);
 
+        // User view: add each item that can appear in findings list.
         foreach ($patterns as $pattern) {
+            // User view: choose the findings list branch for this case.
             if (fnmatch($pattern, $normalizedPath, FNM_NOESCAPE)) {
                 return true;
             }

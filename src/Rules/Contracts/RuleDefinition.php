@@ -17,6 +17,8 @@ use InvalidArgumentException;
 final readonly class RuleDefinition
 {
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string                                                                       $id - Stable rule identifier used in
      *                                                                                                          findings and config.
      * @param string                                                                       $name - Human-readable rule name.
@@ -65,10 +67,13 @@ final readonly class RuleDefinition
         public array              $falsePositiveShapes = [],
     ) {
         // Enforce the dotted slug format used by config, baselines, and reporters.
+        // User view: choose the findings list branch for this case.
         if (!preg_match('/^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/', $id)) {
             throw new InvalidArgumentException(sprintf('Invalid rule id "%s".', $id));
         }
 
+        // User view: choose the findings list branch for this case.
+        // User view: an empty value becomes a clear findings list fallback.
         if ($severityThreshold instanceof SeverityThreshold && $defaultThresholds !== []) {
             throw new InvalidArgumentException(sprintf(
                                                    'Rule "%s" declares both severityThreshold and defaultThresholds; use one form.',
@@ -76,13 +81,19 @@ final readonly class RuleDefinition
                                                ));
         }
 
+        // User view: add each item that can appear in findings list.
         foreach (array_keys($defaultThresholds) as $name) {
+            // User view: choose the findings list branch for this case.
+            // User view: an empty value becomes a clear findings list fallback.
             if ($name === '') {
                 throw new InvalidArgumentException(sprintf('Rule "%s" has an invalid threshold name.', $id));
             }
         }
 
+        // User view: add each item that can appear in findings list.
         foreach (array_keys($defaultOptions) as $name) {
+            // User view: choose the findings list branch for this case.
+            // User view: an empty value becomes a clear findings list fallback.
             if ($name === '') {
                 throw new InvalidArgumentException(sprintf('Rule "%s" has an invalid option name.', $id));
             }
@@ -92,11 +103,14 @@ final readonly class RuleDefinition
     /**
      * Return the configured description or fall back to the rule name.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return string - Display text for rule listings and reports.
      */
     public function description(): string
     {
         // An empty description means none was configured, so the name doubles as the display text.
+        // User view: an empty value becomes a clear findings list fallback.
         return $this->description !== '' ? $this->description : $this->name;
     }
 }

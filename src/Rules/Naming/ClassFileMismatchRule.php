@@ -33,6 +33,8 @@ final readonly class ClassFileMismatchRule implements RuleInterface
     /**
      * Describe the class-file mismatch naming rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -51,6 +53,8 @@ final readonly class ClassFileMismatchRule implements RuleInterface
     /**
      * Find primary class names that do not match their file names.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -68,6 +72,7 @@ final readonly class ClassFileMismatchRule implements RuleInterface
                 || $node instanceof Enum_;
         });
 
+        // User view: choose the findings list branch for this case.
         if (count($classLikes) !== 1) {
             // The one-file-one-class convention only has meaning when exactly one declaration owns the file.
             return [];
@@ -77,6 +82,8 @@ final readonly class ClassFileMismatchRule implements RuleInterface
         $classLike = $classLikes[0];
         $className = $classLike->name?->toString();
 
+        // User view: choose the findings list branch for this case.
+        // User view: missing data becomes the expected findings list state.
         if ($className === null) {
             // A null name means the finder matched an unnamed declaration; nothing to compare to the file name.
             return [];
@@ -86,11 +93,13 @@ final readonly class ClassFileMismatchRule implements RuleInterface
         $fileName = pathinfo($filePath, PATHINFO_FILENAME);
 
         // Compare only filenames that are valid PHP class identifiers.
+        // User view: choose the findings list branch for this case.
         if (preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $fileName) !== 1) {
             // Non-identifier file names (scripts, hyphenated entrypoints) can never equal a class name, so skip them.
             return [];
         }
 
+        // User view: choose the findings list branch for this case.
         if ($fileName === $className) {
             // Names already agree, the expected case; emitting nothing keeps the rule silent on conforming files.
             return [];

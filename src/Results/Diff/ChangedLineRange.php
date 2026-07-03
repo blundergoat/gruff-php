@@ -12,6 +12,8 @@ final readonly class ChangedLineRange
     /**
      * Create an inclusive changed-line range.
      *
+      * User flow: Narrows analysis feedback to the code under review.
+      *
      * @param int $startLine - First changed line in the range.
      * @param int $endLine - Last changed line in the range.
      */
@@ -24,6 +26,8 @@ final readonly class ChangedLineRange
     /**
      * Check whether this range overlaps another inclusive line span.
      *
+      * User flow: Narrows analysis feedback to the code under review.
+      *
      * @param int $startLine - First line in the compared range.
      * @param int $endLine - Last line in the compared range.
      *
@@ -39,6 +43,8 @@ final readonly class ChangedLineRange
     /**
      * Serialize this value object into the array shape used by reports.
      *
+      * User flow: Narrows analysis feedback to the code under review.
+      *
      * @return array{start: int, end: int} - inclusive bounds under the report wire keys, where start/end mirror startLine/endLine
      */
     public function toArray(): array

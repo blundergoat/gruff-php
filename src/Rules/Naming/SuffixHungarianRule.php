@@ -62,6 +62,8 @@ final readonly class SuffixHungarianRule implements RuleInterface
     /**
      * Describe the suffix-Hungarian rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -81,6 +83,8 @@ final readonly class SuffixHungarianRule implements RuleInterface
     /**
      * Find properties, parameters, and locals that encode type suffixes.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for configured suffixes.
      *
@@ -93,6 +97,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
         $identifierTokenizer = new IdentifierTokenizer();
         $findings            = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (NodeIndex::nodesOf($analysisUnit, Property::class) as $property) {
             array_push(
                 $findings,
@@ -106,6 +111,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
             );
         }
 
+        // User view: add each item that can appear in findings list.
         foreach ((new FunctionLikeScopeWalker())->scopes($analysisUnit->statements) as $scope) {
             array_push(
                 $findings,
@@ -125,6 +131,8 @@ final readonly class SuffixHungarianRule implements RuleInterface
     /**
      * Build suffix-Hungarian findings for properties declared in one property statement.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param RuleDefinition        $definition - Rule metadata used to populate emitted findings.
      * @param AnalysisUnit          $analysisUnit - Parsed unit that owns the property declaration.
      * @param Property              $property - Property statement whose individual props are inspected.
@@ -142,6 +150,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
     ): array {
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach ($property->props as $prop) {
             $finding = $this->finding(
                 definition:   $definition,
@@ -153,6 +162,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
                 type:         $property->type,
             );
 
+            // User view: choose the findings list branch for this case.
             if ($finding instanceof Finding) {
                 $findings[] = $finding;
             }
@@ -164,6 +174,8 @@ final readonly class SuffixHungarianRule implements RuleInterface
     /**
      * Build suffix-Hungarian findings for parameters and locals inside one callable scope.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param RuleDefinition        $definition - Rule metadata used to populate emitted findings.
      * @param AnalysisUnit          $analysisUnit - Parsed unit that owns the callable scope.
      * @param FunctionLikeScope     $scope - Callable scope whose identifiers are inspected.
@@ -200,6 +212,8 @@ final readonly class SuffixHungarianRule implements RuleInterface
     /**
      * Build suffix-Hungarian findings for parameters inside one callable scope.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param RuleDefinition        $definition - Rule metadata used to populate emitted findings.
      * @param AnalysisUnit          $analysisUnit - Parsed unit that owns the callable scope.
      * @param FunctionLikeScope     $scope - Callable scope whose parameters are inspected.
@@ -218,7 +232,9 @@ final readonly class SuffixHungarianRule implements RuleInterface
         $findings = [];
         $symbol   = $this->symbol($scope);
 
+        // User view: add each item that can appear in findings list.
         foreach ($scope->node->params as $param) {
+            // User view: choose the findings list branch for this case.
             if (!$param->var instanceof Variable || !is_string($param->var->name)) {
                 continue;
             }
@@ -233,6 +249,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
                 type:         $param->type,
             );
 
+            // User view: choose the findings list branch for this case.
             if ($finding instanceof Finding) {
                 $findings[] = $finding;
             }
@@ -244,6 +261,8 @@ final readonly class SuffixHungarianRule implements RuleInterface
     /**
      * Build suffix-Hungarian findings for local variables inside one callable scope.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param RuleDefinition        $definition - Rule metadata used to populate emitted findings.
      * @param AnalysisUnit          $analysisUnit - Parsed unit that owns the callable scope.
      * @param FunctionLikeScope     $scope - Callable scope whose locals are inspected.
@@ -262,8 +281,11 @@ final readonly class SuffixHungarianRule implements RuleInterface
         $findings = [];
         $symbol   = $this->symbol($scope);
 
+        // User view: add each item that can appear in findings list.
         foreach ($scope->localVariables as $name => $variable) {
             $suffixToken = $this->suffixToken($name, $suffixes, $tokenizer);
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($suffixToken === null || !$this->allowsLocalTypeSuffix($variable, $suffixes[$suffixToken])) {
                 continue;
             }
@@ -278,6 +300,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
                 type:         null,
             );
 
+            // User view: choose the findings list branch for this case.
             if ($finding instanceof Finding) {
                 $findings[] = $finding;
             }
@@ -287,6 +310,8 @@ final readonly class SuffixHungarianRule implements RuleInterface
     }
 
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param RuleDefinition                                         $definition - Rule metadata supplying id, severity, pillar, and confidence for the finding.
      * @param AnalysisUnit                                           $analysisUnit - Parsed unit whose display path anchors the reported finding.
      * @param Node                                                   $node - Declaration node whose start line locates the finding.
@@ -310,11 +335,14 @@ final readonly class SuffixHungarianRule implements RuleInterface
         $name        = $identifier['name'];
         $symbol      = $identifier['symbol'];
         $suffixToken = $this->suffixToken($name, $suffixes, $tokenizer);
+        // User view: choose the findings list branch for this case.
+        // User view: missing data becomes the expected findings list state.
         if ($suffixToken === null) {
             return null;
         }
 
         $suffix = $suffixes[$suffixToken];
+        // User view: choose the findings list branch for this case.
         if ($this->doesTypeContradictSuffix($type, $suffixToken)) {
             return null;
         }
@@ -337,6 +365,8 @@ final readonly class SuffixHungarianRule implements RuleInterface
     /**
      * Check local PHPDoc `@var` evidence when it exists.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Variable $variable - Local variable node whose nearest `@var` annotation, if any, is consulted.
      * @param string   $suffix - Display suffix the name carries, compared case-insensitively against the doc type.
      *
@@ -346,10 +376,13 @@ final readonly class SuffixHungarianRule implements RuleInterface
     {
         $docType = $this->localVarDocType($variable);
 
+        // User view: missing data becomes the expected findings list state.
         return $docType === null || $this->matchesDocTypeSuffix($docType, strtolower($suffix));
     }
 
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string                $name - Identifier (without leading `$`) whose trailing token is examined.
      * @param array<string, string> $suffixes - Map of lower-case suffix token to configured display suffix.
      * @param IdentifierTokenizer   $tokenizer - Splits the name into tokens so the final word can be matched.
@@ -359,6 +392,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
     private function suffixToken(string $name, array $suffixes, IdentifierTokenizer $tokenizer): ?string
     {
         $tokens = $tokenizer->tokenize($name);
+        // User view: choose the findings list branch for this case.
         if (count($tokens) < 2 || $this->isConversionIdiom($tokens)) {
             return null;
         }
@@ -371,6 +405,8 @@ final readonly class SuffixHungarianRule implements RuleInterface
     /**
      * Read the nearest local `@var` type attached to a variable assignment.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Variable $variable - Local variable node; the walk climbs its `parent` chain looking for a `@var` doc.
      *
      * @return string|null - PHPDoc type text when present.
@@ -382,10 +418,13 @@ final readonly class SuffixHungarianRule implements RuleInterface
         while ($parent instanceof Node) {
             $docComment = $parent->getDocComment();
             // Read an adjacent @var type assertion before using it to infer suffix intent.
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($docComment !== null && preg_match('/@var\s+([^\s]+)/', $docComment->getText(), $matches) === 1) {
                 return $matches[1];
             }
 
+            // User view: choose the findings list branch for this case.
             if ($parent instanceof Expression || $parent instanceof ClassMethod || $parent instanceof Function_) {
                 return null;
             }
@@ -397,6 +436,8 @@ final readonly class SuffixHungarianRule implements RuleInterface
     }
 
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Node|null $type - Declared type node to test, or null when the declaration omits a type.
      * @param string    $suffix - Lower-case suffix token the name carries (e.g. `string`, `array`).
      *
@@ -404,18 +445,23 @@ final readonly class SuffixHungarianRule implements RuleInterface
      */
     private function doesTypeContradictSuffix(?Node $type, string $suffix): bool
     {
+        // User view: choose the findings list branch for this case.
+        // User view: missing data becomes the expected findings list state.
         if ($type === null) {
             return false;
         }
 
         $typeName = $this->singleTypeName($type);
 
+        // User view: missing data becomes the expected findings list state.
         return $typeName !== null && !$this->matchesTypeNameSuffix($typeName, $suffix);
     }
 
     /**
      * Check whether a single-arm PHPDoc type supports the configured suffix.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $type - Raw PHPDoc type text from a `@var` tag, possibly nullable or a union.
      * @param string $suffix - Lower-case suffix token to confirm against the type's sole non-null arm.
      *
@@ -429,6 +475,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
             static fn (string $arm): bool => strtolower(trim($arm)) !== 'null',
         ));
 
+        // User view: choose the findings list branch for this case.
         if (count($arms) !== 1) {
             return false;
         }
@@ -439,6 +486,8 @@ final readonly class SuffixHungarianRule implements RuleInterface
     /**
      * Check whether a native or short type name supports the configured suffix.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $typeName - Declared or PHPDoc type name; namespace, generics, and `[]` are stripped first.
      * @param string $suffix - Lower-case suffix token the identifier carries, naming the native type it claims to
      *                         be; the `match ($suffix)` expression is the authoritative set of recognised tokens and
@@ -449,8 +498,10 @@ final readonly class SuffixHungarianRule implements RuleInterface
     private function matchesTypeNameSuffix(string $typeName, string $suffix): bool
     {
         $normalised = strtolower(ltrim($typeName, '\\'));
+        // User view: missing data becomes a safe findings list default.
         $normalised = preg_replace('/(?:<.*>|\\{.*|\\[\\])$/', '', $normalised) ?? $normalised;
         $parts      = explode('\\', $normalised);
+        // User view: missing data becomes a safe findings list default.
         $shortName  = $parts[array_key_last($parts)] ?? $normalised;
 
         return match ($suffix) {
@@ -467,20 +518,25 @@ final readonly class SuffixHungarianRule implements RuleInterface
     /**
      * Resolve nullable or simple single-arm types to one type name.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param Node $type - Type-hint node from a declaration: nullable, plain, or union form.
      *
      * @return string|null - Type name when the declaration has exactly one non-null arm.
      */
     private function singleTypeName(Node $type): ?string
     {
+        // User view: choose the findings list branch for this case.
         if ($type instanceof NullableType) {
             return $this->singleTypeName($type->type);
         }
 
+        // User view: choose the findings list branch for this case.
         if ($type instanceof Identifier || $type instanceof Name) {
             return $type->toString();
         }
 
+        // User view: choose the findings list branch for this case.
         if ($type instanceof UnionType) {
             $nonNull = array_values(array_filter(
                 $type->types,
@@ -496,6 +552,8 @@ final readonly class SuffixHungarianRule implements RuleInterface
     /**
      * Normalize configured suffixes to case-insensitive lookup keys.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param list<string> $suffixes - Configured display suffixes as authored in `.gruff-php.yaml`, any casing.
      *
      * @return array<string, string> - Lower-case token keyed to the original display suffix; blanks dropped.
@@ -504,8 +562,11 @@ final readonly class SuffixHungarianRule implements RuleInterface
     {
         $normalised = [];
 
+        // User view: add each item that can appear in findings list.
         foreach ($suffixes as $suffix) {
             $token = strtolower($suffix);
+            // User view: choose the findings list branch for this case.
+            // User view: an empty value becomes a clear findings list fallback.
             if ($token !== '') {
                 $normalised[$token] = $suffix;
             }
@@ -515,12 +576,15 @@ final readonly class SuffixHungarianRule implements RuleInterface
     }
 
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param list<string> $tokens - Lower-case name tokens in source order; the last is the candidate suffix.
      *
      * @return bool - True when the suffix is part of an explicit conversion idiom.
      */
     private function isConversionIdiom(array $tokens): bool
     {
+        // User view: choose the findings list branch for this case.
         if (count($tokens) < 3) {
             return false;
         }
@@ -533,12 +597,15 @@ final readonly class SuffixHungarianRule implements RuleInterface
     /**
      * Resolve the human-readable symbol for a function-like scope.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param FunctionLikeScope $scope - Scope being reported; its node and kind name the owning callable.
      *
      * @return string - Named callable symbol or synthetic closure/arrow label.
      */
     private function symbol(FunctionLikeScope $scope): string
     {
+        // User view: choose the findings list branch for this case.
         if ($scope->node instanceof ClassMethod || $scope->node instanceof Function_) {
             return CyclomaticComplexityRule::resolveSymbol($scope->node);
         }

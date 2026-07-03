@@ -30,6 +30,8 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
     /**
      * Describe the missing method PHPDoc rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -47,6 +49,8 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
     /**
      * Find method declarations that do not have a local PHPDoc block.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -57,8 +61,11 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
         $definition = $this->definition();
         $findings   = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (NodeIndex::nodesOf($analysisUnit, ClassMethod::class) as $classMethod) {
             /** @var ClassMethod $classMethod Finder predicate restricts results to method declarations. */
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($classMethod->getDocComment() !== null) {
                 continue;
             }
@@ -72,6 +79,8 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
     /**
      * Build the missing PHPDoc finding for one method.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit  $analysisUnit - Parsed unit supplying the display path reported in the finding.
      * @param RuleDefinition $definition - Rule metadata supplying severity, pillar, tier, and confidence.
      * @param ClassMethod   $classMethod - Undocumented method whose name and start line are reported.

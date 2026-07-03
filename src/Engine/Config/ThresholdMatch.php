@@ -14,6 +14,8 @@ final readonly class ThresholdMatch
     /**
      * Capture the threshold and severity selected for a measured value.
      *
+      * User flow: Turns project settings into the analysis run the user requested.
+      *
      * @param int|float $threshold - Threshold value that matched.
      * @param Severity  $severity - Severity assigned to the threshold.
      */

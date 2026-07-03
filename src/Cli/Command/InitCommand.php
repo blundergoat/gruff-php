@@ -92,6 +92,8 @@ final class InitCommand extends Command
     /**
      * Register init CLI options and metadata.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @return void
      */
     protected function configure(): void
@@ -106,6 +108,8 @@ final class InitCommand extends Command
     /**
      * Generate the default config file at the project root.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface  $input - Console input; only the --project-root and --force options are read.
      * @param OutputInterface $output - Console output; carries the wrote-path notice, next-steps guidance, and any error.
      *
@@ -114,6 +118,8 @@ final class InitCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $projectRoot = $this->projectRoot($input, $output);
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($projectRoot === null) {
             return Command::FAILURE;
         }
@@ -122,6 +128,8 @@ final class InitCommand extends Command
         $shouldForce = (bool)$input->getOption('force');
 
         $guardExitCode = $this->guardExistingConfig($projectRoot, $targetPath, $shouldForce, $output);
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if ($guardExitCode !== null) {
             return $guardExitCode;
         }
@@ -129,9 +137,11 @@ final class InitCommand extends Command
         $registry = RuleRegistry::defaults();
         $config   = AnalysisConfig::fromRegistry($registry);
 
+        // User view: missing data becomes a safe terminal output default.
         $ignoredPaths = self::existingIgnoredPaths($targetPath) ?? self::DEFAULT_IGNORED_PATHS;
 
         try {
+            // User view: missing data becomes a safe terminal output default.
             $minimumSeverity = self::existingMinimumSeverity($targetPath) ?? self::DEFAULT_MINIMUM_SEVERITY;
             self::existingSchemaVersion($targetPath);
         } catch (ConfigException $exception) {
@@ -145,6 +155,7 @@ final class InitCommand extends Command
         $rulesYaml    = self::renderRulesSection($registry);
         $contents     = self::FILE_HEADER . $scaffoldYaml . $rulesYaml;
 
+        // User view: choose the terminal output branch for this case.
         if (file_put_contents($targetPath, $contents) === false) {
             $output->writeln(sprintf('<error>Unable to write %s.</error>', $targetPath));
 
@@ -165,6 +176,8 @@ final class InitCommand extends Command
     /**
      * Resolve the directory the new config file will be written to.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param InputInterface  $input - Console input; an explicit --project-root wins, else the current working directory is used.
      * @param OutputInterface $output - Console output used to report a missing directory or an undeterminable working directory.
      *
@@ -173,7 +186,10 @@ final class InitCommand extends Command
     private function projectRoot(InputInterface $input, OutputInterface $output): ?string
     {
         $explicit = $input->getOption('project-root');
+        // User view: choose the terminal output branch for this case.
+        // User view: an empty value becomes a clear terminal output fallback.
         if (is_string($explicit) && $explicit !== '') {
+            // User view: choose the terminal output branch for this case.
             if (!is_dir($explicit)) {
                 $output->writeln(sprintf('<error>--project-root must be an existing directory: %s</error>', $explicit));
 
@@ -184,6 +200,7 @@ final class InitCommand extends Command
         }
 
         $cwd = getcwd();
+        // User view: choose the terminal output branch for this case.
         if ($cwd === false) {
             $output->writeln('<error>Unable to determine current working directory.</error>');
 
@@ -196,6 +213,8 @@ final class InitCommand extends Command
     /**
      * Refuse to overwrite a preferred or legacy config file without --force.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string          $projectRoot - Directory checked for a sibling legacy .gruff.yaml that --force would shadow.
      * @param string          $targetPath - Full path of the .gruff-php.yaml about to be written; refused when it already exists.
      * @param bool            $shouldForce - True bypasses both guards; the caller derives it from the --force option.
@@ -205,10 +224,12 @@ final class InitCommand extends Command
      */
     private function guardExistingConfig(string $projectRoot, string $targetPath, bool $shouldForce, OutputInterface $output): ?int
     {
+        // User view: choose the terminal output branch for this case.
         if ($shouldForce) {
             return null;
         }
 
+        // User view: choose the terminal output branch for this case.
         if (is_file($targetPath)) {
             $output->writeln(sprintf(
                                  '<error>%s already exists. Pass --force to overwrite.</error>',
@@ -219,6 +240,7 @@ final class InitCommand extends Command
         }
 
         $legacyPath = $projectRoot . '/' . ConfigLoader::LEGACY_DEFAULT_CONFIG_FILE;
+        // User view: choose the terminal output branch for this case.
         if (is_file($legacyPath)) {
             $output->writeln(sprintf(
                                  '<error>%s already exists; writing %s would silently switch analyse over to generated defaults. Remove or rename the legacy file, or pass --force to write the preferred config alongside it.</error>',
@@ -238,6 +260,8 @@ final class InitCommand extends Command
      * renderRulesSection so each rule can carry a leading description comment
      * that Yaml::dump can't emit.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param AnalysisConfig        $analysisConfig - Config seeded from the registry defaults.
      * @param list<string>          $ignoredPaths - Paths to omit from generated project scans.
      * @param array<string, string> $minimumSeverity - Per-command exit-code thresholds emitted under `minimumSeverity:`.
@@ -273,6 +297,8 @@ final class InitCommand extends Command
      * display name when no description is set). Output is appended to the
      * scaffold YAML; the existing 4-space indent contract is preserved.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param RuleRegistry $ruleRegistry - Source of the rules to render and the descriptions that become their comments.
      *
      * @return string - Rendered `rules:` block including trailing newline.
@@ -280,12 +306,15 @@ final class InitCommand extends Command
     private static function renderRulesSection(RuleRegistry $ruleRegistry): string
     {
         $output = "rules:\n";
+        // User view: add each item that can appear in terminal output.
         foreach ($ruleRegistry->all() as $rule) {
             $ruleDefinition = $rule->definition();
+            // User view: an empty value becomes a clear terminal output fallback.
             $description    = $ruleDefinition->description !== '' ? $ruleDefinition->description : $ruleDefinition->name;
             $output         .= '    # ' . $description . "\n";
             $ruleEntry      = self::buildRuleEntry($ruleDefinition);
             $ruleEntryYaml  = Yaml::dump([$ruleDefinition->id => $ruleEntry], self::YAML_INLINE_DEPTH, self::YAML_INDENT, Yaml::DUMP_EMPTY_ARRAY_AS_SEQUENCE);
+            // User view: add each item that can appear in terminal output.
             foreach (explode("\n", rtrim($ruleEntryYaml, "\n")) as $line) {
                 $output .= '    ' . $line . "\n";
             }
@@ -300,6 +329,8 @@ final class InitCommand extends Command
      * gating-command + threshold-value contract the loader applies so an invalid
      * block surfaces a useful error before init blindly preserves it.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string $targetPath - Path of the config file being regenerated, read for a hand-edited block to carry forward.
      *
      * @return array<string, string>|null - Existing block (command => threshold), or null when none can be preserved.
@@ -307,12 +338,14 @@ final class InitCommand extends Command
      */
     private static function existingMinimumSeverity(string $targetPath): ?array
     {
+        // User view: choose the terminal output branch for this case.
         if (!self::hasMinimumSeverityBlock($targetPath)) {
             return null;
         }
 
         $existing  = self::readMinimumSeverityBlock($targetPath);
         $preserved = [];
+        // User view: add each item that can appear in terminal output.
         foreach ($existing as $command => $threshold) {
             $preserved[self::validateGatingCommand($command)] = self::validateGatingThreshold((string)$command, $threshold);
         }
@@ -326,12 +359,15 @@ final class InitCommand extends Command
      * so the two-stage call avoids returning a nullable mixed-array shape from
      * a single helper (which trips `modernisation.phpdoc-mixed-overuse`).
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string $targetPath - Path of the existing config file to probe; a missing or unparseable file counts as absent.
      *
      * @return bool - True when the YAML loads and contains a top-level `minimumSeverity:` key.
      */
     private static function hasMinimumSeverityBlock(string $targetPath): bool
     {
+        // User view: choose the terminal output branch for this case.
         if (!is_file($targetPath)) {
             return false;
         }
@@ -348,6 +384,8 @@ final class InitCommand extends Command
     /**
      * Read and shape-validate the `minimumSeverity:` block from the existing config.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string $targetPath - Path of the config file to read; the caller has already confirmed the block is present.
      *
      * @return array<array-key, mixed> - Decoded YAML map; per-entry validation happens in the caller.
@@ -356,11 +394,14 @@ final class InitCommand extends Command
     private static function readMinimumSeverityBlock(string $targetPath): array
     {
         $decoded = Yaml::parseFile($targetPath);
+        // User view: choose the terminal output branch for this case.
         if (!is_array($decoded) || !array_key_exists('minimumSeverity', $decoded)) {
             return [];
         }
 
         $existing = $decoded['minimumSeverity'];
+        // User view: choose the terminal output branch for this case.
+        // User view: an empty value becomes a clear terminal output fallback.
         if (!is_array($existing) || ($existing !== [] && array_is_list($existing))) {
             throw new ConfigException('Config key "minimumSeverity" must be a map of command name to threshold.');
         }
@@ -371,6 +412,8 @@ final class InitCommand extends Command
     /**
      * Confirm the user-supplied key names a real gating command.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param mixed $command - Raw YAML map key; must be a string naming one of ConfigLoader::GATING_COMMANDS.
      *
      * @return string - Validated gating-command name.
@@ -378,10 +421,12 @@ final class InitCommand extends Command
      */
     private static function validateGatingCommand(mixed $command): string
     {
+        // User view: choose the terminal output branch for this case.
         if (!is_string($command)) {
             throw new ConfigException('Config key "minimumSeverity" keys must be strings.');
         }
 
+        // User view: choose the terminal output branch for this case.
         if (!in_array($command, ConfigLoader::GATING_COMMANDS, true)) {
             throw new ConfigException(sprintf(
                                           'Config key "minimumSeverity.%s" is not a valid gating command. Valid keys are: %s.',
@@ -396,6 +441,8 @@ final class InitCommand extends Command
     /**
      * Confirm the user-supplied threshold names a canonical `FailThreshold` value.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string $command - Owning command name, used only to point the rejection message at the offending key.
      * @param mixed  $threshold - Raw YAML value; must be a string accepted by FailThreshold::fromInput.
      *
@@ -404,6 +451,8 @@ final class InitCommand extends Command
      */
     private static function validateGatingThreshold(string $command, mixed $threshold): string
     {
+        // User view: choose the terminal output branch for this case.
+        // User view: missing data becomes the expected terminal output state.
         if (!is_string($threshold) || FailThreshold::fromInput($threshold) === null) {
             throw new ConfigException(sprintf(
                                           'Config key "minimumSeverity.%s" value "%s" is not a valid threshold. Accepted: %s.',
@@ -422,6 +471,8 @@ final class InitCommand extends Command
      * overwrite a deliberate downgrade; the scaffold always writes the canonical
      * value, so a mismatch is treated as a user intent worth confirming.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string $targetPath - Path of the config file to inspect; a missing, unparseable, or unset schemaVersion is allowed.
      *
      * @return void
@@ -429,6 +480,7 @@ final class InitCommand extends Command
      */
     private static function existingSchemaVersion(string $targetPath): void
     {
+        // User view: choose the terminal output branch for this case.
         if (!is_file($targetPath)) {
             return;
         }
@@ -439,15 +491,19 @@ final class InitCommand extends Command
             return;
         }
 
+        // User view: choose the terminal output branch for this case.
         if (!is_array($decoded) || !array_key_exists('schemaVersion', $decoded)) {
             return;
         }
 
         $existing = $decoded['schemaVersion'];
+        // User view: choose the terminal output branch for this case.
+        // User view: an empty value becomes a clear terminal output fallback.
         if (!is_string($existing) || $existing === '') {
             return;
         }
 
+        // User view: choose the terminal output branch for this case.
         if ($existing !== ConfigLoader::SCHEMA_VERSION) {
             throw new ConfigException(sprintf(
                                           'Config key "schemaVersion" must be "%s". Got "%s". Remove the deliberate override before regenerating with --force.',
@@ -460,12 +516,15 @@ final class InitCommand extends Command
     /**
      * Read an existing config's path ignores so --force does not wipe local policy.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string $targetPath - Path of the config file to read; any non-list or blank-entry ignore block is rejected wholesale.
      *
      * @return list<string>|null - Existing ignore paths, or null when none can be preserved.
      */
     private static function existingIgnoredPaths(string $targetPath): ?array
     {
+        // User view: choose the terminal output branch for this case.
         if (!is_file($targetPath)) {
             return null;
         }
@@ -476,22 +535,30 @@ final class InitCommand extends Command
             return null;
         }
 
+        // User view: choose the terminal output branch for this case.
         if (!is_array($decoded)) {
             return null;
         }
 
+        // User view: missing data becomes a safe terminal output default.
         $paths = $decoded['paths'] ?? null;
+        // User view: choose the terminal output branch for this case.
         if (!is_array($paths)) {
             return null;
         }
 
+        // User view: missing data becomes a safe terminal output default.
         $ignore = $paths['ignore'] ?? null;
+        // User view: choose the terminal output branch for this case.
         if (!is_array($ignore) || !array_is_list($ignore)) {
             return null;
         }
 
         $ignoredPaths = [];
+        // User view: add each item that can appear in terminal output.
         foreach ($ignore as $path) {
+            // User view: choose the terminal output branch for this case.
+            // User view: an empty value becomes a clear terminal output fallback.
             if (!is_string($path) || trim($path) === '') {
                 return null;
             }
@@ -505,6 +572,8 @@ final class InitCommand extends Command
     /**
      * Serialise one rule's registry defaults into the config shape.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param RuleDefinition $ruleDefinition - Rule definition to serialise.
      *
      * @return array<string, mixed> - config entry carrying only the keys this rule defines defaults for; always has `enabled`, with
@@ -514,15 +583,20 @@ final class InitCommand extends Command
     {
         $ruleEntry = ['enabled' => $ruleDefinition->isEnabledByDefault];
 
+        // User view: choose the terminal output branch for this case.
         if ($ruleDefinition->severityThreshold instanceof SeverityThreshold) {
             $ruleEntry['threshold'] = $ruleDefinition->severityThreshold->threshold;
             $ruleEntry['severity']  = $ruleDefinition->severityThreshold->severity->value;
         }
 
+        // User view: choose the terminal output branch for this case.
+        // User view: an empty value becomes a clear terminal output fallback.
         if ($ruleDefinition->defaultThresholds !== []) {
             $ruleEntry['thresholds'] = $ruleDefinition->defaultThresholds;
         }
 
+        // User view: choose the terminal output branch for this case.
+        // User view: an empty value becomes a clear terminal output fallback.
         if ($ruleDefinition->defaultOptions !== []) {
             $ruleEntry['options'] = $ruleDefinition->defaultOptions;
         }

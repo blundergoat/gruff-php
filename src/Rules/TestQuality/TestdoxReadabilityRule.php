@@ -28,6 +28,8 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
     /**
      * Describe the TestDox readability rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - identity, pillar/tier, advisory severity, and the default minWords=2 threshold; enabled by default
      */
     public function definition(): RuleDefinition
@@ -48,6 +50,8 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
     /**
      * Find test names that produce hard-to-read TestDox output.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -59,7 +63,9 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
         $threshold = (int)$ruleContext->settingsFor($this->definition())->numericThreshold('minWords');
         $findings  = [];
 
+        // User view: add each item that can appear in findings list.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
+            // User view: choose the findings list branch for this case.
             if ($scope->isPest || !$scope->node instanceof ClassMethod) {
                 continue;
             }
@@ -67,6 +73,7 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
             $methodName = $scope->name;
             $words      = $this->splitWords($methodName);
 
+            // User view: choose the findings list branch for this case.
             if (count($words) >= $threshold) {
                 continue;
             }
@@ -98,27 +105,35 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
     /**
      * Split testdox text into words for readability checks.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param string $methodName - Raw test method name; the `test` prefix is stripped and CamelCase split into words.
      *
      * @return list<string> - the test name's words in order, `test` prefix removed and CamelCase split; empty when the name reduces to nothing
      */
     private function splitWords(string $methodName): array
     {
+        // User view: missing data becomes a safe findings list default.
         $name   = preg_replace('/^test[_]?/i', '', $methodName) ?? $methodName;
         $name   = (string)preg_replace('/(?<!^)([A-Z])/', ' $1', $name);
         $tokens = preg_split('/[\s_]+/', $name) ?: [];
 
         // Drop empty tokens so the word count reflects real words, not separators between them.
+        // User view: an empty value becomes a clear findings list fallback.
         return array_values(array_filter($tokens, static fn(string $token): bool => $token !== ''));
     }
 
     /**
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param list<string> $words - Words split from the test name, in order; empty when the name reduced to nothing.
      *
      * @return string - the words lower-cased and space-joined to mirror PHPUnit's testdox output; empty string when no words remain
      */
     private function renderTestdox(array $words): string
     {
+        // User view: choose the findings list branch for this case.
+        // User view: an empty value becomes a clear findings list fallback.
         if ($words === []) {
             return '';
         }

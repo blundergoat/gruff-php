@@ -15,6 +15,8 @@ use GruffPhp\Engine\Source\SourceDiscoveryResult;
 final readonly class AnalysisSourceLoader
 {
     /**
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string       $projectRoot - Root used for source discovery and parsing.
      * @param list<string> $paths - Project-relative paths requested by the CLI.
      * @param bool         $shouldIncludeIgnored - Whether files matching default ignore patterns are included.
@@ -33,10 +35,12 @@ final readonly class AnalysisSourceLoader
         $diagnostics     = $this->missingPathDiagnostics($discoveryResult);
         $analysisUnits   = [];
 
+        // User view: add each item that can appear in terminal output.
         foreach ($discoveryResult->files as $file) {
             $unit            = $phpFileParser->parse($file);
             $analysisUnits[] = $unit;
 
+            // User view: add each item that can appear in terminal output.
             foreach ($unit->diagnostics as $diagnostic) {
                 $diagnostics[] = new RunDiagnostic(
                     type:     'parse-error',
@@ -55,6 +59,8 @@ final readonly class AnalysisSourceLoader
      * file at a time so each unit's AST can be released immediately after
      * analysis, keeping peak memory close to one unit's worth.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param string       $projectRoot - Root used for source discovery.
      * @param list<string> $paths - Project-relative paths requested by the CLI.
      * @param bool         $shouldIncludeIgnored - Whether files matching default ignore patterns are included.
@@ -81,6 +87,8 @@ final readonly class AnalysisSourceLoader
      * Build the diagnostics list for paths that disappeared between argument
      * parsing and discovery.
      *
+      * User flow: Supports the terminal command path and the feedback it prints.
+      *
      * @param SourceDiscoveryResult $sourceDiscoveryResult - Discovery output; each missing path yields one diagnostic.
      *
      * @return list<RunDiagnostic> - one missing-path diagnostic per vanished input path, in discovery order; empty when every path resolved
@@ -88,6 +96,7 @@ final readonly class AnalysisSourceLoader
     private function missingPathDiagnostics(SourceDiscoveryResult $sourceDiscoveryResult): array
     {
         $diagnostics = [];
+        // User view: add each item that can appear in terminal output.
         foreach ($sourceDiscoveryResult->missingPaths as $missingPath) {
             $diagnostics[] = new RunDiagnostic(
                 type:    'missing-path',

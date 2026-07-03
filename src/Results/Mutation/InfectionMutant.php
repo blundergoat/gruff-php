@@ -12,6 +12,8 @@ final readonly class InfectionMutant
     /**
      * Capture a mutant entry parsed from Infection output.
      *
+      * User flow: Folds mutation results into the quality feedback users see.
+      *
      * @param string      $status - Infection status for the mutant.
      * @param string      $filePath - Source file path reported by Infection.
      * @param int|null    $line - Source line reported for the mutant, when available.
@@ -32,6 +34,8 @@ final readonly class InfectionMutant
     /**
      * Serialize this value object into the array shape used by reports.
      *
+      * User flow: Folds mutation results into the quality feedback users see.
+      *
      * @return array{status: string, file: string, line: int|null, mutator: string, diff: string|null, processOutput: string|null} - report-ready map
      *                       keyed by Infection JSON field names; line/diff/processOutput are null when Infection omitted them
      */

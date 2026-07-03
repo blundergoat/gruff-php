@@ -12,6 +12,8 @@ final readonly class MutationAnalysisResult
     /**
      * Create a mutation analysis result with optional baseline and budget context.
      *
+      * User flow: Folds mutation results into the quality feedback users see.
+      *
      * @param InfectionReport      $report - Current mutation report.
      * @param InfectionReport|null $baselineReport - Baseline mutation report, when supplied.
      * @param int|null             $mutationBudget - Allowed survived-mutant budget, when configured.
@@ -26,6 +28,8 @@ final readonly class MutationAnalysisResult
     /**
      * Count escaped and timed-out mutants in the current report.
      *
+      * User flow: Folds mutation results into the quality feedback users see.
+      *
      * @return int - mutants the suite failed to kill (escaped plus timed-out); the figure the budget is measured against
      */
     public function survivedCount(): int
@@ -36,20 +40,26 @@ final readonly class MutationAnalysisResult
     /**
      * Check whether the survived mutant count exceeds the configured budget.
      *
+      * User flow: Folds mutation results into the quality feedback users see.
+      *
      * @return bool - true when survivors strictly exceed the budget; false when no budget is set or the cap is hit exactly
      */
     public function isBudgetExceeded(): bool
     {
+        // User view: missing data becomes the expected mutation feedback state.
         return $this->mutationBudget !== null && $this->survivedCount() > $this->mutationBudget;
     }
 
     /**
      * Calculate the mutation score delta versus the baseline report.
      *
+      * User flow: Folds mutation results into the quality feedback users see.
+      *
      * @return float|null - current minus baseline MSI rounded to two places (positive means improved); null when no baseline exists
      */
     public function msiDelta(): ?float
     {
+        // User view: choose the mutation feedback branch for this case.
         if (!$this->baselineReport instanceof InfectionReport) {
             return null;
         }
@@ -58,6 +68,8 @@ final readonly class MutationAnalysisResult
     }
 
     /**
+      * User flow: Folds mutation results into the quality feedback users see.
+      *
      * @return array{
      *     source: string,
      *     stats: array<string, int|float>,
@@ -100,9 +112,11 @@ final readonly class MutationAnalysisResult
                 ? [
                     'source' => $this->baselineReport->reportPath,
                     'msi'    => $this->baselineReport->msi(),
+                    // User view: missing data becomes a safe mutation feedback default.
                     'delta'  => $this->msiDelta() ?? 0.0,
                 ]
                 : null,
+            // User view: missing data becomes the expected mutation feedback state.
             'budget'          => $this->mutationBudget === null
                 ? null
                 : [

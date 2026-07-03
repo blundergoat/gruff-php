@@ -31,6 +31,8 @@ final readonly class MissingReturnTagRule implements RuleInterface
     /**
      * Describe the missing @return tag rule.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -49,6 +51,8 @@ final readonly class MissingReturnTagRule implements RuleInterface
     /**
      * Find documented function-like declarations that lack an @return tag.
      *
+      * User flow: Decides whether this rule adds a finding to the user report.
+      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -61,20 +65,25 @@ final readonly class MissingReturnTagRule implements RuleInterface
 
         $findings = [];
 
+        // User view: add each item that can appear in findings list.
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
+            // User view: choose the findings list branch for this case.
             if ($node instanceof ClassMethod && in_array($node->name->toString(), ['__construct', '__destruct'], true)) {
                 continue;
             }
 
             $docComment = $node->getDocComment();
 
+            // User view: choose the findings list branch for this case.
+            // User view: missing data becomes the expected findings list state.
             if ($docComment === null) {
                 continue;
             }
 
             $docText = $docComment->getText();
 
+            // User view: choose the findings list branch for this case.
             if (str_contains($docText, '@return')) {
                 continue;
             }
