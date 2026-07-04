@@ -19,7 +19,11 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 
 /**
- * Detects empty method and function bodies that do not communicate useful intent.
+ * Flags a method or function with a genuinely empty body, catching stubs that were never filled in -
+ * while exempting promoted constructors, whose empty body is doing real assignment work.
+ *
+ * Runs per file over every callable, skipping abstract methods. A non-abstract empty body is reported at
+ * advisory; a constructor that exists only to promote properties is left alone.
  */
 final readonly class EmptyMethodRule implements RuleInterface
 {
@@ -29,7 +33,7 @@ final readonly class EmptyMethodRule implements RuleInterface
     public const ID = 'waste.empty-method';
 
     /**
-     * Describe the empty method rule.
+     * Describes the empty-method rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -47,7 +51,7 @@ final readonly class EmptyMethodRule implements RuleInterface
     }
 
     /**
-     * Find function-like declarations with empty bodies.
+     * Reports each non-abstract empty callable body, excluding promoted constructors.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -61,16 +65,20 @@ final readonly class EmptyMethodRule implements RuleInterface
 
         $findings = [];
 
+        // Check each function and method in the file.
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
+            // An abstract method has no body by design.
             if ($node instanceof ClassMethod && $node->isAbstract()) {
                 continue;
             }
 
+            // Only a present-but-empty body counts: null means bodyless, a non-empty list means real code.
             if ($node->stmts === null || $node->stmts !== []) {
                 continue;
             }
 
+            // A promoted constructor's empty body still does assignment work, so skip it.
             if ($node instanceof ClassMethod && $this->isPromotedConstructor($node)) {
                 continue;
             }
@@ -96,7 +104,7 @@ final readonly class EmptyMethodRule implements RuleInterface
     }
 
     /**
-     * Allow empty constructors that only define promoted properties.
+     * Reports whether an empty constructor exists only to promote properties, so its empty body is fine.
      *
      * @param ClassMethod $classMethod - Method to test; only `__construct` with promoted params earns the exemption.
      *
@@ -104,11 +112,12 @@ final readonly class EmptyMethodRule implements RuleInterface
      */
     private function isPromotedConstructor(ClassMethod $classMethod): bool
     {
+        // Non-constructors gain nothing from an empty body, so they stay reportable.
         if ($classMethod->name->toString() !== '__construct') {
-            // Non-constructors gain nothing from an empty body, so they stay reportable.
             return false;
         }
 
+        // A single promoted param means the empty body is really doing work.
         foreach ($classMethod->params as $param) {
             if ($param->isPromoted()) {
                 // A promoted param means the empty body is doing real work (assigning the property); exempt it.

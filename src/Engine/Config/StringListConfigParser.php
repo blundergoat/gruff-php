@@ -7,7 +7,14 @@ namespace GruffPhp\Engine\Config;
 use GruffPhp\Support\PathHelper;
 
 /**
- * Normalises scalar and list configuration values into validated string lists.
+ * Turns a raw config value into a clean, validated list of strings - the workhorse behind every
+ * list-shaped setting a user writes.
+ *
+ * Config values arrive loosely typed from YAML, so a setting like `ignore:` or `acceptedAbbreviations:`
+ * needs checking and tidying before use. This rejects anything that is not a list of non-empty strings,
+ * de-duplicates while preserving order, and (for path settings) normalises separators and refuses
+ * patterns that would escape the project or use globs where they are not allowed - so a typo in config
+ * becomes a clear error rather than a silently wrong scan.
  *
  * @phpstan-type ConfigScalar bool|float|int|object|string|null
  * @phpstan-type ConfigValue ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key,
@@ -16,22 +23,27 @@ use GruffPhp\Support\PathHelper;
 final readonly class StringListConfigParser
 {
     /**
-     * @param ConfigValue $configValue - Raw config value to normalize.
-     * @param string      $path - Config path used in validation messages.
-     * @param bool        $hasPathPatterns - Whether values are interpreted as path patterns.
-     * @param bool        $allowsGlobs - Whether glob-like wildcard patterns are accepted.
+     * Validates and cleans one list setting into de-duplicated strings, throwing a clear error when the
+     * user wrote something that is not a list of strings.
      *
-     * @return list<string> - deduplicated, reindexed strings in first-seen order; empty when the input list is empty
+     * @param ConfigValue $configValue - Raw config value to normalize.
+     * @param string      $path - Config key path, used in validation messages so the user knows what to fix.
+     * @param bool        $hasPathPatterns - When true, each value is checked as a project-relative path pattern.
+     * @param bool        $allowsGlobs - When true, `*` wildcards are accepted in the path patterns.
+     *
+     * @return list<string> - Deduplicated, reindexed strings in first-seen order; empty when the input list was empty.
      * @throws ConfigException When the config value is not a valid string list.
      */
     public function parse(object|array|string|int|float|bool|null $configValue, string $path, bool $hasPathPatterns, bool $allowsGlobs): array
     {
+        // The setting has to be a list; a scalar or a keyed map means the user wrote the wrong shape.
         if (!is_array($configValue) || !array_is_list($configValue)) {
             throw new ConfigException(sprintf('Config key "%s" must be a list of strings.', $path));
         }
 
         $strings = [];
 
+        // Clean and validate each entry in turn.
         foreach ($configValue as $index => $rawConfigValue) {
             $strings[] = $this->normalizedString($rawConfigValue, $path, $index, hasPathPatterns: $hasPathPatterns, allowsGlobs: $allowsGlobs);
         }
@@ -40,7 +52,8 @@ final readonly class StringListConfigParser
     }
 
     /**
-     * Normalize one configured string and validate optional path-pattern rules.
+     * Cleans one list entry to canonical form and, for path settings, checks it is a safe relative
+     * pattern - rejecting a blank or non-string entry outright.
      *
      * @param mixed      $rawConfigValue - One list element; must be a non-empty string or the call throws.
      * @param string     $path - Parent config key, prefixed onto error messages for locatability.
@@ -48,7 +61,7 @@ final readonly class StringListConfigParser
      * @param bool       $hasPathPatterns - When true, the value must also pass project-relative path-pattern checks.
      * @param bool       $allowsGlobs - When true, `*` wildcards are allowed; only read under $hasPathPatterns.
      *
-     * @return string - canonical form: input trimmed and every backslash folded to `/` for path comparison
+     * @return string - Canonical form: input trimmed and every backslash folded to `/` for path comparison.
      */
     private function normalizedString(
         mixed      $rawConfigValue,
@@ -57,12 +70,14 @@ final readonly class StringListConfigParser
         bool       $hasPathPatterns,
         bool       $allowsGlobs,
     ): string {
+        // A blank or non-string entry is a config mistake, so reject it and point at the exact index.
         if (!is_string($rawConfigValue) || trim($rawConfigValue) === '') {
             throw new ConfigException(sprintf('Config key "%s.%s" must be a non-empty string.', $path, $index));
         }
 
         $normalized = str_replace('\\', '/', trim($rawConfigValue));
 
+        // Path settings get the extra safety check that the pattern stays inside the project.
         if ($hasPathPatterns) {
             $this->assertPathPattern($normalized, $path, $index, $allowsGlobs);
         }
@@ -71,7 +86,8 @@ final readonly class StringListConfigParser
     }
 
     /**
-     * Reject path patterns that can escape the project or use disallowed globs.
+     * Rejects a path pattern that could escape the project tree, or uses a glob where globs are not
+     * allowed, so an ignore rule can never reach outside the user's project.
      *
      * @param string     $normalized - Already-normalized pattern to vet; must stay inside the project tree.
      * @param string     $path - Parent config key, prefixed onto the rejection message for locatability.
@@ -82,10 +98,12 @@ final readonly class StringListConfigParser
      */
     private function assertPathPattern(string $normalized, string $path, int|string $index, bool $allowsGlobs): void
     {
+        // An absolute path or a `..` climb would point outside the project, which an ignore pattern must never do.
         if (PathHelper::isAbsolute($normalized) || str_contains($normalized, '../') || $normalized === '..') {
             throw new ConfigException(sprintf('Config key "%s.%s" must be a relative project path pattern.', $path, $index));
         }
 
+        // This setting does not support wildcards, so a `*` here is a mistake worth flagging.
         if (!$allowsGlobs && str_contains($normalized, '*')) {
             throw new ConfigException(sprintf('Config key "%s.%s" does not support glob syntax.', $path, $index));
         }

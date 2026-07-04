@@ -15,7 +15,11 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\SourceTextRuleInterface;
 
 /**
- * Flags Composer scripts that run shell or remote commands at install time.
+ * Flags a Composer lifecycle script that runs a shell or remote command at install time - a `curl | sh`,
+ * an `eval`, a backtick - the shape that lets `composer install` execute arbitrary code (supply-chain risk).
+ *
+ * Scans `composer.json` as text, matching install-time events whose command contains a risky shell fragment.
+ * Warning, medium confidence - fragment matching catches the shape but cannot prove intent or harm.
  */
 final class DependencyComposerScriptRule implements SourceTextRuleInterface
 {
@@ -68,7 +72,7 @@ final class DependencyComposerScriptRule implements SourceTextRuleInterface
     ];
 
     /**
-     * Describe the risky Composer script rule.
+     * Describes the risky-Composer-script rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -86,7 +90,7 @@ final class DependencyComposerScriptRule implements SourceTextRuleInterface
     }
 
     /**
-     * Find `scripts` entries that run shell or remote commands.
+     * Reports each install-time Composer script that runs a shell or remote command.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -107,7 +111,9 @@ final class DependencyComposerScriptRule implements SourceTextRuleInterface
         }
 
         $findings = [];
+        // Check each declared script event.
         foreach ($manifest['scripts'] as $event => $commands) {
+            // Only an install-time event running a risky command is flagged.
             if (!is_string($event) || !in_array($event, self::INSTALL_TIME_EVENTS, true) || !$this->hasRiskyCommand($commands)) {
                 continue;
             }
@@ -132,7 +138,7 @@ final class DependencyComposerScriptRule implements SourceTextRuleInterface
     }
 
     /**
-     * Decide whether any command for an event is a shell/remote invocation.
+     * Reports whether any command for an event is a shell or remote invocation.
      *
      * @param mixed $commands - Script value: a command string or a list of commands.
      *
@@ -142,12 +148,15 @@ final class DependencyComposerScriptRule implements SourceTextRuleInterface
     {
         $normalizedCommands = is_array($commands) ? $commands : [$commands];
 
+        // Weigh each command the event runs.
         foreach ($normalizedCommands as $command) {
+            // A non-string command (e.g. a nested array) is skipped.
             if (!is_string($command)) {
                 continue;
             }
 
             $normalized = strtolower($command);
+            // Check the command against each known risky fragment.
             foreach (self::RISKY_FRAGMENTS as $fragment) {
                 if (str_contains($normalized, $fragment)) {
                     // First risky fragment is enough to flag the event; no need to inspect the remaining commands.

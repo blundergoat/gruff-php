@@ -19,7 +19,7 @@ final class ComposerManifest
     public const FILENAME = 'composer.json';
 
     /**
-     * Decide whether a display path refers to a Composer manifest.
+     * Reports whether a display path refers to a Composer manifest.
      *
      * @param string $displayPath - File display path, as reported by the source file.
      *
@@ -36,7 +36,7 @@ final class ComposerManifest
     }
 
     /**
-     * Decode manifest JSON into an associative array, tolerating malformed input.
+     * Decodes manifest JSON into an associative array, tolerating malformed input.
      *
      * @param string $source - Raw manifest contents.
      *
@@ -62,7 +62,7 @@ final class ComposerManifest
     }
 
     /**
-     * Resolve the 1-based line number of the first occurrence of a token.
+     * Resolves the 1-based line number of the first occurrence of a token.
      *
      * Used to anchor a finding near the offending key without embedding any
      * value in the finding payload.

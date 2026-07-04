@@ -35,6 +35,8 @@ final readonly class StmtChildBlock
     public const KIND_FINALLY_BODY = 'finally-body';
 
     /**
+     * Wraps one child-statement block with its role and a back-reference to the owning node.
+     *
      * @param string      $kind - One of the `KIND_*` constants identifying the block role.
      * @param array<Stmt> $statements - Statements inside the block, as PhpParser yields them.
      * @param Node        $owner - Owning node (Stmt, Else_, ElseIf_, Case_, Catch_, or Finally_) - gives rules access to extras.

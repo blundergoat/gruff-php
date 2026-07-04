@@ -1,13 +1,13 @@
 # Code Map - gruff-php
 
-Last reviewed 2026-06-13. Captures the v0.4.1 surface as wired in `composer.json`, `bin/gruff-php`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
+Last reviewed 2026-07-04. Captures the current source surface as wired in `composer.json`, `bin/gruff-php`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
 
 ## Top-level layout
 
 ```text
 .
 |-- README.md                 = project entry doc; also probed by docs.missing-readme rule
-|-- CHANGELOG.md              = unreleased notes for the v0.1 surface
+|-- CHANGELOG.md              = release history; the top section tracks the current `Application::VERSION`
 |-- CLAUDE.md                 = Claude Code root instruction file
 |-- AGENTS.md                 = Codex peer instruction file
 |-- composer.json             = Composer metadata, runtime deps, bin, autoload, `check`/`phpstan`/`security:scan`/`test` scripts
@@ -18,7 +18,6 @@ Last reviewed 2026-06-13. Captures the v0.4.1 surface as wired in `composer.json
 |-- package-lock.json         = npm lockfile for harness Node tooling
 |-- node_modules/             = harness Node tooling install (gitignored)
 |-- vendor/                   = Composer install (gitignored)
-|-- .gruff-cache/             = incremental result cache (ADR-020); gitignored + discovery-ignored
 |-- bin/                      = PHP CLI entrypoint
 |-- scripts/                  = local maintenance scripts
 |-- src/                      = gruff-php application source (PSR-4 root `GruffPhp\`)
@@ -29,7 +28,7 @@ Last reviewed 2026-06-13. Captures the v0.4.1 surface as wired in `composer.json
 |-- .github/                  = repository-facing guidance and CI workflow, including the gruff security-profile SARIF upload job
 |-- .idea/                    = JetBrains IDE settings (developer-local)
 |-- .goat-flow/               = goat-flow project memory and reference docs
-|-- .claude/                  = Claude Code config, hooks, and installed skills
+|-- .claude/                  = Claude Code settings and installed skills
 |-- .codex/                   = Codex hooks/config surface
 `-- .agents/                  = shared peer-agent skill root (Codex/Gemini)
 ```
@@ -67,7 +66,7 @@ Application source map:
     |   |-- Hook/ = hook finding filtering, scope attribution, identity, and presenter values
     |   +-- Reporter/ = text, JSON, HTML, Markdown, GitHub annotations, hotspot, SARIF, format, display-filter, and fail-threshold output
     |-- Results/ = serialisable analysis results and optional enrichment payloads
-    |   |-- Baseline/ = baseline read/write/apply/report values for gruff.baseline.v1
+    |   |-- Baseline/ = baseline read/write/apply/report values for gruff.baseline.v2 grouped counts
     |   |-- Diff/ = Git diff ranges, diff-mode metadata, and changed-line finding filter
     |   |-- Finding/ = finding value, severity, confidence, pillar, and tier enums
     |   |-- Mutation/ = Infection report parsing, optional Infection run wrapper, mutation findings, budgets, and mutation payloads
@@ -178,8 +177,8 @@ tests/
 |-- architecture.md                           = system architecture notes (this file's sibling)
 |-- code-map.md                               = this repository map
 |-- glossary.md                               = project and harness terms
-|-- config.yaml                               = goat-flow version + configured agents
-|-- hooks/                                    = shared hook scripts, including deny-dangerous and gruff-code-quality
+|-- config.yaml                               = goat-flow version, installed skills, and global hook desired state
+|-- hooks/                                    = shared hook scripts, including deny-dangerous, gruff-code-quality, and post-turn-safety
 |-- learning-loop/
 |   |-- decisions/                            = ADRs, including ADR-028 for source namespace consolidation
 |   |-- footguns/                             = reproducible traps with evidence
@@ -195,10 +194,8 @@ tests/
 `-- logs/                                     = local setup, quality, critique, and security logs (gitignored content under it)
 
 .claude/
-|-- settings.json                             = committed Claude Code settings
+|-- settings.json                             = committed Claude Code settings registering shared hooks
 |-- settings.local.json                       = developer-local Claude Code settings (gitignored)
-|-- hooks/
-|   `-- deny-dangerous.sh                     = PreToolUse shell-safety hook
 `-- skills/
     |-- goat/
     |-- goat-critique/
@@ -210,9 +207,7 @@ tests/
 
 .codex/
 |-- config.toml                               = Codex hooks feature config
-|-- hooks.json                                = Codex PreToolUse hook registration
-`-- hooks/
-    `-- deny-dangerous.sh                     = shell-safety hook (mirrors Claude's)
+`-- hooks.json                                = Codex PreToolUse hook registration for the shared deny-dangerous hook; Codex post-tool/Stop hooks are unsupported in goat-flow 1.13.0
 
 .agents/
 `-- skills/                                   = peer-agent skills mirroring `.claude/skills/`
@@ -231,4 +226,4 @@ tests/
 - CI lives in `.github/workflows/ci.yml`: `verify` runs Composer checks and preflight on PHP 8.3/8.4, `security` gates on `composer security:scan` with read-only permissions, and `security-sarif` uploads gruff SARIF on non-PR events with `security-events: write`.
 - `composer.json`'s `check` script lints every committed PHP source/test file with `php -l` via `find src tests -name '*.php'` (excluding the intentional `tests/Fixtures/Source/syntax-error` fixtures), so new files are linted automatically rather than from a hand-maintained list.
 - Pillars currently emitted by registered static rules: Size, Complexity, Maintainability, DeadCode, Naming, Documentation, Modernisation, Security, SensitiveData, TestQuality. Optional Infection ingestion emits Mutation findings. Other `Pillar::*` cases (Coupling, Architecture, Design) are reserved; Design emptied when the project rules were retired (ADR-026).
-- Static baselines are explicit `gruff.baseline.v1` JSON files. They suppress exact fingerprint/rule/file matches only; inline suppression comments are intentionally absent in v0.1.
+- Static baselines are explicit `gruff.baseline.v2` JSON files of grouped count rows. Matching is count arithmetic per `(file, ruleId, message)` group (ADR-029), so line shifts never resurface accepted debt; legacy v1 files fail closed with a regenerate instruction. Inline suppression comments are intentionally absent.

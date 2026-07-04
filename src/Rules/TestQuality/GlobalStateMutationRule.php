@@ -19,7 +19,9 @@ use PhpParser\Node\Expr;
 use PhpParser\Node\Stmt;
 
 /**
- * Detects tests that mutate shared process state without cleanup.
+ * Flags a test that mutates process-wide state - writing a superglobal like `$_GET[...]` or calling
+ * `putenv`/`ini_set` - in a class with no tearDown / #[After] cleanup, so the change leaks into whichever
+ * test runs next and makes failures order-dependent. Runs over every test. Warning, medium confidence.
  */
 final readonly class GlobalStateMutationRule implements RuleInterface
 {
@@ -39,7 +41,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     private const STATE_FUNCTIONS = ['putenv', 'ini_set', 'error_reporting', 'date_default_timezone_set'];
 
     /**
-     * Describe the global state mutation rule.
+     * Describes the global-state-mutation rule for the registry and reports.
      *
      * @return RuleDefinition - id, name, pillar, tier, and the warning/medium defaults applied to every finding
      */
@@ -56,7 +58,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     }
 
     /**
-     * Find tests that mutate global state without detected cleanup hooks.
+     * Reports tests that mutate global state without a detected cleanup hook.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -69,7 +71,9 @@ final readonly class GlobalStateMutationRule implements RuleInterface
         $cleanupCache  = [];
         $classesByName = $this->classesByName($analysisUnit);
 
+        // Weigh every test scope in the file.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
+            // Only scopes in a cleanup-free class can leak state into the next test.
             if (!$this->shouldCheckScopeCleanup($scope, $cleanupCache, $classesByName)) {
                 continue;
             }
@@ -85,6 +89,8 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     }
 
     /**
+     * Reports whether a scope should be scanned for cleanup-sensitive mutations.
+     *
      * @param TestQualityScope           $scope - Scope to test; Pest scopes are exempt from cleanup checks.
      * @param array<int, bool>           $cleanupCache - Memo by enclosing class object id; true means a hook was found.
      * @param array<string, Stmt\Class_> $classesByName - Declared classes by name, used to resolve parent cleanup hooks.
@@ -105,6 +111,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
         }
 
         $classKey = spl_object_id($class);
+        // Resolve the class's cleanup verdict once and memoise it.
         if (!array_key_exists($classKey, $cleanupCache)) {
             $cleanupCache[$classKey] = $this->hasCleanupInClass($class, $classesByName);
         }
@@ -114,7 +121,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     }
 
     /**
-     * Build superglobal findings for the test-quality rule.
+     * Builds the findings for unscoped superglobal writes in a test.
      *
      * @param AnalysisUnit     $analysisUnit - Parsed unit; supplies the display path recorded on each finding.
      * @param TestQualityScope $scope - Cleanup-free test scope scanned for direct superglobal writes.
@@ -125,8 +132,10 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     {
         $findings = [];
 
+        // Weigh every assignment in the test body.
         foreach (NodeIndex::descendantsOfAny($scope->node, [Expr\Assign::class]) as $assign) {
             $superglobal = $this->superglobalWriteName($assign->var);
+            // Skip assignments that do not write a tracked superglobal.
             if ($superglobal === null) {
                 continue;
             }
@@ -144,7 +153,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     }
 
     /**
-     * Build state function findings for the test-quality rule.
+     * Builds the findings for unscoped state-mutating calls in a test.
      *
      * @param AnalysisUnit     $analysisUnit - Parsed unit; supplies the display path recorded on each finding.
      * @param TestQualityScope $scope - Cleanup-free test scope; its calls are matched against the state list.
@@ -155,12 +164,15 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     {
         $findings = [];
 
+        // Inspect each call the test makes.
         foreach (TestQualityNodeHelper::calls($scope) as $call) {
+            // Only a global function call can be a state mutator.
             if (!$call instanceof Expr\FuncCall) {
                 continue;
             }
 
             $name = TestQualityNodeHelper::functionName($call);
+            // Only the modelled state-mutating functions qualify.
             if ($name === null || !in_array($name, self::STATE_FUNCTIONS, true)) {
                 continue;
             }
@@ -178,7 +190,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     }
 
     /**
-     * Extract the written superglobal name from an assignment target.
+     * Returns the superglobal name an assignment target writes to, or null.
      *
      * @param Expr $target - Left-hand side of an assignment; nested array-dim writes are unwrapped to the base variable.
      *
@@ -192,6 +204,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
         }
 
         $variable = $target->var;
+        // Unwrap nested index writes down to the base variable.
         while ($variable instanceof Expr\ArrayDimFetch) {
             $variable = $variable->var;
         }
@@ -205,6 +218,8 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     }
 
     /**
+     * Reports whether a class or an ancestor declares a cleanup hook.
+     *
      * @param Stmt\Class_                $class - Class whose own methods and ancestors are searched for a hook.
      * @param array<string, Stmt\Class_> $classesByName - Declared classes by name, used to follow `extends` to a parent.
      * @param array<int, true>           $visited - Object ids already walked; guards against cycles in the graph.
@@ -221,6 +236,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
 
         $visited[$classId] = true;
 
+        // Weigh each method for a cleanup hook.
         foreach ($class->getMethods() as $classMethod) {
             $methodName = strtolower($classMethod->name->toString());
 
@@ -261,7 +277,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     }
 
     /**
-     * Index declared classes by fully qualified and short names.
+     * Indexes declared classes by short and namespaced name.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit whose declared classes seed the lookup table.
      *
@@ -271,7 +287,9 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     {
         $classes = [];
 
+        // Weigh every class declaration in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Class_::class) as $class) {
+            // Only a named class can be keyed for lookup.
             if (!$class->name instanceof Node\Identifier) {
                 continue;
             }
@@ -280,6 +298,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
             $classes[$name] = $class;
             $namespacedName = $class->getAttribute('namespacedName');
 
+            // Also key the class by its namespaced name when known.
             if ($namespacedName instanceof Node\Name) {
                 $classes[$namespacedName->toString()] = $class;
             }
@@ -289,7 +308,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     }
 
     /**
-     * Return the final segment of a fully qualified class name.
+     * Returns the final segment of a fully qualified class name.
      *
      * @param string $name - Fully qualified or already-short class name; an empty-segment result falls back to the input.
      *
@@ -303,6 +322,8 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     }
 
     /**
+     * Builds the global-state-mutation finding.
+     *
      * @param AnalysisUnit          $analysisUnit - Parsed unit; supplies the display path recorded on the finding.
      * @param TestQualityScope      $scope - Offending test scope; its symbol identifies the test in the finding.
      * @param int                   $line - 1-based source line of the mutation, reported to the user.

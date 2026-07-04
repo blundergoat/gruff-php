@@ -1,0 +1,18 @@
+{
+    "schemaVersion": "gruff.baseline.v2",
+    "generatedAt": "2026-07-03T00:00:00+00:00",
+    "groups": [
+        {
+            "file": "src/Example.php",
+            "ruleId": "docs.missing-public-phpdoc",
+            "message": "Method calculateTotal needs a brief intent description above its declaration (one plain-English line; not a restatement of the method signature).",
+            "count": 2
+        },
+        {
+            "file": "src/Other.php",
+            "ruleId": "security.dangerous-function-call",
+            "message": "Dangerous PHP execution pattern detected: eval.",
+            "count": 1
+        }
+    ]
+}

@@ -20,7 +20,12 @@ use PhpParser\Node\Scalar;
 use PhpParser\Node\Stmt;
 
 /**
- * Detects callable arrays that can use first-class callable syntax.
+ * Flags an old-style `[$object, 'method']` array callable that PHP 8.1's first-class callable syntax
+ * (`$object->method(...)`) can express more clearly, so the user can consider modernising it.
+ *
+ * Runs per file on PHP 8.1+ targets. It reports each two-element callable array that sits where a callable
+ * is actually used (an argument, assignment, or return). Advisory only - the rewrite can shift binding
+ * semantics, so gruff-php suggests rather than gates.
  */
 final readonly class FirstClassCallableCandidateRule implements RuleInterface
 {
@@ -30,9 +35,9 @@ final readonly class FirstClassCallableCandidateRule implements RuleInterface
     public const ID = 'modernisation.first-class-callable-candidate';
 
     /**
-     * Describe the first-class callable candidate rule.
+     * Describes the first-class-callable-candidate rule for the registry and reports.
      *
-     * @return RuleDefinition - Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults (advisory severity, medium confidence).
      */
     public function definition(): RuleDefinition
     {
@@ -48,12 +53,12 @@ final readonly class FirstClassCallableCandidateRule implements RuleInterface
     }
 
     /**
-     * Find array-callable expressions that may use first-class callable syntax.
+     * Reports each array callable that PHP 8.1 first-class callable syntax could replace.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext - Rule context supplying the target PHP version.
      *
-     * @return list<Finding> - Findings for PHP 8.1 callable syntax candidates.
+     * @return list<Finding> - One finding per first-class callable candidate; empty on pre-8.1 targets or when none qualify.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -64,7 +69,9 @@ final readonly class FirstClassCallableCandidateRule implements RuleInterface
 
         $findings = [];
 
+        // Scan every array literal in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\Array_::class) as $array) {
+            // Only a genuine callable pair used in a callable position is worth suggesting.
             if (!$this->isCallableArray($array) || !$this->isCallableContext($array)) {
                 continue;
             }
@@ -89,11 +96,11 @@ final readonly class FirstClassCallableCandidateRule implements RuleInterface
     }
 
     /**
-     * Check whether an array expression has the two-part callable shape.
+     * Reports whether an array has the two-part `[target, 'method']` callable shape.
      *
      * @param Expr\Array_ $array - Array literal under inspection; only the unkeyed [target, 'method'] pair matches.
      *
-     * @return bool - True when the array looks like a callable pair.
+     * @return bool - True when the array looks like a callable pair, false otherwise.
      */
     private function isCallableArray(Expr\Array_ $array): bool
     {
@@ -127,11 +134,11 @@ final readonly class FirstClassCallableCandidateRule implements RuleInterface
     }
 
     /**
-     * Check whether the array callable appears in a callable-friendly context.
+     * Reports whether the array callable sits where a callable would actually be invoked.
      *
      * @param Expr\Array_ $array - Array literal whose enclosing node decides if a callable would actually be invoked.
      *
-     * @return bool - True when the parent context can accept a callable.
+     * @return bool - True when the parent context can accept a callable, false when it is plain array data.
      */
     private function isCallableContext(Expr\Array_ $array): bool
     {

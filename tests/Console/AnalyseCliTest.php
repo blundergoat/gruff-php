@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Console;
 
+use GruffPhp\Cli\Application;
 use JsonException;
 use Symfony\Component\Process\Process;
 
@@ -32,7 +33,7 @@ final class AnalyseCliTest extends CliTestCase
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-        self::assertStringContainsString('gruff-php 0.4.1', $process->getOutput());
+        self::assertStringContainsString('gruff-php ' . Application::VERSION, $process->getOutput());
         self::assertStringContainsString('Discovered: 2', $process->getOutput());
         self::assertStringContainsString('Ignored: 6', $process->getOutput());
         self::assertStringContainsString('tests/Fixtures/Source/mixed/vendor/ignored.php', $process->getOutput());
@@ -770,18 +771,29 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
-     * Load an expected CLI golden output fixture.
+     * Load an expected CLI golden output fixture with its version stamps normalised.
+     *
+     * The stamped tool version inside a golden is rewritten to the live
+     * `Application::VERSION` at compare time, so version bumps never require
+     * regenerating goldens and goldens can never stamp-drift silently.
      *
      * @param string $fileName - Basename under tests/Fixtures/Cli/Golden whose contents are the expected output.
      *
-     * @return string - verbatim fixture text to assert the CLI's actual output against
+     * @return string - fixture text with the header/`"version"` stamps replaced by the live version
      */
     private function goldenOutput(string $fileName): string
     {
         $contents = file_get_contents(self::PROJECT_ROOT . '/tests/Fixtures/Cli/Golden/' . $fileName);
         self::assertIsString($contents);
 
-        return $contents;
+        $normalised = preg_replace(
+            ['/^gruff-php \d+\.\d+\.\d+(?:-[A-Za-z0-9.]+)? /m', '/"version": "\d+\.\d+\.\d+(?:-[A-Za-z0-9.]+)?"/'],
+            ['gruff-php ' . Application::VERSION . ' ', '"version": "' . Application::VERSION . '"'],
+            $contents,
+        );
+        self::assertIsString($normalised);
+
+        return $normalised;
     }
 
 }

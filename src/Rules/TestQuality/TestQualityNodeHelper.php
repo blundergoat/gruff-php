@@ -15,7 +15,10 @@ use PhpParser\Node\Scalar;
 use PhpParser\Node\Stmt;
 
 /**
- * Provides shared AST helpers for test-quality rules.
+ * Central AST toolkit every test-quality rule leans on: it finds the PHPUnit and Pest test scopes in a file,
+ * recognises assertion, mock, and expectation calls, and reads literal argument values back out of them. The
+ * discovered scopes are memoised per unit so the many test rules share a single AST walk rather than each
+ * re-scanning the file. Pure static helpers - no rule state lives here.
  */
 final class TestQualityNodeHelper
 {
@@ -23,7 +26,7 @@ final class TestQualityNodeHelper
     private static ?\WeakMap $scopeCache = null;
 
     /**
-     * Detect whether the unit looks like a PHPUnit test file by path or filename.
+     * Reports whether the unit looks like a PHPUnit test file by path or filename.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit whose path should be classified.
      *
@@ -44,7 +47,7 @@ final class TestQualityNodeHelper
     }
 
     /**
-     * Discover PHPUnit and Pest test scopes in an analysis unit.
+     * Discovers the PHPUnit and Pest test scopes in an analysis unit.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect for test scopes.
      *
@@ -62,7 +65,9 @@ final class TestQualityNodeHelper
 
         $scopes = [];
 
+        // Weigh every method declared in the file for xUnit-style tests.
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\ClassMethod::class) as $classMethod) {
+            // Skip methods that are not recognised test methods.
             if (!self::isTestMethod($classMethod)) {
                 continue;
             }
@@ -83,18 +88,22 @@ final class TestQualityNodeHelper
             );
         }
 
+        // Weigh every function call for a Pest it()/test() block.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
             $name = self::functionName($call);
+            // Only it()/test() with a description and a body defines a Pest scope.
             if (($name !== 'it' && $name !== 'test') || count($call->args) < 2) {
                 continue;
             }
 
+            // Spread or named-argument forms are not a plain Pest definition.
             if (!$call->args[0] instanceof Arg || !$call->args[1] instanceof Arg) {
                 continue;
             }
 
             $description = self::argString($call->args[0]) ?? $name;
             $closure     = $call->args[1]->value;
+            // Without a closure body there is no Pest test to scope.
             if (!$closure instanceof Expr\Closure) {
                 continue;
             }
@@ -116,7 +125,7 @@ final class TestQualityNodeHelper
     }
 
     /**
-     * Detect whether the method is a PHPUnit test (Test attribute, @test annotation, or test*-prefix on a TestCase subclass).
+     * Reports whether the method is a PHPUnit test (Test attribute, @test annotation, or test*-prefix on a TestCase subclass).
      *
      * @param Stmt\ClassMethod $classMethod - Method node to classify.
      *
@@ -148,7 +157,7 @@ final class TestQualityNodeHelper
     }
 
     /**
-     * Detect a real PHPUnit `@test` annotation line.
+     * Reports whether the method docblock carries a standalone PHPUnit `@test` annotation line.
      *
      * @param Stmt\ClassMethod $classMethod - Method node whose docblock is scanned for a standalone `@test` tag.
      *
@@ -163,7 +172,7 @@ final class TestQualityNodeHelper
     }
 
     /**
-     * Detect whether the class extends a *TestCase base.
+     * Reports whether the class extends a *TestCase base.
      *
      * @param Stmt\Class_|null $class - Class node to inspect, or null when the method is detached.
      *
@@ -183,7 +192,7 @@ final class TestQualityNodeHelper
     }
 
     /**
-     * Collect function, method, and static calls from a test scope.
+     * Collects the function, method, and static calls in a test scope.
      *
      * @param TestQualityScope $scope - Test scope whose statements should be walked.
      *
@@ -195,7 +204,7 @@ final class TestQualityNodeHelper
     }
 
     /**
-     * Collect assertion-like calls from a test scope.
+     * Collects the assertion-like calls in a test scope.
      *
      * @param TestQualityScope $scope - Test scope whose calls should be filtered.
      *
@@ -210,7 +219,7 @@ final class TestQualityNodeHelper
     }
 
     /**
-     * Detect whether the call is a PHPUnit assertion, Pest expectation, or other supported assertion shape.
+     * Reports whether the call is a PHPUnit assertion, Pest expectation, or other supported assertion shape.
      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Call node to classify.
      *
@@ -315,7 +324,7 @@ final class TestQualityNodeHelper
     }
 
     /**
-     * Detect whether the assertion is trivially-true (e.g. assertTrue(true), assertSame($x, $x)).
+     * Reports whether the assertion is trivially true (e.g. assertTrue(true), assertSame($x, $x)).
      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Assertion call to inspect.
      *
@@ -344,7 +353,7 @@ final class TestQualityNodeHelper
     }
 
     /**
-     * Detect whether the call's first two arguments are the same literal value.
+     * Reports whether the call's first two arguments are the same literal value.
      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - assertSame/assertEquals call to compare.
      *
@@ -360,7 +369,7 @@ final class TestQualityNodeHelper
     }
 
     /**
-     * Detect whether a Pest expectation's literal argument matches the expected value.
+     * Reports whether a Pest expectation's literal argument matches the expected value.
      *
      * @param Expr\MethodCall $call - toBe/toEqual matcher; its argument is compared with the expect()'d value.
      *
@@ -376,7 +385,7 @@ final class TestQualityNodeHelper
     }
 
     /**
-     * Lowercase short name of the call (method, function, or static), or null when the name is dynamic.
+     * Returns the lowercase short name of the call (method, function, or static), or null when the name is dynamic.
      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Call node whose name should be normalized.
      *
@@ -399,7 +408,7 @@ final class TestQualityNodeHelper
     }
 
     /**
-     * Lowercase function name, or null when the call target is not a Name node.
+     * Returns the lowercase function name, or null when the call target is not a Name node.
      *
      * @param Expr\FuncCall $call - Function call node to inspect.
      *
@@ -417,7 +426,7 @@ final class TestQualityNodeHelper
     }
 
     /**
-     * Detect whether the call creates a mock, stub, or spy via a recognised factory name.
+     * Reports whether the call creates a mock, stub, or spy via a recognised factory name.
      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Call node to classify.
      *
@@ -440,7 +449,7 @@ final class TestQualityNodeHelper
     }
 
     /**
-     * Detect whether the call wires a mock expectation (expects, shouldReceive, once, etc.).
+     * Reports whether the call wires a mock expectation (expects, shouldReceive, once, etc.).
      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Call node to classify.
      *
@@ -463,7 +472,7 @@ final class TestQualityNodeHelper
     }
 
     /**
-     * Value of the call's first argument, or null when the call has no first argument.
+     * Returns the value of the call's first argument, or null when the call has no first argument.
      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Call node to inspect.
      *
@@ -475,7 +484,7 @@ final class TestQualityNodeHelper
     }
 
     /**
-     * Value of the call's argument at the given index, or null when missing or spread.
+     * Returns the value of the call's argument at the given index, or null when missing or spread.
      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Call node to inspect.
      * @param int                                           $index - Zero-based argument index.
@@ -484,6 +493,7 @@ final class TestQualityNodeHelper
      */
     public static function argValue(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call, int $index): ?Expr
     {
+        // A missing or spread argument yields no expression to read.
         if (!isset($call->args[$index]) || !$call->args[$index] instanceof Arg) {
             return null;
         }
@@ -492,7 +502,7 @@ final class TestQualityNodeHelper
     }
 
     /**
-     * String literal value of the argument, or null when the argument is not a string literal.
+     * Returns the string-literal value of the argument, or null when the argument is not a string literal.
      *
      * @param Arg $arg - Argument node to inspect.
      *
@@ -504,7 +514,7 @@ final class TestQualityNodeHelper
     }
 
     /**
-     * Resolve the literal value of an expression (scalar literal or const true/false/null), or null when not a literal.
+     * Resolves the literal value of an expression (scalar literal or const true/false/null), or null when not a literal.
      *
      * @param Expr|null $expr - Expression to resolve.
      *
@@ -518,6 +528,7 @@ final class TestQualityNodeHelper
             return $expr->value;
         }
 
+        // A bare constant may be one of the magic literals true/false/null.
         if ($expr instanceof Expr\ConstFetch) {
             $name = strtolower($expr->name->toString());
 
@@ -535,7 +546,7 @@ final class TestQualityNodeHelper
     }
 
     /**
-     * Walk a Pest expectation chain back to the expect()'d value.
+     * Returns the expect()'d value at the base of a Pest expectation chain, or null.
      *
      * @param Expr\MethodCall $call - Pest expectation method call to unwind.
      *
@@ -560,7 +571,7 @@ final class TestQualityNodeHelper
     }
 
     /**
-     * Detect whether the method carries an attribute matching the given short name (case-insensitive).
+     * Reports whether the method carries an attribute matching the given short name (case-insensitive).
      *
      * @param Stmt\ClassMethod $node - Method node whose attributes should be inspected.
      * @param string           $shortName - Attribute short name to match case-insensitively.
@@ -569,7 +580,9 @@ final class TestQualityNodeHelper
      */
     public static function hasAttribute(Stmt\ClassMethod $node, string $shortName): bool
     {
+        // Weigh every attribute group on the method.
         foreach ($node->attrGroups as $attributeGroup) {
+            // One group can hold several attributes.
             foreach ($attributeGroup->attrs as $attribute) {
                 if (strtolower($attribute->name->getLast()) === strtolower($shortName)) {
                     // Match on the last name segment so both #[Test] and #[PHPUnit\...\Test] qualify.
@@ -583,7 +596,7 @@ final class TestQualityNodeHelper
     }
 
     /**
-     * Get the enclosing Class_ node via the `parent` AST attribute, or null when unattached.
+     * Returns the enclosing Class_ node via the `parent` AST attribute, or null when unattached.
      *
      * @param Node $node - Node whose parent chain should be inspected.
      *
@@ -599,7 +612,7 @@ final class TestQualityNodeHelper
     }
 
     /**
-     * Strip the test* prefix and non-alphanumeric chars from a test method name; lowercase the result.
+     * Returns the test name with its test* prefix and non-alphanumeric characters stripped, lowercased.
      *
      * @param string $name - Test method name to normalize.
      *
@@ -613,7 +626,7 @@ final class TestQualityNodeHelper
     }
 
     /**
-     * Detect a non-trivial integer literal used as the assertion's expected value, or null when none.
+     * Returns a non-trivial integer literal used as the assertion's expected value, or null when none.
      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Assertion call to inspect.
      *

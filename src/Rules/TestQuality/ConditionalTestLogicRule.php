@@ -17,7 +17,9 @@ use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Node\Stmt;
 
 /**
- * Detects branches in tests that make outcomes depend on local control flow.
+ * Flags an `if` statement inside a test body - branching means the test can take a path that quietly skips
+ * its assertions, so its outcome depends on control flow rather than a fixed scenario. Runs over every test;
+ * matrix-style suites can exempt paths via `ignoredPathPatterns`. Advisory, high confidence.
  */
 final readonly class ConditionalTestLogicRule implements RuleInterface
 {
@@ -27,7 +29,7 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
     public const ID = 'test-quality.conditional-logic';
 
     /**
-     * Describe the conditional test logic rule.
+     * Describes the conditional-test-logic rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -46,7 +48,7 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
     }
 
     /**
-     * Find test cases that hide behavior behind conditionals.
+     * Reports test cases that hide behaviour behind conditionals.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -65,7 +67,9 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
 
         $findings = [];
 
+        // Weigh every test scope in the file.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
+            // Every if statement inside the test body is a branch worth flagging.
             foreach (NodeIndex::descendantsOfAny($scope->node, [Stmt\If_::class]) as $conditional) {
                 $findings[] = new Finding(
                     ruleId:      self::ID,
@@ -86,7 +90,7 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
     }
 
     /**
-     * Check whether a project-configured path exemption applies.
+     * Reports whether a project-configured path exemption applies.
      *
      * @param string       $displayPath - Repository-relative path of the analysed file, used as the fnmatch subject.
      * @param list<string> $patterns - Glob patterns the caller configured to exempt known matrix-style test paths.
@@ -97,7 +101,9 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
     {
         $normalizedPath = str_replace('\\', '/', $displayPath);
 
+        // Weigh the display path against each configured exemption glob.
         foreach ($patterns as $pattern) {
+            // A matching pattern opts this path out of the rule.
             if (fnmatch($pattern, $normalizedPath, FNM_NOESCAPE)) {
                 return true;
             }

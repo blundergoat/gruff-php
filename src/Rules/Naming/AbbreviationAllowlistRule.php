@@ -25,11 +25,12 @@ use PhpParser\Node\Stmt\Function_;
 use PhpParser\Node\Stmt\Property;
 
 /**
- * Requires short lowercase abbreviations to be declared in project config.
+ * Requires a short lowercase abbreviation to be declared in project config before it is accepted, so the
+ * user builds an explicit, documented vocabulary instead of scattering ad-hoc short names.
  *
- * M51 keeps this separate from ShortVariableRule: single-character variables are
- * a local clarity problem, while 2-5 character abbreviations need an explicit
- * project vocabulary through allowlists.acceptedAbbreviations.
+ * Kept deliberately separate from ShortVariableRule: a single-character variable is a local clarity problem,
+ * while a 2-3 character abbreviation needs an explicit project vocabulary through
+ * allowlists.acceptedAbbreviations. High confidence, advisory severity.
  */
 final readonly class AbbreviationAllowlistRule implements RuleInterface
 {
@@ -40,7 +41,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     private const DEFAULT_IGNORED_NAMES = ['this'];
 
     /**
-     * Describe the abbreviation allowlist rule.
+     * Describes the abbreviation-allowlist rule for the registry and reports.
      *
      * @return RuleDefinition - id, pillar, tier, severity, and the default 2-3 character length band
      */
@@ -59,7 +60,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     }
 
     /**
-     * Find undeclared lowercase abbreviations on properties, parameters, and locals.
+     * Reports undeclared lowercase abbreviations on properties, parameters, and locals.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context carrying accepted abbreviations.
@@ -75,6 +76,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
         $accepted   = $this->lowercaseList($ruleContext->config->acceptedAbbreviations());
         $findings   = [];
 
+        // Check every declared property in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, Property::class) as $property) {
             array_push(
                 $findings,
@@ -90,6 +92,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
             );
         }
 
+        // Check parameters and locals across every function-like scope.
         foreach ((new FunctionLikeScopeWalker())->scopes($analysisUnit->statements) as $scope) {
             array_push(
                 $findings,
@@ -109,7 +112,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     }
 
     /**
-     * Build abbreviation findings for properties declared in one property statement.
+     * Builds abbreviation findings for the properties declared in one property statement.
      *
      * @param RuleDefinition $definition - Rule metadata used to populate emitted findings.
      * @param AnalysisUnit   $analysisUnit - Parsed unit that owns the property declaration.
@@ -132,6 +135,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     ): array {
         $findings = [];
 
+        // One declaration can name several properties, so check each in turn.
         foreach ($property->props as $prop) {
             $finding = $this->finding(
                 definition:   $definition,
@@ -143,6 +147,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
                 minLength:    $minLength,
                 maxLength:    $maxLength,
             );
+            // Keep the property only when its name is an undeclared abbreviation.
             if ($finding instanceof Finding) {
                 $findings[] = $finding;
             }
@@ -152,7 +157,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     }
 
     /**
-     * Build abbreviation findings for parameters and local variables inside one callable scope.
+     * Builds abbreviation findings for the parameters and local variables in one callable scope.
      *
      * @param RuleDefinition    $definition - Rule metadata used to populate emitted findings.
      * @param AnalysisUnit      $analysisUnit - Parsed unit that owns the callable scope.
@@ -196,7 +201,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     }
 
     /**
-     * Build abbreviation findings for parameters inside one callable scope.
+     * Builds abbreviation findings for the parameters in one callable scope.
      *
      * @param RuleDefinition    $definition - Rule metadata used to populate emitted findings.
      * @param AnalysisUnit      $analysisUnit - Parsed unit that owns the callable scope.
@@ -220,7 +225,9 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
         $findings = [];
         $symbol   = $this->symbol($scope);
 
+        // Weigh each declared parameter.
         foreach ($scope->node->params as $param) {
+            // Skip anything without a plain string name.
             if (!$param->var instanceof Variable || !is_string($param->var->name)) {
                 continue;
             }
@@ -235,6 +242,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
                 minLength:    $minLength,
                 maxLength:    $maxLength,
             );
+            // Keep the parameter only when its name is an undeclared abbreviation.
             if ($finding instanceof Finding) {
                 $findings[] = $finding;
             }
@@ -244,7 +252,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     }
 
     /**
-     * Build abbreviation findings for local variables inside one callable scope.
+     * Builds abbreviation findings for the local variables in one callable scope.
      *
      * @param RuleDefinition    $definition - Rule metadata used to populate emitted findings.
      * @param AnalysisUnit      $analysisUnit - Parsed unit that owns the callable scope.
@@ -269,7 +277,9 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
         $symbol       = $this->symbol($scope);
         $exemptLocals = $this->exemptLocalNames($scope);
 
+        // Weigh each local the scope declares.
         foreach ($scope->localVariables as $name => $variable) {
+            // Skip a conventional loop or catch variable.
             if (isset($exemptLocals[$name])) {
                 continue;
             }
@@ -284,6 +294,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
                 minLength:    $minLength,
                 maxLength:    $maxLength,
             );
+            // Keep the local only when its name is an undeclared abbreviation.
             if ($finding instanceof Finding) {
                 $findings[] = $finding;
             }
@@ -293,7 +304,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     }
 
     /**
-     * Build a finding for one identifier, or null when it passes every abbreviation gate.
+     * Builds a finding for one identifier, or null when it passes every abbreviation gate.
      *
      * @param RuleDefinition                                         $definition - Rule metadata supplying id, severity, and tier for any finding
      *                                                                             raised.
@@ -359,7 +370,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     }
 
     /**
-     * Read a positive integer rule option, falling back when configuration is not numeric.
+     * Reads a positive integer rule option, falling back when configuration is not numeric.
      *
      * @param RuleContext    $ruleContext - Source of resolved settings for this rule.
      * @param RuleDefinition $definition - Rule whose settings bag the option is read from.
@@ -377,7 +388,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     }
 
     /**
-     * Collect local names exempt from abbreviation checks.
+     * Collects the local names exempt from abbreviation checks.
      *
      * @param FunctionLikeScope $scope - Scope whose body is scanned for loop and catch variable declarations.
      *
@@ -387,7 +398,9 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     {
         $names = [];
 
+        // Scan the scope body for loop and catch declarations.
         foreach ($scope->bodyDescendants as $scopeNode) {
+            // A for, foreach, or catch introduces conventional variable names.
             if ($scopeNode instanceof For_ || $scopeNode instanceof Foreach_ || $scopeNode instanceof Catch_) {
                 $this->collectExemptLocalNames($scopeNode, $names);
             }
@@ -397,7 +410,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     }
 
     /**
-     * Add loop and catch variables that are conventional enough to skip abbreviation findings.
+     * Adds the loop and catch variables that are conventional enough to skip abbreviation findings.
      *
      * @param Node                $node - Loop or catch node to inspect; other node kinds contribute nothing.
      * @param array<string, true> $names - Accumulator mutated in place; matched variable names are added as keys.
@@ -406,12 +419,15 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
      */
     private function collectExemptLocalNames(Node $node, array &$names): void
     {
+        // A for loop's init clause declares induction variables.
         if ($node instanceof For_) {
             $this->collectVariableNames($node->init, $names);
         }
 
+        // A foreach binds its value, and optionally its key.
         if ($node instanceof Foreach_) {
             $foreachVariables = [$node->valueVar];
+            // Include the key variable when the loop declares one.
             if ($node->keyVar instanceof Node) {
                 $foreachVariables[] = $node->keyVar;
             }
@@ -419,13 +435,14 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
             $this->collectVariableNames($foreachVariables, $names);
         }
 
+        // A catch clause names its exception variable.
         if ($node instanceof Catch_ && $node->var instanceof Variable && is_string($node->var->name)) {
             $names[$node->var->name] = true;
         }
     }
 
     /**
-     * Collect local variable names from a node list.
+     * Collects the local variable names from a node list.
      *
      * @param array<Node>         $nodes - Loop init or foreach key/value nodes to walk for variable references.
      * @param array<string, true> $names - Accumulator mutated in place; each discovered variable name is added as a key.
@@ -434,13 +451,14 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
      */
     private function collectVariableNames(array $nodes, array &$names): void
     {
+        // Walk each supplied node.
         foreach ($nodes as $node) {
             $this->collectVariableName($node, $names);
         }
     }
 
     /**
-     * Record a local variable name when the node is a variable reference.
+     * Records a local variable name when the node is a variable reference.
      *
      * @param Node                $node - Node to test and then recurse into; only string-named variables are recorded.
      * @param array<string, true> $names - Accumulator mutated in place; each discovered variable name is added as a key.
@@ -449,17 +467,19 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
      */
     private function collectVariableName(Node $node, array &$names): void
     {
+        // Record a plainly named variable.
         if ($node instanceof Variable && is_string($node->name)) {
             $names[$node->name] = true;
         }
 
+        // Recurse into the node's children to reach nested variables.
         foreach ($this->childNodes($node) as $child) {
             $this->collectVariableName($child, $names);
         }
     }
 
     /**
-     * List direct child nodes that can be recursively traversed.
+     * Lists the direct child nodes that can be recursively traversed.
      *
      * @param Node $node - Parent node whose sub-node slots are flattened into child nodes.
      *
@@ -469,6 +489,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     {
         $children = [];
 
+        // Flatten every sub-node slot the parser exposes for this node.
         foreach ($node->getSubNodeNames() as $name) {
             $this->collectChildNodes($node->{$name}, $children);
         }
@@ -477,7 +498,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     }
 
     /**
-     * Append traversable child nodes to the current collection.
+     * Appends the traversable child nodes found in one sub-node slot.
      *
      * @param mixed      $subNode - A sub-node slot value: a Node, an array of them, or a scalar that is skipped.
      * @param list<Node> $children - Accumulator mutated in place; discovered Node instances are appended.
@@ -497,13 +518,14 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
             return;
         }
 
+        // An array slot can hold several children, so recurse into each entry.
         foreach ($subNode as $childSubNode) {
             $this->collectChildNodes($childSubNode, $children);
         }
     }
 
     /**
-     * Resolve the human-readable symbol for a function-like scope.
+     * Resolves the human-readable symbol for a function-like scope.
      *
      * @param FunctionLikeScope $scope - Scope whose node determines whether a real name or a synthetic label is used.
      *
@@ -511,15 +533,17 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
      */
     private function symbol(FunctionLikeScope $scope): string
     {
+        // Named callables resolve to their declared symbol.
         if ($scope->node instanceof ClassMethod || $scope->node instanceof Function_) {
             return CyclomaticComplexityRule::resolveSymbol($scope->node);
         }
 
+        // Closures and arrow functions have no name, so fall back to a kind@line label.
         return sprintf('%s@%d', $scope->kind, $scope->node->getStartLine());
     }
 
     /**
-     * Normalize string lists for case-insensitive comparisons.
+     * Normalises a string list to lowercase for case-insensitive comparisons.
      *
      * @param list<string> $values - Input strings to lowercase for case-insensitive allowlist comparison.
      *

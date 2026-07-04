@@ -17,7 +17,12 @@ use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Token;
 
 /**
- * Detects files where TODO and FIXME comments exceed the configured density.
+ * Flags a file whose TODO/FIXME/HACK/XXX comment count crosses the configured density, so the user can
+ * clear a pile of deferred-work markers before it becomes a pile of forgotten debt.
+ *
+ * Runs per file, bailing fast when no marker appears at all. It counts markers across every comment and
+ * docblock and reports a single file-level finding when the count exceeds the threshold (default 10).
+ * Error severity at the threshold, high confidence.
  */
 final readonly class TodoDensityRule implements RuleInterface
 {
@@ -27,9 +32,9 @@ final readonly class TodoDensityRule implements RuleInterface
     public const ID = 'docs.todo-density';
 
     /**
-     * Describe the TODO density rule.
+     * Describes the TODO-density rule for the registry and reports.
      *
-     * @return RuleDefinition - Rule metadata and thresholds.
+     * @return RuleDefinition - Rule metadata and thresholds (default 10 markers per file).
      */
     public function definition(): RuleDefinition
     {
@@ -46,10 +51,10 @@ final readonly class TodoDensityRule implements RuleInterface
     }
 
     /**
-     * Count TODO-style markers in comments and report files above threshold.
+     * Counts TODO-style markers across the file's comments and reports when the count exceeds the threshold.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext - Rule context supplying the density threshold.
      *
      * @return list<Finding> - Findings for excessive TODO density.
      */
@@ -67,13 +72,17 @@ final readonly class TodoDensityRule implements RuleInterface
         $count     = 0;
         $firstLine = null;
 
+        // Scan every token, counting markers only inside comments.
         foreach ($analysisUnit->tokens as $token) {
+            // Code and whitespace tokens carry no marker text.
             if (!$this->isCommentToken($token)) {
                 continue;
             }
 
+            // Count the TODO-style markers in this comment's text.
             $matches = preg_match_all('/\b(TODO|FIXME|HACK|XXX)\b/i', $token->text);
 
+            // Skip a comment with no markers.
             if ($matches === 0 || $matches === false) {
                 continue;
             }
@@ -106,7 +115,7 @@ final readonly class TodoDensityRule implements RuleInterface
     }
 
     /**
-     * Check whether a token is a normal comment or docblock.
+     * Reports whether a token is a comment or docblock (the only kinds that can hold a marker).
      *
      * @param Token $token - Lexer token from the parsed unit; only comment-bearing kinds can hold a marker.
      *

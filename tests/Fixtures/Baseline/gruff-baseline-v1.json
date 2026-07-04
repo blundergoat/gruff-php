@@ -1,0 +1,14 @@
+{
+    "schemaVersion": "gruff.baseline.v1",
+    "generatedAt": "2026-06-01T00:00:00+00:00",
+    "findings": [
+        {
+            "fingerprint": "0123456789abcdef",
+            "ruleId": "docs.missing-public-phpdoc",
+            "file": "src/Example.php",
+            "line": 12,
+            "symbol": "calculateTotal",
+            "message": "Method calculateTotal needs a brief intent description above its declaration (one plain-English line; not a restatement of the method signature)."
+        }
+    ]
+}

@@ -4,42 +4,77 @@
 # Sourced by deny-dangerous.sh; not executable on its own.
 # shellcheck shell=bash disable=SC2034,SC2154,SC2317,SC2319
 
+# Is this an rm command that deletes recursively (-r/-R/--recursive)?
+# First gate of the delete guard: only recursive removals get the strict
+# path checks below - a plain `rm file.txt` is left alone.
 rm_has_recursive() {
   local c="$1"
   # Match by basename so /bin/rm, /usr/bin/rm, etc. are all caught after
   # normalize_command_candidate has stripped any wrappers.
   local base
   base=$(first_word_base "$c")
+  # Not rm at all -> nothing for this rule to judge.
   [[ "$base" == "rm" ]] || return 1
 
+  # True when the long flag or any bundled short flags (-rf, -fR, ...) ask for recursion.
   [[ "$c" =~ (^|[[:space:]])--recursive([[:space:]]|$) ]] || [[ "$c" =~ (^|[[:space:]])-[^-[:space:]]*[rR][^[:space:]]*([[:space:]]|$) ]]
 }
 
+# Is every deletion target a safe, project-local cleanup path?
+# This is what lets an agent honour a user request like "clear out
+# node_modules and do a fresh install" (rm -rf node_modules -> allowed)
+# while a wrong-directory `rm -rf /etc` or `rm -rf ~/` is blocked before
+# it ever executes.
 rm_is_safely_scoped() {
   local c="$1"
   local targets_str
   targets_str=$(drop_first_shell_word "$c")
   targets_str="${targets_str#"${targets_str%%[![:space:]]*}"}"
   targets_str="${targets_str%"${targets_str##*[![:space:]]}"}"
+  # No targets at all (bare `rm -rf`) -> unsafe; never guess what was meant.
   [[ -z "$targets_str" ]] && return 1
   # Check each target independently - one unsafe path fails the whole command.
   local target
   for target in $targets_str; do
+    # Strip quotes before every scope check: a leading quote otherwise defeats
+    # the absolute/home/drive checks below AND the safe-target allowlist, so
+    # `rm -rf "/etc"` slipped through while `rm -rf "node_modules"` was blocked.
+    target=$(strip_shell_quotes_for_path_scan "$target")
+    # `--` only ends option parsing; it is not a path.
     [[ "$target" == "--" ]] && continue
+    # Options like -rf are not paths either.
     [[ "$target" == -* ]] && continue
+    # Normalize ./foo/ -> foo so the allowlist below sees one spelling.
     target="${target#./}"
     target="${target%/}"
+    # Target reduced to nothing (e.g. `rm -rf ./`) -> unsafe.
     [[ -z "$target" ]] && return 1
-    [[ "$target" =~ ^/tmp/build-[a-zA-Z0-9._-] ]] && continue
+    # A target that begins with an unresolved shell expansion - $VAR, ${VAR},
+    # $'...', $(...), or a `backtick` command - can point anywhere once the
+    # shell expands it (e.g. rm -rf $HOME/.cache, rm -rf $'/etc'). The hook
+    # can't prove it stays in the project, and the "*/*" slash-scoped allow
+    # below would otherwise wave it through. Demand an explicit literal path.
+    [[ "$target" == '$'* || "$target" == '`'* ]] && return 1
+    # Dot traversal makes the path shown in review differ from what rm deletes.
+    case "/$target/" in
+      */../*|*/./*) return 1 ;;
+    esac
+    # Scratch dirs under /tmp/build-* are the one absolute location we allow.
+    [[ "$target" =~ ^/tmp/build-[a-zA-Z0-9._-]+(/[a-zA-Z0-9._-]+)*$ ]] && continue
+    # Absolute paths could reach anywhere on the machine -> block.
     [[ "$target" == /* ]] && return 1
+    # Home-relative paths (~/...) reach the user's personal files -> block.
     [[ "$target" == "~"* ]] && return 1
     # Windows drive-rooted paths (e.g. C:/Users/x or C:\Users\x) are absolute
     # in Windows semantics; reject them the same way as POSIX-absolute paths.
     [[ "$target" =~ ^[A-Za-z]:[/\\] ]] && return 1
+    # Well-known disposable build/cache dirs are always fine to remove.
     case "$target" in
       node_modules|dist|out|build|coverage|__pycache__|.cache|.next|.nuxt|.turbo) continue ;;
     esac
+    # A slash means the path stays scoped inside the project (src/old-module) -> fine.
     [[ "$target" == */* ]] && continue
+    # Anything else is a bare top-level name we don't recognise -> unsafe.
     return 1
   done
   return 0
@@ -155,6 +190,47 @@ is_interpreter_command() {
   esac
 }
 
+is_local_data_pipe_source() {
+  local c
+  c=$(normalize_command_candidate "$1")
+  c="${c#"${c%%[![:space:]]*}"}"
+  case "$(first_word_base "$c")" in
+    cat|printf|echo) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+is_downloader_pipe_source() {
+  local c
+  c=$(normalize_command_candidate "$1")
+  c="${c#"${c%%[![:space:]]*}"}"
+  case "$(first_word_base "$c")" in
+    curl|wget|fetch|http) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+is_inline_interpreter_command() {
+  local c="$1"
+  local -a words=()
+  local base i word
+  c=$(normalize_command_candidate "$c")
+  c="${c#"${c%%[![:space:]]*}"}"
+  split_shell_words_into words "$c"
+  [[ "${#words[@]}" -gt 0 ]] || return 1
+
+  base="${words[0]##*/}"
+  for ((i = 1; i < ${#words[@]}; i++)); do
+    word="${words[$i]}"
+    case "$base:$word" in
+      python:-c|python3:-c|node:-e|node:--eval|perl:-e|ruby:-e)
+        return 0
+        ;;
+    esac
+  done
+  return 1
+}
+
 strip_sql_literals_inside_double_quotes() {
   local input="$1"
   local out=""
@@ -221,13 +297,22 @@ check_pipeline_shell_consumers() {
   local pipe_scan="${CMD_UNQUOTED//||/__GOAT_OR__}"
   local -a pipeline_parts
   local pipe_index
+  local previous_part
+  local saw_downloader_pipe_source=0
   IFS='|' read -ra pipeline_parts <<< "$pipe_scan"
   for ((pipe_index = 1; pipe_index < ${#pipeline_parts[@]}; pipe_index++)); do
+    previous_part="${pipeline_parts[$((pipe_index - 1))]}"
+    if is_downloader_pipe_source "$previous_part"; then
+      saw_downloader_pipe_source=1
+    fi
     if is_shell_command "${pipeline_parts[$pipe_index]}"; then
       block "Pipe to shell. Download or inspect first, then run; to feed a local script, redirect from a file (cmd < file) instead of piping." || return $?
     fi
     if is_interpreter_command "${pipeline_parts[$pipe_index]}"; then
-      block "Pipe to interpreter. Download or inspect first, then run." || return $?
+      if [[ "${depth:-0}" -eq 0 && "$saw_downloader_pipe_source" -eq 0 ]] && is_local_data_pipe_source "$previous_part" && is_inline_interpreter_command "${pipeline_parts[$pipe_index]}"; then
+        continue
+      fi
+      block "Pipe to interpreter. Download or inspect first, then run; to feed local data to inline interpreter code, redirect from a file (cmd < file) instead of piping." || return $?
     fi
   done
 }

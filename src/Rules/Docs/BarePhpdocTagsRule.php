@@ -19,7 +19,12 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 
 /**
- * Detects PHPDoc blocks that list tags without descriptive intent.
+ * Flags a docblock that lists only bare param/return tags with no summary and no tag descriptions, so the
+ * user turns box-ticking documentation into something that states intent.
+ *
+ * Runs per file over documented function-likes. A docblock fires only when every line is a tag AND every
+ * tag is a bare param/return with no prose after its type. Advisory, medium confidence - a tags-only block
+ * can be deliberate on a trivial unit.
  */
 final readonly class BarePhpdocTagsRule implements RuleInterface
 {
@@ -29,9 +34,9 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
     public const ID = 'docs.bare-phpdoc-tags';
 
     /**
-     * Describe the bare PHPDoc tag rule.
+     * Describes the bare-PHPDoc-tag rule for the registry and reports.
      *
-     * @return RuleDefinition - Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults (advisory severity, medium confidence).
      */
     public function definition(): RuleDefinition
     {
@@ -48,7 +53,7 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
     }
 
     /**
-     * Find docblocks that only list parameter or return tags.
+     * Reports each docblock that only lists bare parameter or return tags.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -62,10 +67,12 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
 
         $findings = [];
 
+        // Check every documented method and function in the file.
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
             $docComment = $node->getDocComment();
 
+            // An undocumented callable has no docblock to weigh.
             if ($docComment === null) {
                 continue;
             }
@@ -81,6 +88,7 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
 
             $hasNonTagContent = false;
 
+            // Look for any line that is not a tag.
             foreach ($lines as $line) {
                 if (!str_starts_with($line, '@')) {
                     $hasNonTagContent = true;
@@ -89,16 +97,19 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
                 }
             }
 
+            // A docblock that carries real prose already states intent.
             if ($hasNonTagContent) {
                 continue;
             }
 
+            // An empty docblock is nothing this rule reports.
             if ($lines === []) {
                 continue;
             }
 
             $hasOnlyBareTags = true;
 
+            // Every remaining line is a tag; check each one is a bare tag.
             foreach ($lines as $line) {
                 if ($this->isBareParamOrReturnTag($line)) {
                     continue;
@@ -109,6 +120,7 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
                 break;
             }
 
+            // A described tag means the block is not bare, so leave it alone.
             if (!$hasOnlyBareTags) {
                 continue;
             }
@@ -133,7 +145,7 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
     }
 
     /**
-     * Check whether one PHPDoc tag has a type but no description.
+     * Reports whether one PHPDoc tag has a type but no description.
      *
      * @param string $line - Single trimmed docblock line, already stripped of comment markers, to classify.
      *

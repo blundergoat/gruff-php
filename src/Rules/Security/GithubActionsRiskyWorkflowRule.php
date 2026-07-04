@@ -15,7 +15,11 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\SourceTextRuleInterface;
 
 /**
- * Detects risky GitHub Actions workflow patterns in source text.
+ * Flags a risky GitHub Actions workflow pattern - an unpinned action ref, `write-all` token permissions, a
+ * `pull_request_target` trigger, secrets in a PR-triggered job, or `github.event` data spliced into a shell
+ * - so the user tightens the workflow before a fork PR can steal secrets or run code.
+ *
+ * Scans a `.github/workflows/*.yml` file line by line as text. Warning, medium confidence.
  */
 final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
 {
@@ -25,6 +29,8 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
     public const ID = 'security.github-actions-risky-workflow';
 
     /**
+     * Token permission scopes whose `write` grant is broader than most jobs need.
+     *
      * @var list<string>
      */
     private const WRITE_PERMISSIONS = [
@@ -39,7 +45,7 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
     ];
 
     /**
-     * Describe the risky GitHub Actions workflow rule.
+     * Describes the risky-GitHub-Actions-workflow rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -57,7 +63,7 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
     }
 
     /**
-     * Find risky patterns in GitHub Actions workflow YAML.
+     * Reports each risky pattern in a GitHub Actions workflow YAML file.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -77,10 +83,12 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
         $runBlockIndent       = null;
         $reportedRunBlockLine = null;
 
+        // Scan the workflow line by line.
         foreach ($lines === false ? [] : $lines as $index => $line) {
             $lineNumber = $index + 1;
             $sinks      = $this->lineFindingSinks($line, $hasPullRequestEvent, $runBlockIndent, $reportedRunBlockLine);
 
+            // Emit a finding for each risky sink found on the line.
             foreach ($sinks as $sink) {
                 $findings[] = $this->finding($analysisUnit, $lineNumber, $sink);
             }
@@ -90,6 +98,8 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
     }
 
     /**
+     * Reports whether a display path is a GitHub Actions workflow YAML file.
+     *
      * @param string $displayPath - Repository-relative path of the unit, in either slash style.
      *
      * @return bool - True when the display path is a GitHub Actions workflow YAML file.
@@ -103,6 +113,8 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
     }
 
     /**
+     * Collects the risky sinks on one line, tracking multiline run-block state across lines.
+     *
      * @param string   $line - One raw YAML line, leading indentation intact for block-scalar tracking.
      * @param bool     $hasPullRequestEvent - True when a pull_request event is present, gating secret leaks.
      * @param int|null $runBlockIndent - Current block scalar run indentation, updated in place.
@@ -119,14 +131,17 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
         $this->closeRunBlockWhenDedented($line, $runBlockIndent, $reportedRunBlockLine);
 
         $sinks = [];
+        // Add each single-line sink found on this line.
         foreach ($this->directLineSinks($line, $hasPullRequestEvent) as $sink) {
             $sinks[] = $sink;
         }
 
+        // A `run: |` opener starts tracking a block scalar.
         if ($this->isRunBlockStart($line)) {
             $runBlockIndent = $this->indent($line);
         }
 
+        // Report the first github.event interpolation inside an open run block.
         if ($runBlockIndent !== null && $reportedRunBlockLine === null && $this->hasGithubEventInterpolation($line)) {
             $reportedRunBlockLine = 1;
             $sinks[]              = 'github-event-run-interpolation';
@@ -136,6 +151,8 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
     }
 
     /**
+     * Collects the single-line risky sinks that need no multiline run-block state.
+     *
      * @param string $line - One raw YAML line to scan for single-line risky patterns.
      * @param bool   $hasPullRequestEvent - True when a pull_request event is present, enabling the secrets-in-PR sink.
      *
@@ -145,20 +162,25 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
     {
         $sinks = [];
 
+        // A pull_request_target trigger runs with the base repo's secrets.
         if ($this->isPullRequestTargetTrigger($line)) {
             $sinks[] = 'pull_request_target';
         }
 
+        // Add any risky uses: or permissions: sink on the line.
         foreach ([$this->riskyUsesFinding($line), $this->riskyPermissionFinding($line)] as $sink) {
+            // Skip a check that found nothing.
             if ($sink !== null) {
                 $sinks[] = $sink;
             }
         }
 
+        // Secrets referenced in a PR-triggered workflow can leak to a fork.
         if ($hasPullRequestEvent && str_contains($line, '${{ secrets.')) {
             $sinks[] = 'secrets-in-pr-workflow';
         }
 
+        // An inline run step interpolating event data is a shell-injection sink.
         if ($this->hasInlineGithubEventRun($line)) {
             $sinks[] = 'github-event-run-interpolation';
         }
@@ -167,7 +189,7 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
     }
 
     /**
-     * Reset run-block state once a non-empty line dedents back to the parent level.
+     * Resets run-block state once a non-empty line dedents back to the parent level.
      *
      * @param string   $line - Current YAML line; its indentation decides whether the run block closed.
      * @param int|null $runBlockIndent - Active run-block indentation, cleared in place once the block ends.
@@ -187,6 +209,8 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
     }
 
     /**
+     * Reports whether the workflow listens to a pull_request event.
+     *
      * @param string $source - Full workflow YAML source to scan for a pull_request trigger in either syntax.
      *
      * @return bool - True when the workflow listens to pull_request or pull_request_target.
@@ -203,6 +227,8 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
     }
 
     /**
+     * Reports whether a line declares a pull_request_target trigger.
+     *
      * @param string $line - One YAML line to test for a pull_request_target mapping key.
      *
      * @return bool - True when the line declares a pull_request_target trigger.
@@ -217,6 +243,8 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
     }
 
     /**
+     * Reports whether a line starts a YAML block-scalar run step.
+     *
      * @param string $line - One YAML line to test for the start of a block-scalar run step.
      *
      * @return bool - True when the line starts a YAML block-scalar run step.
@@ -231,6 +259,8 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
     }
 
     /**
+     * Reports whether an inline run step interpolates github.event data.
+     *
      * @param string $line - One YAML line to test for an inline run step that interpolates event data.
      *
      * @return bool - True when an inline run step interpolates github.event data.
@@ -245,6 +275,8 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
     }
 
     /**
+     * Reports whether a line carries github.event interpolation.
+     *
      * @param string $line - One line of a run block to test for any github.event interpolation.
      *
      * @return bool - True when any text contains github.event interpolation.
@@ -259,6 +291,8 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
     }
 
     /**
+     * Returns the number of leading spaces on a line.
+     *
      * @param string $line - One YAML line whose leading-space count defines its indentation level.
      *
      * @return int - Number of leading spaces.
@@ -272,9 +306,11 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
     }
 
     /**
+     * Returns the sink for a risky uses: action reference, or null when it is pinned.
+     *
      * @param string $line - One YAML line that may declare a uses: step referencing an action.
      *
-     * @return string|null - Finding sink for a risky uses: reference.
+     * @return string|null - Sink name for a risky uses: reference, or null when the action is safely pinned.
      */
     private function riskyUsesFinding(string $line): ?string
     {
@@ -308,9 +344,11 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
     }
 
     /**
+     * Returns the sink for a broad token-permission grant, or null when scoped.
+     *
      * @param string $line - One YAML line that may grant token permissions at workflow or job scope.
      *
-     * @return string|null - Finding sink for broad write permissions.
+     * @return string|null - Sink name for a broad write-permission grant, or null when the grant is scoped.
      */
     private function riskyPermissionFinding(string $line): ?string
     {
@@ -332,7 +370,7 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
     }
 
     /**
-     * Build the workflow finding.
+     * Builds the workflow finding.
      *
      * @param AnalysisUnit $analysisUnit - Unit under analysis, supplying the display path attached to the finding.
      * @param int          $line - 1-based line where the risky pattern was matched.

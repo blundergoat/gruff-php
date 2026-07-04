@@ -23,7 +23,13 @@ use PhpParser\Node\Stmt\Function_;
 use PhpParser\Node\Stmt\Property;
 
 /**
- * Detects PHPDoc `mixed` usage that should be narrowed.
+ * Flags a PHPDoc param, return, var, or property tag that types a value as `mixed` where a narrower type
+ * would tell the reader (and static analysis) more, so the user can tighten the documentation.
+ *
+ * Runs per file, bailing fast when the source has no `mixed` at all. For each documented declaration it
+ * parses the tag blocks and reports a `mixed` tag - unless the value is an honest unstructured payload bag
+ * (`array<string, mixed>`), a precise `array{...}` envelope with a concrete sibling field, or simply
+ * mirrors a native `mixed` hint already on the signature. Advisory only.
  */
 final readonly class PhpDocMixedOveruseRule implements RuleInterface
 {
@@ -64,7 +70,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     private const TYPE_ALIAS_TAGS = ['phpstan-type', 'phpstan-import-type'];
 
     /**
-     * Describe the rule for the registry and reports.
+     * Describes the PHPDoc mixed-overuse rule for the registry and reports.
      *
      * @return RuleDefinition - the rule's fixed identity, pillar, default severity, and false-positive shapes for the registry
      */
@@ -92,7 +98,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     }
 
     /**
-     * Detect PHPDoc tags that use `mixed` where a narrower type would carry more meaning.
+     * Reports each PHPDoc tag that types a value as `mixed` where a narrower type would carry more meaning.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -115,14 +121,17 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
             [ClassMethod::class, Function_::class, Property::class, ClassConst::class],
         );
 
+        // Inspect each documented method, function, property, and constant.
         foreach ($targets as $node) {
             $doc = $node->getDocComment();
+            // Skip a declaration that carries no docblock to scan.
             if (!$doc instanceof Doc) {
                 continue;
             }
 
             $symbol = $this->resolveSymbol($node);
 
+            // Weigh each tag in the docblock.
             foreach ($this->extractTagBlocks($doc) as $block) {
                 $finding = $this->findingForTagBlock(
                     definition:   $definition,
@@ -131,6 +140,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
                     symbol:       $symbol,
                     block:        $block,
                 );
+                // Collect a finding when this tag warrants narrowing.
                 if ($finding instanceof Finding) {
                     $findings[] = $finding;
                 }
@@ -141,7 +151,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     }
 
     /**
-     * Build a mixed-overuse finding for one PHPDoc tag block, or null when an exemption applies.
+     * Builds a mixed-overuse finding for one PHPDoc tag block, or null when an exemption applies.
      *
      * @param RuleDefinition                          $definition - Rule metadata used to populate emitted findings.
      * @param AnalysisUnit                            $analysisUnit - Parsed unit that owns the documented node.
@@ -159,11 +169,13 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
         array $block,
     ): ?Finding {
         $tagKind = $block['tag'];
+        // Only param/return/var/property/type-alias tags are in scope for this rule.
         if (!$this->isScannedTag($tagKind)) {
             return null;
         }
 
         $analysis = $this->classifyMixedInBody($block['body'], in_array($tagKind, self::TYPE_ALIAS_TAGS, true));
+        // A tag with no mixed, an honest payload bag, or a precise shape is fine as it stands.
         if (!$analysis['hasMixed'] || $this->isUnstructuredArrayBagType($block['body']) || $this->isPreciseArrayShape($block['body'])) {
             return null;
         }
@@ -172,6 +184,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
             ? $this->extractParamName($block['body'])
             : null;
 
+        // A standalone mixed that only mirrors a native `mixed` hint adds no noise, so leave it.
         if ($analysis['isStandalone'] && $this->hasSignatureBroadTypeCoverage($node, $tagKind, $paramName)) {
             return null;
         }
@@ -196,7 +209,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     }
 
     /**
-     * Detect whether the tag is one this rule examines (param / return / var / property / type-alias variants).
+     * Reports whether the tag is one this rule examines (param / return / var / property / type-alias variants).
      *
      * @param string $tagName - Lower-cased PHPDoc tag name (without the leading `@`) to classify.
      *
@@ -212,7 +225,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     }
 
     /**
-     * Extract PHPDoc tag bodies with their source line numbers.
+     * Extracts each PHPDoc tag body with its source line number, joining multi-line bodies.
      *
      * @param Doc $doc - Docblock attached to the node under inspection; multi-line tag bodies are joined.
      *
@@ -227,11 +240,13 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
         $blocks  = [];
         $current = null;
 
+        // Walk the docblock line by line.
         foreach ($lines as $offset => $rawLine) {
             $stripped = $this->stripDocPrefix($rawLine);
 
             // Split a PHPDoc line into the tag name and remaining tag body.
             if (preg_match('/^@([A-Za-z][A-Za-z0-9_-]*)\b\s*(.*)$/', $stripped, $matches) === 1) {
+                // Flush the tag we were building before starting the new one.
                 if ($current !== null) {
                     $blocks[] = $current;
                 }
@@ -243,11 +258,13 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
                 continue;
             }
 
+            // A non-tag line continues the current tag's body.
             if ($current !== null) {
                 $current['body'] .= "\n" . $stripped;
             }
         }
 
+        // Flush the final tag once the docblock ends.
         if ($current !== null) {
             $blocks[] = $current;
         }
@@ -256,7 +273,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     }
 
     /**
-     * Strip the leading `/**`, trailing `*​/`, and per-line `*` characters from a docblock line.
+     * Strips the leading `/**`, trailing `*​/`, and per-line `*` framing from a docblock line.
      *
      * @param string $line - One raw physical line of the docblock, still carrying its `*` framing.
      *
@@ -274,7 +291,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     }
 
     /**
-     * Detect whether a PHPDoc tag contains a standalone mixed type.
+     * Reports whether a PHPDoc tag body contains a standalone `mixed` type, and whether it is exactly `mixed`.
      *
      * @param string $body - Tag body after the tag name, e.g. the text following `@param`.
      * @param bool   $isTypeAlias - True when the body is a `phpstan-type`/`import-type` alias, so the alias
@@ -300,7 +317,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     }
 
     /**
-     * Detect unstructured decoded/config payload bags where mixed is the honest boundary type.
+     * Reports whether the tag types an unstructured payload bag, where `mixed` is the honest boundary type.
      *
      * @param string $body - Tag body whose leading type expression is tested for an array/list bag.
      *
@@ -309,6 +326,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     private function isUnstructuredArrayBagType(string $body): bool
     {
         $type = $this->extractTypeExpression($body);
+        // No leading type means nothing to classify as a bag.
         if ($type === null) {
             return false;
         }
@@ -345,6 +363,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
      */
     private function isArrayBagValueType(string $type): bool
     {
+        // A mixed leaf is the bag signature we accept as honest.
         if ($type === 'mixed') {
             return true;
         }
@@ -353,10 +372,10 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     }
 
     /**
-     * Detect PHPStan/Psalm `array{...}` shapes that carry at least one field whose
-     * type is not `mixed`. The nested mixed in that case describes a genuinely
-     * heterogeneous leaf (e.g. JSON envelope payload) rather than type sloppiness.
-     * An `array{value: mixed}` shape with no concrete sibling field is NOT
+     * Reports whether the type is a precise `array{...}` shape carrying at least one non-mixed field.
+     *
+     * The nested mixed in that case describes a genuinely heterogeneous leaf (e.g. JSON envelope payload)
+     * rather than type sloppiness. An `array{value: mixed}` shape with no concrete sibling field is NOT
      * precise and still fires.
      *
      * @param string $body - Tag body whose leading type is inspected for an `array{...}` shape.
@@ -366,6 +385,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     private function isPreciseArrayShape(string $body): bool
     {
         $type = $this->extractTypeExpression($body);
+        // No leading type means there is no shape to inspect.
         if ($type === null) {
             return false;
         }
@@ -377,17 +397,21 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
         }
 
         $inner = $matches[1];
+        // An empty `array{}` has no fields to weigh.
         if ($inner === '') {
             return false;
         }
 
+        // Inspect each field of the shape.
         foreach ($this->splitTopLevelComma($inner) as $pair) {
             $colonIndex = $this->topLevelColonIndex($pair);
+            // A positional field has no `key: type` colon to read.
             if ($colonIndex === null) {
                 continue;
             }
 
             $fieldType = trim(substr($pair, $colonIndex + 1));
+            // One concrete sibling field makes the whole shape precise, and thus exempt.
             if ($fieldType !== '' && strcasecmp($fieldType, 'mixed') !== 0) {
                 return true;
             }
@@ -397,7 +421,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     }
 
     /**
-     * Split a string on top-level commas, ignoring commas nested inside `<>{}()[]`.
+     * Splits a string on top-level commas, keeping commas nested inside `<>{}()[]` intact.
      *
      * @param string $body - Inner shape text (between `array{` and `}`) to split into field pairs.
      *
@@ -410,15 +434,18 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
         $depth    = 0;
         $length   = strlen($body);
 
+        // Scan the text character by character, tracking bracket depth.
         for ($i = 0; $i < $length; $i++) {
             $char = $body[$i];
 
+            // Opening brackets deepen the nesting, closing brackets lift it.
             if ($char === '<' || $char === '{' || $char === '(' || $char === '[') {
                 $depth++;
             } elseif ($char === '>' || $char === '}' || $char === ')' || $char === ']') {
                 $depth = max(0, $depth - 1);
             }
 
+            // A comma at the top level ends one field.
             if ($depth === 0 && $char === ',') {
                 $segments[] = $segment;
                 $segment    = '';
@@ -428,6 +455,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
             $segment .= $char;
         }
 
+        // Keep the trailing field after the last comma.
         if ($segment !== '') {
             $segments[] = $segment;
         }
@@ -436,7 +464,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     }
 
     /**
-     * Return the index of the first top-level colon in a shape pair, or null when none exists.
+     * Returns the index of the first top-level colon in a shape pair, or null when none exists.
      *
      * @param string $pair - A single `key: type` shape field, possibly nesting `<>{}()[]` in the type.
      *
@@ -447,9 +475,11 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
         $depth  = 0;
         $length = strlen($pair);
 
+        // Scan for the first colon that sits outside any bracket.
         for ($i = 0; $i < $length; $i++) {
             $char = $pair[$i];
 
+            // Track bracket depth so a colon nested inside a generic is ignored.
             if ($char === '<' || $char === '{' || $char === '(' || $char === '[') {
                 $depth++;
             } elseif ($char === '>' || $char === '}' || $char === ')' || $char === ']') {
@@ -463,7 +493,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     }
 
     /**
-     * Extract the leading type expression from a tag body, balancing generics / arrays / shapes.
+     * Extracts the leading type expression from a tag body, balancing generics, arrays, and shapes.
      *
      * @param string $body - Tag body; the type is read up to the first top-level whitespace.
      *
@@ -481,13 +511,16 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
         $depth  = 0;
         $length = strlen($body);
 
+        // Read characters until the first top-level whitespace ends the type token.
         for ($i = 0; $i < $length; $i++) {
             $char = $body[$i];
 
+            // Unnested whitespace marks the end of the type token.
             if ($depth === 0 && ($char === ' ' || $char === "\t" || $char === "\n")) {
                 break;
             }
 
+            // Track bracket depth so whitespace inside a generic does not end the token early.
             if ($char === '<' || $char === '{' || $char === '(' || $char === '[') {
                 $depth++;
             } elseif ($char === '>' || $char === '}' || $char === ')' || $char === ']') {
@@ -503,7 +536,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     }
 
     /**
-     * Extract the type expression from a PHPDoc type alias body after the alias name.
+     * Extracts the type expression from a PHPDoc type-alias body, after the alias name.
      *
      * @param string $body - `phpstan-type`/`import-type` body whose alias name (and optional `=`) precedes the type.
      *
@@ -522,7 +555,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     }
 
     /**
-     * Extract the parameter variable name from a @param body, or null when none is present.
+     * Extracts the parameter variable name from a `@param` body, or null when none is present.
      *
      * @param string $body - `@param` tag body whose first parameter variable token identifies the documented parameter.
      *
@@ -539,7 +572,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     }
 
     /**
-     * Detect whether the signature's typed declaration already says `mixed`, in which case the PHPDoc tag is not adding noise.
+     * Reports whether the signature's native type already says `mixed`, so the PHPDoc tag only mirrors it.
      *
      * @param Node        $node - Method, function, or property node whose native type hint is compared.
      * @param string      $tagKind - Lower-cased tag name driving which declaration (param / return / var) is checked.
@@ -549,14 +582,17 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
      */
     private function hasSignatureBroadTypeCoverage(Node $node, string $tagKind, ?string $paramName): bool
     {
+        // A param tag is checked against the matching parameter's native type.
         if (in_array($tagKind, self::PARAM_TAGS, true)) {
             return $this->hasParamSignatureMixedCoverage($node, $paramName);
         }
 
+        // A return tag is checked against the native return type.
         if (in_array($tagKind, self::RETURN_TAGS, true)) {
             return $this->hasReturnSignatureMixedCoverage($node);
         }
 
+        // A var tag is checked against the property's native type.
         if (in_array($tagKind, self::VAR_TAGS, true)) {
             return $this->hasVarSignatureMixedCoverage($node);
         }
@@ -565,7 +601,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     }
 
     /**
-     * Check whether a PHPDoc param tag mirrors a native `mixed` parameter type.
+     * Reports whether a PHPDoc param tag merely mirrors a native `mixed` parameter type.
      *
      * @param Node        $node - Method or function node to inspect.
      * @param string|null $paramName - Parameter name extracted from the PHPDoc tag body.
@@ -574,15 +610,19 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
      */
     private function hasParamSignatureMixedCoverage(Node $node, ?string $paramName): bool
     {
+        // Without a parameter name and a callable node there is nothing to match against.
         if ($paramName === null || !($node instanceof ClassMethod || $node instanceof Function_)) {
             return false;
         }
 
+        // Find the signature parameter that matches the documented name.
         foreach ($node->params as $param) {
+            // Skip a parameter with no plain, static name.
             if (!$param->var instanceof Node\Expr\Variable || !is_string($param->var->name)) {
                 continue;
             }
 
+            // A native `mixed` on the matching parameter means the tag only mirrors it.
             if ($param->var->name === $paramName) {
                 return ModernisationNodeHelper::typeName($param->type) === 'mixed';
             }
@@ -592,7 +632,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     }
 
     /**
-     * Check whether a PHPDoc return tag mirrors a native `mixed` return type.
+     * Reports whether a PHPDoc return tag merely mirrors a native `mixed` return type.
      *
      * @param Node $node - Method or function node to inspect.
      *
@@ -605,7 +645,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     }
 
     /**
-     * Check whether a PHPDoc var tag mirrors a native `mixed` property type.
+     * Reports whether a PHPDoc var tag merely mirrors a native `mixed` property type.
      *
      * @param Node $node - Property node to inspect.
      *
@@ -613,6 +653,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
      */
     private function hasVarSignatureMixedCoverage(Node $node): bool
     {
+        // Only a property declaration carries a var type to compare against.
         if (!$node instanceof Property) {
             return false;
         }
@@ -621,7 +662,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     }
 
     /**
-     * Render a readable symbol for the finding: method/function name, property list, or constant list.
+     * Renders a readable symbol for the finding: method/function name, property list, or constant list.
      *
      * @param Node $node - Declaration node a finding points at; property/const lists render every declared name.
      *
@@ -629,10 +670,12 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
      */
     private function resolveSymbol(Node $node): string
     {
+        // A method or function renders as its qualified name.
         if ($node instanceof ClassMethod || $node instanceof Function_) {
             return CyclomaticComplexityRule::resolveSymbol($node);
         }
 
+        // A property declaration renders every declared name.
         if ($node instanceof Property) {
             $names = [];
             foreach ($node->props as $prop) {
@@ -642,6 +685,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
             return implode(', ', $names);
         }
 
+        // A constant declaration renders every declared name.
         if ($node instanceof ClassConst) {
             $names = [];
             foreach ($node->consts as $const) {
@@ -655,7 +699,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     }
 
     /**
-     * Drop a leading or trailing top-level `null` union member from a normalized type.
+     * Drops a leading or trailing top-level `null` union member from a normalized type.
      *
      * A nullable bag such as `array<string, mixed>|null` is still an unstructured bag,
      * so its `null` union member is removed before the array-bag exemption check.
@@ -666,10 +710,12 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
      */
     private function stripTopLevelNullUnion(string $type): string
     {
+        // Drop a trailing `|null` union member.
         if (str_ends_with($type, '|null')) {
             return substr($type, 0, -strlen('|null'));
         }
 
+        // Drop a leading `null|` union member.
         if (str_starts_with($type, 'null|')) {
             return substr($type, strlen('null|'));
         }

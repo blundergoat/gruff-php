@@ -51,6 +51,27 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     }
 
     /**
+     * Verify only same-scope throws require @throws; nested-scope throws belong to their own contracts.
+     *
+     * @return void
+     */
+    public function testMissingThrowsTagPrunesNestedFunctionLikeScopes(): void
+    {
+        $findings = $this->analyseRule('throws-nested-scopes.php', MissingThrowsTagRule::ID);
+
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
+        // Direct throws in a method and a free function still report...
+        self::assertContains('ScopedThrows::directThrow()', $symbols);
+        self::assertContains('freeFunctionDirectThrow()', $symbols);
+        // ...while arrow-function, closure, anonymous-class, and IIFE throws never charge the outer method.
+        self::assertNotContains('ScopedThrows::arrowFunctionThrow()', $symbols);
+        self::assertNotContains('ScopedThrows::closureThrow()', $symbols);
+        self::assertNotContains('ScopedThrows::anonymousClassThrow()', $symbols);
+        self::assertNotContains('ScopedThrows::iifeThrow()', $symbols);
+        self::assertCount(2, $findings);
+    }
+
+    /**
      * Verify override aware throws rule uses inherited contracts but local phpdoc is required.
      *
      * @return void

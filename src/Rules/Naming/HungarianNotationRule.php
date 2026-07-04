@@ -20,7 +20,12 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 
 /**
- * Detects variable names that encode type prefixes.
+ * Flags a variable or parameter whose name carries a redundant type prefix - `strName`, `intCount`,
+ * `arrItems`, and the like - because the type already lives in the declaration and the prefix only adds noise.
+ *
+ * Matches a configured prefix followed by an uppercase word boundary, judged per function-like scope. The
+ * prefix list is configurable, so a genuine domain convention can be removed from it. Advisory, medium
+ * confidence.
  */
 final readonly class HungarianNotationRule implements RuleInterface
 {
@@ -35,7 +40,7 @@ final readonly class HungarianNotationRule implements RuleInterface
     private const PREFIXES = ['str', 'int', 'float', 'bool', 'arr', 'obj', 'fn', 'cls'];
 
     /**
-     * Describe the Hungarian notation rule.
+     * Describes the Hungarian-notation rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -55,7 +60,7 @@ final readonly class HungarianNotationRule implements RuleInterface
     }
 
     /**
-     * Find local variables that use type-prefix naming.
+     * Reports parameters and locals whose names carry a redundant type prefix.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -68,6 +73,7 @@ final readonly class HungarianNotationRule implements RuleInterface
         $prefixes   = $this->normalisedPrefixes($ruleContext->settingsFor($definition)->stringListOption('typePrefixes'));
         $findings   = [];
 
+        // Judge each function-like scope on its own parameters and locals.
         foreach ((new FunctionLikeScopeWalker())->scopes($analysisUnit->statements) as $scope) {
             array_push(
                 $findings,
@@ -80,7 +86,7 @@ final readonly class HungarianNotationRule implements RuleInterface
     }
 
     /**
-     * Find Hungarian notation parameters in one function-like scope.
+     * Finds the Hungarian-notation parameters in one function-like scope.
      *
      * @param RuleDefinition    $definition - Rule definition supplying severity, pillar, and ids for emitted findings.
      * @param AnalysisUnit      $analysisUnit - Parsed unit, used for the finding's file path and line numbers.
@@ -99,7 +105,9 @@ final readonly class HungarianNotationRule implements RuleInterface
         $findings = [];
         $symbol   = $this->symbol($scope);
 
+        // Weigh each declared parameter.
         foreach ($scope->node->params as $param) {
+            // Skip anything without a plain string name.
             if (!$param->var instanceof Variable || !is_string($param->var->name)) {
                 continue;
             }
@@ -113,6 +121,7 @@ final readonly class HungarianNotationRule implements RuleInterface
                 symbol:       $symbol,
                 prefixes:     $prefixes,
             );
+            // Keep the parameter only when it actually matched a type prefix.
             if ($finding instanceof Finding) {
                 $findings[] = $finding;
             }
@@ -122,7 +131,7 @@ final readonly class HungarianNotationRule implements RuleInterface
     }
 
     /**
-     * Find Hungarian notation local variables in one function-like scope.
+     * Finds the Hungarian-notation local variables in one function-like scope.
      *
      * @param RuleDefinition    $definition - Rule definition supplying severity, pillar, and ids for emitted findings.
      * @param AnalysisUnit      $analysisUnit - Parsed unit, used for the finding's file path and line numbers.
@@ -141,6 +150,7 @@ final readonly class HungarianNotationRule implements RuleInterface
         $findings = [];
         $symbol   = $this->symbol($scope);
 
+        // Weigh each local the scope declares.
         foreach ($scope->localVariables as $name => $variable) {
             $finding = $this->finding(
                 definition:   $definition,
@@ -151,6 +161,7 @@ final readonly class HungarianNotationRule implements RuleInterface
                 symbol:       $symbol,
                 prefixes:     $prefixes,
             );
+            // Keep the local only when it actually matched a type prefix.
             if ($finding instanceof Finding) {
                 $findings[] = $finding;
             }
@@ -160,7 +171,7 @@ final readonly class HungarianNotationRule implements RuleInterface
     }
 
     /**
-     * Build a Hungarian notation finding when the identifier matches a type prefix.
+     * Builds a Hungarian-notation finding when the identifier carries a type prefix.
      *
      * @param RuleDefinition $definition - Rule definition supplying severity, pillar, and ids for the finding.
      * @param AnalysisUnit   $analysisUnit - Parsed unit, source of the finding's file path.
@@ -205,7 +216,7 @@ final readonly class HungarianNotationRule implements RuleInterface
     }
 
     /**
-     * Detect a configured type prefix followed by an uppercase boundary.
+     * Detects a configured type prefix followed by an uppercase word boundary.
      *
      * @param string       $name - Identifier to test; a match needs the prefix plus an uppercase next character.
      * @param list<string> $prefixes - Configured lowercase type prefixes.
@@ -214,6 +225,7 @@ final readonly class HungarianNotationRule implements RuleInterface
      */
     private function detectPrefix(string $name, array $prefixes): ?string
     {
+        // Try each configured prefix against the name.
         foreach ($prefixes as $prefix) {
             if (str_starts_with($name, $prefix)
                 && strlen($name) > strlen($prefix)
@@ -229,6 +241,8 @@ final readonly class HungarianNotationRule implements RuleInterface
     }
 
     /**
+     * Lowercases and de-duplicates the configured type prefixes.
+     *
      * @param list<string> $prefixes - Configured type prefixes.
      *
      * @return list<string> - Lowercase type prefixes.
@@ -243,7 +257,7 @@ final readonly class HungarianNotationRule implements RuleInterface
     }
 
     /**
-     * Resolve the human-readable symbol for a function-like scope.
+     * Resolves the human-readable symbol for a function-like scope.
      *
      * @param FunctionLikeScope $scope - Scope to label; named callables resolve to their name, others to kind@line.
      *

@@ -12,12 +12,16 @@ use PhpParser\Node\Name;
 use PhpParser\Node\Stmt;
 
 /**
- * Provides shared AST helpers for modernisation rules.
+ * Shared AST helpers the modernisation rules lean on - target-version checks, type-name normalisation,
+ * `$this->prop` detection, class-name and DTO classification, and parent-node lookup.
+ *
+ * Centralising these keeps every modernisation rule reading the AST the same way, so a `mixed` check or a
+ * DTO exemption behaves identically wherever it fires. Pure static utility that holds no state.
  */
 final class ModernisationNodeHelper
 {
     /**
-     * Determine whether the configured target PHP version supports a syntax feature.
+     * Reports whether the project's target PHP version is new enough for a given syntax feature.
      *
      * @param RuleContext $ruleContext - Rule context carrying effective config.
      * @param float       $version - PHP version required by the syntax feature.
@@ -30,11 +34,11 @@ final class ModernisationNodeHelper
     }
 
     /**
-     * Normalize simple PHP type nodes to lower-case names.
+     * Normalises a simple PHP type node to its lower-case name for easy comparison.
      *
      * @param null|Identifier|Name|Node\ComplexType $type - Type node to normalize.
      *
-     * @return string|null - Type name, or null for complex/absent types.
+     * @return string|null - Type name, or null when the type is compound (union/intersection/nullable) or absent.
      */
     public static function typeName(null|Identifier|Name|Node\ComplexType $type): ?string
     {
@@ -48,10 +52,10 @@ final class ModernisationNodeHelper
     }
 
     /**
-     * Check whether an expression fetches a property from `$this`.
+     * Reports whether an expression reads a property off `$this` (optionally a specific named one).
      *
      * @param Expr        $expr - Expression to inspect.
-     * @param string|null $propertyName - Optional property name to match.
+     * @param string|null $propertyName - Optional property name to match; null matches any `$this` property.
      *
      * @return bool - True when the expression matches the requested `$this` property.
      */
@@ -71,11 +75,11 @@ final class ModernisationNodeHelper
     }
 
     /**
-     * Resolve the property name from a static property-fetch expression.
+     * Resolves the static property name from a `$obj->prop` fetch.
      *
      * @param Expr $expr - Expression to inspect.
      *
-     * @return string|null - Property name, or null for dynamic property access.
+     * @return string|null - Property name, or null when the access is dynamic (`$obj->$name`) or not a fetch.
      */
     public static function propertyFetchName(Expr $expr): ?string
     {
@@ -88,11 +92,11 @@ final class ModernisationNodeHelper
     }
 
     /**
-     * Resolve a class statement's declared name.
+     * Resolves a class statement's declared name.
      *
      * @param Stmt\Class_ $class - Class statement to inspect.
      *
-     * @return string|null - Class name, or null for anonymous classes.
+     * @return string|null - Class name, or null for an anonymous class that has no declared name.
      */
     public static function className(Stmt\Class_ $class): ?string
     {
@@ -100,11 +104,11 @@ final class ModernisationNodeHelper
     }
 
     /**
-     * Identify value-style classes by conventional suffixes.
+     * Reports whether a class name looks like a DTO/value object by its conventional suffix.
      *
      * @param Stmt\Class_ $class - Class statement to classify.
      *
-     * @return bool - True when the class name looks like a DTO/value object.
+     * @return bool - True when the class name looks like a DTO/value object, false otherwise.
      */
     public static function isDtoClass(Stmt\Class_ $class): bool
     {
@@ -114,6 +118,7 @@ final class ModernisationNodeHelper
             return false;
         }
 
+        // Compare the class name against the known value-object suffixes.
         foreach (['Data', 'Dto', 'DTO', 'Payload', 'ValueObject'] as $suffix) {
             if (str_ends_with($name, $suffix)) {
                 // A recognised value-object suffix is the signal that exempts the class from mutable-state rules.
@@ -125,11 +130,11 @@ final class ModernisationNodeHelper
     }
 
     /**
-     * Read the parent node connected by PhpParser's parent visitor.
+     * Reads the parent node wired up by PhpParser's parent visitor.
      *
      * @param Node $node - Node whose parent attribute should be read.
      *
-     * @return Node|null - Parent node, or null when the attribute is absent.
+     * @return Node|null - Parent node, or null when the visitor never ran or this is a root node.
      */
     public static function parent(Node $node): ?Node
     {

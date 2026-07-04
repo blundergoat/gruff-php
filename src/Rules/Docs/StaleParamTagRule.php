@@ -20,7 +20,12 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 
 /**
- * Detects @param tags whose names no longer match the callable signature.
+ * Flags an `@param` tag naming a parameter the callable's signature no longer has, so the user can remove
+ * or rename documentation that has drifted out of sync with the code.
+ *
+ * Runs per file over documented function-likes, collecting the documented parameter names and the real
+ * ones, then reporting every documented name with no matching parameter. Warning, high confidence, since a
+ * stale tag actively misleads a reader.
  */
 final readonly class StaleParamTagRule implements RuleInterface
 {
@@ -30,9 +35,9 @@ final readonly class StaleParamTagRule implements RuleInterface
     public const ID = 'docs.stale-param-tag';
 
     /**
-     * Describe the stale @param tag rule.
+     * Describes the stale `@param` tag rule for the registry and reports.
      *
-     * @return RuleDefinition - Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults (warning severity, high confidence).
      */
     public function definition(): RuleDefinition
     {
@@ -48,7 +53,7 @@ final readonly class StaleParamTagRule implements RuleInterface
     }
 
     /**
-     * Find @param tags that no longer match function parameters.
+     * Reports each `@param` tag that no longer matches a signature parameter.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -62,10 +67,12 @@ final readonly class StaleParamTagRule implements RuleInterface
 
         $findings = [];
 
+        // Check every documented method and function in the file.
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
             $docComment = $node->getDocComment();
 
+            // An undocumented callable has no tags to check.
             if ($docComment === null) {
                 continue;
             }
@@ -73,13 +80,16 @@ final readonly class StaleParamTagRule implements RuleInterface
             $docText          = $docComment->getText();
             $documentedParams = MissingParamTagRule::extractParamNames($docText);
 
+            // Nothing to verify when the docblock documents no parameters.
             if ($documentedParams === []) {
                 continue;
             }
 
             $actualParams = [];
 
+            // Index the parameters the signature actually declares.
             foreach ($node->params as $param) {
+                // Only a plain named parameter can be matched by name.
                 if ($param->var instanceof Variable && is_string($param->var->name)) {
                     $actualParams[$param->var->name] = true;
                 }
@@ -87,7 +97,9 @@ final readonly class StaleParamTagRule implements RuleInterface
 
             $symbol = CyclomaticComplexityRule::resolveSymbol($node);
 
+            // Check each documented parameter name against the real ones.
             foreach ($documentedParams as $docParam) {
+                // A documented name that still matches a parameter is fine.
                 if (isset($actualParams[$docParam])) {
                     continue;
                 }

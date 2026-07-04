@@ -23,7 +23,12 @@ use PhpParser\Node\Stmt\Property;
 use PhpParser\Node\Stmt\Trait_;
 
 /**
- * Detects types with enough properties to suggest broad state ownership.
+ * Flags a class, trait, or enum that owns so many properties its state has likely sprawled beyond one
+ * clear responsibility - though an immutable data carrier gets a gentler advisory instead of an error.
+ *
+ * Runs per file over every class-like scope, counting declared properties plus promoted constructor
+ * params against the threshold (default error above 15). A final readonly class whose methods only
+ * expose state is treated as a data carrier and softened to advisory.
  */
 final readonly class PropertyCountRule implements RuleInterface
 {
@@ -33,7 +38,7 @@ final readonly class PropertyCountRule implements RuleInterface
     public const ID = 'size.property-count';
 
     /**
-     * Describe the property-count rule.
+     * Describes the property-count rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and thresholds.
      */
@@ -51,7 +56,7 @@ final readonly class PropertyCountRule implements RuleInterface
     }
 
     /**
-     * Find class-like scopes whose declared property count exceeds thresholds.
+     * Reports each class-like scope whose property count exceeds the configured threshold.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -67,11 +72,13 @@ final readonly class PropertyCountRule implements RuleInterface
 
         $findings = [];
 
+        // Check each class, trait, and enum in the file.
         foreach ($classLikes as $classLike) {
             /** @var Class_|Trait_|Enum_ $classLike Finder predicate restricts results to class-like declarations. */
             $propertyCount  = $this->countProperties($classLike);
             $thresholdMatch = $settings->highValueThresholdMatch($propertyCount);
 
+            // A count within the threshold is fine, so skip it.
             if ($thresholdMatch === null) {
                 continue;
             }
@@ -125,6 +132,8 @@ final readonly class PropertyCountRule implements RuleInterface
     }
 
     /**
+     * Counts a class-like's owned state: declared properties plus promoted constructor parameters.
+     *
      * @param Class_|Trait_|Enum_ $classLike - Class-like declaration whose properties and promoted constructor params are counted.
      *
      * @return int - Declared and promoted property count.
@@ -133,13 +142,17 @@ final readonly class PropertyCountRule implements RuleInterface
     {
         $count = 0;
 
+        // Add up declared properties and promoted constructor params.
         foreach ($classLike->stmts as $stmt) {
+            // A property declaration can define several names at once.
             if ($stmt instanceof Property) {
                 $count += count($stmt->props);
             }
 
+            // The constructor may promote parameters into properties.
             if ($stmt instanceof ClassMethod && $stmt->name->toString() === '__construct') {
                 foreach ($stmt->params as $param) {
+                    // A non-zero flag set means the param is promoted, so it owns state too.
                     if ($param->flags !== 0) {
                         $count++;
                     }
@@ -152,7 +165,7 @@ final readonly class PropertyCountRule implements RuleInterface
     }
 
     /**
-     * Detect immutable data carriers whose property count is lower risk than broad mutable state.
+     * Reports whether a class is a final readonly data carrier, which earns the softer advisory severity.
      *
      * @param Class_|Trait_|Enum_ $classLike - Class-like declaration being classified.
      *
@@ -160,11 +173,14 @@ final readonly class PropertyCountRule implements RuleInterface
      */
     private function isReadonlyDataCarrier(Class_|Trait_|Enum_ $classLike): bool
     {
+        // Only a final readonly class can be a pure data carrier.
         if (!$classLike instanceof Class_ || !$classLike->isFinal() || !$classLike->isReadonly()) {
             return false;
         }
 
+        // Check every method other than the constructor.
         foreach ($classLike->getMethods() as $method) {
+            // The constructor sets state; it is not behaviour.
             if ($method->name->toString() === '__construct') {
                 continue;
             }
@@ -181,7 +197,7 @@ final readonly class PropertyCountRule implements RuleInterface
     }
 
     /**
-     * Decide whether a non-constructor method performs behaviour rather than expose state.
+     * Reports whether a method performs behaviour (returns void/never or is untyped) rather than expose state.
      *
      * @param ClassMethod $method - Parameterless method to classify.
      *
@@ -191,9 +207,9 @@ final readonly class PropertyCountRule implements RuleInterface
     {
         $returnType = $method->returnType;
 
+        // No declared return type: we cannot confirm the method only exposes state, so treat it as
+        // behaviour and keep the configured severity rather than the data-carrier downgrade.
         if ($returnType === null) {
-            // No declared return type: we cannot confirm the method only exposes state, so treat it as
-            // behaviour and keep the configured severity rather than the data-carrier downgrade.
             return true;
         }
 
@@ -202,7 +218,7 @@ final readonly class PropertyCountRule implements RuleInterface
     }
 
     /**
-     * Build a display symbol for a class-like node.
+     * Builds a display name for a class-like node, synthesising a label when it is unnamed.
      *
      * @param Node $node - Class, trait, or enum declaration to render as a finding symbol.
      *
@@ -230,7 +246,7 @@ final readonly class PropertyCountRule implements RuleInterface
     }
 
     /**
-     * Format threshold numbers without unnecessary decimal places.
+     * Formats a threshold number for the message, dropping a whole number's ".0" tail.
      *
      * @param int|float $number - Threshold value to render; whole values are shown without a trailing decimal.
      *
@@ -238,6 +254,7 @@ final readonly class PropertyCountRule implements RuleInterface
      */
     private function formatNumber(int|float $number): string
     {
+        // A genuine fraction keeps its decimals; a whole value is shown without them.
         if (is_float($number) && floor($number) !== $number) {
             return (string) $number;
         }

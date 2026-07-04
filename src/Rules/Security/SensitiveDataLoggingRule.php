@@ -19,7 +19,11 @@ use PhpParser\Node\Expr;
 use PhpParser\Node\Scalar;
 
 /**
- * Detects logging or dumping of request-controlled or sensitive-looking data.
+ * Flags a log or dump call whose argument carries request-controlled or secret-looking data - `error_log`,
+ * `var_dump`, a PSR-3 `$logger->error(...)` - so a token, password, or payload does not end up in the logs.
+ *
+ * Runs per file over the modelled log functions and logger methods, skipping purely static messages.
+ * Warning, medium confidence - taint and secret detection are heuristic.
  */
 final class SensitiveDataLoggingRule implements RuleInterface
 {
@@ -29,17 +33,21 @@ final class SensitiveDataLoggingRule implements RuleInterface
     public const ID = 'security.sensitive-data-logging';
 
     /**
+     * Global functions that write or dump a value to a log or the output.
+     *
      * @var list<string>
      */
     private const LOG_FUNCTIONS = ['error_log', 'print_r', 'var_dump'];
 
     /**
+     * PSR-3 logger method names whose first argument is the logged message.
+     *
      * @var list<string>
      */
     private const LOG_METHODS = ['alert', 'critical', 'debug', 'emergency', 'error', 'info', 'log', 'notice', 'warning'];
 
     /**
-     * Describe the sensitive data logging rule.
+     * Describes the sensitive-data-logging rule for the registry and reports.
      *
      * @return RuleDefinition - identity, pillar, tier, and default severity/confidence the registry
      *   uses to list and configure this rule
@@ -57,7 +65,7 @@ final class SensitiveDataLoggingRule implements RuleInterface
     }
 
     /**
-     * Find log sinks that include request or secret-like values.
+     * Reports each log sink that includes request-controlled or secret-looking values.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -69,21 +77,26 @@ final class SensitiveDataLoggingRule implements RuleInterface
     {
         $findings = [];
 
+        // Check global log and dump function calls.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
             $name = SecurityNodeHelper::globalFunctionName($call);
+            // Only the modelled log/dump functions are sinks.
             if ($name === null || !in_array($name, self::LOG_FUNCTIONS, true)) {
                 continue;
             }
 
+            // Flag the call when an argument carries request or secret data.
             if ($this->hasSensitiveArgument($call->args)) {
                 $findings[] = $this->finding($analysisUnit, $call, $name);
             }
         }
 
+        // Check logger method calls such as $logger->error(...).
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\MethodCall::class) as $call) {
             array_push($findings, ...$this->loggerCallFindings($analysisUnit, $call));
         }
 
+        // Check static logger calls such as Log::error(...).
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\StaticCall::class) as $call) {
             array_push($findings, ...$this->loggerCallFindings($analysisUnit, $call));
         }
@@ -92,7 +105,7 @@ final class SensitiveDataLoggingRule implements RuleInterface
     }
 
     /**
-     * Build logger call findings for the security rule.
+     * Builds the logger-call findings for one method or static call.
      *
      * @param AnalysisUnit                    $analysisUnit - Unit being scanned; supplies the display path for findings.
      * @param Expr\MethodCall|Expr\StaticCall $call - Possible logger call whose name and arguments are checked.
@@ -116,6 +129,8 @@ final class SensitiveDataLoggingRule implements RuleInterface
     }
 
     /**
+     * Reports whether any argument carries request-tainted or secret-bearing data.
+     *
      * @param array<int|string, Node\Arg|Node\VariadicPlaceholder> $args - Logger-call arguments to scan for request-tainted or secret-bearing values.
      *
      * @return bool - true on the first argument carrying request-tainted or secret-bearing data;
@@ -123,11 +138,14 @@ final class SensitiveDataLoggingRule implements RuleInterface
      */
     private function hasSensitiveArgument(array $args): bool
     {
+        // Weigh each argument to the log call.
         foreach ($args as $arg) {
+            // A spread placeholder is not a plain argument.
             if (!$arg instanceof Node\Arg) {
                 continue;
             }
 
+            // A purely static message leaks nothing.
             if ($this->isStaticLogArgument($arg->value)) {
                 continue;
             }
@@ -143,7 +161,7 @@ final class SensitiveDataLoggingRule implements RuleInterface
     }
 
     /**
-     * Detect logger arguments that contain only static message/context values.
+     * Reports whether a logger argument resolves to only static, compile-time values.
      *
      * @param Expr $expr - Argument expression to classify; recursed into for arrays and concatenations.
      *
@@ -169,7 +187,9 @@ final class SensitiveDataLoggingRule implements RuleInterface
             return in_array($name, ['false', 'null', 'true'], true);
         }
 
+        // An array is static only when every element is static.
         if ($expr instanceof Expr\Array_) {
+            // Weigh each element of the array.
             foreach ($expr->items as $item) {
                 if ($item->unpack || !$this->isStaticLogArgument($item->value)) {
                     // A spread or any non-static element can carry runtime data, so the whole array is unsafe.
@@ -191,7 +211,7 @@ final class SensitiveDataLoggingRule implements RuleInterface
     }
 
     /**
-     * Build the sensitive data logging finding.
+     * Builds the sensitive-data-logging finding.
      *
      * @param AnalysisUnit $analysisUnit - Unit being scanned; supplies the display path recorded on the finding.
      * @param Node         $node - Log call flagged as leaking; its start line locates the finding.

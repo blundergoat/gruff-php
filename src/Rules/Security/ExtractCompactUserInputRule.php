@@ -17,7 +17,11 @@ use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Node\Expr;
 
 /**
- * Detects extract and compact calls on request-shaped input data.
+ * Flags an `extract()` or `compact()` call whose data comes from the request, the shape that lets an
+ * attacker spawn arbitrary local variables - so the user maps request fields explicitly instead.
+ *
+ * Runs per file, matching global extract/compact calls whose first argument reaches user input. Warning,
+ * medium confidence - a request-fed call is a likely variable-injection sink, not a certain one.
  */
 final class ExtractCompactUserInputRule implements RuleInterface
 {
@@ -27,7 +31,7 @@ final class ExtractCompactUserInputRule implements RuleInterface
     public const ID = 'security.extract-compact-user-input';
 
     /**
-     * Describe the extract or compact user input security rule.
+     * Describes the extract/compact-on-request-data rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -45,7 +49,7 @@ final class ExtractCompactUserInputRule implements RuleInterface
     }
 
     /**
-     * Find extract and compact calls that operate on user-controlled input.
+     * Reports each `extract()` or `compact()` call reached by request data.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -56,13 +60,16 @@ final class ExtractCompactUserInputRule implements RuleInterface
     {
         $findings = [];
 
+        // Check every function call in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
             $name = SecurityNodeHelper::globalFunctionName($call);
+            // Only extract() and compact() import a whole variable table.
             if ($name === null || !in_array($name, ['compact', 'extract'], true)) {
                 continue;
             }
 
             $firstArg = SecurityNodeHelper::argumentValue($call->args, 0);
+            // A call with no request-controlled input is safe, so skip it.
             if ($firstArg === null || !SecurityNodeHelper::containsUserInput($firstArg)) {
                 continue;
             }

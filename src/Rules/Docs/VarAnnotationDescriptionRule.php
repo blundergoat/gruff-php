@@ -25,7 +25,12 @@ use PhpParser\Node\Stmt\Property;
 use PhpParser\NodeFinder;
 
 /**
- * Detects local var assertions that omit the reason the assertion is needed.
+ * Flags a local `@var` type assertion that names a type but never says why it is needed, so the user
+ * records the invariant that makes the narrowing safe instead of leaving a bare cast for the next reader.
+ *
+ * Runs per file (bailing fast when the source has no `@var`), walking the AST so a `@var` on a property,
+ * parameter, or other declaration is exempt - only genuine local assertions are judged. A docblock with
+ * any prose line is treated as explained. Warning, high confidence.
  */
 final readonly class VarAnnotationDescriptionRule implements RuleInterface
 {
@@ -35,7 +40,7 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
     public const ID = 'docs.var-annotation-description';
 
     /**
-     * Describe the local var-annotation description rule.
+     * Describes the local var-annotation description rule for the registry and reports.
      *
      * @return RuleDefinition - metadata and defaults the registry uses to wire this rule
      */
@@ -54,7 +59,7 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
     }
 
     /**
-     * Find local var assertions that do not explain why the assertion is needed.
+     * Reports each local var assertion that names a type without explaining why it is needed.
      *
      * @param AnalysisUnit $analysisUnit - parsed unit to inspect
      * @param RuleContext $ruleContext - rule context for this analysis pass
@@ -85,21 +90,26 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
             static fn(Node $node): bool => $node->getDocComment() instanceof Doc,
         );
 
+        // Weigh each node that carries a docblock.
         foreach ($candidates as $node) {
             $doc = $node->getDocComment();
+            // Skip a node whose docblock vanished between find and read.
             if (!$doc instanceof Doc) {
                 continue;
             }
 
             $docText = $doc->getText();
+            // Only a docblock with a var assertion is in scope.
             if (!str_contains($docText, '@var')) {
                 continue;
             }
 
+            // A var tag on a declaration documents that declaration, not a local assertion.
             if ($this->isDeclarationNode($node)) {
                 continue;
             }
 
+            // Report each bare assertion the docblock carries.
             foreach ($this->bareVarAnnotations($docText) as $variable) {
                 $findings[] = new Finding(
                     ruleId:      $definition->id,
@@ -121,7 +131,7 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
     }
 
     /**
-     * Distinguish declaration docblocks from local variable assertion docblocks.
+     * Reports whether a docblock documents a declaration (exempt) rather than a local var assertion.
      *
      * @param Node $node - AST node carrying the @var docblock; a declaration node means the tag documents that
      *                   declaration rather than a local assertion, so it is exempt from this rule.
@@ -141,7 +151,7 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
     }
 
     /**
-     * Find local var assertion tags that name a type without explaining intent.
+     * Finds the local var-assertion variables that state a type but give no reason.
      *
      * @param string $docText - raw docblock text, including the comment markers
      *
@@ -153,13 +163,16 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
         $descriptiveLines = [];
         $bareVariables    = [];
 
+        // Weigh each line of the docblock.
         foreach (preg_split('/\R/', $docText) ?: [] as $line) {
             $line = trim($line, " \t\n\r\0\x0B/*");
 
+            // Skip blank lines.
             if ($line === '') {
                 continue;
             }
 
+            // A non-tag line is prose that already explains the docblock.
             if (!str_starts_with($line, '@')) {
                 $descriptiveLines[] = $line;
                 continue;
@@ -170,6 +183,7 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
                 continue;
             }
 
+            // A trailing explanation means this assertion already states its reason.
             if (trim($matches['description']) !== '') {
                 continue;
             }

@@ -15,7 +15,11 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
 
 /**
- * Detects projects without a root README file.
+ * Flags a project whose root has no `README.md`, so the user gets a single reminder to add the entry-point
+ * documentation every project needs.
+ *
+ * A project-level rule: it fires at most once per run (not once per file), keyed off the project root, and
+ * caches the README presence check so repeated units stay cheap. Warning severity, high confidence.
  */
 final class MissingReadmeRule implements RuleInterface
 {
@@ -33,9 +37,9 @@ final class MissingReadmeRule implements RuleInterface
     private bool $emitted = false;
 
     /**
-     * Describe the missing README rule.
+     * Describes the missing-README rule for the registry and reports.
      *
-     * @return RuleDefinition - Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults (warning severity, high confidence).
      */
     public function definition(): RuleDefinition
     {
@@ -50,7 +54,7 @@ final class MissingReadmeRule implements RuleInterface
     }
 
     /**
-     * Emit one finding when the project root has no README.md file.
+     * Emits a single finding when the project root has no README.md file.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -68,6 +72,7 @@ final class MissingReadmeRule implements RuleInterface
         $readmePresent = $this->readmePresenceByRoot[$root]
             ??= file_exists($root . '/README.md');
 
+        // A README already exists at the root, so there is nothing to report.
         if ($readmePresent) {
             return [];
         }

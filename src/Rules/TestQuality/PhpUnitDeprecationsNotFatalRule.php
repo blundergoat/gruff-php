@@ -16,7 +16,9 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
 
 /**
- * Detects PHPUnit configs where deprecations do not fail the suite.
+ * Flags a PHPUnit config that does not set `failOnDeprecation="true"` - without it, deprecated calls pile
+ * up silently instead of failing the build, so a reviewer never sees the suite drifting onto removed APIs.
+ * Fires once per project when a PHPUnit test file is seen. Warning, high confidence.
  */
 final class PhpUnitDeprecationsNotFatalRule implements RuleInterface
 {
@@ -34,9 +36,9 @@ final class PhpUnitDeprecationsNotFatalRule implements RuleInterface
     private array $emittedRoots = [];
 
     /**
-     * Create the rule with injectable PHPUnit config discovery for tests.
+     * Creates the rule with injectable PHPUnit config discovery for tests.
      *
-     * @param PhpUnitConfigDiscovery|null $discovery - Discovery service override for tests.
+     * @param PhpUnitConfigDiscovery|null $discovery - Discovery service override for tests, or null to use the default discovery.
      */
     public function __construct(?PhpUnitConfigDiscovery $discovery = null)
     {
@@ -44,7 +46,7 @@ final class PhpUnitDeprecationsNotFatalRule implements RuleInterface
     }
 
     /**
-     * Describe the PHPUnit deprecations-not-fatal rule.
+     * Describes the phpunit-deprecations-not-fatal rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -62,7 +64,7 @@ final class PhpUnitDeprecationsNotFatalRule implements RuleInterface
     }
 
     /**
-     * Report a project once when PHPUnit deprecations do not fail the run.
+     * Reports a project once when PHPUnit deprecations do not fail the run.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit used to decide whether the project has PHPUnit tests.
      * @param RuleContext  $ruleContext - Rule context carrying project root.

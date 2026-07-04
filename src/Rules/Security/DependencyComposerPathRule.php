@@ -15,7 +15,11 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\SourceTextRuleInterface;
 
 /**
- * Flags Composer `path` repositories that link local code into the dependency tree.
+ * Flags a Composer `path` repository, which symlinks local code straight into the dependency tree - so the
+ * user confirms the linked path is trusted before it ships as if it were a published package.
+ *
+ * Scans `composer.json` as text over each `repositories` entry of type `path`. Warning, medium confidence -
+ * a path repo is a posture smell to review, not proof of a vulnerability.
  */
 final class DependencyComposerPathRule implements SourceTextRuleInterface
 {
@@ -25,7 +29,7 @@ final class DependencyComposerPathRule implements SourceTextRuleInterface
     public const ID = 'security.dependency-composer-path';
 
     /**
-     * Describe the Composer path-repository rule.
+     * Describes the Composer path-repository rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -43,7 +47,7 @@ final class DependencyComposerPathRule implements SourceTextRuleInterface
     }
 
     /**
-     * Find `repositories` entries of type `path`.
+     * Reports each Composer `path` repository declared in the manifest.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -64,12 +68,15 @@ final class DependencyComposerPathRule implements SourceTextRuleInterface
         }
 
         $findings = [];
+        // Check each declared repository entry.
         foreach ($manifest['repositories'] as $repository) {
+            // A malformed, non-object entry cannot be a path repository.
             if (!is_array($repository)) {
                 continue;
             }
 
             $type = isset($repository['type']) && is_string($repository['type']) ? strtolower($repository['type']) : '';
+            // Only a `path` repository links local code into the tree.
             if ($type !== 'path') {
                 continue;
             }

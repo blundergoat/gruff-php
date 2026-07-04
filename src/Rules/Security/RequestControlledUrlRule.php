@@ -18,7 +18,13 @@ use PhpParser\Node;
 use PhpParser\Node\Expr;
 
 /**
- * Detects URL fetches assembled from request-controlled data.
+ * Flags an outbound URL fetch whose target is built from request data - a curl handle, a Guzzle-style
+ * `$client->get(...)`, or a stream-wrapper read - the shape that lets an attacker point the server at
+ * internal hosts (SSRF).
+ *
+ * Runs per file over curl functions, stream-wrapper readers, and HTTP-client method calls whose URL reaches
+ * user input. Warning, medium confidence - a request-built URL is a probable SSRF sink, defused by a host
+ * allow-list.
  */
 final class RequestControlledUrlRule implements RuleInterface
 {
@@ -28,12 +34,14 @@ final class RequestControlledUrlRule implements RuleInterface
     public const ID = 'security.request-controlled-url';
 
     /**
+     * HTTP-client method names whose URL argument names a fetch target.
+     *
      * @var list<string>
      */
     private const HTTP_METHODS = ['delete', 'get', 'head', 'patch', 'post', 'put', 'request', 'send'];
 
     /**
-     * Describe the request-controlled URL rule.
+     * Describes the request-controlled-URL rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -51,7 +59,7 @@ final class RequestControlledUrlRule implements RuleInterface
     }
 
     /**
-     * Find URL sinks that receive request-controlled expressions.
+     * Reports each URL sink that receives request-controlled data.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -62,14 +70,17 @@ final class RequestControlledUrlRule implements RuleInterface
     {
         $findings = [];
 
+        // Check curl and stream-wrapper function calls.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
             array_push($findings, ...$this->functionFindings($analysisUnit, $call));
         }
 
+        // Check HTTP-client method calls such as $client->get(...).
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\MethodCall::class) as $call) {
             array_push($findings, ...$this->httpClientFindings($analysisUnit, $call));
         }
 
+        // Check static HTTP-client calls too.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\StaticCall::class) as $call) {
             array_push($findings, ...$this->httpClientFindings($analysisUnit, $call));
         }
@@ -78,7 +89,7 @@ final class RequestControlledUrlRule implements RuleInterface
     }
 
     /**
-     * Build http client findings for the security rule.
+     * Builds the HTTP-client findings for one method or static call.
      *
      * @param AnalysisUnit $analysisUnit - Unit being scanned; supplies the display path for any finding.
      * @param Expr\MethodCall|Expr\StaticCall $call - Client call whose URL argument is checked for request taint.
@@ -96,6 +107,7 @@ final class RequestControlledUrlRule implements RuleInterface
 
         $argumentIndex = $method === 'request' ? 1 : 0;
         $urlArg        = SecurityNodeHelper::argumentValue($call->args, $argumentIndex);
+        // A request-controlled URL argument is the SSRF risk.
         if ($urlArg !== null && SecurityNodeHelper::containsUrlLiteral($urlArg) && SecurityNodeHelper::containsUserInput($urlArg)) {
             $findings[] = $this->finding($analysisUnit, $call, $method);
         }
@@ -104,7 +116,7 @@ final class RequestControlledUrlRule implements RuleInterface
     }
 
     /**
-     * Build function findings for the security rule.
+     * Builds the finding for a global curl or stream-wrapper URL call.
      *
      * @param AnalysisUnit  $analysisUnit - Unit being scanned; supplies the display path for any finding.
      * @param Expr\FuncCall $call - Global-function call routed by name to the matching curl/stream-wrapper check.
@@ -144,7 +156,7 @@ final class RequestControlledUrlRule implements RuleInterface
     }
 
     /**
-     * Detect curl_init() with a request-controlled URL.
+     * Reports whether a `curl_init()` call takes a request-controlled URL.
      *
      * @param Expr\FuncCall $call - curl_init() call whose first (URL) argument is inspected for request taint.
      *
@@ -159,7 +171,7 @@ final class RequestControlledUrlRule implements RuleInterface
     }
 
     /**
-     * Detect curl_setopt(CURLOPT_URL, ...) with a request-controlled URL.
+     * Reports whether a `curl_setopt(CURLOPT_URL, ...)` sets a request-controlled URL.
      *
      * @param Expr\FuncCall $call - curl_setopt() call whose option (arg 1) and value (arg 2) are checked for URL taint.
      *
@@ -178,7 +190,7 @@ final class RequestControlledUrlRule implements RuleInterface
     }
 
     /**
-     * Detect CURLOPT_URL entries in curl_setopt_array().
+     * Reports whether a `curl_setopt_array()` option map sets a request-controlled URL.
      *
      * @param Expr\FuncCall $call - curl_setopt_array() call whose option-map (arg 1) is scanned for a tainted URL.
      *
@@ -192,7 +204,9 @@ final class RequestControlledUrlRule implements RuleInterface
             return false;
         }
 
+        // Weigh each option in the map.
         foreach ($optionsArg->items as $arrayItem) {
+            // Only a CURLOPT_URL entry is a URL sink.
             if (!$arrayItem->key instanceof Node || SecurityNodeHelper::constantName($arrayItem->key) !== 'CURLOPT_URL') {
                 continue;
             }
@@ -208,7 +222,7 @@ final class RequestControlledUrlRule implements RuleInterface
     }
 
     /**
-     * Detect stream-wrapper URL fetches with request-controlled URL pieces.
+     * Reports whether a stream-wrapper read fetches a request-controlled remote URL.
      *
      * @param Expr\FuncCall $call - file_get_contents()/fopen()/readfile() call whose path (arg 0) is taint-checked.
      *
@@ -225,7 +239,7 @@ final class RequestControlledUrlRule implements RuleInterface
     }
 
     /**
-     * Build the request-controlled URL finding.
+     * Builds the request-controlled-URL finding.
      *
      * @param AnalysisUnit $analysisUnit - Unit being scanned; supplies the display path reported to the reviewer.
      * @param Node         $node - Tainted sink node whose start line anchors the finding for the reviewer.

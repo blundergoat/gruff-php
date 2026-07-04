@@ -21,7 +21,9 @@ use PhpParser\Node\Name;
 use PhpParser\Node\Scalar;
 
 /**
- * Detects tests that reach hidden external fixtures or global state.
+ * Flags a "mystery guest" - a test that reads an external file or opens a database from inside its own body
+ * (`file_get_contents`, `new PDO`, ...), pulling in fixtures a reader cannot see, so the test's outcome
+ * hinges on hidden state. Paths the test itself prepared are exempt. Runs over every test. Advisory, medium confidence.
  */
 final readonly class MysteryGuestRule implements RuleInterface
 {
@@ -53,7 +55,7 @@ final readonly class MysteryGuestRule implements RuleInterface
     ];
 
     /**
-     * Describe the mystery guest test rule.
+     * Describes the mystery-guest rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -71,7 +73,7 @@ final readonly class MysteryGuestRule implements RuleInterface
     }
 
     /**
-     * Find tests that reach external files or databases from inside the test body.
+     * Reports tests that reach external files or databases from inside the test body.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -82,13 +84,17 @@ final readonly class MysteryGuestRule implements RuleInterface
     {
         $findings = [];
 
+        // Weigh every test scope in the file.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
+            // Weigh every call and construction in the test body.
             foreach (NodeIndex::descendantsOfAny($scope->node, [Expr\FuncCall::class, Expr\New_::class]) as $node) {
                 $guest = $this->mysteryGuest($node);
+                // Skip nodes that reach no external file or database.
                 if ($guest === null) {
                     continue;
                 }
 
+                // A path the test prepared earlier is explicit setup, not a hidden guest.
                 if ($this->usesPreparedPath($scope, $node)) {
                     continue;
                 }
@@ -113,7 +119,7 @@ final readonly class MysteryGuestRule implements RuleInterface
     }
 
     /**
-     * Identify external file/database access in a call or constructor node.
+     * Returns the name of an external file/database dependency in a node, or null.
      *
      * @param Node $node - Call or constructor node from a test body to classify.
      *
@@ -121,6 +127,7 @@ final readonly class MysteryGuestRule implements RuleInterface
      */
     private function mysteryGuest(Node $node): ?string
     {
+        // A tracked read function names the external file it touches.
         if ($node instanceof Expr\FuncCall) {
             $name = TestQualityNodeHelper::functionName($node);
 
@@ -130,6 +137,7 @@ final readonly class MysteryGuestRule implements RuleInterface
                 : null;
         }
 
+        // A direct PDO/mysqli construction opens an external connection.
         if ($node instanceof Expr\New_ && $node->class instanceof Name) {
             $class = strtolower($node->class->toString());
 
@@ -142,7 +150,7 @@ final readonly class MysteryGuestRule implements RuleInterface
     }
 
     /**
-     * Detect reads from paths the test created or handed to the SUT earlier in the same test.
+     * Reports whether a read uses a path the test itself prepared earlier.
      *
      * @param TestQualityScope $scope - Enclosing test scope whose earlier statements may have prepared the path.
      * @param Node             $node - Read node under suspicion of reaching a hidden fixture.
@@ -164,7 +172,9 @@ final readonly class MysteryGuestRule implements RuleInterface
         }
 
         $readerLine = $node->getStartLine();
+        // Look for an earlier statement that prepared this path.
         foreach (NodeIndex::descendantsOfAny($scope->node, [Expr\FuncCall::class, Expr\MethodCall::class, Expr\StaticCall::class, Expr\New_::class]) as $candidate) {
+            // Only statements before the read can have prepared its path.
             if ($candidate->getStartLine() >= $readerLine) {
                 continue;
             }
@@ -181,7 +191,7 @@ final readonly class MysteryGuestRule implements RuleInterface
     }
 
     /**
-     * Return the path argument from a file-read call.
+     * Returns the path argument of a file-read call, or null for non-path guests.
      *
      * @param Node $node - Guest node whose first argument may carry the read path.
      *
@@ -207,7 +217,7 @@ final readonly class MysteryGuestRule implements RuleInterface
     }
 
     /**
-     * Collect path-identifying keys prepared by a prior setup/SUT call.
+     * Collects the path keys a prior setup or SUT call prepared.
      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall|Expr\New_ $node - Earlier call that may have created or
      *                                                                      received the path the later read consumes.
@@ -216,8 +226,10 @@ final readonly class MysteryGuestRule implements RuleInterface
      */
     private function preparedPathKeys(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall|Expr\New_ $node): array
     {
+        // A write function keys the path it created.
         if ($node instanceof Expr\FuncCall) {
             $name = TestQualityNodeHelper::functionName($node);
+            // A tracked write prepares the path at its destination argument.
             if ($name !== null && isset(self::WRITE_FUNCTION_TARGET_ARG[$name])) {
                 $arg = $node->args[self::WRITE_FUNCTION_TARGET_ARG[$name]] ?? null;
 
@@ -242,6 +254,8 @@ final readonly class MysteryGuestRule implements RuleInterface
     }
 
     /**
+     * Collects the path keys found across a call's arguments.
+     *
      * @param list<Arg|Node\VariadicPlaceholder> $args - Call arguments to inspect.
      *
      * @return list<string> - Path keys found in arguments.
@@ -250,7 +264,9 @@ final readonly class MysteryGuestRule implements RuleInterface
     {
         $keys = [];
 
+        // Weigh each argument for a path key.
         foreach ($args as $arg) {
+            // Skip spread placeholders, which carry no plain value.
             if (!$arg instanceof Arg) {
                 continue;
             }
@@ -263,7 +279,7 @@ final readonly class MysteryGuestRule implements RuleInterface
     }
 
     /**
-     * Build stable keys for simple literal, variable, concatenated, and array path expressions.
+     * Builds stable comparison keys for a path expression.
      *
      * @param Expr $expression - Path expression to reduce to comparable keys; recursion handles concat and array forms.
      *
@@ -291,6 +307,7 @@ final readonly class MysteryGuestRule implements RuleInterface
 
         if ($expression instanceof Expr\Array_) {
             $keys = [];
+            // Fold in every element's path keys.
             foreach ($expression->items as $arrayItem) {
                 array_push($keys, ...$this->pathKeys($arrayItem->value));
             }

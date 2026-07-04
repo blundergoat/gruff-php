@@ -20,7 +20,12 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 
 /**
- * Measures maintainability by combining complexity, volume, and length signals.
+ * Scores each function or method with a maintainability index - a blend of cyclomatic complexity,
+ * Halstead volume, and length - and flags the ones that fall below the configured floor.
+ *
+ * Runs per file over every function-like node. A low index (default advisory below 35) marks a refactor
+ * candidate for the user to weigh, not a confirmed defect, so it ships at the lowest severity. The
+ * finding names the computed score and the threshold it missed.
  */
 final readonly class MaintainabilityIndexRule implements RuleInterface
 {
@@ -30,7 +35,7 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
     public const ID = 'complexity.maintainability-index';
 
     /**
-     * Describe the maintainability index rule.
+     * Describes the maintainability-index rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and thresholds.
      */
@@ -51,7 +56,7 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
     }
 
     /**
-     * Find function-like declarations whose maintainability index falls below thresholds.
+     * Reports each function-like node whose maintainability index sits below the configured floor.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context carrying thresholds.
@@ -67,11 +72,13 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
 
         $findings = [];
 
+        // Score every function and method in the file.
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node NodeIndex query is constrained to function-like classes. */
             $mi             = self::computeMaintainabilityIndex($node, $analysisUnit);
             $thresholdMatch = $settings->lowValueThresholdMatch($mi);
 
+            // A node at or above the floor is fine, so skip it.
             if ($thresholdMatch === null) {
                 continue;
             }
@@ -109,6 +116,8 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
     }
 
     /**
+     * Computes the 0-100 maintainability index for one node from its complexity, volume, and length.
+     *
      * @param ClassMethod|Function_ $node - Function-like node to score.
      * @param AnalysisUnit          $analysisUnit - Parsed unit that owns the node.
      *
@@ -136,7 +145,7 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
     }
 
     /**
-     * Format threshold numbers without unnecessary decimal places.
+     * Formats a threshold number for the message, dropping a whole number's ".0" tail.
      *
      * @param int|float $number - Configured maintainability threshold; an integral float drops its ".0" tail.
      *
@@ -144,6 +153,7 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
      */
     private static function formatNumber(int|float $number): string
     {
+        // A genuine fraction keeps its decimals; a whole value is shown without them.
         if (is_float($number) && floor($number) !== $number) {
             return (string) $number;
         }

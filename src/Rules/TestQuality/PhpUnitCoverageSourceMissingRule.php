@@ -16,7 +16,9 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
 
 /**
- * Detects PHPUnit configs without explicit coverage source paths.
+ * Flags a PHPUnit config that declares no coverage source (`<source>` in PHPUnit 10+, or the legacy
+ * `<filter><whitelist>`) - without it a coverage run measures nothing useful and the numbers mislead. Fires
+ * once per project when a PHPUnit test file is seen. Advisory, medium confidence.
  */
 final class PhpUnitCoverageSourceMissingRule implements RuleInterface
 {
@@ -34,9 +36,9 @@ final class PhpUnitCoverageSourceMissingRule implements RuleInterface
     private array $emittedRoots = [];
 
     /**
-     * Create the rule with injectable PHPUnit config discovery for tests.
+     * Creates the rule with injectable PHPUnit config discovery for tests.
      *
-     * @param PhpUnitConfigDiscovery|null $discovery - Discovery service override for tests.
+     * @param PhpUnitConfigDiscovery|null $discovery - Discovery service override for tests, or null to use the default discovery.
      */
     public function __construct(?PhpUnitConfigDiscovery $discovery = null)
     {
@@ -44,7 +46,7 @@ final class PhpUnitCoverageSourceMissingRule implements RuleInterface
     }
 
     /**
-     * Describe the PHPUnit coverage source rule.
+     * Describes the phpunit-coverage-source-missing rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -61,7 +63,7 @@ final class PhpUnitCoverageSourceMissingRule implements RuleInterface
     }
 
     /**
-     * Report a project once when its PHPUnit config lacks coverage source configuration.
+     * Reports a project once when its PHPUnit config lacks coverage source configuration.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit used to decide whether the project has PHPUnit tests.
      * @param RuleContext  $ruleContext - Rule context carrying project root.
@@ -117,7 +119,7 @@ final class PhpUnitCoverageSourceMissingRule implements RuleInterface
     }
 
     /**
-     * Check for PHPUnit 10 coverage source declarations.
+     * Reports whether the PHPUnit config declares a coverage source/include block.
      *
      * @param \SimpleXMLElement $root - Parsed <phpunit> root element whose coverage children are probed.
      *

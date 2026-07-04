@@ -7,40 +7,52 @@ namespace GruffPhp\Output\Reporter;
 use GruffPhp\Results\Finding\Severity;
 
 /**
- * Defines the lowest finding severity that should fail a run.
+ * The severity gate behind `gruff-php analyse --fail-on <level>`: it names the lowest finding
+ * severity allowed to fail a run. A user reaches for this when wiring gruff into CI or a
+ * pre-commit hook and choosing how strict the gate should be - `--fail-on warning` lets advisory
+ * notes slide but fails on warnings and errors, while `--fail-on none` still reports every finding
+ * yet never breaks the build. `fromInput()` turns the raw flag value the user typed into one of
+ * these cases, and `isTriggeredBy()` answers, finding by finding, whether that gate has tripped.
  */
 enum FailThreshold: string
 {
     /**
-     * Never fail from finding severities.
+     * The `--fail-on none` choice: every finding is still reported, but the run always exits
+     * clean - for a user who wants the scores without ever letting the gate fail CI.
      */
     case None = 'none';
 
     /**
-     * Fail on any finding, including advisory findings.
+     * The strictest gate (`--fail-on advisory`): any finding at all, down to the gentlest
+     * advisory nudge, is enough to fail the run.
      */
     case Advisory = 'advisory';
 
     /**
-     * Fail on warning and error findings.
+     * The middle gate (`--fail-on warning`): advisory notes are allowed through, but warnings
+     * and errors fail the run.
      */
     case Warning = 'warning';
 
     /**
-     * Fail only on error findings.
+     * The most lenient failing gate (`--fail-on error`): only genuine error-severity findings
+     * fail the run; advisory and warning findings pass.
      */
     case Error = 'error';
 
     /**
-     * Convert a CLI fail threshold string into the matching enum case.
+     * Turns the raw `--fail-on` value the user typed on the command line into the matching gate,
+     * so the rest of the run can reason about a case instead of a free-form string.
      *
-     * @param string $rawInput - CLI fail-on value to parse.
+     * @param string $rawInput - Raw `--fail-on` text the user typed; an empty or unknown value matches no case.
      *
-     * @return self|null - Matching threshold, or null for unsupported input.
+     * @return self|null - Matching threshold; null when the text is none of the four names
+     *                     (e.g. `--fail-on loud`), which the caller reports as a usage error.
      */
     public static function fromInput(string $rawInput): ?self
     {
-        // Exact-match the CLI string to a case; anything else is an unsupported value the caller reports, hence null.
+        // Match the exact text the user passed to `--fail-on` against the four known names;
+        // anything else (say `--fail-on loud`) falls through to null for the caller to reject.
         return match ($rawInput) {
             self::None->value => self::None,
             self::Advisory->value => self::Advisory,
@@ -51,15 +63,17 @@ enum FailThreshold: string
     }
 
     /**
-     * Decide whether a finding severity should fail for this threshold.
+     * Answers, for one finding, whether its severity is serious enough to trip this gate - the
+     * check that ultimately turns a scan's findings into a green or red exit code for the user.
      *
-     * @param Severity $severity - Finding severity to compare with this threshold.
+     * @param Severity $severity - Severity of the finding being weighed against this threshold.
      *
-     * @return bool - True when the severity meets or exceeds the threshold.
+     * @return bool - True when the finding is at or above the threshold and should fail the run;
+     *                false when it is allowed through and the run may still pass.
      */
     public function isTriggeredBy(Severity $severity): bool
     {
-        // Each case names the floor: a severity trips the gate only when it is at least as severe as the threshold.
+        // Each gate names a severity floor: this finding fails only when it is at least as severe as the threshold.
         return match ($this) {
             self::None => false,
             self::Advisory => true,

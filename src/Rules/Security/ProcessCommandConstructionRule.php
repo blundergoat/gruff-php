@@ -18,7 +18,11 @@ use PhpParser\Node;
 use PhpParser\Node\Expr;
 
 /**
- * Detects process command construction from request-controlled data.
+ * Flags a process command built from request-controlled data - a tainted backtick string, `new Process(...)`,
+ * or `Process::fromShellCommandline(...)` - the shape that lets an attacker inject shell commands (RCE).
+ *
+ * Runs per file over shell-exec expressions and Symfony Process constructors/factories whose command reaches
+ * user input. Warning, medium confidence - a request-tainted command is a likely RCE sink, not a certain one.
  */
 final class ProcessCommandConstructionRule implements RuleInterface
 {
@@ -28,7 +32,7 @@ final class ProcessCommandConstructionRule implements RuleInterface
     public const ID = 'security.process-command-construction';
 
     /**
-     * Describe the process command construction rule.
+     * Describes the process-command-construction rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -46,7 +50,7 @@ final class ProcessCommandConstructionRule implements RuleInterface
     }
 
     /**
-     * Find process commands that include request-controlled expressions.
+     * Reports each process command built from request-controlled data.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -57,24 +61,31 @@ final class ProcessCommandConstructionRule implements RuleInterface
     {
         $findings = [];
 
+        // Check every backtick shell-exec in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\ShellExec::class) as $shellExec) {
+            // Request-controlled data inside a shell string is the injection risk.
             if (SecurityNodeHelper::containsUserInput($shellExec)) {
                 $findings[] = $this->finding($analysisUnit, $shellExec, 'shell-exec');
             }
         }
 
+        // Check every object construction for a Symfony Process.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\New_::class) as $new) {
+            // Only a Symfony Process constructor builds a command line.
             if (!SecurityNodeHelper::hasMatchingClassName($new->class, ['Symfony\Component\Process\Process', 'Process'])) {
                 continue;
             }
 
             $firstArg = SecurityNodeHelper::argumentValue($new->args, 0);
+            // A request-controlled command argument is the risk.
             if ($firstArg !== null && SecurityNodeHelper::containsUserInput($firstArg)) {
                 $findings[] = $this->finding($analysisUnit, $new, 'symfony-process');
             }
         }
 
+        // Check every static call for Process::fromShellCommandline.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\StaticCall::class) as $staticCall) {
+            // Only Process::fromShellCommandline parses a raw shell string.
             if (
                 !SecurityNodeHelper::hasMatchingClassName($staticCall->class, ['Symfony\Component\Process\Process', 'Process'])
                 || SecurityNodeHelper::methodName($staticCall) !== 'fromshellcommandline'
@@ -83,6 +94,7 @@ final class ProcessCommandConstructionRule implements RuleInterface
             }
 
             $firstArg = SecurityNodeHelper::argumentValue($staticCall->args, 0);
+            // A request-controlled command line is the risk.
             if ($firstArg !== null && SecurityNodeHelper::containsUserInput($firstArg)) {
                 $findings[] = $this->finding($analysisUnit, $staticCall, 'process-shell-commandline');
             }
@@ -92,7 +104,7 @@ final class ProcessCommandConstructionRule implements RuleInterface
     }
 
     /**
-     * Build the process command finding.
+     * Builds the process-command finding.
      *
      * @param AnalysisUnit $analysisUnit - Unit being scanned; supplies the display path reported to the reviewer.
      * @param Node         $node - Tainted sink node whose start line anchors the finding for the reviewer.

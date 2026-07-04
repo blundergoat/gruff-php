@@ -21,7 +21,9 @@ use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
 /**
- * Detects repeated test bodies that should likely use a data provider.
+ * Flags three or more test methods in a class whose bodies share the same call and control-flow shape but
+ * carry no data provider - a sign the same scenario is copy-pasted with different literals and would read
+ * better as one parametrised test. Runs per class; paths can be exempted. Advisory, low confidence.
  */
 final readonly class RepeatedStructureMissingDataProviderRule implements RuleInterface
 {
@@ -36,7 +38,7 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
     private const MIN_GROUP_SIZE = 3;
 
     /**
-     * Describe the repeated test structure rule.
+     * Describes the repeated-structure-missing-data-provider rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -54,7 +56,7 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
     }
 
     /**
-     * Find repeated test bodies that look like data-provider candidates.
+     * Reports repeated test bodies that look like data-provider candidates.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -74,24 +76,30 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
         $nodeFinder = new NodeFinder();
         $findings   = [];
 
+        // Weigh every class declaration in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Class_::class) as $class) {
             $className = $class->name?->toString();
+            // An anonymous class has no name to report against.
             if ($className === null) {
                 continue;
             }
 
             $groups = [];
 
+            // Inspect each test method's body shape.
             foreach ($class->getMethods() as $classMethod) {
+                // Only real test methods are grouped by shape.
                 if (!TestQualityNodeHelper::isTestMethod($classMethod)) {
                     continue;
                 }
 
+                // A method already driven by a data provider is exempt.
                 if ($this->usesDataProvider($classMethod)) {
                     continue;
                 }
 
                 $stmts = array_values($classMethod->stmts ?? []);
+                // A one-statement body is too trivial to call repetitive.
                 if (count($stmts) < 2) {
                     continue;
                 }
@@ -101,7 +109,9 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
                 $groups[$shape][] = $classMethod;
             }
 
+            // Weigh each group of identically shaped tests.
             foreach ($groups as $methods) {
+                // Only a large enough group is worth collapsing into a provider.
                 if (count($methods) < self::MIN_GROUP_SIZE) {
                     continue;
                 }
@@ -134,7 +144,7 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
     }
 
     /**
-     * Check whether a project-configured path exemption applies.
+     * Reports whether a project-configured path exemption applies.
      *
      * @param string       $displayPath - File path under analysis; matched after backslashes are normalised to slashes.
      * @param list<string> $patterns - Glob patterns for accepted test shapes.
@@ -145,6 +155,7 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
     {
         $normalizedPath = str_replace('\\', '/', $displayPath);
 
+        // Weigh the display path against each configured exemption glob.
         foreach ($patterns as $pattern) {
             if (fnmatch($pattern, $normalizedPath, FNM_NOESCAPE)) {
                 // First matching glob is enough to exempt the path; no need to test the rest.
@@ -156,7 +167,7 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
     }
 
     /**
-     * Check whether a test method already declares a data provider.
+     * Reports whether a test method already declares a data provider.
      *
      * @param Stmt\ClassMethod $classMethod - Test method whose attributes and docblock are scanned for a provider.
      *
@@ -164,7 +175,9 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
      */
     private function usesDataProvider(Stmt\ClassMethod $classMethod): bool
     {
+        // Read the method's attributes for a DataProvider.
         foreach ($classMethod->attrGroups as $group) {
+            // One group can hold several attributes.
             foreach ($group->attrs as $attr) {
                 if (strtolower($attr->name->getLast()) === 'dataprovider') {
                     // A #[DataProvider] attribute already drives this method, so it is exempt from the heuristic.
@@ -177,7 +190,7 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
     }
 
     /**
-     * Reduce a test body to a token string capturing only its call and control-flow shape, ignoring literal values.
+     * Reduces a test body to a structure fingerprint of its call and control-flow shape.
      *
      * @param list<Node> $stmts - Statements of one test method body; the unit being fingerprinted.
      * @param NodeFinder $nodeFinder - Finder shared across the class scan so one instance serves every method.
@@ -188,6 +201,7 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
     {
         $tokens = [];
 
+        // Walk the body's calls and control-flow nodes in order.
         foreach ($nodeFinder->find($stmts, static fn (Node $node): bool => $node instanceof Expr\New_
             || $node instanceof Expr\FuncCall
             || $node instanceof Expr\MethodCall
@@ -205,7 +219,7 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
     }
 
     /**
-     * Convert a structural AST node to a stable fingerprint token.
+     * Returns a stable fingerprint token for a structural AST node.
      *
      * @param Node $node - One structural node from a test body; call targets fold into the token, plain shapes do not.
      *
@@ -213,6 +227,7 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
      */
     private function tokenFor(Node $node): string
     {
+        // A construction folds in its class name.
         if ($node instanceof Expr\New_) {
             $class = $node->class instanceof Name ? $node->class->toString() : 'expr';
 
@@ -230,6 +245,7 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
             return 'method:' . (TestQualityNodeHelper::callName($node) ?? 'expr');
         }
 
+        // A static call folds in both class and method.
         if ($node instanceof Expr\StaticCall) {
             $class = $node->class instanceof Name ? $node->class->toString() : 'expr';
 

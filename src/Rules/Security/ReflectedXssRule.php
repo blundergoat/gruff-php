@@ -50,7 +50,7 @@ final class ReflectedXssRule implements RuleInterface
     private const PRINTF_SINKS = ['printf', 'vprintf'];
 
     /**
-     * Describe the reflected-XSS rule.
+     * Describes the reflected-XSS rule for the registry and reports.
      *
      * @return RuleDefinition - warning-severity, medium-confidence security metadata plus the escaping false-positive shape
      */
@@ -75,7 +75,7 @@ final class ReflectedXssRule implements RuleInterface
     }
 
     /**
-     * Find request-derived output that is not HTML-escaped.
+     * Reports request-derived output that is not HTML-escaped.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -86,8 +86,11 @@ final class ReflectedXssRule implements RuleInterface
     {
         $findings = [];
 
+        // Weigh every echo statement, the most common output sink.
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Echo_::class) as $echo) {
+            // An echo can render several comma-separated values, so check each one.
             foreach ($echo->exprs as $expr) {
+                // One unescaped request value in the list is enough to flag the echo.
                 if ($this->hasUnescapedRequestSource($expr, $analysisUnit)) {
                     $findings[] = $this->finding($analysisUnit, $echo->getStartLine(), 'echo');
                     break;
@@ -95,19 +98,25 @@ final class ReflectedXssRule implements RuleInterface
             }
         }
 
+        // Weigh every print expression, which renders a single value.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\Print_::class) as $print) {
+            // Flag the print when its value carries unescaped request data.
             if ($this->hasUnescapedRequestSource($print->expr, $analysisUnit)) {
                 $findings[] = $this->finding($analysisUnit, $print->getStartLine(), 'print');
             }
         }
 
+        // Weigh every function call for a printf-family output sink.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
             $name = SecurityNodeHelper::globalFunctionName($call);
+            // Only printf and vprintf render their arguments to the response.
             if ($name === null || !in_array($name, self::PRINTF_SINKS, true)) {
                 continue;
             }
 
+            // Any format or argument slot can carry the tainted value.
             foreach ($call->args as $arg) {
+                // One unescaped request argument means the printf output is exploitable.
                 if ($arg instanceof Node\Arg && $this->hasUnescapedRequestSource($arg->value, $analysisUnit)) {
                     $findings[] = $this->finding($analysisUnit, $call->getStartLine(), $name);
                     break;
@@ -119,7 +128,7 @@ final class ReflectedXssRule implements RuleInterface
     }
 
     /**
-     * Decide whether an output expression carries unescaped request data.
+     * Reports whether an output expression carries unescaped request data.
      *
      * @param Expr         $output - Expression rendered to output.
      * @param AnalysisUnit $analysisUnit - Parsed unit (top-level scope fallback).
@@ -128,6 +137,7 @@ final class ReflectedXssRule implements RuleInterface
      */
     private function hasUnescapedRequestSource(Expr $output, AnalysisUnit $analysisUnit): bool
     {
+        // A request superglobal used directly at the sink is the clearest XSS shape.
         foreach ($this->superglobalLeaves($output) as $leaf) {
             if (!$this->isEscapedBetween($leaf, $output)) {
                 // A raw request superglobal at the sink is enough to flag the output.
@@ -143,6 +153,7 @@ final class ReflectedXssRule implements RuleInterface
             return false;
         }
 
+        // A local alias can smuggle request data to the sink even when no superglobal appears inline.
         foreach ($this->variableLeaves($output) as $variable) {
             if (is_string($variable->name) && isset($tainted[$variable->name]) && !$this->isEscapedBetween($variable, $output)) {
                 // A tainted alias reaching the sink remains unsafe unless wrapped by an escaper.
@@ -155,7 +166,7 @@ final class ReflectedXssRule implements RuleInterface
     }
 
     /**
-     * Compute local variables holding unescaped request data before the sink.
+     * Computes the local variables holding unescaped request data before the sink.
      *
      * @param list<Stmt>        $statements - Statements of the owning scope.
      * @param FunctionLike|null $scope - Owning function-like scope, or null for top level.
@@ -174,7 +185,7 @@ final class ReflectedXssRule implements RuleInterface
         $nodeFinder  = new NodeFinder();
         $assignments = $nodeFinder->find(
             $statements,
-            static fn(Node $candidate): bool => $candidate instanceof Expr\Assign
+            static fn(Node $candidate): bool => SecurityNodeHelper::isTaintTrackedAssignment($candidate)
                                                 && $candidate->getStartFilePos() >= 0
                                                 && $candidate->getStartFilePos() < $sinkPosition,
         );
@@ -183,21 +194,36 @@ final class ReflectedXssRule implements RuleInterface
             static fn(Node $left, Node $right): int => $left->getStartFilePos() <=> $right->getStartFilePos(),
         );
 
+        // Replay each write in source order so the alias map at the echo/print reflects what really ran.
         foreach ($assignments as $assignment) {
-            if (!$assignment instanceof Expr\Assign || !$assignment->var instanceof Expr\Variable || !is_string($assignment->var->name)) {
+            // Narrow to the tracked assignment shapes; the finder predicate already matched them.
+            if (!($assignment instanceof Expr\Assign) && !($assignment instanceof Expr\AssignOp\Concat)) {
                 continue;
             }
 
+            $variableName = SecurityNodeHelper::assignmentTargetName($assignment);
+            // Property and array-offset targets are beyond same-scope alias tracking; skip them.
+            if ($variableName === null) {
+                continue;
+            }
+
+            // Writes inside nested closures cannot affect this scope's aliases at the sink.
             if ($this->enclosingFunctionLike($assignment) !== $scope) {
                 continue;
             }
 
+            // Unescaped request data on the right side marks the target as a dangerous alias.
             if ($this->hasUnescapedRequestExpression($assignment->expr, $tainted)) {
-                $tainted[$assignment->var->name] = true;
+                $tainted[$variableName] = true;
                 continue;
             }
 
-            unset($tainted[$assignment->var->name]);
+            // A clean concat append neither taints nor cleans: the alias keeps whatever it held.
+            if ($assignment instanceof Expr\AssignOp\Concat) {
+                continue;
+            }
+
+            unset($tainted[$variableName]);
         }
 
         // The map contains only aliases still tainted immediately before the sink.
@@ -205,7 +231,7 @@ final class ReflectedXssRule implements RuleInterface
     }
 
     /**
-     * Decide whether an assignment right-hand side carries unescaped request data.
+     * Reports whether an assignment right-hand side carries unescaped request data.
      *
      * @param Expr                $expr - Right-hand side expression.
      * @param array<string, true> $tainted - Already-tainted local variable names.
@@ -214,6 +240,7 @@ final class ReflectedXssRule implements RuleInterface
      */
     private function hasUnescapedRequestExpression(Expr $expr, array $tainted): bool
     {
+        // A request superglobal on the right-hand side taints the assigned local directly.
         foreach ($this->superglobalLeaves($expr) as $leaf) {
             if (!$this->isEscapedBetween($leaf, $expr)) {
                 // Direct assignment from a request superglobal taints the local.
@@ -221,6 +248,7 @@ final class ReflectedXssRule implements RuleInterface
             }
         }
 
+        // Reading an already-tainted alias carries its request data forward.
         foreach ($this->variableLeaves($expr) as $variable) {
             if (is_string($variable->name) && isset($tainted[$variable->name]) && !$this->isEscapedBetween($variable, $expr)) {
                 // Taint propagates through aliases until an escaping wrapper is encountered.
@@ -233,7 +261,7 @@ final class ReflectedXssRule implements RuleInterface
     }
 
     /**
-     * Determine whether a leaf is wrapped by an escaper/encoder/cast up to a root.
+     * Reports whether a leaf is wrapped by an escaper/encoder/cast up to a root.
      *
      * @param Node $leaf - Request-source leaf node.
      * @param Node $root - Output expression boundary (inclusive).
@@ -242,6 +270,7 @@ final class ReflectedXssRule implements RuleInterface
      */
     private function isEscapedBetween(Node $leaf, Node $root): bool
     {
+        // Walk outward from the request leaf toward the output boundary.
         $current = $leaf;
         while ($current instanceof Node) {
             if ($current !== $leaf && ($this->isEscaperCall($current) || $this->isNumericCast($current))) {
@@ -249,6 +278,7 @@ final class ReflectedXssRule implements RuleInterface
                 return true;
             }
 
+            // Stop once the walk reaches the output expression itself.
             if ($current === $root) {
                 break;
             }
@@ -262,7 +292,7 @@ final class ReflectedXssRule implements RuleInterface
     }
 
     /**
-     * Detect an escaper/encoder function call.
+     * Reports whether a node is an escaper/encoder function call.
      *
      * @param Node $node - Candidate node.
      *
@@ -282,7 +312,7 @@ final class ReflectedXssRule implements RuleInterface
     }
 
     /**
-     * Detect a numeric/boolean cast that neutralises markup.
+     * Reports whether a node is a numeric/boolean cast that neutralises markup.
      *
      * @param Node $node - Candidate node.
      *
@@ -297,7 +327,7 @@ final class ReflectedXssRule implements RuleInterface
     }
 
     /**
-     * List request-superglobal variable nodes within an expression.
+     * Lists the request-superglobal variable nodes within an expression.
      *
      * @param Node $node - Expression to inspect.
      *
@@ -306,7 +336,9 @@ final class ReflectedXssRule implements RuleInterface
     private function superglobalLeaves(Node $node): array
     {
         $leaves = [];
+        // Keep only the variable leaves that name a request superglobal.
         foreach ($this->variableLeaves($node) as $variable) {
+            // A superglobal-named leaf is a request source we must track.
             if (is_string($variable->name) && in_array($variable->name, SecurityNodeHelper::userInputSuperglobals(), true)) {
                 $leaves[] = $variable;
             }
@@ -317,7 +349,7 @@ final class ReflectedXssRule implements RuleInterface
     }
 
     /**
-     * List variable nodes within an expression.
+     * Lists the variable nodes within an expression.
      *
      * @param Node $node - Expression to inspect.
      *
@@ -326,7 +358,9 @@ final class ReflectedXssRule implements RuleInterface
     private function variableLeaves(Node $node): array
     {
         $variables = [];
+        // Collect every variable node the finder returns beneath this expression.
         foreach ((new NodeFinder())->find($node, static fn(Node $candidate): bool => $candidate instanceof Expr\Variable) as $variable) {
+            // Guard the finder's loose node type before treating it as a variable.
             if ($variable instanceof Expr\Variable) {
                 $variables[] = $variable;
             }
@@ -337,7 +371,7 @@ final class ReflectedXssRule implements RuleInterface
     }
 
     /**
-     * Find the function, method, or closure scope containing a node.
+     * Returns the function, method, or closure scope containing a node.
      *
      * @param Node $node - Node whose containing function-like scope is needed.
      *
@@ -345,6 +379,7 @@ final class ReflectedXssRule implements RuleInterface
      */
     private function enclosingFunctionLike(Node $node): ?FunctionLike
     {
+        // Climb the parent chain looking for the nearest function-like owner.
         $current = $node->getAttribute('parent');
         while ($current instanceof Node) {
             if ($current instanceof FunctionLike) {
@@ -361,7 +396,7 @@ final class ReflectedXssRule implements RuleInterface
     }
 
     /**
-     * Build a reflected-XSS finding for an output sink.
+     * Builds a reflected-XSS finding for an output sink.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit being analysed.
      * @param int          $line - Sink line number.

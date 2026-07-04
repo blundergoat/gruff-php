@@ -14,7 +14,12 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\SourceTextRuleInterface;
 
 /**
- * Detects contextual identifiers that look like protected health information.
+ * Flags a number that looks like a protected-health-information identifier (SSN, NHI, MRN, Medicare, TFN)
+ * when nearby text confirms a health context, so the user can keep real PHI out of source and fixtures.
+ *
+ * A source-text rule with a context gate: a bare number never fires unless its line also names a
+ * health-domain keyword, and documented example/placeholder lines under docs/ are suppressed. The reported
+ * value is redacted. Warning severity, medium confidence - context matching still leaves room for a miss.
  */
 final readonly class PhiPatternRule implements SourceTextRuleInterface
 {
@@ -24,7 +29,7 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
     public const ID = 'sensitive-data.phi-pattern';
 
     /**
-     * List the regex patterns enforced by this rule.
+     * Lists the PHI identifier patterns this rule scans for.
      *
      * @return list<array{name: string, pattern: string}> - one entry per identifier family; name keys the context check and message, pattern is the
      *                          matching regex
@@ -41,7 +46,7 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
     }
 
     /**
-     * Describe the PHI identifier pattern rule.
+     * Describes the PHI-identifier-pattern rule for the registry and reports.
      *
      * @return RuleDefinition - the rule's id, pillar, tier, and default Warning/Medium severity used by the registry
      */
@@ -59,7 +64,7 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
     }
 
     /**
-     * Find health identifier patterns when nearby text gives PHI context.
+     * Reports each PHI-shaped identifier whose line carries health context, redacting the value.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -81,21 +86,27 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
         $findings      = [];
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
 
+        // Run each PHI identifier pattern over the source.
         foreach ($this->patterns() as $definition) {
+            // Match every occurrence of this identifier shape, capturing each offset.
             preg_match_all($definition['pattern'], $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
+            // Weigh each candidate this pattern found.
             foreach ($matches[0] as $match) {
                 [$candidateSecret, $offset] = $match;
+                // A match inside a comment is documentation, not live data.
                 if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
                     continue;
                 }
 
                 $lineNumber = SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset);
                 $line       = $this->lineText($analysisUnit->source, $lineNumber);
+                // Without a health keyword on the same line, the number is probably not PHI.
                 if (!$this->hasPhiContext($line, $definition['name'])) {
                     continue;
                 }
 
+                // Skip lines that flag themselves as examples or documented placeholders.
                 if ($this->isPlaceholderPhiLine($line, $candidateSecret, $analysisUnit->file->displayPath)) {
                     continue;
                 }
@@ -118,7 +129,7 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
     }
 
     /**
-     * Check whether a matched identifier line contains health-data context.
+     * Reports whether a matched identifier's line carries health-data context.
      *
      * @param string $line - Source line that produced the candidate match.
      * @param string $detector - Pattern name (e.g. ssn, mrn) whose own keyword also counts as context.
@@ -141,7 +152,7 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
     }
 
     /**
-     * Suppress PHI-looking identifiers that are obvious examples or placeholders.
+     * Reports whether a PHI-looking match is an obvious example or placeholder that should be suppressed.
      *
      * @param string $line - Source line carrying the match, lower-cased here for keyword checks.
      * @param string $candidateSecret - Matched identifier text; punctuation is stripped before comparison.
@@ -173,7 +184,7 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
     }
 
     /**
-     * Return source text for a 1-based line number.
+     * Returns the source text for a 1-based line number, or empty when out of range.
      *
      * @param string $source - Full unit source to slice by newline.
      * @param int    $lineNumber - 1-based line to read; out-of-range numbers yield an empty string.

@@ -35,7 +35,7 @@ final class PermissiveCorsRule implements RuleInterface
     public const ID = 'security.permissive-cors';
 
     /**
-     * Describe the permissive-CORS rule.
+     * Describes the permissive-CORS rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -54,7 +54,7 @@ final class PermissiveCorsRule implements RuleInterface
     }
 
     /**
-     * Find a wildcard CORS origin paired with credentialed CORS in one file.
+     * Reports a wildcard CORS origin paired with credentialed CORS in the same scope.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -66,12 +66,15 @@ final class PermissiveCorsRule implements RuleInterface
         /** @var array<string, array{wildcardLine: int|null, credentials: bool}> $scopes keyed by scope so separate functions do not combine headers. */
         $scopes = [];
 
+        // Check every function call in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
+            // Only a header() call can carry a CORS directive here.
             if (SecurityNodeHelper::globalFunctionName($call) !== 'header') {
                 continue;
             }
 
             $firstArg = SecurityNodeHelper::argumentValue($call->args, 0);
+            // A non-literal header value is left to the header-injection rule.
             if (!$firstArg instanceof Scalar\String_) {
                 continue;
             }
@@ -80,23 +83,28 @@ final class PermissiveCorsRule implements RuleInterface
             $isWildcard = preg_match('/access-control-allow-origin\s*:\s*\*/i', $firstArg->value) === 1;
             // Match credentialed CORS headers so the paired wildcard origin can be flagged.
             $isCredentials = preg_match('/access-control-allow-credentials\s*:\s*true/i', $firstArg->value) === 1;
+            // Ignore any header that is neither of the two CORS directives.
             if (!$isWildcard && !$isCredentials) {
                 continue;
             }
 
             $scopeKey            = $this->scopeKey($call);
             $scopes[$scopeKey] ??= ['wildcardLine' => null, 'credentials' => false];
+            // Remember the first wildcard-origin line seen in this scope.
             if ($isWildcard && $scopes[$scopeKey]['wildcardLine'] === null) {
                 $scopes[$scopeKey]['wildcardLine'] = $call->getStartLine();
             }
 
+            // Note that this scope also enables credentials.
             if ($isCredentials) {
                 $scopes[$scopeKey]['credentials'] = true;
             }
         }
 
         $findings = [];
+        // Report only a scope that set both unsafe directives.
         foreach ($scopes as $scope) {
+            // A scope missing either half is not the unsafe combination.
             if ($scope['wildcardLine'] === null || !$scope['credentials']) {
                 continue;
             }
@@ -118,7 +126,7 @@ final class PermissiveCorsRule implements RuleInterface
     }
 
     /**
-     * Build a stable grouping key for the enclosing function-like scope.
+     * Builds a stable grouping key for the enclosing function-like scope.
      *
      * @param Node $node - Header call node.
      *
@@ -127,6 +135,7 @@ final class PermissiveCorsRule implements RuleInterface
     private function scopeKey(Node $node): string
     {
         $current = $node->getAttribute('parent');
+        // Walk outward to the nearest enclosing function-like.
         while ($current instanceof Node) {
             if ($current instanceof FunctionLike) {
                 // Function-like identity keeps unrelated local header calls from merging.

@@ -21,11 +21,12 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 
 /**
- * Detects method and function bodies that exceed the configured line threshold.
+ * Flags a method, function, or closure whose logical body runs long, since a callable that spans many
+ * statements is usually doing more than one job and is hard to read top to bottom.
  *
- * Measures logical lines - distinct start lines of non-`Nop` statements inside
- * the callable body. Multi-line constructor calls, fluent builders, and array
- * literals count as one logical line per statement boundary. See ADR-012.
+ * Runs per file over every callable, counting logical lines - distinct start lines of non-`Nop`
+ * statements inside the body - against the threshold (default error above 100). Multi-line constructor
+ * calls, fluent builders, and array literals count as one logical line per statement boundary. See ADR-012.
  */
 final readonly class MethodLengthRule implements RuleInterface
 {
@@ -35,7 +36,7 @@ final readonly class MethodLengthRule implements RuleInterface
     public const ID = 'size.method-length';
 
     /**
-     * Describe the method-length rule.
+     * Describes the method-length rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and thresholds.
      */
@@ -53,7 +54,7 @@ final readonly class MethodLengthRule implements RuleInterface
     }
 
     /**
-     * Find callables whose logical statement line count exceeds thresholds.
+     * Reports each callable whose logical line count runs over the configured budget.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -69,7 +70,9 @@ final readonly class MethodLengthRule implements RuleInterface
 
         $findings = [];
 
+        // Measure each method, function, and closure in the file.
         foreach ($nodes as $node) {
+            // Only real callables are measured.
             if (!$node instanceof ClassMethod && !$node instanceof Function_ && !$node instanceof Closure) {
                 continue;
             }
@@ -77,6 +80,7 @@ final readonly class MethodLengthRule implements RuleInterface
             $startLine = $node->getStartLine();
             $endLine   = $node->getEndLine();
 
+            // Skip a synthetic node with no line span.
             if ($startLine < 0 || $endLine < 0) {
                 continue;
             }
@@ -84,6 +88,7 @@ final readonly class MethodLengthRule implements RuleInterface
             $length         = NodeIndex::logicalStatementLineCount($node);
             $thresholdMatch = $settings->highValueThresholdMatch($length);
 
+            // A callable within budget is fine, so skip it.
             if ($thresholdMatch === null) {
                 continue;
             }
@@ -121,7 +126,7 @@ final readonly class MethodLengthRule implements RuleInterface
     }
 
     /**
-     * Build a display symbol for a callable node.
+     * Builds a display symbol for a callable node (Class::method(), function(), or Closure@line).
      *
      * @param Node $node - Callable node (method, function, or closure) to render as a finding symbol.
      *
@@ -129,6 +134,7 @@ final readonly class MethodLengthRule implements RuleInterface
      */
     private function resolveSymbol(Node $node): string
     {
+        // A method is qualified by its owning type name.
         if ($node instanceof ClassMethod) {
             $parent    = $node->getAttribute('parent');
             $className = $parent instanceof Node\Stmt\Class_
@@ -153,7 +159,7 @@ final readonly class MethodLengthRule implements RuleInterface
     }
 
     /**
-     * Format threshold numbers without unnecessary decimal places.
+     * Formats a threshold number for the message, dropping a whole number's ".0" tail.
      *
      * @param int|float $number - Threshold value to render; whole values are shown without a trailing decimal.
      *
@@ -161,6 +167,7 @@ final readonly class MethodLengthRule implements RuleInterface
      */
     private function formatNumber(int|float $number): string
     {
+        // A genuine fraction keeps its decimals; a whole value is shown without them.
         if (is_float($number) && floor($number) !== $number) {
             return (string) $number;
         }

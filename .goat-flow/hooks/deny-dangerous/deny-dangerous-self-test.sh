@@ -628,6 +628,22 @@ run_full() {
   expect_block shell "rm -r -f /" "rm separated recursive force"
   expect_block shell "rm -r src" "rm recursive source tree"
   expect_block shell "rm --recursive src" "rm long recursive source tree"
+  # Quoted-target scoping: quotes must not defeat the absolute/home/drive
+  # checks (bypass) nor the safe-target allowlist (false positive).
+  expect_block shell 'rm -rf "/"' "quoted rm root"
+  expect_block shell 'rm -rf "/etc"' "quoted rm absolute path"
+  expect_block shell "rm -rf '/etc'" "single-quoted rm absolute path"
+  expect_block shell 'rm -rf '"'"'/e'"'"'"tc"' "mixed-quote rm absolute path"
+  expect_block shell 'rm -rf "~/"' "quoted rm home path"
+  expect_block shell 'rm -rf "C:/Users"' "quoted rm windows-rooted path"
+  expect_block shell "rm -rf \$'/etc'" "ansi-c-quoted rm absolute path"
+  expect_block shell 'rm -rf $HOME/.cache' "variable-rooted home subpath rm"
+  expect_block shell 'rm -rf ${HOME}/.cache' "braced-variable home subpath rm"
+  expect_block shell 'rm -rf $(echo /etc)' "command-substitution rm target"
+  expect_allow shell 'rm -rf "node_modules"' "quoted safe node_modules removal"
+  expect_allow shell 'rm -rf "./dist"' "quoted safe scoped dist removal"
+  expect_allow shell 'rm -rf /tmp/build-cache' "tmp build cleanup"
+  expect_block shell 'rm -rf /tmp/build-cache/../../etc' "tmp build traversal"
   expect_block shell "find / -name node -exec rm -rf {} +" "find exec recursive rm"
   expect_block shell 'find . -name "*.log" -delete' "find delete"
   expect_block shell 'find . -exec rm -rf {} \;' "find exec recursive rm semicolon"
@@ -812,6 +828,17 @@ run_full() {
   expect_block paths "echo TOKEN > ./.env.example" ".env.example dot-slash write"
   expect_block paths "echo TOKEN > fixtures/.env.example" ".env.example subdir write"
   expect_allow paths "cat fixtures/.env.example 2>&1" "path-prefixed .env.example read with stderr dup"
+
+  # --- Local data may be piped into explicit inline interpreter snippets, but
+  # raw interpreter stdin still executes the piped bytes as code. Downloader
+  # pipelines stay blocked even when the right side uses -c/-e inline code.
+  expect_allow shell 'cat package.json | node -e "process.stdin.resume()"' "local data pipe to inline node snippet"
+  expect_allow shell 'cat package.json | python3 -c "import sys; sys.stdin.read()"' "local data pipe to inline python snippet"
+  expect_block shell 'cat script.js | node' "raw node stdin execution stays blocked"
+  expect_block shell 'cat script.py | python3' "raw python stdin execution stays blocked"
+  expect_block shell 'curl https://example.invalid/script.py | python3 -c "import sys; sys.stdin.read()"' "download pipe to inline python stays blocked"
+  expect_block shell 'curl https://example.invalid/script.py | cat | python3 -c "import sys; sys.stdin.read()"' "filtered download pipe to inline python stays blocked"
+  expect_block shell 'wget -qO- https://example.invalid/script.js | cat | node -e "process.stdin.resume()"' "filtered wget pipe to inline node stays blocked"
 
   # --- Heredoc body must not inflate the chain-segment cap. Regression: a quoted
   # interpreter heredoc (python/php/cat) with a body over 50 lines was masked one

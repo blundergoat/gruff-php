@@ -16,7 +16,9 @@ use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Node\Stmt\ClassMethod;
 
 /**
- * Detects TestDox names that are too hard to read as behavior descriptions.
+ * Flags a PHPUnit test method whose name yields too few words to read as a behaviour sentence in testdox
+ * output - `testProcess` renders as "process", which tells a reader nothing about the scenario. Runs over
+ * every non-Pest test method; the minimum-words cap is tunable. Advisory, low confidence.
  */
 final readonly class TestdoxReadabilityRule implements RuleInterface
 {
@@ -26,7 +28,7 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
     public const ID = 'test-quality.testdox-readability';
 
     /**
-     * Describe the TestDox readability rule.
+     * Describes the testdox-readability rule for the registry and reports.
      *
      * @return RuleDefinition - identity, pillar/tier, advisory severity, and the default minWords=2 threshold; enabled by default
      */
@@ -46,7 +48,7 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
     }
 
     /**
-     * Find test names that produce hard-to-read TestDox output.
+     * Reports test names that produce hard-to-read TestDox output.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -59,7 +61,9 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
         $threshold = (int)$ruleContext->settingsFor($this->definition())->numericThreshold('minWords');
         $findings  = [];
 
+        // Weigh every test scope in the file.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
+            // Only a non-Pest method name renders through testdox here.
             if ($scope->isPest || !$scope->node instanceof ClassMethod) {
                 continue;
             }
@@ -67,6 +71,7 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
             $methodName = $scope->name;
             $words      = $this->splitWords($methodName);
 
+            // A name with enough words already reads as a sentence.
             if (count($words) >= $threshold) {
                 continue;
             }
@@ -96,7 +101,7 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
     }
 
     /**
-     * Split testdox text into words for readability checks.
+     * Splits a test method name into TestDox words for the readability check.
      *
      * @param string $methodName - Raw test method name; the `test` prefix is stripped and CamelCase split into words.
      *
@@ -113,12 +118,15 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
     }
 
     /**
+     * Renders the split words as PHPUnit would show them in testdox output.
+     *
      * @param list<string> $words - Words split from the test name, in order; empty when the name reduced to nothing.
      *
      * @return string - the words lower-cased and space-joined to mirror PHPUnit's testdox output; empty string when no words remain
      */
     private function renderTestdox(array $words): string
     {
+        // No words left means an empty testdox line.
         if ($words === []) {
             return '';
         }

@@ -21,7 +21,12 @@ use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Stmt;
 
 /**
- * Detects temporary variables that only hold a value immediately returned by the same block.
+ * Flags a temporary variable that is assigned once and immediately returned by the next line, so the
+ * user can inline it and drop a needless intermediate.
+ *
+ * Runs per file over every callable body, recursing into nested blocks. It fires only when the
+ * assignment and the return are the block's only two statements, and it leaves the variable alone when a
+ * `@var` narrowing docblock makes it load-bearing. Advisory, since assign-then-return is still legible.
  */
 final readonly class RedundantVariableRule implements RuleInterface
 {
@@ -31,7 +36,7 @@ final readonly class RedundantVariableRule implements RuleInterface
     public const ID = 'waste.redundant-variable';
 
     /**
-     * Describe the redundant variable waste rule.
+     * Describes the redundant-variable rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -50,7 +55,7 @@ final readonly class RedundantVariableRule implements RuleInterface
     }
 
     /**
-     * Find temporary variables that are immediately returned.
+     * Reports each assign-then-return pair across every callable body.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -63,6 +68,7 @@ final readonly class RedundantVariableRule implements RuleInterface
         $findings   = [];
         $functions  = NodeIndex::nodesOfAny($analysisUnit, [Stmt\ClassMethod::class, Stmt\Function_::class, Closure::class]);
 
+        // Scan each function, method, and closure body.
         foreach ($functions as $function) {
             /** @var Stmt\ClassMethod|Stmt\Function_|Closure $function Finder predicate restricts results to function-like nodes. */
             $this->checkBlock($function->stmts ?? [], $analysisUnit, $definition, $findings);
@@ -72,7 +78,7 @@ final readonly class RedundantVariableRule implements RuleInterface
     }
 
     /**
-     * Inspect a single statement list, then recurse into the child blocks of each statement.
+     * Checks one block for the assign-then-return pair, then recurses into each statement's child blocks.
      *
      * The pattern is only flagged when the assignment and the return are the block's *only* two
      * statements (count === 2); a variable used more than once first is not redundant. Recursion still
@@ -89,6 +95,7 @@ final readonly class RedundantVariableRule implements RuleInterface
     {
         $statements = array_values($statements);
 
+        // Only a block of exactly two statements can be the assign-then-return shape.
         if (count($statements) === 2) {
             $this->flagRedundantPair(
                 assignment:      $statements[0],
@@ -99,13 +106,14 @@ final readonly class RedundantVariableRule implements RuleInterface
             );
         }
 
+        // Recurse into every statement's nested blocks.
         foreach ($statements as $statement) {
             $this->checkChildBlocks($statement, $analysisUnit, $definition, $findings);
         }
     }
 
     /**
-     * Append a finding when the two given statements are exactly "assign $x" then "return $x".
+     * Records a finding when two statements are exactly "assign $x" then "return $x".
      *
      * Every guard below is a precondition the caller must have satisfied for the pair to qualify; any
      * unmet guard means this is not the redundant shape and the method exits without recording anything.
@@ -166,8 +174,7 @@ final readonly class RedundantVariableRule implements RuleInterface
     }
 
     /**
-     * Re-run the block check on each nested block a statement contains (if/else arms, loop and try
-     * bodies), so the assign-then-return pattern is detected at every depth, not just top level.
+     * Re-runs the block check on each nested block a statement owns, catching the pattern at every depth.
      *
      * @param Stmt           $statement - Statement whose child blocks (via StmtChildVisitor) get scanned.
      * @param AnalysisUnit   $analysisUnit - Unit forwarded unchanged so nested findings carry the same path.
@@ -178,16 +185,18 @@ final readonly class RedundantVariableRule implements RuleInterface
      */
     private function checkChildBlocks(Stmt $statement, AnalysisUnit $analysisUnit, RuleDefinition $definition, array &$findings): void
     {
+        // Check each nested block for the same shape.
         foreach (StmtChildVisitor::childBlocks($statement) as $block) {
             $this->checkBlock($block->statements, $analysisUnit, $definition, $findings);
         }
     }
 
     /**
-     * Detect when a `@var`/`@phpstan-var`/`@psalm-var` docblock on the assignment or
-     * return statement narrows the variable's type. The intermediate variable then
-     * carries a type-system contract that bare return-of-expression would lose, so
-     * the redundant-variable finding must be suppressed for that assign.
+     * Reports whether a `@var`/`@phpstan-var`/`@psalm-var` docblock narrows the variable's type.
+     *
+     * The intermediate variable then carries a type-system contract that a bare
+     * return-of-expression would lose, so the redundant-variable finding must be
+     * suppressed for that assign.
      *
      * @param Stmt   $assignment - Statement holding the assignment expression.
      * @param Stmt   $returnStatement - Following return statement.
@@ -199,6 +208,7 @@ final readonly class RedundantVariableRule implements RuleInterface
     {
         $pattern = '/@(?:var|phpstan-var|psalm-var)\s+\S+\s+\$' . preg_quote($variableName, '/') . '\b/';
 
+        // Check both statements for a narrowing docblock.
         foreach ([$returnStatement, $assignment] as $statement) {
             $docComment = $statement->getDocComment();
             // Match a narrowing PHPDoc tag for the exact temporary variable, not another variable with the same prefix.

@@ -17,7 +17,9 @@ use PhpParser\Node\Expr;
 use PhpParser\Node\Name;
 
 /**
- * Detects tests whose body outweighs the apparent production code under test.
+ * Flags a long test that appears to exercise only a single call into the system under test - a hint that
+ * its bulk is setup and assertions rather than behaviour, so it may be doing too much or testing too little.
+ * A static heuristic (it cannot measure the real SUT); integration harness drivers are exempt. Advisory, low confidence.
  */
 final readonly class TestLongerThanSutRule implements RuleInterface
 {
@@ -27,7 +29,7 @@ final readonly class TestLongerThanSutRule implements RuleInterface
     public const ID = 'test-quality.test-longer-than-sut';
 
     /**
-     * Describe the long-test-versus-SUT rule.
+     * Describes the test-longer-than-SUT rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and thresholds.
      */
@@ -45,7 +47,7 @@ final readonly class TestLongerThanSutRule implements RuleInterface
     }
 
     /**
-     * Find long tests that appear to exercise only one SUT call.
+     * Reports long tests that appear to exercise only one SUT call.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -58,12 +60,15 @@ final readonly class TestLongerThanSutRule implements RuleInterface
         $minTestLines = (int) $ruleContext->settingsFor($definition)->numericThreshold('minTestLines');
         $findings     = [];
 
+        // Weigh every test scope in the file.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             $sutCalls = $this->sutCalls($scope);
+            // Only long tests with a single SUT call and at least one assertion qualify.
             if ($scope->lineCount() < $minTestLines || count($sutCalls) > 1 || TestQualityNodeHelper::assertionCalls($scope) === []) {
                 continue;
             }
 
+            // A lone integration-harness call needs heavy arrangement, so leave it alone.
             if (count($sutCalls) === 1 && $this->isIntegrationHarnessCall($sutCalls[0])) {
                 continue;
             }
@@ -87,7 +92,7 @@ final readonly class TestLongerThanSutRule implements RuleInterface
     }
 
     /**
-     * Count apparent non-assertion SUT calls in a test scope.
+     * Collects the apparent non-assertion SUT calls in a test scope.
      *
      * @param TestQualityScope $scope - Single test method whose call sites are filtered down to candidate SUT calls.
      *
@@ -97,6 +102,7 @@ final readonly class TestLongerThanSutRule implements RuleInterface
     {
         $calls = [];
 
+        // Weigh each call the test makes.
         foreach (TestQualityNodeHelper::calls($scope) as $call) {
             if (TestQualityNodeHelper::isAssertionCall($call) || TestQualityNodeHelper::isMockCreationCall($call) || TestQualityNodeHelper::isMockVerificationCall($call)) {
                 // Assertions and mock plumbing are test scaffolding, never the system under test.
@@ -104,6 +110,7 @@ final readonly class TestLongerThanSutRule implements RuleInterface
             }
 
             $name = TestQualityNodeHelper::callName($call);
+            // Count any real call except sleeps as apparent SUT exercise.
             if ($name !== null && !in_array($name, ['sleep', 'usleep'], true)) {
                 $calls[] = $call;
             }
@@ -113,7 +120,7 @@ final readonly class TestLongerThanSutRule implements RuleInterface
     }
 
     /**
-     * Detect integration-test harness calls that naturally need more arrangement than the SUT call itself.
+     * Reports whether the sole SUT call is an integration-test harness driver.
      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - The sole SUT call, examined to exempt harness drivers.
      *
@@ -142,7 +149,7 @@ final readonly class TestLongerThanSutRule implements RuleInterface
     }
 
     /**
-     * Detect harness-looking receiver variables and direct new expressions.
+     * Reports whether a receiver looks like a test harness (by variable name or inline new).
      *
      * @param Expr         $receiver - Method-call receiver, matched as a named variable or an inline `new`.
      * @param list<string> $variableTokens - Lowercase variable-name fragments accepted as harnesses.
@@ -151,8 +158,10 @@ final readonly class TestLongerThanSutRule implements RuleInterface
      */
     private function isHarnessReceiver(Expr $receiver, array $variableTokens): bool
     {
+        // A named receiver variable may spell out a harness role.
         if ($receiver instanceof Expr\Variable && is_string($receiver->name)) {
             $variableName = strtolower($receiver->name);
+            // Any allowed harness fragment in the name marks it as a driver.
             foreach ($variableTokens as $token) {
                 if (str_contains($variableName, $token)) {
                     // Receiver variable name contains an allowed harness fragment, so treat the call as a driver.
@@ -161,6 +170,7 @@ final readonly class TestLongerThanSutRule implements RuleInterface
             }
         }
 
+        // An inline new of a known tester/process class is also a harness.
         if ($receiver instanceof Expr\New_ && $receiver->class instanceof Name) {
             $className = strtolower($receiver->class->getLast());
 

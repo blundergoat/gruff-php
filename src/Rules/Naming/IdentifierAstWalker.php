@@ -11,13 +11,18 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 
 /**
- * Scope-bounded AST walker used by IdentifierQualityRule. Stops at function-like
- * boundaries (closures, arrow functions, nested methods) so the parent scope's
- * locals do not pick up declarations from inner callables.
+ * Scope-bounded AST walker used by the identifier-quality rule to gather the descendant nodes inside a
+ * single function-like scope. Stops at function-like boundaries (closures, arrow functions, nested methods)
+ * so the parent scope's locals do not pick up declarations from inner callables.
+ *
+ * Keeping scopes separate is what lets the naming rules attribute a badly named variable to the exact method
+ * or closure that declared it, instead of blaming an unrelated outer function.
  */
 final readonly class IdentifierAstWalker
 {
     /**
+     * Collects every descendant across the given roots that satisfies the predicate.
+     *
      * @param list<Node>           $nodes - Roots to traverse.
      * @param callable(Node): bool $predicate - Predicate that selects matching descendants.
      *
@@ -27,6 +32,7 @@ final readonly class IdentifierAstWalker
     {
         $matches = [];
 
+        // Walk each root scope in turn.
         foreach ($nodes as $node) {
             $this->collectMatchingNodes($node, $predicate, $matches);
         }
@@ -35,6 +41,8 @@ final readonly class IdentifierAstWalker
     }
 
     /**
+     * Recursively collects predicate-matching descendants, stopping at any nested scope.
+     *
      * @param Node                 $node - Current node to test; recursion stops at function-like boundaries.
      * @param callable(Node): bool $predicate - Predicate that selects matching descendants.
      * @param list<Node>           $matches - Output list of matching descendant nodes.
@@ -48,17 +56,19 @@ final readonly class IdentifierAstWalker
             return;
         }
 
+        // Keep the node when it matches the caller's predicate.
         if ($predicate($node)) {
             $matches[] = $node;
         }
 
+        // Descend into the node's own children, staying inside this scope.
         foreach ($this->childNodes($node) as $child) {
             $this->collectMatchingNodes($child, $predicate, $matches);
         }
     }
 
     /**
-     * List direct child nodes that can be recursively traversed.
+     * Lists the direct child nodes that can be recursively traversed.
      *
      * @param Node $node - Parent node whose declared sub-node slots are flattened into traversable children.
      *
@@ -68,6 +78,7 @@ final readonly class IdentifierAstWalker
     {
         $children = [];
 
+        // Flatten every sub-node slot the parser exposes for this node.
         foreach ($node->getSubNodeNames() as $name) {
             $this->collectChildNodes($node->{$name}, $children);
         }
@@ -76,7 +87,7 @@ final readonly class IdentifierAstWalker
     }
 
     /**
-     * Append traversable child nodes to the current collection.
+     * Appends the traversable child nodes found in one sub-node slot.
      *
      * @param mixed      $subNode - One sub-node slot value: a Node, an array of them, or a scalar/null that is skipped.
      * @param list<Node> $children - Accumulator mutated in place; discovered child nodes are appended in traversal order.
@@ -97,6 +108,7 @@ final readonly class IdentifierAstWalker
             return;
         }
 
+        // An array slot can hold several children, so recurse into each entry.
         foreach ($subNode as $childSubNode) {
             $this->collectChildNodes($childSubNode, $children);
         }

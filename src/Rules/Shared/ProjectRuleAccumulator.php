@@ -24,14 +24,14 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 interface ProjectRuleAccumulator
 {
     /**
-     * Describe the rule for the registry and reports.
+     * Describes the rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata.
      */
     public function definition(): RuleDefinition;
 
     /**
-     * Reset any accumulated state at the start of a project pass.
+     * Resets any accumulated state at the start of a project pass.
      *
      * @param RuleContext $ruleContext - Rule context carrying config and settings.
      *
@@ -40,7 +40,7 @@ interface ProjectRuleAccumulator
     public function startProject(RuleContext $ruleContext): void;
 
     /**
-     * Extract project-level data from one analysis unit.
+     * Extracts the project-level data this rule needs from one unit, so the unit can then be released.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to accumulate.
      * @param RuleContext  $ruleContext - Rule context carrying config and settings.
@@ -52,7 +52,7 @@ interface ProjectRuleAccumulator
     public function accumulate(AnalysisUnit $analysisUnit, RuleContext $ruleContext): void;
 
     /**
-     * Produce project-level findings from the accumulated state and clear it.
+     * Produces the project-level findings from the accumulated state and clears it.
      *
      * @param RuleContext $ruleContext - Rule context carrying config and settings.
      *

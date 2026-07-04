@@ -16,7 +16,9 @@ use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Node\Expr;
 
 /**
- * Detects tests that assert exception type without checking its details.
+ * Flags a test that calls `expectException()` on a type but never pairs it with a message, code, or object
+ * check - so a different exception of the same class would still pass, and the test barely pins the failure
+ * down. Runs over every test in the file. Advisory, medium confidence - a bare type check is sometimes fine.
  */
 final readonly class ExceptionTypeOnlyRule implements RuleInterface
 {
@@ -41,7 +43,7 @@ final readonly class ExceptionTypeOnlyRule implements RuleInterface
     ];
 
     /**
-     * Describe the exception type-only assertion rule.
+     * Describes the exception-type-only rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -59,7 +61,7 @@ final readonly class ExceptionTypeOnlyRule implements RuleInterface
     }
 
     /**
-     * Find tests that assert only an exception type without message or state.
+     * Reports tests that assert only an exception type without message or state.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -70,30 +72,37 @@ final readonly class ExceptionTypeOnlyRule implements RuleInterface
     {
         $findings = [];
 
+        // Weigh every test scope in the file.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             $typeOnlyCall     = null;
             $hasSupplementary = false;
 
+            // Scan the test's calls for exception expectations.
             foreach (TestQualityNodeHelper::calls($scope) as $call) {
+                // Only method and static calls can be an expectException() family call.
                 if (!$call instanceof Expr\MethodCall && !$call instanceof Expr\StaticCall) {
                     continue;
                 }
 
                 $name = TestQualityNodeHelper::callName($call);
+                // A call with no resolvable name cannot be classified.
                 if ($name === null) {
                     continue;
                 }
 
+                // Remember the first bare type expectation the test makes.
                 if (in_array($name, self::TYPE_ONLY_METHODS, true) && $typeOnlyCall === null) {
                     $typeOnlyCall = $call;
                     continue;
                 }
 
+                // A message/code/object check makes the expectation specific enough.
                 if (in_array($name, self::SUPPLEMENTARY_METHODS, true)) {
                     $hasSupplementary = true;
                 }
             }
 
+            // Flag only a lone type expectation with nothing to narrow it.
             if ($typeOnlyCall === null || $hasSupplementary) {
                 continue;
             }

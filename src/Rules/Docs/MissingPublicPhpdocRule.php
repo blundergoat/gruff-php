@@ -18,7 +18,11 @@ use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Node\Stmt\ClassMethod;
 
 /**
- * Detects method declarations that are missing local PHPDoc.
+ * Flags a method that carries no docblock of its own, so the user documents its intent - the strictest
+ * docs rule (error severity), since an undocumented method is the one a reviewer most has to reverse-engineer.
+ *
+ * Runs per file over every method declaration, reporting each one with no local PHPDoc block. High
+ * confidence. Inherited or trait-provided documentation does not count; the rule wants a local block.
  */
 final readonly class MissingPublicPhpdocRule implements RuleInterface
 {
@@ -28,9 +32,9 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
     public const ID = 'docs.missing-public-phpdoc';
 
     /**
-     * Describe the missing method PHPDoc rule.
+     * Describes the missing-method-PHPDoc rule for the registry and reports.
      *
-     * @return RuleDefinition - Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults (error severity, high confidence).
      */
     public function definition(): RuleDefinition
     {
@@ -45,7 +49,7 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
     }
 
     /**
-     * Find method declarations that do not have a local PHPDoc block.
+     * Reports each method declaration that has no local PHPDoc block.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -57,8 +61,10 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
         $definition = $this->definition();
         $findings   = [];
 
+        // Check every method declared in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, ClassMethod::class) as $classMethod) {
             /** @var ClassMethod $classMethod Finder predicate restricts results to method declarations. */
+            // A method that already carries a docblock is fine.
             if ($classMethod->getDocComment() !== null) {
                 continue;
             }
@@ -70,7 +76,7 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
     }
 
     /**
-     * Build the missing PHPDoc finding for one method.
+     * Builds the missing-PHPDoc finding for one undocumented method.
      *
      * @param AnalysisUnit  $analysisUnit - Parsed unit supplying the display path reported in the finding.
      * @param RuleDefinition $definition - Rule metadata supplying severity, pillar, tier, and confidence.

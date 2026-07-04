@@ -19,7 +19,11 @@ use PhpParser\Node\Stmt\ClassLike;
 use PhpParser\Node\Stmt\Namespace_;
 
 /**
- * Detects files that lack file-level or single-type structural documentation.
+ * Flags a file with no top-of-file docblock and no single documented type to orient a reader, so the user
+ * gives every file a one-line statement of what it is for.
+ *
+ * Runs per file. It is satisfied by either a docblock on the first top-level statement or a lone class-like
+ * that documents itself. Namespaces are unwrapped first. Advisory, medium confidence.
  */
 final readonly class MissingFilePhpdocRule implements RuleInterface
 {
@@ -29,7 +33,7 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
     public const ID = 'docs.missing-file-phpdoc';
 
     /**
-     * Describe the missing file PHPDoc rule.
+     * Describes the missing-file-PHPDoc rule for the registry and reports.
      *
      * @return RuleDefinition - this rule's identity, pillar, tier, and default severity/confidence used by the registry
      */
@@ -46,7 +50,7 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
     }
 
     /**
-     * Find files that lack a file-level docblock or a documented sole class-like declaration.
+     * Reports a file that lacks a file-level docblock or a documented sole class-like declaration.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -81,7 +85,7 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
     }
 
     /**
-     * List top-level statements that count toward file documentation.
+     * Lists the top-level statements that count toward file documentation.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit whose namespaced statements are flattened.
      *
@@ -91,8 +95,11 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
     {
         $effective = [];
 
+        // Flatten each namespace so its inner statements count as top-level.
         foreach ($analysisUnit->statements as $statement) {
+            // A namespace wrapper contributes its own inner statements.
             if ($statement instanceof Namespace_) {
+                // Hoist each statement out of the namespace.
                 foreach ($statement->stmts as $inner) {
                     $effective[] = $inner;
                 }
@@ -106,6 +113,8 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
     }
 
     /**
+     * Reports whether the file declares exactly one class-like that documents itself.
+     *
      * @param list<Node\Stmt> $statements - Effective top-level statements after namespace wrappers are flattened.
      *
      * @return bool - true only when the file declares exactly one class-like and it carries its own docblock; false otherwise
@@ -126,7 +135,7 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
     }
 
     /**
-     * Check whether the first effective statement carries a docblock comment.
+     * Reports whether the first effective statement carries a docblock comment.
      *
      * @param Node\Stmt $statement - First top-level statement whose attached comments are scanned.
      *
@@ -134,6 +143,7 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
      */
     private function hasFirstStatementDoc(Node\Stmt $statement): bool
     {
+        // Scan the statement's attached comments for a docblock.
         foreach ($statement->getComments() as $comment) {
             if ($comment instanceof Doc) {
                 // A structured docblock counts as file-level documentation.
@@ -145,7 +155,7 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
     }
 
     /**
-     * Build finding for the documentation rule.
+     * Builds the finding for a file missing top-level documentation.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit supplying the display path reported in the finding.
      * @param Node\Stmt    $first - First top-level statement, used to record the offending statement kind.
@@ -176,7 +186,7 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
     }
 
     /**
-     * Return a compact statement kind for finding metadata.
+     * Returns a compact statement-kind label for finding metadata.
      *
      * @param Node\Stmt $node - Statement whose class name is reduced to a short kind label.
      *

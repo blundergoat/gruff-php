@@ -27,13 +27,12 @@ use PhpParser\Node\Stmt\Property;
 use PhpParser\Node\UnionType;
 
 /**
- * Detects variable names that encode type suffixes.
+ * Flags a variable, property, or parameter whose name ends in a type suffix - `$nameString`, `$itemsArray`,
+ * `$flagBoolean` - so the user drops the redundant tag when the declared or documented type already says it.
  *
- * M51 uses the name-suffix-plus-narrowed-type contract rather than a
- * declared-type-only contract. A configured trailing type token is reported
- * when the declaration or local PHPDoc type matches the suffix, or when no
- * local type evidence contradicts it. `As<Type>` conversion idioms are exempt
- * so transient casts such as `$nameAsString` remain readable.
+ * A configured trailing token is reported when the declaration or local PHPDoc type matches the suffix, or
+ * when no local type evidence contradicts it. `As<Type>` / `To<Type>` conversion idioms are exempt so a
+ * transient cast such as `$nameAsString` stays readable. Advisory, medium confidence.
  *
  * Overlap deferral order is centralised in RuleRegistry:
  * class-file-mismatch > confusing-name > negative-boolean > boolean-prefix >
@@ -60,7 +59,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
     ];
 
     /**
-     * Describe the suffix-Hungarian rule.
+     * Describes the suffix-Hungarian rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -79,7 +78,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
     }
 
     /**
-     * Find properties, parameters, and locals that encode type suffixes.
+     * Reports properties, parameters, and locals whose names end in a redundant type suffix.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for configured suffixes.
@@ -93,6 +92,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
         $identifierTokenizer = new IdentifierTokenizer();
         $findings            = [];
 
+        // Check every declared property in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, Property::class) as $property) {
             array_push(
                 $findings,
@@ -106,6 +106,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
             );
         }
 
+        // Check parameters and locals across every function-like scope.
         foreach ((new FunctionLikeScopeWalker())->scopes($analysisUnit->statements) as $scope) {
             array_push(
                 $findings,
@@ -123,7 +124,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
     }
 
     /**
-     * Build suffix-Hungarian findings for properties declared in one property statement.
+     * Builds suffix-Hungarian findings for the properties in one property statement.
      *
      * @param RuleDefinition        $definition - Rule metadata used to populate emitted findings.
      * @param AnalysisUnit          $analysisUnit - Parsed unit that owns the property declaration.
@@ -142,6 +143,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
     ): array {
         $findings = [];
 
+        // One declaration can name several properties, so check each in turn.
         foreach ($property->props as $prop) {
             $finding = $this->finding(
                 definition:   $definition,
@@ -153,6 +155,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
                 type:         $property->type,
             );
 
+            // Keep the property only when its name carries a type suffix.
             if ($finding instanceof Finding) {
                 $findings[] = $finding;
             }
@@ -162,7 +165,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
     }
 
     /**
-     * Build suffix-Hungarian findings for parameters and locals inside one callable scope.
+     * Builds suffix-Hungarian findings for the parameters and locals in one callable scope.
      *
      * @param RuleDefinition        $definition - Rule metadata used to populate emitted findings.
      * @param AnalysisUnit          $analysisUnit - Parsed unit that owns the callable scope.
@@ -198,7 +201,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
     }
 
     /**
-     * Build suffix-Hungarian findings for parameters inside one callable scope.
+     * Builds suffix-Hungarian findings for the parameters in one callable scope.
      *
      * @param RuleDefinition        $definition - Rule metadata used to populate emitted findings.
      * @param AnalysisUnit          $analysisUnit - Parsed unit that owns the callable scope.
@@ -218,7 +221,9 @@ final readonly class SuffixHungarianRule implements RuleInterface
         $findings = [];
         $symbol   = $this->symbol($scope);
 
+        // Weigh each declared parameter.
         foreach ($scope->node->params as $param) {
+            // Skip anything without a plain string name.
             if (!$param->var instanceof Variable || !is_string($param->var->name)) {
                 continue;
             }
@@ -233,6 +238,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
                 type:         $param->type,
             );
 
+            // Keep the parameter only when its name carries a type suffix.
             if ($finding instanceof Finding) {
                 $findings[] = $finding;
             }
@@ -242,7 +248,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
     }
 
     /**
-     * Build suffix-Hungarian findings for local variables inside one callable scope.
+     * Builds suffix-Hungarian findings for the local variables in one callable scope.
      *
      * @param RuleDefinition        $definition - Rule metadata used to populate emitted findings.
      * @param AnalysisUnit          $analysisUnit - Parsed unit that owns the callable scope.
@@ -262,8 +268,10 @@ final readonly class SuffixHungarianRule implements RuleInterface
         $findings = [];
         $symbol   = $this->symbol($scope);
 
+        // Weigh each local the scope declares.
         foreach ($scope->localVariables as $name => $variable) {
             $suffixToken = $this->suffixToken($name, $suffixes, $tokenizer);
+            // Skip a name with no type suffix, or one whose local doc type disagrees with it.
             if ($suffixToken === null || !$this->allowsLocalTypeSuffix($variable, $suffixes[$suffixToken])) {
                 continue;
             }
@@ -278,6 +286,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
                 type:         null,
             );
 
+            // Keep the local only when its name carries a type suffix.
             if ($finding instanceof Finding) {
                 $findings[] = $finding;
             }
@@ -287,6 +296,8 @@ final readonly class SuffixHungarianRule implements RuleInterface
     }
 
     /**
+     * Builds a finding for an identifier whose name ends in a type suffix, unless the type contradicts it.
+     *
      * @param RuleDefinition                                         $definition - Rule metadata supplying id, severity, pillar, and confidence for the finding.
      * @param AnalysisUnit                                           $analysisUnit - Parsed unit whose display path anchors the reported finding.
      * @param Node                                                   $node - Declaration node whose start line locates the finding.
@@ -310,11 +321,13 @@ final readonly class SuffixHungarianRule implements RuleInterface
         $name        = $identifier['name'];
         $symbol      = $identifier['symbol'];
         $suffixToken = $this->suffixToken($name, $suffixes, $tokenizer);
+        // No configured suffix at the end of the name, so there is nothing to report.
         if ($suffixToken === null) {
             return null;
         }
 
         $suffix = $suffixes[$suffixToken];
+        // A declared type that disagrees with the suffix means the name is not restating it.
         if ($this->doesTypeContradictSuffix($type, $suffixToken)) {
             return null;
         }
@@ -335,7 +348,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
     }
 
     /**
-     * Check local PHPDoc `@var` evidence when it exists.
+     * Reports whether the local `@var` evidence, if any, leaves the suffix redundant.
      *
      * @param Variable $variable - Local variable node whose nearest `@var` annotation, if any, is consulted.
      * @param string   $suffix - Display suffix the name carries, compared case-insensitively against the doc type.
@@ -350,6 +363,8 @@ final readonly class SuffixHungarianRule implements RuleInterface
     }
 
     /**
+     * Returns the configured suffix token at the end of a name, or null when there is none.
+     *
      * @param string                $name - Identifier (without leading `$`) whose trailing token is examined.
      * @param array<string, string> $suffixes - Map of lower-case suffix token to configured display suffix.
      * @param IdentifierTokenizer   $tokenizer - Splits the name into tokens so the final word can be matched.
@@ -359,6 +374,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
     private function suffixToken(string $name, array $suffixes, IdentifierTokenizer $tokenizer): ?string
     {
         $tokens = $tokenizer->tokenize($name);
+        // A single-word name, or a conversion idiom, carries no type suffix to flag.
         if (count($tokens) < 2 || $this->isConversionIdiom($tokens)) {
             return null;
         }
@@ -369,7 +385,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
     }
 
     /**
-     * Read the nearest local `@var` type attached to a variable assignment.
+     * Reads the nearest local `@var` type attached to a variable assignment.
      *
      * @param Variable $variable - Local variable node; the walk climbs its `parent` chain looking for a `@var` doc.
      *
@@ -379,6 +395,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
     {
         $parent = $variable->getAttribute('parent');
 
+        // Walk outward from the variable looking for an attached doc type.
         while ($parent instanceof Node) {
             $docComment = $parent->getDocComment();
             // Read an adjacent @var type assertion before using it to infer suffix intent.
@@ -386,6 +403,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
                 return $matches[1];
             }
 
+            // Stop at the enclosing statement or function; a doc further out is unrelated to this variable.
             if ($parent instanceof Expression || $parent instanceof ClassMethod || $parent instanceof Function_) {
                 return null;
             }
@@ -397,6 +415,8 @@ final readonly class SuffixHungarianRule implements RuleInterface
     }
 
     /**
+     * Reports whether a declared type exists and does not support the suffix.
+     *
      * @param Node|null $type - Declared type node to test, or null when the declaration omits a type.
      * @param string    $suffix - Lower-case suffix token the name carries (e.g. `string`, `array`).
      *
@@ -404,6 +424,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
      */
     private function doesTypeContradictSuffix(?Node $type, string $suffix): bool
     {
+        // An untyped declaration cannot contradict the suffix.
         if ($type === null) {
             return false;
         }
@@ -414,7 +435,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
     }
 
     /**
-     * Check whether a single-arm PHPDoc type supports the configured suffix.
+     * Reports whether a single-arm PHPDoc type supports the configured suffix.
      *
      * @param string $type - Raw PHPDoc type text from a `@var` tag, possibly nullable or a union.
      * @param string $suffix - Lower-case suffix token to confirm against the type's sole non-null arm.
@@ -429,6 +450,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
             static fn (string $arm): bool => strtolower(trim($arm)) !== 'null',
         ));
 
+        // Only a single non-null arm can be judged against the suffix.
         if (count($arms) !== 1) {
             return false;
         }
@@ -437,7 +459,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
     }
 
     /**
-     * Check whether a native or short type name supports the configured suffix.
+     * Reports whether a native or short type name supports the configured suffix.
      *
      * @param string $typeName - Declared or PHPDoc type name; namespace, generics, and `[]` are stripped first.
      * @param string $suffix - Lower-case suffix token the identifier carries, naming the native type it claims to
@@ -465,7 +487,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
     }
 
     /**
-     * Resolve nullable or simple single-arm types to one type name.
+     * Resolves nullable or simple single-arm types to one type name.
      *
      * @param Node $type - Type-hint node from a declaration: nullable, plain, or union form.
      *
@@ -473,14 +495,17 @@ final readonly class SuffixHungarianRule implements RuleInterface
      */
     private function singleTypeName(Node $type): ?string
     {
+        // Unwrap `?T` down to the inner type.
         if ($type instanceof NullableType) {
             return $this->singleTypeName($type->type);
         }
 
+        // A plain type name is returned as-is.
         if ($type instanceof Identifier || $type instanceof Name) {
             return $type->toString();
         }
 
+        // A union resolves only when it has exactly one non-null arm.
         if ($type instanceof UnionType) {
             $nonNull = array_values(array_filter(
                 $type->types,
@@ -494,7 +519,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
     }
 
     /**
-     * Normalize configured suffixes to case-insensitive lookup keys.
+     * Normalises the configured suffixes to case-insensitive lookup keys.
      *
      * @param list<string> $suffixes - Configured display suffixes as authored in `.gruff-php.yaml`, any casing.
      *
@@ -504,8 +529,10 @@ final readonly class SuffixHungarianRule implements RuleInterface
     {
         $normalised = [];
 
+        // Key each configured suffix by its lowercase token.
         foreach ($suffixes as $suffix) {
             $token = strtolower($suffix);
+            // Skip a blank suffix entry.
             if ($token !== '') {
                 $normalised[$token] = $suffix;
             }
@@ -515,12 +542,15 @@ final readonly class SuffixHungarianRule implements RuleInterface
     }
 
     /**
+     * Reports whether the suffix is part of an explicit `as`/`to` conversion idiom.
+     *
      * @param list<string> $tokens - Lower-case name tokens in source order; the last is the candidate suffix.
      *
      * @return bool - True when the suffix is part of an explicit conversion idiom.
      */
     private function isConversionIdiom(array $tokens): bool
     {
+        // A conversion idiom needs at least a name, a connector, and the type token.
         if (count($tokens) < 3) {
             return false;
         }
@@ -531,7 +561,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
     }
 
     /**
-     * Resolve the human-readable symbol for a function-like scope.
+     * Resolves the human-readable symbol for a function-like scope.
      *
      * @param FunctionLikeScope $scope - Scope being reported; its node and kind name the owning callable.
      *
@@ -539,10 +569,12 @@ final readonly class SuffixHungarianRule implements RuleInterface
      */
     private function symbol(FunctionLikeScope $scope): string
     {
+        // Named callables resolve to their declared symbol.
         if ($scope->node instanceof ClassMethod || $scope->node instanceof Function_) {
             return CyclomaticComplexityRule::resolveSymbol($scope->node);
         }
 
+        // Closures and arrow functions have no name, so fall back to a kind@line label.
         return sprintf('%s@%d', $scope->kind, $scope->node->getStartLine());
     }
 }

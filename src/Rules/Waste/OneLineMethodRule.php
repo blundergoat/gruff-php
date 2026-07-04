@@ -30,7 +30,14 @@ use PhpParser\Node\Stmt\TraitUse;
 use PhpParser\NodeFinder;
 
 /**
- * Detects trivial wrapper methods that only delegate a one-line call.
+ * Flags a trivial wrapper method whose entire body is a single one-line call that only delegates
+ * elsewhere, so the user can inline the indirection - while sparing methods where the thin shape is
+ * deliberate (named constructors, contract methods, intent-bearing public API).
+ *
+ * For each method it confirms the body is exactly one line containing a call, then applies exemptions -
+ * magic/lifecycle names, test scaffolding, low-arg accessors, factory pairs, interface/trait/override
+ * contracts, and allow-listed symbols - before reporting at advisory. Options tune the parameter floor,
+ * in-file caller threshold, and allow list.
  */
 final readonly class OneLineMethodRule implements RuleInterface
 {
@@ -67,9 +74,9 @@ final readonly class OneLineMethodRule implements RuleInterface
     ];
 
     /**
-     * Describe the one-line method rule.
+     * Describes the one-line method rule for the registry and reports.
      *
-     * @return RuleDefinition - Rule metadata, defaults, and options.
+     * @return RuleDefinition - Rule metadata, defaults, and the tuning options a team can override.
      */
     public function definition(): RuleDefinition
     {
@@ -107,12 +114,12 @@ final readonly class OneLineMethodRule implements RuleInterface
     }
 
     /**
-     * Find trivial methods that only wrap a single call expression.
+     * Reports each method whose single-line body only wraps a delegating call.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext - Rule context supplying the team's option overrides.
      *
-     * @return list<Finding> - Findings for one-line wrapper methods.
+     * @return list<Finding> - One finding per trivial one-line wrapper; empty when every method earns its body.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -301,7 +308,7 @@ final readonly class OneLineMethodRule implements RuleInterface
      * Count in-class self-targeted method calls (`$this->name()`, `self::name()`,
      * `static::name()`, `parent::name()`) keyed by enclosing class object id and
      * lowercase method name. Scoping by class prevents two unrelated classes in
-     * the same file from cross-contaminating each other's caller counts — a
+     * the same file from cross-contaminating each other's caller counts - a
      * file with `A::save()` called twice and a separate `B::save()` wrapper
      * with no callers would otherwise see `B::save()` silently exempted under
      * the `minInFileCallers: 2` default.

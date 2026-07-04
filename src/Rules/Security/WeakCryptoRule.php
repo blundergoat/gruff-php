@@ -17,7 +17,11 @@ use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Node\Expr;
 
 /**
- * Detects weak cryptography primitives that should be replaced with modern alternatives.
+ * Flags a call to a weak cryptographic primitive - `md5()`, `sha1()`, or any `mcrypt_*` function - so the
+ * user moves to a modern hashing or encryption API before the value can be forged or reversed.
+ *
+ * Runs per file over global calls to the known-weak function names. Warning, high confidence - the names are
+ * unambiguous, so a match is a near-certain weak-primitive use.
  */
 final class WeakCryptoRule implements RuleInterface
 {
@@ -27,7 +31,7 @@ final class WeakCryptoRule implements RuleInterface
     public const ID = 'security.weak-crypto';
 
     /**
-     * Describe the weak cryptography security rule.
+     * Describes the weak-cryptography rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -45,7 +49,7 @@ final class WeakCryptoRule implements RuleInterface
     }
 
     /**
-     * Find weak hashing and cryptography primitives in source code.
+     * Reports each call to a weak hashing or cryptography primitive.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -56,12 +60,15 @@ final class WeakCryptoRule implements RuleInterface
     {
         $findings = [];
 
+        // Check every function call in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
             $name = SecurityNodeHelper::globalFunctionName($call);
+            // A dynamic or method call has no global name to match.
             if ($name === null) {
                 continue;
             }
 
+            // Only md5, sha1, and the mcrypt_* family are the weak primitives.
             if (!in_array($name, ['md5', 'sha1'], true) && !str_starts_with($name, 'mcrypt_')) {
                 continue;
             }

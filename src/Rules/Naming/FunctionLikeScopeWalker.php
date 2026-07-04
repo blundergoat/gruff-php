@@ -9,14 +9,19 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 use WeakMap;
 /**
- * Discovers isolated function-like scopes for naming rules.
+ * Discovers the isolated function-like scopes in a parsed unit so the naming rules can judge each method,
+ * function, closure, and arrow function on its own.
+ *
+ * Walks the AST depth-first, opening a fresh scope at every function-like boundary and pruning nested
+ * callables from their parent's view, so a variable is only ever attributed to the scope that declares it.
+ * Results are memoised per unit via a WeakMap keyed on the first statement.
  */
 final class FunctionLikeScopeWalker
 {
     /** @var WeakMap<Node, array{count: int, scopes: list<FunctionLikeScope>}>|null */
     private static ?WeakMap $cache = null;
     /**
-     * Build function-like scopes from top-level statements.
+     * Builds the function-like scopes for a parsed unit, memoised per unit.
      *
      * @param list<Node> $statements - Top-level AST nodes for one parsed unit; the first node keys the scope cache.
      *
@@ -24,6 +29,7 @@ final class FunctionLikeScopeWalker
      */
     public function scopes(array $statements): array
     {
+        // An empty unit has no scopes to build.
         if ($statements === []) {
             return [];
         }
@@ -34,6 +40,7 @@ final class FunctionLikeScopeWalker
             return $cached['scopes'];
         }
         $scopes = [];
+        // Discover scopes from each top-level statement.
         foreach ($statements as $statement) {
             $this->discoverScopes($statement, $scopes);
         }
@@ -41,7 +48,7 @@ final class FunctionLikeScopeWalker
         return $scopes;
     }
     /**
-     * Recursively collect function-like scopes, descending only into scope bodies.
+     * Recursively collects function-like scopes, descending only into scope bodies.
      *
      * @param Node                    $node - Current AST node being visited in the depth-first walk.
      * @param list<FunctionLikeScope> $scopes - Accumulator appended to in place as scopes are discovered.
@@ -50,20 +57,23 @@ final class FunctionLikeScopeWalker
      */
     private function discoverScopes(Node $node, array &$scopes): void
     {
+        // A function-like node opens a new scope of its own.
         if ($node instanceof ClassMethod || $node instanceof Function_ || $node instanceof Closure || $node instanceof ArrowFunction) {
             $scopes[] = $this->scopeFor($node);
+            // Walk this scope's body to find any nested scopes.
             foreach ($this->bodyNodes($node) as $child) {
                 $this->discoverScopes($child, $scopes);
             }
             // This node opened a scope and its body is already walked, so stop before re-descending its children.
             return;
         }
+        // Not a scope opener, so keep descending into its children.
         foreach ($this->childNodes($node) as $child) {
             $this->discoverScopes($child, $scopes);
         }
     }
     /**
-     * Build one isolated scope description for a function-like node.
+     * Builds one isolated scope description for a function-like node.
      *
      * @param ClassMethod|Function_|Closure|ArrowFunction $node - Function-like node whose own scope is described.
      *
@@ -84,7 +94,7 @@ final class FunctionLikeScopeWalker
         );
     }
     /**
-     * Return parameter names keyed for fast exclusion checks.
+     * Returns the parameter names keyed for fast exclusion checks.
      *
      * @param ClassMethod|Function_|Closure|ArrowFunction $node - Node whose declared parameters are collected.
      *
@@ -93,7 +103,9 @@ final class FunctionLikeScopeWalker
     private function parameterNames(ClassMethod|Function_|Closure|ArrowFunction $node): array
     {
         $names = [];
+        // Collect each declared parameter name.
         foreach ($node->params as $param) {
+            // Only a plainly named parameter can be excluded by name later.
             if ($param->var instanceof Variable && is_string($param->var->name)) {
                 $names[$param->var->name] = true;
             }
@@ -101,6 +113,8 @@ final class FunctionLikeScopeWalker
         return $names;
     }
     /**
+     * Collects the first occurrence of each genuinely local variable in the body.
+     *
      * @param list<Node>                                  $bodyDescendants - Descendant nodes in this scope body.
      * @param array<string, true>                         $parameterNames - Names to skip; parameters are not locals.
      * @param ClassMethod|Function_|Closure|ArrowFunction $node - Owning node; its `use` captures are skipped.
@@ -111,14 +125,19 @@ final class FunctionLikeScopeWalker
     {
         $variables = [];
         $excluded  = $parameterNames;
+        // A closure's use() captures come from the parent scope, so they are not locals here.
         if ($node instanceof Closure) {
+            // Exclude each captured variable by name.
             foreach ($node->uses as $use) {
+                // A dynamically named capture has no name to exclude.
                 if (is_string($use->var->name)) {
                     $excluded[$use->var->name] = true;
                 }
             }
         }
+        // Record the first sighting of each genuine local.
         foreach ($bodyDescendants as $child) {
+            // Keep plainly named variables that are neither a parameter nor a capture.
             if ($child instanceof Variable && is_string($child->name) && !isset($excluded[$child->name])) {
                 $variables[$child->name] ??= $child;
             }
@@ -127,7 +146,7 @@ final class FunctionLikeScopeWalker
     }
 
     /**
-     * List all descendant nodes inside a function-like body.
+     * Lists all descendant nodes inside a function-like body.
      *
      * @param ClassMethod|Function_|Closure|ArrowFunction $node - Node whose body subtree is flattened.
      *
@@ -137,6 +156,7 @@ final class FunctionLikeScopeWalker
     {
         $descendants = [];
 
+        // Flatten each direct body node into the descendant list.
         foreach ($this->bodyNodes($node) as $child) {
             $this->collectBodyDescendants($child, $descendants);
         }
@@ -145,7 +165,7 @@ final class FunctionLikeScopeWalker
     }
 
     /**
-     * Append descendant nodes from a function-like body.
+     * Appends the in-scope descendant nodes from a function-like body.
      *
      * @param Node       $node - Current node in the body walk.
      * @param list<Node> $descendants - Accumulator appended to in place with the in-scope nodes.
@@ -161,12 +181,13 @@ final class FunctionLikeScopeWalker
 
         $descendants[] = $node;
 
+        // Descend into the node's children, staying inside this scope.
         foreach ($this->childNodes($node) as $child) {
             $this->collectBodyDescendants($child, $descendants);
         }
     }
     /**
-     * Return immediate body nodes for any supported function-like node.
+     * Returns the immediate body nodes for any supported function-like node.
      *
      * @param ClassMethod|Function_|Closure|ArrowFunction $node - Node whose direct body nodes are returned.
      *
@@ -182,7 +203,7 @@ final class FunctionLikeScopeWalker
         return array_values($node->stmts ?? []);
     }
     /**
-     * Name the function-like node shape for synthetic symbols.
+     * Names the function-like node shape for synthetic symbols.
      *
      * @param ClassMethod|Function_|Closure|ArrowFunction $node - Node whose kind label is derived.
      *
@@ -199,7 +220,7 @@ final class FunctionLikeScopeWalker
         };
     }
     /**
-     * Return direct child nodes for recursive body traversal.
+     * Returns the direct child nodes for recursive body traversal.
      *
      * @param Node $node - Parent node whose sub-node slots are scanned for child nodes.
      *
@@ -208,13 +229,14 @@ final class FunctionLikeScopeWalker
     private function childNodes(Node $node): array
     {
         $children = [];
+        // Flatten every sub-node slot the parser exposes for this node.
         foreach ($node->getSubNodeNames() as $name) {
             $this->collectChildNodes($node->{$name}, $children);
         }
         return $children;
     }
     /**
-     * Append traversable child nodes to the current collection.
+     * Appends the traversable child nodes found in one sub-node slot.
      *
      * @param mixed      $subNode - A single sub-node slot value: a Node, an array of them, or a scalar to ignore.
      * @param list<Node> $children - Accumulator appended to in place with any Node found in the slot.
@@ -232,6 +254,7 @@ final class FunctionLikeScopeWalker
             // Scalars such as names, flags, and null carry no child nodes, so there is nothing to collect.
             return;
         }
+        // An array slot can hold several children, so recurse into each entry.
         foreach ($subNode as $childSubNode) {
             $this->collectChildNodes($childSubNode, $children);
         }

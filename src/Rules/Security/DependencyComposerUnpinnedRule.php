@@ -15,7 +15,11 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\SourceTextRuleInterface;
 
 /**
- * Flags unpinned Composer version constraints that allow non-reproducible upgrades.
+ * Flags an unpinned Composer dependency constraint - `*`, a `dev-` branch, or an open `>=` with no upper
+ * bound - so the user pins it before an unattended `composer update` pulls unvetted or breaking code.
+ *
+ * Scans `composer.json` as text over the require and require-dev sections. Warning, medium confidence - an
+ * unbounded constraint is a reproducibility smell to review, not a proven risk.
  */
 final class DependencyComposerUnpinnedRule implements SourceTextRuleInterface
 {
@@ -32,7 +36,7 @@ final class DependencyComposerUnpinnedRule implements SourceTextRuleInterface
     private const REQUIRE_SECTIONS = ['require', 'require-dev'];
 
     /**
-     * Describe the unpinned Composer constraint rule.
+     * Describes the unpinned-Composer-constraint rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -50,7 +54,7 @@ final class DependencyComposerUnpinnedRule implements SourceTextRuleInterface
     }
 
     /**
-     * Find `require`/`require-dev` constraints that are unbounded or wildcarded.
+     * Reports each unpinned `require`/`require-dev` constraint.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -71,12 +75,16 @@ final class DependencyComposerUnpinnedRule implements SourceTextRuleInterface
         }
 
         $findings = [];
+        // Check both the require and require-dev sections.
         foreach (self::REQUIRE_SECTIONS as $section) {
+            // Skip a section the manifest does not declare.
             if (!isset($manifest[$section]) || !is_array($manifest[$section])) {
                 continue;
             }
 
+            // Weigh each package constraint in the section.
             foreach ($manifest[$section] as $package => $constraint) {
+                // Only a string package with an unpinned constraint is flagged.
                 if (!is_string($package) || !is_string($constraint) || !$this->isUnpinned($constraint)) {
                     continue;
                 }
@@ -103,7 +111,7 @@ final class DependencyComposerUnpinnedRule implements SourceTextRuleInterface
     }
 
     /**
-     * Decide whether a version constraint is unpinned (wildcard, branch, or unbounded).
+     * Reports whether a version constraint is unpinned (wildcard, branch, or unbounded).
      *
      * @param string $constraint - Raw Composer version constraint.
      *
@@ -113,7 +121,9 @@ final class DependencyComposerUnpinnedRule implements SourceTextRuleInterface
     {
         $normalized = strtolower(trim($constraint));
 
+        // A constraint can be an OR of alternatives; check each one.
         foreach (preg_split('/\s*\|\|?\s*/', $normalized) ?: [$normalized] as $alternative) {
+            // One unpinned alternative makes the whole constraint unpinned.
             if ($this->isUnpinnedAlternative($alternative)) {
                 return true;
             }
@@ -123,7 +133,7 @@ final class DependencyComposerUnpinnedRule implements SourceTextRuleInterface
     }
 
     /**
-     * Decide whether a single Composer constraint alternative is unpinned.
+     * Reports whether a single Composer constraint alternative is unpinned.
      *
      * @param string $constraint - One OR-separated Composer version alternative.
      *
@@ -138,6 +148,7 @@ final class DependencyComposerUnpinnedRule implements SourceTextRuleInterface
             return true;
         }
 
+        // Any embedded wildcard accepts a whole range of versions.
         if (str_contains($normalized, '*')) {
             return true;
         }

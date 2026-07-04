@@ -14,7 +14,12 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\SourceTextRuleInterface;
 
 /**
- * Detects string literals shaped like AWS access keys.
+ * Flags a string shaped like an AWS access key ID (`AKIA...`/`ASIA...` plus 16 chars), so the user can pull
+ * a committed credential out of source and rotate it.
+ *
+ * A source-text rule: it scans the raw file, skipping matches inside comments and obvious dummy values, and
+ * redacts the reported value. Warning severity, high confidence - the AKIA/ASIA prefix with a fixed body is
+ * a near-unique AWS shape.
  */
 final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
 {
@@ -24,9 +29,9 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
     public const ID = 'sensitive-data.aws-access-key';
 
     /**
-     * Describe the AWS access key sensitive-data rule.
+     * Describes the AWS-access-key sensitive-data rule for the registry and reports.
      *
-     * @return RuleDefinition - Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults (warning severity, high confidence).
      */
     public function definition(): RuleDefinition
     {
@@ -42,7 +47,7 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
     }
 
     /**
-     * Find string literals that resemble AWS access key IDs.
+     * Reports each string that resembles a live AWS access key ID, redacting the value.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -56,16 +61,20 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
             return [];
         }
 
+        // Match every AWS access-key-id shape, capturing each one's byte offset.
         preg_match_all('/\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/', $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
         $findings      = [];
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
+        // Weigh each candidate the scan found.
         foreach ($matches[0] as $match) {
             [$candidateSecret, $offset] = $match;
+            // A match inside a comment is documentation or an example, not a live secret.
             if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
                 continue;
             }
 
+            // An obvious placeholder or dummy value is not a real credential.
             if (SecretScannerHelper::isLikelyDummyValue($candidateSecret)) {
                 continue;
             }

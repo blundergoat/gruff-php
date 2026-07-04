@@ -12,7 +12,12 @@ use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
 
 /**
- * Provides shared string and finding helpers for sensitive-data scanners.
+ * Shared string and finding helpers the sensitive-data scanners lean on - comment-range lookup,
+ * offset-to-line conversion, value redaction, dummy/placeholder detection, path classification, Shannon
+ * entropy, and a common finding builder.
+ *
+ * Centralising these keeps every secret scanner redacting, skipping comments, and scoring entropy the same
+ * way. Pure static utility; the only state is a per-unit comment-range cache keyed by display path.
  */
 final class SecretScannerHelper
 {
@@ -24,7 +29,7 @@ final class SecretScannerHelper
     private static array $commentRangeCache = [];
 
     /**
-     * List key-name fragments that mark literals as secret-like.
+     * Lists the key-name fragments every scanner treats as secret context.
      *
      * @return list<string> - upper-cased key-name fragments shared by every scanner as secret context
      */
@@ -35,7 +40,7 @@ final class SecretScannerHelper
     }
 
     /**
-     * Build the list of comment byte ranges for an analysis unit so pattern rules can skip in-comment matches.
+     * Builds (and memoises) the comment byte ranges of a unit so scanners can skip in-comment matches.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit whose tokens describe comment spans.
      *
@@ -52,7 +57,9 @@ final class SecretScannerHelper
 
         $ranges = [];
 
+        // Record the byte span of every comment token in the unit.
         foreach ($analysisUnit->tokens as $token) {
+            // Both line comments and doc comments count as comment spans.
             if ($token->id === T_COMMENT || $token->id === T_DOC_COMMENT) {
                 $ranges[] = [$token->pos, $token->getEndPos()];
             }
@@ -65,7 +72,7 @@ final class SecretScannerHelper
     }
 
     /**
-     * Check whether a source-text byte offset falls inside one of the given comment ranges.
+     * Reports whether a source-text byte offset falls inside one of the given comment ranges.
      *
      * @param int                      $offset - Zero-based byte offset of a pattern match.
      * @param list<array{0:int,1:int}> $ranges - Comment ranges produced by commentRanges().
@@ -74,6 +81,7 @@ final class SecretScannerHelper
      */
     public static function isInsideComment(int $offset, array $ranges): bool
     {
+        // Test the offset against each comment span.
         foreach ($ranges as [$start, $end]) {
             if ($offset >= $start && $offset < $end) {
                 // Half-open interval: the match starts inside this comment span, so the caller must skip it.
@@ -86,7 +94,7 @@ final class SecretScannerHelper
     }
 
     /**
-     * Compute the 1-based line number for a byte offset within a source string.
+     * Converts a byte offset into its 1-based source line number.
      *
      * @param string $source - Source text being scanned.
      * @param int    $offset - Zero-based byte offset inside the source text.
@@ -100,7 +108,7 @@ final class SecretScannerHelper
     }
 
     /**
-     * Build a redacted preview of a sensitive value (first 4 + last 4 chars for values longer than 8 chars).
+     * Builds a redacted preview of a secret value (length only, or first 4 + last 4 chars over 8 chars).
      *
      * @param string $secretValue - Sensitive value to redact for reporting.
      *
@@ -119,7 +127,7 @@ final class SecretScannerHelper
     }
 
     /**
-     * Build a `KEY=<redacted:N chars>` string for env-style secret findings.
+     * Builds a `KEY=<redacted:N chars>` string for env-style secret findings.
      *
      * @param string $key - Environment-style key name.
      * @param string $secretValue - Sensitive value associated with the key.
@@ -133,7 +141,7 @@ final class SecretScannerHelper
     }
 
     /**
-     * Detect whether the value looks like a placeholder rather than a real secret (changeme / dummy / example / etc.).
+     * Reports whether a value looks like a placeholder rather than a real secret (changeme / dummy / etc.).
      *
      * @param string $secretValue - Candidate sensitive value.
      *
@@ -147,6 +155,7 @@ final class SecretScannerHelper
             return true;
         }
 
+        // Check the value for any known placeholder word.
         foreach (['changeme', 'dummy', 'example', 'fake', 'placeholder', 'redacted', 'sample', 'test'] as $marker) {
             if (str_contains($normalized, $marker)) {
                 // A known placeholder word anywhere in the value marks it as documentation, not a live credential.
@@ -159,7 +168,7 @@ final class SecretScannerHelper
     }
 
     /**
-     * Detect whether the file's basename is `.env` or `.env.*`.
+     * Reports whether the file's basename is `.env` or a `.env.*` variant.
      *
      * @param string $displayPath - Project-relative path being scanned.
      *
@@ -174,7 +183,7 @@ final class SecretScannerHelper
     }
 
     /**
-     * Detect whether the path lives under a test or fixtures directory (test, tests, fixture, fixtures).
+     * Reports whether the path lives under a test or fixtures directory (test, tests, fixture, fixtures).
      *
      * @param string $displayPath - Project-relative path being scanned.
      *
@@ -191,7 +200,7 @@ final class SecretScannerHelper
     }
 
     /**
-     * Detect whether the line contains an upper-cased secret-context fragment (API_KEY, PASSWORD, etc.).
+     * Reports whether a line names an upper-cased secret-context fragment (API_KEY, PASSWORD, etc.).
      *
      * @param string $line - Source line being scanned.
      *
@@ -201,6 +210,7 @@ final class SecretScannerHelper
     {
         $upperLine = strtoupper($line);
 
+        // Check the line for any secret-context fragment.
         foreach (self::sensitiveKeyFragments() as $fragment) {
             if (str_contains($upperLine, $fragment)) {
                 // A secret-context fragment on the line raises confidence that a nearby literal is a credential.
@@ -213,7 +223,7 @@ final class SecretScannerHelper
     }
 
     /**
-     * Compute the Shannon entropy of a string in bits-per-character.
+     * Computes the Shannon entropy of a string in bits per character.
      *
      * @param string $secretValue - Candidate secret value.
      *
@@ -231,6 +241,7 @@ final class SecretScannerHelper
         $counts  = count_chars($secretValue, 1);
         $entropy = 0.0;
 
+        // Sum each character's contribution to the total entropy.
         foreach ($counts as $count) {
             $probability = $count / $length;
             $entropy     -= $probability * log($probability, 2);
@@ -240,7 +251,7 @@ final class SecretScannerHelper
     }
 
     /**
-     * Build a sensitive-data Finding with redacted preview / detector metadata.
+     * Builds a sensitive-data finding with a redacted preview and detector metadata.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit that owns the finding.
      * @param string       $ruleId - Sensitive-data rule identifier.

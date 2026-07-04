@@ -10,21 +10,30 @@ use GruffPhp\Results\Finding\Pillar;
 use GruffPhp\Support\PathHelper;
 
 /**
- * Stateless path- and finding-normalisation helpers shared by the analyse command and branch-review builder.
+ * Stateless helpers that tidy findings and paths after a scan, before the user ever sees them.
+ *
+ * The `analyse` command and the branch-review builder lean on this to suppress secret findings the
+ * user has already vetted in config, narrow results to the files a changed-only or branch review
+ * actually touched, and rewrite long absolute paths into the short project-relative form shown in
+ * reports. It also canonicalises the paths a user types on the command line so they match cleanly.
+ * Every method is side-effect free (it never mutates its inputs), though some consult the filesystem
+ * (realpath, file existence) so a path that moves on disk between runs can change the tidied result.
  */
 final readonly class AnalysisFindingSupport
 {
     /**
-     * Drop sensitive-data findings whose preview is on the config allowlist.
+     * Removes secret-like findings the user has already vetted, so an allowlisted value in their
+     * config stops resurfacing as noise on every scan.
      *
      * @param list<Finding> $findings - Findings produced for the run.
-     * @param AnalysisConfig $config - Effective config supplying the secret-preview allowlist.
+     * @param AnalysisConfig $config - Effective config supplying the secret-preview allowlist; an empty allowlist suppresses nothing.
      *
-     * @return list<Finding> - Findings with allowlisted secret previews removed.
+     * @return list<Finding> - Findings with allowlisted secret previews removed; unchanged when the allowlist is empty.
      */
     public function filterAllowedSecretPreviews(array $findings, AnalysisConfig $config): array
     {
         $allowedPreviews = $config->allowedSecretPreviews();
+        // With no previews allowlisted there is nothing to hide, so hand back every finding untouched.
         if ($allowedPreviews === []) {
             return $findings;
         }
@@ -43,17 +52,18 @@ final readonly class AnalysisFindingSupport
     }
 
     /**
-     * Keep only findings whose file is in the changed-files set.
+     * Narrows findings to the files the user actually touched, so a changed-only or branch review
+     * reports on this diff instead of the whole project.
      *
      * @param list<Finding> $findings - Findings to filter.
-     * @param list<string>  $changedFiles - Project-relative paths considered changed.
+     * @param list<string>  $changedFiles - Project-relative paths considered changed; an empty set means nothing changed and drops every finding.
      *
-     * @return list<Finding> - Findings located in a changed file.
+     * @return list<Finding> - Findings located in a changed file; empty when no files changed.
      */
     public function filterFindingsToChangedFiles(array $findings, array $changedFiles): array
     {
+        // An empty changed set means nothing changed, so no finding qualifies - an intentional drop-all, not a bug.
         if ($changedFiles === []) {
-            // An empty changed set means nothing changed, so no finding qualifies; this is an intentional drop-all.
             return [];
         }
 
@@ -66,25 +76,27 @@ final readonly class AnalysisFindingSupport
     }
 
     /**
-     * Keep project-rule findings inside the files requested by this invocation.
+     * Scopes whole-project rule findings to the files the user asked about, so analysing a single
+     * path does not surface project-wide issues from files that were never requested.
      *
      * @param list<Finding> $findings - Findings to filter.
-     * @param list<string>  $projectRuleIds - Rule ids whose output came from project-wide context.
+     * @param list<string>  $projectRuleIds - Rule ids whose output came from project-wide context; empty means no rule needs scoping and every finding is kept.
      * @param list<string>  $filePaths - Project-relative display paths in the requested source set; an empty set drops every project-rule finding.
      *
      * @return list<Finding> - Findings with out-of-scope project-rule rows removed.
      */
     public function filterProjectRuleFindingsToFiles(array $findings, array $projectRuleIds, array $filePaths): array
     {
+        // No rule ids were flagged as project-scoped for this call, so there is nothing to scope and every finding stays as-is.
         if ($projectRuleIds === []) {
             return $findings;
         }
 
         $projectRules = array_fill_keys($projectRuleIds, true);
 
+        // The user named files but discovery found none on disk, so nothing is in scope; drop every
+        // project-rule finding rather than leaking whole-project context this run never actually loaded.
         if ($filePaths === []) {
-            // The invocation requested files but discovered none, so nothing is in scope. Drop every
-            // project-rule finding rather than leaking the whole-project context this run never loaded.
             return array_values(array_filter(
                 $findings,
                 static fn(Finding $finding): bool => !isset($projectRules[$finding->ruleId]),
@@ -101,20 +113,23 @@ final readonly class AnalysisFindingSupport
     }
 
     /**
-     * Rewrite absolute finding paths to be relative to the requested base directory.
+     * Shortens absolute file paths into the base-relative form shown in reports, so the user reads
+     * `src/Foo.php` rather than a long machine-specific absolute path.
      *
      * @param list<Finding> $findings - Findings whose paths may need normalising.
-     * @param string|null   $pathsRelativeTo - Base directory for relative paths, or null to leave paths untouched.
+     * @param string|null   $pathsRelativeTo - Base directory for relative paths; null leaves every path exactly as the run produced it.
      *
      * @return list<Finding> - Findings with absolute paths rebased under the directory when it resolves.
      */
     public function normalizeFindingPaths(array $findings, ?string $pathsRelativeTo): array
     {
+        // No base directory was requested, so leave every path exactly as the run reported it.
         if ($pathsRelativeTo === null) {
             return $findings;
         }
 
         $realRoot = realpath($pathsRelativeTo);
+        // The base directory does not resolve on disk, so there is nothing to rebase against; hand paths back untouched.
         if ($realRoot === false) {
             return $findings;
         }
@@ -122,8 +137,10 @@ final readonly class AnalysisFindingSupport
         $root       = rtrim(PathHelper::normalizeSeparators($realRoot), '/');
         $normalized = [];
 
+        // Walk each finding, shortening absolute paths that sit under the project root so displayed locations stay readable; ones outside it are left untouched.
         foreach ($findings as $finding) {
             $path = PathHelper::normalizeSeparators($finding->filePath);
+            // Already relative, so it is display-ready; keep it as-is and move on to the next finding.
             if (!PathHelper::isAbsolute($path)) {
                 $normalized[] = $finding;
                 continue;
@@ -152,26 +169,31 @@ final readonly class AnalysisFindingSupport
     }
 
     /**
-     * Normalise user-supplied path arguments to project-relative paths sorted for stable matching.
+     * Canonicalises the paths a user typed on the command line - absolute, `./`-prefixed, or
+     * trailing-slash forms - into tidy project-relative paths that later matching can rely on.
      *
      * @param string       $projectRoot - Project root requested paths resolve against.
-     * @param list<string> $paths - User-supplied path arguments.
+     * @param list<string> $paths - User-supplied path arguments; blank or outside-root entries are dropped, so the result may be empty.
      *
-     * @return list<string> - Project-relative paths sorted for stable matching.
+     * @return list<string> - Project-relative paths sorted for stable matching; empty when nothing usable was given.
      */
     public function normaliseRequestedPaths(string $projectRoot, array $paths): array
     {
         $root       = rtrim(PathHelper::canonical($projectRoot), '/');
         $normalised = [];
 
+        // Clean each argument the user passed, one at a time, into a comparable project-relative form.
         foreach ($paths as $path) {
             $candidate = PathHelper::normalizeSeparators($path);
+            // The argument was blank once separators were normalised, so there is nothing to match; skip it.
             if ($candidate === '') {
                 continue;
             }
 
+            // An absolute path (say the user pasted `/home/me/proj/src`) must be pulled back inside the project first.
             if (PathHelper::isAbsolute($candidate)) {
                 $candidate = rtrim(PathHelper::canonical($candidate), '/');
+                // Rebase against the root: the root itself becomes `.`, a path under it becomes its relative tail, and anything outside the project is dropped.
                 if ($candidate === $root) {
                     $candidate = '.';
                 } elseif (str_starts_with($candidate, $root . '/')) {
@@ -181,6 +203,7 @@ final readonly class AnalysisFindingSupport
                 }
             }
 
+            // Strip any leading `./` segments so `./src` and `src` collapse to the same entry.
             while (str_starts_with($candidate, './')) {
                 $candidate = substr($candidate, 2);
             }
@@ -196,10 +219,11 @@ final readonly class AnalysisFindingSupport
     }
 
     /**
-     * Report whether a changed file is inside the requested path set.
+     * Decides whether a changed file falls within what the user asked to review, so a branch review
+     * scoped to `src/` ignores a change made anywhere else.
      *
      * @param string       $changedFile - Project-relative changed file path.
-     * @param list<string> $requestedPaths - Normalised requested paths to match against.
+     * @param list<string> $requestedPaths - Normalised requested paths to match against; an empty set matches nothing.
      *
      * @return bool - True when the changed file is inside the requested path set.
      */
@@ -207,15 +231,16 @@ final readonly class AnalysisFindingSupport
     {
         $changedFile = PathHelper::normalizeSeparators($changedFile);
 
+        // Check the file against each requested path, stopping at the first one that covers it.
         foreach ($requestedPaths as $requestedPath) {
+            // A `.` request means the whole project, so any changed file counts as in scope.
             if ($requestedPath === '.') {
-                // '.' means the whole project was requested, so every changed file is in scope.
                 return true;
             }
 
+            // A requested path covers itself and everything beneath it; the trailing `/` is the boundary that
+            // stops a request for `src/Foo` also matching the sibling file `src/FooBar.php`.
             if ($changedFile === $requestedPath || str_starts_with($changedFile, $requestedPath . '/')) {
-                // A requested path scopes itself and everything under it as a directory; the trailing '/' is the
-                // boundary that stops a request for 'src/Foo' matching the sibling file 'src/FooBar.php'.
                 return true;
             }
         }
@@ -224,18 +249,21 @@ final readonly class AnalysisFindingSupport
     }
 
     /**
-     * Keep the changed paths that exist on disk under the project root.
+     * Filters a diff's paths down to the ones still present on disk, so a file the user deleted in
+     * this change is not handed to source discovery as something to scan.
      *
      * @param string       $projectRoot - Project root the changed paths resolve against.
      * @param list<string> $changedFiles - Project-relative paths from a diff.
      *
-     * @return list<string> - Existing paths that can be passed to source discovery.
+     * @return list<string> - Existing paths that can be passed to source discovery; empty when none survive.
      */
     public function existingChangedFiles(string $projectRoot, array $changedFiles): array
     {
         $existing = [];
 
+        // Test each changed path against the working tree, keeping only those that are really there.
         foreach ($changedFiles as $changedFile) {
+            // Present on disk, so it is safe to scan; a path the user deleted in this change is simply left out.
             if (file_exists(PathHelper::resolveAgainst($projectRoot, $changedFile))) {
                 $existing[] = $changedFile;
             }
@@ -247,25 +275,30 @@ final readonly class AnalysisFindingSupport
     }
 
     /**
-     * Keep requested paths that exist in the base snapshot.
+     * Filters requested paths to those present in the branch review's base snapshot, so the "before"
+     * side of the diff only looks where the checked-out base actually has files.
      *
      * @param string       $baseRoot - Base-snapshot root the paths resolve against.
-     * @param list<string> $paths - Requested project-relative paths.
+     * @param list<string> $paths - Requested project-relative paths; an empty list is treated as the whole project (`.`).
      *
-     * @return list<string> - Paths that exist in the base snapshot.
+     * @return list<string> - Paths that exist in the base snapshot; empty when none are present there.
      */
     public function existingSnapshotPaths(string $baseRoot, array $paths): array
     {
+        // No explicit paths means the user is reviewing everything, so fall back to the whole project.
         $requested = $paths === [] ? ['.'] : $paths;
         $existing  = [];
 
+        // Resolve each requested path against the base snapshot and keep the ones that exist there.
         foreach ($requested as $path) {
             $absolute = PathHelper::resolveAgainst($baseRoot, $path);
+            // Present in the base, so it can anchor the before/after comparison; a path new in this branch is skipped.
             if (file_exists($absolute)) {
                 $existing[] = PathHelper::relativeToRoot($absolute, $baseRoot) ?? $path;
             }
         }
 
+        // Hand back what survived, or an empty set when nothing in the request exists in the base snapshot.
         return $existing === [] ? [] : $existing;
     }
 }

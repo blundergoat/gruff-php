@@ -19,7 +19,9 @@ use PhpParser\Node\Expr;
 use PhpParser\Node\Name;
 
 /**
- * Detects type assertions that restate guarantees already made by the subject.
+ * Flags an `assertInstanceOf(X::class, $v)` whose value is already statically known to be that type -
+ * built by `new X()` right there or assigned one earlier in the test - so the assertion restates a
+ * guarantee the code already makes and proves nothing. Runs over every test. Error severity, high confidence.
  */
 final readonly class TautologicalTypeAssertionRule implements RuleInterface
 {
@@ -29,7 +31,7 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
     public const ID = 'test-quality.tautological-type-assertion';
 
     /**
-     * Describe the tautological type assertion rule.
+     * Describes the tautological-type-assertion rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -46,7 +48,7 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
     }
 
     /**
-     * Find `assertInstanceOf` calls where the value type is already proven locally.
+     * Reports assertInstanceOf calls where the value's type is already proven locally.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -57,22 +59,27 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
     {
         $findings = [];
 
+        // Weigh every test scope in the file.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             $localTypes = $this->collectLocalAssignmentTypes($scope);
 
+            // Inspect each call the test makes.
             foreach (TestQualityNodeHelper::calls($scope) as $call) {
                 $name = TestQualityNodeHelper::callName($call);
+                // Only assertInstanceOf() can be a redundant type assertion.
                 if ($name !== 'assertinstanceof') {
                     continue;
                 }
 
                 $expected = $this->classNameArg($call, 0);
                 $valueArg = TestQualityNodeHelper::argValue($call, 1);
+                // Need both an expected class and a value argument to judge.
                 if ($expected === null || $valueArg === null) {
                     continue;
                 }
 
                 $proven = $this->provenClass($valueArg, $localTypes);
+                // Flag only when the value's proven type already equals the asserted one.
                 if ($proven === null || strtolower($proven) !== strtolower($expected)) {
                     continue;
                 }
@@ -102,7 +109,7 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
     }
 
     /**
-     * Map local variables to the class names assigned to them.
+     * Maps local variables to the class names assigned to them via `new`.
      *
      * @param TestQualityScope $scope - Single test method whose direct `$var = new X()` assignments are scanned.
      *
@@ -112,12 +119,15 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
     {
         $types = [];
 
+        // Weigh every assignment in the test body.
         foreach (NodeIndex::descendantsOfAny($scope->node, [Expr\Assign::class]) as $assign) {
+            // Only a plainly named variable target can be tracked.
             if (!$assign->var instanceof Expr\Variable || !is_string($assign->var->name)) {
                 continue;
             }
 
             $class = $this->newClassName($assign->expr);
+            // Record the variable's type when it is built with new.
             if ($class !== null) {
                 $types[$assign->var->name] = $class;
             }
@@ -128,6 +138,8 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
     }
 
     /**
+     * Resolves the statically proven class of a value, or null when it cannot be inferred.
+     *
      * @param Expr                  $expr - Value expression from the assertion's second argument to resolve.
      * @param array<string, string> $localTypes - Map of variable name to class built by collectLocalAssignmentTypes().
      *
@@ -151,7 +163,7 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
     }
 
     /**
-     * Extract the class name from a direct `new ClassName` expression.
+     * Returns the class name of a direct `new ClassName` expression, or null.
      *
      * @param Expr $expr - Candidate expression; only a `new` with a static class name yields a result.
      *
@@ -169,7 +181,7 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
     }
 
     /**
-     * Extract a `ClassName::class` argument from an assertion call.
+     * Returns the class named by a `ClassName::class` argument, or null.
      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Assertion call whose argument list is read.
      * @param int $index - Zero-based argument position the caller expects to hold a `X::class` constant.
@@ -195,7 +207,7 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
     }
 
     /**
-     * Describe the asserted value for the finding message.
+     * Describes the asserted value for the finding message.
      *
      * @param Expr $expr - Asserted value expression rendered for human-readable finding text.
      *
@@ -203,6 +215,7 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
      */
     private function describeValue(Expr $expr): string
     {
+        // A named variable reads best in the message.
         if ($expr instanceof Expr\Variable && is_string($expr->name)) {
             return $expr->name;
         }

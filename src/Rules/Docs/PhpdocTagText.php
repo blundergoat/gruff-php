@@ -16,7 +16,7 @@ namespace GruffPhp\Rules\Docs;
 final readonly class PhpdocTagText
 {
     /**
-     * Detect prose after a return type while tolerating spaces inside PHPDoc generic types, so that
+     * Reports whether prose follows a return type, tolerating spaces inside PHPDoc generic types so that
      * `array<string, int>` is read as the type alone, not type-plus-description.
      *
      * @param string $body - text following `@return `, e.g. `array<string, int> remaining counts`, to scan
@@ -28,14 +28,17 @@ final readonly class PhpdocTagText
         $depth  = 0;
         $length = strlen($body);
 
+        // Walk the body character by character, tracking generic-bracket depth.
         for ($offset = 0; $offset < $length; $offset++) {
             $character = $body[$offset];
 
+            // An opening bracket enters a generic type.
             if (str_contains('<{[(', $character)) {
                 $depth++;
                 continue;
             }
 
+            // A closing bracket leaves the generic type.
             if (str_contains('>}])', $character) && $depth > 0) {
                 $depth--;
                 continue;
@@ -52,7 +55,7 @@ final readonly class PhpdocTagText
     }
 
     /**
-     * Read the text following the first `@return` tag in a docblock, including continuation
+     * Reads the text following the first `@return` tag in a docblock, including continuation
      * lines for multiline array shapes.
      *
      * @param string $docText - raw docblock text including its `/**`, ` * `, and `*\/` framing
@@ -64,16 +67,20 @@ final readonly class PhpdocTagText
     {
         $lines = self::contentLines($docText);
 
+        // Scan each content line for the return tag.
         foreach ($lines as $index => $line) {
             if ($line === '@return') {
                 // A lone `@return` with no type or prose: present but empty, so callers see no description.
                 return '';
             }
 
+            // A return tag carrying a body: gather the type and any continuation lines.
             if (str_starts_with($line, '@return ')) {
                 $bodyLines = [trim(substr($line, strlen('@return ')))];
 
+                // Continuation lines, until the next tag, extend a multiline array shape.
                 for ($offset = $index + 1, $count = count($lines); $offset < $count; $offset++) {
+                    // The next tag ends the return body.
                     if (str_starts_with($lines[$offset], '@')) {
                         break;
                     }
@@ -90,7 +97,7 @@ final readonly class PhpdocTagText
     }
 
     /**
-     * Strip docblock framing and return the non-empty, trimmed content lines.
+     * Strips docblock framing and returns the non-empty, trimmed content lines.
      *
      * @param string $docText - raw docblock text including its `/**`, ` * `, and `*\/` framing
      *

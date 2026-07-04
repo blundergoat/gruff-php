@@ -21,18 +21,27 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * Builds validated analyse command setup from console input.
+ * Turns everything typed after `gruff-php analyse` into one validated setup object, or the first
+ * usage or config error the invocation tripped.
+ *
+ * Every `analyse` run passes through here before a single file is scanned: it parses and
+ * range-checks the flags (`--format`, `--fail-on`, `--mutation-budget`, `--include-rule`), rejects
+ * contradictory pairs with a one-line message, offers to write a starter config on a first run,
+ * then loads the project config and folds any CLI overrides into the final rule selection. A ready
+ * result lets the command scan at once; an error result stops it and shows the user how to fix the
+ * command instead of emitting a misleading report.
  */
 final readonly class AnalyseCommandSetupBuilder
 {
     /**
-     * Build the validated analysis setup from console input.
+     * Entry point the `analyse` command calls first: capture the working directory the user launched
+     * from, then hand off to the full validation pass. Returns a ready setup or the error they must fix.
      *
      * @param InputInterface           $input - Symfony console input for the analyse command.
-     * @param OutputInterface          $output - Symfony console output for optional init prompting.
-     * @param SymfonyApplication|null  $symfonyApplication - Console application used to dispatch the init command.
+     * @param OutputInterface          $output - Symfony console output for the optional first-run init prompt.
+     * @param SymfonyApplication|null  $symfonyApplication - Console application used to dispatch `init`; null skips the first-run config offer.
      *
-     * @return AnalyseCommandSetupResult - Ready setup or formatted usage/config error.
+     * @return AnalyseCommandSetupResult - Ready-to-scan setup when the directory is known, otherwise a plain error result.
      */
     public function build(
         InputInterface $input,
@@ -41,6 +50,8 @@ final readonly class AnalyseCommandSetupBuilder
     ): AnalyseCommandSetupResult {
         $projectRoot = getcwd();
 
+        // Every scanned and reported path is resolved against the launch directory; if the shell can't
+        // name it (say it was deleted mid-session), stop rather than scan an unknown location.
         if ($projectRoot === false) {
             return AnalyseCommandSetupResult::plainError(
                 '<error>Unable to determine current working directory.</error>',
@@ -52,14 +63,16 @@ final readonly class AnalyseCommandSetupBuilder
     }
 
     /**
-     * Build setup, prompting for an init config only after option validation passes.
+     * The validation gauntlet each run walks in the order the user feels it: check every flag, offer a
+     * first-run config, load the project config, then fold in any CLI rule overrides. Stops at the
+     * first problem with a message the user can act on rather than a half-finished report.
      *
      * @param InputInterface          $input - Symfony console input for the analyse command.
-     * @param OutputInterface         $output - Console output used for the optional init prompt.
-     * @param SymfonyApplication|null $symfonyApplication - Console application used to dispatch the init command.
-     * @param string                  $projectRoot - Current project root.
+     * @param OutputInterface         $output - Console output used for the optional first-run init prompt.
+     * @param SymfonyApplication|null $symfonyApplication - Console application used to dispatch `init`; null skips the first-run config offer.
+     * @param string                  $projectRoot - Working directory the run is anchored to, already known to be readable.
      *
-     * @return AnalyseCommandSetupResult - Ready setup or formatted usage/config error.
+     * @return AnalyseCommandSetupResult - Ready setup when every check passes, otherwise the first usage or config error hit.
      */
     private function buildSetup(
         InputInterface $input,
@@ -68,6 +81,8 @@ final readonly class AnalyseCommandSetupBuilder
         string $projectRoot,
     ): AnalyseCommandSetupResult {
         $options = AnalyseCommandOptions::fromInput($input);
+        // The user passed `--no-config` and `--config` together; obeying one would silently ignore the
+        // other, so reject the contradictory pair before anything else.
         if ($options->usageError() === '--no-config cannot be combined with --config.') {
             return AnalyseCommandSetupResult::plainError(
                 '<error>--no-config cannot be combined with --config.</error>',
@@ -76,11 +91,15 @@ final readonly class AnalyseCommandSetupBuilder
         }
 
         $formatResult = $this->format($input->getOption('format'));
+        // `--format` named something we can't render (e.g. `--format=xml`), so `$formatResult` is the
+        // usage-error string; show it instead of starting a scan that can't be printed.
         if (!$formatResult instanceof OutputFormat) {
             return AnalyseCommandSetupResult::plainError($formatResult, Command::INVALID);
         }
 
         $failThreshold = $this->failThreshold($input->getOption('fail-on'));
+        // `--fail-on` wasn't one of the accepted severities, so echo the bad value back rather than
+        // guessing which gate the user meant.
         if (!$failThreshold instanceof FailThreshold) {
             return AnalyseCommandSetupResult::reportError(
                 $this->usageReport(
@@ -94,6 +113,8 @@ final readonly class AnalyseCommandSetupBuilder
         }
 
         $mutationBudget = $this->mutationBudget($input->getOption('mutation-budget'));
+        // `--mutation-budget` was set to something other than a whole number, so we can't tell how many
+        // surviving mutants the user is willing to tolerate.
         if ($mutationBudget === false) {
             return AnalyseCommandSetupResult::reportError(
                 $this->usageReport(
@@ -108,6 +129,8 @@ final readonly class AnalyseCommandSetupBuilder
 
         $options    = $options->withMutationBudget($mutationBudget);
         $usageError = $options->usageError();
+        // Some other flag combination still doesn't hang together (for instance `--changed-only` without
+        // the `--diff-vs` it needs, or two mutually exclusive diff selectors); surface the specific reason so the user can fix that one flag.
         if ($usageError !== null) {
             return AnalyseCommandSetupResult::reportError(
                 $this->usageReport($options, $formatResult, $failThreshold->value, $usageError),
@@ -117,9 +140,21 @@ final readonly class AnalyseCommandSetupBuilder
 
         $registry        = RuleRegistry::defaults();
         $ruleFilterError = $this->ruleFilterError($registry, $options->includeRules, $options->excludeRules);
+        // `--include-rule` or `--exclude-rule` named an id no rule owns, which would quietly filter to
+        // nothing; name the typo instead of running an empty scan the user would misread as clean.
         if ($ruleFilterError !== null) {
             return AnalyseCommandSetupResult::reportError(
                 $this->usageReport($options, $formatResult, $failThreshold->value, $ruleFilterError),
+                $formatResult,
+            );
+        }
+
+        $profileIncludeError = $this->profileIncludeRuleError($registry, $options);
+        // The user paired `--profile` with an `--include-rule` from a pillar that profile never scores,
+        // so the finding could never move the grade; explain both ways out.
+        if ($profileIncludeError !== null) {
+            return AnalyseCommandSetupResult::reportError(
+                $this->usageReport($options, $formatResult, $failThreshold->value, $profileIncludeError),
                 $formatResult,
             );
         }
@@ -133,6 +168,8 @@ final readonly class AnalyseCommandSetupBuilder
             shouldSkipConfig:        $options->noConfig,
             isMachineReadableFormat: $formatResult->isMachineReadable(),
         );
+        // First run in a project with no config: the init offer already ran to a verdict, so stop and
+        // pass its exit code straight back to the shell.
         if ($promptExitCode !== null) {
             return AnalyseCommandSetupResult::exitCode($promptExitCode);
         }
@@ -146,12 +183,16 @@ final readonly class AnalyseCommandSetupBuilder
             failThreshold: $failThreshold,
             configLoader:  $configLoader,
         );
+        // The project's config couldn't be loaded (missing, malformed, or naming an unknown rule); the
+        // config step already turned that failure into an error report, so hand it straight back.
         if ($configResult instanceof AnalysisReport) {
             return AnalyseCommandSetupResult::reportError($configResult, $formatResult);
         }
         $failThreshold        = $this->resolveFailThresholdWithConfig($input, $configResult, $failThreshold);
         $failThresholds       = $this->resolveFailThresholds($input, $configResult, $failThreshold);
         $referenceError       = $this->newFindingsReferenceError($options, $failThresholds);
+        // A new-findings gate is armed but nothing defines "new" yet; tell the user to add a baseline or
+        // `--diff-vs <ref>` before the gate can mean anything.
         if ($referenceError !== null) {
             return AnalyseCommandSetupResult::reportError(
                 $this->usageReport(
@@ -165,9 +206,13 @@ final readonly class AnalyseCommandSetupBuilder
             );
         }
         $profileRuleSelection = $options->profileRuleSelection();
+        // A profile such as `--profile security` narrows execution to its own pillars; swap that
+        // selection in over whatever the config chose.
         if ($profileRuleSelection !== null) {
             $configResult = $configResult->withRuleSelection($profileRuleSelection);
         }
+        // The user hand-picked rules with `--include-rule`/`--exclude-rule`; apply those choices on top of
+        // the configured selection (include-only narrows to them; exclude drops just those).
         if ($options->includeRules !== [] || $options->excludeRules !== []) {
             $configResult = $configResult->withRuleSelection(
                 $this->refinedSelection($configResult->ruleSelection(), $options->includeRules, $options->excludeRules),
@@ -187,7 +232,8 @@ final readonly class AnalyseCommandSetupBuilder
     }
 
     /**
-     * Resolve the execution-level rule selection for analyse --include-rule/--exclude-rule.
+     * Works out the final rule set once `--include-rule`/`--exclude-rule` are in play, so the run
+     * honours exactly what the user chose to focus on or drop.
      *
      * Mirrors the hook command's selection refinement: --include-rule means "run
      * only these ids", so it must narrow to exactly those rules because
@@ -204,6 +250,8 @@ final readonly class AnalyseCommandSetupBuilder
      */
     private function refinedSelection(RuleSelection $existing, array $includeRules, array $excludeRules): RuleSelection
     {
+        // `--include-rule` means "run only these ids", so focus on exactly them and drop the inherited
+        // tiers and pillars that would otherwise widen the run back out.
         if ($includeRules !== []) {
             return new RuleSelection(rules: $includeRules, excludeRules: $excludeRules);
         }
@@ -218,18 +266,118 @@ final readonly class AnalyseCommandSetupBuilder
     }
 
     /**
-     * Validate execution-level rule filters before they can narrow the run to zero rules.
+     * Rejects an `--include-rule` whose pillar the active profile never scores, before any file is read.
+     *
+     * A command like `gruff-php analyse --profile security --include-rule docs.missing-public-phpdoc`
+     * fails fast here: without this gate it would print a docs error while the user's grade stayed a
+     * security-only 100, which reads as a contradiction. A bare `--exclude-rule` stays a plain narrowing.
+     *
+     * @param RuleRegistry          $registry - Registry resolving rule ids to their definitions.
+     * @param AnalyseCommandOptions $options - Validated options carrying the profile and include filters.
+     *
+     * @return string|null - Usage error naming the first out-of-profile include, or null when compatible.
+     */
+    private function profileIncludeRuleError(RuleRegistry $registry, AnalyseCommandOptions $options): ?string
+    {
+        $profileScorePillars = $options->profileScorePillars();
+        // The default profile scores every pillar, so there is nothing to reject.
+        if ($profileScorePillars === null) {
+            return null;
+        }
+
+        return self::outOfProfileIncludeError($registry, $options->profile, $profileScorePillars, $options->includeRules);
+    }
+
+    /**
+     * Builds the usage error shown when `--include-rule` ids fall outside a profile's scored pillars.
+     *
+     * Shared with `ReportCommand` so both commands reject the same incoherent combinations with
+     * identical wording, and report can do it before its own init prompt runs.
+     *
+     * @param RuleRegistry         $registry - Registry resolving rule ids to their definitions; ids must already be validated.
+     * @param string               $profile - Requested profile name, echoed into the error message.
+     * @param list<\GruffPhp\Results\Finding\Pillar> $profileScorePillars - Pillars the profile's composite counts.
+     * @param list<string>         $includeRuleIds - Requested --include-rule ids.
+     *
+     * @return string|null - usage error naming the first out-of-profile include and both remedies, or null when
+     *                     every include belongs to a scored pillar (including the no-includes case)
+     */
+    public static function outOfProfileIncludeError(
+        RuleRegistry $registry,
+        string       $profile,
+        array        $profileScorePillars,
+        array        $includeRuleIds,
+    ): ?string {
+        $profilePillarNames = [];
+        // Build the profile wording the user sees in the usage error.
+        foreach ($profileScorePillars as $profileScorePillar) {
+            $profilePillarNames[] = $profileScorePillar->value;
+        }
+        $profilePillarsLabel = self::formatPillarList($profilePillarNames);
+        $profilePillarIds    = implode('/', $profilePillarNames);
+
+        // Check each requested rule against the pillars the profile's grade actually counts.
+        foreach ($includeRuleIds as $ruleId) {
+            $pillar = $registry->get($ruleId)->definition()->pillar;
+            // An unscored pillar would emit findings the grade ignores; tell the user both ways out.
+            if (!in_array($pillar, $profileScorePillars, true)) {
+                return sprintf(
+                    '--include-rule %s selects a %s rule, but --profile %s executes and scores only %s rules. Drop --profile %s or include only %s rule ids.',
+                    $ruleId,
+                    $pillar->value,
+                    $profile,
+                    $profilePillarsLabel,
+                    $profile,
+                    $profilePillarIds,
+                );
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Joins pillar names into the readable list the usage error reads aloud, so the message names them
+     * as "a", "a and b", or "a, b and c" instead of a raw array.
+     *
+     * @param list<string> $pillarNames - Pillar names in display order; an empty list reads as "no".
+     *
+     * @return string - Names joined as "a", "a and b", or "a, b and c".
+     */
+    private static function formatPillarList(array $pillarNames): string
+    {
+        // Empty profile wording should read plainly if a future profile scores no pillars.
+        if ($pillarNames === []) {
+            return 'no';
+        }
+
+        // A single pillar needs no joining words in the CLI message.
+        if (count($pillarNames) === 1) {
+            return $pillarNames[0];
+        }
+
+        $lastPillarName = array_pop($pillarNames);
+
+        return implode(', ', $pillarNames) . ' and ' . $lastPillarName;
+    }
+
+    /**
+     * Catches a mistyped `--include-rule`/`--exclude-rule` id before it silently narrows the run to no
+     * rules at all, so the user hears about the typo instead of trusting an empty scan.
      *
      * @param RuleRegistry $registry - Registry whose ids define valid CLI rule filters.
-     * @param list<string> $includeRules - Rule ids from --include-rule.
-     * @param list<string> $excludeRules - Rule ids from --exclude-rule.
+     * @param list<string> $includeRules - Rule ids from `--include-rule`; empty when the user focused nothing.
+     * @param list<string> $excludeRules - Rule ids from `--exclude-rule`; empty when the user dropped nothing.
      *
      * @return string|null - Usage error for the first unknown id, or null when every id is registered.
      */
     private function ruleFilterError(RuleRegistry $registry, array $includeRules, array $excludeRules): ?string
     {
+        // Check the include and exclude lists the same way, so a typo in either is caught and blamed on
+        // the flag that carried it.
         foreach (['--include-rule' => $includeRules, '--exclude-rule' => $excludeRules] as $option => $ruleIds) {
             $unknownRuleIds = $registry->unknownRuleIds($ruleIds);
+            // At least one id matches no registered rule; name the first so the user can correct that flag.
             if ($unknownRuleIds !== []) {
                 return sprintf('Unknown rule id "%s" for %s.', $unknownRuleIds[0], $option);
             }
@@ -239,11 +387,13 @@ final readonly class AnalyseCommandSetupBuilder
     }
 
     /**
-     * Parse the requested output format.
+     * Turns the raw `--format` value into a renderer choice, or a ready-to-print usage error when it
+     * names a format gruff can't produce. Runs before any scan so the user never waits for a report
+     * that can't be rendered.
      *
      * @param mixed $optionValue - Raw --format console option; a non-string (option absent) defaults to text.
      *
-     * @return OutputFormat|string - Parsed format, or a formatted usage error string.
+     * @return OutputFormat|string - Parsed format, or a formatted usage error string when the value is unsupported.
      */
     private function format(mixed $optionValue): OutputFormat|string
     {
@@ -258,7 +408,8 @@ final readonly class AnalyseCommandSetupBuilder
     }
 
     /**
-     * Apply ADR-015 precedence to the parsed --fail-on value.
+     * Settles which severity fails the run by the documented precedence: an explicit `--fail-on` the
+     * user typed wins, otherwise a per-command config threshold, otherwise the built-in default.
      *
      * @param InputInterface $input - Console input used for explicit-flag detection.
      * @param AnalysisConfig $config - Loaded analysis config supplying per-command overrides.
@@ -271,8 +422,9 @@ final readonly class AnalyseCommandSetupBuilder
         AnalysisConfig $config,
         FailThreshold $explicitOrDefault,
     ): FailThreshold {
+        // The user typed an explicit `--fail-on`, which outranks any config setting, so keep the parsed
+        // threshold exactly as given.
         if ($input->hasParameterOption('--fail-on', true)) {
-            // An explicit CLI --fail-on outranks config under ADR-015, so use the parsed value as-is.
             return $explicitOrDefault;
         }
 
@@ -281,7 +433,8 @@ final readonly class AnalyseCommandSetupBuilder
     }
 
     /**
-     * Resolve the count-gate thresholds with explicit CLI > failureConditions > resolved-default precedence.
+     * Resolves the richer count-gate that decides the exit code, in precedence order the user controls:
+     * an explicit CLI flag, then a `failureConditions:` config block, then the single resolved threshold.
      *
      * An explicit `--fail-on` always wins (back-compat); otherwise an explicit
      * `failureConditions:` block is used; otherwise the already-resolved singular
@@ -303,40 +456,49 @@ final readonly class AnalyseCommandSetupBuilder
         $hasExplicitFailOn       = $input->hasParameterOption('--fail-on', true);
         $hasExplicitFailOnNew    = $input->hasParameterOption('--fail-on-new', true);
 
+        // The user gave an explicit `--fail-on`, which wins outright; if `--fail-on-new` rides along, arm
+        // the new-findings sub-gate on top of it.
         if ($hasExplicitFailOn) {
             return FailThresholds::fromFailOn($failThreshold)->withNewFindingsGate(
                 $hasExplicitFailOnNew ? FailThresholds::fromFailOn(FailThreshold::Error) : null,
             );
         }
 
+        // Only `--fail-on-new` was given, so let the overall gate pass but still fail when new findings appear.
         if ($hasExplicitFailOnNew) {
             return FailThresholds::fromFailOn(FailThreshold::None)
                 ->withNewFindingsGate(FailThresholds::fromFailOn(FailThreshold::Error));
         }
 
+        // No gate flags on the command line, but the project's `failureConditions:` block spells one out,
+        // so honour it verbatim.
         if ($configFailureConditions instanceof FailThresholds) {
             return $configFailureConditions;
         }
 
+        // Nothing overrode the gate, so desugar the single resolved threshold into the count-gate form.
         return FailThresholds::fromFailOn($failThreshold);
     }
 
     /**
-     * Return the "no reference point" error when a new-findings gate is configured
-     * without a baseline or --diff-vs to define "new" against, else null.
+     * Guards against a new-findings gate that has nothing to compare against: returns the remediation
+     * message when no baseline or `--diff-vs` defines what counts as "new", and null once one does.
      *
      * @param AnalyseCommandOptions $options - Validated options carrying baseline and diff-vs selections.
      * @param FailThresholds        $failThresholds - Resolved gate, whose new-findings sub-gate may be set.
      *
-     * @return string|null - Remediation message, or null when a reference point exists.
+     * @return string|null - Remediation message, or null when a reference point exists so the gate is well-formed.
      */
     private function newFindingsReferenceError(AnalyseCommandOptions $options, FailThresholds $failThresholds): ?string
     {
+        // No new-findings sub-gate is armed, so there's no "new" to measure and nothing to complain about.
         if ($failThresholds->newFindingsGate === null) {
             return null;
         }
 
         $baselineWillApply = $options->baseline->baselinePath !== null && $options->baseline->generateBaselinePath === null;
+        // A baseline will apply, or `--diff-vs` names a ref to compare against, so "new" has a concrete
+        // meaning and the gate is well-formed.
         if ($baselineWillApply || $options->diffVs !== null) {
             return null;
         }
@@ -345,28 +507,32 @@ final readonly class AnalyseCommandSetupBuilder
     }
 
     /**
-     * Parse the requested failure threshold.
+     * Parses the requested `--fail-on` severity, defaulting to advisory when the flag is absent and
+     * handing the raw text straight back when it isn't a severity so the caller can quote it in an error.
      *
      * @param mixed $optionValue - Raw --fail-on console option; a non-string (option absent) defaults to advisory.
      *
-     * @return FailThreshold|string - Parsed threshold, or the unsupported raw value.
+     * @return FailThreshold|string - Parsed threshold, or the unsupported raw value the caller reports back.
      */
     private function failThreshold(mixed $optionValue): FailThreshold|string
     {
         $rawValue = is_string($optionValue) ? $optionValue : FailThreshold::Advisory->value;
 
+        // Hand back the matched threshold, or the raw text unchanged so the caller can name the bad value.
         return FailThreshold::fromInput($rawValue) ?? $rawValue;
     }
 
     /**
-     * Parse the optional mutation finding budget.
+     * Parses the optional `--mutation-budget`: how many surviving mutants the user will tolerate before
+     * the run is treated as having failed its testing bar.
      *
      * @param mixed $optionValue - Raw --mutation-budget console option; null means the flag was not supplied.
      *
-     * @return int|false|null - Non-negative budget, false for invalid input, or null when omitted.
+     * @return int|false|null - Non-negative budget, false when the value wasn't a whole number, or null when the flag was omitted.
      */
     private function mutationBudget(mixed $optionValue): int|false|null
     {
+        // The `--mutation-budget` flag was never passed, so report "not set" rather than a budget of zero.
         if ($optionValue === null) {
             return null;
         }
@@ -376,7 +542,8 @@ final readonly class AnalyseCommandSetupBuilder
     }
 
     /**
-     * Load analysis configuration or convert configuration failures to a report.
+     * Loads the project's analysis configuration, or turns a broken config into a printable error report
+     * so a bad `.gruff-php.yaml` fails the run cleanly instead of throwing at the user.
      *
      * @param AnalyseCommandOptions $options - Validated options; its noConfig/configPath select the load path.
      * @param RuleRegistry          $registry - Default rule set used to seed config when loading is disabled.
@@ -384,7 +551,7 @@ final readonly class AnalyseCommandSetupBuilder
      * @param FailThreshold         $failThreshold - Threshold echoed into the error report so its failOn stays accurate.
      * @param ConfigLoader          $configLoader - Loader that reads and validates the on-disk config file.
      *
-     * @return AnalysisConfig|AnalysisReport - Loaded config or a formatted config error report.
+     * @return AnalysisConfig|AnalysisReport - Loaded config, or a formatted config-error report when the file can't be used.
      */
     private function config(
         AnalyseCommandOptions $options,
@@ -394,10 +561,14 @@ final readonly class AnalyseCommandSetupBuilder
         ConfigLoader $configLoader,
     ): AnalysisConfig|AnalysisReport {
         try {
+            // `--no-config` skips the YAML entirely and runs the registry defaults; otherwise load and
+            // validate the project file the user relies on.
             return $options->noConfig
                 ? AnalysisConfig::fromRegistry($registry)
                 : $configLoader->load($options->configPath, $registry);
         } catch (ConfigException $exception) {
+            // A broken or unreadable config is the user's to fix, so surface the reason as a report
+            // rather than a stack trace.
             return $this->usageReport(
                 options: $options,
                 format:  $format,
@@ -409,24 +580,28 @@ final readonly class AnalyseCommandSetupBuilder
     }
 
     /**
-     * Resolve the config path that should be reported for this run.
+     * Works out which config path the report should name, so the user can see exactly which file shaped
+     * the run - the one they passed, the one auto-discovery found, or none.
      *
      * @param AnalyseCommandOptions $options - Validated options; noConfig and an explicit configPath drive the result.
      * @param ConfigLoader          $configLoader - Loader used to auto-discover the path when none was given explicitly.
      *
-     * @return string|null - Resolved path, explicit path, or null when config loading is disabled.
+     * @return string|null - Explicit or auto-discovered path, or null when `--no-config` ran with no file at all.
      */
     private function effectiveConfigPath(AnalyseCommandOptions $options, ConfigLoader $configLoader): ?string
     {
+        // `--no-config` ran without reading any file, so there's no config path to show in the report.
         if ($options->noConfig) {
             return null;
         }
 
+        // Otherwise report the path the user named, or the one auto-discovery settles on when they named none.
         return $options->configPath ?? $configLoader->resolveConfigPath(null);
     }
 
     /**
-     * Build a zero-finding report for CLI usage and configuration errors.
+     * Packages a usage or config error as a zero-finding report, so a bad invocation flows through the
+     * same renderer and exit code as a real scan and reads consistently in every `--format`.
      *
      * @param AnalyseCommandOptions $options - Validated options supplying the requested paths and config path for context.
      * @param OutputFormat          $format - Format the caller will render this error report in.

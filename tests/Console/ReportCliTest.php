@@ -107,6 +107,221 @@ final class ReportCliTest extends CliTestCase
     }
 
     /**
+     * Verify report accepts and forwards the newer analyse workflows it used to reject.
+     *
+     * @throws JsonException
+     *
+     * @return void
+     */
+    public function testReportCommandForwardsChangedScopeGatingAndCacheOptions(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            self::PROJECT_ROOT . '/bin/gruff-php',
+            'report',
+            'tests/Fixtures/Source/Code',
+            '--format',
+            'json',
+            '--fail-on',
+            'none',
+            '--no-config',
+            '--no-baseline',
+            '--no-cache',
+            '--since',
+            'HEAD',
+            '--changed-scope',
+            'file',
+            '--baseline-include-absent',
+        ], self::PROJECT_ROOT);
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput() . $process->getOutput());
+
+        $report = $this->decodeJsonOutput($process);
+        self::assertSame('gruff.analysis.v2', $report['schemaVersion'] ?? null);
+        // --since forwarded: the child records an active diff block for the changed-region scan.
+        $diff = $report['diff'] ?? null;
+        self::assertIsArray($diff);
+        self::assertTrue($diff['active'] ?? null);
+    }
+
+    /**
+     * Verify --fail-on-new forwards with gating semantics: a real introduced finding trips exit 1
+     * while the artifact is still written.
+     *
+     * @return void
+     */
+    public function testReportCommandForwardsFailOnNewAndStillWritesArtifact(): void
+    {
+        $repo       = $this->tempDir();
+        $outputPath = $repo . '/gruff-report.html';
+
+        try {
+            // A one-commit repo whose working tree then gains an error-severity finding: if the
+            // forwarded --fail-on-new were silently dropped, the run would exit 0 and this test fails.
+            self::assertTrue(mkdir($repo . '/src', 0777, true));
+            file_put_contents(
+                $repo . '/src/Documented.php',
+                "<?php\n\nclass Documented\n{\n    /**\n     * Say hello to the caller.\n     */\n    public function greet(): string\n    {\n        return 'hello';\n    }\n}\n",
+            );
+            $this->runGit($repo, 'init', '-q');
+            $this->runGit($repo, 'config', 'user.email', 'test@example.com');
+            $this->runGit($repo, 'config', 'user.name', 'Gruff Test');
+            $this->runGit($repo, 'add', 'src/Documented.php');
+            $this->runGit($repo, 'commit', '-qm', 'base');
+
+            file_put_contents(
+                $repo . '/src/Newcomer.php',
+                "<?php\n\nclass Newcomer\n{\n    public function arrive(): string\n    {\n        return 'new';\n    }\n}\n",
+            );
+
+            $process = new Process([
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff-php',
+                'report',
+                'src',
+                '--format',
+                'html',
+                '--output',
+                $outputPath,
+                '--fail-on',
+                'none',
+                '--fail-on-new',
+                '--diff-vs',
+                'HEAD',
+                '--no-config',
+                '--no-baseline',
+            ], $repo);
+            $process->run();
+
+            self::assertSame(1, $process->getExitCode(), $process->getErrorOutput() . $process->getOutput());
+            self::assertFileExists($outputPath);
+        } finally {
+            $this->removeDir($repo);
+        }
+    }
+
+    /**
+     * Verify the incoherent profile/include combination is rejected before any prompt or subprocess.
+     *
+     * @return void
+     */
+    public function testReportCommandRejectsOutOfProfileIncludeBeforeSpawningAnalyse(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            self::PROJECT_ROOT . '/bin/gruff-php',
+            'report',
+            'tests/Fixtures/Source/Code',
+            '--format',
+            'json',
+            '--fail-on',
+            'none',
+            '--profile',
+            'security',
+            '--include-rule',
+            'docs.missing-public-phpdoc',
+            '--no-config',
+            '--no-baseline',
+        ], self::PROJECT_ROOT);
+        $process->run();
+
+        self::assertSame(2, $process->getExitCode());
+        self::assertStringContainsString('selects a documentation rule', $process->getOutput());
+        // No report body means report itself rejected the run before spawning the analyse child.
+        self::assertStringNotContainsString('schemaVersion', $process->getOutput());
+    }
+
+    /**
+     * Verify unsupported profiles are rejected before report can offer or write config.
+     *
+     * @return void
+     */
+    public function testReportCommandRejectsUnknownProfileBeforeConfigPrompt(): void
+    {
+        $repo = $this->createBaselineProject();
+
+        try {
+            $process = new Process([
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff-php',
+                'report',
+                'src',
+                '--profile',
+                'security-plus',
+                '--fail-on',
+                'none',
+            ], $repo);
+            $process->run();
+
+            self::assertSame(2, $process->getExitCode());
+            self::assertStringContainsString('Unsupported profile "security-plus". Use default or security.', $process->getOutput());
+            self::assertFileDoesNotExist($repo . '/.gruff-php.yaml');
+        } finally {
+            $this->removeDir($repo);
+        }
+    }
+
+    /**
+     * Run git inside a fixture repository.
+     *
+     * @param string $repo - Fixture repository root.
+     * @param string ...$arguments - Git arguments.
+     *
+     * @return void
+     */
+    private function runGit(string $repo, string ...$arguments): void
+    {
+        $process = new Process(['git', ...$arguments], $repo);
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+    }
+
+    /**
+     * Verify the curated analyse option surface is exposed by report, minus the documented analyse-only flags.
+     *
+     * @return void
+     */
+    public function testReportCommandOptionParityWithAnalyse(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            self::PROJECT_ROOT . '/bin/gruff-php',
+            'report',
+            '--help',
+        ], self::PROJECT_ROOT);
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        $helpText = $process->getOutput();
+
+        $reportSupportedOptions = [
+            '--profile',
+            '--fail-on-new',
+            '--no-cache',
+            '--since',
+            '--changed-ranges',
+            '--changed-scope',
+            '--baseline-include-absent',
+            '--infection-run',
+            '--infection-bin',
+            '--infection-config',
+            '--infection-test-framework-options',
+            '--print-runtime',
+            '--runtime-mode',
+        ];
+        foreach ($reportSupportedOptions as $optionName) {
+            self::assertStringContainsString($optionName, $helpText, sprintf('report --help must document %s.', $optionName));
+        }
+
+        // Analyse-only by decision: baseline writing stays with analyse, and the paths argument
+        // already covers explicit file selection for report.
+        self::assertStringNotContainsString('--generate-baseline', $helpText);
+        self::assertStringNotContainsString('--file ', $helpText);
+    }
+
+    /**
      * Verify report command does not leak raw sensitive-data snippets.
      *
      * @return void

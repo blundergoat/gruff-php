@@ -15,7 +15,11 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\SourceTextRuleInterface;
 
 /**
- * Flags Composer VCS repositories that resolve dependencies outside Packagist.
+ * Flags a Composer VCS repository (git, svn, and the like), which resolves a dependency straight from a
+ * version-control source outside Packagist - so the user verifies the source is trusted and pinned.
+ *
+ * Scans `composer.json` as text over each `repositories` entry whose type pulls from version control.
+ * Warning, medium confidence - a VCS source is a supply-chain smell to review, not proof of harm.
  */
 final class DependencyComposerVcsRule implements SourceTextRuleInterface
 {
@@ -32,7 +36,7 @@ final class DependencyComposerVcsRule implements SourceTextRuleInterface
     private const VCS_TYPES = ['vcs', 'git', 'svn', 'hg', 'fossil', 'perforce'];
 
     /**
-     * Describe the Composer VCS-repository rule.
+     * Describes the Composer VCS-repository rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -50,7 +54,7 @@ final class DependencyComposerVcsRule implements SourceTextRuleInterface
     }
 
     /**
-     * Find `repositories` entries that resolve dependencies from version control.
+     * Reports each Composer repository that resolves dependencies from version control.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -71,12 +75,15 @@ final class DependencyComposerVcsRule implements SourceTextRuleInterface
         }
 
         $findings = [];
+        // Check each declared repository entry.
         foreach ($manifest['repositories'] as $repository) {
+            // A malformed, non-object entry cannot be a VCS repository.
             if (!is_array($repository)) {
                 continue;
             }
 
             $type = isset($repository['type']) && is_string($repository['type']) ? strtolower($repository['type']) : '';
+            // Only a version-control repository type is flagged.
             if (!in_array($type, self::VCS_TYPES, true)) {
                 continue;
             }

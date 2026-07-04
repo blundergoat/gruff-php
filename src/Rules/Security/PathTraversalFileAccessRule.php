@@ -18,7 +18,11 @@ use PhpParser\Node;
 use PhpParser\Node\Expr;
 
 /**
- * Detects filesystem access with request-controlled paths.
+ * Flags a filesystem call whose path comes from the request - `file_get_contents`, `fopen`, `unlink`, a
+ * SplFileObject, and the like - the shape that lets an attacker climb out of the intended directory (`../`).
+ *
+ * Runs per file over known path-taking functions and filesystem-iterator constructors whose path argument
+ * reaches user input, skipping URL literals. Warning, medium confidence - a likely traversal sink, not certain.
  */
 final class PathTraversalFileAccessRule implements RuleInterface
 {
@@ -28,6 +32,8 @@ final class PathTraversalFileAccessRule implements RuleInterface
     public const ID = 'security.path-traversal-file-access';
 
     /**
+     * Path-taking filesystem functions mapped to the argument indices that hold a path.
+     *
      * @var array<string, list<int>>
      */
     private const PATH_ARGUMENTS = [
@@ -47,7 +53,7 @@ final class PathTraversalFileAccessRule implements RuleInterface
     ];
 
     /**
-     * Describe the path traversal file access rule.
+     * Describes the path-traversal-file-access rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -65,7 +71,7 @@ final class PathTraversalFileAccessRule implements RuleInterface
     }
 
     /**
-     * Find filesystem sinks that receive request-controlled paths.
+     * Reports each filesystem sink fed a request-controlled path.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -76,14 +82,18 @@ final class PathTraversalFileAccessRule implements RuleInterface
     {
         $findings = [];
 
+        // Check every function call in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
             $name = SecurityNodeHelper::globalFunctionName($call);
+            // Only the known path-taking functions can be traversal sinks.
             if ($name === null || !isset(self::PATH_ARGUMENTS[$name])) {
                 continue;
             }
 
+            // Weigh each path argument the function takes.
             foreach (self::PATH_ARGUMENTS[$name] as $argumentIndex) {
                 $pathArg = SecurityNodeHelper::argumentValue($call->args, $argumentIndex);
+                // A URL, or a path with no request data, is not local traversal.
                 if ($pathArg === null || SecurityNodeHelper::containsUrlLiteral($pathArg) || !SecurityNodeHelper::containsUserInput($pathArg)) {
                     continue;
                 }
@@ -93,12 +103,15 @@ final class PathTraversalFileAccessRule implements RuleInterface
             }
         }
 
+        // Check filesystem iterator and file-object constructions too.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\New_::class) as $new) {
+            // Only the path-taking filesystem classes qualify.
             if (!SecurityNodeHelper::hasMatchingClassName($new->class, ['FilesystemIterator', 'RecursiveDirectoryIterator', 'SplFileObject'])) {
                 continue;
             }
 
             $pathArg = SecurityNodeHelper::argumentValue($new->args, 0);
+            // A request-controlled path is the traversal risk.
             if ($pathArg !== null && SecurityNodeHelper::containsUserInput($pathArg)) {
                 $findings[] = $this->finding($analysisUnit, $new, 'filesystem-object');
             }
@@ -108,7 +121,7 @@ final class PathTraversalFileAccessRule implements RuleInterface
     }
 
     /**
-     * Build the path traversal finding.
+     * Builds the path-traversal finding.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit supplying the display path recorded on the finding.
      * @param Node         $node - Call or `new` node whose start line localises the finding for the reviewer.

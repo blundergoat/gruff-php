@@ -16,10 +16,11 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
 
 /**
- * Detects source files that exceed the configured line threshold.
+ * Flags a source file whose raw line count runs past the configured budget, the simplest signal that a
+ * file has taken on too much and is getting hard to navigate.
  *
- * Measures raw source lines (newline count). File length is a container
- * measure aligned with how reviewers navigate files. See ADR-012.
+ * Runs once per file, comparing its newline count against the threshold (default error above 1000).
+ * File length is a container measure aligned with how reviewers navigate files. See ADR-012.
  */
 final readonly class FileLengthRule implements RuleInterface
 {
@@ -29,7 +30,7 @@ final readonly class FileLengthRule implements RuleInterface
     public const ID = 'size.file-length';
 
     /**
-     * Describe the file length rule.
+     * Describes the file-length rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and thresholds.
      */
@@ -47,7 +48,7 @@ final readonly class FileLengthRule implements RuleInterface
     }
 
     /**
-     * Find files whose line count exceeds configured thresholds.
+     * Reports the file when its line count runs over the configured budget.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -61,6 +62,7 @@ final readonly class FileLengthRule implements RuleInterface
         $lineCount      = $analysisUnit->lineCount();
         $thresholdMatch = $settings->highValueThresholdMatch($lineCount);
 
+        // A file within budget produces no finding.
         if ($thresholdMatch === null) {
             return [];
         }
@@ -93,7 +95,7 @@ final readonly class FileLengthRule implements RuleInterface
     }
 
     /**
-     * Format threshold numbers without unnecessary decimal places.
+     * Formats a threshold number for the message, dropping a whole number's ".0" tail.
      *
      * @param int|float $number - Threshold value to render; whole values are shown without a trailing decimal.
      *
@@ -101,6 +103,7 @@ final readonly class FileLengthRule implements RuleInterface
      */
     private function formatNumber(int|float $number): string
     {
+        // A genuine fraction keeps its decimals; a whole value is shown without them.
         if (is_float($number) && floor($number) !== $number) {
             return (string) $number;
         }

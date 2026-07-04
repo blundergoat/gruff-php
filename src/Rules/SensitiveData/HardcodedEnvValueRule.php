@@ -14,7 +14,12 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\SourceTextRuleInterface;
 
 /**
- * Detects hardcoded values assigned to environment-style keys.
+ * Flags a hardcoded value assigned to an environment-style key (`API_KEY`, `PASSWORD`, `SECRET`, `TOKEN`,
+ * `PRIVATE_KEY`, ...), so the user can move committed secrets into real environment configuration.
+ *
+ * A source-text rule that skips `.env` files (their sanctioned home) and comments, and applies several
+ * value-shape heuristics - length, entropy, and label/identifier exclusions - so config labels and cache
+ * keys do not read as secrets. The reported value is redacted. Warning severity, medium confidence.
  */
 final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
 {
@@ -24,9 +29,9 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
     public const ID = 'sensitive-data.hardcoded-env-value';
 
     /**
-     * Describe the hardcoded environment value rule.
+     * Describes the hardcoded-environment-value rule for the registry and reports.
      *
-     * @return RuleDefinition - Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults (warning severity, medium confidence).
      */
     public function definition(): RuleDefinition
     {
@@ -42,7 +47,7 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
     }
 
     /**
-     * Find env-style assignments that look like committed secrets.
+     * Reports each env-style assignment whose value looks like a committed secret, redacting it.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -64,6 +69,7 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
             return [];
         }
 
+        // Match every secret-like key=value assignment, capturing the key, value, and offset.
         preg_match_all(
             '/\b(?<key>[A-Z0-9_]*(?:API_KEY|PASSWORD|PASS|SECRET|TOKEN|PRIVATE_KEY)[A-Z0-9_]*)\s*=\s*["\']?(?<value>[A-Za-z0-9_+\/=.-]{8,})["\']?/',
             $analysisUnit->source,
@@ -73,14 +79,17 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
 
         $findings      = [];
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
+        // Weigh each assignment the scan found.
         foreach ($matches[0] as $index => $match) {
             $key         = $matches['key'][$index][0];
             $secretValue = $matches['value'][$index][0];
             $offset      = $match[1];
+            // An assignment inside a comment is an example, not a live secret.
             if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
                 continue;
             }
 
+            // Skip obvious dummy values and values too weak in shape to be a real secret.
             if (SecretScannerHelper::isLikelyDummyValue($secretValue) || !$this->hasSecretValueEvidence($key, $secretValue)) {
                 continue;
             }
@@ -102,7 +111,7 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
     }
 
     /**
-     * Check whether a key/value pair has enough evidence to be treated as secret-like.
+     * Reports whether a key/value pair has enough evidence to be treated as secret-like.
      *
      * @param string $key - Matched env-style key, e.g. DB_PASSWORD; suffix sets the value-evidence bar.
      * @param string $secretValue - Raw matched value, quotes and whitespace included; trimmed and entropy-scored here.
@@ -135,7 +144,7 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
     }
 
     /**
-     * Detect key suffixes that need stronger value evidence.
+     * Reports whether a key suffix (_NAME/_PREFIX/_ID/_MODE) needs stronger value evidence.
      *
      * @param string $key - Upper-cased env-style key to test against the conservative suffix list.
      *
@@ -143,6 +152,7 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
      */
     private function isConservativeKeySuffix(string $key): bool
     {
+        // Check the key against the conservative, usually-label suffixes.
         foreach (['_NAME', '_PREFIX', '_ID', '_MODE'] as $suffix) {
             if (str_ends_with($key, $suffix)) {
                 // A descriptive suffix like _NAME means the value is usually a label, so flag it as conservative.
@@ -155,7 +165,7 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
     }
 
     /**
-     * Detect short identifier-like values that are usually not secrets.
+     * Reports whether a value is a plain label (kebab/snake/path fragment) rather than a secret.
      *
      * @param string $secretValue - Already-normalized value to classify as a plain label rather than a credential.
      *
@@ -186,7 +196,7 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
     }
 
     /**
-     * Detect field names, cache keys, and labels that include secret words but are not secret values.
+     * Reports whether a key/value is an identifier (cache key, field name, duration), not a credential.
      *
      * @param string $key - Upper-cased env-style key whose suffix steers which identifier shapes are allowed.
      * @param string $secretValue - Already-normalized value; tested for identifier shape rather than secret shape.

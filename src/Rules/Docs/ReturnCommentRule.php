@@ -40,7 +40,7 @@ final readonly class ReturnCommentRule implements RuleInterface
     public const ID = 'docs.return-comment';
 
     /**
-     * Describe the described-return-tag documentation rule.
+     * Describes the described-return-tag documentation rule for the registry and reports.
      *
      * @return RuleDefinition - rule metadata and defaults for the registry and listings
      */
@@ -59,7 +59,7 @@ final readonly class ReturnCommentRule implements RuleInterface
     }
 
     /**
-     * Find value-returning function-likes whose `@return` tag is present but undescribed.
+     * Reports each value-returning function-like whose `@return` tag is present but undescribed.
      *
      * @param AnalysisUnit $unit    - parsed unit to inspect
      * @param RuleContext  $context - rule context for this analysis pass
@@ -72,8 +72,10 @@ final readonly class ReturnCommentRule implements RuleInterface
         $nodes      = NodeIndex::nodesOfAny($unit, [ClassMethod::class, Function_::class]);
         $findings   = [];
 
+        // Check every method and function in the file.
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
+            // Only a value-returning callable has a result whose contract needs describing.
             if (!$this->isValueReturning($node)) {
                 continue;
             }
@@ -92,6 +94,7 @@ final readonly class ReturnCommentRule implements RuleInterface
                 continue;
             }
 
+            // A return tag that already carries a description meets the contract.
             if (PhpdocTagText::hasReturnTagDescription($returnBody)) {
                 continue;
             }
@@ -116,7 +119,7 @@ final readonly class ReturnCommentRule implements RuleInterface
     }
 
     /**
-     * Decide whether a function-like declaration returns a value whose contract needs describing.
+     * Reports whether a function-like declaration returns a value whose contract needs describing.
      *
      * A declared return type other than void/never counts; constructors and destructors never do
      * (mirroring MissingReturnTagRule). When no return type is declared, fall back to whether the
@@ -135,6 +138,7 @@ final readonly class ReturnCommentRule implements RuleInterface
 
         $returnType = $node->getReturnType();
 
+        // A simple named return type decides it directly: void/never carry no value.
         if ($returnType instanceof Identifier) {
             $typeName = strtolower($returnType->name);
 
@@ -152,7 +156,7 @@ final readonly class ReturnCommentRule implements RuleInterface
     }
 
     /**
-     * Detect at least one `return <expr>;` inside a function-like body.
+     * Reports whether a function-like body has at least one `return <expr>;` statement.
      *
      * @param ClassMethod|Function_ $node - function-like declaration whose body is scanned
      *
@@ -162,8 +166,10 @@ final readonly class ReturnCommentRule implements RuleInterface
     {
         $finder = new NodeFinder();
 
+        // Look for any return statement that carries a value.
         foreach ($finder->findInstanceOf((array)$node->stmts, Return_::class) as $return) {
             /** @var Return_ $return Finder predicate restricts results to return statements. */
+            // A `return <expr>;` proves the body yields a value.
             if ($return->expr !== null) {
                 return true;
             }

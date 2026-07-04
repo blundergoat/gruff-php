@@ -10,7 +10,12 @@ use PhpParser\Node\Expr;
 use PhpParser\Node\Stmt;
 
 /**
- * Classifies complexity shapes that raw branch counts mis-rank.
+ * Recognises the one complexity shape raw branch counts over-penalise: a flat run of top-level guard
+ * clauses, so the complexity rules can spare well-structured validation from a false warning.
+ *
+ * A method that opens with five-plus early-return `if` guards and no nesting reads as simple to a human
+ * yet scores high on branch count. isFlatGuardClauseFlow() spots exactly that pattern - flat, no
+ * else/elseif, every guard exits early, nothing heavier nested - so callers can downgrade its severity.
  */
 final readonly class ComplexityShapeClassifier
 {
@@ -18,7 +23,7 @@ final readonly class ComplexityShapeClassifier
     public const SHAPE_FLAT_GUARD_CLAUSES = 'flat-guard-clauses';
 
     /**
-     * Detect flat validation flow made of top-level guard clauses that each exit early.
+     * Reports whether a function-like body is a flat stack of early-exit guard clauses (5+, no nesting).
      *
      * @param Stmt\ClassMethod|Stmt\Function_ $node - Function-like node to classify.
      *
@@ -27,14 +32,18 @@ final readonly class ComplexityShapeClassifier
     public static function isFlatGuardClauseFlow(Stmt\ClassMethod|Stmt\Function_ $node): bool
     {
         $stmts = $node->stmts ?? [];
+        // An empty body has no guard shape to recognise.
         if ($stmts === []) {
             return false;
         }
 
         $topLevelIfs = 0;
+        // Every top-level statement must be a simple guard or a plain, control-free statement.
         foreach ($stmts as $stmt) {
+            // A top-level if has to be a simple early-exit guard.
             if ($stmt instanceof Stmt\If_) {
                 $topLevelIfs++;
+                // Any non-guard if breaks the flat shape.
                 if (!self::isSimpleTopLevelIf($stmt)) {
                     return false;
                 }
@@ -42,20 +51,25 @@ final readonly class ComplexityShapeClassifier
                 continue;
             }
 
+            // A loop or switch at the top level is not guard flow.
             if (self::isDisallowedTopLevelStatement($stmt)) {
                 return false;
             }
         }
 
+        // Fewer than five guards is ordinary branching, not the shape worth exempting.
         if ($topLevelIfs < 5) {
             return false;
         }
 
+        // No control flow may hide deeper in the body.
         foreach (NodeIndex::bodyDescendants($node) as $child) {
+            // A nested if (anything below the top level) breaks the flat shape.
             if ($child instanceof Stmt\If_ && $child->getAttribute('parent') !== $node) {
                 return false;
             }
 
+            // Any nested loop, switch, match, or ternary breaks it too.
             if (self::isDisallowedNestedControl($child)) {
                 return false;
             }
@@ -65,7 +79,7 @@ final readonly class ComplexityShapeClassifier
     }
 
     /**
-     * Check one top-level `if` for the flat guard shape: no else/elseif, no nested control, and an early exit.
+     * Reports whether one top-level if is a clean guard: no else/elseif, no nested control, exits early.
      *
      * @param Stmt\If_ $ifStatement - Candidate top-level if.
      *
@@ -73,11 +87,14 @@ final readonly class ComplexityShapeClassifier
      */
     private static function isSimpleTopLevelIf(Stmt\If_ $ifStatement): bool
     {
+        // An else or elseif means it is branching, not a one-way guard.
         if ($ifStatement->elseifs !== [] || $ifStatement->else !== null) {
             return false;
         }
 
+        // The guard body must hold no nested if or heavy control.
         foreach ($ifStatement->stmts as $stmt) {
+            // A nested if or loop disqualifies the guard.
             if ($stmt instanceof Stmt\If_ || self::isDisallowedTopLevelStatement($stmt)) {
                 return false;
             }
@@ -87,7 +104,7 @@ final readonly class ComplexityShapeClassifier
     }
 
     /**
-     * Decide whether a guard branch ends by leaving the method early.
+     * Reports whether a guard branch ends by leaving the method early (return, throw, or exit/die).
      *
      * Mirrors the terminator set the unreachable-code analysis uses: a `return`, or an `exit`/`die` or
      * `throw` expression. A guard clause short-circuits; a branch that does work and falls through is
@@ -103,10 +120,12 @@ final readonly class ComplexityShapeClassifier
     {
         $last = $stmts === [] ? null : $stmts[array_key_last($stmts)];
 
+        // A trailing return exits the method early.
         if ($last instanceof Stmt\Return_) {
             return true;
         }
 
+        // A trailing exit/die or throw also exits early.
         if ($last instanceof Stmt\Expression) {
             return $last->expr instanceof Expr\Exit_ || $last->expr instanceof Expr\Throw_;
         }
@@ -115,7 +134,7 @@ final readonly class ComplexityShapeClassifier
     }
 
     /**
-     * Reject statement-level constructs that mark decision trees or mixed responsibilities.
+     * Reports whether a node is nested control flow that disqualifies the flat-guard shape.
      *
      * @param Node $node - Statement or expression node to classify.
      *
@@ -135,7 +154,7 @@ final readonly class ComplexityShapeClassifier
     }
 
     /**
-     * Reject top-level statements that are too control-heavy for flat validation.
+     * Reports whether a top-level statement is too control-heavy to count as flat validation.
      *
      * @param Stmt $stmt - Top-level statement.
      *

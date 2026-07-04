@@ -24,7 +24,12 @@ use PhpParser\Node\Stmt\For_;
 use PhpParser\Node\Stmt\Function_;
 
 /**
- * Detects one-character variables outside narrow local conventions.
+ * Flags a single-character variable, parameter, or promoted property whose name says nothing about what it
+ * holds, so the user replaces throwaway names like `$d` or `$q` with something a later reader can follow.
+ *
+ * Narrow conventions are allowed: loop counters (`$i`, `$j`, ...) inside a `for`, `$e` for a caught
+ * exception, the `$_` throwaway, and any name on the project's accepted-abbreviation list. High confidence,
+ * advisory severity.
  */
 final readonly class ShortVariableRule implements RuleInterface
 {
@@ -44,7 +49,7 @@ final readonly class ShortVariableRule implements RuleInterface
     private const CATCH_ALLOWLIST = ['e'];
 
     /**
-     * Describe the short variable naming rule.
+     * Describes the short-variable naming rule for the registry and reports.
      *
      * @return RuleDefinition - the rule's identity, pillar, tier, and default Advisory severity used to stamp findings
      */
@@ -61,7 +66,7 @@ final readonly class ShortVariableRule implements RuleInterface
     }
 
     /**
-     * Find short variable names outside accepted local conventions.
+     * Reports single-character parameters and locals outside the accepted loop and catch conventions.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context carrying accepted abbreviations.
@@ -73,6 +78,7 @@ final readonly class ShortVariableRule implements RuleInterface
         $definition = $this->definition();
         $findings   = [];
 
+        // Judge each function-like scope for its short parameter and local names.
         foreach ((new FunctionLikeScopeWalker())->scopes($analysisUnit->statements) as $scope) {
             array_push(
                    $findings,
@@ -85,7 +91,7 @@ final readonly class ShortVariableRule implements RuleInterface
     }
 
     /**
-     * Find short parameters in one function-like scope.
+     * Finds the short parameters in one function-like scope.
      *
      * @param RuleDefinition    $definition - Rule identity and defaults stamped onto each emitted finding.
      * @param AnalysisUnit      $analysisUnit - Parsed unit supplying the display path and source for locations.
@@ -103,7 +109,9 @@ final readonly class ShortVariableRule implements RuleInterface
         $findings = [];
         $symbol   = $this->symbol($scope);
 
+        // Weigh each declared parameter.
         foreach ($scope->node->params as $param) {
+            // Skip anything without a plain string name.
             if (!$param->var instanceof Variable || !is_string($param->var->name)) {
                 continue;
             }
@@ -118,6 +126,7 @@ final readonly class ShortVariableRule implements RuleInterface
                 symbol:       $symbol,
             );
 
+            // Keep the parameter only when the name was actually too short.
             if ($finding instanceof Finding) {
                 $findings[] = $finding;
             }
@@ -127,7 +136,7 @@ final readonly class ShortVariableRule implements RuleInterface
     }
 
     /**
-     * Find short local variables in one function-like scope.
+     * Finds the short local variables in one function-like scope.
      *
      * @param RuleDefinition    $definition - Rule identity and defaults stamped onto each emitted finding.
      * @param AnalysisUnit      $analysisUnit - Parsed unit supplying the display path and source for locations.
@@ -147,11 +156,14 @@ final readonly class ShortVariableRule implements RuleInterface
         $loopVars  = $this->collectLoopVars($scope);
         $catchVars = $this->collectCatchVars($scope);
 
+        // Weigh each local the scope declares.
         foreach ($scope->localVariables as $name => $variable) {
+            // An allowed loop counter such as `$i` is fine inside a loop.
             if (in_array($name, self::LOOP_COUNTER_ALLOWLIST, true) && isset($loopVars[$name])) {
                 continue;
             }
 
+            // An allowed `$e` is fine as a caught exception.
             if (in_array($name, self::CATCH_ALLOWLIST, true) && isset($catchVars[$name])) {
                 continue;
             }
@@ -166,6 +178,7 @@ final readonly class ShortVariableRule implements RuleInterface
                 symbol:       $symbol,
             );
 
+            // Keep the local only when the name was actually too short.
             if ($finding instanceof Finding) {
                 $findings[] = $finding;
             }
@@ -175,7 +188,7 @@ final readonly class ShortVariableRule implements RuleInterface
     }
 
     /**
-     * Build a short-variable finding when the name violates the rule.
+     * Builds a short-variable finding when the name breaks the rule.
      *
      * @param RuleDefinition $definition - Rule identity and defaults stamped onto the finding when one is built.
      * @param AnalysisUnit   $analysisUnit - Parsed unit supplying the display path and source for the location.
@@ -223,7 +236,7 @@ final readonly class ShortVariableRule implements RuleInterface
     }
 
     /**
-     * Return a best-effort 1-indexed column for a variable or parameter name.
+     * Returns a best-effort 1-indexed column for a variable or parameter name.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit whose raw source is scanned for the name's offset.
      * @param Node         $node - Node whose start line selects which source line to search.
@@ -252,7 +265,7 @@ final readonly class ShortVariableRule implements RuleInterface
     }
 
     /**
-     * Collect variable names introduced by foreach loops.
+     * Collects the variable names introduced by `for` loops.
      *
      * @param FunctionLikeScope $scope - Scope whose body is searched for `for` loops; nested callables are excluded.
      *
@@ -262,7 +275,9 @@ final readonly class ShortVariableRule implements RuleInterface
     {
         $vars = [];
 
+        // Look at each for loop in the scope.
         foreach ($this->nodesInScope($scope, static fn(Node $node): bool => $node instanceof For_) as $loop) {
+            // The predicate already guarantees this; the guard narrows the type for the analyzer.
             if (!$loop instanceof For_) {
                 continue;
             }
@@ -274,7 +289,7 @@ final readonly class ShortVariableRule implements RuleInterface
     }
 
     /**
-     * Collect variable names introduced by catch clauses.
+     * Collects the variable names introduced by catch clauses.
      *
      * @param FunctionLikeScope $scope - Scope whose body is searched for `catch` clauses; nested callables excluded.
      *
@@ -284,7 +299,9 @@ final readonly class ShortVariableRule implements RuleInterface
     {
         $vars = [];
 
+        // Look at each catch clause in the scope.
         foreach ($this->nodesInScope($scope, static fn(Node $node): bool => $node instanceof Catch_) as $catch) {
+            // Record the named exception variable when the clause has one.
             if ($catch instanceof Catch_ && $catch->var !== null && is_string($catch->var->name)) {
                 $vars[$catch->var->name] = true;
             }
@@ -294,7 +311,7 @@ final readonly class ShortVariableRule implements RuleInterface
     }
 
     /**
-     * Collect variable references keyed by variable name.
+     * Collects the variable references under the given nodes, keyed by name.
      *
      * @param array<Node>        $nodes - AST nodes whose descendants are scanned for variable references.
      * @param array<string,true> $variables - Accumulator mutated in place; each discovered variable name is added as a key.
@@ -303,8 +320,11 @@ final readonly class ShortVariableRule implements RuleInterface
      */
     private function collectVariablesByName(array $nodes, array &$variables): void
     {
+        // Walk each supplied node.
         foreach ($nodes as $node) {
+            // Record each variable the scope-bounded walk finds beneath it.
             foreach ($this->nodesMatching([$node], static fn(Node $candidate): bool => $candidate instanceof Variable) as $variable) {
+                // Keep only plainly named variables.
                 if ($variable instanceof Variable && is_string($variable->name)) {
                     $variables[$variable->name] = true;
                 }
@@ -313,7 +333,7 @@ final readonly class ShortVariableRule implements RuleInterface
     }
 
     /**
-     * List descendant nodes in the current function-like scope.
+     * Filters the scope's pre-walked descendants down to the predicate matches.
      *
      * @param FunctionLikeScope    $scope - Scope whose precomputed body descendants are tested, one level deep.
      * @param callable(Node): bool $predicate - Returns true to keep a node; called once per descendant.
@@ -324,7 +344,9 @@ final readonly class ShortVariableRule implements RuleInterface
     {
         $matches = [];
 
+        // Filter the pre-walked descendants down to the caller's matches.
         foreach ($scope->bodyDescendants as $node) {
+            // Keep the nodes the predicate accepts.
             if ($predicate($node)) {
                 $matches[] = $node;
             }
@@ -334,7 +356,7 @@ final readonly class ShortVariableRule implements RuleInterface
     }
 
     /**
-     * Filter descendant nodes with a predicate.
+     * Collects the predicate matches under the given roots.
      *
      * @param list<Node>           $nodes - Roots to walk; each is traversed recursively until a nested callable.
      * @param callable(Node): bool $predicate - Returns true to keep a node; applied at every visited descendant.
@@ -345,6 +367,7 @@ final readonly class ShortVariableRule implements RuleInterface
     {
         $matches = [];
 
+        // Walk each root.
         foreach ($nodes as $node) {
             $this->collectMatchingNodes($node, $predicate, $matches);
         }
@@ -353,7 +376,7 @@ final readonly class ShortVariableRule implements RuleInterface
     }
 
     /**
-     * Append descendant nodes that satisfy a predicate.
+     * Appends the predicate-matching descendants, stopping at any nested callable.
      *
      * @param Node                 $node - Subtree root to inspect and recurse into for the current call.
      * @param callable(Node): bool $predicate - Returns true to keep a node; tested before descending.
@@ -368,17 +391,19 @@ final readonly class ShortVariableRule implements RuleInterface
             return;
         }
 
+        // Keep this node when it matches the predicate.
         if ($predicate($node)) {
             $matches[] = $node;
         }
 
+        // Descend into the node's children, staying inside this scope.
         foreach ($this->childNodes($node) as $child) {
             $this->collectMatchingNodes($child, $predicate, $matches);
         }
     }
 
     /**
-     * List direct child nodes that can be recursively traversed.
+     * Lists the direct child nodes that can be recursively traversed.
      *
      * @param Node $node - Parent whose declared sub-node slots are flattened into child AST nodes.
      *
@@ -388,6 +413,7 @@ final readonly class ShortVariableRule implements RuleInterface
     {
         $children = [];
 
+        // Flatten every sub-node slot the parser exposes for this node.
         foreach ($node->getSubNodeNames() as $name) {
             $this->collectChildNodes($node->{$name}, $children);
         }
@@ -396,7 +422,7 @@ final readonly class ShortVariableRule implements RuleInterface
     }
 
     /**
-     * Append traversable child nodes to the current collection.
+     * Appends the traversable child nodes found in one sub-node slot.
      *
      * @param mixed      $subNode - A raw sub-node slot: a Node, an array of them, or a scalar/null to ignore.
      * @param list<Node> $children - Accumulator appended to in place so the recursion builds one flat child list.
@@ -417,13 +443,14 @@ final readonly class ShortVariableRule implements RuleInterface
             return;
         }
 
+        // An array slot can hold several children, so recurse into each entry.
         foreach ($subNode as $childSubNode) {
             $this->collectChildNodes($childSubNode, $children);
         }
     }
 
     /**
-     * Resolve the human-readable symbol for a function-like scope.
+     * Resolves the human-readable symbol for a function-like scope.
      *
      * @param FunctionLikeScope $scope - Scope being labelled; its node decides named vs synthetic resolution.
      *
@@ -431,10 +458,12 @@ final readonly class ShortVariableRule implements RuleInterface
      */
     private function symbol(FunctionLikeScope $scope): string
     {
+        // Named callables resolve to their declared symbol.
         if ($scope->node instanceof ClassMethod || $scope->node instanceof Function_) {
             return CyclomaticComplexityRule::resolveSymbol($scope->node);
         }
 
+        // Closures and arrow functions have no name, so fall back to a kind@line label.
         return sprintf('%s@%d', $scope->kind, $scope->node->getStartLine());
     }
 }

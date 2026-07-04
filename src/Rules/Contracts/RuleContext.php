@@ -8,12 +8,17 @@ use GruffPhp\Engine\Config\AnalysisConfig;
 use GruffPhp\Engine\Config\RuleSettings;
 
 /**
- * Supplies project configuration and root path to rule execution.
+ * The per-run context handed to every rule as it executes, carrying the project root and the effective
+ * config so a rule can read its own thresholds and options.
+ *
+ * Rules never load config themselves; they ask this object. It bundles the analysis root (for resolving
+ * paths) with the merged AnalysisConfig, and settingsFor() hands back the enabled flag, thresholds, and
+ * options that apply to one rule once defaults and any user override are combined.
  */
 final readonly class RuleContext
 {
     /**
-     * Capture project-level context and effective rule configuration.
+     * Captures the project root and effective config for one analysis run.
      *
      * @param string         $projectRoot - Project root for the analysis run.
      * @param AnalysisConfig $config - Effective analysis configuration.
@@ -25,7 +30,7 @@ final readonly class RuleContext
     }
 
     /**
-     * Look up effective settings for a rule definition.
+     * Hands a rule the effective settings - enabled, thresholds, options - that apply to it this run.
      *
      * @param RuleDefinition $definition - Rule definition whose settings should be read.
      *

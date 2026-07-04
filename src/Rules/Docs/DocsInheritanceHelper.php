@@ -13,11 +13,18 @@ use PhpParser\Node\Stmt\Interface_;
 use PhpParser\NodeFinder;
 
 /**
- * Resolves inherited method documentation contracts for docs rules.
+ * Resolves whether a method inherits its documentation contract from a parent or interface, so the docs
+ * rules can exempt an override that legitimately relies on the ancestor's documented contract.
+ *
+ * Used by the missing-throws and missing-param rules: an `@inheritdoc` marker, an `#[Override]` attribute,
+ * or a documented same-file ancestor method all count as an inherited contract. Only ancestors declared in
+ * the same parsed unit are resolved; cross-file inheritance is out of scope.
  */
 final readonly class DocsInheritanceHelper
 {
     /**
+     * Reports whether a method inherits its documentation contract from a parent, interface, or marker.
+     *
      * @param ClassMethod     $classMethod - Method node whose inherited contract should be inspected.
      * @param list<Node\Stmt> $statements - Parsed statements used to find ancestor declarations.
      * @param NodeFinder      $nodeFinder - Node finder used to search inherited method candidates.
@@ -49,7 +56,7 @@ final readonly class DocsInheritanceHelper
     }
 
     /**
-     * Return short parent and implemented interface names for a class.
+     * Returns the short parent and implemented-interface names declared directly on a class.
      *
      * @param Class_ $class - Class declaration whose direct parent and interfaces should be collected.
      *
@@ -58,10 +65,12 @@ final readonly class DocsInheritanceHelper
     private function ancestorNames(Class_ $class): array
     {
         $ancestorNames = [];
+        // A named parent class is a direct ancestor.
         if ($class->extends instanceof Name) {
             $ancestorNames[] = $this->shortName($class->extends);
         }
 
+        // Each implemented interface is a direct ancestor too.
         foreach ($class->implements as $interface) {
             $ancestorNames[] = $this->shortName($interface);
         }
@@ -71,7 +80,7 @@ final readonly class DocsInheritanceHelper
     }
 
     /**
-     * Check direct ancestors in the same parsed unit for a documented method contract.
+     * Reports whether a same-file direct ancestor documents the given method.
      *
      * @param list<string>    $ancestorNames - Short names of direct ancestors.
      * @param string          $methodName - Lowercase method name to find.
@@ -86,11 +95,14 @@ final readonly class DocsInheritanceHelper
         array $statements,
         NodeFinder $nodeFinder,
     ): bool {
+        // Search every class-like in the unit for a matching ancestor.
         foreach ($nodeFinder->findInstanceOf($statements, ClassLike::class) as $candidate) {
+            // Only the class's named ancestors are worth searching.
             if (!$this->isNamedAncestorCandidate($candidate, $ancestorNames)) {
                 continue;
             }
 
+            // Look for the overridden method on the ancestor.
             foreach ($candidate->getMethods() as $ancestorMethod) {
                 if ($this->isDocumentedMethod($ancestorMethod, $methodName)) {
                     // First documented ancestor override is enough; the contract is inherited.
@@ -104,7 +116,7 @@ final readonly class DocsInheritanceHelper
     }
 
     /**
-     * Check whether a class-like node is a named direct ancestor candidate.
+     * Reports whether a class-like node is a named direct ancestor worth searching for methods.
      *
      * @param ClassLike    $candidate - Class-like node found in the unit, tested against the ancestor list.
      * @param list<string> $ancestorNames - Short names of direct ancestors.
@@ -125,7 +137,7 @@ final readonly class DocsInheritanceHelper
     }
 
     /**
-     * Check whether an ancestor method matches the target name and has PHPDoc.
+     * Reports whether an ancestor method matches the target name and carries a docblock.
      *
      * @param ClassMethod $ancestorMethod - Candidate ancestor method to compare by name and docblock.
      * @param string      $methodName - Already-lowercased name of the overriding method to match.
@@ -140,7 +152,7 @@ final readonly class DocsInheritanceHelper
     }
 
     /**
-     * Check whether a method docblock declares inheritdoc.
+     * Reports whether a method's own docblock declares inheritdoc.
      *
      * @param ClassMethod $classMethod - Method whose own docblock is scanned for an inheritdoc marker.
      *
@@ -155,7 +167,7 @@ final readonly class DocsInheritanceHelper
     }
 
     /**
-     * Check whether a method has an Override attribute.
+     * Reports whether a method carries an #[Override] attribute.
      *
      * @param ClassMethod $classMethod - Method whose attribute groups are scanned for #[Override].
      *
@@ -163,7 +175,9 @@ final readonly class DocsInheritanceHelper
      */
     private function hasOverrideAttribute(ClassMethod $classMethod): bool
     {
+        // Scan each attribute group on the method.
         foreach ($classMethod->attrGroups as $group) {
+            // Check each attribute for the Override marker.
             foreach ($group->attrs as $attribute) {
                 $shortName = strtolower($this->shortName($attribute->name));
                 if ($shortName === 'override') {
@@ -178,7 +192,7 @@ final readonly class DocsInheritanceHelper
     }
 
     /**
-     * Walk parent attributes to find the enclosing class.
+     * Walks the parent chain to the enclosing class, or null when the method lives outside a class.
      *
      * @param ClassMethod $classMethod - Method whose ancestor chain is walked outward to its class.
      *
@@ -188,6 +202,7 @@ final readonly class DocsInheritanceHelper
     {
         $parent = $classMethod->getAttribute('parent');
 
+        // Walk outward through the parent chain looking for the enclosing class.
         while ($parent instanceof Node) {
             if ($parent instanceof Class_) {
                 // Nearest enclosing Class_ wins; interfaces and traits are skipped by the loop condition.
@@ -202,7 +217,7 @@ final readonly class DocsInheritanceHelper
     }
 
     /**
-     * Return the final segment of a name node.
+     * Returns the final, unqualified segment of a name node.
      *
      * @param Name $name - Possibly namespaced name whose last segment is wanted.
      *

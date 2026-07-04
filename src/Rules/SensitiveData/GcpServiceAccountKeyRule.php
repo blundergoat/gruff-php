@@ -14,7 +14,8 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\SourceTextRuleInterface;
 
 /**
- * Detects committed GCP service-account key JSON.
+ * Flags committed GCP service-account key JSON, so the user can remove it, rotate the key in IAM, and load
+ * credentials from a secret manager instead.
  *
  * A service-account key is the JSON object Google issues with
  * `"type": "service_account"` and an embedded RSA `private_key`. The finding is
@@ -28,9 +29,9 @@ final readonly class GcpServiceAccountKeyRule implements SourceTextRuleInterface
     public const ID = 'sensitive-data.gcp-service-account-key';
 
     /**
-     * Describe the GCP service-account-key rule.
+     * Describes the GCP service-account-key rule for the registry and reports.
      *
-     * @return RuleDefinition - Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults (warning severity, high confidence).
      */
     public function definition(): RuleDefinition
     {
@@ -47,7 +48,7 @@ final readonly class GcpServiceAccountKeyRule implements SourceTextRuleInterface
     }
 
     /**
-     * Find service-account key JSON that embeds a private key.
+     * Reports committed GCP service-account key JSON, anchored at the service-account marker.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -82,8 +83,10 @@ final readonly class GcpServiceAccountKeyRule implements SourceTextRuleInterface
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
 
         $findings = [];
+        // Report each service-account marker found outside a comment.
         foreach ($matches[0] as $match) {
             [, $offset] = $match;
+            // A marker inside a comment is an example, not a committed key.
             if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
                 continue;
             }
@@ -104,7 +107,7 @@ final readonly class GcpServiceAccountKeyRule implements SourceTextRuleInterface
     }
 
     /**
-     * Decide whether the source carries a private-key body.
+     * Reports whether the source carries a private-key body (PEM armor or a JSON private_key field).
      *
      * @param string $source - Raw source text.
      *
@@ -122,7 +125,7 @@ final readonly class GcpServiceAccountKeyRule implements SourceTextRuleInterface
     }
 
     /**
-     * Decide whether the embedded key is a placeholder rather than real material.
+     * Reports whether the embedded key is a placeholder rather than real material.
      *
      * Real private-key bodies are long base64 blobs; placeholders are short
      * marker phrases. A length test on the armor-stripped body separates them
@@ -150,7 +153,7 @@ final readonly class GcpServiceAccountKeyRule implements SourceTextRuleInterface
     }
 
     /**
-     * Extract the first PEM private-key block from source text.
+     * Extracts the first PEM private-key block from the source, or null when none is present.
      *
      * @param string $source - Raw source text.
      *
@@ -169,7 +172,7 @@ final readonly class GcpServiceAccountKeyRule implements SourceTextRuleInterface
     }
 
     /**
-     * Extract the JSON private_key field value when present.
+     * Extracts the JSON private_key field value when present, or null when absent.
      *
      * @param string $source - Raw source text.
      *

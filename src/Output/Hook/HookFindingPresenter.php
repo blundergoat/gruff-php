@@ -8,17 +8,25 @@ use GruffPhp\Results\Finding\Finding;
 use JsonException;
 
 /**
- * Serialises native findings into the gruff.hook.v1 finding shape.
+ * Shapes internal `Finding` objects into the `gruff.hook.v1` finding entries the `hook` command
+ * emits to an editor or coding agent.
+ *
+ * This is the last pass before a finding leaves the tool: it copies the reportable fields, fills in
+ * a default remediation line when the rule offered none, and rewrites raw threshold metadata into
+ * the uniform `measured`/`threshold`/`unit`/`direction` shape a consumer can render as "you are at
+ * N, the limit is M" without knowing which rule fired. It also sorts a batch worst-first so the
+ * caller shows the most serious findings at the top of its list.
  */
 final readonly class HookFindingPresenter
 {
     /**
-     * Convert a finding to the hook-contract payload.
+     * Builds the single JSON finding entry the `hook` command emits for one result, copying the
+     * reportable fields and attaching the caller's stable identity plus a freshly recomputed fingerprint.
      *
-     * @param Finding $finding        - Native finding.
-     * @param string  $stableIdentity - Disambiguated hook identity for this finding, resolved across the full result set.
+     * @param Finding $finding        - The internal finding to reshape for the hook contract.
+     * @param string  $stableIdentity - Disambiguated hook identity for this finding, resolved across the full result set so no two entries collide.
      *
-     * @return array<string, mixed> - JSON-ready hook finding.
+     * @return array<string, mixed> - JSON-ready hook finding entry with `metadata` always an object, never an empty list.
      * @throws JsonException When the fingerprint cannot be encoded.
      */
     public function toArray(Finding $finding, string $stableIdentity): array
@@ -40,6 +48,7 @@ final readonly class HookFindingPresenter
             'fingerprint'    => $finding->fingerprint(),
         ];
 
+        // With no metadata to report, swap the empty array for an object so the JSON shows `"metadata": {}` and a consumer can always treat it as a keyed map, never a list.
         if ($payload['metadata'] === []) {
             $payload['metadata'] = (object)[];
         }
@@ -48,11 +57,12 @@ final readonly class HookFindingPresenter
     }
 
     /**
-     * Sort hook findings by severity descending, then file and line.
+     * Orders an already-presented batch worst-first - severity descending, then file, line, and rule
+     * id - so an editor or agent surfaces the most serious findings at the top of its list.
      *
-     * @param list<array<string, mixed>> $findings - Presented findings.
+     * @param list<array<string, mixed>> $findings - Presented hook findings to order; an empty list comes back unchanged.
      *
-     * @return list<array<string, mixed>> - Sorted findings.
+     * @return list<array<string, mixed>> - The same findings ordered worst-first for display.
      */
     public function sort(array $findings): array
     {
@@ -77,16 +87,19 @@ final readonly class HookFindingPresenter
     }
 
     /**
-     * Normalize threshold metadata to the hook contract while preserving native keys.
+     * Rewrites a threshold rule's raw metadata into the uniform `measured`/`threshold`/`unit`/`direction`
+     * shape the hook contract promises, so a consumer can render the measurement against its limit without
+     * knowing the rule. Non-threshold findings pass straight through.
      *
-     * @param Finding $finding - Native finding.
+     * @param Finding $finding - The finding whose metadata is being normalised for the hook payload.
      *
-     * @return array<string, mixed> - Hook metadata.
+     * @return array<string, mixed> - The normalised shape for a threshold finding, or the rule's raw metadata untouched for a non-threshold one; empty when the rule attached none, which a consumer shows as a finding with no measured detail.
      */
     private function metadata(Finding $finding): array
     {
         $metadata = $finding->metadata;
 
+        // A finding with no `threshold` key is not a limit breach - a naming or docs rule, say - so hand its metadata back untouched rather than inventing measured and limit fields.
         if (!isset($metadata['threshold'])) {
             return $metadata;
         }
@@ -103,26 +116,32 @@ final readonly class HookFindingPresenter
     }
 
     /**
-     * Pick the measured value from native threshold metadata.
+     * Digs the finding's measured value out of its metadata - the "N" in "you are at N, limit M", though
+     * the value may be any scalar - checking the keys this rule is known to use before falling back to any leftover number.
      *
-     * @param Finding $finding - Native finding.
+     * @param Finding $finding - The finding whose threshold measurement is being extracted.
      *
-     * @return bool|float|int|string|null - Measured value, when available.
+     * @return bool|float|int|string|null - The measured value to display; null when none was found, so the consumer shows the limit with no measured figure beside it.
      */
     private function measuredValue(Finding $finding): bool|float|int|string|null
     {
+        // First try the metadata keys this rule is known to store its measurement under, since those hold the measurement worth showing.
         foreach ($this->measuredKeys($finding->ruleId) as $key) {
             $value = $finding->metadata[$key] ?? null;
+            // Take the first known key that actually holds a scalar; that is the measurement the consumer will render.
             if (is_bool($value) || is_float($value) || is_int($value) || is_string($value)) {
                 return $value;
             }
         }
 
+        // No known key matched, so scan the rest of the metadata for any numeric value we can report instead.
         foreach ($finding->metadata as $key => $value) {
+            // Skip the limit and its type - those describe the boundary, not how far past it the code went.
             if ($key === 'threshold' || $key === 'thresholdType') {
                 continue;
             }
 
+            // Any remaining number is a fair stand-in for the measurement, so surface the first one found.
             if (is_float($value) || is_int($value)) {
                 return $value;
             }
@@ -132,11 +151,12 @@ final readonly class HookFindingPresenter
     }
 
     /**
-     * Return likely measured-value metadata keys for a rule.
+     * Names the metadata keys each rule stores its measurement under, giving `measuredValue()` a short
+     * priority list to check before it resorts to a blind numeric scan.
      *
-     * @param string $ruleId - Rule identifier.
+     * @param string $ruleId - The rule whose finding is being presented.
      *
-     * @return list<string> - Candidate metadata keys in priority order.
+     * @return list<string> - Candidate metadata keys in priority order; a generic `lines`/`count` pair for rules with no specific mapping.
      */
     private function measuredKeys(string $ruleId): array
     {
@@ -156,11 +176,12 @@ final readonly class HookFindingPresenter
     }
 
     /**
-     * Infer a human-stable unit for threshold metadata.
+     * Labels the measurement's unit - `lines`, `levels`, `score`, and so on - so a consumer can print
+     * "42 lines" or "5 levels" beside the threshold instead of a bare number.
      *
-     * @param Finding $finding - Native finding.
+     * @param Finding $finding - The finding whose measurement needs a unit label.
      *
-     * @return string - Unit label.
+     * @return string - The unit shown beside the measured value; `count` for any rule with no more specific unit.
      */
     private function unit(Finding $finding): string
     {
@@ -179,11 +200,12 @@ final readonly class HookFindingPresenter
     }
 
     /**
-     * Infer whether a threshold is breached above or below the limit.
+     * Says which way the limit was crossed so a consumer words the breach correctly: the maintainability
+     * index fails by dropping too low, every other threshold fails by climbing too high.
      *
-     * @param Finding $finding - Native finding.
+     * @param Finding $finding - The finding whose breach direction is being inferred.
      *
-     * @return string - above or below.
+     * @return string - `below` for the maintainability index, `above` for every other threshold rule.
      */
     private function direction(Finding $finding): string
     {
@@ -191,11 +213,12 @@ final readonly class HookFindingPresenter
     }
 
     /**
-     * Severity rank used by hook output sorting.
+     * Turns a severity word into a sortable rank so `sort()` can push errors above warnings above
+     * advisories when ordering a batch for display.
      *
-     * @param string $severity - Severity value.
+     * @param string $severity - The finding's severity word, such as `error`, `warning`, or `advisory`.
      *
-     * @return int - Higher means more severe.
+     * @return int - Sort rank where higher means more severe; an unrecognised severity ranks 0 and sinks to the bottom.
      */
     private static function severityRank(string $severity): int
     {

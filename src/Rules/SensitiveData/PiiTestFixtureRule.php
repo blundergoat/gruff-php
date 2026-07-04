@@ -14,7 +14,12 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\SourceTextRuleInterface;
 
 /**
- * Detects test fixtures that appear to contain personally identifiable data.
+ * Flags a realistic-looking PII value (email, phone, or street address) inside a test fixture, so the user
+ * can swap in reserved example data that can never point at a real person.
+ *
+ * A source-text rule scoped to test/fixture paths only. It exempts values that are obviously synthetic -
+ * reserved example domains, the 555-010x phone block, author/copyright attribution emails, and addresses
+ * carrying a marker word like "Test" or "Anytown". Warning severity, medium confidence.
  */
 final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
 {
@@ -35,7 +40,7 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     private const SYNTHETIC_ADDRESS_MARKERS = ['anytown', 'demo', 'fake', 'sample', 'test'];
 
     /**
-     * List the regex patterns enforced by this rule.
+     * Lists the PII detection patterns this rule scans for (email, phone, address).
      *
      * @return list<array{name: string, pattern: string}> - one entry per PII family, each a detector name paired with its match regex; order is the
      *                          scan order
@@ -52,7 +57,7 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     }
 
     /**
-     * Describe the PII test fixture rule.
+     * Describes the PII-test-fixture rule for the registry and reports.
      *
      * @return RuleDefinition - id, name, pillar, tier, and the warning/medium defaults a caller applies unless overridden
      */
@@ -80,7 +85,7 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     }
 
     /**
-     * Find realistic PII-like values inside test fixture files.
+     * Reports each realistic PII-like value in a fixture that survives the synthetic-data allowances.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -97,15 +102,20 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
 
         $findings      = [];
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
+        // Run each PII detector over the fixture source.
         foreach ($this->patterns() as $definition) {
+            // Match every occurrence of this PII shape, capturing each offset.
             preg_match_all($definition['pattern'], $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
+            // Weigh each candidate this detector found.
             foreach ($matches[0] as $match) {
                 [$candidateFixture, $offset] = $match;
+                // A match inside a comment is documentation, not fixture data.
                 if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
                     continue;
                 }
 
+                // Skip values the rule already treats as safely synthetic.
                 if ($this->isSuppressedMatch($definition['name'], $candidateFixture, $analysisUnit->source, $offset)) {
                     continue;
                 }
@@ -130,7 +140,7 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     }
 
     /**
-     * Decide whether a PII match falls under one of the rule's built-in allowances.
+     * Reports whether a PII match falls under one of the rule's built-in synthetic allowances.
      *
      * @param string $detectorName - Detector family of the match (email, phone, or address); gates the
      *                             detector-specific allowances.
@@ -143,6 +153,7 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
      */
     private function isSuppressedMatch(string $detectorName, string $candidateFixture, string $source, int $offset): bool
     {
+        // A clearly synthetic example is fine in any fixture.
         if ($this->isAllowedExample($candidateFixture)) {
             return true;
         }
@@ -157,7 +168,7 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     }
 
     /**
-     * Allow clearly synthetic example values.
+     * Reports whether a value is a clearly synthetic example (reserved domain or a 555-010x phone number).
      *
      * @param string $candidateFixture - Matched fixture text, lower-cased here before substring checks.
      *
@@ -176,7 +187,7 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     }
 
     /**
-     * Ignore email addresses that appear in attribution or copyright lines.
+     * Reports whether an email sits on an author/copyright line rather than being fixture PII.
      *
      * @param string $source - Full unit source, used to recover the physical line around the match.
      * @param int    $offset - Byte offset of the email match within the source.
@@ -193,7 +204,7 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     }
 
     /**
-     * Allow email addresses whose domain ends in a reserved special-use suffix.
+     * Reports whether an email's domain ends in a reserved, undeliverable special-use suffix.
      *
      * @param string $candidateFixture - Matched email text; only the domain part after the last `@` is examined.
      *
@@ -210,6 +221,7 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
 
         $domain = strtolower(substr($candidateFixture, $atPosition + 1));
 
+        // Compare the domain against each reserved special-use suffix.
         foreach (self::RESERVED_DOMAIN_SUFFIXES as $reservedSuffix) {
             if (str_ends_with($domain, $reservedSuffix)) {
                 // The suffix's leading dot enforces a label boundary, so only true reserved-zone domains pass.
@@ -222,7 +234,7 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     }
 
     /**
-     * Allow addresses whose matched tokens or surrounding line carry a synthetic marker word.
+     * Reports whether an address, or its surrounding line, carries a synthetic marker word.
      *
      * @param string $source - Full unit source, used to recover the physical line around the match.
      * @param int    $offset - Byte offset of the address match within the source.
@@ -244,7 +256,7 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     }
 
     /**
-     * Recover the lower-cased physical line that contains a byte offset.
+     * Recovers the lower-cased physical line that contains a byte offset.
      *
      * @param string $source - Full unit source being scanned.
      * @param int    $offset - Byte offset inside the source.

@@ -12,11 +12,19 @@ use GruffPhp\Results\Finding\Severity;
 use InvalidArgumentException;
 
 /**
- * Describes rule metadata, defaults, thresholds, and reporting text.
+ * The immutable description of one rule - its id, name, pillar, severity, defaults, thresholds, and the
+ * help text `list-rules` shows - that the registry and reports read to load, run, and explain it.
+ *
+ * Every rule returns one of these from definition(). It is the single source of truth for how a rule is
+ * named in findings and config, what its out-of-the-box severity and thresholds are, and what the user
+ * sees when they inspect it. The constructor validates the id shape and rejects a rule that declares
+ * both threshold forms (ADR-008).
  */
 final readonly class RuleDefinition
 {
     /**
+     * Builds a validated rule definition, rejecting a malformed id or a rule that mixes threshold forms.
+     *
      * @param string                                                                       $id - Stable rule identifier used in
      *                                                                                                          findings and config.
      * @param string                                                                       $name - Human-readable rule name.
@@ -69,6 +77,7 @@ final readonly class RuleDefinition
             throw new InvalidArgumentException(sprintf('Invalid rule id "%s".', $id));
         }
 
+        // A rule must pick one threshold form, not both (ADR-008).
         if ($severityThreshold instanceof SeverityThreshold && $defaultThresholds !== []) {
             throw new InvalidArgumentException(sprintf(
                                                    'Rule "%s" declares both severityThreshold and defaultThresholds; use one form.',
@@ -76,12 +85,14 @@ final readonly class RuleDefinition
                                                ));
         }
 
+        // Reject any blank threshold name, which config could never address.
         foreach (array_keys($defaultThresholds) as $name) {
             if ($name === '') {
                 throw new InvalidArgumentException(sprintf('Rule "%s" has an invalid threshold name.', $id));
             }
         }
 
+        // Reject any blank option name, which config could never address.
         foreach (array_keys($defaultOptions) as $name) {
             if ($name === '') {
                 throw new InvalidArgumentException(sprintf('Rule "%s" has an invalid option name.', $id));
@@ -90,7 +101,7 @@ final readonly class RuleDefinition
     }
 
     /**
-     * Return the configured description or fall back to the rule name.
+     * Returns the display description, falling back to the rule name when none was configured.
      *
      * @return string - Display text for rule listings and reports.
      */

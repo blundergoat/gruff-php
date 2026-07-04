@@ -23,7 +23,13 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 
 /**
- * Measures function-like branch count using cyclomatic complexity.
+ * Flags a function or method whose cyclomatic complexity - the number of independent branches through
+ * it - climbs above the configured threshold, since more branches mean more paths to test and follow.
+ *
+ * Runs per file over every function-like node with a body, counting decision points (ifs, loops,
+ * catches, short-circuit operators, match arms, non-default cases). Anything over the threshold (default
+ * warning above 20) is reported; a well-structured flat guard-clause method is softened to advisory so
+ * the shape is not over-penalised.
  */
 final readonly class CyclomaticComplexityRule implements RuleInterface
 {
@@ -63,7 +69,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     public const ID = 'complexity.cyclomatic';
 
     /**
-     * Describe the cyclomatic complexity rule.
+     * Describes the cyclomatic-complexity rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and thresholds.
      */
@@ -82,7 +88,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     }
 
     /**
-     * Find functions and methods whose cyclomatic complexity exceeds thresholds.
+     * Reports each function-like node whose cyclomatic complexity exceeds the configured threshold.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context carrying thresholds.
@@ -98,8 +104,10 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
 
         $findings = [];
 
+        // Measure every function and method in the file.
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node NodeIndex query is constrained to function-like classes. */
+            // An abstract or bodyless declaration has no branches to count.
             if (!self::hasExecutableBody($node)) {
                 continue;
             }
@@ -107,6 +115,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
             $ccn            = self::computeCyclomaticComplexity($node);
             $thresholdMatch = $settings->highValueThresholdMatch($ccn);
 
+            // A count within the threshold is fine, so skip it.
             if ($thresholdMatch === null) {
                 continue;
             }
@@ -156,6 +165,8 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     }
 
     /**
+     * Computes the cyclomatic complexity of one function-like node, memoised so a shared node counts once.
+     *
      * @param ClassMethod|Function_ $node - Function-like node whose control-flow constructs are counted.
      *
      * @return int - Cyclomatic complexity number.
@@ -163,10 +174,12 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     public static function computeCyclomaticComplexity(Node $node): int
     {
         static $cyclomaticCache = null;
+        // Lazily create the shared per-node cache on first use.
         if (!$cyclomaticCache instanceof \WeakMap) {
             $cyclomaticCache = new \WeakMap();
         }
 
+        // Reuse a memoised score when this node was already counted.
         if (isset($cyclomaticCache[$node])) {
             $cached = $cyclomaticCache[$node];
             if (is_int($cached)) {
@@ -177,13 +190,18 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
 
         $ccn = 1;
 
+        // Add a point for each decision node in the body.
         foreach (NodeIndex::bodyDescendants($node) as $child) {
+            // Each branch statement or short-circuit operator adds one.
             if (self::isDecisionNode($child)) {
                 $ccn++;
             }
 
+            // A match adds one point per arm condition.
             if ($child instanceof Expr\Match_) {
+                // Count each arm's conditions in turn.
                 foreach ($child->arms as $arm) {
+                    // The default arm has no conditions, so it adds nothing.
                     if ($arm->conds !== null) {
                         $ccn += count($arm->conds);
                     }
@@ -197,7 +215,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     }
 
     /**
-     * Check whether a node contributes one cyclomatic complexity point.
+     * Reports whether a node forks control flow and so adds one cyclomatic point.
      *
      * @param Node $child - Body descendant being classified as a decision point or not.
      *
@@ -212,7 +230,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     }
 
     /**
-     * Check whether a node is an instance of any configured class.
+     * Reports whether a node is an instance of any of the given classes.
      *
      * @param Node                      $node - Node whose runtime class is tested against the candidates.
      * @param list<class-string<Node>> $classes - Candidate node classes.
@@ -221,6 +239,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
      */
     private static function isInstanceOfAny(Node $node, array $classes): bool
     {
+        // Check the node against each candidate class.
         foreach ($classes as $class) {
             if ($node instanceof $class) {
                 // First matching class is enough; the caller only needs membership, not which class matched.
@@ -232,7 +251,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     }
 
     /**
-     * Build a display symbol for a function-like node.
+     * Builds the display symbol for a function-like node (Class::method() or function()).
      *
      * @param ClassMethod|Function_ $node - Function-like node to describe.
      *
@@ -240,6 +259,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
      */
     public static function resolveSymbol(ClassMethod|Function_ $node): string
     {
+        // A method is qualified by its owning class name.
         if ($node instanceof ClassMethod) {
             $parent    = $node->getAttribute('parent');
             $className = $parent instanceof Stmt\Class_
@@ -248,6 +268,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
                 ? ($parent->name?->toString() ?? 'class@anonymous')
                 : null;
 
+            // Qualify with the class name when known, otherwise use the bare method name.
             return $className !== null
                 ? sprintf('%s::%s()', $className, $node->name->toString())
                 : $node->name->toString() . '()';
@@ -257,7 +278,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     }
 
     /**
-     * Whether a function-like node has an executable body to measure.
+     * Reports whether a function-like node has a real body to measure (abstract/interface methods do not).
      *
      * Abstract methods, interface methods, and other bodyless signatures parse as
      * a {@see ClassMethod} with `stmts === null`: they declare a contract but
@@ -279,7 +300,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     }
 
     /**
-     * Format threshold numbers without unnecessary decimal places.
+     * Formats a threshold number for the message, dropping a whole number's ".0" tail.
      *
      * @param int|float $number - Configured threshold to render; whole floats are shown without a trailing decimal.
      *
@@ -287,6 +308,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
      */
     private static function formatNumber(int|float $number): string
     {
+        // A genuine fraction keeps its decimals; a whole value is shown without them.
         if (is_float($number) && floor($number) !== $number) {
             return (string) $number;
         }

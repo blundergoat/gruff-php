@@ -17,7 +17,12 @@ use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Node\Stmt;
 
 /**
- * Detects public mutable properties that expose object state directly.
+ * Flags a public mutable property that lets any caller read and overwrite object state directly, so the
+ * user can move to readonly properties or accessor methods that keep the class's invariants intact.
+ *
+ * Runs per file over every class, skipping DTO-style data carriers where public fields are the whole
+ * point. Each remaining public, non-static, non-readonly property is reported at warning - gruff-php only
+ * surfaces it, it never rewrites the property for you.
  */
 final readonly class PublicPropertyRule implements RuleInterface
 {
@@ -27,9 +32,9 @@ final readonly class PublicPropertyRule implements RuleInterface
     public const ID = 'modernisation.public-property';
 
     /**
-     * Describe the public property modernisation rule.
+     * Describes the public-property modernisation rule for the registry and reports.
      *
-     * @return RuleDefinition - Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults (warning severity, high confidence).
      */
     public function definition(): RuleDefinition
     {
@@ -44,27 +49,32 @@ final readonly class PublicPropertyRule implements RuleInterface
     }
 
     /**
-     * Find mutable public properties that expose object state directly.
+     * Reports each public mutable property that exposes state a caller could overwrite.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> - Findings for public property declarations.
+     * @return list<Finding> - One finding per exposed public mutable property; empty when every class guards its state.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $findings = [];
 
+        // Inspect every class declared in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Class_::class) as $class) {
+            // A DTO exists to carry public data, so its public fields are intentional, not a leak.
             if (ModernisationNodeHelper::isDtoClass($class)) {
                 continue;
             }
 
+            // Check each property the class declares.
             foreach ($class->getProperties() as $property) {
+                // Only a plain public, non-static, non-readonly property exposes overwritable state.
                 if (!$property->isPublic() || $property->isStatic() || $property->isReadonly()) {
                     continue;
                 }
 
+                // One declaration can name several properties, so report each name separately.
                 foreach ($property->props as $propertyProperty) {
                     $name       = $propertyProperty->name->toString();
                     $findings[] = new Finding(

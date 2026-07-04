@@ -11,15 +11,21 @@ use PhpParser\Node\FunctionLike;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\Node\Scalar;
+use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
 /**
- * Provides shared AST helpers for security rules.
+ * Shared AST helpers that back every security rule - taint tracking, receiver/class resolution, argument
+ * unwrapping, and the branch-reachability model that decides when an earlier write can hide a finding.
+ *
+ * Rules delegate here so `gruff-php analyse --pillar security` applies one consistent notion of "request
+ * input", "same-scope taint", and "skippable write" across header injection, XSS, SSRF, and the rest.
+ * All methods are static and side-effect free; taint analysis is bounded to a single function-like scope.
  */
 final class SecurityNodeHelper
 {
     /**
-     * List PHP superglobals treated as request-controlled input.
+     * Lists the PHP superglobals treated as request-controlled input.
      *
      * @return list<string> - superglobal variable names without the leading `$`, treated as tainted sources
      */
@@ -30,7 +36,43 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Resolve a non-namespaced function call to its lower-case name.
+     * Reports whether a node is one of the assignment shapes local taint tracking understands.
+     *
+     * This decides which writes every security sink sees when a user runs, for example,
+     * `gruff-php analyse src --include-rule security.header-injection`. Concat assignment
+     * is tracked because appending request input taints a value exactly like assigning it.
+     * Reference assignment is deliberately NOT tracked: `=&` creates an alias whose later
+     * writes flow both ways, which last-write-wins tracking would classify backwards, so
+     * aliased flows stay out of scope rather than mislead the user. Arithmetic operators
+     * stay out until a concrete sink justifies them.
+     *
+     * @param Node $node - Candidate node from a scope walk.
+     *
+     * @return bool - true for plain assignment or concat assignment nodes
+     */
+    public static function isTaintTrackedAssignment(Node $node): bool
+    {
+        return $node instanceof Expr\Assign
+            || $node instanceof Expr\AssignOp\Concat;
+    }
+
+    /**
+     * Resolves the plain local variable a taint-tracked assignment writes to.
+     *
+     * @param Expr\Assign|Expr\AssignOp\Concat $assignment - Assignment node from a scope walk.
+     *
+     * @return string|null - the written variable name, or null for property/offset/dynamic targets that local
+     *                     taint tracking does not model
+     */
+    public static function assignmentTargetName(Expr\Assign|Expr\AssignOp\Concat $assignment): ?string
+    {
+        return $assignment->var instanceof Expr\Variable && is_string($assignment->var->name)
+            ? $assignment->var->name
+            : null;
+    }
+
+    /**
+     * Resolves a non-namespaced function call to its lower-case name.
      *
      * @param FuncCall $call - Function call node to inspect.
      *
@@ -54,6 +96,8 @@ final class SecurityNodeHelper
     }
 
     /**
+     * Returns the unwrapped value of a positional call argument by index.
+     *
      * @param array<int|string, Node\Arg|Node\VariadicPlaceholder> $args - Call argument nodes to inspect.
      * @param int                                                  $index - Zero-based argument index.
      *
@@ -62,6 +106,7 @@ final class SecurityNodeHelper
     public static function argumentValue(array $args, int $index): ?Expr
     {
         $arg = $args[$index] ?? null;
+        // A missing slot or a variadic spread has no plain value to hand back.
         if (!$arg instanceof Node\Arg) {
             return null;
         }
@@ -70,7 +115,7 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Resolve a constant fetch to its normalized constant name.
+     * Resolves a constant fetch to its normalized constant name.
      *
      * @param Node $node - Node to inspect.
      *
@@ -94,7 +139,7 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Determine whether a node statically represents a false-like value.
+     * Reports whether a node statically represents a false-like value.
      *
      * @param Node $node - Node to inspect.
      *
@@ -117,7 +162,7 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Detect whether an expression reads from user-input superglobals.
+     * Reports whether an expression reads from user-input superglobals.
      *
      * Also follows simple same-scope local assignments before the inspected
      * expression so sinks catch `$next = $_GET["next"]; header($next);`.
@@ -138,7 +183,7 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Detect direct reads from request superglobals within a node tree.
+     * Reports whether a node tree directly reads a request superglobal.
      *
      * @param Node $node - Node tree to inspect.
      *
@@ -157,7 +202,7 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Detect local variables that were assigned request data earlier in the same scope.
+     * Reports whether a node reads a local that was assigned request data earlier in the same scope.
      *
      * @param Node $node - Node tree to inspect.
      *
@@ -191,6 +236,7 @@ final class SecurityNodeHelper
 
         $taintedVariables = self::taintedVariableNamesBefore(array_values($statements), $scope, $sinkPosition);
 
+        // A sink that reads any tainted local is carrying laundered request data.
         foreach ($referencedVariables as $variableName) {
             if (isset($taintedVariables[$variableName])) {
                 // The sink reads a local that an earlier same-scope assignment filled from request input.
@@ -203,6 +249,8 @@ final class SecurityNodeHelper
     }
 
     /**
+     * Computes the set of local variable names tainted before the sink position.
+     *
      * @param list<Node\Stmt> $statements - Statements in the owning function-like scope, walked up to the sink position.
      * @param FunctionLike    $scope - Scope that owns the sink expression.
      * @param int             $sinkPosition - Byte offset of the sink expression.
@@ -215,30 +263,40 @@ final class SecurityNodeHelper
         $nodeFinder       = new NodeFinder();
         $assignments      = $nodeFinder->find(
             $statements,
-            static fn(Node $candidate): bool => $candidate instanceof Expr\Assign
+            static fn(Node $candidate): bool => self::isTaintTrackedAssignment($candidate)
                                                 && $candidate->getStartFilePos() >= 0
                                                 && $candidate->getStartFilePos() < $sinkPosition,
         );
 
+        // Replay each write in source order so the taint state at the sink reflects what really ran.
         foreach ($assignments as $assignment) {
-            if (!$assignment instanceof Expr\Assign) {
+            // Narrow to the tracked assignment shapes; the finder predicate already matched them.
+            if (!$assignment instanceof Expr\Assign && !$assignment instanceof Expr\AssignOp\Concat) {
                 continue;
             }
 
+            // Writes inside nested closures cannot affect this scope's locals at the sink.
             if (self::enclosingFunctionLike($assignment) !== $scope) {
                 continue;
             }
 
-            if (!$assignment->var instanceof Expr\Variable || !is_string($assignment->var->name)) {
+            $variableName = self::assignmentTargetName($assignment);
+            // Property and array-offset targets are beyond same-scope local tracking; skip them.
+            if ($variableName === null) {
                 continue;
             }
 
-            $variableName = $assignment->var->name;
+            // Request data on the right side, direct or via an already-tainted local, taints the target.
             if (
                 self::containsDirectUserInput($assignment->expr)
                 || self::hasTaintedVariableReference($assignment->expr, $taintedVariables)
             ) {
                 $taintedVariables[$variableName] = true;
+                continue;
+            }
+
+            // A clean concat append neither taints nor cleans: the variable keeps whatever it held.
+            if ($assignment instanceof Expr\AssignOp\Concat) {
                 continue;
             }
 
@@ -251,7 +309,7 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Check whether a node references a known tainted variable.
+     * Reports whether a node references a known tainted variable.
      *
      * @param Node                $node - Node tree to inspect.
      * @param array<string, true> $taintedVariables - Tainted local-variable names known at the current sink or assignment.
@@ -260,6 +318,7 @@ final class SecurityNodeHelper
      */
     private static function hasTaintedVariableReference(Node $node, array $taintedVariables): bool
     {
+        // Any referenced name that is already tainted pulls request data into this expression.
         foreach (self::referencedVariableNames($node) as $variableName) {
             if (isset($taintedVariables[$variableName])) {
                 // The expression reads an already-tainted local, so taint propagates to this assignment.
@@ -272,7 +331,7 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Return non-superglobal variable names referenced by a node tree.
+     * Returns the non-superglobal variable names referenced by a node tree.
      *
      * @param Node $node - Node tree to inspect.
      *
@@ -284,11 +343,14 @@ final class SecurityNodeHelper
         $nodeFinder = new NodeFinder();
         $variables  = $nodeFinder->find($node, static fn(Node $candidate): bool => $candidate instanceof Expr\Variable);
 
+        // Collect every variable leaf the finder returned beneath the tree.
         foreach ($variables as $variable) {
+            // Guard the finder's loose node type before reading the name.
             if (!$variable instanceof Expr\Variable) {
                 continue;
             }
 
+            // Keep plainly named locals only; superglobals are sources, not laundered aliases.
             if (is_string($variable->name) && !in_array($variable->name, self::userInputSuperglobals(), true)) {
                 $names[$variable->name] = true;
             }
@@ -299,7 +361,162 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Find the function, method, or closure scope containing a node.
+     * Collects the identities of every ancestor between a node and its scope boundary.
+     *
+     * @param Node      $node - Node whose ancestor chain is captured (typically a sink call).
+     * @param Node|null $scopeBoundary - Enclosing function-like to stop at, or null to walk to the file root.
+     *
+     * @return array<int, true> - set of ancestor object ids, so a write can test whether it shares the sink's branches
+     */
+    public static function ancestorIdsWithin(Node $node, ?Node $scopeBoundary): array
+    {
+        $ancestorIds = [];
+        $parent      = $node->getAttribute('parent');
+
+        // Record every ancestor up to (excluding) the scope boundary.
+        while ($parent instanceof Node && $parent !== $scopeBoundary) {
+            $ancestorIds[spl_object_id($parent)] = true;
+            $parent                              = $parent->getAttribute('parent');
+        }
+
+        return $ancestorIds;
+    }
+
+    /**
+     * Reports whether a finding can still reach the report without this earlier write running.
+     *
+     * A write inside a branch the sink does not share may be skipped on the path that
+     * reaches the sink, so trackers let such writes add evidence toward a finding but
+     * never erase what an earlier write established. A write inside the sink's own
+     * branch chain always runs before the sink and counts as unconditional.
+     *
+     * @param Node            $node - Write/event node whose reachability is being classified.
+     * @param Node            $sink - Sink node whose runtime path must be reached.
+     * @param Node|null       $scopeBoundary - Enclosing function-like boundary, or null for file scope.
+     * @param array<int, true> $sinkAncestorIds - Ancestor-id set of the sink, from ancestorIdsWithin().
+     *
+     * @return bool - true when the user-facing finding must keep earlier taint evidence alive
+     */
+    public static function isSkippableBeforeSink(Node $node, Node $sink, ?Node $scopeBoundary, array $sinkAncestorIds): bool
+    {
+        $parent = $node->getAttribute('parent');
+
+        // Walk outward from the write until the sink's scope boundary is reached.
+        while ($parent instanceof Node && $parent !== $scopeBoundary) {
+            // A skipping ancestor means the CLI must not let this write erase a possible finding.
+            if (self::isPotentialSkippingConstruct($parent)) {
+                $parentId = spl_object_id($parent);
+
+                // If the sink is outside this branch, users can reach the sink without this write.
+                if (!isset($sinkAncestorIds[$parentId])) {
+                    return true;
+                }
+
+                // Sibling if/else paths also keep earlier taint visible in the report.
+                if ($parent instanceof Stmt\If_ && self::hasDifferentIfBranches($node, $sink, $parent)) {
+                    return true;
+                }
+            }
+
+            $parent = $parent->getAttribute('parent');
+        }
+
+        return false;
+    }
+
+    /**
+     * Reports whether a node can skip code that would affect a user-facing finding.
+     *
+     * @param Node $node - Candidate ancestor node between a write and sink.
+     *
+     * @return bool - true when this ancestor can make the write optional before the sink
+     */
+    private static function isPotentialSkippingConstruct(Node $node): bool
+    {
+        return $node instanceof Stmt\If_
+            || $node instanceof Stmt\ElseIf_
+            || $node instanceof Stmt\Else_
+            || $node instanceof Stmt\Switch_
+            || $node instanceof Stmt\Case_
+            || $node instanceof Stmt\While_
+            || $node instanceof Stmt\Do_
+            || $node instanceof Stmt\For_
+            || $node instanceof Stmt\Foreach_
+            || $node instanceof Stmt\Catch_
+            || $node instanceof Expr\Ternary
+            || $node instanceof Expr\Match_
+            || $node instanceof Expr\BinaryOp\BooleanAnd
+            || $node instanceof Expr\BinaryOp\BooleanOr
+            || $node instanceof Expr\BinaryOp\Coalesce;
+    }
+
+    /**
+     * Reports whether two nodes sit in different branches of one if-chain.
+     *
+     * @param Node     $node - Write/event node being classified.
+     * @param Node     $sink - Sink node whose path is being compared.
+     * @param Stmt\If_ $ifStatement - Shared if-chain ancestor.
+     *
+     * @return bool - true when the CLI should keep earlier taint because only one branch runs
+     */
+    private static function hasDifferentIfBranches(Node $node, Node $sink, Stmt\If_ $ifStatement): bool
+    {
+        $nodeBranch = self::ifBranchKey($node, $ifStatement);
+        $sinkBranch = self::ifBranchKey($sink, $ifStatement);
+
+        return $nodeBranch !== null && $sinkBranch !== null && $nodeBranch !== $sinkBranch;
+    }
+
+    /**
+     * Identifies which if-chain body a node belongs to for reporting decisions.
+     *
+     * Conditions return null because they run before the body the user can reach.
+     *
+     * @param Node     $node - Descendant candidate.
+     * @param Stmt\If_ $ifStatement - If-chain ancestor to classify against.
+     *
+     * @return string|null - stable branch key for if/elseif/else bodies, or null for conditions/unrelated nodes
+     */
+    private static function ifBranchKey(Node $node, Stmt\If_ $ifStatement): ?string
+    {
+        $current = $node;
+        $parent  = $current->getAttribute('parent');
+
+        // Climb toward the shared if-chain, then classify which branch body this node sits in.
+        while ($parent instanceof Node) {
+            // Once the shared if-chain is reached, classify the direct child branch.
+            if ($parent === $ifStatement) {
+                // The main if body is one possible path to the user-facing sink.
+                if (in_array($current, $ifStatement->stmts, true)) {
+                    return 'if';
+                }
+
+                // Each elseif body is a separate path in the report's runtime story.
+                foreach ($ifStatement->elseifs as $elseIf) {
+                    // A matching elseif node means the write and sink may be mutually exclusive.
+                    if ($current === $elseIf) {
+                        return 'elseif:' . spl_object_id($elseIf);
+                    }
+                }
+
+                // The else body is the fallback path a user can reach when earlier tests fail.
+                if ($ifStatement->else instanceof Stmt\Else_ && $current === $ifStatement->else) {
+                    return 'else:' . spl_object_id($ifStatement->else);
+                }
+
+                // Conditions and unrelated children are not branch bodies, so they cannot split the finding.
+                return null;
+            }
+
+            $current = $parent;
+            $parent  = $current->getAttribute('parent');
+        }
+
+        return null;
+    }
+
+    /**
+     * Returns the function, method, or closure scope containing a node.
      *
      * @param Node $node - Node whose containing function-like scope is needed.
      *
@@ -307,6 +524,7 @@ final class SecurityNodeHelper
      */
     public static function enclosingFunctionLike(Node $node): ?FunctionLike
     {
+        // Climb the parent chain to the nearest function-like owner.
         $current = $node;
         while ($current instanceof Node) {
             if ($current instanceof FunctionLike) {
@@ -323,7 +541,7 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Detect string construction patterns that can hide unsafe concatenation.
+     * Reports whether a node tree builds a string via concatenation or interpolation.
      *
      * @param Node $node - Node tree to inspect.
      *
@@ -341,7 +559,7 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Identify literal string nodes for security-rule exemptions.
+     * Reports whether a node is a literal string, for security-rule exemptions.
      *
      * @param Node $node - Node to inspect.
      *
@@ -353,7 +571,7 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Build the display name used when reporting a function call.
+     * Builds the display name used when reporting a function call.
      *
      * @param FuncCall $call - Function call node to describe.
      *
@@ -367,7 +585,7 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Resolve a method name to its lower-case string when statically known.
+     * Resolves a method name to its lower-case string when statically known.
      *
      * @param Expr\MethodCall|Expr\StaticCall $call - Call node to inspect.
      *
@@ -375,6 +593,7 @@ final class SecurityNodeHelper
      */
     public static function methodName(Expr\MethodCall|Expr\StaticCall $call): ?string
     {
+        // A computed method name (e.g. $obj->$method()) has no static string to resolve.
         if (!$call->name instanceof Identifier) {
             return null;
         }
@@ -383,7 +602,7 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Resolve a class node to a lower-case class name when statically known.
+     * Resolves a class node to a lower-case class name when statically known.
      *
      * @param Node $class - Class node from a new/static call.
      *
@@ -407,7 +626,7 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Match a class node against exact FQCNs or short class names.
+     * Reports whether a class node matches any exact FQCN or short class name.
      *
      * @param Node         $class - Class node from a new/static call.
      * @param list<string> $classNames - FQCNs or short class names to match.
@@ -416,18 +635,24 @@ final class SecurityNodeHelper
      */
     public static function hasMatchingClassName(Node $class, array $classNames): bool
     {
+        // Matching is deliberately name-based (short names match FQCN tails and vice versa): a userland
+        // class sharing a built-in's short name matches too. Callers accept name evidence, not resolved
+        // types, so imported and fully-qualified spellings keep matching without a name-resolution pass.
         $resolvedName = self::className($class);
         if ($resolvedName === null) {
             // An unresolvable class name can never equal a configured target, so it cannot match.
             return false;
         }
 
+        // Weigh the resolved name against each configured target.
         foreach ($classNames as $className) {
             $normalized = strtolower(ltrim($className, '\\'));
+            // An exact match on the normalised name is a direct hit.
             if ($resolvedName === $normalized) {
                 return true;
             }
 
+            // A short target also matches when it is the final segment of the resolved FQCN.
             if (!str_contains($normalized, '\\') && str_ends_with($resolvedName, '\\' . $normalized)) {
                 return true;
             }
@@ -437,7 +662,7 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Detect whether a node tree contains an HTTP(S) literal.
+     * Reports whether a node tree contains an HTTP(S) literal.
      *
      * @param Node $node - Node tree to inspect.
      *
@@ -459,7 +684,7 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Detect whether an expression references likely sensitive data.
+     * Reports whether an expression references likely sensitive data.
      *
      * @param Node $node - Node tree to inspect.
      *
@@ -501,7 +726,7 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Detect env-reader calls that request a sensitive key.
+     * Reports whether a call is an env reader requesting a sensitive key.
      *
      * @param FuncCall $call - Call node to inspect; only env readers (getenv/env/apache_getenv) are considered.
      *
@@ -526,7 +751,7 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Detect secret-like words in identifiers or string keys.
+     * Reports whether text contains a secret-like word (identifier or string key).
      *
      * @param string $contextText - Identifier or string-key text to scan; the value itself, never a read secret.
      *

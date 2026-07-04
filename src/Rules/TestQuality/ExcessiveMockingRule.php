@@ -15,7 +15,9 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
 
 /**
- * Detects tests with enough mocks to hide the behavior under test.
+ * Flags a test that stands up more mock objects than the configured cap - a signal the test is pinned to
+ * its collaborators' choreography rather than the behaviour under test, and will break on any refactor.
+ * Runs over every test in the file; the cap is tunable. Advisory, medium confidence.
  */
 final readonly class ExcessiveMockingRule implements RuleInterface
 {
@@ -25,7 +27,7 @@ final readonly class ExcessiveMockingRule implements RuleInterface
     public const ID = 'test-quality.excessive-mocking';
 
     /**
-     * Describe the excessive mocking rule.
+     * Describes the excessive-mocking rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -44,7 +46,7 @@ final readonly class ExcessiveMockingRule implements RuleInterface
     }
 
     /**
-     * Find tests that create more mocks than the configured threshold.
+     * Reports tests that create more mocks than the configured threshold.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -57,14 +59,18 @@ final readonly class ExcessiveMockingRule implements RuleInterface
         $maxMocks   = (int) $ruleContext->settingsFor($definition)->numericThreshold('maxMocks');
         $findings   = [];
 
+        // Weigh every test scope in the file.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             $mockCount = 0;
+            // Count how many mocks the test stands up.
             foreach (TestQualityNodeHelper::calls($scope) as $call) {
+                // Only mock-creation calls add to the tally.
                 if (TestQualityNodeHelper::isMockCreationCall($call)) {
                     $mockCount++;
                 }
             }
 
+            // Stay quiet while the mock count is within the configured cap.
             if ($mockCount <= $maxMocks) {
                 continue;
             }

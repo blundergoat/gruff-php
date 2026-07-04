@@ -14,7 +14,8 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\SourceTextRuleInterface;
 
 /**
- * Detects HTTP(S) URLs that embed `user:password@host` credentials.
+ * Flags an HTTP(S) URL that embeds `user:password@host` credentials, so the user can move authentication
+ * into headers or a secret store instead of leaving it in source.
  *
  * Complements `sensitive-data.database-url-password` (which covers DB schemes);
  * this rule scopes to `http`/`https` only, so the two never match the same URL.
@@ -26,9 +27,9 @@ final readonly class UrlEmbeddedCredentialsRule implements SourceTextRuleInterfa
     public const ID = 'sensitive-data.url-credentials';
 
     /**
-     * Describe the URL-embedded-credentials rule.
+     * Describes the URL-embedded-credentials rule for the registry and reports.
      *
-     * @return RuleDefinition - Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults (warning severity, high confidence).
      */
     public function definition(): RuleDefinition
     {
@@ -45,7 +46,7 @@ final readonly class UrlEmbeddedCredentialsRule implements SourceTextRuleInterfa
     }
 
     /**
-     * Find http(s) URLs that embed a password credential.
+     * Reports each http(s) URL that embeds a password credential, redacting the password.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -60,6 +61,7 @@ final readonly class UrlEmbeddedCredentialsRule implements SourceTextRuleInterfa
             return [];
         }
 
+        // Match every http(s) URL that carries an inline credential, capturing user, password, and host.
         preg_match_all(
             '#\bhttps?://(?<user>[^:\s/@]+):(?<password>[^@\s"\']+)@(?<host>[^\s"\']+)#i',
             $analysisUnit->source,
@@ -69,18 +71,23 @@ final readonly class UrlEmbeddedCredentialsRule implements SourceTextRuleInterfa
 
         $findings      = [];
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
+        // Weigh each URL the scan found.
         foreach ($matches[0] as $index => $match) {
             [$credentialUrl, $offset] = $match;
+            // A URL inside a comment is an example, not a live credential.
             if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
                 continue;
             }
 
             $password = $matches['password'][$index][0];
+            // An obvious placeholder password is not a real secret.
             if (SecretScannerHelper::isLikelyDummyValue($password)) {
                 continue;
             }
 
+            // Redact the password in the preview so the finding never carries the real value.
             $preview = preg_replace('#:' . preg_quote($password, '#') . '@#', ':<redacted:' . strlen($password) . ' chars>@', $credentialUrl);
+            // Fall back to a fully redacted URL if the replace could not run.
             if (!is_string($preview)) {
                 $preview = '<redacted URL credential>';
             }

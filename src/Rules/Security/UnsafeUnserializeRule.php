@@ -18,7 +18,11 @@ use PhpParser\Node\Expr;
 use PhpParser\Node\Scalar;
 
 /**
- * Detects unserialize calls that can hydrate attacker-controlled payloads.
+ * Flags an `unserialize()` call whose payload is not a fixed literal, the shape that can hydrate an
+ * attacker-controlled object and trigger a gadget chain - so the user gates it before it reaches the sink.
+ *
+ * Runs per file over global unserialize() calls, skipping literal payloads and calls that disable object
+ * hydration with `allowed_classes => false`. Warning, medium confidence.
  */
 final class UnsafeUnserializeRule implements RuleInterface
 {
@@ -28,7 +32,7 @@ final class UnsafeUnserializeRule implements RuleInterface
     public const ID = 'security.unsafe-unserialize';
 
     /**
-     * Describe the unsafe unserialize security rule.
+     * Describes the unsafe-unserialize rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -46,7 +50,7 @@ final class UnsafeUnserializeRule implements RuleInterface
     }
 
     /**
-     * Find unserialize calls that can deserialize untrusted data.
+     * Reports each `unserialize()` call that can hydrate untrusted data.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -57,16 +61,20 @@ final class UnsafeUnserializeRule implements RuleInterface
     {
         $findings = [];
 
+        // Check every function call in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
+            // Only a global unserialize() is an object-hydration sink.
             if (SecurityNodeHelper::globalFunctionName($call) !== 'unserialize') {
                 continue;
             }
 
             $firstArg = SecurityNodeHelper::argumentValue($call->args, 0);
+            // A literal-string payload is fixed, not attacker-controlled.
             if ($firstArg === null || SecurityNodeHelper::isStringLiteral($firstArg)) {
                 continue;
             }
 
+            // Object hydration disabled by allowed_classes => false is already safe.
             if ($this->hasAllowedClassesFalse($call)) {
                 continue;
             }
@@ -88,7 +96,7 @@ final class UnsafeUnserializeRule implements RuleInterface
     }
 
     /**
-     * Detect `unserialize($payload, ['allowed_classes' => false])` object-hydration guardrails.
+     * Reports whether the call disables object hydration via `allowed_classes => false`.
      *
      * @param Expr\FuncCall $call - unserialize() call whose second argument is checked for an options array.
      *
@@ -102,7 +110,9 @@ final class UnsafeUnserializeRule implements RuleInterface
             return false;
         }
 
+        // Weigh each key in the options array.
         foreach ($options->items as $item) {
+            // Only a string key can be the allowed_classes option.
             if (!$item->key instanceof Scalar\String_) {
                 continue;
             }

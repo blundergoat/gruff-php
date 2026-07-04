@@ -236,11 +236,18 @@ php bin/gruff-php analyse src --generate-baseline --format text --fail-on none
 
 Only update `gruff-baseline.json` when accepting known findings is intentional and reviewable.
 
-Read baseline movement to see how debt changed. Every applied-baseline run classifies findings into three buckets, exposed in JSON at `baseline.buckets` and summarised as a one-line "Movement" view in text, markdown, and HTML:
+Baselines use the `gruff.baseline.v2` schema: grouped count rows keyed by
+`(file, ruleId, message)`, so accepted debt keeps matching after unrelated
+line shifts. Legacy `gruff.baseline.v1` files fail closed with a regenerate
+instruction (exit code `2`) — regenerate them once with `--generate-baseline`.
+Because the message is part of the match key, upgrading across a release that
+rewords rule messages also requires a regenerate.
 
-- **new** — present this run, not in the baseline (the set a new-findings gate would block);
-- **unchanged** — matched a baseline entry (accepted debt, removed before scoring);
-- **absent** — a baseline entry with no matching finding this run (a resolved/fixed item).
+Read baseline movement to see how debt changed. Every applied-baseline run classifies finding instances into three buckets, exposed in JSON at `baseline.buckets` and summarised as a one-line "Movement" view in text, markdown, and HTML:
+
+- **new** — instances beyond their group's accepted count (the set a new-findings gate would block);
+- **unchanged** — instances matched within a group's accepted count (accepted debt, removed before scoring);
+- **absent** — accepted instances with no matching finding this run (resolved/fixed items).
 
 ```bash
 php bin/gruff-php analyse src --baseline --format json --fail-on none | jq '.baseline.buckets'

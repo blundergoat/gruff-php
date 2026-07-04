@@ -15,21 +15,28 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * Prints configured rule metadata for humans or tooling, with an optional
- * per-rule detail view when a `<ruleId>` argument is supplied.
+ * Backs the `gruff-php list-rules` command - the browsable catalogue of every quality rule the
+ * analyser can apply.
+ *
+ * Reach for this when a user asks "what does gruff check?" or wants to inspect one rule before
+ * tuning it. With no argument it prints the whole catalogue as a table, JSON, or plain text; pass
+ * a `<ruleId>` and it renders that rule in full - severity, options, the `.gruff-php.yaml` escape
+ * hatches that disable or retune it, and known false-positive shapes. A mistyped id gets a
+ * "did you mean" nudge instead of an empty result.
  */
 final class ListRulesCommand extends Command
 {
     /**
-     * Maximum Levenshtein distance to consider when suggesting a near-match
-     * for a mistyped rule id.
+     * How far a typed rule id may stray from a real one and still earn a "did you mean" suggestion;
+     * ids further than this edit distance are treated as unrelated and dropped from the hints.
      */
     private const SUGGESTION_DISTANCE = 4;
 
     /**
-     * Register list-rules CLI options and metadata.
+     * Declares the `list-rules` command name, its optional `<ruleId>` argument, and the `--format`
+     * flag - everything the user can type after `gruff-php list-rules`.
      *
-     * @return void
+     * @return void - Registers the command's metadata with Symfony; nothing is returned.
      */
     protected function configure(): void
     {
@@ -41,9 +48,10 @@ final class ListRulesCommand extends Command
     }
 
     /**
-     * Render rule metadata as either a table or JSON document, or a per-rule detail view.
+     * Runs the whole command when a user types `gruff-php list-rules`: validate `--format`, then
+     * either render one rule's detail view (a `<ruleId>` was given) or the full catalogue.
      *
-     * @param InputInterface  $input - Parsed invocation; supplies the `format` option and optional `ruleId` argument.
+     * @param InputInterface  $input - Parsed invocation; supplies the `--format` option and optional `<ruleId>` argument.
      * @param OutputInterface $output - Destination the rendered catalogue, detail view, or error is written to.
      *
      * @return int - Symfony exit code: SUCCESS once output is written, INVALID for a bad format, FAILURE if JSON encoding fails
@@ -51,6 +59,8 @@ final class ListRulesCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $format = $input->getOption('format');
+        // Reject anything but the three renderers we support, so a bad flag like `--format=xml` fails
+        // fast with a usage error rather than a broken render at the end.
         if (!is_string($format) || !in_array($format, ['text', 'table', 'json'], true)) {
             $output->writeln('<error>USAGE-ERROR Unsupported rule-list format. Use text, table, or json.</error>');
 
@@ -61,6 +71,7 @@ final class ListRulesCommand extends Command
         $config   = AnalysisConfig::fromRegistry($registry);
         $ruleId   = $input->getArgument('ruleId');
 
+        // A non-empty `<ruleId>` means the user wants one rule in depth, so branch to the detail view.
         if (is_string($ruleId) && $ruleId !== '') {
             return $this->renderRuleDetail(
                 ruleId:   $ruleId,
@@ -74,16 +85,20 @@ final class ListRulesCommand extends Command
         /** @var list<array{id: string, name: string, pillar: string, tier: string, defaultSeverity: string, confidence: string, defaultEnabled: bool, thresholds: array<string, int|float>|\stdClass, options: array<string, int|float|bool|string|array<array-key, int|float|bool|string>>|\stdClass, description: string}> $rows Accumulator shape is built from rule definitions for table rendering. */
         $rows = [];
 
+        // No id given: build one catalogue row per registered rule, tagging each with whether this
+        // project currently has it enabled.
         foreach ($registry->all() as $rule) {
             $definition = $rule->definition();
             $settings   = $config->ruleSettings($definition->id);
             $rows[]     = $this->ruleMetadataRow($definition, $settings->enabled);
         }
 
+        // The full rules list serialises to JSON for tooling to consume; the table and text formats fall through to the human renderer below.
         if ($format === 'json') {
             try {
                 $output->write(json_encode(['rules' => $rows], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . PHP_EOL, false, OutputInterface::OUTPUT_RAW);
             } catch (JsonException $exception) {
+                // json_encode only trips here on unencodable rule metadata; tell the user rather than emit half a document.
                 $output->writeln(sprintf('<error>Unable to encode rule metadata: %s</error>', $exception->getMessage()));
 
                 return Command::FAILURE;
@@ -95,6 +110,7 @@ final class ListRulesCommand extends Command
         $output->writeln('Rule ID | Pillar | Tier | Severity | Confidence | Enabled | Description');
         $output->writeln('--- | --- | --- | --- | --- | --- | ---');
 
+        // Emit one Markdown-style table row per rule, in registry order, under the header just printed.
         foreach ($rows as $ruleMetadata) {
             $output->writeln(sprintf(
                                  '%s | %s | %s | %s | %s | %s | %s',
@@ -112,7 +128,8 @@ final class ListRulesCommand extends Command
     }
 
     /**
-     * Render the per-rule detail view, or report a typo with near-match suggestions.
+     * Renders one rule's full detail view once the user passed a `<ruleId>`, or hands off to the
+     * typo path when that id matches nothing in the registry.
      *
      * @param string          $ruleId - Rule id the caller asked to inspect; matched exactly against the registry.
      * @param RuleRegistry    $registry - Source of the canonical rule set the lookup and typo suggestions draw from.
@@ -126,24 +143,29 @@ final class ListRulesCommand extends Command
     private function renderRuleDetail(string $ruleId, RuleRegistry $registry, AnalysisConfig $config, string $format, OutputInterface $output): int
     {
         $match = null;
+        // Scan the registry for the exact id the user typed; rule ids are matched literally, not fuzzily.
         foreach ($registry->all() as $rule) {
             $definition = $rule->definition();
+            // Stop at the first exact hit - that is the rule whose detail view we will render.
             if ($definition->id === $ruleId) {
                 $match = $definition;
                 break;
             }
         }
 
+        // Nothing matched, so the id was mistyped or retired; hand off to the "did you mean" response.
         if ($match === null) {
             return $this->renderRuleNotFound($ruleId, $registry, $output);
         }
 
         $enabled = $config->ruleSettings($match->id)->enabled;
 
+        // A single rule's detail serialises to JSON for tooling; text and table share the human renderer below.
         if ($format === 'json') {
             try {
                 $output->write(json_encode($this->ruleDetailPayload($match, $enabled), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . PHP_EOL, false, OutputInterface::OUTPUT_RAW);
             } catch (JsonException $exception) {
+                // json_encode only trips here on an unencodable detail payload; surface the reason instead of a partial document.
                 $output->writeln(sprintf('<error>Unable to encode rule detail: %s</error>', $exception->getMessage()));
 
                 return Command::FAILURE;
@@ -158,7 +180,8 @@ final class ListRulesCommand extends Command
     }
 
     /**
-     * Print a friendly typo response with up to three near-match suggestions, exit INVALID.
+     * Tells the user their `<ruleId>` matched no rule and offers up to three closest ids as
+     * "did you mean" hints, so a small typo like `naming-cammel-case` still points somewhere useful.
      *
      * @param string          $ruleId - Unrecognised rule id the caller typed; echoed back and used as the match anchor.
      * @param RuleRegistry    $registry - Source of known rule ids the Levenshtein suggestions are drawn from.
@@ -171,6 +194,7 @@ final class ListRulesCommand extends Command
         $output->writeln(sprintf('<error>Unknown rule: %s.</error>', $ruleId));
 
         $candidates = [];
+        // Score every known id by how many edits separate it from what the user typed.
         foreach ($registry->all() as $rule) {
             $candidateId              = $rule->definition()->id;
             $candidates[$candidateId] = levenshtein($ruleId, $candidateId);
@@ -178,16 +202,20 @@ final class ListRulesCommand extends Command
 
         asort($candidates);
         $suggestions = [];
+        // Walk the ids closest-first (asort ordered them by distance) to pick the best few hints.
         foreach ($candidates as $candidateId => $distance) {
+            // Beyond this edit distance the id is too different to be a likely typo, so drop it.
             if ($distance > self::SUGGESTION_DISTANCE) {
                 continue;
             }
             $suggestions[] = $candidateId;
+            // Three hints is enough to be helpful without burying the user in near-misses.
             if (count($suggestions) === 3) {
                 break;
             }
         }
 
+        // Only add the "did you mean" line when at least one id was close enough to suggest.
         if ($suggestions !== []) {
             $output->writeln(sprintf('Did you mean: %s ?', implode(', ', $suggestions)));
         }
@@ -196,7 +224,8 @@ final class ListRulesCommand extends Command
     }
 
     /**
-     * Serialise the per-rule detail payload for JSON output.
+     * Assembles one rule's detail as a JSON-ready associative array for `list-rules <ruleId>
+     * --format json`, so tooling reads the same facts the text view shows a person.
      *
      * @param RuleDefinition $definition - Rule whose metadata, thresholds, options, and escape hatches are serialised.
      * @param bool           $enabled - Effective project enabled state; emitted as the `defaultEnabled` field.
@@ -226,7 +255,7 @@ final class ListRulesCommand extends Command
             ? ['threshold' => $single->threshold, 'severity' => $single->severity->value]
             : ($definition->defaultThresholds === [] ? (object)[] : $definition->defaultThresholds);
 
-        // Empty maps become stdClass above so JSON encodes them as `{}` not `[]`, keeping the schema object-typed.
+        // An empty thresholds map becomes stdClass so this detail JSON shows `thresholds: {}` rather than an array.
         return [
             'id'                  => $definition->id,
             'name'                => $definition->name,
@@ -245,7 +274,9 @@ final class ListRulesCommand extends Command
     }
 
     /**
-     * Render a per-rule detail view as multi-line text.
+     * Lays out one rule's detail as the block a person reads in the terminal - identity header,
+     * description, default options, `.gruff-php.yaml` escape hatches, and false-positive shapes,
+     * with default options and false-positive shapes shown only when the rule has them.
      *
      * @param RuleDefinition $definition - Rule whose name, pillar, options, hatches, and false-positive shapes render.
      * @param bool           $enabled - Effective project enabled state; printed on the "Enabled by default" line.
@@ -267,10 +298,12 @@ final class ListRulesCommand extends Command
         $lines[] = 'Description:';
         $lines[] = '  ' . $definition->description();
 
+        // Show the tunable options only for rules that have them; a rule with no knobs skips this block.
         if ($definition->defaultOptions !== []) {
             $lines[]  = '';
             $lines[]  = 'Default options:';
             $keyWidth = max(array_map('strlen', array_keys($definition->defaultOptions)));
+            // One aligned row per option: its key, the default value, and any help text the rule supplies.
             foreach ($definition->defaultOptions as $key => $defaultValue) {
                 $valueRender = $this->formatOptionValue($defaultValue);
                 $description = $definition->optionDescriptions[$key] ?? '';
@@ -284,10 +317,12 @@ final class ListRulesCommand extends Command
         }
 
         $hatches = $this->escapeHatchesFor($definition);
+        // List the `.gruff-php.yaml` paths that switch this rule off or retune it; every rule carries at least the enable/exclude-from-score hatches, so this block always renders.
         if ($hatches !== []) {
             $lines[]   = '';
             $lines[]   = 'Escape hatches:';
             $pathWidth = max(array_map(static fn(array $escapeHatch): int => strlen($escapeHatch['path']), $hatches));
+            // One aligned row per config path, so a user can copy the exact key to change in their config.
             foreach ($hatches as $hatch) {
                 $lines[] = sprintf(
                     '  %-' . $pathWidth . 's  %s',
@@ -297,9 +332,11 @@ final class ListRulesCommand extends Command
             }
         }
 
+        // Only rules with documented false positives get this section; it warns where the check can misfire.
         if ($definition->falsePositiveShapes !== []) {
             $lines[] = '';
             $lines[] = 'Common false-positive shapes:';
+            // Pair each misfire shape with its mitigation so the user knows how to quiet a false alarm.
             foreach ($definition->falsePositiveShapes as $entry) {
                 $lines[] = '  - ' . $entry['shape'];
                 $lines[] = '    Mitigation: ' . $entry['mitigation'];
@@ -311,17 +348,20 @@ final class ListRulesCommand extends Command
     }
 
     /**
-     * Derive the escape-hatch config paths a user can set for a rule.
+     * Lists the `.gruff-php.yaml` config paths a user can set to retune or silence a rule - the
+     * per-option keys first, then the always-present enable and exclude-from-score switches, and a
+     * threshold/severity pair for the rules that support one.
      *
      * @param RuleDefinition $definition - Rule whose option keys, severity threshold, and id seed the config paths.
      *
-     * @return list<array{path: string, description: string}> - settable `.gruff-php.yaml` config paths with help text, per-option paths first then
-     *                          the always-present enable/score/threshold hatches; empty only when the rule has no options and no threshold
+     * @return list<array{path: string, description: string}> - settable `.gruff-php.yaml` config paths with help text: per-option paths first,
+     *                          then the enable and exclude-from-score switches every rule gets, and a threshold/severity path for tunable rules. Never empty.
      */
     private function escapeHatchesFor(RuleDefinition $definition): array
     {
         $hatches = [];
 
+        // One hatch per tunable option, pointing at the exact `rules.<id>.options.<key>` path to set.
         foreach (array_keys($definition->defaultOptions) as $optionKey) {
             $description = $definition->optionDescriptions[$optionKey] ?? 'See `Default options` above.';
             $hatches[]   = [
@@ -339,6 +379,7 @@ final class ListRulesCommand extends Command
             'description' => 'Set to true to keep findings visible without penalising the composite score (ADR-016).',
         ];
 
+        // Add the threshold/severity hatch only for rules that actually have a tunable threshold.
         if ($definition->severityThreshold !== null || $definition->defaultThresholds !== []) {
             $hatches[] = [
                 'path'        => sprintf('rules.%s.threshold + severity', $definition->id),
@@ -351,7 +392,8 @@ final class ListRulesCommand extends Command
     }
 
     /**
-     * Format an option default value for inline display in the detail view.
+     * Renders one option's default value the way it would look in `.gruff-php.yaml`, so the detail
+     * view shows a value the user could copy straight into their config.
      *
      * @param int|float|bool|string|array<array-key, int|float|bool|string> $value - Raw default option value from a rule definition.
      *
@@ -359,21 +401,21 @@ final class ListRulesCommand extends Command
      */
     private function formatOptionValue(int|float|bool|string|array $value): string
     {
+        // Render booleans as the YAML keywords `true`/`false`, not PHP's `1`/empty-string cast, so the value mirrors config syntax.
         if (is_bool($value)) {
-            // Render booleans as YAML keywords, not PHP's `1`/empty-string cast, so the value mirrors config syntax.
             return $value ? 'true' : 'false';
         }
 
+        // List options render as a bracketed, comma-joined line; string items stay quoted to read like the source.
         if (is_array($value)) {
-            // List options render as a bracketed, comma-joined line; string items stay quoted to read like the source.
             return $value === [] ? '[]' : sprintf('[%s]', implode(', ', array_map(
                 static fn($optionValue): string => is_string($optionValue) ? '"' . $optionValue . '"' : (string)$optionValue,
                 $value,
             )));
         }
 
+        // Quote string scalars so the reader can tell an empty string from an unset value.
         if (is_string($value)) {
-            // Quote string scalars so the reader can tell an empty string from an unset value.
             return '"' . $value . '"';
         }
 
@@ -382,7 +424,8 @@ final class ListRulesCommand extends Command
     }
 
     /**
-     * Build the machine-readable row emitted by list-rules.
+     * Flattens one rule into the single row the catalogue shows - the shared shape behind both the
+     * Markdown table and the `--format json` list, so a rule reads the same either way.
      *
      * @param RuleDefinition $definition - Rule whose metadata, thresholds, and options populate the catalogue row.
      * @param bool           $enabled - Effective project enabled state; emitted as the `defaultEnabled` field.
@@ -399,7 +442,7 @@ final class ListRulesCommand extends Command
             ? ['threshold' => $single->threshold, 'severity' => $single->severity->value]
             : ($definition->defaultThresholds === [] ? (object)[] : $definition->defaultThresholds);
 
-        // Empty maps become stdClass above so JSON encodes them as `{}` not `[]`, keeping the row schema stable.
+        // Coerce an empty thresholds map to stdClass so this row's `thresholds` stays object-typed across every rule listed.
         return [
             'id'              => $definition->id,
             'name'            => $definition->name,

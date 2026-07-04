@@ -114,6 +114,12 @@ failureConditions:
       error: 0
 ```
 
+With a baseline reference point, "new" derives from `gruff.baseline.v2` group
+matching: a finding counts as new when its `(file, ruleId, message)` group has
+more live instances than the baseline accepted, so unrelated line shifts never
+re-trigger the gate. Legacy `gruff.baseline.v1` files fail closed — regenerate
+them once with `analyse --generate-baseline`.
+
 ## Paths
 
 Use `paths.ignore` for project-specific ignore patterns. The CLI also honours

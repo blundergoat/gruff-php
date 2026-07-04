@@ -16,7 +16,9 @@ use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Node\Stmt;
 
 /**
- * Detects legacy data provider annotations that should use PHPUnit attributes.
+ * Flags a test method that wires its data provider with the legacy `@dataProvider` docblock annotation
+ * instead of the modern `#[DataProvider]` attribute, so a reviewer on PHPUnit 10+ can migrate it. Runs
+ * over every test method in the file. Advisory, high confidence - the annotation still works on old suites.
  */
 final readonly class DataProviderAnnotationRule implements RuleInterface
 {
@@ -26,7 +28,7 @@ final readonly class DataProviderAnnotationRule implements RuleInterface
     public const ID = 'test-quality.data-provider-annotation';
 
     /**
-     * Describe the data provider annotation rule.
+     * Describes the data-provider-annotation rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -44,7 +46,7 @@ final readonly class DataProviderAnnotationRule implements RuleInterface
     }
 
     /**
-     * Find legacy data provider annotations in PHPUnit tests.
+     * Reports legacy data-provider annotations that should use PHPUnit attributes.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -55,12 +57,15 @@ final readonly class DataProviderAnnotationRule implements RuleInterface
     {
         $findings = [];
 
+        // Weigh every test scope in the file.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
+            // Only a real PHPUnit method can carry a docblock annotation.
             if (!$scope->node instanceof Stmt\ClassMethod) {
                 continue;
             }
 
             $comment = $scope->node->getDocComment()?->getText() ?? '';
+            // Nothing to migrate unless the method declares a dataProvider annotation.
             if (!str_contains($comment, '@dataProvider')) {
                 continue;
             }

@@ -20,7 +20,12 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 
 /**
- * Detects documented methods and functions whose parameters lack matching @param tags.
+ * Flags a documented method or function whose parameters have no matching `@param` tag, so the user keeps
+ * the documented contract in step with the signature at any visibility.
+ *
+ * Runs per file over documented function-likes that carry real contract prose or tags (a bare skeleton is
+ * left to other rules). A depth-aware parser reads the documented parameter names, tolerating multi-line
+ * array shapes, and each undocumented parameter is reported. Advisory, high confidence.
  */
 final readonly class MissingParamTagRule implements RuleInterface
 {
@@ -30,9 +35,9 @@ final readonly class MissingParamTagRule implements RuleInterface
     public const ID = 'docs.missing-param-tag';
 
     /**
-     * Describe the missing @param tag rule.
+     * Describes the missing `@param` tag rule for the registry and reports.
      *
-     * @return RuleDefinition - Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults (advisory severity, high confidence).
      */
     public function definition(): RuleDefinition
     {
@@ -47,7 +52,7 @@ final readonly class MissingParamTagRule implements RuleInterface
     }
 
     /**
-     * Find documented function-like declarations with undocumented parameters, at any visibility.
+     * Reports each documented function-like with undocumented parameters, at any visibility.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -61,16 +66,19 @@ final readonly class MissingParamTagRule implements RuleInterface
 
         $findings = [];
 
+        // Check every method and function in the file.
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
             $docComment = $node->getDocComment();
 
+            // Skip a callable with no docblock or no parameters to document.
             if ($docComment === null || $node->params === []) {
                 continue;
             }
 
             $docText = $docComment->getText();
 
+            // A skeleton docblock with no real contract is left to other rules.
             if (!$this->hasContractDoc($docText)) {
                 continue;
             }
@@ -78,13 +86,16 @@ final readonly class MissingParamTagRule implements RuleInterface
             $documentedParams = $this->extractParamNames($docText);
             $symbol           = CyclomaticComplexityRule::resolveSymbol($node);
 
+            // Check each signature parameter has a matching tag.
             foreach ($node->params as $param) {
+                // Only a plain named parameter can be matched by name.
                 if (!$param->var instanceof Variable || !is_string($param->var->name)) {
                     continue;
                 }
 
                 $paramName = $param->var->name;
 
+                // A documented parameter is fine.
                 if (in_array($paramName, $documentedParams, true)) {
                     continue;
                 }
@@ -109,8 +120,8 @@ final readonly class MissingParamTagRule implements RuleInterface
     }
 
     /**
-     * Extract parameter names documented by @param tags. Depth-aware so multi-line array shapes match the
-     * closing documented variable even when it sits on a different line from the `@param` token.
+     * Extracts the parameter names documented by `@param` tags. Depth-aware so multi-line array shapes match
+     * the closing documented variable even when it sits on a different line from the `@param` token.
      *
      * @param string $docText - Raw docblock text.
      *
@@ -123,8 +134,10 @@ final readonly class MissingParamTagRule implements RuleInterface
         $length     = strlen($stripped);
         $position   = 0;
 
+        // Walk the docblock, finding each param tag in turn.
         while ($position < $length) {
             $tagPosition = strpos($stripped, '@param', $position);
+            // No more param tags left to read.
             if ($tagPosition === false) {
                 break;
             }
@@ -137,12 +150,14 @@ final readonly class MissingParamTagRule implements RuleInterface
             // and falsely suppress the missing-input-tag finding.
             if ($position < $length) {
                 $next = $stripped[$position];
+                // A following word character marks a different tag such as param-out.
                 if ($next === '-' || ctype_alnum($next) || $next === '_') {
                     continue;
                 }
             }
 
             $varName = self::scanForParamVariable($stripped, $length, $position);
+            // Record the variable this tag documents.
             if ($varName !== null) {
                 $paramNames[] = $varName;
             }
@@ -152,7 +167,7 @@ final readonly class MissingParamTagRule implements RuleInterface
     }
 
     /**
-     * Walk forward from a `@param` token through balanced `{} <> [] ()` brackets and return the
+     * Walks forward from a `@param` token through balanced `{} <> [] ()` brackets and returns the
      * first parameter variable token reached at depth zero. Stops at the next `@tag` (next docblock entry) or
      * end of input.
      *
@@ -165,16 +180,20 @@ final readonly class MissingParamTagRule implements RuleInterface
     private static function scanForParamVariable(string $stripped, int $length, int &$position): ?string
     {
         $depth = 0;
+        // Scan forward through balanced brackets for the parameter variable.
         while ($position < $length) {
             $character = $stripped[$position];
 
+            // An opening bracket enters a type shape.
             if ($character === '{' || $character === '<' || $character === '[' || $character === '(') {
                 $depth++;
                 $position++;
                 continue;
             }
 
+            // A closing bracket leaves the type shape.
             if ($character === '}' || $character === '>' || $character === ']' || $character === ')') {
+                // Never let depth go negative on an unbalanced bracket.
                 if ($depth > 0) {
                     $depth--;
                 }
@@ -201,7 +220,7 @@ final readonly class MissingParamTagRule implements RuleInterface
     }
 
     /**
-     * Remove docblock framing (`/**`, ` * `, `*\/`) so the result reads as flat prose for the
+     * Removes docblock framing (`/**`, ` * `, `*\/`) so the result reads as flat prose for the
      * depth-aware parser. Newlines are preserved so multi-line bracketed shapes keep their line breaks
      * for caller inspection; only the per-line `*` decoration is stripped.
      *
@@ -218,7 +237,7 @@ final readonly class MissingParamTagRule implements RuleInterface
     }
 
     /**
-     * Check whether a docblock carries enough contract text to require @param tags.
+     * Reports whether a docblock carries enough contract text to require `@param` tags.
      *
      * @param string $docText - Raw docblock text scanned for prose or contract-bearing tags.
      *
@@ -226,8 +245,10 @@ final readonly class MissingParamTagRule implements RuleInterface
      */
     private function hasContractDoc(string $docText): bool
     {
+        // Weigh each line of the docblock.
         foreach (preg_split('/\R/', $docText) ?: [] as $line) {
             $line = trim($line, " \t\n\r\0\x0B/*");
+            // Blank and tag lines are not contract prose.
             if ($line === '' || str_starts_with($line, '@')) {
                 continue;
             }

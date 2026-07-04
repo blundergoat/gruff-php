@@ -16,7 +16,12 @@ use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Token;
 
 /**
- * Detects regular comments that look like disabled PHP code.
+ * Flags a regular comment whose body looks like disabled PHP code, so the user can clear out
+ * commented-out snippets that reviewers otherwise have to mentally skip.
+ *
+ * Runs per file over every non-docblock comment token, stripping the delimiters and scoring the body for
+ * code-shaped signals (assignments, method calls, control-flow keywords). Two or more signals reports the
+ * comment at advisory, since the heuristic can misread prose.
  */
 final readonly class CommentedOutCodeRule implements RuleInterface
 {
@@ -26,7 +31,7 @@ final readonly class CommentedOutCodeRule implements RuleInterface
     public const ID = 'waste.commented-out-code';
 
     /**
-     * Describe the commented-out code rule.
+     * Describes the commented-out-code rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -44,7 +49,7 @@ final readonly class CommentedOutCodeRule implements RuleInterface
     }
 
     /**
-     * Find comment tokens that appear to contain disabled executable code.
+     * Reports each comment whose stripped body scores as commented-out code.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -56,7 +61,9 @@ final readonly class CommentedOutCodeRule implements RuleInterface
         $definition = $this->definition();
         $findings   = [];
 
+        // Scan every token, looking only at the comments.
         foreach ($analysisUnit->tokens as $token) {
+            // Only a regular comment is a candidate.
             if (!$this->isCommentToken($token)) {
                 continue;
             }
@@ -64,12 +71,14 @@ final readonly class CommentedOutCodeRule implements RuleInterface
             $text = $token->text;
             $line = $token->line;
 
+            // A docblock is documentation, never disabled code.
             if (str_starts_with(trim($text), '/**')) {
                 continue;
             }
 
             $content = $this->stripCommentMarkers($text);
 
+            // Report a comment body that scores as code.
             if ($this->isCodeLike($content)) {
                 $findings[] = new Finding(
                     ruleId:      $definition->id,
@@ -89,7 +98,7 @@ final readonly class CommentedOutCodeRule implements RuleInterface
     }
 
     /**
-     * Check whether a parser token is a regular comment.
+     * Reports whether a parser token is a regular comment (never a docblock).
      *
      * @param Token $token - Lexer token to classify; only line and inline block comments qualify, never docblocks.
      *
@@ -102,7 +111,7 @@ final readonly class CommentedOutCodeRule implements RuleInterface
     }
 
     /**
-     * Remove PHP comment delimiters before code-shape checks.
+     * Strips PHP comment delimiters and per-line decoration, leaving the bare comment body.
      *
      * @param string $text - Raw comment token text, still carrying its leading slashes, hash, or block delimiters.
      *
@@ -110,8 +119,11 @@ final readonly class CommentedOutCodeRule implements RuleInterface
      */
     private function stripCommentMarkers(string $text): string
     {
+        // Strip the surrounding block-comment delimiters.
         $text = preg_replace('/^\/\*+\s*|\s*\*+\/$/', '', $text) ?? $text;
+        // Strip the leading star decoration from each block-comment line.
         $text = preg_replace('/^\s*\*\s?/m', '', $text) ?? $text;
+        // Strip the leading slashes from each line comment.
         $text = preg_replace('/^\/\/\s?/m', '', $text) ?? $text;
 
         // Inner content with every delimiter and per-line decoration removed, ready for the shape scan.
@@ -119,7 +131,7 @@ final readonly class CommentedOutCodeRule implements RuleInterface
     }
 
     /**
-     * Detect whether comment content has enough PHP-like syntax signals.
+     * Reports whether a comment body carries enough PHP-like signals to look like disabled code.
      *
      * @param string $content - Delimiter-stripped comment body to scan for disabled-code signals.
      *
@@ -127,20 +139,22 @@ final readonly class CommentedOutCodeRule implements RuleInterface
      */
     private function isCodeLike(string $content): bool
     {
+        // Too short to carry a meaningful statement; never treat tiny comments as code.
         if (strlen($content) < 5) {
-            // Too short to carry a meaningful statement; never treat tiny comments as code.
             return false;
         }
 
+        // Drop blank lines before scoring the rest.
         $lines = array_filter(explode("\n", $content), static fn (string $line): bool => trim($line) !== '');
 
+        // Only blank lines remained after filtering, so there is nothing to classify.
         if ($lines === []) {
-            // Only blank lines remained after filtering, so there is nothing to classify.
             return false;
         }
 
         $codeIndicators = 0;
 
+        // Score each non-blank line for code signals.
         foreach ($lines as $line) {
             $trimmed = trim($line);
 

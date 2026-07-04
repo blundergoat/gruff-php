@@ -1,5 +1,5 @@
 ---
-goat-flow-reference-version: "1.11.0"
+goat-flow-reference-version: "1.13.0"
 ---
 # Skill Playbooks
 
@@ -36,7 +36,7 @@ When you add a new tool to the project that future agents need to discover:
 3. Include a grep-findable `## Availability Check` section before any workflow that depends on a tool. For runnable tools/capabilities, include an exact shell-runnable verification command; for non-runnable authoring references, state the load condition and why no CLI check applies.
 4. Include the boundary, workflow, fallback/troubleshooting, and verification gate an agent needs to apply the playbook without inherited context.
 5. Add a row to the table above so the index stays complete.
-6. Check the ADR-023 budget tier before adding content: top-level playbooks in this directory are progressive references and must stay under 3000 body words.
+6. Check the current reference-pack budget tier before adding content: top-level playbooks in this directory are progressive references and must stay under 3000 body words.
 
 ## Admission checklist
 

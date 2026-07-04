@@ -94,7 +94,7 @@ final class DashboardScanRunnerTest extends TestCase
         $second = $runner->scanHtml($context, ['paths' => 'src']);
         file_put_contents($project . '/.gruff-php.yaml', "schemaVersion: gruff-php.config.v0.1\nrules:\n  size.file-length:\n    enabled: false\n");
         $third = $runner->scanHtml($context, ['paths' => 'src']);
-        file_put_contents($project . '/gruff-baseline.json', "{\"schemaVersion\":\"gruff.baseline.v1\",\"findings\":[]}\n");
+        file_put_contents($project . '/gruff-baseline.json', "{\"schemaVersion\":\"gruff.baseline.v2\",\"groups\":[]}\n");
         $fourth = $runner->scanHtml($context, ['paths' => 'src']);
 
         self::assertStringContainsString('scan 1', $first);
@@ -142,7 +142,7 @@ final class DashboardScanRunnerTest extends TestCase
 
         $first = $runner->scanHtml($context, $query);
         file_put_contents($project . '/.gruff-php.yaml', "schemaVersion: gruff-php.config.v0.1\nrules: {}\n");
-        file_put_contents($project . '/gruff-baseline.json', "{\"schemaVersion\":\"gruff.baseline.v1\",\"findings\":[]}\n");
+        file_put_contents($project . '/gruff-baseline.json', "{\"schemaVersion\":\"gruff.baseline.v2\",\"groups\":[]}\n");
         $second = $runner->scanHtml($context, $query);
 
         self::assertStringContainsString('scan 1', $first);

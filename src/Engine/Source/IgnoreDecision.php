@@ -5,14 +5,21 @@ declare(strict_types=1);
 namespace GruffPhp\Engine\Source;
 
 /**
- * Outcome of asking the ignore engine whether a single path is excluded.
+ * The answer to "should gruff skip this path?" - whether it is ignored and, if so, why.
+ *
+ * As gruff walks a project it asks the ignore engine about each path; this carries the verdict back.
+ * When a path is ignored it also records the reason (config, default, generated, gitignore) and the
+ * pattern that matched, so a report can tell the user not just that a file was skipped but which rule
+ * skipped it - handy when a file they expected to be scanned quietly was not.
  */
 final readonly class IgnoreDecision
 {
     /**
-     * @param bool        $ignored - Whether the path is excluded from analysis.
-     * @param string|null $source - Reason category when ignored: config, default, generated, or gitignore.
-     * @param string|null $pattern - Matching glob, directory token, filename, or git rule when ignored.
+     * Captures whether a path is ignored and, when it is, the reason and matching pattern.
+     *
+     * @param bool        $ignored - True when the path is excluded from analysis.
+     * @param string|null $source - Reason category when ignored (config, default, generated, or gitignore); null when the path is in scope.
+     * @param string|null $pattern - The glob, directory token, filename, or git rule that matched; null when in scope or when no concrete pattern applied.
      */
     public function __construct(
         public bool $ignored,
@@ -22,12 +29,12 @@ final readonly class IgnoreDecision
     }
 
     /**
-     * Build an "ignored" decision carrying the matched source and pattern.
+     * Builds an "ignored" decision that remembers why the path was excluded, so reports can attribute it.
      *
      * @param string      $source - Reason category for the exclusion.
-     * @param string|null $pattern - Matching glob, directory token, filename, or git rule.
+     * @param string|null $pattern - The glob, directory token, filename, or git rule that matched; null when there was no concrete match string.
      *
-     * @return self - Ignored decision.
+     * @return self - An ignored decision carrying the source and pattern.
      */
     public static function ignored(string $source, ?string $pattern): self
     {
@@ -36,9 +43,9 @@ final readonly class IgnoreDecision
     }
 
     /**
-     * Build a "not ignored" decision.
+     * Builds a plain "not ignored" decision for a path that stays in scope.
      *
-     * @return self - Decision indicating the path is in scope.
+     * @return self - A decision marking the path as in scope, with no source or pattern.
      */
     public static function notIgnored(): self
     {

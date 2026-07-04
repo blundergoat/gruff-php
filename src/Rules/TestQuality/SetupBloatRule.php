@@ -17,7 +17,9 @@ use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Node\Stmt;
 
 /**
- * Detects oversized setup methods that make individual tests depend on shared state.
+ * Flags a PHPUnit `setUp()` that is both over the line cap and longer than the class's average test method
+ * - shared setup heavy enough that each test's real intent is hidden behind it. Runs per test class; the
+ * minimum-lines cap is tunable. Advisory, medium confidence - a heavy setUp is sometimes deliberate.
  */
 final readonly class SetupBloatRule implements RuleInterface
 {
@@ -27,7 +29,7 @@ final readonly class SetupBloatRule implements RuleInterface
     public const ID = 'test-quality.setup-bloat';
 
     /**
-     * Describe the setup bloat rule.
+     * Describes the setup-bloat rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -46,7 +48,7 @@ final readonly class SetupBloatRule implements RuleInterface
     }
 
     /**
-     * Find setup methods that exceed the configured size threshold.
+     * Reports setUp() methods that are longer than the average test method.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -59,27 +61,33 @@ final readonly class SetupBloatRule implements RuleInterface
         $minSetupLines = (int) $ruleContext->settingsFor($definition)->numericThreshold('minSetupLines');
         $findings      = [];
 
+        // Weigh every test class in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Class_::class) as $class) {
             $setup          = null;
             $testLineCounts = [];
 
+            // Find the setUp() method and measure each test method's length.
             foreach ($class->getMethods() as $method) {
+                // The setUp() method is the shared fixture under scrutiny.
                 if ($method->name->toString() === 'setUp') {
                     $setup = $method;
                     continue;
                 }
 
+                // Record the span of each real test method for the average.
                 if (TestQualityNodeHelper::isTestMethod($method)) {
                     $testLineCounts[] = max(1, $method->getEndLine() - $method->getStartLine() + 1);
                 }
             }
 
+            // Need both a setUp() and at least one test to compare against.
             if (!$setup instanceof Stmt\ClassMethod || $testLineCounts === []) {
                 continue;
             }
 
             $setupLines       = max(1, $setup->getEndLine() - $setup->getStartLine() + 1);
             $averageTestLines = array_sum($testLineCounts) / count($testLineCounts);
+            // Only flag a setUp() that is over the cap and longer than the typical test.
             if ($setupLines < $minSetupLines || $setupLines <= $averageTestLines) {
                 continue;
             }

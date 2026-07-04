@@ -22,7 +22,9 @@ use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
 /**
- * Detects data providers that return no test cases.
+ * Flags a test bound to a data provider that the AST proves yields no rows - an empty array, a body with
+ * no yields or returns - so PHPUnit silently skips the test and its coverage quietly vanishes. Runs per
+ * test class; only provably empty providers fire. Error severity, high confidence.
  */
 final readonly class EmptyDataProviderRule implements RuleInterface
 {
@@ -32,7 +34,7 @@ final readonly class EmptyDataProviderRule implements RuleInterface
     public const ID = 'test-quality.empty-data-provider';
 
     /**
-     * Describe the empty data provider rule.
+     * Describes the empty-data-provider rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -49,7 +51,7 @@ final readonly class EmptyDataProviderRule implements RuleInterface
     }
 
     /**
-     * Find tests linked to data providers that cannot yield any rows.
+     * Reports tests linked to data providers that cannot yield any rows.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -60,6 +62,7 @@ final readonly class EmptyDataProviderRule implements RuleInterface
     {
         $findings = [];
 
+        // Weigh every class declaration in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Class_::class) as $class) {
             array_push($findings, ...$this->classFindings($analysisUnit, $class));
         }
@@ -68,7 +71,7 @@ final readonly class EmptyDataProviderRule implements RuleInterface
     }
 
     /**
-     * Build empty-provider findings for one test class.
+     * Builds the empty-provider findings for one test class.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit that owns the test class.
      * @param Stmt\Class_  $class - Test class declaration being inspected.
@@ -78,6 +81,7 @@ final readonly class EmptyDataProviderRule implements RuleInterface
     private function classFindings(AnalysisUnit $analysisUnit, Stmt\Class_ $class): array
     {
         $className = $class->name?->toString();
+        // An anonymous class has no name to report against.
         if ($className === null) {
             return [];
         }
@@ -85,7 +89,9 @@ final readonly class EmptyDataProviderRule implements RuleInterface
         $methodsByName = $this->methodsByLowerName($class);
         $findings      = [];
 
+        // Inspect each test method for a data-provider binding.
         foreach ($class->getMethods() as $testMethod) {
+            // Only real test methods can name a provider.
             if (!TestQualityNodeHelper::isTestMethod($testMethod)) {
                 continue;
             }
@@ -97,7 +103,7 @@ final readonly class EmptyDataProviderRule implements RuleInterface
     }
 
     /**
-     * Key class methods by lower-cased method name for case-insensitive provider lookup.
+     * Indexes class methods by lower-cased name for case-insensitive provider lookup.
      *
      * @param Stmt\Class_ $class - Class declaration whose methods are indexed.
      *
@@ -107,6 +113,7 @@ final readonly class EmptyDataProviderRule implements RuleInterface
     {
         $methodsByName = [];
 
+        // Index every method so a provider name resolves case-insensitively.
         foreach ($class->getMethods() as $classMethod) {
             $methodsByName[strtolower($classMethod->name->toString())] = $classMethod;
         }
@@ -115,7 +122,7 @@ final readonly class EmptyDataProviderRule implements RuleInterface
     }
 
     /**
-     * Build empty-provider findings for one test method.
+     * Builds the empty-provider findings for one test method.
      *
      * @param AnalysisUnit                    $analysisUnit - Parsed unit that owns the test class.
      * @param string                          $className - Test class name used in messages and symbols.
@@ -132,8 +139,10 @@ final readonly class EmptyDataProviderRule implements RuleInterface
     ): array {
         $findings = [];
 
+        // Weigh each provider the test names.
         foreach ($this->dataProviderNames($testMethod) as $providerName) {
             $providerMethod = $methodsByName[strtolower($providerName)] ?? null;
+            // Only a resolvable, provably empty provider is a finding.
             if ($providerMethod === null || !$this->isProvablyEmpty($providerMethod)) {
                 continue;
             }
@@ -162,7 +171,7 @@ final readonly class EmptyDataProviderRule implements RuleInterface
     }
 
     /**
-     * List data provider method names referenced by test attributes.
+     * Lists the data-provider method names a test method references.
      *
      * @param Stmt\ClassMethod $classMethod - Test method whose provider bindings are read - both the #[DataProvider]
      *                                      attribute and the legacy @dataProvider docblock annotation are scanned.
@@ -173,13 +182,17 @@ final readonly class EmptyDataProviderRule implements RuleInterface
     {
         $names = [];
 
+        // Read provider names from the modern DataProvider attributes.
         foreach ($classMethod->attrGroups as $group) {
+            // One group can hold several attributes.
             foreach ($group->attrs as $attr) {
+                // Only a DataProvider attribute names a provider.
                 if (strtolower($attr->name->getLast()) !== 'dataprovider') {
                     continue;
                 }
 
                 $first = $attr->args[0] ?? null;
+                // A string literal argument names the provider method.
                 if ($first instanceof Arg && $first->value instanceof Scalar\String_) {
                     $names[] = $first->value->value;
                 }
@@ -187,7 +200,9 @@ final readonly class EmptyDataProviderRule implements RuleInterface
         }
 
         $doc = $classMethod->getDocComment()?->getText() ?? '';
+        // Also read provider names from the legacy docblock annotation.
         if (preg_match_all('/@dataProvider\s+(\w+)/', $doc, $matches) > 0) {
+            // Record every annotated provider name.
             foreach ($matches[1] as $name) {
                 $names[] = $name;
             }
@@ -198,7 +213,7 @@ final readonly class EmptyDataProviderRule implements RuleInterface
     }
 
     /**
-     * Determine whether a provider method is statically guaranteed to produce no rows.
+     * Reports whether a provider method is statically guaranteed to produce no rows.
      *
      * Conservative: only returns true when the AST proves emptiness; anything dynamic is treated as possibly non-empty
      * so the Error-severity finding cannot fire on a false positive.
@@ -231,13 +246,16 @@ final readonly class EmptyDataProviderRule implements RuleInterface
             return true;
         }
 
+        // Weigh each return the provider makes.
         foreach ($returns as $return) {
+            // Guard the finder's loose node type before reading the returned value.
             if (!$return instanceof Stmt\Return_) {
                 continue;
             }
 
             $expr = $return->expr;
 
+            // A returned array is empty only when it has no elements.
             if ($expr instanceof Expr\Array_) {
                 if ($expr->items !== []) {
                     // A returned array literal with at least one element supplies real rows, so not empty.

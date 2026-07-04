@@ -21,7 +21,9 @@ use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
 /**
- * Detects assertions inside loops that lack a failing-case message.
+ * Flags a PHPUnit/Pest assertion inside a loop that carries no message argument - when it fails on one
+ * iteration the reader cannot tell which, so a message naming the row (`"row $i"`) is what makes the
+ * failure diagnosable. Runs over every test. Advisory, medium confidence.
  */
 final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
 {
@@ -31,7 +33,7 @@ final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
     public const ID = 'test-quality.loop-assertion-without-message';
 
     /**
-     * Describe the loop assertion message rule.
+     * Describes the loop-assertion-without-message rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -48,7 +50,7 @@ final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
     }
 
     /**
-     * Find assertions inside loops that lack a context-bearing message.
+     * Reports assertions inside loops that lack a context-bearing message.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -60,6 +62,7 @@ final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
         $nodeFinder = new NodeFinder();
         $findings   = [];
 
+        // Weigh every test scope in the file.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             $loops = $nodeFinder->find(
                 $scope->statements,
@@ -69,7 +72,9 @@ final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
                     || $node instanceof Stmt\Do_,
             );
 
+            // Inspect each loop the test runs.
             foreach ($loops as $loop) {
+                // Guard the finder's loose node type before reading loop bodies.
                 if (!$loop instanceof Stmt\For_
                     && !$loop instanceof Stmt\Foreach_
                     && !$loop instanceof Stmt\While_
@@ -84,11 +89,14 @@ final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
                         && TestQualityNodeHelper::isAssertionCall($node),
                 );
 
+                // Weigh each assertion inside the loop body.
                 foreach ($assertions as $assertion) {
+                    // Only real assertion call nodes are in scope.
                     if (!$assertion instanceof Expr\FuncCall && !$assertion instanceof Expr\MethodCall && !$assertion instanceof Expr\StaticCall) {
                         continue;
                     }
 
+                    // A message that names the iteration already makes failures diagnosable.
                     if ($this->hasMessageArgument($assertion)) {
                         continue;
                     }
@@ -120,7 +128,7 @@ final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
     }
 
     /**
-     * Check whether an assertion call appears to include a message argument.
+     * Reports whether an assertion call appears to include a message argument.
      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Assertion call whose argument list is sniffed.
      *
@@ -144,6 +152,8 @@ final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
     }
 
     /**
+     * Returns how many required arguments precede an assertion's optional message, or null when unknown.
+     *
      * @param string $name - Lower-cased assertion name to classify against the known PHPUnit arities.
      *
      * @return int|null - Number of required non-message arguments, or null for unknown assertions.
@@ -198,7 +208,7 @@ final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
     }
 
     /**
-     * Keep a conservative fallback for custom assertion helpers with unknown arity.
+     * Reports whether a custom assertion's trailing argument reads as a message (fallback).
      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Custom assertion whose trailing argument is sniffed.
      *
@@ -222,7 +232,7 @@ final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
     }
 
     /**
-     * Detect string-like expressions commonly used for assertion messages.
+     * Reports whether an expression can produce assertion-message text.
      *
      * @param Expr $expr - Trailing-argument expression tested for whether it can yield a readable message.
      *
@@ -245,6 +255,7 @@ final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
             return true;
         }
 
+        // A string-formatting builder produces message text too.
         if ($expr instanceof Expr\FuncCall) {
             $name = TestQualityNodeHelper::functionName($expr);
 

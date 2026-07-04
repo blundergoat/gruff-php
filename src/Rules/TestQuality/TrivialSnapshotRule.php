@@ -15,7 +15,9 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
 
 /**
- * Detects snapshot assertions that only lock down trivial values.
+ * Flags a snapshot assertion (`toMatchSnapshot`, `assertMatchesSnapshot`) whose captured value is a short
+ * scalar - the kind of value a direct `assertSame` would check more clearly, with none of a snapshot's
+ * benefit. Runs over every test's assertions; the length cap is tunable. Advisory, medium confidence.
  */
 final readonly class TrivialSnapshotRule implements RuleInterface
 {
@@ -25,7 +27,7 @@ final readonly class TrivialSnapshotRule implements RuleInterface
     public const ID = 'test-quality.trivial-snapshot';
 
     /**
-     * Describe the trivial snapshot rule.
+     * Describes the trivial-snapshot rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -44,7 +46,7 @@ final readonly class TrivialSnapshotRule implements RuleInterface
     }
 
     /**
-     * Find snapshot assertions that lack supporting behavioral assertions.
+     * Reports snapshot assertions that only capture a tiny literal value.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -57,18 +59,23 @@ final readonly class TrivialSnapshotRule implements RuleInterface
         $maxLength  = (int) $ruleContext->settingsFor($definition)->numericThreshold('maxLiteralLength');
         $findings   = [];
 
+        // Weigh every test scope in the file.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
+            // Inspect each assertion the test makes.
             foreach (TestQualityNodeHelper::assertionCalls($scope) as $call) {
                 $name = TestQualityNodeHelper::callName($call);
+                // Only snapshot-style assertions are in scope here.
                 if ($name === null || !str_contains($name, 'snapshot')) {
                     continue;
                 }
 
                 $literal = TestQualityNodeHelper::literalValue(TestQualityNodeHelper::firstArgValue($call));
+                // A Pest expectation carries its value on the expect() receiver, so read that too.
                 if (!is_string($literal) && $call instanceof \PhpParser\Node\Expr\MethodCall) {
                     $literal = TestQualityNodeHelper::literalValue(TestQualityNodeHelper::pestExpectationValue($call));
                 }
 
+                // Leave real snapshots alone; only a short scalar literal is the smell.
                 if (!is_string($literal) || strlen($literal) > $maxLength) {
                     continue;
                 }

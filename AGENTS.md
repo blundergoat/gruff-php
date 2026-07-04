@@ -1,4 +1,4 @@
-# AGENTS.md - project v1.5.1 / goat-flow 1.10.1 (2026-06-09)
+# AGENTS.md - project v1.5.1 / goat-flow 1.13.0 (2026-07-03)
 gruff-php is an opinionated PHP code-quality analyzer; its mission is to govern AI-generated code so a human can verify, trust, and sign off on it (legible, secure, genuinely tested). Current invariant: keep app claims and commands grounded in real source/config files.
 
 ## Truth Order
@@ -32,6 +32,7 @@ gruff-php is an opinionated PHP code-quality analyzer; its mission is to govern 
 - Skill reference: `.goat-flow/skill-docs/`
 - Tool playbooks: `.goat-flow/skill-docs/playbooks/README.md`, `.goat-flow/skill-docs/playbooks/browser-use.md`, `.goat-flow/skill-docs/playbooks/page-capture.md`
 - Orientation: `.goat-flow/architecture.md`, `.goat-flow/code-map.md`, `.goat-flow/glossary.md`
+- Codex hook reality: `.codex/hooks.json` registers only `deny-dangerous`; `gruff-code-quality` and `post-turn-safety` may be enabled globally but are unsupported for Codex until its post-tool/Stop lifecycles are verified. Run `goat-flow hooks list . --agent codex` before claiming Codex hook coverage.
 
 ## Commit Messages
 
@@ -97,10 +98,10 @@ Footguns go in `.goat-flow/learning-loop/footguns/<category>.md`; lessons in `.g
 | Claude peer instruction file | `CLAUDE.md` |
 | Learning loop | `.goat-flow/learning-loop/footguns/`, `.goat-flow/learning-loop/lessons/`, `.goat-flow/learning-loop/patterns/`, `.goat-flow/learning-loop/decisions/` |
 | Skill reference (meta) | `.goat-flow/skill-docs/` |
-| Tool playbooks (CLI/MCP availability checks: browser-use, page-capture, skill-quality-testing) | `.goat-flow/skill-docs/playbooks/` - read BEFORE declaring a tool unavailable |
+| Tool playbooks (README index for CLI/MCP availability checks; examples: browser-use, page-capture, skill-quality-testing) | `.goat-flow/skill-docs/playbooks/` - read BEFORE declaring a tool unavailable |
 | Orientation | `.goat-flow/architecture.md`, `.goat-flow/code-map.md`, `.goat-flow/glossary.md` |
-| Codex skills/config | `.agents/skills/`, `.codex/config.toml`, `.codex/hooks.json`, `.codex/hooks/` |
-| Claude skills/config | `.claude/skills/`, `.claude/settings.json`, `.claude/hooks/` |
+| Codex skills/config | `.agents/skills/`, `.codex/config.toml`, `.codex/hooks.json` |
+| Claude skills/config | `.claude/skills/`, `.claude/settings.json` |
 | Local workspace notes | `.goat-flow/logs/sessions/`, `.goat-flow/plans/`, `.goat-flow/scratchpad/` |
 | Commit guidance | `docs/coding-standards/git-commit.md` |
 | Project entry docs | `README.md` |

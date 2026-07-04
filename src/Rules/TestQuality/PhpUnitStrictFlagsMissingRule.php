@@ -17,7 +17,9 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
 
 /**
- * Detects PHPUnit configs that omit strict feedback flags.
+ * Flags a PHPUnit config that omits strict-mode attributes (`failOnRisky`, `failOnWarning`,
+ * `beStrictAboutTestsThatDoNotTestAnything`, ...) - without them, risky and noisy tests pass unnoticed and
+ * the suite's signal erodes. Fires once per project when a PHPUnit test file is seen. Warning, high confidence.
  */
 final class PhpUnitStrictFlagsMissingRule implements RuleInterface
 {
@@ -46,9 +48,9 @@ final class PhpUnitStrictFlagsMissingRule implements RuleInterface
     private array $emittedRoots = [];
 
     /**
-     * Create the rule with injectable PHPUnit config discovery for tests.
+     * Creates the rule with injectable PHPUnit config discovery for tests.
      *
-     * @param PhpUnitConfigDiscovery|null $discovery - Discovery service override for tests.
+     * @param PhpUnitConfigDiscovery|null $discovery - Discovery service override for tests, or null to use the default discovery.
      */
     public function __construct(?PhpUnitConfigDiscovery $discovery = null)
     {
@@ -56,7 +58,7 @@ final class PhpUnitStrictFlagsMissingRule implements RuleInterface
     }
 
     /**
-     * Describe the PHPUnit strict flags rule.
+     * Describes the phpunit-strict-flags-missing rule for the registry and reports.
      *
      * @return RuleDefinition - the rule's identity, pillar, tier, and default severity/confidence used by the registry
      */
@@ -74,7 +76,7 @@ final class PhpUnitStrictFlagsMissingRule implements RuleInterface
     }
 
     /**
-     * Report a project once when PHPUnit strict-mode attributes are missing.
+     * Reports a project once when PHPUnit strict-mode attributes are missing.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit used to decide whether the project has PHPUnit tests.
      * @param RuleContext  $ruleContext - Rule context carrying project root.
@@ -102,6 +104,7 @@ final class PhpUnitStrictFlagsMissingRule implements RuleInterface
         }
 
         $missing = $this->missingFlags($config);
+        // When no flag is missing, mark the root checked and stay silent.
         if ($missing === []) {
             $this->emittedRoots[$root] = true;
 
@@ -134,7 +137,7 @@ final class PhpUnitStrictFlagsMissingRule implements RuleInterface
     }
 
     /**
-     * List PHPUnit strictness flags missing from configuration.
+     * Lists the PHPUnit strictness flags missing from configuration.
      *
      * @param PhpUnitConfig $config - Discovered config whose <phpunit> root attributes are checked for each flag.
      *
@@ -145,8 +148,10 @@ final class PhpUnitStrictFlagsMissingRule implements RuleInterface
         $attributes = $config->root->attributes();
         $missing    = [];
 
+        // Weigh each strict flag the config should set.
         foreach (self::STRICT_FLAGS as $flag) {
             $flagValue = $attributes !== null ? $attributes->{$flag} : null;
+            // A flag that is absent, empty, or "false" is not enforced.
             if ($flagValue === null || $flagValue->__toString() === '' || strtolower($flagValue->__toString()) === 'false') {
                 $missing[] = $flag;
             }

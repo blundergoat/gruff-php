@@ -55,6 +55,37 @@ final class AnalyseCliBaselineTest extends CliTestCase
     }
 
     /**
+     * Verify changed-region runs record a diff-scope trend entry without a cross-scope delta.
+     *
+     * @throws JsonException
+     *
+     * @return void
+     */
+    public function testChangedRegionTrendRecordsDiffScopeWithoutCrossScopeDelta(): void
+    {
+        $project = $this->createBaselineProject();
+
+        try {
+            $fullRun   = $this->runInProject($project, ['analyse', 'src', '--format', 'json', '--fail-on', 'none', '--no-baseline', '--history-file', 'gruff-history.json']);
+            $fullTrend = $this->decodeJsonOutput($fullRun)['trend'] ?? null;
+            self::assertIsArray($fullTrend);
+            self::assertSame('full-project', $fullTrend['scope'] ?? null);
+
+            $diffRun   = $this->runInProject($project, ['analyse', '--changed-ranges', '1-5', 'src/OrderCalculator.php', '--format', 'json', '--fail-on', 'none', '--no-baseline', '--history-file', 'gruff-history.json']);
+            $diffTrend = $this->decodeJsonOutput($diffRun)['trend'] ?? null;
+            self::assertIsArray($diffTrend);
+            // The diff-scoped score joins its own series: no delta against the full-project entry.
+            self::assertSame('diff', $diffTrend['scope'] ?? null);
+            self::assertArrayHasKey('previousScore', $diffTrend);
+            self::assertNull($diffTrend['previousScore']);
+            self::assertArrayHasKey('delta', $diffTrend);
+            self::assertNull($diffTrend['delta']);
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+
+    /**
      * Verify analyse command generates and applies baseline.
      *
      * @throws JsonException
@@ -148,7 +179,44 @@ final class AnalyseCliBaselineTest extends CliTestCase
 
             self::assertSame(2, $process->getExitCode());
             self::assertStringContainsString('[BASELINE-ERROR]', $process->getOutput());
-            self::assertStringContainsString('Baseline schemaVersion must be "gruff.baseline.v1".', $process->getOutput());
+            self::assertStringContainsString('Baseline schemaVersion must be "gruff.baseline.v2".', $process->getOutput());
+        } finally {
+            $this->removeDir($tempDir);
+        }
+    }
+
+    /**
+     * Verify a legacy v1 baseline fails closed with a regenerate instruction instead of parsing silently.
+     *
+     * @return void
+     */
+    public function testAnalyseCommandFailsClosedOnLegacyV1Baseline(): void
+    {
+        $tempDir      = $this->tempDir();
+        $baselinePath = $tempDir . '/gruff-baseline.json';
+
+        try {
+            file_put_contents(
+                $baselinePath,
+                '{"schemaVersion":"gruff.baseline.v1","findings":[{"fingerprint":"0123456789abcdef","ruleId":"docs.example","file":"src/Example.php","line":1,"symbol":null,"message":"Example finding."}]}',
+            );
+
+            $process = new Process([
+                PHP_BINARY,
+                __DIR__ . '/../../bin/gruff-php',
+                'analyse',
+                'tests/Fixtures/Source/Code',
+                '--fail-on',
+                'none',
+                '--baseline',
+                $baselinePath,
+            ], __DIR__ . '/../..');
+            $process->run();
+
+            self::assertSame(2, $process->getExitCode());
+            self::assertStringContainsString('[BASELINE-ERROR]', $process->getOutput());
+            self::assertStringContainsString('Baseline schema "gruff.baseline.v1" is no longer supported', $process->getOutput());
+            self::assertStringContainsString('--generate-baseline', $process->getOutput());
         } finally {
             $this->removeDir($tempDir);
         }
@@ -516,6 +584,132 @@ final class AnalyseCliBaselineTest extends CliTestCase
         } finally {
             $this->removeDir($project);
         }
+    }
+
+    /**
+     * Verify a line inserted above a baselined finding leaves the accepted debt suppressed.
+     *
+     * @throws JsonException
+     *
+     * @return void
+     */
+    public function testLineShiftAboveBaselinedFindingKeepsItSuppressed(): void
+    {
+        $project = $this->createBaselineProject();
+
+        try {
+            $this->runInProject($project, ['analyse', 'src', '--format', 'json', '--fail-on', 'none', '--generate-baseline']);
+
+            // Insert one line above the baselined finding so its line, endLine, and fingerprint all shift.
+            $fixture = (string)file_get_contents($project . '/src/OrderCalculator.php');
+            file_put_contents(
+                $project . '/src/OrderCalculator.php',
+                str_replace(
+                    'declare(strict_types=1);',
+                    "declare(strict_types=1);\n\n// Unrelated line inserted above the accepted finding.",
+                    $fixture,
+                ),
+            );
+
+            $rerun    = $this->runInProject($project, ['analyse', 'src', '--format', 'json', '--fail-on', 'none']);
+            $report   = $this->decodeJsonOutput($rerun);
+            $baseline = $report['baseline'] ?? null;
+            self::assertIsArray($baseline);
+            $buckets = $baseline['buckets'] ?? null;
+            self::assertIsArray($buckets);
+            self::assertSame(0, $buckets['new'] ?? null);
+            self::assertSame(1, $buckets['unchanged'] ?? null);
+            self::assertSame(0, $buckets['absent'] ?? null);
+            $summary = $report['summary'] ?? null;
+            self::assertIsArray($summary);
+            $counts = $summary['findings'] ?? null;
+            self::assertIsArray($counts);
+            self::assertSame(0, $counts['total'] ?? null);
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+
+    /**
+     * Verify --fail-on-new trips on instances beyond a group's accepted count and passes within it.
+     *
+     * @throws JsonException
+     *
+     * @return void
+     */
+    public function testFailOnNewGatesOnGroupCountOverflow(): void
+    {
+        $project = $this->createBaselineProject();
+
+        try {
+            // Two anonymous classes sharing an undocumented method name emit two error findings
+            // with identical (file, ruleId, message) identity, so they land in one baseline group.
+            file_put_contents(
+                $project . '/src/Handlers.php',
+                "<?php\n\n\$first = new class {\n    public function handle(): int\n    {\n        return 1;\n    }\n};\n\n\$second = new class {\n    public function handle(): int\n    {\n        return 2;\n    }\n};\n",
+            );
+            $this->writeHandlerGroupBaseline($project, 1);
+
+            $overflowRun = new Process([
+                PHP_BINARY,
+                __DIR__ . '/../../bin/gruff-php',
+                'analyse',
+                'src/Handlers.php',
+                '--format',
+                'json',
+                '--fail-on',
+                'none',
+                '--fail-on-new',
+                '--baseline',
+                'gruff-baseline.json',
+                '--include-rule',
+                'docs.missing-public-phpdoc',
+            ], $project);
+            $overflowRun->run();
+
+            self::assertSame(1, $overflowRun->getExitCode(), $overflowRun->getErrorOutput());
+            $overflowReport = $this->decodeJsonOutput($overflowRun);
+            self::assertSame(1, $overflowReport['newFindingsCount'] ?? null);
+
+            // Accepting both instances in the group must clear the gate.
+            $this->writeHandlerGroupBaseline($project, 2);
+            $withinBudgetRun = $this->runInProject($project, [
+                'analyse',
+                'src/Handlers.php',
+                '--format',
+                'json',
+                '--fail-on',
+                'none',
+                '--fail-on-new',
+                '--baseline',
+                'gruff-baseline.json',
+                '--include-rule',
+                'docs.missing-public-phpdoc',
+            ]);
+            $withinBudgetReport = $this->decodeJsonOutput($withinBudgetRun);
+            self::assertSame(0, $withinBudgetReport['newFindingsCount'] ?? null);
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+
+    /**
+     * Write a one-group v2 baseline accepting the anonymous-class handler findings.
+     *
+     * @param string $project - Fixture project root the baseline is written into.
+     * @param int    $acceptedCount - Accepted instance count for the handler group.
+     *
+     * @return void
+     */
+    private function writeHandlerGroupBaseline(string $project, int $acceptedCount): void
+    {
+        file_put_contents(
+            $project . '/gruff-baseline.json',
+            sprintf(
+                '{"schemaVersion":"gruff.baseline.v2","groups":[{"file":"src/Handlers.php","ruleId":"docs.missing-public-phpdoc","message":"Method class@anonymous::handle() needs a brief intent description above its declaration (one plain-English line; not a restatement of the method signature).","count":%d}]}',
+                $acceptedCount,
+            ),
+        );
     }
 
     /**

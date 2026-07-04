@@ -147,14 +147,17 @@ use InvalidArgumentException;
 use WeakMap;
 
 /**
- * Stores available rules and dispatches enabled rule analysis.
+ * The catalogue of every analysis rule and the engine that runs them. Holds each rule keyed by id, snapshots
+ * their definitions once, and - given an AnalysisConfig - hands back only the enabled set, memoised per config.
+ * Drives both the one-shot analyse() flow and the streaming begin/analyseUnit/end pipeline that keeps a large
+ * codebase's peak memory near a single unit, then dedupes and canonically orders every finding for the report.
  */
 final class RuleRegistry
 {
     /**
      * Rule priority for overlapping naming findings on the same identifier.
      *
-     * Lower numbers win. The order is the M51 documented deferral contract.
+     * Lower numbers win. The order encodes the documented deferral contract for overlapping naming rules.
      */
     private const NAMING_RULE_PRIORITY = [
         'naming.class-file-mismatch'    => 0,
@@ -207,6 +210,7 @@ final class RuleRegistry
             $definition = $rule->definition();
             $id         = $definition->id;
 
+            // A second rule claiming an id already taken is a registration bug.
             if (isset($indexedRules[$id])) {
                 throw new InvalidArgumentException(sprintf('Duplicate rule id "%s".', $id));
             }
@@ -223,7 +227,7 @@ final class RuleRegistry
     }
 
     /**
-     * Build the default registry containing every built-in rule.
+     * Builds the default registry containing every built-in rule.
      *
      * @return self - registry pre-loaded with every built-in rule, keyed and sorted by rule id
      */
@@ -362,7 +366,7 @@ final class RuleRegistry
     }
 
     /**
-     * List every registered rule in execution order.
+     * Lists every registered rule in execution order.
      *
      * @return list<RuleInterface|ProjectRuleInterface> - all registered rules, id-sorted ascending; empty when none were registered
      */
@@ -372,7 +376,7 @@ final class RuleRegistry
     }
 
     /**
-     * Check whether a rule id is registered.
+     * Reports whether a rule id is registered.
      *
      * @param string $ruleId - Rule identifier to check.
      *
@@ -384,7 +388,7 @@ final class RuleRegistry
     }
 
     /**
-     * Return the requested rule ids that are not registered.
+     * Returns the requested rule ids that are not registered.
      *
      * @param list<string> $ruleIds - Rule identifiers to validate.
      *
@@ -405,7 +409,7 @@ final class RuleRegistry
     }
 
     /**
-     * Return a registered rule by id.
+     * Returns a registered rule by id.
      *
      * @param string $ruleId - Rule identifier to look up.
      *
@@ -419,7 +423,7 @@ final class RuleRegistry
     }
 
     /**
-     * Return rules enabled by the effective analysis config.
+     * Returns the rules enabled by the effective analysis config.
      *
      * @param AnalysisConfig $config - Config used to filter registered rules.
      *
@@ -432,7 +436,7 @@ final class RuleRegistry
     }
 
     /**
-     * Filter the registered rules down to the set the config enables.
+     * Filters the registered rules down to the set the config enables.
      *
      * @param AnalysisConfig $config - Config used to filter registered rules.
      *
@@ -454,7 +458,7 @@ final class RuleRegistry
     }
 
     /**
-     * Check whether the effective config enables at least one project-level rule.
+     * Reports whether the effective config enables at least one project-level rule.
      *
      * @param AnalysisConfig $config - Config used to filter registered rules.
      *
@@ -472,7 +476,7 @@ final class RuleRegistry
     }
 
     /**
-     * Return enabled rule ids whose findings come from project-wide analysis.
+     * Returns the enabled rule ids whose findings come from project-wide analysis.
      *
      * @param AnalysisConfig $config - Config used to filter registered rules.
      *
@@ -492,7 +496,7 @@ final class RuleRegistry
     }
 
     /**
-     * Determine whether the enabled rule set is fully streaming-capable.
+     * Reports whether the enabled rule set is fully streaming-capable.
      *
      * A rule set is streaming-capable when every enabled project rule
      * implements ProjectRuleAccumulator. Per-unit rules are always
@@ -514,7 +518,7 @@ final class RuleRegistry
     }
 
     /**
-     * Initialise project-rule accumulators before a streaming analysis pass.
+     * Initialises the project-rule accumulators before a streaming analysis pass.
      *
      * @param RuleContext $ruleContext - Rule execution context.
      *
@@ -530,7 +534,7 @@ final class RuleRegistry
     }
 
     /**
-     * Run every enabled per-unit rule and accumulator against a single unit.
+     * Runs every enabled per-unit rule and accumulator against a single unit.
      *
      * Use together with beginStreaming() and endStreaming() to drive a
      * parse → analyse → release pipeline that keeps peak memory close to
@@ -554,7 +558,7 @@ final class RuleRegistry
     }
 
     /**
-     * Run only the per-unit (file-scoped) rules against a single unit.
+     * Runs only the per-unit (file-scoped) rules against a single unit.
      *
      * @param AnalysisUnit            $analysisUnit - Parsed unit to analyse.
      * @param RuleContext             $ruleContext - Rule execution context.
@@ -567,6 +571,7 @@ final class RuleRegistry
         RuleContext         $ruleContext,
         ?RuleRunnerObserver $ruleRunnerObserver,
     ): array {
+        // A file that failed to parse has no reliable AST for the rules to read.
         if ($analysisUnit->hasParseErrors()) {
             return [];
         }
@@ -574,6 +579,7 @@ final class RuleRegistry
         $findings = [];
         $isPhp    = $analysisUnit->file->isPhp();
 
+        // Run every enabled rule that applies to this unit.
         foreach ($this->enabledRules($ruleContext->config) as $rule) {
             if (!$rule instanceof RuleInterface) {
                 continue;
@@ -598,7 +604,7 @@ final class RuleRegistry
     }
 
     /**
-     * Push one unit through every enabled streaming project rule.
+     * Pushes one unit through every enabled streaming project rule.
      *
      * @param AnalysisUnit            $analysisUnit - Parsed unit to accumulate.
      * @param RuleContext             $ruleContext - Rule execution context.
@@ -611,11 +617,13 @@ final class RuleRegistry
         RuleContext         $ruleContext,
         ?RuleRunnerObserver $ruleRunnerObserver,
     ): void {
+        // A file that failed to parse contributes nothing to the accumulators.
         if ($analysisUnit->hasParseErrors()) {
             return;
         }
 
         $isPhp = $analysisUnit->file->isPhp();
+        // Feed the unit to every enabled streaming accumulator.
         foreach ($this->enabledRules($ruleContext->config) as $rule) {
             if (!$rule instanceof ProjectRuleAccumulator) {
                 continue;
@@ -637,7 +645,7 @@ final class RuleRegistry
     }
 
     /**
-     * Finalise project-rule accumulators after streaming analysis completes.
+     * Finalises the project-rule accumulators and returns their findings after streaming completes.
      *
      * @param RuleContext             $ruleContext - Rule execution context.
      * @param RuleRunnerObserver|null $ruleRunnerObserver - Optional per-rule timing hook.
@@ -650,6 +658,7 @@ final class RuleRegistry
     ): array {
         $findings = [];
 
+        // Flush every enabled accumulator's project-level findings.
         foreach ($this->enabledRules($ruleContext->config) as $rule) {
             if (!$rule instanceof ProjectRuleAccumulator) {
                 continue;
@@ -671,7 +680,7 @@ final class RuleRegistry
     }
 
     /**
-     * Apply the canonical ordering and dedupe pass to a streaming run's
+     * Applies the canonical ordering and dedupe pass to a streaming run's
      * collected findings. Callers that drive analyseUnit() / endStreaming()
      * themselves should call this once at the end so the output matches
      * the non-streaming analyse() flow byte-for-byte.
@@ -703,7 +712,7 @@ final class RuleRegistry
     }
 
     /**
-     * Run all enabled file and project rules against parsed units.
+     * Runs all enabled file and project rules against parsed units.
      *
      * @param list<AnalysisUnit>      $units - Parsed units to analyse with file-scoped rules.
      * @param RuleContext             $ruleContext - Rule execution context.
@@ -746,6 +755,7 @@ final class RuleRegistry
 
         array_push($findings, ...$this->endStreaming($ruleContext, $ruleRunnerObserver));
 
+        // Legacy project rules still need the whole unit list handed to them at once.
         if ($legacyProjectRules !== []) {
             array_push($findings, ...$this->runLegacyProjectRules(
                 $legacyProjectRules,
@@ -759,7 +769,7 @@ final class RuleRegistry
     }
 
     /**
-     * Find enabled project rules that still need the full unit list.
+     * Returns the enabled project rules that still need the full unit list.
      *
      * @param RuleContext $ruleContext - Rule execution context.
      *
@@ -779,7 +789,7 @@ final class RuleRegistry
     }
 
     /**
-     * Run project-level rules that need the full analysis context.
+     * Runs the project-level rules that need the full analysis context.
      *
      * @param list<ProjectRuleInterface> $rules - Project rules to run.
      * @param list<AnalysisUnit>         $contextUnits - Candidate units available to project rules.
@@ -799,6 +809,7 @@ final class RuleRegistry
                                              static fn(AnalysisUnit $analysisUnit): bool => !$analysisUnit->hasParseErrors() && $analysisUnit->file->isPhp(),
                                          ));
 
+        // No parse-clean PHP units means the project rules have nothing to inspect.
         if ($analyseableUnits === []) {
             return [];
         }
@@ -821,7 +832,7 @@ final class RuleRegistry
     }
 
     /**
-     * Build deduplicate findings for the component.
+     * Collapses findings that share a full reporting identity, keeping the first occurrence.
      *
      * @param list<Finding> $findings - Findings to collapse by full reporting identity.
      *
@@ -844,6 +855,7 @@ final class RuleRegistry
                 $finding->metadata === [] ? '' : serialize($finding->metadata),
             ]);
 
+            // An exact-identity repeat is dropped so the report shows each finding once.
             if (isset($seen[$key])) {
                 continue;
             }
@@ -856,7 +868,7 @@ final class RuleRegistry
     }
 
     /**
-     * Keep only the highest-priority naming finding when multiple naming rules
+     * Keeps only the highest-priority naming finding when multiple naming rules
      * report the same identifier at the same source location.
      *
      * @param list<Finding> $findings - Findings that may contain overlapping naming reports.
@@ -876,6 +888,7 @@ final class RuleRegistry
             }
 
             $priority = self::NAMING_RULE_PRIORITY[$finding->ruleId];
+            // Keep this finding only when its rule outranks the best seen for the identifier.
             if (!isset($bestByIdentifier[$key]) || $priority < $bestByIdentifier[$key]['priority']) {
                 $bestByIdentifier[$key] = ['index' => $index, 'priority' => $priority];
             }
@@ -891,7 +904,7 @@ final class RuleRegistry
     }
 
     /**
-     * Build the cross-rule identifier key used to collapse duplicate naming findings.
+     * Builds the cross-rule identifier key used to collapse duplicate naming findings.
      *
      * @param Finding $finding - Finding to classify for naming-rule overlap.
      *
@@ -918,7 +931,7 @@ final class RuleRegistry
     }
 
     /**
-     * Extract the identifier name from finding metadata.
+     * Returns the identifier name from finding metadata.
      *
      * @param Finding $finding - Finding whose metadata may carry an identifier.
      *

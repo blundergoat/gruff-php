@@ -16,7 +16,9 @@ use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Node\Stmt\ClassMethod;
 
 /**
- * Detects tests that execute without making a verifiable assertion.
+ * Flags a test that runs without a single observable check - no PHPUnit/Pest assertion, no mock
+ * verification, no expectException, no explicit assertion-count marker - so it proves nothing and passes
+ * as long as the code does not throw. Runs over every test in the file. Error severity, medium confidence.
  */
 final readonly class NoAssertionsRule implements RuleInterface
 {
@@ -26,7 +28,7 @@ final readonly class NoAssertionsRule implements RuleInterface
     public const ID = 'test-quality.no-assertions';
 
     /**
-     * Describe the no-assertions rule.
+     * Describes the no-assertions rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -44,7 +46,7 @@ final readonly class NoAssertionsRule implements RuleInterface
     }
 
     /**
-     * Find tests that do not contain an observable assertion or expectation.
+     * Reports tests that do not contain an observable assertion or expectation.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -55,7 +57,9 @@ final readonly class NoAssertionsRule implements RuleInterface
     {
         $findings = [];
 
+        // Weigh every test scope in the file.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
+            // A test with any observable expectation is already proving something.
             if ($this->hasObservableExpectation($scope)) {
                 continue;
             }
@@ -79,7 +83,7 @@ final readonly class NoAssertionsRule implements RuleInterface
     }
 
     /**
-     * Detect assertions, mock verifications, or explicit PHPUnit expectation markers.
+     * Reports whether a test has any observable assertion, verification, or expectation marker.
      *
      * @param TestQualityScope $scope - Test scope whose body is searched for any observable expectation.
      *
@@ -97,6 +101,7 @@ final readonly class NoAssertionsRule implements RuleInterface
             return true;
         }
 
+        // Fall back to scanning the test's calls for a mock check or explicit marker.
         foreach (TestQualityNodeHelper::calls($scope) as $call) {
             if (TestQualityNodeHelper::isMockVerificationCall($call)) {
                 // A mock verification (such as a Mockery expectation) is checked at teardown, so it counts.
@@ -115,7 +120,7 @@ final readonly class NoAssertionsRule implements RuleInterface
     }
 
     /**
-     * Detect legacy `@expectedException` annotations.
+     * Reports whether a method docblock declares a legacy `@expectedException` annotation.
      *
      * @param ClassMethod $classMethod - Test method whose docblock is checked for the legacy annotation.
      *

@@ -38,7 +38,7 @@ final class DebugModeEnabledRule implements RuleInterface
     private const DISPLAY_DIRECTIVES = ['display_errors', 'display_startup_errors'];
 
     /**
-     * Describe the debug-mode rule.
+     * Describes the debug-mode rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -63,7 +63,7 @@ final class DebugModeEnabledRule implements RuleInterface
     }
 
     /**
-     * Find ini_set calls that turn error display on.
+     * Reports each `ini_set()` call that forces error display on.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -74,17 +74,21 @@ final class DebugModeEnabledRule implements RuleInterface
     {
         $findings = [];
 
+        // Check every function call in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
+            // Only a global ini_set() can flip an error-display directive.
             if (SecurityNodeHelper::globalFunctionName($call) !== 'ini_set') {
                 continue;
             }
 
             $directive = SecurityNodeHelper::argumentValue($call->args, 0);
+            // Only a literal display_errors / display_startup_errors directive is in scope.
             if (!$directive instanceof Scalar\String_ || !in_array(strtolower($directive->value), self::DISPLAY_DIRECTIVES, true)) {
                 continue;
             }
 
             $directiveValue = SecurityNodeHelper::argumentValue($call->args, 1);
+            // A falsy or absent value leaves error display off, which is the safe state.
             if ($directiveValue === null || !$this->isTruthy($directiveValue)) {
                 continue;
             }
@@ -109,7 +113,7 @@ final class DebugModeEnabledRule implements RuleInterface
     }
 
     /**
-     * Decide whether a literal argument turns the directive on.
+     * Reports whether a literal argument turns the directive on.
      *
      * @param Expr $directiveValue - Second argument to ini_set.
      *

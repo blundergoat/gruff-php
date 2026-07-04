@@ -55,6 +55,116 @@ final class TrendRecorderTest extends TestCase
     }
 
     /**
+     * Verify deltas compare only like-for-like scopes across mixed history entries.
+     *
+     * @return void
+     */
+    public function testRecordComparesOnlySameScopeEntries(): void
+    {
+        $root = $this->tempDir();
+
+        try {
+            file_put_contents($root . '/history.json', json_encode([
+                                                                       [
+                                                                           'schemaVersion' => 'gruff.analysis.v2',
+                                                                           'timestamp'     => '2026-05-12T00:00:00+00:00',
+                                                                           'score'         => 80.0,
+                                                                           'grade'         => 'B',
+                                                                           'scope'         => 'full-project',
+                                                                           'findings'      => 12,
+                                                                       ],
+                                                                       [
+                                                                           'schemaVersion' => 'gruff.analysis.v2',
+                                                                           'timestamp'     => '2026-05-13T00:00:00+00:00',
+                                                                           'score'         => 60.0,
+                                                                           'grade'         => 'D',
+                                                                           'scope'         => 'diff',
+                                                                           'findings'      => 4,
+                                                                       ],
+                                                                   ], JSON_THROW_ON_ERROR));
+
+            // A full-project run skips the interleaved diff entry and compares against the full-project one.
+            $fullReport = (new TrendRecorder())->record($root, 'history.json', $this->score(90.0), 3);
+
+            self::assertSame('full-project', $fullReport->scope);
+            self::assertSame(80.0, $fullReport->previousScore);
+            self::assertSame(10.0, $fullReport->delta);
+
+            // A diff-scoped run compares against the latest diff entry, never the full-project scores.
+            $diffReport = (new TrendRecorder())->record($root, 'history.json', $this->score(70.0, 'diff'), 2);
+
+            self::assertSame('diff', $diffReport->scope);
+            self::assertSame(60.0, $diffReport->previousScore);
+            self::assertSame(10.0, $diffReport->delta);
+            self::assertCount(4, $diffReport->entries);
+        } finally {
+            $this->removeDir($root);
+        }
+    }
+
+    /**
+     * Verify a diff run against full-project-only history records its entry but reports no delta.
+     *
+     * @return void
+     */
+    public function testDiffRunAgainstFullProjectHistoryReportsNoDelta(): void
+    {
+        $root = $this->tempDir();
+
+        try {
+            file_put_contents($root . '/history.json', json_encode([
+                                                                       [
+                                                                           'schemaVersion' => 'gruff.analysis.v2',
+                                                                           'timestamp'     => '2026-05-12T00:00:00+00:00',
+                                                                           'score'         => 80.0,
+                                                                           'grade'         => 'B',
+                                                                           'scope'         => 'full-project',
+                                                                           'findings'      => 12,
+                                                                       ],
+                                                                   ], JSON_THROW_ON_ERROR));
+
+            $report = (new TrendRecorder())->record($root, 'history.json', $this->score(40.0, 'diff'), 9);
+
+            self::assertSame('diff', $report->scope);
+            self::assertNull($report->previousScore);
+            self::assertNull($report->delta);
+            self::assertCount(2, $report->entries);
+            self::assertSame('diff', $report->entries[1]['scope'] ?? null);
+        } finally {
+            $this->removeDir($root);
+        }
+    }
+
+    /**
+     * Verify legacy entries without a scope field compare as full-project history.
+     *
+     * @return void
+     */
+    public function testLegacyEntriesWithoutScopeCompareAsFullProject(): void
+    {
+        $root = $this->tempDir();
+
+        try {
+            file_put_contents($root . '/history.json', json_encode([
+                                                                       [
+                                                                           'schemaVersion' => 'gruff.analysis.v2',
+                                                                           'timestamp'     => '2026-05-12T00:00:00+00:00',
+                                                                           'score'         => 75.0,
+                                                                           'grade'         => 'C',
+                                                                           'findings'      => 20,
+                                                                       ],
+                                                                   ], JSON_THROW_ON_ERROR));
+
+            $fullReport = (new TrendRecorder())->record($root, 'history.json', $this->score(85.0), 5);
+
+            self::assertSame(75.0, $fullReport->previousScore);
+            self::assertSame(10.0, $fullReport->delta);
+        } finally {
+            $this->removeDir($root);
+        }
+    }
+
+    /**
      * Verify record creates nested history, keeps the newest fifty entries, and persists scalar payloads.
      *
      * @return void
@@ -110,6 +220,67 @@ final class TrendRecorderTest extends TestCase
             self::assertCount(50, $persisted);
             self::assertSame(7, $firstPersisted['score'] ?? null);
             self::assertSame(92, $lastPersisted['score'] ?? null);
+        } finally {
+            $this->removeDir($root);
+        }
+    }
+
+    /**
+     * Verify history retention keeps fifty snapshots for each score scope.
+     *
+     * @return void
+     */
+    public function testRecordBoundsPersistedEntriesPerScope(): void
+    {
+        $root = $this->tempDir();
+
+        try {
+            $history = [];
+            for ($index = 1; $index <= 55; $index++) {
+                $history[] = [
+                    'schemaVersion' => 'gruff.analysis.v2',
+                    'timestamp'     => sprintf('2026-05-12T00:%02d:00+00:00', $index % 60),
+                    'score'         => (float)$index,
+                    'grade'         => 'D',
+                    'scope'         => 'full-project',
+                    'findings'      => $index,
+                ];
+                $history[] = [
+                    'schemaVersion' => 'gruff.analysis.v2',
+                    'timestamp'     => sprintf('2026-05-12T01:%02d:00+00:00', $index % 60),
+                    'score'         => (float)(1000 + $index),
+                    'grade'         => 'D',
+                    'scope'         => 'diff',
+                    'findings'      => $index,
+                ];
+            }
+
+            file_put_contents($root . '/history.json', json_encode($history, JSON_THROW_ON_ERROR));
+
+            $report    = (new TrendRecorder())->record($root, 'history.json', $this->score(92.0), 8);
+            $persisted = json_decode((string)file_get_contents($root . '/history.json'), true);
+
+            self::assertSame(55.0, $report->previousScore);
+            self::assertSame(37.0, $report->delta);
+            self::assertCount(100, $report->entries);
+            self::assertIsArray($persisted);
+            self::assertCount(100, $persisted);
+
+            $fullProjectEntries = array_values(array_filter(
+                $persisted,
+                static fn(mixed $entry): bool => is_array($entry) && ($entry['scope'] ?? null) === 'full-project',
+            ));
+            $diffEntries = array_values(array_filter(
+                $persisted,
+                static fn(mixed $entry): bool => is_array($entry) && ($entry['scope'] ?? null) === 'diff',
+            ));
+
+            self::assertCount(50, $fullProjectEntries);
+            self::assertCount(50, $diffEntries);
+            self::assertSame(7, $fullProjectEntries[0]['score'] ?? null);
+            self::assertSame(92, $fullProjectEntries[49]['score'] ?? null);
+            self::assertSame(1006, $diffEntries[0]['score'] ?? null);
+            self::assertSame(1055, $diffEntries[49]['score'] ?? null);
         } finally {
             $this->removeDir($root);
         }
@@ -193,18 +364,19 @@ final class TrendRecorderTest extends TestCase
     /**
      * Build a score report fixture for trend assertions.
      *
-     * @param float $score - Composite score value to place in the trend fixture.
+     * @param float  $score - Composite score value to place in the trend fixture.
+     * @param string $scope - Score scope stamped on the report; varied to prove scope-aware delta selection.
      *
-     * @return ScoreReport - a minimal full-project report graded from the given score, with empty pillars and offenders
+     * @return ScoreReport - a minimal report graded from the given score, with empty pillars and offenders
      */
-    private function score(float $score): ScoreReport
+    private function score(float $score, string $scope = 'full-project'): ScoreReport
     {
         return new ScoreReport(
             composite:              Grade::fromScore($score),
             pillars:                [],
             topOffenders:           [],
             complexityDistribution: [],
-            scope:                  'full-project',
+            scope:                  $scope,
             explanation:            'Example score.',
         );
     }

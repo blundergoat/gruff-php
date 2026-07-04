@@ -227,6 +227,63 @@ final class AgentWorkflowCliTest extends TestCase
     }
 
     /**
+     * Verify a symbol-less finding that only shifted lines is neither introduced nor removed.
+     *
+     * @return void
+     * @throws JsonException
+     */
+    public function testBranchReviewKeepsLineShiftedSymbolLessFindingUnchanged(): void
+    {
+        $this->skipWhenGitIsUnavailable();
+        $repo = $this->tempDir();
+
+        try {
+            self::assertTrue(mkdir($repo . '/src', 0777, true));
+            $this->runGit($repo, 'init');
+            $this->runGit($repo, 'config', 'user.email', 'test@example.com');
+            $this->runGit($repo, 'config', 'user.name', 'Gruff Test');
+            // security.dangerous-function-call emits no symbol, so this finding exercises the symbol-less identity.
+            file_put_contents(
+                $repo . '/src/Sink.php',
+                "<?php\n\nfunction runSink(string \$code): mixed\n{\n    return eval(\$code);\n}\n",
+            );
+            $this->runGit($repo, 'add', 'src/Sink.php');
+            $this->runGit($repo, 'commit', '-m', 'base');
+
+            // Insert one line above the finding so its line and fingerprint shift without any semantic change.
+            file_put_contents(
+                $repo . '/src/Sink.php',
+                "<?php\n\n// Unrelated line inserted above the finding.\nfunction runSink(string \$code): mixed\n{\n    return eval(\$code);\n}\n",
+            );
+
+            $process = new Process([
+                                       PHP_BINARY,
+                                       self::PROJECT_ROOT . '/bin/gruff-php',
+                                       'analyse',
+                                       'src',
+                                       '--format=json',
+                                       '--fail-on=none',
+                                       '--no-config',
+                                       '--no-baseline',
+                                       '--diff-vs=HEAD',
+                                       '--include-rule=security.dangerous-function-call',
+                                   ], $repo);
+            $process->run();
+
+            self::assertSame(0, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
+            $report = $this->decodeJson($process);
+            $review = $this->arrayValue($report, 'review');
+            $counts = $this->arrayValue($review, 'counts');
+
+            self::assertSame(0, $this->intValue($counts, 'introduced'));
+            self::assertSame(0, $this->intValue($counts, 'removed'));
+            self::assertSame(1, $this->intValue($counts, 'unchanged'));
+        } finally {
+            $this->removeDir($repo);
+        }
+    }
+
+    /**
      * Verify branch review reports removed findings.
      *
      * @return void

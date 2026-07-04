@@ -18,7 +18,9 @@ use PhpParser\Node\Expr;
 use PhpParser\Node\Scalar;
 
 /**
- * Detects assertions that compare against unexplained numeric literals.
+ * Flags an assertion that compares against a bare numeric literal whose meaning is not explained - a magic
+ * number that leaves a reader guessing what the test expects and why. Well-known codes (HTTP statuses) and
+ * counts/named getters are exempt; the allowlist is tunable. Runs over every test. Advisory, low confidence.
  */
 final readonly class MagicNumberAssertionRule implements RuleInterface
 {
@@ -99,7 +101,7 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
     ];
 
     /**
-     * Describe the magic number assertion rule.
+     * Describes the magic-number-assertion rule for the registry and reports.
      *
      * @return RuleDefinition - this rule's id, pillar/tier, default Advisory severity, and allowed-literal allowlist
      */
@@ -117,7 +119,7 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
     }
 
     /**
-     * Find assertions that compare against unexplained numeric literals.
+     * Reports assertions that compare against unexplained numeric literals.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -129,9 +131,12 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
         $allowed  = $this->loadAllowedLiterals($ruleContext);
         $findings = [];
 
+        // Weigh every test scope in the file.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
+            // Inspect each assertion the test makes.
             foreach (TestQualityNodeHelper::assertionCalls($scope) as $call) {
                 $number = TestQualityNodeHelper::isAssertionMagicNumber($call);
+                // Skip literals that are allowlisted or already explained by context.
                 if ($number === null || in_array($number, $allowed, true) || $this->hasContextualNumericTarget($call)) {
                     continue;
                 }
@@ -156,7 +161,7 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
     }
 
     /**
-     * Load configured assertion literals, falling back to the default self-explanatory values.
+     * Loads the allowed literals, falling back to the default self-explanatory set.
      *
      * @param RuleContext $ruleContext - Source of the per-rule `allowedLiterals` option for this run.
      *
@@ -171,7 +176,9 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
         }
 
         $allowedLiterals = [];
+        // Keep only the integer entries from the configured list.
         foreach ($configuredLiterals as $configuredLiteral) {
+            // A non-integer entry is not a literal we can match.
             if (is_int($configuredLiteral)) {
                 $allowedLiterals[] = $configuredLiteral;
             }
@@ -181,6 +188,8 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
     }
 
     /**
+     * Reports whether an assertion's numeric literal is already explained by its context.
+     *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Assertion call whose numeric literal is judged.
      *
      * @return bool - true when the call is a cardinality assertion or its compared value labels the number's meaning
@@ -205,6 +214,8 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
     }
 
     /**
+     * Returns the actual value an assertion compares against the literal, or null.
+     *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Assertion or Pest expectation call to read from.
      * @param string                                        $name - Lowercased call name that selects the extraction path.
      *
@@ -222,6 +233,8 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
     }
 
     /**
+     * Reports whether an expression labels what the compared number means.
+     *
      * @param Expr $expr - Expression compared against the numeric literal; wrappers are unwrapped recursively.
      *
      * @return bool - true when the expression (count call, named getter, or contextual property/key) labels the number
@@ -238,6 +251,7 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
             return TestQualityNodeHelper::functionName($expr) === 'count';
         }
 
+        // A named getter can label what the number means.
         if ($expr instanceof Expr\MethodCall || $expr instanceof Expr\StaticCall) {
             $name = TestQualityNodeHelper::callName($expr);
 
@@ -262,6 +276,8 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
     }
 
     /**
+     * Reports whether a property name is a contextual numeric name.
+     *
      * @param Node $node - Property-name node to inspect; only a literal identifier carries a comparable name.
      *
      * @return bool - true when the property is a static identifier with a contextual name; false for dynamic names
@@ -277,6 +293,8 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
     }
 
     /**
+     * Reports whether an array key is a contextual numeric name.
+     *
      * @param Expr|null $expr - Array-dimension node; only a literal string key carries a comparable name.
      *
      * @return bool - true when the key is a literal string with a contextual normalized value; false for computed keys
@@ -292,6 +310,8 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
     }
 
     /**
+     * Normalises an identifier or key for case- and separator-insensitive lookup.
+     *
      * @param string $name - Raw identifier or array key whose case and separators are insignificant for matching.
      *
      * @return string - the name lowercased with non-alphanumeric characters stripped, for case-insensitive lookup

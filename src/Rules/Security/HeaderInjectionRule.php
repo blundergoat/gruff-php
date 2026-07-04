@@ -17,7 +17,11 @@ use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Node\Expr;
 
 /**
- * Detects dynamic header values that may allow response splitting.
+ * Flags a `header()` call whose value is built from request data, the shape that lets an attacker inject
+ * CR/LF and split the response - so the user reviews it before a redirect or header leaks extra content.
+ *
+ * Runs per file, matching global header() calls whose first argument reaches user input. Warning, medium
+ * confidence - a request-fed header is a likely response-splitting sink, not a certain one.
  */
 final class HeaderInjectionRule implements RuleInterface
 {
@@ -27,7 +31,7 @@ final class HeaderInjectionRule implements RuleInterface
     public const ID = 'security.header-injection';
 
     /**
-     * Describe the header injection security rule.
+     * Describes the header-injection rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -45,7 +49,7 @@ final class HeaderInjectionRule implements RuleInterface
     }
 
     /**
-     * Find header calls that may receive unsanitized user input.
+     * Reports each `header()` call reached by request-controlled data.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -56,12 +60,15 @@ final class HeaderInjectionRule implements RuleInterface
     {
         $findings = [];
 
+        // Check every function call in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
+            // Only a call to the global header() can split the response.
             if (SecurityNodeHelper::globalFunctionName($call) !== 'header') {
                 continue;
             }
 
             $firstArg = SecurityNodeHelper::argumentValue($call->args, 0);
+            // A header value with no request-controlled data is safe, so skip it.
             if ($firstArg === null || !SecurityNodeHelper::containsUserInput($firstArg)) {
                 continue;
             }

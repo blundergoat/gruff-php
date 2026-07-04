@@ -8,12 +8,17 @@ use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 
 /**
- * Carries shared inputs needed to evaluate and emit identifier-quality findings.
+ * Carries the shared inputs the identifier-quality rules need to evaluate and emit a finding - the rule
+ * metadata, the parsed unit under inspection, the tokenizer, and the configured placeholder, generic,
+ * ignored, and accepted-abbreviation lists.
+ *
+ * Bundled into one object so each naming check reads from a single context instead of threading a long
+ * argument list through every helper.
  */
 final readonly class IdentifierFindingContext
 {
     /**
-     * Capture rule metadata, parsed unit, tokenizer, and configured identifier lists.
+     * Captures rule metadata, parsed unit, tokenizer, and configured identifier lists.
      *
      * @param RuleDefinition      $definition - Rule metadata used on emitted findings.
      * @param AnalysisUnit        $analysisUnit - Parsed unit being inspected.

@@ -18,7 +18,11 @@ use PhpParser\Node;
 use PhpParser\Node\Expr;
 
 /**
- * Detects HTTP client options that disable SSL certificate verification.
+ * Flags a cURL call that turns off certificate verification - `CURLOPT_SSL_VERIFYPEER` or
+ * `CURLOPT_SSL_VERIFYHOST` set false - the toggle that lets a man-in-the-middle impersonate the remote host.
+ *
+ * Runs per file over `curl_setopt` calls and `curl_setopt_array` option maps. Warning, high confidence -
+ * a literal verify-off toggle is unambiguous.
  */
 final class DisabledSslVerificationRule implements RuleInterface
 {
@@ -28,7 +32,7 @@ final class DisabledSslVerificationRule implements RuleInterface
     public const ID = 'security.disabled-ssl-verification';
 
     /**
-     * Describe the disabled SSL verification rule.
+     * Describes the disabled-SSL-verification rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -46,7 +50,7 @@ final class DisabledSslVerificationRule implements RuleInterface
     }
 
     /**
-     * Find cURL calls that disable peer or hostname verification.
+     * Reports each cURL call that turns peer or hostname verification off.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -57,12 +61,15 @@ final class DisabledSslVerificationRule implements RuleInterface
     {
         $findings = [];
 
+        // Check every function call in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
             $name = SecurityNodeHelper::globalFunctionName($call);
+            // A single curl_setopt disabling a verify option is a finding.
             if ($name === 'curl_setopt' && $this->isDisabledCurlSetopt($call)) {
                 $findings[] = $this->finding($analysisUnit, $call);
             }
 
+            // An options map disabling a verify option is a finding too.
             if ($name === 'curl_setopt_array' && $this->isDisabledCurlSetoptArray($call)) {
                 $findings[] = $this->finding($analysisUnit, $call);
             }
@@ -72,7 +79,7 @@ final class DisabledSslVerificationRule implements RuleInterface
     }
 
     /**
-     * Detect disabled verification in a `curl_setopt` call.
+     * Reports whether a `curl_setopt` call disables SSL verification.
      *
      * @param Expr\FuncCall $call - Parsed `curl_setopt($handle, $option, $value)` call whose option/value pair is read.
      *
@@ -104,7 +111,7 @@ final class DisabledSslVerificationRule implements RuleInterface
     }
 
     /**
-     * Detect disabled verification in a `curl_setopt_array` option map.
+     * Reports whether a `curl_setopt_array` option map disables SSL verification.
      *
      * @param Expr\FuncCall $call - Parsed `curl_setopt_array($handle, $options)` call; its options array is scanned.
      *
@@ -118,16 +125,20 @@ final class DisabledSslVerificationRule implements RuleInterface
             return false;
         }
 
+        // Weigh each option in the map.
         foreach ($optionsArg->items as $arrayItem) {
+            // A spread entry has no key to read.
             if (!$arrayItem->key instanceof Node) {
                 continue;
             }
 
             $option = SecurityNodeHelper::constantName($arrayItem->key);
+            // Skip an entry whose key is not a named constant.
             if ($option === null) {
                 continue;
             }
 
+            // Only the two SSL verification options matter here.
             if (!in_array($option, ['CURLOPT_SSL_VERIFYHOST', 'CURLOPT_SSL_VERIFYPEER'], true)) {
                 continue;
             }
@@ -143,7 +154,7 @@ final class DisabledSslVerificationRule implements RuleInterface
     }
 
     /**
-     * Build the SSL verification finding for a cURL call.
+     * Builds the SSL-verification finding for a cURL call.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit supplying the display path recorded on the finding.
      * @param Node         $node - cURL call node whose start line localises the finding for the reviewer.

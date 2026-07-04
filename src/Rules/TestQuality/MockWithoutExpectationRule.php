@@ -17,7 +17,9 @@ use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Node\Expr;
 
 /**
- * Detects mock objects that are used without verification expectations.
+ * Flags a mock that is set up and passed around but never given a verifying expectation - no `expects()`,
+ * `shouldReceive()`, and so on - so the test never actually checks the interaction it mocked. A stub-only
+ * mock (return values wired, no call asserted) downgrades to advisory. Runs over every test. Warning, medium confidence.
  */
 final readonly class MockWithoutExpectationRule implements RuleInterface
 {
@@ -37,7 +39,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     private const STUB_METHODS = ['willreturn', 'willreturnmap', 'willreturncallback', 'willreturnonconsecutivecalls', 'willreturnself', 'willthrowexception', 'andreturn'];
 
     /**
-     * Describe the mock-without-expectation rule.
+     * Describes the mock-without-expectation rule for the registry and reports.
      *
      * @return RuleDefinition - id, name, pillar, tier and the default Warning/Medium severity the engine reads
      */
@@ -54,7 +56,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     }
 
     /**
-     * Find mocks that are read without any verification call.
+     * Reports mocks that are read without any verification call.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -65,6 +67,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     {
         $findings = [];
 
+        // Weigh every test scope in the file.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             $findings = array_merge($findings, $this->findingsForScope($analysisUnit, $scope));
         }
@@ -73,7 +76,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     }
 
     /**
-     * Build mock-expectation findings for one test scope.
+     * Builds the mock-expectation findings for one test scope.
      *
      * @param AnalysisUnit     $analysisUnit - Parsed unit supplying the display path recorded on each finding.
      * @param TestQualityScope $scope - Single test method or function whose mock usage is examined.
@@ -93,6 +96,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
         $reads    = $this->variableReads($scope, $assignedVarObjectIds);
         $findings = [];
 
+        // Weigh each mock the scope created.
         foreach ($mockAssignments as $varName => $assignment) {
             $finding = $this->findingForMock(
                 analysisUnit: $analysisUnit,
@@ -102,6 +106,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
                 reads:        $reads,
             );
 
+            // Keep the finding when the mock proved unverified.
             if ($finding instanceof Finding) {
                 $findings[] = $finding;
             }
@@ -111,7 +116,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     }
 
     /**
-     * Collect mock variables created in the test scope.
+     * Collects the mock variables created in a test scope.
      *
      * @param TestQualityScope $scope - Test scope whose assignments are scanned for mock creation.
      * @param array<int, true> $assignedVarObjectIds - Out-param: records the object id of every assigned variable
@@ -129,13 +134,16 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
         $mockAssignments = [];
         $assignments     = NodeIndex::descendantsOfAny($scope->node, [Expr\Assign::class]);
 
+        // Weigh every assignment in the test body.
         foreach ($assignments as $assign) {
+            // Only a plainly named variable target can be tracked.
             if (!$assign->var instanceof Expr\Variable || !is_string($assign->var->name)) {
                 continue;
             }
 
             $assignedVarObjectIds[spl_object_id($assign->var)] = true;
 
+            // Record the target only when the right-hand side creates a mock.
             if (!$this->isMockCreationExpression($assign->expr)) {
                 continue;
             }
@@ -151,7 +159,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     }
 
     /**
-     * Collect reads of variables created as mocks.
+     * Collects the read occurrences of each variable, excluding assignment targets.
      *
      * @param TestQualityScope $scope - Test scope whose variable nodes are walked.
      * @param array<int, true> $assignedVarObjectIds - Object ids of assignment-target nodes, used to skip the write
@@ -166,11 +174,14 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     {
         $reads = [];
 
+        // Weigh every variable node in the test body.
         foreach (NodeIndex::descendantsOfAny($scope->node, [Expr\Variable::class]) as $var) {
+            // Skip variable-variables with no static name.
             if (!is_string($var->name)) {
                 continue;
             }
 
+            // Skip the assignment target itself; that write is not a read.
             if (isset($assignedVarObjectIds[spl_object_id($var)])) {
                 continue;
             }
@@ -183,7 +194,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     }
 
     /**
-     * Decide whether one mock variable lacks a verifying call and build the finding if so.
+     * Builds a finding when a mock variable lacks a verifying call, or null.
      *
      * @param AnalysisUnit                       $analysisUnit - Parsed unit supplying the display path for the finding.
      * @param TestQualityScope                   $scope - Test scope the mock lives in; its symbol labels findings.
@@ -233,7 +244,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     }
 
     /**
-     * Build the finding message for a mock variable.
+     * Builds the finding message for a mock variable.
      *
      * @param string $symbol - Enclosing test symbol named in the message so the reader can locate the mock.
      * @param string $varName - Mock variable name without the sigil; rendered as $name in the message.
@@ -253,7 +264,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     }
 
     /**
-     * Detect whether an expression creates a mock directly or through a method chain.
+     * Reports whether an expression creates a mock directly or through a method chain.
      *
      * @param Expr $expr - Right-hand side of an assignment being classified as mock creation or not.
      *
@@ -276,7 +287,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     }
 
     /**
-     * Walk a method-call chain to see whether it originates at mock creation.
+     * Reports whether a method-call chain originates at a mock creator.
      *
      * @param Expr\MethodCall $call - Outermost call of a builder chain (e.g. ...->getMock()) to trace back to its root.
      *
@@ -290,6 +301,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
         }
 
         $receiver = $call->var;
+        // Unwind the receiver chain looking for a mock creator.
         while ($receiver instanceof Expr\MethodCall) {
             if (TestQualityNodeHelper::isMockCreationCall($receiver)) {
                 // A mid-chain builder step (getMockBuilder()->...) is the creator we were after.
@@ -305,7 +317,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     }
 
     /**
-     * List method names called on a specific variable.
+     * Lists the method names called on a specific variable.
      *
      * @param TestQualityScope $scope - Test scope searched for calls rooted at the variable.
      * @param string           $varName - Variable whose method calls are collected, without the sigil.
@@ -317,12 +329,15 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     {
         $names = [];
 
+        // Weigh every method call in the test body.
         foreach (NodeIndex::descendantsOfAny($scope->node, [Expr\MethodCall::class]) as $call) {
+            // Only calls rooted at this variable count.
             if (!$this->isChainRootedAtVariable($call, $varName)) {
                 continue;
             }
 
             $name = TestQualityNodeHelper::callName($call);
+            // Record each resolvable method name called on it.
             if ($name !== null) {
                 $names[] = $name;
             }
@@ -332,7 +347,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     }
 
     /**
-     * Check whether a method-call chain starts at the target variable.
+     * Reports whether a method-call chain is rooted at the target variable.
      *
      * @param Expr\MethodCall $call - Call whose receiver chain is unwound to find its base expression.
      * @param string          $varName - Variable name the chain must bottom out at to count as rooted there.
@@ -343,6 +358,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     {
         $receiver = $call->var;
 
+        // Unwind the receiver chain to its base expression.
         while ($receiver instanceof Expr\MethodCall) {
             $receiver = $receiver->var;
         }
@@ -353,7 +369,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     }
 
     /**
-     * Check whether two normalised method-name lists overlap.
+     * Reports whether two method-name lists overlap.
      *
      * @param list<string> $names - Normalised method names collected from the test body.
      * @param list<string> $needles - Normalised expectation method names to look for.
@@ -362,6 +378,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
      */
     private function hasAnyIntersection(array $names, array $needles): bool
     {
+        // Look for the first shared name between the lists.
         foreach ($names as $name) {
             if (in_array($name, $needles, true)) {
                 // First shared entry is enough to confirm overlap; stop scanning.

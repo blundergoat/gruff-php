@@ -16,7 +16,7 @@ The complete result of one scan: schema version, tool metadata, run metadata, pa
 
 ### Baseline
 
-A reviewed-finding suppression file. `gruff-php` writes and reads `gruff.baseline.v1`; entries match by stable finding identity so known findings can be suppressed without disabling rules.
+A reviewed-finding suppression file. `gruff-php` writes and reads `gruff.baseline.v2`: grouped count rows keyed by `(file, ruleId, message)`, matched by count arithmetic so accepted findings stay suppressed across line shifts without disabling rules.
 
 ### Changed-Code Scan
 
@@ -102,7 +102,7 @@ Default scans are local source inspections. `gruff-php` parses files and may cal
 
 ### Symfony Console Application
 
-`src/Cli/Application.php` registers the CLI commands: `analyse`, `summary`, `report`, `dashboard`, `init`, and `list-rules`, plus Symfony-provided help/list/completion behavior.
+`src/Cli/Application.php` registers the CLI commands: `analyse`, `check-ignore`, `dashboard`, `hook`, `init`, `list-rules`, `report`, and `summary`, plus Symfony-provided help/list/completion behavior.
 
 ### PHP Parser
 

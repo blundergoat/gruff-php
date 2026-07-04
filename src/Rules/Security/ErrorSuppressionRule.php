@@ -17,7 +17,11 @@ use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Node\Expr;
 
 /**
- * Detects error suppression operators that hide runtime failures.
+ * Flags the `@` error-suppression operator, which silences whatever failure the expression hits and leaves
+ * the user staring at a blank result with no clue why an operation quietly did nothing.
+ *
+ * Runs per file over every suppression node. Warning, high confidence - the operator is an unambiguous AST
+ * node, and modernisation is a secondary pillar since explicit error handling is the modern replacement.
  */
 final class ErrorSuppressionRule implements RuleInterface
 {
@@ -27,7 +31,7 @@ final class ErrorSuppressionRule implements RuleInterface
     public const ID = 'security.error-suppression';
 
     /**
-     * Describe the error suppression security rule.
+     * Describes the error-suppression rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -46,7 +50,7 @@ final class ErrorSuppressionRule implements RuleInterface
     }
 
     /**
-     * Find uses of PHP error suppression that can hide failures.
+     * Reports each `@`-suppressed expression that can hide a runtime failure.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -57,6 +61,7 @@ final class ErrorSuppressionRule implements RuleInterface
     {
         $findings = [];
 
+        // Flag every `@`-suppressed expression in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\ErrorSuppress::class) as $node) {
             $findings[] = new Finding(
                 ruleId:           self::ID,

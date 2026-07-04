@@ -18,7 +18,12 @@ use PhpParser\Node\Stmt\Use_;
 use PhpParser\NodeFinder;
 
 /**
- * Detects import statements whose alias is not referenced outside the import list.
+ * Flags an import whose alias is never referenced anywhere but the `use` line itself, so the user can
+ * drop dead imports that clutter the top of a file.
+ *
+ * Runs per file: it blanks out the import lines, then searches the rest of the source for each alias as a
+ * whole token. An alias with no match is reported at warning, since an unreferenced import is almost
+ * always dead code.
  */
 final readonly class UnusedImportRule implements RuleInterface
 {
@@ -28,7 +33,7 @@ final readonly class UnusedImportRule implements RuleInterface
     public const ID = 'waste.unused-import';
 
     /**
-     * Describe the unused import rule.
+     * Describes the unused-import rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -46,7 +51,7 @@ final readonly class UnusedImportRule implements RuleInterface
     }
 
     /**
-     * Find imported names that are not referenced after import declarations are removed.
+     * Reports each import alias that never appears once its own `use` line is blanked out.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -58,8 +63,8 @@ final readonly class UnusedImportRule implements RuleInterface
         $definition = $this->definition();
         $uses       = NodeIndex::nodesOf($analysisUnit, Use_::class);
 
+        // No imports to check, so skip the source-text scan entirely rather than blank a file with no use lines.
         if ($uses === []) {
-            // No imports to check, so skip the source-text scan entirely rather than blank a file with no use lines.
             return [];
         }
 
@@ -68,7 +73,9 @@ final readonly class UnusedImportRule implements RuleInterface
         $sourceWithoutUses = $this->removeUseStatements($analysisUnit->source, $useStatements);
         $findings          = [];
 
+        // Check every import statement in the file.
         foreach ($useStatements as $use) {
+            // A single `use` line can import several names.
             foreach ($use->uses as $useUse) {
                 $alias = $useUse->getAlias()->toString();
 
@@ -98,9 +105,10 @@ final readonly class UnusedImportRule implements RuleInterface
     }
 
     /**
-     * Blank out the source lines occupied by import declarations so the alias search cannot match an
-     * import against its own `use` statement. Lines are replaced with empty strings rather than removed
-     * so every other line keeps its original 1-based number for any later position lookup.
+     * Blanks out the source lines occupied by imports so the alias search cannot match an import's own line.
+     *
+     * Lines are replaced with empty strings rather than removed so every other
+     * line keeps its original 1-based number for any later position lookup.
      *
      * @param string     $source - Full source text of the unit, used only as the haystack to blank and scan.
      * @param list<Use_> $uses - Import statements whose line spans must be erased before the alias search.
@@ -111,12 +119,15 @@ final readonly class UnusedImportRule implements RuleInterface
     {
         $lines = explode("\n", $source);
 
+        // Erase the line span of each import.
         foreach ($uses as $use) {
             $startLine = $use->getStartLine();
             $endLine   = $use->getEndLine();
 
+            // Only blank a real, positioned line span.
             if ($startLine > 0 && $endLine > 0) {
                 for ($i = $startLine - 1; $i < $endLine; $i++) {
+                    // Guard against a line index past the end of the source.
                     if (isset($lines[$i])) {
                         $lines[$i] = '';
                     }

@@ -20,7 +20,11 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Enum_;
 
 /**
- * Detects classes with public APIs large enough to dilute their responsibility.
+ * Flags a class or enum that exposes so many public methods its responsibility has likely blurred, a
+ * size signal that the type is doing too much for one caller to hold in their head.
+ *
+ * Runs per file over every class and enum, counting public methods and reporting any past the threshold
+ * (default error above 25). The finding names the type and its public-method count.
  */
 final readonly class PublicMethodCountRule implements RuleInterface
 {
@@ -30,7 +34,7 @@ final readonly class PublicMethodCountRule implements RuleInterface
     public const ID = 'size.public-method-count';
 
     /**
-     * Describe the public method count rule.
+     * Describes the public-method-count rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and thresholds.
      */
@@ -48,7 +52,7 @@ final readonly class PublicMethodCountRule implements RuleInterface
     }
 
     /**
-     * Find classes and enums with too many public methods.
+     * Reports each class or enum whose public-method count exceeds the configured threshold.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -64,17 +68,21 @@ final readonly class PublicMethodCountRule implements RuleInterface
 
         $findings = [];
 
+        // Check each class and enum in the file.
         foreach ($classLikes as $classLike) {
             /** @var Class_|Enum_ $classLike Finder predicate restricts results to class and enum declarations. */
             $publicCount = 0;
 
+            // Count the public methods on this type.
             foreach ($classLike->stmts as $stmt) {
+                // Only public methods count toward the API surface.
                 if ($stmt instanceof ClassMethod && $stmt->isPublic()) {
                     $publicCount++;
                 }
             }
             $thresholdMatch = $settings->highValueThresholdMatch($publicCount);
 
+            // A count within the threshold is fine, so skip it.
             if ($thresholdMatch === null) {
                 continue;
             }
@@ -114,7 +122,7 @@ final readonly class PublicMethodCountRule implements RuleInterface
     }
 
     /**
-     * Format threshold numbers without unnecessary decimal places.
+     * Formats a threshold number for the message, dropping a whole number's ".0" tail.
      *
      * @param int|float $number - Threshold value to render; whole values are shown without a trailing decimal.
      *
@@ -122,6 +130,7 @@ final readonly class PublicMethodCountRule implements RuleInterface
      */
     private function formatNumber(int|float $number): string
     {
+        // A genuine fraction keeps its decimals; a whole value is shown without them.
         if (is_float($number) && floor($number) !== $number) {
             return (string) $number;
         }

@@ -19,7 +19,9 @@ use PhpParser\Node\Expr;
 use PhpParser\Node\Name;
 
 /**
- * Detects tests that depend on sleeps or wall-clock reads.
+ * Flags a test that pauses on a real `sleep()`/`usleep()` or reads the wall clock (`time()`, `microtime()`,
+ * `new DateTime("now")`) - both couple the test to real time, making it slow and flaky. Runs over every
+ * test in the file. Warning, high confidence.
  */
 final readonly class SleepInTestRule implements RuleInterface
 {
@@ -44,7 +46,7 @@ final readonly class SleepInTestRule implements RuleInterface
     private const WALL_CLOCK_DATETIME_CLASSES = ['datetime', 'datetimeimmutable'];
 
     /**
-     * Describe the rule for the registry and reports.
+     * Describes the sleep-in-test rule for the registry and reports.
      *
      * @return RuleDefinition - static descriptor (id, name, pillar, tier, default severity, confidence) the registry uses to list and report this
      *                        rule
@@ -62,7 +64,7 @@ final readonly class SleepInTestRule implements RuleInterface
     }
 
     /**
-     * Flag tests that sleep or read the wall clock; both make tests flaky and slow.
+     * Reports tests that sleep or read the wall clock, which make them flaky and slow.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -73,6 +75,7 @@ final readonly class SleepInTestRule implements RuleInterface
     {
         $findings = [];
 
+        // Weigh every test scope in the file.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             array_push(
                    $findings,
@@ -85,7 +88,7 @@ final readonly class SleepInTestRule implements RuleInterface
     }
 
     /**
-     * Build function findings for the test-quality rule.
+     * Builds the sleep and wall-clock findings for a test's function calls.
      *
      * @param AnalysisUnit     $analysisUnit - Parsed unit supplying the display path stamped onto each finding.
      * @param TestQualityScope $scope - Single test method scope whose calls are searched for sleeps/clock reads.
@@ -96,17 +99,21 @@ final readonly class SleepInTestRule implements RuleInterface
     {
         $findings = [];
 
+        // Inspect each call the test makes.
         foreach (TestQualityNodeHelper::calls($scope) as $call) {
+            // Only a global function call can be a sleep or clock read.
             if (!$call instanceof Expr\FuncCall) {
                 continue;
             }
 
             $name = TestQualityNodeHelper::callName($call);
+            // A call with no resolvable name cannot be classified.
             if ($name === null) {
                 continue;
             }
 
             $finding = $this->functionFinding($analysisUnit, $scope, $call, $name);
+            // Keep the finding when the call was a sleep or clock read.
             if ($finding !== null) {
                 $findings[] = $finding;
             }
@@ -116,7 +123,7 @@ final readonly class SleepInTestRule implements RuleInterface
     }
 
     /**
-     * Build a Finding for a sleep or wall-clock function call, or null when the call is neither.
+     * Builds a finding for a sleep or wall-clock call, or null when it is neither.
      *
      * @param AnalysisUnit     $analysisUnit - Parsed unit supplying the display path stamped onto the finding.
      * @param TestQualityScope $scope - Enclosing test scope, used for the symbol and message wording.
@@ -142,7 +149,7 @@ final readonly class SleepInTestRule implements RuleInterface
     }
 
     /**
-     * Build date time findings for the test-quality rule.
+     * Builds the findings for current-time DateTime constructions in a test.
      *
      * @param AnalysisUnit     $analysisUnit - Parsed unit supplying the display path stamped onto each finding.
      * @param TestQualityScope $scope - Test scope whose descendant `new` expressions are checked for clock reads.
@@ -153,7 +160,9 @@ final readonly class SleepInTestRule implements RuleInterface
     {
         $findings = [];
 
+        // Weigh every object construction in the test body.
         foreach (NodeIndex::descendantsOfAny($scope->node, [Expr\New_::class]) as $newExpression) {
+            // A current-time DateTime construction couples the test to real time.
             if ($this->isWallClockDateTimeConstructor($newExpression)) {
                 $findings[] = $this->dateTimeFinding($analysisUnit, $scope, $newExpression);
             }
@@ -163,7 +172,7 @@ final readonly class SleepInTestRule implements RuleInterface
     }
 
     /**
-     * Detect whether a `new DateTime(...)` / `new DateTimeImmutable(...)` reads the current time.
+     * Reports whether a DateTime construction reads the current time.
      *
      * @param Expr\New_ $newExpression - Object-construction node; only DateTime-family classes are considered.
      *
@@ -185,7 +194,7 @@ final readonly class SleepInTestRule implements RuleInterface
     }
 
     /**
-     * Detect whether the DateTime constructor argument is empty or the literal string "now".
+     * Reports whether a DateTime constructor argument is empty or the literal "now".
      *
      * @param Expr\New_ $newExpression - Construction node whose first argument is examined; non-literal args are treated
      *                                 as not-now so only provably current-time constructions are flagged.
@@ -212,7 +221,7 @@ final readonly class SleepInTestRule implements RuleInterface
     }
 
     /**
-     * Build the Finding for a sleep / usleep / time_nanosleep call inside a test.
+     * Builds the finding for a sleep-family call inside a test.
      *
      * @param AnalysisUnit     $analysisUnit - Parsed unit supplying the display path stamped onto the finding.
      * @param TestQualityScope $scope - Enclosing test scope; its symbol names the offending test in the message.
@@ -239,7 +248,7 @@ final readonly class SleepInTestRule implements RuleInterface
     }
 
     /**
-     * Build the Finding for a time() / microtime() call inside a test.
+     * Builds the finding for a wall-clock read inside a test.
      *
      * @param AnalysisUnit     $analysisUnit - Parsed unit supplying the display path stamped onto the finding.
      * @param TestQualityScope $scope - Enclosing test scope; its symbol names the offending test in the message.
@@ -266,7 +275,7 @@ final readonly class SleepInTestRule implements RuleInterface
     }
 
     /**
-     * Build the Finding for a `new DateTime("now")` / `new DateTimeImmutable()` inside a test.
+     * Builds the finding for a current-time DateTime construction inside a test.
      *
      * @param AnalysisUnit     $analysisUnit - Parsed unit supplying the display path stamped onto the finding.
      * @param TestQualityScope $scope - Enclosing test scope; its symbol names the offending test in the message.
@@ -277,6 +286,7 @@ final readonly class SleepInTestRule implements RuleInterface
      */
     private function dateTimeFinding(AnalysisUnit $analysisUnit, TestQualityScope $scope, Expr\New_ $newExpression): Finding
     {
+        // The caller only reaches here for a named class, so guard the invariant.
         if (!$newExpression->class instanceof Name) {
             throw new \LogicException('DateTime finding requires a named class.');
         }

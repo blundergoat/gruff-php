@@ -22,7 +22,14 @@ use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
 /**
- * Detects include and require paths built from variables.
+ * Flags an `include`/`require` whose path is built from a variable or other runtime value rather than a
+ * fixed literal - the shape that lets request data steer which file the server loads (local/remote file
+ * inclusion). A reviewer sees each dynamic include so they can confirm the path is allow-listed upstream.
+ *
+ * Runs per file. Literals, `__DIR__`/`__FILE__`, ALL-CAPS deployment constants (ABSPATH, ...), and locals
+ * whose every same-scope assignment is itself a fixed path are treated as safe and never flagged; anything
+ * that could carry runtime data is reported. Warning severity, medium confidence, and configurable via
+ * `treatGlobalConstantsAsFixed` and `dynamicPathConstants`.
  */
 final class VariableIncludeRule implements RuleInterface
 {
@@ -51,7 +58,7 @@ final class VariableIncludeRule implements RuleInterface
     ];
 
     /**
-     * Describe the variable include security rule.
+     * Describes the variable-include security rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -87,7 +94,7 @@ final class VariableIncludeRule implements RuleInterface
     }
 
     /**
-     * Find include and require expressions using dynamic paths.
+     * Reports include and require expressions built from dynamic paths.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -101,6 +108,7 @@ final class VariableIncludeRule implements RuleInterface
         $dynamicConstantNames        = $settings->stringListOption('dynamicPathConstants');
         $findings                    = [];
 
+        // Weigh every include and require in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\Include_::class) as $include) {
             $isFixedPath = $this->isFixedIncludeExpression(
                 expression:                  $include->expr,
@@ -109,6 +117,7 @@ final class VariableIncludeRule implements RuleInterface
                 dynamicConstantNames:        $dynamicConstantNames,
                 canFollowAssignments:        true,
             );
+            // A path that cannot vary is a safe bootstrap include, so leave it alone.
             if ($isFixedPath) {
                 continue;
             }
@@ -130,7 +139,8 @@ final class VariableIncludeRule implements RuleInterface
     }
 
     /**
-     * Treat literal paths and paths derived only from compile-time constants as fixed bootstrap includes.
+     * Reports whether an include path resolves to a fixed value - a literal, or a path derived only from
+     * compile-time constants - so bootstrap includes stay unflagged.
      *
      * @param Expr         $expression - Include/require path expression, recursed into for concatenation and dirname() wrappers.
      * @param AnalysisUnit $analysisUnit - Unit owning the include, used for same-scope assignment propagation.
@@ -175,6 +185,7 @@ final class VariableIncludeRule implements RuleInterface
                    );
         }
 
+        // A dirname() wrapper keeps a fixed path fixed, so unwrap and re-check it.
         if ($expression instanceof Expr\FuncCall && SecurityNodeHelper::globalFunctionName($expression) === 'dirname') {
             return $this->isFixedDirnameCall(
                 call:                        $expression,
@@ -195,7 +206,7 @@ final class VariableIncludeRule implements RuleInterface
     }
 
     /**
-     * Decide whether a dirname() wrapper preserves a fixed include path.
+     * Reports whether a dirname() wrapper preserves a fixed include path.
      *
      * @param Expr\FuncCall $call - dirname() call to inspect.
      * @param AnalysisUnit  $analysisUnit - Unit owning the include, used for same-scope assignment propagation.
@@ -232,7 +243,7 @@ final class VariableIncludeRule implements RuleInterface
     }
 
     /**
-     * Decide whether a bare constant fetch names a fixed deployment-path constant.
+     * Reports whether a bare constant fetch names a fixed deployment-path constant.
      *
      * @param Expr\ConstFetch $constant - Constant fetch inside the include path.
      * @param list<string>    $dynamicConstantNames - Constant names configured to stay dynamic.
@@ -258,7 +269,7 @@ final class VariableIncludeRule implements RuleInterface
     }
 
     /**
-     * Decide whether every same-scope assignment to an include-path variable is a fixed expression.
+     * Reports whether every same-scope assignment to an include-path variable is a fixed expression.
      *
      * The walk inverts the taint propagation used by SecurityNodeHelper: instead of looking for one
      * tainted assignment, it requires every plain assignment in the variable's scope to be provably
@@ -293,11 +304,13 @@ final class VariableIncludeRule implements RuleInterface
 
         $scope      = SecurityNodeHelper::enclosingFunctionLike($variable);
         $statements = $scope instanceof FunctionLike ? ($scope->getStmts() ?? []) : $analysisUnit->statements;
+        // A write the walk cannot prove fixed (parameter, by-ref, extract) leaves the path dynamic.
         if ($this->hasUnprovableWrite($name, array_values($statements), $scope, $sinkPosition)) {
             return false;
         }
 
         $hasReachingAssignment = false;
+        // Every plain assignment to the local must itself resolve to a fixed path.
         foreach ($this->plainAssignmentsTo($name, array_values($statements), $scope) as $assignment) {
             $isFixedAssignment = $this->isFixedIncludeExpression(
                 expression:                  $assignment->expr,
@@ -311,6 +324,7 @@ final class VariableIncludeRule implements RuleInterface
                 return false;
             }
 
+            // Note when a fixed assignment actually reaches the include ahead of it.
             if ($assignment->getStartFilePos() >= 0 && $assignment->getStartFilePos() < $sinkPosition) {
                 $hasReachingAssignment = true;
             }
@@ -321,7 +335,7 @@ final class VariableIncludeRule implements RuleInterface
     }
 
     /**
-     * List plain same-scope assignments to a variable name.
+     * Lists the plain same-scope assignments to a variable name.
      *
      * @param string            $name - Variable name without the leading `$`.
      * @param list<Stmt>        $statements - Statements of the owning scope.
@@ -334,11 +348,14 @@ final class VariableIncludeRule implements RuleInterface
         $assignments = [];
         $nodeFinder  = new NodeFinder();
 
+        // Weigh every assignment node the finder returns.
         foreach ($nodeFinder->find($statements, static fn(Node $candidate): bool => $candidate instanceof Expr\Assign) as $assignment) {
+            // Keep only plain writes whose target is exactly this variable name.
             if (!$assignment instanceof Expr\Assign || !$assignment->var instanceof Expr\Variable || $assignment->var->name !== $name) {
                 continue;
             }
 
+            // Assignments in a different function-like scope do not bind this local.
             if (SecurityNodeHelper::enclosingFunctionLike($assignment) !== $scope) {
                 continue;
             }
@@ -350,7 +367,7 @@ final class VariableIncludeRule implements RuleInterface
     }
 
     /**
-     * Detect writes to a variable that defeat the fixed-assignment proof.
+     * Reports whether any write to a variable defeats the fixed-assignment proof.
      *
      * @param string            $name - Variable name without the leading `$`.
      * @param list<Stmt>        $statements - Statements of the owning scope.
@@ -376,7 +393,7 @@ final class VariableIncludeRule implements RuleInterface
     }
 
     /**
-     * Check whether a candidate can affect the include expression by source order.
+     * Reports whether a candidate can affect the include expression by source order.
      *
      * @param Node $candidate - Candidate write or call node.
      * @param int  $sinkPosition - Byte offset of the include-path variable.
@@ -391,7 +408,7 @@ final class VariableIncludeRule implements RuleInterface
     }
 
     /**
-     * Check whether a name is bound as a parameter of the given scope.
+     * Reports whether a name is bound as a parameter of the given scope.
      *
      * @param string       $name - Variable name without the leading `$`.
      * @param FunctionLike $scope - Function-like scope owning the include.
@@ -400,7 +417,9 @@ final class VariableIncludeRule implements RuleInterface
      */
     private function isParameterName(string $name, FunctionLike $scope): bool
     {
+        // Weigh each declared parameter of the scope.
         foreach ($scope->getParams() as $parameter) {
+            // The name is a parameter when a declared parameter carries it.
             if ($parameter->var instanceof Expr\Variable && $parameter->var->name === $name) {
                 return true;
             }
@@ -410,7 +429,7 @@ final class VariableIncludeRule implements RuleInterface
     }
 
     /**
-     * Classify a node as a write that defeats the fixed-assignment proof for a variable name.
+     * Reports whether a node is a write that defeats the fixed-assignment proof for a variable name.
      *
      * @param Node   $candidate - Node to classify.
      * @param string $name - Variable name without the leading `$`.
@@ -420,6 +439,7 @@ final class VariableIncludeRule implements RuleInterface
      */
     private function isUnprovableWriteNode(Node $candidate, string $name): bool
     {
+        // A compound or by-reference assignment mutates the value in ways the walk cannot follow.
         if (($candidate instanceof Expr\AssignOp || $candidate instanceof Expr\AssignRef)
             && $candidate->var instanceof Expr\Variable
             && $candidate->var->name === $name
@@ -427,12 +447,15 @@ final class VariableIncludeRule implements RuleInterface
             return true;
         }
 
+        // A call may hand the variable to code that rewrites it.
         if ($candidate instanceof Expr\FuncCall || $candidate instanceof Expr\MethodCall || $candidate instanceof Expr\StaticCall) {
+            // Passing the local as a mutable argument counts as an unprovable write.
             if ($this->doesPassNameAsDirectMutableArgument($candidate, $name)) {
                 return true;
             }
         }
 
+        // A foreach key or value binding reassigns the variable on each pass.
         if ($candidate instanceof Stmt\Foreach_ && ($this->doesBindName($candidate->valueVar, $name) || ($candidate->keyVar instanceof Expr && $this->doesBindName($candidate->keyVar, $name)))) {
             return true;
         }
@@ -454,7 +477,7 @@ final class VariableIncludeRule implements RuleInterface
     }
 
     /**
-     * Detect calls that hand the include-path local to code that may mutate it before the include.
+     * Reports whether a call hands the include-path local to code that may mutate it before the include.
      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Call node whose arguments are inspected.
      * @param string                                        $name - Variable name without the leading `$`.
@@ -463,11 +486,14 @@ final class VariableIncludeRule implements RuleInterface
      */
     private function doesPassNameAsDirectMutableArgument(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call, string $name): bool
     {
+        // Weigh each argument handed to the call.
         foreach ($call->args as $argument) {
+            // Skip spread placeholders, which are not plain arguments.
             if (!$argument instanceof Node\Arg) {
                 continue;
             }
 
+            // The local is at risk when passed by reference or into unknown code.
             if ($argument->value instanceof Expr\Variable && $argument->value->name === $name) {
                 return $argument->byRef || !$this->isKnownNonMutatingPathFunction($call);
             }
@@ -477,7 +503,7 @@ final class VariableIncludeRule implements RuleInterface
     }
 
     /**
-     * Check whether a direct argument is being read by a known path guard instead of handed to unknown code.
+     * Reports whether a call is a known path guard that reads its argument without mutating it.
      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Call node carrying the argument.
      *
@@ -496,7 +522,7 @@ final class VariableIncludeRule implements RuleInterface
     }
 
     /**
-     * Check whether a binding expression (variable, list, or array pattern) binds a name.
+     * Reports whether a binding expression (variable, list, or array pattern) binds a name.
      *
      * @param Expr   $binding - Foreach value/key var or destructuring target.
      * @param string $name - Variable name without the leading `$`.
@@ -514,7 +540,7 @@ final class VariableIncludeRule implements RuleInterface
     }
 
     /**
-     * Check whether a global or static statement declares a name.
+     * Reports whether a global or static statement declares a name.
      *
      * @param Stmt\Global_|Stmt\Static_ $declaration - Declaration statement to inspect.
      * @param string                    $name - Variable name without the leading `$`.
@@ -523,8 +549,11 @@ final class VariableIncludeRule implements RuleInterface
      */
     private function doesDeclareName(Stmt\Global_|Stmt\Static_ $declaration, string $name): bool
     {
+        // A global statement lists the names it imports from global scope.
         if ($declaration instanceof Stmt\Global_) {
+            // Weigh each imported name.
             foreach ($declaration->vars as $declared) {
+                // The declaration touches the variable when it imports this name.
                 if ($declared instanceof Expr\Variable && $declared->name === $name) {
                     return true;
                 }
@@ -533,7 +562,9 @@ final class VariableIncludeRule implements RuleInterface
             return false;
         }
 
+        // Weigh each static-declared name.
         foreach ($declaration->vars as $staticVar) {
+            // The declaration touches the variable when it declares this name static.
             if ($staticVar->var->name === $name) {
                 return true;
             }

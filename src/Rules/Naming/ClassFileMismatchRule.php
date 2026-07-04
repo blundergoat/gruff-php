@@ -21,7 +21,11 @@ use PhpParser\Node\Stmt\Trait_;
 use PhpParser\NodeFinder;
 
 /**
- * Detects single-type files whose class-like name does not match the file name.
+ * Flags a single-type file whose one class, interface, trait, or enum has a name that does not match the
+ * file name, which breaks PSR-4 autoloading and leaves the reader hunting for where the type is declared.
+ *
+ * Only fires when exactly one named declaration owns the file and the file name is itself a valid class
+ * identifier, so scripts, entrypoints, and multi-class files are left alone. Warning, high confidence.
  */
 final readonly class ClassFileMismatchRule implements RuleInterface
 {
@@ -31,7 +35,7 @@ final readonly class ClassFileMismatchRule implements RuleInterface
     public const ID = 'naming.class-file-mismatch';
 
     /**
-     * Describe the class-file mismatch naming rule.
+     * Describes the class-file mismatch rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -49,7 +53,7 @@ final readonly class ClassFileMismatchRule implements RuleInterface
     }
 
     /**
-     * Find primary class names that do not match their file names.
+     * Reports a lone class-like whose name disagrees with its file name.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.

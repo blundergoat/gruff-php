@@ -20,7 +20,13 @@ use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
 /**
- * Detects constructor assignments that could use property promotion.
+ * Flags a constructor that copies a same-named parameter straight into a property (`$this->x = $x;`),
+ * where PHP 8 constructor property promotion would collapse the boilerplate, so the user can consider it.
+ *
+ * Runs per file on PHP 8.0+ targets, and only on self-contained classes (no parent, no traits, an explicit
+ * constructor) where a single-file scan can reason safely. It reports each plain assignment whose property
+ * is never written elsewhere and whose parameter is not already promoted. Advisory only - promotion
+ * changes constructor shape, so gruff-php reports rather than rewrites.
  */
 final readonly class ConstructorPromotionCandidateRule implements RuleInterface
 {
@@ -30,7 +36,7 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     public const ID = 'modernisation.constructor-promotion-candidate';
 
     /**
-     * Describe the constructor-promotion candidate rule.
+     * Describes the constructor-promotion candidate rule for the registry and reports.
      *
      * @return RuleDefinition - advisory, medium-confidence metadata that registers the rule and keeps it from gating a build alone
      */
@@ -47,10 +53,10 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     }
 
     /**
-     * Find constructor assignments that can likely use property promotion.
+     * Reports each constructor assignment across the unit's classes that could use property promotion.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext - Rule context supplying the target PHP version.
      *
      * @return list<Finding> - one advisory per promotable constructor assignment across the unit's classes; empty on pre-8.0 targets or when none
      *                       qualify
@@ -64,6 +70,7 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
 
         $findings = [];
 
+        // Weigh each class that cleared the promotion pre-check.
         foreach ($this->candidateClasses($analysisUnit) as $class) {
             array_push($findings, ...$this->findingsForClass($analysisUnit, $class));
         }
@@ -72,7 +79,7 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     }
 
     /**
-     * Find classes with constructors that may support property promotion.
+     * Finds the classes whose self-contained constructor shape clears the promotion pre-check.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit whose class declarations are screened.
      *
@@ -82,8 +89,10 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     {
         $classes = [];
 
+        // Screen every class declared in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Class_::class) as $class) {
             /** @var Stmt\Class_ $class Finder predicate restricts results to class declarations. */
+            // Keep only classes a single-file scan can reason about safely.
             if ($this->canPromoteClass($class)) {
                 $classes[] = $class;
             }
@@ -93,7 +102,7 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     }
 
     /**
-     * Check whether a class has a simple shape suitable for promotion suggestions.
+     * Reports whether a class has a simple enough shape to reason about promotion within one file.
      *
      * @param Stmt\Class_ $class - Class declaration to screen before suggesting promotion.
      *
@@ -109,7 +118,7 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     }
 
     /**
-     * Build promotion findings for constructor assignments in one class.
+     * Builds the promotion findings for the promotable constructor assignments in one class.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit supplying the display path for any finding raised here.
      * @param Stmt\Class_  $class - Class whose constructor body is scanned for promotable assignments.
@@ -128,9 +137,11 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
         $lateAssignments = $this->lateAssignments($class);
         $findings        = [];
 
+        // Weigh each direct assignment the constructor makes.
         foreach ($this->constructorAssignments($constructor) as $assign) {
             $property = $this->promotableProperty($assign, $constructor, $properties, $lateAssignments);
 
+            // Collect a finding for each assignment that is safe to promote.
             if ($property !== null) {
                 $findings[] = $this->finding($analysisUnit, $assign, $property);
             }
@@ -140,7 +151,7 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     }
 
     /**
-     * Collect constructor assignments that affect the modernisation rule.
+     * Collects the constructor's direct top-level `$this->x = ...` assignments in source order.
      *
      * @param Stmt\ClassMethod $constructor - Constructor whose top-level statements are scanned.
      *
@@ -150,7 +161,9 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     {
         $assignments = [];
 
+        // Look only at the constructor's top-level statements.
         foreach ($constructor->stmts ?? [] as $statement) {
+            // A bare `$this->x = ...;` statement is the shape we can promote.
             if ($statement instanceof Stmt\Expression && $statement->expr instanceof Expr\Assign) {
                 $assignments[] = $statement->expr;
             }
@@ -160,7 +173,7 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     }
 
     /**
-     * Decide whether one constructor assignment is a safe property-promotion candidate.
+     * Decides whether one constructor assignment is a safe promotion candidate, naming the property.
      *
      * @param Expr\Assign         $assign - Single `$this->x = $x;` assignment under test.
      * @param Stmt\ClassMethod    $constructor - Constructor that must expose a matching plain parameter.
@@ -201,7 +214,7 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     }
 
     /**
-     * Return the class constructor when one is declared.
+     * Returns the class's declared constructor, or null when it has none.
      *
      * @param Stmt\Class_ $class - Class declaration whose methods are searched for a constructor.
      *
@@ -210,6 +223,7 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
      */
     private function constructor(Stmt\Class_ $class): ?Stmt\ClassMethod
     {
+        // Search the class methods for the constructor.
         foreach ($class->getMethods() as $classMethod) {
             if (strtolower($classMethod->name->toString()) === '__construct') {
                 // Constructor names are case-insensitive in PHP, so the lowercased compare is the reliable match.
@@ -221,7 +235,7 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     }
 
     /**
-     * Index declared property names on the class.
+     * Indexes the non-static, non-public property names declared on the class.
      *
      * @param Stmt\Class_ $class - Class declaration whose property list is indexed.
      *
@@ -230,11 +244,14 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     private function declaredProperties(Stmt\Class_ $class): array
     {
         $properties = [];
+        // Index each property the class declares.
         foreach ($class->getProperties() as $property) {
+            // A static or public property is out of scope for promotion here.
             if ($property->isStatic() || $property->isPublic()) {
                 continue;
             }
 
+            // One declaration can name several properties.
             foreach ($property->props as $propertyProperty) {
                 $properties[$propertyProperty->name->toString()] = true;
             }
@@ -244,7 +261,7 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     }
 
     /**
-     * Collect late assignments that affect the modernisation rule.
+     * Collects the property names written outside the constructor, which block promotion.
      *
      * @param Stmt\Class_ $class - Class declaration whose non-constructor methods are scanned for property writes.
      *
@@ -255,13 +272,17 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
         $assignments = [];
         $nodeFinder  = new NodeFinder();
 
+        // Scan every method for writes made after construction.
         foreach ($class->getMethods() as $classMethod) {
+            // Skip the constructor; its own assignments are the ones we might promote.
             if (strtolower($classMethod->name->toString()) === '__construct') {
                 continue;
             }
 
+            // Record each property the method assigns.
             foreach ($nodeFinder->findInstanceOf($classMethod->stmts ?? [], Expr\Assign::class) as $assign) {
                 $name = ModernisationNodeHelper::propertyFetchName($assign->var);
+                // Track only writes to a named `$this` property.
                 if ($name !== null && ModernisationNodeHelper::isThisPropertyFetch($assign->var)) {
                     $assignments[$name] = true;
                 }
@@ -273,7 +294,7 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     }
 
     /**
-     * Check whether the constructor has an unpromoted parameter matching the property.
+     * Reports whether the constructor has an un-promoted parameter matching the property.
      *
      * @param Stmt\ClassMethod $constructor - Constructor whose parameter list is searched.
      * @param string           $property - Property name the parameter must share for a promotion rewrite.
@@ -282,6 +303,7 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
      */
     private function hasPlainConstructorParameter(Stmt\ClassMethod $constructor, string $property): bool
     {
+        // Look for a matching parameter that is not already promoted.
         foreach ($constructor->params as $parameter) {
             if ($parameter->var instanceof Expr\Variable && $parameter->var->name === $property && $parameter->flags === 0) {
                 // Zero flags means no visibility modifier, so this parameter is not already promoted and can adopt one.
@@ -293,7 +315,7 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     }
 
     /**
-     * Build the finding for a promotable property assignment.
+     * Builds the advisory finding for one promotable property assignment.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit providing the display path reported to the user.
      * @param Node         $node - Assignment node whose start line anchors the finding.

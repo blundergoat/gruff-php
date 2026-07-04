@@ -18,7 +18,12 @@ use PhpParser\Node;
 use PhpParser\Node\Stmt;
 
 /**
- * Detects signatures that rely on mixed where narrower types would improve contracts.
+ * Flags a public signature that leans on the catch-all `mixed` type where a narrower parameter or return
+ * type would document the real contract, so the user can tighten the API for callers and static analysis.
+ *
+ * Runs per file on PHP 8.0+ targets (mixed did not exist before then), over public methods and every
+ * function. It reports each public function-like that declares `mixed` on a parameter or return, listing
+ * the offending sites. Advisory only - narrowing is a suggestion to weigh, never a build-breaker.
  */
 final readonly class MixedTypeOveruseRule implements RuleInterface
 {
@@ -28,7 +33,7 @@ final readonly class MixedTypeOveruseRule implements RuleInterface
     public const ID = 'modernisation.mixed-type-overuse';
 
     /**
-     * Describe the mixed type overuse rule.
+     * Describes the mixed-type-overuse rule for the registry and reports.
      *
      * @return RuleDefinition - registry identity for this rule, fixed at Advisory severity and Medium
      *   confidence so narrowing mixed reads as a contract suggestion rather than a build-breaking failure
@@ -47,10 +52,10 @@ final readonly class MixedTypeOveruseRule implements RuleInterface
     }
 
     /**
-     * Find parameters and returns that overuse explicit mixed types.
+     * Reports each public function-like that overuses the explicit `mixed` type on a parameter or return.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext - Rule context supplying the target PHP version.
      *
      * @return list<Finding> - one finding per public function-like that declares mixed on a parameter or
      *   return; empty when nothing offends or the target predates PHP 8.0 (mixed did not exist before then)
@@ -64,16 +69,20 @@ final readonly class MixedTypeOveruseRule implements RuleInterface
 
         $findings = [];
 
+        // Check every method and free function in the file.
         foreach (NodeIndex::nodesOfAny($analysisUnit, [Stmt\ClassMethod::class, Stmt\Function_::class]) as $functionLike) {
+            // A non-public method is not part of the API contract this rule guards.
             if ($functionLike instanceof Stmt\ClassMethod && !$functionLike->isPublic()) {
                 continue;
             }
 
+            // Guard the type: only a method or function carries the params and return this rule scans.
             if (!$functionLike instanceof Stmt\ClassMethod && !$functionLike instanceof Stmt\Function_) {
                 continue;
             }
 
             $locations = $this->mixedLocations($functionLike);
+            // Nothing here uses mixed, so there is nothing to suggest narrowing.
             if ($locations === []) {
                 continue;
             }
@@ -100,7 +109,7 @@ final readonly class MixedTypeOveruseRule implements RuleInterface
     }
 
     /**
-     * List source locations where broad mixed types appear.
+     * Lists the source locations where a signature falls back to the broad `mixed` type.
      *
      * @param Stmt\ClassMethod|Stmt\Function_ $functionLike - Function-like whose parameter and return types are scanned
      *                                                      for mixed; the labels feed the finding message verbatim.
@@ -111,7 +120,9 @@ final readonly class MixedTypeOveruseRule implements RuleInterface
     {
         $locations = [];
 
+        // Inspect each declared parameter for a mixed type.
         foreach ($functionLike->params as $parameter) {
+            // A mixed parameter hides the shape the caller must actually pass.
             if (ModernisationNodeHelper::typeName($parameter->type) === 'mixed') {
                 $name        = $parameter->var instanceof \PhpParser\Node\Expr\Variable && is_string($parameter->var->name)
                     ? '$' . $parameter->var->name
@@ -120,6 +131,7 @@ final readonly class MixedTypeOveruseRule implements RuleInterface
             }
         }
 
+        // A mixed return type leaves callers guessing what they get back.
         if (ModernisationNodeHelper::typeName($functionLike->returnType) === 'mixed') {
             $locations[] = 'return type';
         }

@@ -11,12 +11,16 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 
 /**
- * Describes one isolated function-like naming scope.
+ * Describes one isolated function-like naming scope - a method, function, closure, or arrow function paired
+ * with the parameter and local-variable names declared directly inside it.
+ *
+ * Built by the scope walker so the identifier-quality rules can judge names one scope at a time, without a
+ * nested closure's variables leaking into the enclosing function's view.
  */
 final readonly class FunctionLikeScope
 {
     /**
-     * Capture a function-like node with its immediate parameter and local variable names.
+     * Captures a function-like node with its immediate parameter and local variable names.
      *
      * @param ClassMethod|Function_|Closure|ArrowFunction $node - Function-like AST node.
      * @param string                                      $kind - Scope kind: method, function, closure, or arrow.

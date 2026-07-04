@@ -1,6 +1,6 @@
 ---
 category: rules
-last_reviewed: 2026-06-14
+last_reviewed: 2026-07-04
 ---
 
 # Rule Footguns
@@ -165,6 +165,16 @@ The size rules treat immutable value objects gently: `src/Rules/Size/PropertyCou
 **Evidence:** Both rules now disqualify only on the RETURN shape via `isBehaviourMethod` (search: `isBehaviourMethod`): a method is a command/behaviour when it returns `void`/`never` or is untyped (`returnType === null`), because a value object's methods always return a value. Fixtures `tests/Fixtures/Size/readonly-service-constructor.php` (a `void` command) and `tests/Fixtures/Size/readonly-carrier-with-behaviour.php` (an untyped method) lock the service shape, while `tests/Fixtures/Size/promoted-payload.php` (a pure DTO) stays exempt. The over-broad params-based check was caught by the full-project self-scan flagging the project's own DTOs, NOT by any unit test.
 
 **Prevention:** Any "is this a value object / data carrier?" heuristic must classify behaviour by what a method RETURNS (a command returns nothing or is untyped), never by whether it takes a parameter. Add a fixture for a value object with a param-taking query/wither/factory method and assert it stays exempt, plus a void/untyped-command fixture that does not. Accept the inherent limit: a service whose methods all return typed values is shape-indistinguishable from a value object and stays exempt - that is a deliberate non-guess, not a bug.
+
+## Footgun: `size.class-length` counts comment and docblock lines, so a documentation pass can push a large class over the 800-line ERROR cap
+
+**Status:** active | **Created:** 2026-07-04 | **Evidence:** OBSERVED
+
+`size.class-length` measures RAW lines — `src/Rules/Size/ClassLengthRule.php` (search: `$endLine - $startLine + 1`) computes `endLine - startLine + 1`, which counts every comment, docblock, and blank line inside the class body, not just statements (the deliberate raw-metric choice recorded in `.goat-flow/learning-loop/decisions/ADR-012-size-rule-line-counting-metric.md`). The consequence for documentation work: adding inline comments and expanding method docblocks on a class whose body is already near the `.gruff-php.yaml` `size.class-length` threshold (800, ERROR) can trip the cap on comments alone, with zero code change. A comments-only pass over `src/Engine/Config/RuleConfigApplier.php` (727-line baseline → 811) and `src/Engine/Config/ConfigLoader.php` (764 → 819) each fired `size.class-length` ERROR mid-pass; `src/Rules/RuleRegistry.php` (class body 787) had only ~13 lines of headroom under 800 and had to be documented "lightly" to stay green.
+
+**Evidence:** `size.class-length` threshold and `error` severity live in `.gruff-php.yaml` (search: `size.class-length`); the raw metric is in `ClassLengthRule` (search: `$endLine - $startLine + 1`). Class-length = last line of the class − line of the `class`/`interface`/`trait`/`enum` keyword + 1, so a docblock ABOVE the class keyword is free (it shifts the decl line and the end line equally), but every line INSIDE the class body counts.
+
+**Prevention:** Before a comment/docblock pass on any class whose body approaches 800 lines, check the baseline class-length headroom first. Put class-level narrative in the class docblock ABOVE the class keyword (free for class-length), keep method summaries to one line, and add inline comments only on non-obvious control flow. `size.file-length` (1000, raw) has the same comment-counting property for whole files. Both are caught by `php bin/gruff-php analyse <file> --fail-on advisory`, so gate large-class edits per-file rather than discovering the cap in a full-project scan.
 
 ## Resolved Entries
 

@@ -13,20 +13,27 @@ set -euo pipefail
 #
 # Behaviour:
 #   - Rewrites Application::VERSION in src/Cli/Application.php.
+#   - Rewrites the README "Current source" stamp and the docs/gruff-cli-summary.md
+#     header/JSON-example stamps to the new version.
 #   - If the new version is not a prerelease tag and CHANGELOG.md still has an
 #     "Unreleased" marker for that version, stamps it with today's date (or
 #     --release-date when supplied).
 #   - Refuses to overwrite an already-dated changelog heading.
 #   - Prints a diff summary on success.
+#
+# CLI golden fixtures need no regeneration: their version stamps are normalised
+# to Application::VERSION at compare time in tests/Console/AnalyseCliTest.php.
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 APPLICATION_PHP="src/Cli/Application.php"
 CHANGELOG="CHANGELOG.md"
+README_MD="README.md"
+SUMMARY_DOC="docs/gruff-cli-summary.md"
 
 usage() {
-  sed -n '3,18p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '3,25p' "$0" | sed 's/^# \{0,1\}//'
   exit "${1:-1}"
 }
 
@@ -117,6 +124,34 @@ if [[ -f "$CHANGELOG" && $IS_PRERELEASE -eq 0 ]]; then
   ' "$CHANGELOG" "$NEW_VERSION")"
 fi
 
+# Rewrite one documentation version stamp in place, warning when the expected shape is missing.
+update_doc_stamp() {
+  local doc_path="$1"
+  local stamp_pattern="$2"
+  local stamp_replacement="$3"
+  local stamp_label="$4"
+
+  if [[ ! -f "$doc_path" ]]; then
+    echo "warning: $doc_path not found; $stamp_label not updated" >&2
+    return 0
+  fi
+
+  # shellcheck disable=SC2016
+  php -r '
+    [$path, $pattern, $replacement, $label] = array_slice($argv, 1);
+    $body = file_get_contents($path);
+    if ($body === false) { fwrite(STDERR, "warning: could not read " . $path . "\n"); exit(0); }
+    $updated = preg_replace($pattern, $replacement, $body, 1, $count);
+    if ($updated === null || $count !== 1) {
+      fwrite(STDERR, "warning: " . $label . " not found in " . $path . "; update it manually\n");
+      exit(0);
+    }
+    if ($body === $updated) { exit(0); }
+    if (file_put_contents($path, $updated) === false) { fwrite(STDERR, "warning: could not write " . $path . "\n"); exit(0); }
+    echo "Updated " . $label . "\n";
+  ' "$doc_path" "$stamp_pattern" "$stamp_replacement" "$stamp_label"
+}
+
 if [[ "$CURRENT_VERSION" == "$NEW_VERSION" ]]; then
   echo "Application::VERSION is already $NEW_VERSION; nothing to do."
 else
@@ -139,6 +174,12 @@ else
   ' "$APPLICATION_PHP" "$NEW_VERSION"
   echo "Updated Application::VERSION: $CURRENT_VERSION -> $NEW_VERSION"
 fi
+
+# Keep every user-visible version stamp in lockstep with Application::VERSION.
+# shellcheck disable=SC2016
+update_doc_stamp "$README_MD" '/\| Current source \| `[^`]+` \|/' "| Current source | \`$NEW_VERSION\` |" 'README current-source stamp'
+update_doc_stamp "$SUMMARY_DOC" '/^gruff-php \S+ summary$/m' "gruff-php $NEW_VERSION summary" 'summary doc header stamp'
+update_doc_stamp "$SUMMARY_DOC" '/"version": "[^"]+"/' "\"version\": \"$NEW_VERSION\"" 'summary doc JSON example stamp'
 
 if [[ -n "$CHANGELOG_STATE" ]]; then
   if [[ "$CHANGELOG_STATE" == "unreleased" ]]; then
@@ -173,5 +214,6 @@ echo
 echo "Next steps:"
 echo "  composer validate --strict"
 echo "  composer check"
-echo "  composer test"
-echo "  git diff $APPLICATION_PHP $CHANGELOG"
+echo "  composer test   # CLI goldens self-normalise to Application::VERSION; no regeneration needed"
+echo "  bash scripts/preflight-checks.sh --release-version $NEW_VERSION   # verifies README/summary-doc stamps"
+echo "  git diff $APPLICATION_PHP $CHANGELOG $README_MD $SUMMARY_DOC"

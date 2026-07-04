@@ -15,7 +15,9 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
 
 /**
- * Detects tests that exercise mock configuration instead of production behavior.
+ * Flags a test that only sets up and verifies mocks - it checks that collaborators were called but never
+ * asserts a real, externally visible effect of the system under test, so it passes even when the behaviour
+ * is wrong. Runs over every test in the file. Warning, medium confidence.
  */
 final readonly class MockOnlyTestRule implements RuleInterface
 {
@@ -25,7 +27,7 @@ final readonly class MockOnlyTestRule implements RuleInterface
     public const ID = 'test-quality.mock-only-test';
 
     /**
-     * Describe the mock-only test rule.
+     * Describes the mock-only-test rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -42,7 +44,7 @@ final readonly class MockOnlyTestRule implements RuleInterface
     }
 
     /**
-     * Find tests that exercise only mocks without a concrete subject.
+     * Reports tests that verify mock interactions without a real assertion.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -53,15 +55,18 @@ final readonly class MockOnlyTestRule implements RuleInterface
     {
         $findings = [];
 
+        // Weigh every test scope in the file.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             $hasMock         = false;
             $hasVerification = false;
 
+            // Tally the mock creation and verification calls the test makes.
             foreach (TestQualityNodeHelper::calls($scope) as $call) {
                 $hasMock         = $hasMock || TestQualityNodeHelper::isMockCreationCall($call);
                 $hasVerification = $hasVerification || TestQualityNodeHelper::isMockVerificationCall($call);
             }
 
+            // Flag only tests that verify mocks yet make no real assertion at all.
             if (!$hasMock || !$hasVerification || TestQualityNodeHelper::assertionCalls($scope) !== []) {
                 continue;
             }

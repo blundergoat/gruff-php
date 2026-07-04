@@ -22,7 +22,11 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 
 /**
- * Detects function and method names that are too generic.
+ * Flags a function or method whose name is a vague verb - `process`, `handle`, `run`, `execute`, and the
+ * like - because such names say that something happens without saying what, forcing the reader into the body.
+ *
+ * Framework-mandated names, such as a Symfony Console command's `execute()`, are exempt so the rule does not
+ * fight contracts the author cannot rename. Advisory, medium confidence.
  */
 final readonly class GenericMethodNameRule implements RuleInterface
 {
@@ -40,7 +44,7 @@ final readonly class GenericMethodNameRule implements RuleInterface
     ];
 
     /**
-     * Describe the generic method name rule.
+     * Describes the generic-method-name rule for the registry and reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -58,7 +62,7 @@ final readonly class GenericMethodNameRule implements RuleInterface
     }
 
     /**
-     * Find functions and methods whose names are too generic to communicate intent.
+     * Reports a function or method whose name is too generic to convey intent.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -72,14 +76,17 @@ final readonly class GenericMethodNameRule implements RuleInterface
 
         $findings = [];
 
+        // Check every function and method in the file.
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
             $name = $node->name->toString();
 
+            // Only the known vague verbs are candidates for this rule.
             if (!in_array(strtolower($name), array_map('strtolower', self::GENERIC_NAMES), true)) {
                 continue;
             }
 
+            // A framework-required name such as Symfony's execute() is left alone.
             if ($node instanceof ClassMethod && $this->matchesFrameworkOverride($node)) {
                 continue;
             }
@@ -104,7 +111,7 @@ final readonly class GenericMethodNameRule implements RuleInterface
     }
 
     /**
-     * Allow known framework-required generic method names.
+     * Reports whether a framework requires this otherwise-generic method name.
      *
      * @param ClassMethod $classMethod - Method whose name and signature decide whether a framework forces it.
      *
@@ -124,7 +131,7 @@ final readonly class GenericMethodNameRule implements RuleInterface
     }
 
     /**
-     * Detect Symfony Console command `execute()` overrides.
+     * Reports whether a method matches the Symfony Console command `execute()` signature.
      *
      * @param ClassMethod $classMethod - Candidate `execute` method to match against the Symfony command signature.
      *
@@ -146,7 +153,7 @@ final readonly class GenericMethodNameRule implements RuleInterface
     }
 
     /**
-     * Compare a parameter type node against an unqualified class/interface name.
+     * Reports whether a parameter type node matches an unqualified class or interface name.
      *
      * @param Node|null $type - Declared parameter type node, or null when the parameter is untyped.
      * @param string    $shortName - Unqualified class or interface name to match, ignoring any namespace prefix.
