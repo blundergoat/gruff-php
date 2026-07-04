@@ -21,11 +21,12 @@ use PhpParser\Node\Stmt\Enum_;
 use PhpParser\Node\Stmt\Trait_;
 
 /**
- * Detects class-like declarations that exceed the configured line threshold.
+ * Flags a class, trait, or enum whose physical span runs past the configured budget - the container
+ * measure that tells the user a single type has grown too large to sit comfortably in one file.
  *
- * Measures raw lines between the class declaration and its closing brace,
- * inclusive - whitespace and comments count. Class-length is a container
- * measure, not a density measure. See ADR-012.
+ * Runs per file over every class-like scope, measuring raw lines between its declaration and closing
+ * brace (whitespace and comments count) against the threshold (default error above 1000). Class-length
+ * is a container measure, not a density measure. See ADR-012.
  */
 final readonly class ClassLengthRule implements RuleInterface
 {
@@ -35,10 +36,8 @@ final readonly class ClassLengthRule implements RuleInterface
     public const ID = 'size.class-length';
 
     /**
-     * Describe the class-length rule.
+     * Describes the class-length rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - Rule metadata and thresholds.
      */
     public function definition(): RuleDefinition
@@ -56,10 +55,8 @@ final readonly class ClassLengthRule implements RuleInterface
     }
 
     /**
-     * Find class-like scopes whose physical line length exceeds thresholds.
+     * Reports each class-like scope whose physical length runs over the configured budget.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -74,12 +71,12 @@ final readonly class ClassLengthRule implements RuleInterface
 
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Measure each class, trait, and enum in the file.
         foreach ($nodes as $node) {
             $startLine = $node->getStartLine();
             $endLine   = $node->getEndLine();
 
-            // User view: choose the findings list branch for this case.
+            // Skip a synthetic node with no line span to measure.
             if ($startLine < 0 || $endLine < 0) {
                 continue;
             }
@@ -87,8 +84,7 @@ final readonly class ClassLengthRule implements RuleInterface
             $length         = $endLine - $startLine + 1;
             $thresholdMatch = $settings->highValueThresholdMatch($length);
 
-            // User view: choose the findings list branch for this case.
-            // User view: missing data becomes the expected findings list state.
+            // A scope within budget is fine, so skip it.
             if ($thresholdMatch === null) {
                 continue;
             }
@@ -126,34 +122,26 @@ final readonly class ClassLengthRule implements RuleInterface
     }
 
     /**
-     * Build a display symbol for a class-like node.
+     * Builds a display name for a class-like node, synthesising a label when it is unnamed.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node $node - Class-like node (Class_, Trait_, or Enum_) whose declared name labels the finding.
      *
      * @return string - Class-like display symbol.
      */
     private function resolveSymbol(Node $node): string
     {
-        // User view: choose the findings list branch for this case.
         if ($node instanceof Class_) {
             // Anonymous classes carry no name node, so synthesise a label keyed to the declaration line.
-            // User view: missing data becomes a safe findings list default.
             return $node->name?->toString() ?? sprintf('class@anonymous:%d', $node->getStartLine());
         }
 
-        // User view: choose the findings list branch for this case.
         if ($node instanceof Trait_) {
             // Traits are always named in valid PHP; the fallback only guards against an unparsed name node.
-            // User view: missing data becomes a safe findings list default.
             return $node->name?->toString() ?? sprintf('trait@%d', $node->getStartLine());
         }
 
-        // User view: choose the findings list branch for this case.
         if ($node instanceof Enum_) {
             // Enums are always named in valid PHP; the fallback only guards against an unparsed name node.
-            // User view: missing data becomes a safe findings list default.
             return $node->name?->toString() ?? sprintf('enum@%d', $node->getStartLine());
         }
 
@@ -162,17 +150,15 @@ final readonly class ClassLengthRule implements RuleInterface
     }
 
     /**
-     * Format threshold numbers without unnecessary decimal places.
+     * Formats a threshold number for the message, dropping a whole number's ".0" tail.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param int|float $number - Threshold value to render; whole floats are shown without a trailing decimal.
      *
      * @return string - Human-readable threshold value with fractional values preserved and whole values stripped.
      */
     private function formatNumber(int|float $number): string
     {
-        // User view: choose the findings list branch for this case.
+        // A genuine fraction keeps its decimals; a whole value is shown without them.
         if (is_float($number) && floor($number) !== $number) {
             return (string) $number;
         }

@@ -19,7 +19,12 @@ use PhpParser\Node\Expr;
 use PhpParser\NodeFinder;
 
 /**
- * Detects archive extraction from request-controlled sources or to request-controlled destinations.
+ * Flags an archive `extractTo()` whose destination or selected entries come from the request, or whose
+ * archive itself was uploaded - the shape that lets a crafted zip write files outside the target directory
+ * (zip-slip path traversal).
+ *
+ * Runs per file over ZipArchive/PharData extractTo() calls, tracing the receiver back through its own scope
+ * to spot a request-controlled archive source. Warning, medium confidence.
  */
 final class UnsafeArchiveExtractionRule implements RuleInterface
 {
@@ -29,10 +34,8 @@ final class UnsafeArchiveExtractionRule implements RuleInterface
     public const ID = 'security.unsafe-archive-extraction';
 
     /**
-     * Describe the unsafe archive extraction rule.
+     * Describes the unsafe-archive-extraction rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -48,10 +51,8 @@ final class UnsafeArchiveExtractionRule implements RuleInterface
     }
 
     /**
-     * Find archive extraction calls with request-controlled destinations or entries.
+     * Reports each archive extraction with a request-controlled destination, entries, or source.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -61,15 +62,14 @@ final class UnsafeArchiveExtractionRule implements RuleInterface
     {
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Check every method call for an extractTo().
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\MethodCall::class) as $call) {
-            // User view: choose the findings list branch for this case.
+            // Only an extractTo() call unpacks an archive.
             if (SecurityNodeHelper::methodName($call) !== 'extractto') {
                 continue;
             }
 
             // Attacker-chosen destination or entry list: the original unsafe shape, reported first.
-            // User view: choose the findings list branch for this case.
             if ($this->hasRequestControlledExtractionArgument($call)) {
                 $findings[] = $this->finding($analysisUnit, $call);
                 continue;
@@ -77,15 +77,14 @@ final class UnsafeArchiveExtractionRule implements RuleInterface
 
             // Destination is fixed but the archive itself came from the request (say, an upload):
             // extraction still processes attacker-supplied entries, so flag the source shape.
-            // User view: choose the findings list branch for this case.
             if ($this->hasRequestControlledArchiveSource($analysisUnit, $call)) {
                 $findings[] = $this->sourceFinding($analysisUnit, $call);
             }
         }
 
-        // User view: add each item that can appear in findings list.
+        // Check static extractTo() calls on PharData/ZipArchive too.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\StaticCall::class) as $call) {
-            // User view: choose the findings list branch for this case.
+            // Only a static extractTo() on a known archive class qualifies.
             if (
                 SecurityNodeHelper::methodName($call) !== 'extractto'
                 || !SecurityNodeHelper::hasMatchingClassName($call->class, ['PharData', 'ZipArchive'])
@@ -93,7 +92,7 @@ final class UnsafeArchiveExtractionRule implements RuleInterface
                 continue;
             }
 
-            // User view: choose the findings list branch for this case.
+            // A request-controlled destination or entry list is the risk.
             if ($this->hasRequestControlledExtractionArgument($call)) {
                 $findings[] = $this->finding($analysisUnit, $call);
             }
@@ -103,10 +102,8 @@ final class UnsafeArchiveExtractionRule implements RuleInterface
     }
 
     /**
-     * Check whether an extractTo() call draws its destination or entry list from request input.
+     * Reports whether an extractTo() call draws its destination or entry list from request input.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Expr\MethodCall|Expr\StaticCall $call - extractTo() call whose first two arguments (destination, entries)
      *                                              are taint-checked against request data.
      *
@@ -114,11 +111,9 @@ final class UnsafeArchiveExtractionRule implements RuleInterface
      */
     private function hasRequestControlledExtractionArgument(Expr\MethodCall|Expr\StaticCall $call): bool
     {
-        // User view: add each item that can appear in findings list.
+        // Weigh the destination and entry-list arguments.
         foreach ([0, 1] as $argumentIndex) {
             $argument = SecurityNodeHelper::argumentValue($call->args, $argumentIndex);
-            // User view: choose the findings list branch for this case.
-            // User view: missing data becomes the expected findings list state.
             if ($argument !== null && SecurityNodeHelper::containsUserInput($argument)) {
                 // A request-tainted destination or entry list is enough to flag the extraction.
                 return true;
@@ -130,7 +125,7 @@ final class UnsafeArchiveExtractionRule implements RuleInterface
     }
 
     /**
-     * Decide whether the extraction receiver can hold a request-controlled archive.
+     * Reports whether the extraction receiver can hold a request-controlled archive.
      *
      * Tracks the receiver variable within its own function-like scope only: an open
      * call with request-tainted input or a `new PharData($request-tainted)` assignment
@@ -139,8 +134,6 @@ final class UnsafeArchiveExtractionRule implements RuleInterface
      * conditional clean re-open cannot hide an uploaded archive; an unskippable clean
      * re-open or reassignment still clears the taint.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit    $analysisUnit - Parsed unit supplying top-level statements when the call has no enclosing function.
      * @param Expr\MethodCall $call - extractTo() call whose receiver variable is being traced.
      *
@@ -149,30 +142,25 @@ final class UnsafeArchiveExtractionRule implements RuleInterface
     private function hasRequestControlledArchiveSource(AnalysisUnit $analysisUnit, Expr\MethodCall $call): bool
     {
         // Property fetches and chained receivers carry no traceable binding; stay silent.
-        // User view: choose the findings list branch for this case.
         if (!$call->var instanceof Expr\Variable || !is_string($call->var->name)) {
             return false;
         }
 
         $callPosition = $call->getStartFilePos();
         // Without byte offsets the event order cannot be proven; stay safe and bail.
-        // User view: choose the findings list branch for this case.
         if ($callPosition < 0) {
             return false;
         }
 
         $variableName     = $call->var->name;
         $scope            = SecurityNodeHelper::enclosingFunctionLike($call);
-        // User view: missing data becomes a safe findings list default.
         $statements       = $scope instanceof Node\FunctionLike ? ($scope->getStmts() ?? []) : $analysisUnit->statements;
         $events           = $this->receiverSourceEvents(array_values($statements), $variableName, $callPosition);
         $sinkAncestorIds  = SecurityNodeHelper::ancestorIdsWithin($call, $scope);
         $hasTaintedSource = false;
         // Replay the variable's history in order; the state left at the extraction call is what counts.
-        // User view: add each item that can appear in findings list.
         foreach ($events as $event) {
             // Events inside nested closures do not rebind this scope's variable.
-            // User view: choose the findings list branch for this case.
             if (SecurityNodeHelper::enclosingFunctionLike($event) !== $scope) {
                 continue;
             }
@@ -180,7 +168,6 @@ final class UnsafeArchiveExtractionRule implements RuleInterface
             $isSkippable = SecurityNodeHelper::isSkippableBeforeSink($event, $call, $scope, $sinkAncestorIds);
 
             // A reassignment rebinds the variable: only a PharData built from request input carries taint.
-            // User view: choose the findings list branch for this case.
             if ($event instanceof Expr\Assign) {
                 $constructsTainted = $this->isTaintedArchiveConstruction($event->expr);
                 // A skippable rebind can add upload evidence but never clear it.
@@ -188,12 +175,10 @@ final class UnsafeArchiveExtractionRule implements RuleInterface
                 continue;
             }
 
-            // User view: choose the findings list branch for this case.
+            // An open() call re-points the receiver at a different archive.
             if ($event instanceof Expr\MethodCall) {
                 $pathArg = SecurityNodeHelper::argumentValue($event->args, 0);
                 // An open call with no path argument tells us nothing about the archive's origin.
-                // User view: choose the findings list branch for this case.
-                // User view: missing data becomes the expected findings list state.
                 if ($pathArg === null) {
                     continue;
                 }
@@ -208,10 +193,8 @@ final class UnsafeArchiveExtractionRule implements RuleInterface
     }
 
     /**
-     * Collect the receiver variable's source-defining events before the extraction call, in byte order.
+     * Collects the receiver variable's source-defining events before the extraction call, in byte order.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param list<Node\Stmt> $statements - Statements of the receiver's own scope.
      * @param string          $variableName - Receiver variable name at the extraction call.
      * @param int             $callPosition - Byte offset of the extraction call bounding the search.
@@ -241,10 +224,8 @@ final class UnsafeArchiveExtractionRule implements RuleInterface
     }
 
     /**
-     * Check whether an assignment expression constructs an archive from request input.
+     * Reports whether an assignment expression constructs an archive from request input.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Expr $expr - Right-hand side of a receiver-variable assignment.
      *
      * @return bool - true only for `new PharData($request-tainted)`; ZipArchive construction takes no path, so
@@ -253,22 +234,18 @@ final class UnsafeArchiveExtractionRule implements RuleInterface
     private function isTaintedArchiveConstruction(Expr $expr): bool
     {
         // Only PharData takes its archive path in the constructor; every other assignment reads as clean.
-        // User view: choose the findings list branch for this case.
         if (!$expr instanceof Expr\New_ || !SecurityNodeHelper::hasMatchingClassName($expr->class, ['PharData'])) {
             return false;
         }
 
         $pathArg = SecurityNodeHelper::argumentValue($expr->args, 0);
 
-        // User view: missing data becomes the expected findings list state.
         return $pathArg !== null && SecurityNodeHelper::containsUserInput($pathArg);
     }
 
     /**
-     * Build the request-controlled archive-source finding.
+     * Builds the request-controlled archive-source finding.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Unit being scanned; supplies the display path recorded on the finding.
      * @param Node         $node - extractTo() call flagged as unsafe; its start line locates the finding.
      *
@@ -295,10 +272,8 @@ final class UnsafeArchiveExtractionRule implements RuleInterface
     }
 
     /**
-     * Build the unsafe archive extraction finding.
+     * Builds the unsafe-archive-extraction finding.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Unit being scanned; supplies the display path recorded on the finding.
      * @param Node         $node - extractTo() call flagged as unsafe; its start line locates the finding.
      *

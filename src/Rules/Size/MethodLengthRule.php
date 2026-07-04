@@ -21,11 +21,12 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 
 /**
- * Detects method and function bodies that exceed the configured line threshold.
+ * Flags a method, function, or closure whose logical body runs long, since a callable that spans many
+ * statements is usually doing more than one job and is hard to read top to bottom.
  *
- * Measures logical lines - distinct start lines of non-`Nop` statements inside
- * the callable body. Multi-line constructor calls, fluent builders, and array
- * literals count as one logical line per statement boundary. See ADR-012.
+ * Runs per file over every callable, counting logical lines - distinct start lines of non-`Nop`
+ * statements inside the body - against the threshold (default error above 100). Multi-line constructor
+ * calls, fluent builders, and array literals count as one logical line per statement boundary. See ADR-012.
  */
 final readonly class MethodLengthRule implements RuleInterface
 {
@@ -35,10 +36,8 @@ final readonly class MethodLengthRule implements RuleInterface
     public const ID = 'size.method-length';
 
     /**
-     * Describe the method-length rule.
+     * Describes the method-length rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - Rule metadata and thresholds.
      */
     public function definition(): RuleDefinition
@@ -55,10 +54,8 @@ final readonly class MethodLengthRule implements RuleInterface
     }
 
     /**
-     * Find callables whose logical statement line count exceeds thresholds.
+     * Reports each callable whose logical line count runs over the configured budget.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -73,9 +70,9 @@ final readonly class MethodLengthRule implements RuleInterface
 
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Measure each method, function, and closure in the file.
         foreach ($nodes as $node) {
-            // User view: choose the findings list branch for this case.
+            // Only real callables are measured.
             if (!$node instanceof ClassMethod && !$node instanceof Function_ && !$node instanceof Closure) {
                 continue;
             }
@@ -83,7 +80,7 @@ final readonly class MethodLengthRule implements RuleInterface
             $startLine = $node->getStartLine();
             $endLine   = $node->getEndLine();
 
-            // User view: choose the findings list branch for this case.
+            // Skip a synthetic node with no line span.
             if ($startLine < 0 || $endLine < 0) {
                 continue;
             }
@@ -91,8 +88,7 @@ final readonly class MethodLengthRule implements RuleInterface
             $length         = NodeIndex::logicalStatementLineCount($node);
             $thresholdMatch = $settings->highValueThresholdMatch($length);
 
-            // User view: choose the findings list branch for this case.
-            // User view: missing data becomes the expected findings list state.
+            // A callable within budget is fine, so skip it.
             if ($thresholdMatch === null) {
                 continue;
             }
@@ -130,34 +126,29 @@ final readonly class MethodLengthRule implements RuleInterface
     }
 
     /**
-     * Build a display symbol for a callable node.
+     * Builds a display symbol for a callable node (Class::method(), function(), or Closure@line).
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node $node - Callable node (method, function, or closure) to render as a finding symbol.
      *
      * @return string - Callable display symbol.
      */
     private function resolveSymbol(Node $node): string
     {
-        // User view: choose the findings list branch for this case.
+        // A method is qualified by its owning type name.
         if ($node instanceof ClassMethod) {
             $parent    = $node->getAttribute('parent');
             $className = $parent instanceof Node\Stmt\Class_
                 || $parent instanceof Node\Stmt\Trait_
                 || $parent instanceof Node\Stmt\Enum_
-                // User view: missing data becomes a safe findings list default.
                 ? ($parent->name?->toString() ?? 'class@anonymous')
                 : null;
 
             // Qualify with the owning type when known; an anonymous class leaves just the bare method name.
-            // User view: missing data becomes the expected findings list state.
             return $className !== null
                 ? sprintf('%s::%s()', $className, $node->name->toString())
                 : $node->name->toString() . '()';
         }
 
-        // User view: choose the findings list branch for this case.
         if ($node instanceof Function_) {
             // A free function is identified by its own name alone.
             return $node->name->toString() . '()';
@@ -168,17 +159,15 @@ final readonly class MethodLengthRule implements RuleInterface
     }
 
     /**
-     * Format threshold numbers without unnecessary decimal places.
+     * Formats a threshold number for the message, dropping a whole number's ".0" tail.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param int|float $number - Threshold value to render; whole values are shown without a trailing decimal.
      *
      * @return string - Human-readable threshold value with fractional values preserved and whole values stripped.
      */
     private function formatNumber(int|float $number): string
     {
-        // User view: choose the findings list branch for this case.
+        // A genuine fraction keeps its decimals; a whole value is shown without them.
         if (is_float($number) && floor($number) !== $number) {
             return (string) $number;
         }

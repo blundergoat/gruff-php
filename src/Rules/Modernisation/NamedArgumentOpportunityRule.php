@@ -20,7 +20,13 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 
 /**
- * Detects calls whose repeated scalar arguments would be clearer as named arguments.
+ * Flags a call passing a long run of positional scalar arguments, where PHP 8 named arguments would make
+ * each value's role obvious at the call site, so the user can consider naming them.
+ *
+ * Runs per file on PHP 8.0+ targets. It fires when a call has at least the configured number of positional
+ * arguments, or slightly fewer when adjacent same-type values or bare boolean/null flags make a mix-up
+ * easy. Calls to same-file variadic callables are skipped, since naming there misleads. Low confidence and
+ * advisory - names are only worth adding for stable APIs, so gruff-php reports only.
  */
 final readonly class NamedArgumentOpportunityRule implements RuleInterface
 {
@@ -30,11 +36,9 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
     public const ID = 'modernisation.named-argument-opportunity';
 
     /**
-     * Describe the named argument opportunity rule.
+     * Describes the named-argument-opportunity rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
-     * @return RuleDefinition - Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults, including the minimum positional-argument threshold.
      */
     public function definition(): RuleDefinition
     {
@@ -50,18 +54,15 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
     }
 
     /**
-     * Find calls with many positional arguments that would read better named.
+     * Reports each call whose many positional arguments would read better as named arguments.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext - Rule context supplying the target PHP version and threshold.
      *
-     * @return list<Finding> - Findings for named argument opportunities.
+     * @return list<Finding> - One finding per named-argument opportunity; empty on pre-8.0 targets or when no call qualifies.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        // User view: choose the findings list branch for this case.
         if (!ModernisationNodeHelper::supportsPhp($ruleContext, 8.0)) {
             // Named arguments are a PHP 8.0 feature; below that target the suggestion would be unactionable.
             return [];
@@ -73,17 +74,16 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
         $findings               = [];
 
         $calls = NodeIndex::nodesOfAny($analysisUnit, [Expr\FuncCall::class, Expr\MethodCall::class, Expr\StaticCall::class]);
-        // User view: add each item that can appear in findings list.
+        // Weigh every function, method, and static call in the file.
         foreach ($calls as $call) {
             /** @var Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call NodeIndex query restricts these classes. */
-            // User view: choose the findings list branch for this case.
+            // A variadic target has no fixed parameter names to suggest, so naming there would mislead.
             if ($this->isVariadicCall($call, $variadicCallableNames)) {
                 continue;
             }
 
             $reason = $this->reason($call->args, $minPositionalArguments);
-            // User view: choose the findings list branch for this case.
-            // User view: missing data becomes the expected findings list state.
+            // Nothing about this call's arguments warrants the suggestion.
             if ($reason === null) {
                 continue;
             }
@@ -109,15 +109,13 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
     }
 
     /**
-     * Decide whether a call carries enough positional arguments to recommend named arguments.
+     * Decides whether a call carries enough positional arguments to recommend named arguments, and why.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param array<int|string, Node\Arg|Node\VariadicPlaceholder> $args - Raw call arguments; spreads and named
      *   arguments are present but do not count toward the positional total.
      * @param int $minPositionalArguments - Inclusive lower bound below which the call is left alone.
      *
-     * @return string|null - Explanation when the call should use named arguments.
+     * @return string|null - Explanation when the call should use named arguments; null when it reads clearly enough.
      */
     private function reason(array $args, int $minPositionalArguments): ?string
     {
@@ -126,23 +124,21 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
         $hasAdjacentAmbiguity = false;
         $hasBooleanOrNull = false;
 
-        // User view: add each item that can appear in findings list.
+        // Count and classify each positional argument.
         foreach ($args as $arg) {
-            // User view: choose the findings list branch for this case.
-            // User view: missing data becomes the expected findings list state.
+            // A spread or already-named argument does not count toward the positional total.
             if (!$arg instanceof Node\Arg || $arg->name !== null) {
                 continue;
             }
 
             $positionalCount++;
             $type = $this->argumentClarityType($arg->value);
-            // User view: choose the findings list branch for this case.
+            // A bare boolean or null flag is especially easy to pass into the wrong slot.
             if ($type === 'bool' || $type === 'null') {
                 $hasBooleanOrNull = true;
             }
 
-            // User view: choose the findings list branch for this case.
-            // User view: missing data becomes the expected findings list state.
+            // Two adjacent same-type scalar values are easy to transpose by mistake.
             if ($type !== null && $type === $previousType) {
                 $hasAdjacentAmbiguity = true;
             }
@@ -151,7 +147,7 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
 
         }
 
-        // User view: choose the findings list branch for this case.
+        // Enough positional arguments on their own to recommend naming.
         if ($positionalCount >= $minPositionalArguments) {
             return sprintf('%d positional arguments', $positionalCount);
         }
@@ -161,12 +157,12 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
         // raising the threshold to suppress shorter calls also suppresses the ambiguity paths.
         $ambiguityFloor = max(4, $minPositionalArguments - 1);
 
-        // User view: choose the findings list branch for this case.
+        // Just under the plain floor, but adjacent same-type values tip it over.
         if ($positionalCount >= $ambiguityFloor && $hasAdjacentAmbiguity) {
             return sprintf('%d positional arguments with adjacent same-type scalar values', $positionalCount);
         }
 
-        // User view: choose the findings list branch for this case.
+        // Just under the plain floor, but bare boolean/null flags tip it over.
         if ($positionalCount >= $ambiguityFloor && $hasBooleanOrNull) {
             return sprintf('%d positional arguments including boolean/null flags', $positionalCount);
         }
@@ -175,40 +171,38 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
     }
 
     /**
-     * Classify argument expressions that are easy to swap accidentally.
+     * Classifies an argument expression by the scalar type that makes it easy to swap by mistake.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Expr $expr - Positional argument expression.
      *
-     * @return string|null - Ambiguity type, or null when the expression is self-describing enough.
+     * @return string|null - Ambiguity type, or null when the expression is self-describing enough to leave alone.
      */
     private function argumentClarityType(Expr $expr): ?string
     {
-        // User view: choose the findings list branch for this case.
+        // A bare string literal carries no hint of which parameter it fills.
         if ($expr instanceof Node\Scalar\String_) {
             return 'string';
         }
 
-        // User view: choose the findings list branch for this case.
+        // A bare integer literal is equally anonymous.
         if ($expr instanceof Node\Scalar\Int_) {
             return 'int';
         }
 
-        // User view: choose the findings list branch for this case.
+        // So is a bare float literal.
         if ($expr instanceof Node\Scalar\Float_) {
             return 'float';
         }
 
-        // User view: choose the findings list branch for this case.
+        // A `true`/`false`/`null` constant reads as an opaque flag at the call site.
         if ($expr instanceof Expr\ConstFetch) {
             $name = strtolower($expr->name->toString());
-            // User view: choose the findings list branch for this case.
+            // Boolean flags are the classic swap hazard.
             if ($name === 'true' || $name === 'false') {
                 return 'bool';
             }
 
-            // User view: choose the findings list branch for this case.
+            // A null flag is just as ambiguous.
             if ($name === 'null') {
                 return 'null';
             }
@@ -218,10 +212,8 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
     }
 
     /**
-     * Find function and method names declared with variadic parameters in the same file.
+     * Collects the names of same-file functions and methods declared with a variadic parameter.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit whose own function-like declarations are scanned for variadic params.
      *
      * @return array<string, true> - Lowercase variadic function and method names.
@@ -230,16 +222,15 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
     {
         $names = [];
 
-        // User view: add each item that can appear in findings list.
+        // Scan every function and method declared in the file.
         foreach (NodeIndex::nodesOfAny($analysisUnit, [ClassMethod::class, Function_::class]) as $functionLike) {
-            // User view: choose the findings list branch for this case.
+            // Guard the type so only real callables are inspected.
             if (!$functionLike instanceof ClassMethod && !$functionLike instanceof Function_) {
                 continue;
             }
 
-            // User view: add each item that can appear in findings list.
+            // A single variadic parameter marks the whole callable as variadic.
             foreach ($functionLike->params as $param) {
-                // User view: choose the findings list branch for this case.
                 if ($param->variadic) {
                     $names[strtolower($functionLike->name->toString())] = true;
                     break;
@@ -252,20 +243,16 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
     }
 
     /**
-     * Detect calls to same-file variadic functions or methods, where named arguments would be misleading.
+     * Reports whether a call targets a same-file variadic callable, where named arguments would mislead.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Call whose callee name is matched against the variadic set.
      * @param array<string, true> $variadicNames - Lowercase callable names declared with variadic params.
      *
-     * @return bool - True when the call target is variadic.
+     * @return bool - True when the call target is variadic, false otherwise.
      */
     private function isVariadicCall(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call, array $variadicNames): bool
     {
         $name = $this->callableSimpleName($call);
-        // User view: choose the findings list branch for this case.
-        // User view: missing data becomes the expected findings list state.
         if ($name === null) {
             // A dynamic or expression callee cannot be resolved to a declaration, so it cannot be matched as variadic.
             return false;
@@ -276,17 +263,15 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
     }
 
     /**
-     * Extract the simple callee name from a supported call expression.
+     * Extracts the simple callee name from a supported call expression.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Call whose callee name is needed.
      *
-     * @return string|null - Simple callee name, or null when the callee is dynamic.
+     * @return string|null - Simple callee name, or null when the callee is dynamic and has no static name.
      */
     private function callableSimpleName(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): ?string
     {
-        // User view: choose the findings list branch for this case.
+        // A function call's name is a Name node; a method or static call's is an Identifier.
         if ($call instanceof Expr\FuncCall) {
             return $call->name instanceof Node\Name ? $call->name->getLast() : null;
         }

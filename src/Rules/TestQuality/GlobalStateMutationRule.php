@@ -19,7 +19,9 @@ use PhpParser\Node\Expr;
 use PhpParser\Node\Stmt;
 
 /**
- * Detects tests that mutate shared process state without cleanup.
+ * Flags a test that mutates process-wide state - writing a superglobal like `$_GET[...]` or calling
+ * `putenv`/`ini_set` - in a class with no tearDown / #[After] cleanup, so the change leaks into whichever
+ * test runs next and makes failures order-dependent. Runs over every test. Warning, medium confidence.
  */
 final readonly class GlobalStateMutationRule implements RuleInterface
 {
@@ -39,10 +41,8 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     private const STATE_FUNCTIONS = ['putenv', 'ini_set', 'error_reporting', 'date_default_timezone_set'];
 
     /**
-     * Describe the global state mutation rule.
+     * Describes the global-state-mutation rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - id, name, pillar, tier, and the warning/medium defaults applied to every finding
      */
     public function definition(): RuleDefinition
@@ -58,10 +58,8 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     }
 
     /**
-     * Find tests that mutate global state without detected cleanup hooks.
+     * Reports tests that mutate global state without a detected cleanup hook.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -73,9 +71,9 @@ final readonly class GlobalStateMutationRule implements RuleInterface
         $cleanupCache  = [];
         $classesByName = $this->classesByName($analysisUnit);
 
-        // User view: add each item that can appear in findings list.
+        // Weigh every test scope in the file.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
-            // User view: choose the findings list branch for this case.
+            // Only scopes in a cleanup-free class can leak state into the next test.
             if (!$this->shouldCheckScopeCleanup($scope, $cleanupCache, $classesByName)) {
                 continue;
             }
@@ -91,8 +89,8 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     }
 
     /**
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
+     * Reports whether a scope should be scanned for cleanup-sensitive mutations.
+     *
      * @param TestQualityScope           $scope - Scope to test; Pest scopes are exempt from cleanup checks.
      * @param array<int, bool>           $cleanupCache - Memo by enclosing class object id; true means a hook was found.
      * @param array<string, Stmt\Class_> $classesByName - Declared classes by name, used to resolve parent cleanup hooks.
@@ -101,21 +99,19 @@ final readonly class GlobalStateMutationRule implements RuleInterface
      */
     private function shouldCheckScopeCleanup(TestQualityScope $scope, array &$cleanupCache, array $classesByName): bool
     {
-        // User view: choose the findings list branch for this case.
         if ($scope->isPest) {
             // Pest closures carry no class to hold a cleanup hook, so this rule has nothing to assert against them.
             return false;
         }
 
         $class = $scope->node->getAttribute('parent');
-        // User view: choose the findings list branch for this case.
         if (!$class instanceof Stmt\Class_) {
             // A method outside a class cannot inherit tearDown either; skip rather than guess.
             return false;
         }
 
         $classKey = spl_object_id($class);
-        // User view: choose the findings list branch for this case.
+        // Resolve the class's cleanup verdict once and memoise it.
         if (!array_key_exists($classKey, $cleanupCache)) {
             $cleanupCache[$classKey] = $this->hasCleanupInClass($class, $classesByName);
         }
@@ -125,10 +121,8 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     }
 
     /**
-     * Build superglobal findings for the test-quality rule.
+     * Builds the findings for unscoped superglobal writes in a test.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit     $analysisUnit - Parsed unit; supplies the display path recorded on each finding.
      * @param TestQualityScope $scope - Cleanup-free test scope scanned for direct superglobal writes.
      *
@@ -138,11 +132,10 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     {
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Weigh every assignment in the test body.
         foreach (NodeIndex::descendantsOfAny($scope->node, [Expr\Assign::class]) as $assign) {
             $superglobal = $this->superglobalWriteName($assign->var);
-            // User view: choose the findings list branch for this case.
-            // User view: missing data becomes the expected findings list state.
+            // Skip assignments that do not write a tracked superglobal.
             if ($superglobal === null) {
                 continue;
             }
@@ -160,10 +153,8 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     }
 
     /**
-     * Build state function findings for the test-quality rule.
+     * Builds the findings for unscoped state-mutating calls in a test.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit     $analysisUnit - Parsed unit; supplies the display path recorded on each finding.
      * @param TestQualityScope $scope - Cleanup-free test scope; its calls are matched against the state list.
      *
@@ -173,16 +164,15 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     {
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Inspect each call the test makes.
         foreach (TestQualityNodeHelper::calls($scope) as $call) {
-            // User view: choose the findings list branch for this case.
+            // Only a global function call can be a state mutator.
             if (!$call instanceof Expr\FuncCall) {
                 continue;
             }
 
             $name = TestQualityNodeHelper::functionName($call);
-            // User view: choose the findings list branch for this case.
-            // User view: missing data becomes the expected findings list state.
+            // Only the modelled state-mutating functions qualify.
             if ($name === null || !in_array($name, self::STATE_FUNCTIONS, true)) {
                 continue;
             }
@@ -200,28 +190,25 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     }
 
     /**
-     * Extract the written superglobal name from an assignment target.
+     * Returns the superglobal name an assignment target writes to, or null.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Expr $target - Left-hand side of an assignment; nested array-dim writes are unwrapped to the base variable.
      *
      * @return string|null - Superglobal name, or null when the assignment is not to a tracked superglobal.
      */
     private function superglobalWriteName(Expr $target): ?string
     {
-        // User view: choose the findings list branch for this case.
         if (!$target instanceof Expr\ArrayDimFetch) {
             // Only indexed writes such as $_GET['x'] mutate a superglobal; a bare assignment is out of scope.
             return null;
         }
 
         $variable = $target->var;
+        // Unwrap nested index writes down to the base variable.
         while ($variable instanceof Expr\ArrayDimFetch) {
             $variable = $variable->var;
         }
 
-        // User view: choose the findings list branch for this case.
         if (!$variable instanceof Expr\Variable || !is_string($variable->name)) {
             // A dynamic or non-variable base ($$x[...]) cannot be resolved to a known superglobal name.
             return null;
@@ -231,8 +218,8 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     }
 
     /**
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
+     * Reports whether a class or an ancestor declares a cleanup hook.
+     *
      * @param Stmt\Class_                $class - Class whose own methods and ancestors are searched for a hook.
      * @param array<string, Stmt\Class_> $classesByName - Declared classes by name, used to follow `extends` to a parent.
      * @param array<int, true>           $visited - Object ids already walked; guards against cycles in the graph.
@@ -242,7 +229,6 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     private function hasCleanupInClass(Stmt\Class_ $class, array $classesByName, array $visited = []): bool
     {
         $classId = spl_object_id($class);
-        // User view: choose the findings list branch for this case.
         if (isset($visited[$classId])) {
             // Cycle break: a class already on the walk path contributes no new hook, so stop recursing.
             return false;
@@ -250,25 +236,21 @@ final readonly class GlobalStateMutationRule implements RuleInterface
 
         $visited[$classId] = true;
 
-        // User view: add each item that can appear in findings list.
+        // Weigh each method for a cleanup hook.
         foreach ($class->getMethods() as $classMethod) {
             $methodName = strtolower($classMethod->name->toString());
 
-            // User view: choose the findings list branch for this case.
             if (in_array($methodName, ['teardown', 'teardownafterclass'], true)) {
                 // A tearDown / tearDownAfterClass method is treated as cleanup, so the class is exempt.
                 return true;
             }
 
-            // User view: missing data becomes a safe findings list default.
             $doc = strtolower($classMethod->getDocComment()?->getText() ?? '');
-            // User view: choose the findings list branch for this case.
             if (str_contains($doc, '@after') || str_contains($doc, '@afterclass')) {
                 // An @after / @afterClass annotation marks an arbitrarily named cleanup hook; honour it.
                 return true;
             }
 
-            // User view: choose the findings list branch for this case.
             if (TestQualityNodeHelper::hasAttribute($classMethod, 'After')
                 || TestQualityNodeHelper::hasAttribute($classMethod, 'AfterClass')
             ) {
@@ -277,18 +259,14 @@ final readonly class GlobalStateMutationRule implements RuleInterface
             }
         }
 
-        // User view: choose the findings list branch for this case.
-        // User view: missing data becomes the expected findings list state.
         if ($class->extends === null) {
             // No own hook and no parent to inherit one from, so this class has no cleanup.
             return false;
         }
 
         $parentName = $class->extends->toString();
-        // User view: missing data becomes a safe findings list default.
         $parent     = $classesByName[$parentName] ?? $classesByName[$this->shortName($parentName)] ?? null;
 
-        // User view: choose the findings list branch for this case.
         if (!$parent instanceof Stmt\Class_) {
             // Parent source is unavailable: assume cleanup exists unless it is the bare PHPUnit TestCase root.
             return !in_array($this->shortName($parentName), ['TestCase'], true);
@@ -299,10 +277,8 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     }
 
     /**
-     * Index declared classes by fully qualified and short names.
+     * Indexes declared classes by short and namespaced name.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit whose declared classes seed the lookup table.
      *
      * @return array<string, Stmt\Class_> - declared classes keyed by both short and namespaced name; empty when the unit declares none
@@ -311,9 +287,9 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     {
         $classes = [];
 
-        // User view: add each item that can appear in findings list.
+        // Weigh every class declaration in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Class_::class) as $class) {
-            // User view: choose the findings list branch for this case.
+            // Only a named class can be keyed for lookup.
             if (!$class->name instanceof Node\Identifier) {
                 continue;
             }
@@ -322,7 +298,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
             $classes[$name] = $class;
             $namespacedName = $class->getAttribute('namespacedName');
 
-            // User view: choose the findings list branch for this case.
+            // Also key the class by its namespaced name when known.
             if ($namespacedName instanceof Node\Name) {
                 $classes[$namespacedName->toString()] = $class;
             }
@@ -332,10 +308,8 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     }
 
     /**
-     * Return the final segment of a fully qualified class name.
+     * Returns the final segment of a fully qualified class name.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param string $name - Fully qualified or already-short class name; an empty-segment result falls back to the input.
      *
      * @return string - the trailing namespace segment, used to match `extends` targets against short class names
@@ -344,13 +318,12 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     {
         $parts = explode('\\', $name);
 
-        // User view: missing data becomes a safe findings list default.
         return $parts[array_key_last($parts)] ?? $name;
     }
 
     /**
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
+     * Builds the global-state-mutation finding.
+     *
      * @param AnalysisUnit          $analysisUnit - Parsed unit; supplies the display path recorded on the finding.
      * @param TestQualityScope      $scope - Offending test scope; its symbol identifies the test in the finding.
      * @param int                   $line - 1-based source line of the mutation, reported to the user.

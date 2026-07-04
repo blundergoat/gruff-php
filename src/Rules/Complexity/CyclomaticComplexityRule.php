@@ -23,7 +23,13 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 
 /**
- * Measures function-like branch count using cyclomatic complexity.
+ * Flags a function or method whose cyclomatic complexity - the number of independent branches through
+ * it - climbs above the configured threshold, since more branches mean more paths to test and follow.
+ *
+ * Runs per file over every function-like node with a body, counting decision points (ifs, loops,
+ * catches, short-circuit operators, match arms, non-default cases). Anything over the threshold (default
+ * warning above 20) is reported; a well-structured flat guard-clause method is softened to advisory so
+ * the shape is not over-penalised.
  */
 final readonly class CyclomaticComplexityRule implements RuleInterface
 {
@@ -63,10 +69,8 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     public const ID = 'complexity.cyclomatic';
 
     /**
-     * Describe the cyclomatic complexity rule.
+     * Describes the cyclomatic-complexity rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - Rule metadata and thresholds.
      */
     public function definition(): RuleDefinition
@@ -84,10 +88,8 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     }
 
     /**
-     * Find functions and methods whose cyclomatic complexity exceeds thresholds.
+     * Reports each function-like node whose cyclomatic complexity exceeds the configured threshold.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context carrying thresholds.
      *
@@ -102,10 +104,10 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
 
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Measure every function and method in the file.
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node NodeIndex query is constrained to function-like classes. */
-            // User view: choose the findings list branch for this case.
+            // An abstract or bodyless declaration has no branches to count.
             if (!self::hasExecutableBody($node)) {
                 continue;
             }
@@ -113,8 +115,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
             $ccn            = self::computeCyclomaticComplexity($node);
             $thresholdMatch = $settings->highValueThresholdMatch($ccn);
 
-            // User view: choose the findings list branch for this case.
-            // User view: missing data becomes the expected findings list state.
+            // A count within the threshold is fine, so skip it.
             if ($thresholdMatch === null) {
                 continue;
             }
@@ -164,8 +165,8 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     }
 
     /**
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
+     * Computes the cyclomatic complexity of one function-like node, memoised so a shared node counts once.
+     *
      * @param ClassMethod|Function_ $node - Function-like node whose control-flow constructs are counted.
      *
      * @return int - Cyclomatic complexity number.
@@ -173,15 +174,14 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     public static function computeCyclomaticComplexity(Node $node): int
     {
         static $cyclomaticCache = null;
-        // User view: choose the findings list branch for this case.
+        // Lazily create the shared per-node cache on first use.
         if (!$cyclomaticCache instanceof \WeakMap) {
             $cyclomaticCache = new \WeakMap();
         }
 
-        // User view: choose the findings list branch for this case.
+        // Reuse a memoised score when this node was already counted.
         if (isset($cyclomaticCache[$node])) {
             $cached = $cyclomaticCache[$node];
-            // User view: choose the findings list branch for this case.
             if (is_int($cached)) {
                 // Reuse the memoised score so a node walked by several complexity rules is only counted once.
                 return $cached;
@@ -190,19 +190,18 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
 
         $ccn = 1;
 
-        // User view: add each item that can appear in findings list.
+        // Add a point for each decision node in the body.
         foreach (NodeIndex::bodyDescendants($node) as $child) {
-            // User view: choose the findings list branch for this case.
+            // Each branch statement or short-circuit operator adds one.
             if (self::isDecisionNode($child)) {
                 $ccn++;
             }
 
-            // User view: choose the findings list branch for this case.
+            // A match adds one point per arm condition.
             if ($child instanceof Expr\Match_) {
-                // User view: add each item that can appear in findings list.
+                // Count each arm's conditions in turn.
                 foreach ($child->arms as $arm) {
-                    // User view: choose the findings list branch for this case.
-                    // User view: missing data becomes the expected findings list state.
+                    // The default arm has no conditions, so it adds nothing.
                     if ($arm->conds !== null) {
                         $ccn += count($arm->conds);
                     }
@@ -216,10 +215,8 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     }
 
     /**
-     * Check whether a node contributes one cyclomatic complexity point.
+     * Reports whether a node forks control flow and so adds one cyclomatic point.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node $child - Body descendant being classified as a decision point or not.
      *
      * @return bool - True when the node is counted as a decision point.
@@ -229,15 +226,12 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
         // Branch statements and short-circuit operators each fork control flow; a `default` case (cond null) does not.
         return self::isInstanceOfAny($child, self::BRANCH_STATEMENT_TYPES)
             || self::isInstanceOfAny($child, self::BRANCH_EXPRESSION_TYPES)
-            // User view: missing data becomes the expected findings list state.
             || ($child instanceof Stmt\Case_ && $child->cond !== null);
     }
 
     /**
-     * Check whether a node is an instance of any configured class.
+     * Reports whether a node is an instance of any of the given classes.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node                      $node - Node whose runtime class is tested against the candidates.
      * @param list<class-string<Node>> $classes - Candidate node classes.
      *
@@ -245,9 +239,8 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
      */
     private static function isInstanceOfAny(Node $node, array $classes): bool
     {
-        // User view: add each item that can appear in findings list.
+        // Check the node against each candidate class.
         foreach ($classes as $class) {
-            // User view: choose the findings list branch for this case.
             if ($node instanceof $class) {
                 // First matching class is enough; the caller only needs membership, not which class matched.
                 return true;
@@ -258,27 +251,24 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     }
 
     /**
-     * Build a display symbol for a function-like node.
+     * Builds the display symbol for a function-like node (Class::method() or function()).
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param ClassMethod|Function_ $node - Function-like node to describe.
      *
      * @return string - Function or method display symbol.
      */
     public static function resolveSymbol(ClassMethod|Function_ $node): string
     {
-        // User view: choose the findings list branch for this case.
+        // A method is qualified by its owning class name.
         if ($node instanceof ClassMethod) {
             $parent    = $node->getAttribute('parent');
             $className = $parent instanceof Stmt\Class_
                 || $parent instanceof Stmt\Trait_
                 || $parent instanceof Stmt\Enum_
-                // User view: missing data becomes a safe findings list default.
                 ? ($parent->name?->toString() ?? 'class@anonymous')
                 : null;
 
-            // User view: missing data becomes the expected findings list state.
+            // Qualify with the class name when known, otherwise use the bare method name.
             return $className !== null
                 ? sprintf('%s::%s()', $className, $node->name->toString())
                 : $node->name->toString() . '()';
@@ -288,7 +278,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     }
 
     /**
-     * Whether a function-like node has an executable body to measure.
+     * Reports whether a function-like node has a real body to measure (abstract/interface methods do not).
      *
      * Abstract methods, interface methods, and other bodyless signatures parse as
      * a {@see ClassMethod} with `stmts === null`: they declare a contract but
@@ -299,8 +289,6 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
      * A free {@see Function_} always carries a body, so this only ever filters
      * bodyless methods.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param ClassMethod|Function_ $node - Function-like node under inspection.
      *
      * @return bool - True when the node has a statement body the rule can measure.
@@ -308,22 +296,19 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     public static function hasExecutableBody(ClassMethod|Function_ $node): bool
     {
         // A null statement list marks a bodyless declaration (abstract/interface), which has no control flow to score.
-        // User view: missing data becomes the expected findings list state.
         return $node->stmts !== null;
     }
 
     /**
-     * Format threshold numbers without unnecessary decimal places.
+     * Formats a threshold number for the message, dropping a whole number's ".0" tail.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param int|float $number - Configured threshold to render; whole floats are shown without a trailing decimal.
      *
      * @return string - Human-readable threshold value.
      */
     private static function formatNumber(int|float $number): string
     {
-        // User view: choose the findings list branch for this case.
+        // A genuine fraction keeps its decimals; a whole value is shown without them.
         if (is_float($number) && floor($number) !== $number) {
             return (string) $number;
         }

@@ -14,7 +14,12 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\SourceTextRuleInterface;
 
 /**
- * Detects source text that appears to contain private key material.
+ * Flags source text that carries a PEM private-key header (`-----BEGIN ... PRIVATE KEY-----`), so the user
+ * can pull committed key material out of the repository and rotate it.
+ *
+ * A source-text rule: it scans the raw file rather than the AST, so keys in heredocs, comments, or fixtures
+ * are all caught. Only the header is reported - the key body is never stored in a finding. Warning
+ * severity, high confidence, since a PEM armor header is an unambiguous signal.
  */
 final readonly class PrivateKeyRule implements SourceTextRuleInterface
 {
@@ -24,11 +29,9 @@ final readonly class PrivateKeyRule implements SourceTextRuleInterface
     public const ID = 'sensitive-data.private-key';
 
     /**
-     * Describe the private key sensitive-data rule.
+     * Describes the private-key sensitive-data rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
-     * @return RuleDefinition - Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults (warning severity, high confidence).
      */
     public function definition(): RuleDefinition
     {
@@ -44,10 +47,8 @@ final readonly class PrivateKeyRule implements SourceTextRuleInterface
     }
 
     /**
-     * Find string literals that appear to contain private key material.
+     * Reports each PEM private-key header found in the raw source, with the key body redacted.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -55,16 +56,16 @@ final readonly class PrivateKeyRule implements SourceTextRuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        // User view: choose the findings list branch for this case.
         if (!str_contains($analysisUnit->source, '-----BEGIN ')) {
             // Without a PEM armor prefix the key regex cannot match, so skip the scan entirely.
             return [];
         }
 
+        // Match every PEM private-key armor header, capturing each one's byte offset.
         preg_match_all('/-----BEGIN (?:RSA |DSA |EC |OPENSSH |PGP )?PRIVATE KEY-----/', $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
         $findings = [];
-        // User view: add each item that can appear in findings list.
+        // Report each private-key header the scan turned up.
         foreach ($matches[0] as $match) {
             [$header, $offset] = $match;
             $findings[]        = SecretScannerHelper::finding(

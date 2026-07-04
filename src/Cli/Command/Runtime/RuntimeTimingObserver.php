@@ -11,7 +11,7 @@ use GruffPhp\Rules\Shared\RuleRunnerObserver;
  *
  * Plugged into `RuleRegistry::analyse()` so that, when a run is measuring performance, each rule's
  * time is accumulated here. The tallied totals let the tool report which rules cost the most of a
- * scan's wall-clock, slowest first — the numbers behind any performance breakdown shown to the user.
+ * scan's wall-clock, slowest first - the numbers behind any performance breakdown shown to the user.
  */
 final class RuntimeTimingObserver implements RuleRunnerObserver
 {
@@ -38,7 +38,7 @@ final class RuntimeTimingObserver implements RuleRunnerObserver
     }
 
     /**
-     * Produces the final per-rule timing table, slowest first — the order the user reads it in.
+     * Produces the final per-rule timing table, slowest first - the order the user reads it in.
      *
      * @return list<array{ruleId: string, totalNs: int, invocations: int}> - Ordered by descending total time.
      */

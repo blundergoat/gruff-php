@@ -19,10 +19,8 @@ final class ComposerManifest
     public const FILENAME = 'composer.json';
 
     /**
-     * Decide whether a display path refers to a Composer manifest.
+     * Reports whether a display path refers to a Composer manifest.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param string $displayPath - File display path, as reported by the source file.
      *
      * @return bool - True when the path's basename is exactly `composer.json`.
@@ -38,10 +36,8 @@ final class ComposerManifest
     }
 
     /**
-     * Decode manifest JSON into an associative array, tolerating malformed input.
+     * Decodes manifest JSON into an associative array, tolerating malformed input.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param string $source - Raw manifest contents.
      *
      * @return array<string, mixed>|null - Decoded top-level object, or null when the source is not a JSON object.
@@ -55,7 +51,6 @@ final class ComposerManifest
             return null;
         }
 
-        // User view: choose the findings list branch for this case.
         if (!is_array($decoded)) {
             // Valid JSON decoding to a scalar or null is not a manifest object; callers skip it like a parse failure.
             return null;
@@ -67,13 +62,11 @@ final class ComposerManifest
     }
 
     /**
-     * Resolve the 1-based line number of the first occurrence of a token.
+     * Resolves the 1-based line number of the first occurrence of a token.
      *
      * Used to anchor a finding near the offending key without embedding any
      * value in the finding payload.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param string $source - Raw manifest contents.
      * @param string $needle - Token to locate (for example a quoted package name).
      *
@@ -81,15 +74,12 @@ final class ComposerManifest
      */
     public static function lineOf(string $source, string $needle): int
     {
-        // User view: choose the findings list branch for this case.
-        // User view: an empty value becomes a clear findings list fallback.
         if ($needle === '') {
             // An empty needle can never anchor a finding precisely, so fall back to the top of the file.
             return 1;
         }
 
         $position = strpos($source, $needle);
-        // User view: choose the findings list branch for this case.
         if ($position === false) {
             // Token absent (e.g. the key was renamed since decode); anchor the finding at line 1 rather than guess.
             return 1;

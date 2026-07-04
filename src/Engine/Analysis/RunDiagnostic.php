@@ -5,20 +5,24 @@ declare(strict_types=1);
 namespace GruffPhp\Engine\Analysis;
 
 /**
- * Represents a diagnostic emitted while preparing or parsing an analysis run.
+ * A non-finding note from a run - something that went wrong or is worth telling the user, but is not a
+ * code-quality finding.
+ *
+ * Not everything gruff needs to report is a rule violation: a file that would not parse, a missing
+ * Infection binary, a misused flag. These are captured as run diagnostics so the reporters can show
+ * them alongside the findings, each tagged with a type and pointed at the relevant file, line, or input
+ * path when there is one.
  */
 final readonly class RunDiagnostic
 {
     /**
-     * Capture a non-finding diagnostic emitted during a gruff-php run.
+     * Captures one non-finding diagnostic - its category, message, and whatever location context exists.
      *
-      * User flow: Moves analysis state toward the output users review.
-      *
-     * @param string      $type - Diagnostic category used by report serializers.
-     * @param string      $message - Human-readable diagnostic detail.
-     * @param string|null $filePath - Source file related to the diagnostic, when available.
-     * @param int|null    $line - Source line related to the diagnostic, when available.
-     * @param string|null $path - Input path related to the diagnostic, when no parsed file exists.
+     * @param string      $type - Diagnostic category the report serializers switch on (for example 'parse-error' or 'usage-error').
+     * @param string      $message - Human-readable detail shown to the user.
+     * @param string|null $filePath - Source file the diagnostic relates to; null when it is not tied to a parsed file.
+     * @param int|null    $line - Source line the diagnostic relates to; null when no specific line applies.
+     * @param string|null $path - Input path the diagnostic relates to when no parsed file exists; null when not applicable.
      */
     public function __construct(
         public string  $type,
@@ -30,12 +34,11 @@ final readonly class RunDiagnostic
     }
 
     /**
-     * Serialize this value object into the array shape used by reports.
+     * Flattens the diagnostic into the JSON shape reports emit, so an editor or CI sees the same note a
+     * person reads in the terminal.
      *
-      * User flow: Moves analysis state toward the output users review.
-      *
      * @return array{type: string, message: string, file: string|null, line: int|null, path: string|null} - report-ready snapshot of this diagnostic;
-     *                     the "file" key holds the source path (null when none) and "line"/"path" are null when not applicable
+     *                     the "file" key holds the source path (null when none) and "line"/"path" are null when not applicable.
      */
     public function toArray(): array
     {

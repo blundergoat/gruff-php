@@ -19,7 +19,12 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 
 /**
- * Detects PHPDoc blocks that list tags without descriptive intent.
+ * Flags a docblock that lists only bare param/return tags with no summary and no tag descriptions, so the
+ * user turns box-ticking documentation into something that states intent.
+ *
+ * Runs per file over documented function-likes. A docblock fires only when every line is a tag AND every
+ * tag is a bare param/return with no prose after its type. Advisory, medium confidence - a tags-only block
+ * can be deliberate on a trivial unit.
  */
 final readonly class BarePhpdocTagsRule implements RuleInterface
 {
@@ -29,11 +34,9 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
     public const ID = 'docs.bare-phpdoc-tags';
 
     /**
-     * Describe the bare PHPDoc tag rule.
+     * Describes the bare-PHPDoc-tag rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
-     * @return RuleDefinition - Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults (advisory severity, medium confidence).
      */
     public function definition(): RuleDefinition
     {
@@ -50,10 +53,8 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
     }
 
     /**
-     * Find docblocks that only list parameter or return tags.
+     * Reports each docblock that only lists bare parameter or return tags.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -66,33 +67,29 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
 
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Check every documented method and function in the file.
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
             $docComment = $node->getDocComment();
 
-            // User view: choose the findings list branch for this case.
-            // User view: missing data becomes the expected findings list state.
+            // An undocumented callable has no docblock to weigh.
             if ($docComment === null) {
                 continue;
             }
 
             $docText  = $docComment->getText();
-            // User view: missing data becomes a safe findings list default.
             $stripped = preg_replace('/\/\*\*|\*\/|\*/', '', $docText) ?? $docText;
             $stripped = trim($stripped);
 
             $lines = array_filter(
                 array_map('trim', explode("\n", $stripped)),
-                // User view: an empty value becomes a clear findings list fallback.
                 static fn(string $line): bool => $line !== '',
             );
 
             $hasNonTagContent = false;
 
-            // User view: add each item that can appear in findings list.
+            // Look for any line that is not a tag.
             foreach ($lines as $line) {
-                // User view: choose the findings list branch for this case.
                 if (!str_starts_with($line, '@')) {
                     $hasNonTagContent = true;
 
@@ -100,22 +97,20 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
                 }
             }
 
-            // User view: choose the findings list branch for this case.
+            // A docblock that carries real prose already states intent.
             if ($hasNonTagContent) {
                 continue;
             }
 
-            // User view: choose the findings list branch for this case.
-            // User view: an empty value becomes a clear findings list fallback.
+            // An empty docblock is nothing this rule reports.
             if ($lines === []) {
                 continue;
             }
 
             $hasOnlyBareTags = true;
 
-            // User view: add each item that can appear in findings list.
+            // Every remaining line is a tag; check each one is a bare tag.
             foreach ($lines as $line) {
-                // User view: choose the findings list branch for this case.
                 if ($this->isBareParamOrReturnTag($line)) {
                     continue;
                 }
@@ -125,7 +120,7 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
                 break;
             }
 
-            // User view: choose the findings list branch for this case.
+            // A described tag means the block is not bare, so leave it alone.
             if (!$hasOnlyBareTags) {
                 continue;
             }
@@ -150,10 +145,8 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
     }
 
     /**
-     * Check whether one PHPDoc tag has a type but no description.
+     * Reports whether one PHPDoc tag has a type but no description.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param string $line - Single trimmed docblock line, already stripped of comment markers, to classify.
      *
      * @return bool - True when the tag is a bare parameter or return tag.
@@ -161,13 +154,11 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
     private function isBareParamOrReturnTag(string $line): bool
     {
         // Match @param tags that end at the variable name with no descriptive prose.
-        // User view: choose the findings list branch for this case.
         if (preg_match('/^@param\s+\S+(?:\s+\S+)*\s+\$\w+\s*$/', $line) === 1) {
             // A @param stopping at the variable name carries no description, so it is bare.
             return true;
         }
 
-        // User view: choose the findings list branch for this case.
         if (!str_starts_with($line, '@return ')) {
             // Lines that are neither a bare @param nor a @return cannot be a bare return tag.
             return false;

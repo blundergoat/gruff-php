@@ -17,7 +17,12 @@ use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Node\Stmt;
 
 /**
- * Detects switch statements that can be expressed more directly as match expressions.
+ * Flags a `switch` whose branches all return a value directly, since a PHP 8 `match` expression says the
+ * same thing more compactly, so the user can consider tightening it up.
+ *
+ * Runs per file, but only on targets already on PHP 8.0+. It reports a switch of three or more cases when
+ * every case is a single `return`. Advisory only: `match` uses strict comparison and is exhaustive, so
+ * the rewrite is not always equivalent - gruff-php suggests, it never gates or rewrites.
  */
 final readonly class MatchExpressionCandidateRule implements RuleInterface
 {
@@ -27,11 +32,9 @@ final readonly class MatchExpressionCandidateRule implements RuleInterface
     public const ID = 'modernisation.match-expression-candidate';
 
     /**
-     * Describe the match-expression candidate rule.
+     * Describes the match-expression candidate rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
-     * @return RuleDefinition - Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults (advisory severity, medium confidence).
      */
     public function definition(): RuleDefinition
     {
@@ -47,18 +50,15 @@ final readonly class MatchExpressionCandidateRule implements RuleInterface
     }
 
     /**
-     * Find switch statements whose direct-return branches may become match expressions.
+     * Reports each switch whose direct-return branches could collapse into a PHP 8 match expression.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext - Rule context supplying the target PHP version.
      *
-     * @return list<Finding> - Findings for PHP 8 match-expression candidates.
+     * @return list<Finding> - One finding per match-expression candidate; empty on pre-PHP-8 targets or when no switch qualifies.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        // User view: choose the findings list branch for this case.
         if (!ModernisationNodeHelper::supportsPhp($ruleContext, 8.0)) {
             // The match expression needs PHP 8.0, so stay silent on targets that cannot use it.
             return [];
@@ -66,9 +66,9 @@ final readonly class MatchExpressionCandidateRule implements RuleInterface
 
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Scan every switch statement in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Switch_::class) as $switch) {
-            // User view: choose the findings list branch for this case.
+            // A match is a clean fit only for a switch of three or more cases that each return directly.
             if (count($switch->cases) < 3 || !$this->allCasesReturnDirectly($switch)) {
                 continue;
             }
@@ -94,19 +94,16 @@ final readonly class MatchExpressionCandidateRule implements RuleInterface
     }
 
     /**
-     * Check whether every switch case consists of exactly one return statement.
+     * Reports whether every switch case is exactly one return, so the body maps cleanly onto a match.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Stmt\Switch_ $switch - Switch under inspection; only an all-direct-return body maps cleanly onto a match.
      *
-     * @return bool - True when all cases return directly.
+     * @return bool - True when all cases return directly, false when any case falls through or does more work.
      */
     private function allCasesReturnDirectly(Stmt\Switch_ $switch): bool
     {
-        // User view: add each item that can appear in findings list.
+        // Check each case in the switch.
         foreach ($switch->cases as $case) {
-            // User view: choose the findings list branch for this case.
             if (count($case->stmts) !== 1 || !$case->stmts[0] instanceof Stmt\Return_) {
                 // Any case with fall-through or extra statements would not survive the rewrite, so reject.
                 return false;

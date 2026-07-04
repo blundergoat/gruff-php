@@ -19,7 +19,11 @@ use PhpParser\Node\Stmt\ClassLike;
 use PhpParser\Node\Stmt\Namespace_;
 
 /**
- * Detects files that lack file-level or single-type structural documentation.
+ * Flags a file with no top-of-file docblock and no single documented type to orient a reader, so the user
+ * gives every file a one-line statement of what it is for.
+ *
+ * Runs per file. It is satisfied by either a docblock on the first top-level statement or a lone class-like
+ * that documents itself. Namespaces are unwrapped first. Advisory, medium confidence.
  */
 final readonly class MissingFilePhpdocRule implements RuleInterface
 {
@@ -29,10 +33,8 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
     public const ID = 'docs.missing-file-phpdoc';
 
     /**
-     * Describe the missing file PHPDoc rule.
+     * Describes the missing-file-PHPDoc rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - this rule's identity, pillar, tier, and default severity/confidence used by the registry
      */
     public function definition(): RuleDefinition
@@ -48,10 +50,8 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
     }
 
     /**
-     * Find files that lack a file-level docblock or a documented sole class-like declaration.
+     * Reports a file that lacks a file-level docblock or a documented sole class-like declaration.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -59,8 +59,6 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        // User view: choose the findings list branch for this case.
-        // User view: an empty value becomes a clear findings list fallback.
         if ($analysisUnit->statements === []) {
             // An empty file carries no declaration to demand documentation of.
             return [];
@@ -68,20 +66,16 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
 
         $topLevel = $this->topLevelStatements($analysisUnit);
 
-        // User view: choose the findings list branch for this case.
-        // User view: an empty value becomes a clear findings list fallback.
         if ($topLevel === []) {
             // Nothing survives namespace unwrapping; no top-level statement to anchor a finding to.
             return [];
         }
 
-        // User view: choose the findings list branch for this case.
         if ($this->isSingleDocumentedClassLikeFile($topLevel)) {
             // A lone documented class-like already orients the reader; the file docblock is redundant.
             return [];
         }
 
-        // User view: choose the findings list branch for this case.
         if ($this->hasFirstStatementDoc($topLevel[0])) {
             // A docblock on the first statement satisfies the file-level documentation requirement.
             return [];
@@ -91,10 +85,8 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
     }
 
     /**
-     * List top-level statements that count toward file documentation.
+     * Lists the top-level statements that count toward file documentation.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit whose namespaced statements are flattened.
      *
      * @return list<Node\Stmt> - statements hoisted out of any namespace wrapper, in source order; empty when the file declares none
@@ -103,11 +95,11 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
     {
         $effective = [];
 
-        // User view: add each item that can appear in findings list.
+        // Flatten each namespace so its inner statements count as top-level.
         foreach ($analysisUnit->statements as $statement) {
-            // User view: choose the findings list branch for this case.
+            // A namespace wrapper contributes its own inner statements.
             if ($statement instanceof Namespace_) {
-                // User view: add each item that can appear in findings list.
+                // Hoist each statement out of the namespace.
                 foreach ($statement->stmts as $inner) {
                     $effective[] = $inner;
                 }
@@ -121,8 +113,8 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
     }
 
     /**
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
+     * Reports whether the file declares exactly one class-like that documents itself.
+     *
      * @param list<Node\Stmt> $statements - Effective top-level statements after namespace wrappers are flattened.
      *
      * @return bool - true only when the file declares exactly one class-like and it carries its own docblock; false otherwise
@@ -134,30 +126,25 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
                                        static fn(Node\Stmt $stmt): bool => $stmt instanceof ClassLike,
                                    ));
 
-        // User view: choose the findings list branch for this case.
         if (count($classLikes) !== 1) {
             // Zero or multiple types means file-level docs are still required.
             return false;
         }
 
-        // User view: missing data becomes the expected findings list state.
         return $classLikes[0]->getDocComment() !== null;
     }
 
     /**
-     * Check whether the first effective statement carries a docblock comment.
+     * Reports whether the first effective statement carries a docblock comment.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node\Stmt $statement - First top-level statement whose attached comments are scanned.
      *
      * @return bool - true when a structured docblock is attached; false when only line or block comments are present
      */
     private function hasFirstStatementDoc(Node\Stmt $statement): bool
     {
-        // User view: add each item that can appear in findings list.
+        // Scan the statement's attached comments for a docblock.
         foreach ($statement->getComments() as $comment) {
-            // User view: choose the findings list branch for this case.
             if ($comment instanceof Doc) {
                 // A structured docblock counts as file-level documentation.
                 return true;
@@ -168,10 +155,8 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
     }
 
     /**
-     * Build finding for the documentation rule.
+     * Builds the finding for a file missing top-level documentation.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit supplying the display path reported in the finding.
      * @param Node\Stmt    $first - First top-level statement, used to record the offending statement kind.
      *
@@ -201,10 +186,8 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
     }
 
     /**
-     * Return a compact statement kind for finding metadata.
+     * Returns a compact statement-kind label for finding metadata.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node\Stmt $node - Statement whose class name is reduced to a short kind label.
      *
      * @return string - short parser node name, lower-cased with the trailing underscore stripped (e.g. "class", "function"), for finding metadata

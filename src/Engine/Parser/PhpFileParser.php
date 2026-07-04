@@ -14,7 +14,14 @@ use PhpParser\ParserFactory;
 use Throwable;
 
 /**
- * Converts source files into parser statements, tokens, and diagnostics.
+ * Turns a source file on disk into the parsed form rules analyse - statements, comment tokens, and any
+ * parse diagnostics.
+ *
+ * Every PHP file gruff checks passes through here first. It reads the file, parses it with
+ * nikic/php-parser, resolves names and links parent nodes so structural rules can navigate the tree,
+ * and keeps only the comment tokens rules actually read (dropping the rest is the big memory saving on
+ * large projects). Crucially, a file that cannot be read or will not parse becomes a diagnostic on an
+ * empty unit rather than an exception, so one broken file never aborts the whole run.
  */
 final readonly class PhpFileParser
 {
@@ -24,32 +31,29 @@ final readonly class PhpFileParser
     private Parser $parser;
 
     /**
-     * Create a parser using the supplied nikic/php-parser instance or default.
+     * Builds the parser, taking a test-supplied instance or falling back to the newest supported version.
      *
-      * User flow: Prepares source files so findings point at the right code.
-      *
      * @param Parser|null $parser - Parser override used by tests, or null for the default parser.
      */
     public function __construct(?Parser $parser = null)
     {
-        // User view: missing data becomes a safe source analysis default.
+        // Fall back to a parser for the newest supported PHP version unless a test supplied its own.
         $this->parser = $parser ?? (new ParserFactory())->createForNewestSupportedVersion();
     }
 
     /**
-     * Parse a source file into statements, tokens, and diagnostics for rules.
+     * Parses one file into an analysis unit for rules, degrading an unreadable or unparseable file into
+     * a diagnostic rather than letting it crash the run.
      *
-      * User flow: Prepares source files so findings point at the right code.
-      *
      * @param SourceFile $file - File descriptor to parse.
      *
-     * @return AnalysisUnit - Parsed source representation consumed by rules.
+     * @return AnalysisUnit - The parsed representation rules consume; an empty unit carrying a ParseDiagnostic when the file could not be read or parsed.
      */
     public function parse(SourceFile $file): AnalysisUnit
     {
         $source = file_get_contents($file->absolutePath);
 
-        // User view: choose the source analysis branch for this case.
+        // The file could not be read, so hand back an empty unit carrying the error.
         if ($source === false) {
             // Unreadable file is surfaced as a diagnostic, not an exception, so one bad file
             // does not abort the whole run; downstream rules see an empty unit carrying the error.
@@ -62,14 +66,14 @@ final readonly class PhpFileParser
             );
         }
 
-        // User view: choose the source analysis branch for this case.
+        // A non-PHP file keeps its text for text-scanning rules but skips the AST and token work.
         if (!$file->isPhp()) {
             // Non-PHP sources keep their text for raw-content rules but skip AST/token work.
             return new AnalysisUnit($file, $source, [], [], []);
         }
 
         try {
-            // User view: missing data becomes a safe source analysis default.
+            // Parse the file; a null result (an empty file) becomes an empty statement list.
             $statements = array_values($this->parser->parse($source) ?? []);
 
             $nodeTraverser = new NodeTraverser();
@@ -82,9 +86,9 @@ final readonly class PhpFileParser
             // scanner comment ranges). Keeping the full token stream is the dominant per-file
             // memory cost at scale (~4-5GB peak on large PHP projects).
             $commentTokens = [];
-            // User view: add each item that can appear in source analysis.
+            // Keep only the comment tokens - the rest of the stream is the memory cost we do not need.
             foreach ($this->parser->getTokens() as $token) {
-                // User view: choose the source analysis branch for this case.
+                // Comment and doc-comment tokens are the ones rules read (TODOs, commented-out code, secret ranges).
                 if ($token->id === T_COMMENT || $token->id === T_DOC_COMMENT) {
                     $commentTokens[] = $token;
                 }

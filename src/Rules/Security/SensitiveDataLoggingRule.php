@@ -19,7 +19,11 @@ use PhpParser\Node\Expr;
 use PhpParser\Node\Scalar;
 
 /**
- * Detects logging or dumping of request-controlled or sensitive-looking data.
+ * Flags a log or dump call whose argument carries request-controlled or secret-looking data - `error_log`,
+ * `var_dump`, a PSR-3 `$logger->error(...)` - so a token, password, or payload does not end up in the logs.
+ *
+ * Runs per file over the modelled log functions and logger methods, skipping purely static messages.
+ * Warning, medium confidence - taint and secret detection are heuristic.
  */
 final class SensitiveDataLoggingRule implements RuleInterface
 {
@@ -29,20 +33,22 @@ final class SensitiveDataLoggingRule implements RuleInterface
     public const ID = 'security.sensitive-data-logging';
 
     /**
+     * Global functions that write or dump a value to a log or the output.
+     *
      * @var list<string>
      */
     private const LOG_FUNCTIONS = ['error_log', 'print_r', 'var_dump'];
 
     /**
+     * PSR-3 logger method names whose first argument is the logged message.
+     *
      * @var list<string>
      */
     private const LOG_METHODS = ['alert', 'critical', 'debug', 'emergency', 'error', 'info', 'log', 'notice', 'warning'];
 
     /**
-     * Describe the sensitive data logging rule.
+     * Describes the sensitive-data-logging rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - identity, pillar, tier, and default severity/confidence the registry
      *   uses to list and configure this rule
      */
@@ -59,10 +65,8 @@ final class SensitiveDataLoggingRule implements RuleInterface
     }
 
     /**
-     * Find log sinks that include request or secret-like values.
+     * Reports each log sink that includes request-controlled or secret-looking values.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -73,27 +77,26 @@ final class SensitiveDataLoggingRule implements RuleInterface
     {
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Check global log and dump function calls.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
             $name = SecurityNodeHelper::globalFunctionName($call);
-            // User view: choose the findings list branch for this case.
-            // User view: missing data becomes the expected findings list state.
+            // Only the modelled log/dump functions are sinks.
             if ($name === null || !in_array($name, self::LOG_FUNCTIONS, true)) {
                 continue;
             }
 
-            // User view: choose the findings list branch for this case.
+            // Flag the call when an argument carries request or secret data.
             if ($this->hasSensitiveArgument($call->args)) {
                 $findings[] = $this->finding($analysisUnit, $call, $name);
             }
         }
 
-        // User view: add each item that can appear in findings list.
+        // Check logger method calls such as $logger->error(...).
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\MethodCall::class) as $call) {
             array_push($findings, ...$this->loggerCallFindings($analysisUnit, $call));
         }
 
-        // User view: add each item that can appear in findings list.
+        // Check static logger calls such as Log::error(...).
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\StaticCall::class) as $call) {
             array_push($findings, ...$this->loggerCallFindings($analysisUnit, $call));
         }
@@ -102,10 +105,8 @@ final class SensitiveDataLoggingRule implements RuleInterface
     }
 
     /**
-     * Build logger call findings for the security rule.
+     * Builds the logger-call findings for one method or static call.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit                    $analysisUnit - Unit being scanned; supplies the display path for findings.
      * @param Expr\MethodCall|Expr\StaticCall $call - Possible logger call whose name and arguments are checked.
      *
@@ -114,14 +115,11 @@ final class SensitiveDataLoggingRule implements RuleInterface
     private function loggerCallFindings(AnalysisUnit $analysisUnit, Expr\MethodCall|Expr\StaticCall $call): array
     {
         $method = SecurityNodeHelper::methodName($call);
-        // User view: choose the findings list branch for this case.
-        // User view: missing data becomes the expected findings list state.
         if ($method === null || !in_array($method, self::LOG_METHODS, true)) {
             // The callee is not one of the modelled logger methods, so it cannot be a sink we track.
             return [];
         }
 
-        // User view: choose the findings list branch for this case.
         if (!$this->hasSensitiveArgument($call->args)) {
             // Every argument is static or non-sensitive, so nothing request-controlled can leak here.
             return [];
@@ -131,8 +129,8 @@ final class SensitiveDataLoggingRule implements RuleInterface
     }
 
     /**
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
+     * Reports whether any argument carries request-tainted or secret-bearing data.
+     *
      * @param array<int|string, Node\Arg|Node\VariadicPlaceholder> $args - Logger-call arguments to scan for request-tainted or secret-bearing values.
      *
      * @return bool - true on the first argument carrying request-tainted or secret-bearing data;
@@ -140,19 +138,18 @@ final class SensitiveDataLoggingRule implements RuleInterface
      */
     private function hasSensitiveArgument(array $args): bool
     {
-        // User view: add each item that can appear in findings list.
+        // Weigh each argument to the log call.
         foreach ($args as $arg) {
-            // User view: choose the findings list branch for this case.
+            // A spread placeholder is not a plain argument.
             if (!$arg instanceof Node\Arg) {
                 continue;
             }
 
-            // User view: choose the findings list branch for this case.
+            // A purely static message leaks nothing.
             if ($this->isStaticLogArgument($arg->value)) {
                 continue;
             }
 
-            // User view: choose the findings list branch for this case.
             if (SecurityNodeHelper::containsUserInput($arg->value) || SecurityNodeHelper::containsSensitiveReference($arg->value)) {
                 // One request-tainted or secret-bearing argument is enough to flag the log call.
                 return true;
@@ -164,10 +161,8 @@ final class SensitiveDataLoggingRule implements RuleInterface
     }
 
     /**
-     * Detect logger arguments that contain only static message/context values.
+     * Reports whether a logger argument resolves to only static, compile-time values.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Expr $expr - Argument expression to classify; recursed into for arrays and concatenations.
      *
      * @return bool - true when the argument resolves to only compile-time constant message/context
@@ -175,19 +170,16 @@ final class SensitiveDataLoggingRule implements RuleInterface
      */
     private function isStaticLogArgument(Expr $expr): bool
     {
-        // User view: choose the findings list branch for this case.
         if ($expr instanceof Scalar) {
             // A literal value carries no runtime data, so it can never leak request input.
             return true;
         }
 
-        // User view: choose the findings list branch for this case.
         if ($expr instanceof Expr\ClassConstFetch) {
             // Class constants are compile-time fixed, so they are safe message tokens.
             return true;
         }
 
-        // User view: choose the findings list branch for this case.
         if ($expr instanceof Expr\ConstFetch) {
             $name = strtolower($expr->name->toString());
 
@@ -195,11 +187,10 @@ final class SensitiveDataLoggingRule implements RuleInterface
             return in_array($name, ['false', 'null', 'true'], true);
         }
 
-        // User view: choose the findings list branch for this case.
+        // An array is static only when every element is static.
         if ($expr instanceof Expr\Array_) {
-            // User view: add each item that can appear in findings list.
+            // Weigh each element of the array.
             foreach ($expr->items as $item) {
-                // User view: choose the findings list branch for this case.
                 if ($item->unpack || !$this->isStaticLogArgument($item->value)) {
                     // A spread or any non-static element can carry runtime data, so the whole array is unsafe.
                     return false;
@@ -210,7 +201,6 @@ final class SensitiveDataLoggingRule implements RuleInterface
             return true;
         }
 
-        // User view: choose the findings list branch for this case.
         if ($expr instanceof Expr\BinaryOp\Concat) {
             // A concatenation is static only when both operands are; either dynamic side taints the result.
             return $this->isStaticLogArgument($expr->left) && $this->isStaticLogArgument($expr->right);
@@ -221,10 +211,8 @@ final class SensitiveDataLoggingRule implements RuleInterface
     }
 
     /**
-     * Build the sensitive data logging finding.
+     * Builds the sensitive-data-logging finding.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Unit being scanned; supplies the display path recorded on the finding.
      * @param Node         $node - Log call flagged as leaking; its start line locates the finding.
      * @param string       $sink - Name of the log function or method, surfaced in the message and metadata.

@@ -23,7 +23,12 @@ use PhpParser\Node\Stmt\Property;
 use PhpParser\Node\Stmt\Trait_;
 
 /**
- * Detects types with enough properties to suggest broad state ownership.
+ * Flags a class, trait, or enum that owns so many properties its state has likely sprawled beyond one
+ * clear responsibility - though an immutable data carrier gets a gentler advisory instead of an error.
+ *
+ * Runs per file over every class-like scope, counting declared properties plus promoted constructor
+ * params against the threshold (default error above 15). A final readonly class whose methods only
+ * expose state is treated as a data carrier and softened to advisory.
  */
 final readonly class PropertyCountRule implements RuleInterface
 {
@@ -33,10 +38,8 @@ final readonly class PropertyCountRule implements RuleInterface
     public const ID = 'size.property-count';
 
     /**
-     * Describe the property-count rule.
+     * Describes the property-count rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - Rule metadata and thresholds.
      */
     public function definition(): RuleDefinition
@@ -53,10 +56,8 @@ final readonly class PropertyCountRule implements RuleInterface
     }
 
     /**
-     * Find class-like scopes whose declared property count exceeds thresholds.
+     * Reports each class-like scope whose property count exceeds the configured threshold.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -71,14 +72,13 @@ final readonly class PropertyCountRule implements RuleInterface
 
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Check each class, trait, and enum in the file.
         foreach ($classLikes as $classLike) {
             /** @var Class_|Trait_|Enum_ $classLike Finder predicate restricts results to class-like declarations. */
             $propertyCount  = $this->countProperties($classLike);
             $thresholdMatch = $settings->highValueThresholdMatch($propertyCount);
 
-            // User view: choose the findings list branch for this case.
-            // User view: missing data becomes the expected findings list state.
+            // A count within the threshold is fine, so skip it.
             if ($thresholdMatch === null) {
                 continue;
             }
@@ -132,8 +132,8 @@ final readonly class PropertyCountRule implements RuleInterface
     }
 
     /**
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
+     * Counts a class-like's owned state: declared properties plus promoted constructor parameters.
+     *
      * @param Class_|Trait_|Enum_ $classLike - Class-like declaration whose properties and promoted constructor params are counted.
      *
      * @return int - Declared and promoted property count.
@@ -142,18 +142,17 @@ final readonly class PropertyCountRule implements RuleInterface
     {
         $count = 0;
 
-        // User view: add each item that can appear in findings list.
+        // Add up declared properties and promoted constructor params.
         foreach ($classLike->stmts as $stmt) {
-            // User view: choose the findings list branch for this case.
+            // A property declaration can define several names at once.
             if ($stmt instanceof Property) {
                 $count += count($stmt->props);
             }
 
-            // User view: choose the findings list branch for this case.
+            // The constructor may promote parameters into properties.
             if ($stmt instanceof ClassMethod && $stmt->name->toString() === '__construct') {
-                // User view: add each item that can appear in findings list.
                 foreach ($stmt->params as $param) {
-                    // User view: choose the findings list branch for this case.
+                    // A non-zero flag set means the param is promoted, so it owns state too.
                     if ($param->flags !== 0) {
                         $count++;
                     }
@@ -166,24 +165,22 @@ final readonly class PropertyCountRule implements RuleInterface
     }
 
     /**
-     * Detect immutable data carriers whose property count is lower risk than broad mutable state.
+     * Reports whether a class is a final readonly data carrier, which earns the softer advisory severity.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Class_|Trait_|Enum_ $classLike - Class-like declaration being classified.
      *
      * @return bool - True when the class is a final readonly data carrier.
      */
     private function isReadonlyDataCarrier(Class_|Trait_|Enum_ $classLike): bool
     {
-        // User view: choose the findings list branch for this case.
+        // Only a final readonly class can be a pure data carrier.
         if (!$classLike instanceof Class_ || !$classLike->isFinal() || !$classLike->isReadonly()) {
             return false;
         }
 
-        // User view: add each item that can appear in findings list.
+        // Check every method other than the constructor.
         foreach ($classLike->getMethods() as $method) {
-            // User view: choose the findings list branch for this case.
+            // The constructor sets state; it is not behaviour.
             if ($method->name->toString() === '__construct') {
                 continue;
             }
@@ -191,7 +188,6 @@ final readonly class PropertyCountRule implements RuleInterface
             // A data carrier answers questions about its own state (accessors, `with*()` copies, `equals()`),
             // which all return a value; a method that returns nothing or is untyped is a command, so the class
             // is a behaviour-carrying service whose property count keeps its configured severity.
-            // User view: choose the findings list branch for this case.
             if ($this->isBehaviourMethod($method)) {
                 return false;
             }
@@ -201,10 +197,8 @@ final readonly class PropertyCountRule implements RuleInterface
     }
 
     /**
-     * Decide whether a non-constructor method performs behaviour rather than expose state.
+     * Reports whether a method performs behaviour (returns void/never or is untyped) rather than expose state.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param ClassMethod $method - Parameterless method to classify.
      *
      * @return bool - True when the method returns nothing or is untyped, so it acts rather than accesses state.
@@ -213,11 +207,9 @@ final readonly class PropertyCountRule implements RuleInterface
     {
         $returnType = $method->returnType;
 
-        // User view: choose the findings list branch for this case.
-        // User view: missing data becomes the expected findings list state.
+        // No declared return type: we cannot confirm the method only exposes state, so treat it as
+        // behaviour and keep the configured severity rather than the data-carrier downgrade.
         if ($returnType === null) {
-            // No declared return type: we cannot confirm the method only exposes state, so treat it as
-            // behaviour and keep the configured severity rather than the data-carrier downgrade.
             return true;
         }
 
@@ -226,34 +218,26 @@ final readonly class PropertyCountRule implements RuleInterface
     }
 
     /**
-     * Build a display symbol for a class-like node.
+     * Builds a display name for a class-like node, synthesising a label when it is unnamed.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node $node - Class, trait, or enum declaration to render as a finding symbol.
      *
      * @return string - Class-like display symbol.
      */
     private function resolveSymbol(Node $node): string
     {
-        // User view: choose the findings list branch for this case.
         if ($node instanceof Class_) {
             // Named class shows its name; an anonymous class falls back to its start line.
-            // User view: missing data becomes a safe findings list default.
             return $node->name?->toString() ?? sprintf('class@anonymous:%d', $node->getStartLine());
         }
 
-        // User view: choose the findings list branch for this case.
         if ($node instanceof Trait_) {
             // Traits are always named, but guard the nullable name and anchor to the line if absent.
-            // User view: missing data becomes a safe findings list default.
             return $node->name?->toString() ?? sprintf('trait@%d', $node->getStartLine());
         }
 
-        // User view: choose the findings list branch for this case.
         if ($node instanceof Enum_) {
             // Enums are always named, but guard the nullable name and anchor to the line if absent.
-            // User view: missing data becomes a safe findings list default.
             return $node->name?->toString() ?? sprintf('enum@%d', $node->getStartLine());
         }
 
@@ -262,17 +246,15 @@ final readonly class PropertyCountRule implements RuleInterface
     }
 
     /**
-     * Format threshold numbers without unnecessary decimal places.
+     * Formats a threshold number for the message, dropping a whole number's ".0" tail.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param int|float $number - Threshold value to render; whole values are shown without a trailing decimal.
      *
      * @return string - Human-readable threshold value with fractional values preserved and whole values stripped.
      */
     private function formatNumber(int|float $number): string
     {
-        // User view: choose the findings list branch for this case.
+        // A genuine fraction keeps its decimals; a whole value is shown without them.
         if (is_float($number) && floor($number) !== $number) {
             return (string) $number;
         }

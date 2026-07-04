@@ -23,7 +23,12 @@ use PhpParser\Node\Scalar;
 use PhpParser\NodeFinder;
 
 /**
- * Detects SQL-like strings assembled through concatenation.
+ * Flags a SQL string assembled by concatenating or interpolating dynamic data into a query - the classic
+ * SQL-injection shape - so the user moves the value to a bound parameter before it reaches the database.
+ *
+ * Runs per file over query methods (`query`, `exec`, `raw`, `select`) whose first argument splices in a
+ * non-allowlisted dynamic part and whose literal fragments contain a SQL keyword. `prepare()` templates and
+ * allowlisted identifier interpolation (`$wpdb->prefix`) are recognised. Warning, medium confidence.
  */
 final class SqlConcatenationRule implements RuleInterface
 {
@@ -33,6 +38,8 @@ final class SqlConcatenationRule implements RuleInterface
     public const ID = 'security.sql-concatenation';
 
     /**
+     * Method names that run a raw SQL string as their first argument.
+     *
      * @var list<string>
      */
     private const QUERY_METHODS = ['exec', 'query', 'raw', 'select'];
@@ -43,10 +50,8 @@ final class SqlConcatenationRule implements RuleInterface
     private const SQL_KEYWORD_PATTERN = '/\b(?:select|insert|update|delete|alter|drop|create|show|from|where)\b/i';
 
     /**
-     * Describe the SQL concatenation rule.
+     * Describes the SQL-concatenation rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -82,10 +87,8 @@ final class SqlConcatenationRule implements RuleInterface
     }
 
     /**
-     * Find query method calls whose first argument splices unsafe dynamic parts into SQL.
+     * Reports each query call whose SQL argument splices in an unsafe dynamic part.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -97,12 +100,11 @@ final class SqlConcatenationRule implements RuleInterface
         $findings      = [];
 
         $calls = NodeIndex::nodesOfAny($analysisUnit, [Expr\MethodCall::class, Expr\StaticCall::class]);
-        // User view: add each item that can appear in findings list.
+        // Check every method and static call in the file.
         foreach ($calls as $call) {
             /** @var Expr\MethodCall|Expr\StaticCall $call NodeIndex query restricts these classes. */
             $firstArg = SecurityNodeHelper::argumentValue($call->args, 0);
-            // User view: choose the findings list branch for this case.
-            // User view: missing data becomes the expected findings list state.
+            // Flag a query method whose SQL argument splices in unsafe dynamic data.
             if ($firstArg !== null
                 && $call->name instanceof Identifier
                 && in_array(strtolower($call->name->toString()), self::QUERY_METHODS, true)
@@ -116,26 +118,24 @@ final class SqlConcatenationRule implements RuleInterface
     }
 
     /**
-     * Select the expression to inspect for a query call's first argument.
+     * Selects the expression to inspect for a query call's first argument.
      *
      * When the argument's root expression is a prepare() call the parameterisation already covers its
      * bound values, so inspection moves to the template argument - which still flags when it
      * interpolates anything beyond allowlisted parts. prepare() is never skipped wholesale.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Expr $firstArg - First argument of the query call.
      *
      * @return Expr - the prepare() template when the root is a prepare() call with one, otherwise the argument itself.
      */
     private function inspectionSubject(Expr $firstArg): Expr
     {
-        // User view: choose the findings list branch for this case.
+        // A prepare() call already binds its values, so inspect its template instead.
         if (($firstArg instanceof Expr\MethodCall || $firstArg instanceof Expr\StaticCall)
             && SecurityNodeHelper::methodName($firstArg) === 'prepare'
         ) {
             $template = SecurityNodeHelper::argumentValue($firstArg->args, 0);
-            // User view: choose the findings list branch for this case.
+            // Use the template when prepare() supplies one.
             if ($template instanceof Expr) {
                 return $template;
             }
@@ -145,10 +145,8 @@ final class SqlConcatenationRule implements RuleInterface
     }
 
     /**
-     * Decide whether an expression assembles SQL with unsafe dynamic parts.
+     * Reports whether an expression assembles SQL with unsafe dynamic parts.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Expr         $subject - Expression under inspection (first argument or prepare() template).
      * @param list<string> $safeReceivers - Variable names whose property fetches are safe identifier interpolation.
      * @param AnalysisUnit $analysisUnit - Unit owning the expression, used to reject local receiver shadows.
@@ -158,7 +156,6 @@ final class SqlConcatenationRule implements RuleInterface
      */
     private function isInjectableSqlConstruction(Expr $subject, array $safeReceivers, AnalysisUnit $analysisUnit): bool
     {
-        // User view: choose the findings list branch for this case.
         if (!$this->hasUnsafeDynamicPart($subject, $safeReceivers, $analysisUnit)) {
             // Every dynamic part is allowlisted identifier interpolation (or there is no string construction at all).
             return false;
@@ -169,10 +166,8 @@ final class SqlConcatenationRule implements RuleInterface
     }
 
     /**
-     * Detect a concatenation or interpolation whose direct dynamic parts include a non-allowlisted expression.
+     * Reports whether any string construction splices in a non-allowlisted dynamic part.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Expr         $subject - Expression under inspection.
      * @param list<string> $safeReceivers - Variable names whose property fetches are safe identifier interpolation.
      * @param AnalysisUnit $analysisUnit - Unit owning the expression, used to reject local receiver shadows.
@@ -181,11 +176,11 @@ final class SqlConcatenationRule implements RuleInterface
      */
     private function hasUnsafeDynamicPart(Expr $subject, array $safeReceivers, AnalysisUnit $analysisUnit): bool
     {
-        // User view: add each item that can appear in findings list.
+        // Inspect every concatenation and interpolated string in the subtree.
         foreach ((new NodeFinder())->find($subject, static fn(Node $candidate): bool => $candidate instanceof Expr\BinaryOp\Concat || $candidate instanceof Scalar\InterpolatedString) as $construction) {
-            // User view: add each item that can appear in findings list.
+            // Weigh each dynamic part directly spliced into this construction.
             foreach ($this->directDynamicParts($construction) as $part) {
-                // User view: choose the findings list branch for this case.
+                // One non-allowlisted dynamic part makes the construction unsafe.
                 if (!$this->isSafeInterpolationPart($part, $safeReceivers, $analysisUnit)) {
                     return true;
                 }
@@ -196,13 +191,11 @@ final class SqlConcatenationRule implements RuleInterface
     }
 
     /**
-     * List the direct dynamic parts of one string construction node.
+     * Lists the direct dynamic parts of one string construction node.
      *
      * Literal fragments and nested constructions are skipped: nested Concat/InterpolatedString nodes are
      * visited as constructions of their own by the caller, so each dynamic leaf is judged exactly once.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node $construction - Concat or interpolated-string node.
      *
      * @return list<Expr> - dynamic (non-literal, non-construction) parts spliced into the string.
@@ -210,20 +203,20 @@ final class SqlConcatenationRule implements RuleInterface
     private function directDynamicParts(Node $construction): array
     {
         $candidates = [];
-        // User view: choose the findings list branch for this case.
+        // A concatenation has a left and right operand.
         if ($construction instanceof Expr\BinaryOp\Concat) {
             $candidates = [$construction->left, $construction->right];
         }
 
-        // User view: choose the findings list branch for this case.
+        // An interpolated string has its embedded parts.
         if ($construction instanceof Scalar\InterpolatedString) {
             $candidates = $construction->parts;
         }
 
         $dynamicParts = [];
-        // User view: add each item that can appear in findings list.
+        // Keep only the dynamic (non-literal, non-nested) parts.
         foreach ($candidates as $candidate) {
-            // User view: choose the findings list branch for this case.
+            // Literal fragments and nested constructions are handled by the caller.
             if ($candidate instanceof InterpolatedStringPart
                 || $candidate instanceof Scalar\String_
                 || $candidate instanceof Expr\BinaryOp\Concat
@@ -239,10 +232,8 @@ final class SqlConcatenationRule implements RuleInterface
     }
 
     /**
-     * Decide whether a dynamic part is allowlisted identifier interpolation.
+     * Reports whether a dynamic part is allowlisted identifier interpolation.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Expr         $part - Dynamic part spliced into the string construction.
      * @param list<string> $safeReceivers - Variable names whose property fetches are safe identifier interpolation.
      * @param AnalysisUnit $analysisUnit - Unit owning the expression, used to reject local receiver shadows.
@@ -251,7 +242,7 @@ final class SqlConcatenationRule implements RuleInterface
      */
     private function isSafeInterpolationPart(Expr $part, array $safeReceivers, AnalysisUnit $analysisUnit): bool
     {
-        // User view: choose the findings list branch for this case.
+        // Only a property fetch on an allowlisted receiver variable can be safe identifier interpolation.
         if (!$part instanceof Expr\PropertyFetch
             || !$part->var instanceof Expr\Variable
             || !is_string($part->var->name)
@@ -264,10 +255,8 @@ final class SqlConcatenationRule implements RuleInterface
     }
 
     /**
-     * Detect local bindings that make an allowlisted receiver name untrustworthy.
+     * Reports whether a local binding makes an allowlisted receiver name untrustworthy.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param string       $receiverName - Variable name without the leading `$`.
      * @param Expr         $part - Property fetch whose source position is the sink boundary.
      * @param AnalysisUnit $analysisUnit - Unit owning the expression.
@@ -277,18 +266,17 @@ final class SqlConcatenationRule implements RuleInterface
     private function isReceiverLocallyShadowed(string $receiverName, Expr $part, AnalysisUnit $analysisUnit): bool
     {
         $scope = SecurityNodeHelper::enclosingFunctionLike($part);
-        // User view: choose the findings list branch for this case.
+        // A receiver bound as a parameter is not the trusted global.
         if ($scope instanceof FunctionLike && $this->isParameterName($receiverName, $scope)) {
             return true;
         }
 
         $sinkPosition = $part->getStartFilePos();
-        // User view: choose the findings list branch for this case.
+        // Without a byte offset the assignment order cannot be proven, so assume shadowed.
         if ($sinkPosition < 0) {
             return true;
         }
 
-        // User view: missing data becomes a safe findings list default.
         $statements = $scope instanceof FunctionLike ? ($scope->getStmts() ?? []) : $analysisUnit->statements;
         $assignments = (new NodeFinder())->find(
             array_values($statements),
@@ -297,19 +285,19 @@ final class SqlConcatenationRule implements RuleInterface
                                                 && $candidate->getStartFilePos() < $sinkPosition,
         );
 
-        // User view: add each item that can appear in findings list.
+        // Weigh each earlier assignment in scope.
         foreach ($assignments as $assignment) {
-            // User view: choose the findings list branch for this case.
+            // Only an assignment node can rebind the receiver.
             if (!($assignment instanceof Expr\Assign || $assignment instanceof Expr\AssignOp || $assignment instanceof Expr\AssignRef)) {
                 continue;
             }
 
-            // User view: choose the findings list branch for this case.
+            // An assignment in a nested scope does not rebind this variable.
             if (SecurityNodeHelper::enclosingFunctionLike($assignment) !== $scope) {
                 continue;
             }
 
-            // User view: choose the findings list branch for this case.
+            // A local assignment to the receiver name shadows the trusted global.
             if ($assignment->var instanceof Expr\Variable && $assignment->var->name === $receiverName) {
                 return true;
             }
@@ -319,10 +307,8 @@ final class SqlConcatenationRule implements RuleInterface
     }
 
     /**
-     * Check whether a function-like declares a parameter with the given name.
+     * Reports whether a function-like declares a parameter with the given name.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param string       $name - Variable name without the leading `$`.
      * @param FunctionLike $scope - Function-like to inspect.
      *
@@ -330,9 +316,9 @@ final class SqlConcatenationRule implements RuleInterface
      */
     private function isParameterName(string $name, FunctionLike $scope): bool
     {
-        // User view: add each item that can appear in findings list.
+        // Check each declared parameter.
         foreach ($scope->getParams() as $parameter) {
-            // User view: choose the findings list branch for this case.
+            // A parameter of that name is the binding we are looking for.
             if ($parameter->var instanceof Expr\Variable && $parameter->var->name === $name) {
                 return true;
             }
@@ -342,10 +328,8 @@ final class SqlConcatenationRule implements RuleInterface
     }
 
     /**
-     * Collect every literal string fragment under an expression.
+     * Collects every literal string fragment under an expression.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Expr $subject - Expression under inspection.
      *
      * @return list<string> - literal and interpolated-string fragment values, in finder order; empty when none.
@@ -355,9 +339,9 @@ final class SqlConcatenationRule implements RuleInterface
         $fragments  = [];
         $nodeFinder = new NodeFinder();
 
-        // User view: add each item that can appear in findings list.
+        // Gather each literal and interpolated fragment under the expression.
         foreach ($nodeFinder->find($subject, static fn(Node $candidate): bool => $candidate instanceof Scalar\String_ || $candidate instanceof InterpolatedStringPart) as $literal) {
-            // User view: choose the findings list branch for this case.
+            // Read the fragment's literal text.
             if ($literal instanceof Scalar\String_ || $literal instanceof InterpolatedStringPart) {
                 $fragments[] = $literal->value;
             }
@@ -367,10 +351,8 @@ final class SqlConcatenationRule implements RuleInterface
     }
 
     /**
-     * Build the SQL concatenation finding for a call node.
+     * Builds the SQL-concatenation finding for a call node.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Unit being scanned; supplies the display path recorded on the finding.
      * @param Node         $node - Query call flagged as concatenating SQL; its start line locates the finding.
      *

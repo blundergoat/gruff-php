@@ -18,7 +18,9 @@ use PhpParser\Node\Expr;
 use PhpParser\NodeFinder;
 
 /**
- * Detects tests that repeat arrange-act-assert cycles in one method.
+ * Flags a test method that runs several act-then-assert cycles back to back - a sign it packs multiple
+ * scenarios into one test, so a failure does not point at a single behaviour. Runs over every test; the
+ * cycle threshold is tunable and end-to-end suites can be exempted by path. Advisory, low confidence.
  */
 final readonly class MultipleAaaCyclesRule implements RuleInterface
 {
@@ -28,10 +30,8 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
     public const ID = 'test-quality.multiple-aaa-cycles';
 
     /**
-     * Describe the multiple arrange-act-assert cycles rule.
+     * Describes the multiple-arrange-act-assert-cycles rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - Rule metadata, defaults, and thresholds.
      */
     public function definition(): RuleDefinition
@@ -51,10 +51,8 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
     }
 
     /**
-     * Find tests that appear to repeat act/assert cycles in one method.
+     * Reports tests that appear to repeat act/assert cycles in one method.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -64,7 +62,6 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
     {
         $settings = $ruleContext->settingsFor($this->definition());
 
-        // User view: choose the findings list branch for this case.
         if ($this->isPathIgnored($analysisUnit->file->displayPath, $settings->stringListOption('ignoredPathPatterns'))) {
             // This path is exempted (e.g. an end-to-end suite that legitimately chains scenarios); skip it.
             return [];
@@ -73,11 +70,11 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
         $threshold = (int) $settings->numericThreshold('minCycles');
         $findings  = [];
 
-        // User view: add each item that can appear in findings list.
+        // Weigh every test scope in the file.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             $cycles = $this->countActAssertCycles($scope);
 
-            // User view: choose the findings list branch for this case.
+            // Stay quiet until the cycle count reaches the configured threshold.
             if ($cycles < $threshold) {
                 continue;
             }
@@ -105,10 +102,8 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
     }
 
     /**
-     * Count apparent act-then-assert cycles across top-level test statements.
+     * Counts the apparent act-then-assert cycles across a test's top-level statements.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param TestQualityScope $scope - Test method whose top-level statements are scanned for act/assert runs.
      *
      * @return int - Number of detected cycles.
@@ -119,7 +114,7 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
         $sawNonAssertionCall = false;
         $nodeFinder          = new NodeFinder();
 
-        // User view: add each item that can appear in findings list.
+        // Walk the test's top-level statements in order.
         foreach ($scope->statements as $stmt) {
             $hasAssertion        = false;
             $hasNonAssertionCall = false;
@@ -131,19 +126,17 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
                     || $node instanceof Expr\StaticCall,
             );
 
-            // User view: add each item that can appear in findings list.
+            // Classify every call the statement makes.
             foreach ($calls as $call) {
-                // User view: choose the findings list branch for this case.
+                // Only real call nodes are act or assertion evidence.
                 if (!$call instanceof Expr\FuncCall && !$call instanceof Expr\MethodCall && !$call instanceof Expr\StaticCall) {
                     continue;
                 }
 
-                // User view: choose the findings list branch for this case.
+                // An assertion closes a cycle; any other call opens a new act.
                 if (TestQualityNodeHelper::isAssertionCall($call)) {
                     $hasAssertion = true;
-                }
-                // User view: choose the next findings list branch for this case.
-                elseif (!$this->isNestedInAssertionCall($call)
+                } elseif (!$this->isNestedInAssertionCall($call)
                     && !TestQualityNodeHelper::isMockCreationCall($call)
                     && !TestQualityNodeHelper::isMockVerificationCall($call)
                 ) {
@@ -151,9 +144,9 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
                 }
             }
 
-            // User view: choose the findings list branch for this case.
+            // An assertion after some act completes one arrange-act-assert cycle.
             if ($hasAssertion) {
-                // User view: choose the findings list branch for this case.
+                // Count the cycle only when a real act preceded this assertion.
                 if ($sawNonAssertionCall || $hasNonAssertionCall) {
                     $cycles++;
                 }
@@ -169,10 +162,8 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
     }
 
     /**
-     * Check whether a project-configured path exemption applies.
+     * Reports whether a project-configured path exemption applies.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param string       $displayPath - Display path of the unit under test, matched after slash normalisation.
      * @param list<string> $patterns - Glob patterns for accepted broad test shapes.
      *
@@ -182,9 +173,9 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
     {
         $normalizedPath = str_replace('\\', '/', $displayPath);
 
-        // User view: add each item that can appear in findings list.
+        // Weigh the display path against each configured exemption glob.
         foreach ($patterns as $pattern) {
-            // User view: choose the findings list branch for this case.
+            // A matching pattern opts this path out of the rule.
             if (fnmatch($pattern, $normalizedPath, FNM_NOESCAPE)) {
                 return true;
             }
@@ -194,10 +185,8 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
     }
 
     /**
-     * Detect whether a call is used only to compute an assertion argument.
+     * Reports whether a call only computes an argument for an enclosing assertion.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Inner call whose ancestor chain is walked.
      *
      * @return bool - True when the call is nested inside an assertion call.
@@ -206,8 +195,8 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
     {
         $parent = $call->getAttribute('parent');
 
+        // Climb the call's ancestors looking for an enclosing assertion.
         while ($parent instanceof Node) {
-            // User view: choose the findings list branch for this case.
             if (($parent instanceof Expr\FuncCall || $parent instanceof Expr\MethodCall || $parent instanceof Expr\StaticCall)
                 && TestQualityNodeHelper::isAssertionCall($parent)
             ) {

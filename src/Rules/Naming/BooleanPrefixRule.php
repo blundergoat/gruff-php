@@ -26,7 +26,12 @@ use PhpParser\Node\Stmt\Property;
 use PhpParser\Node\UnionType;
 
 /**
- * Detects bool-returning callables without boolean-style names.
+ * Flags a bool-returning function or method, or a typed bool property or parameter, whose name does not read
+ * as a yes/no question - so `active()` should become `isActive()` and a `$ready` flag should read as a predicate.
+ *
+ * Accepts predicate prefixes (`is`, `has`, `can`, ...), a configurable list of clear state adjectives for
+ * typed booleans, and an exact-name allowlist for caller-visible names a rename would break. Negative-flag
+ * names are handed to the negative-boolean rule instead. Advisory, medium confidence.
  */
 final readonly class BooleanPrefixRule implements RuleInterface
 {
@@ -54,25 +59,23 @@ final readonly class BooleanPrefixRule implements RuleInterface
     ];
 
     /**
-     * Exact boolean identifier names accepted as-is, regardless of prefix (P3).
+     * Exact boolean identifier names accepted as-is, regardless of prefix.
      *
      * Unlike protocol acronyms there is no universal set of bare boolean names
      * that earns its place across every codebase, so the default is empty and a
      * project appends its own domain vocabulary (e.g. a public `valid(): bool`
      * accessor it does not want renamed to `isValid()`). The escape hatch exists
      * so a finding on a public, caller-visible boolean name can be cleared with
-     * config rather than a breaking rename — the non-breaking resolution P3
-     * requires. Matching is whole-name and case-insensitive.
+     * config rather than a breaking rename, which is the non-breaking resolution
+     * this hatch is here to provide. Matching is whole-name and case-insensitive.
      *
      * @var list<string>
      */
     private const DEFAULT_ACCEPTED_BOOLEAN_NAMES = [];
 
     /**
-     * Describe the boolean method prefix rule.
+     * Describes the boolean-method-prefix rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -93,10 +96,8 @@ final readonly class BooleanPrefixRule implements RuleInterface
     }
 
     /**
-     * Find bool-returning functions and methods without a boolean-style prefix.
+     * Reports bool-returning callables and typed bool properties or parameters that lack a predicate-style name.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -112,7 +113,7 @@ final readonly class BooleanPrefixRule implements RuleInterface
 
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Judge each function-like scope for its callable name and its bool parameters.
         foreach ((new FunctionLikeScopeWalker())->scopes($analysisUnit->statements) as $scope) {
             $node                 = $scope->node;
             $symbol               = $this->symbol($scope);
@@ -142,17 +143,17 @@ final readonly class BooleanPrefixRule implements RuleInterface
             );
         }
 
-        // User view: add each item that can appear in findings list.
+        // Also judge every typed boolean property declared in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, Property::class) as $property) {
-            // User view: choose the findings list branch for this case.
+            // Skip a property that is not typed bool.
             if (!$this->isBoolType($property->type)) {
                 continue;
             }
 
-            // User view: add each item that can appear in findings list.
+            // One declaration can name several properties, so check each in turn.
             foreach ($property->props as $prop) {
                 $name = $prop->name->toString();
-                // User view: choose the findings list branch for this case.
+                // A predicate-style or negative-flag name already reads clearly.
                 if ($this->hasBooleanStyleName($name, $prefixes, $stateAdjectives, $acceptedNames) || $this->hasNegativeFlagName($name)) {
                     continue;
                 }
@@ -172,10 +173,8 @@ final readonly class BooleanPrefixRule implements RuleInterface
     }
 
     /**
-     * Find bool-returning functions and methods without a boolean-style prefix.
+     * Reports a bool-returning function or method whose name is not predicate-style.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param RuleDefinition        $definition - Rule metadata stamped onto any finding produced here.
      * @param AnalysisUnit          $analysisUnit - Parsed unit supplying the display path and line numbers.
      * @param ClassMethod|Function_ $node - Callable whose return type and name are checked.
@@ -194,14 +193,12 @@ final readonly class BooleanPrefixRule implements RuleInterface
         array $acceptedNames,
     ): array
     {
-        // User view: choose the findings list branch for this case.
         if (!$this->isBoolType($node->getReturnType())) {
             // Non-boolean callables are out of scope; nothing to flag.
             return [];
         }
 
         $name = $node->name->toString();
-        // User view: choose the findings list branch for this case.
         if ($this->hasAllowedPrefix($name, $prefixes) || $this->isAcceptedBooleanName($name, $acceptedNames)) {
             // Name already reads as a predicate or is on the accepted allowlist, so it is clear.
             return [];
@@ -224,10 +221,8 @@ final readonly class BooleanPrefixRule implements RuleInterface
     }
 
     /**
-     * Find typed bool parameters without a boolean-style prefix or state adjective.
+     * Reports typed bool parameters that lack a predicate prefix or approved state adjective.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param RuleDefinition    $definition - Rule metadata stamped onto any finding produced here.
      * @param AnalysisUnit      $analysisUnit - Parsed unit supplying the display path and line numbers.
      * @param FunctionLikeScope $scope - Scope whose declared parameters are inspected.
@@ -249,15 +244,15 @@ final readonly class BooleanPrefixRule implements RuleInterface
     ): array {
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Weigh each declared parameter.
         foreach ($scope->node->params as $param) {
-            // User view: choose the findings list branch for this case.
+            // Skip anything that is not a plainly named bool parameter.
             if (!$this->isBoolType($param->type) || !$param->var instanceof Variable || !is_string($param->var->name)) {
                 continue;
             }
 
             $name = $param->var->name;
-            // User view: choose the findings list branch for this case.
+            // A predicate-style or negative-flag name already reads clearly.
             if ($this->hasBooleanStyleName($name, $prefixes, $stateAdjectives, $acceptedNames) || $this->hasNegativeFlagName($name)) {
                 continue;
             }
@@ -276,10 +271,8 @@ final readonly class BooleanPrefixRule implements RuleInterface
     }
 
     /**
-     * Build a finding for a typed boolean property or parameter.
+     * Builds a finding for a typed boolean property or parameter.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param RuleDefinition $definition - Rule metadata stamped onto the finding.
      * @param AnalysisUnit   $analysisUnit - Parsed unit supplying the display path and start line.
      * @param Node           $node - Property or parameter node the finding points at.
@@ -316,35 +309,30 @@ final readonly class BooleanPrefixRule implements RuleInterface
     }
 
     /**
-     * Check whether a declaration type is bool or nullable bool.
+     * Reports whether a declaration type is bool or nullable bool.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node|null $type - Declared type node to classify, or null when the declaration is untyped.
      *
      * @return bool - True when the type resolves to bool, including ?bool and bool|null.
      */
     private function isBoolType(?Node $type): bool
     {
-        // User view: choose the findings list branch for this case.
         if ($type instanceof NullableType) {
             // Unwrap `?T` and classify the inner type so `?bool` counts as bool.
             return $this->isBoolType($type->type);
         }
 
-        // User view: choose the findings list branch for this case.
         if ($type instanceof Identifier) {
             // True only for the built-in scalar `bool` keyword, matched case-insensitively.
             return $type->toLowerString() === 'bool';
         }
 
-        // User view: choose the findings list branch for this case.
         if ($type instanceof Name) {
             // A name token spelling `bool` (e.g. a leading-slash form) still resolves to the scalar.
             return strtolower($type->toString()) === 'bool';
         }
 
-        // User view: choose the findings list branch for this case.
+        // A union type must be unwrapped before it can be judged.
         if ($type instanceof UnionType) {
             $nonNull = array_values(array_filter(
                 $type->types,
@@ -360,10 +348,8 @@ final readonly class BooleanPrefixRule implements RuleInterface
     }
 
     /**
-     * Check whether a typed boolean identifier is already clear.
+     * Reports whether a typed boolean identifier already reads clearly.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param string       $name - Identifier name to test, matched case-insensitively.
      * @param list<string> $prefixes - Configured predicate prefixes.
      * @param list<string> $stateAdjectives - Configured state-adjective names.
@@ -379,15 +365,13 @@ final readonly class BooleanPrefixRule implements RuleInterface
     }
 
     /**
-     * Check whether a boolean identifier is on the exact accepted-name allowlist (P3).
+     * Reports whether a boolean identifier is on the exact accepted-name allowlist.
      *
      * The allowlist holds whole identifier names a project has chosen to keep as
-     * they are — typically a caller-visible name a rename would break — so the
+     * they are, typically a caller-visible name a rename would break, so the
      * comparison is whole-name and case-insensitive, never a prefix match. The
      * caller supplies the names already lowercased.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param string       $name - Identifier name to match, compared whole and case-insensitively.
      * @param list<string> $acceptedNames - Lowercased exact names accepted as-is.
      *
@@ -399,10 +383,8 @@ final readonly class BooleanPrefixRule implements RuleInterface
     }
 
     /**
-     * Check whether the callable name starts with a configured predicate prefix.
+     * Reports whether a callable name starts with a configured predicate prefix at a word boundary.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param string       $name - Callable name to test; a prefix only counts when a word boundary follows it.
      * @param list<string> $prefixes - Configured predicate prefixes.
      *
@@ -410,21 +392,19 @@ final readonly class BooleanPrefixRule implements RuleInterface
      */
     private function hasAllowedPrefix(string $name, array $prefixes): bool
     {
-        // User view: add each item that can appear in findings list.
+        // Try each configured predicate prefix.
         foreach ($prefixes as $prefix) {
-            // User view: choose the findings list branch for this case.
+            // Skip a prefix the name does not start with.
             if (!str_starts_with($name, $prefix)) {
                 continue;
             }
 
-            // User view: choose the findings list branch for this case.
             if (strlen($name) === strlen($prefix)) {
                 // Name equals the prefix exactly (e.g. `is`), which reads as a predicate on its own.
                 return true;
             }
 
             $nextChar = $name[strlen($prefix)];
-            // User view: choose the findings list branch for this case.
             if (($nextChar >= 'A' && $nextChar <= 'Z') || $nextChar === '_') {
                 // An uppercase char marks a camelCase boundary (`isReady`) and an underscore a snake_case
                 // boundary (`is_ready`), so either way the prefix is a real word; a lowercase char (`isolate`) is not.
@@ -436,10 +416,8 @@ final readonly class BooleanPrefixRule implements RuleInterface
     }
 
     /**
-     * Check whether a boolean name starts with a negative flag prefix.
+     * Reports whether a name starts with a negative-flag prefix owned by the negative-boolean rule.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param string $name - Identifier name to test; the negative prefix must be followed by a word boundary.
      *
      * @return bool - True when the name starts with a configured negative prefix, so NegativeBooleanRule owns it.
@@ -448,26 +426,24 @@ final readonly class BooleanPrefixRule implements RuleInterface
     {
         // Delegate to the owning rule's predicate so the prefix set and camelCase/snake_case
         // boundary rules can never drift apart and drop a name between the two rules again.
-        // User view: missing data becomes the expected findings list state.
         return NegativeBooleanRule::negativeFlagPrefix($name) !== null;
     }
 
     /**
-     * Resolve the human-readable symbol for a function-like scope.
+     * Resolves the human-readable symbol for a function-like scope.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param FunctionLikeScope $scope - Scope whose node yields the symbol name.
      *
      * @return string - Named callable symbol or synthetic closure/arrow label.
      */
     private function symbol(FunctionLikeScope $scope): string
     {
-        // User view: choose the findings list branch for this case.
+        // Named callables resolve to their declared symbol.
         if ($scope->node instanceof ClassMethod || $scope->node instanceof Function_) {
             return CyclomaticComplexityRule::resolveSymbol($scope->node);
         }
 
+        // Closures and arrow functions have no name, so fall back to a kind@line label.
         return sprintf('%s@%d', $scope->kind, $scope->node->getStartLine());
     }
 }

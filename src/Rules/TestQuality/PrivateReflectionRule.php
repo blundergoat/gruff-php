@@ -19,7 +19,9 @@ use PhpParser\Node\Name;
 use PhpParser\NodeFinder;
 
 /**
- * Detects tests that access private members through reflection.
+ * Flags a test that reaches into private members through reflection or closure rebinding - `new
+ * ReflectionMethod`, `setAccessible(true)`, `Closure::bind`/`bindTo` - coupling the test to internals the
+ * production code can change freely. Runs over every test in the file. Warning, high confidence.
  */
 final readonly class PrivateReflectionRule implements RuleInterface
 {
@@ -34,10 +36,8 @@ final readonly class PrivateReflectionRule implements RuleInterface
     private const REFLECTION_CLASSES = ['reflectionmethod', 'reflectionclass', 'reflectionproperty'];
 
     /**
-     * Describe the private reflection test rule.
+     * Describes the private-reflection rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -54,10 +54,8 @@ final readonly class PrivateReflectionRule implements RuleInterface
     }
 
     /**
-     * Find tests that use reflection or binding to reach private implementation details.
+     * Reports tests that use reflection or binding to reach private implementation details.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -68,24 +66,24 @@ final readonly class PrivateReflectionRule implements RuleInterface
         $nodeFinder = new NodeFinder();
         $findings   = [];
 
-        // User view: add each item that can appear in findings list.
+        // Weigh every test scope in the file.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             $reflectionNode = null;
-            // User view: add each item that can appear in findings list.
+            // Scan the test body for a reflection or closure-binding node.
             foreach ($nodeFinder->find(
                 $scope->statements,
                 static fn (Node $node): bool => $node instanceof Expr\New_
                     || $node instanceof Expr\MethodCall
                     || $node instanceof Expr\StaticCall,
             ) as $node) {
-                // User view: choose the findings list branch for this case.
+                // The first private-reflection access is enough to flag the test.
                 if ($this->isPrivateReflectionNode($node)) {
                     $reflectionNode = $node;
                     break;
                 }
             }
 
-            // User view: choose the findings list branch for this case.
+            // Nothing to report when the test reaches no privates this way.
             if (!$reflectionNode instanceof Node) {
                 continue;
             }
@@ -108,23 +106,20 @@ final readonly class PrivateReflectionRule implements RuleInterface
     }
 
     /**
-     * Detect reflection or closure binding nodes that expose private members.
+     * Reports whether a node performs reflection or closure-binding access to private members.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node $node - Candidate AST node (a new-expression, static call, or method call) to classify.
      *
      * @return bool - True when the node performs private reflection access.
      */
     private function isPrivateReflectionNode(Node $node): bool
     {
-        // User view: choose the findings list branch for this case.
         if ($node instanceof Expr\New_ && $node->class instanceof Name) {
             // Constructing a Reflection* object is the entry point for reaching privates; match by class name.
             return in_array(strtolower($node->class->getLast()), self::REFLECTION_CLASSES, true);
         }
 
-        // User view: choose the findings list branch for this case.
+        // A Closure::bind static call rebinds scope to read privates.
         if ($node instanceof Expr\StaticCall && $node->class instanceof Name) {
             $name      = TestQualityNodeHelper::callName($node);
             $className = strtolower($node->class->getLast());
@@ -133,11 +128,10 @@ final readonly class PrivateReflectionRule implements RuleInterface
             return $className === 'closure' && $name === 'bind';
         }
 
-        // User view: choose the findings list branch for this case.
+        // A method call may be setAccessible() or a closure bindTo().
         if ($node instanceof Expr\MethodCall) {
             $name = TestQualityNodeHelper::callName($node);
 
-            // User view: choose the findings list branch for this case.
             if ($name === 'setaccessible'
                 && TestQualityNodeHelper::literalValue(TestQualityNodeHelper::firstArgValue($node)) === true
             ) {

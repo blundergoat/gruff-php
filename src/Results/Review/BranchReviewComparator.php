@@ -7,21 +7,27 @@ namespace GruffPhp\Results\Review;
 use GruffPhp\Results\Finding\Finding;
 
 /**
- * Compares current findings against a base-branch analysis snapshot.
+ * Works out what a branch changed about a codebase's findings by comparing this run against a snapshot
+ * of the base branch.
+ *
+ * This backs `gruff-php analyse --diff-vs <base>`: given the current findings and the base branch's
+ * findings, it sorts every issue into introduced (new on this branch), removed (fixed on this branch),
+ * or unchanged (present in both). Matching is line-insensitive, so shuffling code around doesn't make
+ * an old finding look new - the user sees only what their branch genuinely added or resolved.
  */
 final readonly class BranchReviewComparator
 {
     /**
-      * User flow: Compares branch feedback for review workflows.
-      *
-     * @param list<Finding> $current - Current branch findings to compare.
-     * @param list<Finding> $base - Base branch findings to compare against.
-     * @param string        $baseRef - Base ref used to produce the comparison.
-     * @param bool          $isChangedOnly - Whether unchanged changed-file scope applies.
-     * @param float|null    $deltaScore - Optional score delta between base and current runs.
+     * Sorts the current and base findings into introduced, removed, and unchanged, so the user sees
+     * exactly what their branch changed rather than a flat re-listing of everything.
      *
-     * @return BranchReviewResult - findings partitioned into introduced, removed, and unchanged sets plus the
-     *   score delta, ready for the caller to render the branch review
+     * @param list<Finding> $current - Findings from this branch's run.
+     * @param list<Finding> $base - Findings from the base branch's run to compare against; empty means every current finding counts as introduced.
+     * @param string        $baseRef - Base ref the comparison was made against (for example `origin/main`), echoed back in the review.
+     * @param bool          $isChangedOnly - True when the review was restricted to changed files, recorded so the report can say the scope was narrowed.
+     * @param float|null    $deltaScore - Score change from base to current; null when no comparable base score was available to diff.
+     *
+     * @return BranchReviewResult - Findings partitioned into introduced, removed, and unchanged sets plus the score delta, ready for the caller to render the branch review.
      */
     public function compare(
         array  $current,
@@ -37,27 +43,30 @@ final readonly class BranchReviewComparator
         $unchanged             = [];
         $removed               = [];
 
-        // User view: add each item that can appear in branch review feedback.
+        // Walk each group of current findings, deciding which already existed on base and which are new.
         foreach ($currentByKey as $key => $currentFindings) {
-            // User view: missing data becomes a safe branch review feedback default.
+            // No base group under this key means the base branch had none of these, so they are all new.
             $baseFindings = $baseByKey[$key] ?? [];
             $matched      = min(count($currentFindings), count($baseFindings));
 
+            // The first matched findings existed in both runs, so they are unchanged.
             for ($i = 0; $i < $matched; $i++) {
                 $unchanged[] = $currentFindings[$i];
             }
 
+            // Any current findings past the matched count have no base counterpart - this branch introduced them.
             for ($i = $matched, $end = count($currentFindings); $i < $end; $i++) {
                 $introduced[] = $currentFindings[$i];
             }
         }
 
-        // User view: add each item that can appear in branch review feedback.
+        // Now walk the base groups to find what disappeared from this branch.
         foreach ($baseByKey as $key => $baseFindings) {
-            // User view: missing data becomes a safe branch review feedback default.
+            // No current group under this key means every base finding here is gone.
             $currentFindings = $currentByKey[$key] ?? [];
             $matched         = min(count($baseFindings), count($currentFindings));
 
+            // Base findings beyond the matched count no longer appear on the branch - the user resolved them.
             for ($i = $matched, $end = count($baseFindings); $i < $end; $i++) {
                 $removed[] = $baseFindings[$i];
             }
@@ -67,21 +76,19 @@ final readonly class BranchReviewComparator
     }
 
     /**
-     * Index findings by branch-review identity.
+     * Buckets findings by their line-insensitive review identity, so comparing two runs ignores where
+     * code moved to and matches only on what each finding is.
      *
-      * User flow: Compares branch feedback for review workflows.
-      *
      * @param list<Finding>         $findings - Findings to bucket by review identity before comparison.
      * @param FindingReviewIdentity $identity - Key strategy that buckets findings so matching ignores line drift.
      *
-     * @return array<string, list<Finding>> - findings bucketed by review-identity key, keys sorted ascending so iteration order is deterministic;
-     *                       empty when no findings
+     * @return array<string, list<Finding>> - Findings bucketed by review-identity key, keys sorted ascending so iteration is deterministic; empty when there are no findings.
      */
     private function index(array $findings, FindingReviewIdentity $identity): array
     {
         $indexed = [];
 
-        // User view: add each item that can appear in branch review feedback.
+        // Drop each finding into the bucket for its identity key; several findings can share one key.
         foreach ($findings as $finding) {
             $indexed[$identity->key($finding)][] = $finding;
         }

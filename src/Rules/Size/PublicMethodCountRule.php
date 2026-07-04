@@ -20,7 +20,11 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Enum_;
 
 /**
- * Detects classes with public APIs large enough to dilute their responsibility.
+ * Flags a class or enum that exposes so many public methods its responsibility has likely blurred, a
+ * size signal that the type is doing too much for one caller to hold in their head.
+ *
+ * Runs per file over every class and enum, counting public methods and reporting any past the threshold
+ * (default error above 25). The finding names the type and its public-method count.
  */
 final readonly class PublicMethodCountRule implements RuleInterface
 {
@@ -30,10 +34,8 @@ final readonly class PublicMethodCountRule implements RuleInterface
     public const ID = 'size.public-method-count';
 
     /**
-     * Describe the public method count rule.
+     * Describes the public-method-count rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - Rule metadata and thresholds.
      */
     public function definition(): RuleDefinition
@@ -50,10 +52,8 @@ final readonly class PublicMethodCountRule implements RuleInterface
     }
 
     /**
-     * Find classes and enums with too many public methods.
+     * Reports each class or enum whose public-method count exceeds the configured threshold.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -68,30 +68,27 @@ final readonly class PublicMethodCountRule implements RuleInterface
 
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Check each class and enum in the file.
         foreach ($classLikes as $classLike) {
             /** @var Class_|Enum_ $classLike Finder predicate restricts results to class and enum declarations. */
             $publicCount = 0;
 
-            // User view: add each item that can appear in findings list.
+            // Count the public methods on this type.
             foreach ($classLike->stmts as $stmt) {
-                // User view: choose the findings list branch for this case.
+                // Only public methods count toward the API surface.
                 if ($stmt instanceof ClassMethod && $stmt->isPublic()) {
                     $publicCount++;
                 }
             }
             $thresholdMatch = $settings->highValueThresholdMatch($publicCount);
 
-            // User view: choose the findings list branch for this case.
-            // User view: missing data becomes the expected findings list state.
+            // A count within the threshold is fine, so skip it.
             if ($thresholdMatch === null) {
                 continue;
             }
 
             $symbol = $classLike instanceof Class_
-                // User view: missing data becomes a safe findings list default.
                 ? ($classLike->name?->toString() ?? sprintf('class@anonymous:%d', $classLike->getStartLine()))
-                // User view: missing data becomes a safe findings list default.
                 : ($classLike->name?->toString() ?? sprintf('enum@%d', $classLike->getStartLine()));
 
             $findings[] = new Finding(
@@ -125,17 +122,15 @@ final readonly class PublicMethodCountRule implements RuleInterface
     }
 
     /**
-     * Format threshold numbers without unnecessary decimal places.
+     * Formats a threshold number for the message, dropping a whole number's ".0" tail.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param int|float $number - Threshold value to render; whole values are shown without a trailing decimal.
      *
      * @return string - Human-readable threshold value with fractional values preserved and whole values stripped.
      */
     private function formatNumber(int|float $number): string
     {
-        // User view: choose the findings list branch for this case.
+        // A genuine fraction keeps its decimals; a whole value is shown without them.
         if (is_float($number) && floor($number) !== $number) {
             return (string) $number;
         }

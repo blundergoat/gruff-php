@@ -20,7 +20,9 @@ use PhpParser\Node\Name;
 use PhpParser\Node\Stmt;
 
 /**
- * Detects mocks for domain objects where real values keep tests clearer.
+ * Flags a test that mocks a class matching a configured domain-object namespace - domain objects usually
+ * carry real behaviour and read more clearly as concrete values, so mocking one hides intent and couples the
+ * test to internals. Off unless `domainNamespaces` is configured. Runs over every test. Advisory, low confidence.
  */
 final readonly class MockingDomainObjectRule implements RuleInterface
 {
@@ -30,10 +32,8 @@ final readonly class MockingDomainObjectRule implements RuleInterface
     public const ID = 'test-quality.mocking-domain-object';
 
     /**
-     * Describe the mocking-domain-object rule.
+     * Describes the mocking-domain-object rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - this rule's stable identity, default Advisory severity, and the empty `domainNamespaces` option it ships with
      */
     public function definition(): RuleDefinition
@@ -51,10 +51,8 @@ final readonly class MockingDomainObjectRule implements RuleInterface
     }
 
     /**
-     * Find mock creations for classes that match configured domain-object patterns.
+     * Reports mock creations for classes that match configured domain-object patterns.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -64,8 +62,6 @@ final readonly class MockingDomainObjectRule implements RuleInterface
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $patterns = $ruleContext->settingsFor($this->definition())->stringListOption('domainNamespaces');
-        // User view: choose the findings list branch for this case.
-        // User view: an empty value becomes a clear findings list fallback.
         if ($patterns === []) {
             // With no domain namespaces configured, every class is a legitimate mock target; stay silent.
             return [];
@@ -74,18 +70,17 @@ final readonly class MockingDomainObjectRule implements RuleInterface
         $useAliases = $this->collectUseAliases($analysisUnit);
         $findings   = [];
 
-        // User view: add each item that can appear in findings list.
+        // Weigh every test scope in the file.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
-            // User view: add each item that can appear in findings list.
+            // Inspect each call the test makes.
             foreach (TestQualityNodeHelper::calls($scope) as $call) {
-                // User view: choose the findings list branch for this case.
+                // Only a mock-creation call names a class to judge.
                 if (!TestQualityNodeHelper::isMockCreationCall($call)) {
                     continue;
                 }
 
                 $className = $this->classNameArg($call, 0);
-                // User view: choose the findings list branch for this case.
-                // User view: missing data becomes the expected findings list state.
+                // Skip mocks whose target class cannot be read statically.
                 if ($className === null) {
                     continue;
                 }
@@ -93,8 +88,7 @@ final readonly class MockingDomainObjectRule implements RuleInterface
                 $resolved = $this->resolveClassName($className, $useAliases);
                 $matched  = $this->matchesAnyPattern($resolved, $patterns);
 
-                // User view: choose the findings list branch for this case.
-                // User view: missing data becomes the expected findings list state.
+                // Only a class matching a configured domain namespace is a smell.
                 if ($matched === null) {
                     continue;
                 }
@@ -124,10 +118,8 @@ final readonly class MockingDomainObjectRule implements RuleInterface
     }
 
     /**
-     * Map imported class aliases to fully qualified names.
+     * Maps imported class aliases to their fully qualified names.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit whose `use` and group-use statements supply the alias map.
      *
      * @return array<string, string> - local import alias keyed to its fully qualified target; empty when the unit has no `use` statements
@@ -136,19 +128,19 @@ final readonly class MockingDomainObjectRule implements RuleInterface
     {
         $useAliases = [];
 
-        // User view: add each item that can appear in findings list.
+        // Record every plain import alias.
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Use_::class) as $use) {
-            // User view: add each item that can appear in findings list.
+            // One statement can import several names.
             foreach ($use->uses as $useUse) {
                 $alias              = $useUse->getAlias()->toString();
                 $useAliases[$alias] = $useUse->name->toString();
             }
         }
 
-        // User view: add each item that can appear in findings list.
+        // Record group-import aliases under their shared prefix.
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\GroupUse::class) as $group) {
             $prefix = $group->prefix->toString();
-            // User view: add each item that can appear in findings list.
+            // One group statement can import several names.
             foreach ($group->uses as $useUse) {
                 $alias              = $useUse->getAlias()->toString();
                 $useAliases[$alias] = $prefix . '\\' . $useUse->name->toString();
@@ -159,10 +151,8 @@ final readonly class MockingDomainObjectRule implements RuleInterface
     }
 
     /**
-     * Extract a `ClassName::class` argument from a mock creation call.
+     * Returns the class named by a `ClassName::class` argument, or null.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Mock-creation call whose argument is read.
      * @param int                                           $index - Zero-based argument position holding the class.
      *
@@ -171,14 +161,12 @@ final readonly class MockingDomainObjectRule implements RuleInterface
     private function classNameArg(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call, int $index): ?string
     {
         $classConstFetch = TestQualityNodeHelper::argValue($call, $index);
-        // User view: choose the findings list branch for this case.
         if (!$classConstFetch instanceof Expr\ClassConstFetch || !$classConstFetch->class instanceof Name) {
             // The argument is not a `Something::class` fetch, so no class name can be recovered.
             return null;
         }
 
         $name = $classConstFetch->name;
-        // User view: choose the findings list branch for this case.
         if (!$name instanceof Node\Identifier || strtolower($name->toString()) !== 'class') {
             // A `::CONST` other than `::class` does not name a type to mock.
             return null;
@@ -188,8 +176,8 @@ final readonly class MockingDomainObjectRule implements RuleInterface
     }
 
     /**
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
+     * Expands a class reference to its fully qualified name using the import aliases.
+     *
      * @param string                $className - Class reference as written at the mock site, aliased or qualified.
      * @param array<string, string> $useAliases - Import alias map used to expand a leading short segment.
      *
@@ -197,14 +185,14 @@ final readonly class MockingDomainObjectRule implements RuleInterface
      */
     private function resolveClassName(string $className, array $useAliases): string
     {
-        // User view: choose the findings list branch for this case.
+        // A leading backslash already means a fully qualified name.
         if (str_starts_with($className, '\\')) {
             return ltrim($className, '\\');
         }
 
         $first = explode('\\', $className, 2)[0];
 
-        // User view: choose the findings list branch for this case.
+        // Expand the leading segment when it was imported.
         if (isset($useAliases[$first])) {
             $rest = substr($className, strlen($first));
 
@@ -216,8 +204,8 @@ final readonly class MockingDomainObjectRule implements RuleInterface
     }
 
     /**
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
+     * Returns the first domain-object glob the class matches, or null.
+     *
      * @param string       $className - Fully qualified class name to test against the domain-object globs.
      * @param list<string> $patterns - fnmatch globs marking namespaces the project treats as domain objects.
      *
@@ -225,9 +213,8 @@ final readonly class MockingDomainObjectRule implements RuleInterface
      */
     private function matchesAnyPattern(string $className, array $patterns): ?string
     {
-        // User view: add each item that can appear in findings list.
+        // Weigh the class against each configured domain glob.
         foreach ($patterns as $pattern) {
-            // User view: choose the findings list branch for this case.
             if (fnmatch($pattern, $className, FNM_NOESCAPE)) {
                 // First glob the class matches is reported back so the finding can name which rule it tripped.
                 return $pattern;

@@ -147,14 +147,17 @@ use InvalidArgumentException;
 use WeakMap;
 
 /**
- * Stores available rules and dispatches enabled rule analysis.
+ * The catalogue of every analysis rule and the engine that runs them. Holds each rule keyed by id, snapshots
+ * their definitions once, and - given an AnalysisConfig - hands back only the enabled set, memoised per config.
+ * Drives both the one-shot analyse() flow and the streaming begin/analyseUnit/end pipeline that keeps a large
+ * codebase's peak memory near a single unit, then dedupes and canonically orders every finding for the report.
  */
 final class RuleRegistry
 {
     /**
      * Rule priority for overlapping naming findings on the same identifier.
      *
-     * Lower numbers win. The order is the M51 documented deferral contract.
+     * Lower numbers win. The order encodes the documented deferral contract for overlapping naming rules.
      */
     private const NAMING_RULE_PRIORITY = [
         'naming.class-file-mismatch'    => 0,
@@ -194,8 +197,6 @@ final class RuleRegistry
     private readonly WeakMap $enabledRulesByConfig;
 
     /**
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param list<RuleInterface|ProjectRuleInterface> $rules - Rule instances to index by id.
      *
      * @throws InvalidArgumentException When two rules declare the same id.
@@ -205,12 +206,11 @@ final class RuleRegistry
         $indexedRules       = [];
         $indexedDefinitions = [];
 
-        // User view: add each item that can appear in findings list.
         foreach ($rules as $rule) {
             $definition = $rule->definition();
             $id         = $definition->id;
 
-            // User view: choose the findings list branch for this case.
+            // A second rule claiming an id already taken is a registration bug.
             if (isset($indexedRules[$id])) {
                 throw new InvalidArgumentException(sprintf('Duplicate rule id "%s".', $id));
             }
@@ -227,10 +227,8 @@ final class RuleRegistry
     }
 
     /**
-     * Build the default registry containing every built-in rule.
+     * Builds the default registry containing every built-in rule.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return self - registry pre-loaded with every built-in rule, keyed and sorted by rule id
      */
     public static function defaults(): self
@@ -368,10 +366,8 @@ final class RuleRegistry
     }
 
     /**
-     * List every registered rule in execution order.
+     * Lists every registered rule in execution order.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return list<RuleInterface|ProjectRuleInterface> - all registered rules, id-sorted ascending; empty when none were registered
      */
     public function all(): array
@@ -380,10 +376,8 @@ final class RuleRegistry
     }
 
     /**
-     * Check whether a rule id is registered.
+     * Reports whether a rule id is registered.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param string $ruleId - Rule identifier to check.
      *
      * @return bool - true when a rule with this id is registered; false for unknown or misspelled ids
@@ -394,10 +388,8 @@ final class RuleRegistry
     }
 
     /**
-     * Return the requested rule ids that are not registered.
+     * Returns the requested rule ids that are not registered.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param list<string> $ruleIds - Rule identifiers to validate.
      *
      * @return list<string> - Unknown ids in first-seen order, de-duplicated.
@@ -405,9 +397,7 @@ final class RuleRegistry
     public function unknownRuleIds(array $ruleIds): array
     {
         $unknown = [];
-        // User view: add each item that can appear in findings list.
         foreach ($ruleIds as $ruleId) {
-            // User view: choose the findings list branch for this case.
             if (isset($unknown[$ruleId]) || $this->has($ruleId)) {
                 continue;
             }
@@ -419,10 +409,8 @@ final class RuleRegistry
     }
 
     /**
-     * Return a registered rule by id.
+     * Returns a registered rule by id.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param string $ruleId - Rule identifier to look up.
      *
      * @return RuleInterface|ProjectRuleInterface - the shared rule instance registered under this id; never null (throws on miss)
@@ -431,15 +419,12 @@ final class RuleRegistry
     public function get(string $ruleId): RuleInterface|ProjectRuleInterface
     {
         return $this->rules[$ruleId]
-               // User view: missing data becomes a safe findings list default.
                ?? throw new InvalidArgumentException(sprintf('Unknown rule id "%s".', $ruleId));
     }
 
     /**
-     * Return rules enabled by the effective analysis config.
+     * Returns the rules enabled by the effective analysis config.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisConfig $config - Config used to filter registered rules.
      *
      * @return list<RuleInterface|ProjectRuleInterface> - rules passing both per-rule toggle and selection filter, id-sorted; empty when config
@@ -451,10 +436,8 @@ final class RuleRegistry
     }
 
     /**
-     * Filter the registered rules down to the set the config enables.
+     * Filters the registered rules down to the set the config enables.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisConfig $config - Config used to filter registered rules.
      *
      * @return list<RuleInterface|ProjectRuleInterface> - rules passing both per-rule toggle and selection filter, id-sorted; empty when config
@@ -465,9 +448,7 @@ final class RuleRegistry
         $selection    = $config->ruleSelection();
         $enabledRules = [];
 
-        // User view: add each item that can appear in findings list.
         foreach ($this->definitions as $ruleId => $definition) {
-            // User view: choose the findings list branch for this case.
             if ($config->ruleSettings($ruleId)->enabled && $selection->allows($definition)) {
                 $enabledRules[] = $this->rules[$ruleId];
             }
@@ -477,19 +458,15 @@ final class RuleRegistry
     }
 
     /**
-     * Check whether the effective config enables at least one project-level rule.
+     * Reports whether the effective config enables at least one project-level rule.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisConfig $config - Config used to filter registered rules.
      *
      * @return bool - true when at least one enabled rule needs whole-project context; false when a per-unit pass suffices
      */
     public function hasEnabledProjectRules(AnalysisConfig $config): bool
     {
-        // User view: add each item that can appear in findings list.
         foreach ($this->enabledRules($config) as $rule) {
-            // User view: choose the findings list branch for this case.
             if ($rule instanceof ProjectRuleInterface) {
                 return true;
             }
@@ -499,10 +476,8 @@ final class RuleRegistry
     }
 
     /**
-     * Return enabled rule ids whose findings come from project-wide analysis.
+     * Returns the enabled rule ids whose findings come from project-wide analysis.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisConfig $config - Config used to filter registered rules.
      *
      * @return list<string> - Enabled ProjectRuleInterface ids in registry order.
@@ -511,9 +486,7 @@ final class RuleRegistry
     {
         $ruleIds = [];
 
-        // User view: add each item that can appear in findings list.
         foreach ($this->enabledRules($config) as $rule) {
-            // User view: choose the findings list branch for this case.
             if ($rule instanceof ProjectRuleInterface) {
                 $ruleIds[] = $rule->definition()->id;
             }
@@ -523,23 +496,19 @@ final class RuleRegistry
     }
 
     /**
-     * Determine whether the enabled rule set is fully streaming-capable.
+     * Reports whether the enabled rule set is fully streaming-capable.
      *
      * A rule set is streaming-capable when every enabled project rule
      * implements ProjectRuleAccumulator. Per-unit rules are always
      * streaming-friendly.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param RuleContext $ruleContext - Rule execution context.
      *
      * @return bool - true when the run can stream unit-by-unit; false when a legacy project rule forces buffering all units
      */
     public function supportsStreaming(RuleContext $ruleContext): bool
     {
-        // User view: add each item that can appear in findings list.
         foreach ($this->enabledRules($ruleContext->config) as $rule) {
-            // User view: choose the findings list branch for this case.
             if ($rule instanceof ProjectRuleInterface && !$rule instanceof ProjectRuleAccumulator) {
                 return false;
             }
@@ -549,19 +518,15 @@ final class RuleRegistry
     }
 
     /**
-     * Initialise project-rule accumulators before a streaming analysis pass.
+     * Initialises the project-rule accumulators before a streaming analysis pass.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param RuleContext $ruleContext - Rule execution context.
      *
      * @return void
      */
     public function beginStreaming(RuleContext $ruleContext): void
     {
-        // User view: add each item that can appear in findings list.
         foreach ($this->enabledRules($ruleContext->config) as $rule) {
-            // User view: choose the findings list branch for this case.
             if ($rule instanceof ProjectRuleAccumulator) {
                 $rule->startProject($ruleContext);
             }
@@ -569,14 +534,12 @@ final class RuleRegistry
     }
 
     /**
-     * Run every enabled per-unit rule and accumulator against a single unit.
+     * Runs every enabled per-unit rule and accumulator against a single unit.
      *
      * Use together with beginStreaming() and endStreaming() to drive a
      * parse → analyse → release pipeline that keeps peak memory close to
      * one unit's worth on large codebases.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit            $analysisUnit - Parsed unit to analyse.
      * @param RuleContext             $ruleContext - Rule execution context.
      * @param RuleRunnerObserver|null $ruleRunnerObserver - Optional per-rule timing hook.
@@ -595,10 +558,8 @@ final class RuleRegistry
     }
 
     /**
-     * Run only the per-unit (file-scoped) rules against a single unit.
+     * Runs only the per-unit (file-scoped) rules against a single unit.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit            $analysisUnit - Parsed unit to analyse.
      * @param RuleContext             $ruleContext - Rule execution context.
      * @param RuleRunnerObserver|null $ruleRunnerObserver - Optional per-rule timing hook.
@@ -610,7 +571,7 @@ final class RuleRegistry
         RuleContext         $ruleContext,
         ?RuleRunnerObserver $ruleRunnerObserver,
     ): array {
-        // User view: choose the findings list branch for this case.
+        // A file that failed to parse has no reliable AST for the rules to read.
         if ($analysisUnit->hasParseErrors()) {
             return [];
         }
@@ -618,19 +579,15 @@ final class RuleRegistry
         $findings = [];
         $isPhp    = $analysisUnit->file->isPhp();
 
-        // User view: add each item that can appear in findings list.
+        // Run every enabled rule that applies to this unit.
         foreach ($this->enabledRules($ruleContext->config) as $rule) {
-            // User view: choose the findings list branch for this case.
             if (!$rule instanceof RuleInterface) {
                 continue;
             }
-            // User view: choose the findings list branch for this case.
             if (!$isPhp && !$rule instanceof SourceTextRuleInterface) {
                 continue;
             }
 
-            // User view: choose the findings list branch for this case.
-            // User view: missing data becomes the expected findings list state.
             if ($ruleRunnerObserver === null) {
                 array_push($findings, ...$rule->analyse($analysisUnit, $ruleContext));
                 continue;
@@ -647,10 +604,8 @@ final class RuleRegistry
     }
 
     /**
-     * Push one unit through every enabled streaming project rule.
+     * Pushes one unit through every enabled streaming project rule.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit            $analysisUnit - Parsed unit to accumulate.
      * @param RuleContext             $ruleContext - Rule execution context.
      * @param RuleRunnerObserver|null $ruleRunnerObserver - Optional per-rule timing hook.
@@ -662,25 +617,21 @@ final class RuleRegistry
         RuleContext         $ruleContext,
         ?RuleRunnerObserver $ruleRunnerObserver,
     ): void {
-        // User view: choose the findings list branch for this case.
+        // A file that failed to parse contributes nothing to the accumulators.
         if ($analysisUnit->hasParseErrors()) {
             return;
         }
 
         $isPhp = $analysisUnit->file->isPhp();
-        // User view: add each item that can appear in findings list.
+        // Feed the unit to every enabled streaming accumulator.
         foreach ($this->enabledRules($ruleContext->config) as $rule) {
-            // User view: choose the findings list branch for this case.
             if (!$rule instanceof ProjectRuleAccumulator) {
                 continue;
             }
-            // User view: choose the findings list branch for this case.
             if (!$isPhp && !$rule instanceof ProjectSourceTextRuleAccumulator) {
                 continue;
             }
 
-            // User view: choose the findings list branch for this case.
-            // User view: missing data becomes the expected findings list state.
             if ($ruleRunnerObserver === null) {
                 $rule->accumulate($analysisUnit, $ruleContext);
                 continue;
@@ -694,10 +645,8 @@ final class RuleRegistry
     }
 
     /**
-     * Finalise project-rule accumulators after streaming analysis completes.
+     * Finalises the project-rule accumulators and returns their findings after streaming completes.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param RuleContext             $ruleContext - Rule execution context.
      * @param RuleRunnerObserver|null $ruleRunnerObserver - Optional per-rule timing hook.
      *
@@ -709,15 +658,12 @@ final class RuleRegistry
     ): array {
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Flush every enabled accumulator's project-level findings.
         foreach ($this->enabledRules($ruleContext->config) as $rule) {
-            // User view: choose the findings list branch for this case.
             if (!$rule instanceof ProjectRuleAccumulator) {
                 continue;
             }
 
-            // User view: choose the findings list branch for this case.
-            // User view: missing data becomes the expected findings list state.
             if ($ruleRunnerObserver === null) {
                 array_push($findings, ...$rule->finishProject($ruleContext));
                 continue;
@@ -734,13 +680,11 @@ final class RuleRegistry
     }
 
     /**
-     * Apply the canonical ordering and dedupe pass to a streaming run's
+     * Applies the canonical ordering and dedupe pass to a streaming run's
      * collected findings. Callers that drive analyseUnit() / endStreaming()
      * themselves should call this once at the end so the output matches
      * the non-streaming analyse() flow byte-for-byte.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param list<Finding> $findings - Raw findings collected by the streaming analysis path.
      *
      * @return list<Finding> - deduped findings in canonical report order (file, line, rule id, message); empty when no findings survive
@@ -753,13 +697,11 @@ final class RuleRegistry
             $findings,
             static fn(Finding $leftFinding, Finding $rightFinding): int => [
                                                                                $leftFinding->filePath,
-                                                                               // User view: missing data becomes a safe findings list default.
                                                                                $leftFinding->line ?? 0,
                                                                                $leftFinding->ruleId,
                                                                                $leftFinding->message,
                                                                            ] <=> [
                                                                                $rightFinding->filePath,
-                                                                               // User view: missing data becomes a safe findings list default.
                                                                                $rightFinding->line ?? 0,
                                                                                $rightFinding->ruleId,
                                                                                $rightFinding->message,
@@ -770,10 +712,8 @@ final class RuleRegistry
     }
 
     /**
-     * Run all enabled file and project rules against parsed units.
+     * Runs all enabled file and project rules against parsed units.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param list<AnalysisUnit>      $units - Parsed units to analyse with file-scoped rules.
      * @param RuleContext             $ruleContext - Rule execution context.
      * @param list<AnalysisUnit>|null $projectUnits - Parsed units available to project-level rules.
@@ -791,32 +731,23 @@ final class RuleRegistry
     ): array {
         $legacyProjectRules = $this->legacyProjectRules($ruleContext);
         $canReleaseUnits    = $shouldReleaseUnitsAfterAnalysis
-                              // User view: an empty value becomes a clear findings list fallback.
                               && $legacyProjectRules === []
-                              // User view: missing data becomes the expected findings list state.
                               && $projectUnits === null;
 
         $this->beginStreaming($ruleContext);
 
         $findings = [];
-        // User view: add each item that can appear in findings list.
         foreach ($units as $unit) {
             array_push($findings, ...$this->runPerUnitRules($unit, $ruleContext, $ruleRunnerObserver));
-            // User view: choose the findings list branch for this case.
-            // User view: missing data becomes the expected findings list state.
             if ($projectUnits === null) {
                 $this->accumulateForUnit($unit, $ruleContext, $ruleRunnerObserver);
             }
-            // User view: choose the findings list branch for this case.
             if ($canReleaseUnits) {
                 $unit->release();
             }
         }
 
-        // User view: choose the findings list branch for this case.
-        // User view: missing data becomes the expected findings list state.
         if ($projectUnits !== null) {
-            // User view: add each item that can appear in findings list.
             foreach ($projectUnits as $contextUnit) {
                 $this->accumulateForUnit($contextUnit, $ruleContext, $ruleRunnerObserver);
             }
@@ -824,12 +755,10 @@ final class RuleRegistry
 
         array_push($findings, ...$this->endStreaming($ruleContext, $ruleRunnerObserver));
 
-        // User view: choose the findings list branch for this case.
-        // User view: an empty value becomes a clear findings list fallback.
+        // Legacy project rules still need the whole unit list handed to them at once.
         if ($legacyProjectRules !== []) {
             array_push($findings, ...$this->runLegacyProjectRules(
                 $legacyProjectRules,
-                // User view: missing data becomes a safe findings list default.
                 $projectUnits ?? $units,
                 $ruleContext,
                 $ruleRunnerObserver,
@@ -840,10 +769,8 @@ final class RuleRegistry
     }
 
     /**
-     * Find enabled project rules that still need the full unit list.
+     * Returns the enabled project rules that still need the full unit list.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param RuleContext $ruleContext - Rule execution context.
      *
      * @return list<ProjectRuleInterface> - enabled project rules lacking accumulator support, which must run with the full unit list; empty when all
@@ -852,9 +779,7 @@ final class RuleRegistry
     private function legacyProjectRules(RuleContext $ruleContext): array
     {
         $rules = [];
-        // User view: add each item that can appear in findings list.
         foreach ($this->enabledRules($ruleContext->config) as $rule) {
-            // User view: choose the findings list branch for this case.
             if ($rule instanceof ProjectRuleInterface && !$rule instanceof ProjectRuleAccumulator) {
                 $rules[] = $rule;
             }
@@ -864,10 +789,8 @@ final class RuleRegistry
     }
 
     /**
-     * Run project-level rules that need the full analysis context.
+     * Runs the project-level rules that need the full analysis context.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param list<ProjectRuleInterface> $rules - Project rules to run.
      * @param list<AnalysisUnit>         $contextUnits - Candidate units available to project rules.
      * @param RuleContext                $ruleContext - Rule execution context.
@@ -886,17 +809,13 @@ final class RuleRegistry
                                              static fn(AnalysisUnit $analysisUnit): bool => !$analysisUnit->hasParseErrors() && $analysisUnit->file->isPhp(),
                                          ));
 
-        // User view: choose the findings list branch for this case.
-        // User view: an empty value becomes a clear findings list fallback.
+        // No parse-clean PHP units means the project rules have nothing to inspect.
         if ($analyseableUnits === []) {
             return [];
         }
 
         $findings = [];
-        // User view: add each item that can appear in findings list.
         foreach ($rules as $rule) {
-            // User view: choose the findings list branch for this case.
-            // User view: missing data becomes the expected findings list state.
             if ($ruleRunnerObserver === null) {
                 array_push($findings, ...$rule->analyseProject($analyseableUnits, $ruleContext));
                 continue;
@@ -913,10 +832,8 @@ final class RuleRegistry
     }
 
     /**
-     * Build deduplicate findings for the component.
+     * Collapses findings that share a full reporting identity, keeping the first occurrence.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param list<Finding> $findings - Findings to collapse by full reporting identity.
      *
      * @return list<Finding> - input order preserved with later exact-identity duplicates dropped (first occurrence wins)
@@ -926,25 +843,19 @@ final class RuleRegistry
         $seen           = [];
         $uniqueFindings = [];
 
-        // User view: add each item that can appear in findings list.
         foreach ($findings as $finding) {
             $key = implode("\0", [
                 $finding->ruleId,
                 $finding->filePath,
-                // User view: missing data becomes a safe findings list default.
                 (string)($finding->line ?? ''),
-                // User view: missing data becomes a safe findings list default.
                 (string)($finding->endLine ?? ''),
-                // User view: missing data becomes a safe findings list default.
                 (string)($finding->column ?? ''),
-                // User view: missing data becomes a safe findings list default.
                 $finding->symbol ?? '',
                 $finding->message,
-                // User view: an empty value becomes a clear findings list fallback.
                 $finding->metadata === [] ? '' : serialize($finding->metadata),
             ]);
 
-            // User view: choose the findings list branch for this case.
+            // An exact-identity repeat is dropped so the report shows each finding once.
             if (isset($seen[$key])) {
                 continue;
             }
@@ -957,11 +868,9 @@ final class RuleRegistry
     }
 
     /**
-     * Keep only the highest-priority naming finding when multiple naming rules
+     * Keeps only the highest-priority naming finding when multiple naming rules
      * report the same identifier at the same source location.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param list<Finding> $findings - Findings that may contain overlapping naming reports.
      *
      * @return list<Finding> - relative order preserved, keeping only the highest-priority naming finding per overlapping identifier
@@ -971,24 +880,20 @@ final class RuleRegistry
         $bestByIdentifier = [];
         $selectedIndexes  = [];
 
-        // User view: add each item that can appear in findings list.
         foreach ($findings as $index => $finding) {
             $key = $this->namingOverlapKey($finding);
-            // User view: choose the findings list branch for this case.
-            // User view: missing data becomes the expected findings list state.
             if ($key === null) {
                 $selectedIndexes[$index] = true;
                 continue;
             }
 
             $priority = self::NAMING_RULE_PRIORITY[$finding->ruleId];
-            // User view: choose the findings list branch for this case.
+            // Keep this finding only when its rule outranks the best seen for the identifier.
             if (!isset($bestByIdentifier[$key]) || $priority < $bestByIdentifier[$key]['priority']) {
                 $bestByIdentifier[$key] = ['index' => $index, 'priority' => $priority];
             }
         }
 
-        // User view: add each item that can appear in findings list.
         foreach ($bestByIdentifier as $selected) {
             $selectedIndexes[$selected['index']] = true;
         }
@@ -999,56 +904,43 @@ final class RuleRegistry
     }
 
     /**
-     * Build the cross-rule identifier key used to collapse duplicate naming findings.
+     * Builds the cross-rule identifier key used to collapse duplicate naming findings.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Finding $finding - Finding to classify for naming-rule overlap.
      *
      * @return string|null - overlap-bucket key (file, line, column, symbol, identifier); null when the finding cannot participate in naming dedup
      */
     private function namingOverlapKey(Finding $finding): ?string
     {
-        // User view: choose the findings list branch for this case.
         if (!isset(self::NAMING_RULE_PRIORITY[$finding->ruleId])) {
             return null;
         }
 
         $identifierName = $this->findingIdentifierName($finding);
-        // User view: choose the findings list branch for this case.
-        // User view: missing data becomes the expected findings list state.
         if ($identifierName === null) {
             return null;
         }
 
         return implode("\0", [
             $finding->filePath,
-            // User view: missing data becomes a safe findings list default.
             (string)($finding->line ?? ''),
-            // User view: missing data becomes a safe findings list default.
             (string)($finding->column ?? ''),
-            // User view: missing data becomes a safe findings list default.
             $finding->symbol ?? '',
             strtolower($identifierName),
         ]);
     }
 
     /**
-     * Extract the identifier name from finding metadata.
+     * Returns the identifier name from finding metadata.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Finding $finding - Finding whose metadata may carry an identifier.
      *
      * @return string|null - identifier from metadata, falling back to the finding symbol; null when neither is present
      */
     private function findingIdentifierName(Finding $finding): ?string
     {
-        // User view: add each item that can appear in findings list.
         foreach (['identifierName', 'variable', 'parameter'] as $metadataKey) {
-            // User view: missing data becomes a safe findings list default.
             $metadataValue = $finding->metadata[$metadataKey] ?? null;
-            // User view: choose the findings list branch for this case.
             if (is_string($metadataValue)) {
                 return $metadataValue;
             }

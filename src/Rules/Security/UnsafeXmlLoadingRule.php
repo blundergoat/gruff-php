@@ -19,7 +19,14 @@ use PhpParser\Node\Expr;
 use PhpParser\NodeFinder;
 
 /**
- * Detects XML loading of request-controlled data without network restrictions.
+ * Flags an XML loader - `simplexml_load_string`, `DOMDocument::loadXML`, `XMLReader::open`, and friends -
+ * that parses request-controlled data without `LIBXML_NONET`, the shape that lets a crafted document pull
+ * in external entities and reach internal hosts (XXE / SSRF). A reviewer sees each unguarded parse.
+ *
+ * Runs per file. Generic loader method names (`load`, `open`, `xml`) are only flagged when the receiver is
+ * provably a real XML parser class, traced through variables, `$this` properties, and constructor writes,
+ * so archives and ORMs that share those names stay quiet. A call passing `LIBXML_NONET` is treated as
+ * guarded. Warning severity, medium confidence - taint tracking is heuristic and the flag may be set out of view.
  */
 final class UnsafeXmlLoadingRule implements RuleInterface
 {
@@ -38,10 +45,8 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     private const XML_RECEIVER_CLASS_NAMES = ['DOMDocument', 'SimpleXMLElement', 'XMLReader'];
 
     /**
-     * Describe the unsafe XML loading rule.
+     * Describes the unsafe-XML-loading rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -58,10 +63,8 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     }
 
     /**
-     * Find XML loaders that receive request-controlled data without LIBXML_NONET.
+     * Reports XML loaders that receive request-controlled data without LIBXML_NONET.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
      *
@@ -71,28 +74,27 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     {
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Weigh every function call for a SimpleXML loader.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
             $name = SecurityNodeHelper::globalFunctionName($call);
-            // User view: choose the findings list branch for this case.
+            // Only the simplexml_load_* functions load XML from this path.
             if (!in_array($name, ['simplexml_load_file', 'simplexml_load_string'], true)) {
                 continue;
             }
 
             $xmlArg = SecurityNodeHelper::argumentValue($call->args, 0);
-            // User view: choose the findings list branch for this case.
-            // User view: missing data becomes the expected findings list state.
+            // Request-controlled XML with no LIBXML_NONET is the unsafe shape to flag.
             if ($xmlArg !== null && SecurityNodeHelper::containsUserInput($xmlArg) && !$this->hasLibxmlNonetArgument($call->args, 2)) {
                 $findings[] = $this->finding($analysisUnit, $call, $name);
             }
         }
 
-        // User view: add each item that can appear in findings list.
+        // Weigh every method call for a DOMDocument/XMLReader-style loader.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\MethodCall::class) as $call) {
             array_push($findings, ...$this->xmlMethodFindings($analysisUnit, $call));
         }
 
-        // User view: add each item that can appear in findings list.
+        // Weigh static loader calls the same way.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\StaticCall::class) as $call) {
             array_push($findings, ...$this->xmlMethodFindings($analysisUnit, $call));
         }
@@ -101,10 +103,8 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     }
 
     /**
-     * Build XML-loading findings for DOMDocument/XMLReader-style method and static calls.
+     * Builds the XML-loading findings for DOMDocument/XMLReader-style method and static calls.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit                    $analysisUnit - Parsed unit supplying the display path for any finding.
      * @param Expr\MethodCall|Expr\StaticCall $call         - Loader call to inspect (`load`, `loadXML`, `open`, `xml`).
      *
@@ -113,7 +113,6 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     private function xmlMethodFindings(AnalysisUnit $analysisUnit, Expr\MethodCall|Expr\StaticCall $call): array
     {
         $method = SecurityNodeHelper::methodName($call);
-        // User view: choose the findings list branch for this case.
         if (!in_array($method, ['load', 'loadxml', 'open', 'xml'], true)) {
             // Not an XML-loading entry point, so it cannot trigger external-entity or network fetches; skip it.
             return [];
@@ -121,14 +120,11 @@ final class UnsafeXmlLoadingRule implements RuleInterface
 
         // Loader-shaped names are everywhere (archives, ORMs, builders); without receiver evidence
         // of an XML parser class this is not an XML sink, so the user sees no false warning.
-        // User view: choose the findings list branch for this case.
         if (!$this->isXmlCapableReceiver($analysisUnit, $call)) {
             return [];
         }
 
         $xmlArg = SecurityNodeHelper::argumentValue($call->args, 0);
-        // User view: choose the findings list branch for this case.
-        // User view: missing data becomes the expected findings list state.
         if ($xmlArg === null || !SecurityNodeHelper::containsUserInput($xmlArg)) {
             // The XML payload is trusted (or absent), so an unrestricted loader carries no injection risk here.
             return [];
@@ -136,7 +132,6 @@ final class UnsafeXmlLoadingRule implements RuleInterface
 
         // DOMDocument load/loadXML put options at index 1; XMLReader open/xml take encoding first, so options sit at 2.
         $optionsIndex = in_array($method, ['open', 'xml'], true) ? 2 : 1;
-        // User view: choose the findings list branch for this case.
         if ($this->hasLibxmlNonetArgument($call->args, $optionsIndex)) {
             // The caller passed LIBXML_NONET, which blocks the network fetch this rule guards against; not a finding.
             return [];
@@ -147,14 +142,12 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     }
 
     /**
-     * Decide whether the call's receiver is provably an XML-capable parser class.
+     * Reports whether the call's receiver is provably an XML-capable parser class.
      *
      * This gate is why `gruff-php analyse --include-rule security.unsafe-xml-loading` warns
      * on real XML parsers but stays quiet on archives, ORMs, and builders that happen to
      * share the same method names.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit                    $analysisUnit - Parsed unit supplying top-level statements for receiver tracing.
      * @param Expr\MethodCall|Expr\StaticCall $call         - Loader-named call whose receiver is being classified.
      *
@@ -165,25 +158,22 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     private function isXmlCapableReceiver(AnalysisUnit $analysisUnit, Expr\MethodCall|Expr\StaticCall $call): bool
     {
         // Static calls name their class directly, so the allowlist check is immediate.
-        // User view: choose the findings list branch for this case.
         if ($call instanceof Expr\StaticCall) {
             return SecurityNodeHelper::hasMatchingClassName($call->class, self::XML_RECEIVER_CLASS_NAMES);
         }
 
         $receiver = $call->var;
         // An inline construction names the class right at the call site.
-        // User view: choose the findings list branch for this case.
         if ($receiver instanceof Expr\New_) {
             return SecurityNodeHelper::hasMatchingClassName($receiver->class, self::XML_RECEIVER_CLASS_NAMES);
         }
 
         // A plain variable needs its earlier assignments traced to learn what it holds.
-        // User view: choose the findings list branch for this case.
         if ($receiver instanceof Expr\Variable && is_string($receiver->name)) {
             return $this->isVariableXmlParser($analysisUnit, $receiver->name, $call);
         }
 
-        // User view: choose the findings list branch for this case.
+        // A property receiver needs its declared type or assignments traced.
         if ($receiver instanceof Expr\PropertyFetch) {
             return $this->isPropertyXmlParser($analysisUnit, $receiver, $call);
         }
@@ -193,15 +183,13 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     }
 
     /**
-     * Trace whether a receiver variable can hold an XML parser at the loader call.
+     * Reports whether a receiver variable can hold an XML parser at the loader call.
      *
      * Same-scope writes are replayed in source order. A write the runtime could skip
      * on the sink's path (it sits in a branch the sink does not share) can add XML
      * evidence but never erase it, so one conditional rebind cannot hide a real
      * parser from the user; an unskippable write fully rebinds the receiver.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit    $analysisUnit - Parsed unit supplying top-level statements when the call has no enclosing function.
      * @param string          $variableName - Receiver variable name at the loader call.
      * @param Expr\MethodCall $call         - Loader call whose byte offset bounds the assignment search.
@@ -213,13 +201,11 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     {
         $callPosition = $call->getStartFilePos();
         // Without byte offsets the assignment order cannot be proven; stay silent rather than guess.
-        // User view: choose the findings list branch for this case.
         if ($callPosition < 0) {
             return false;
         }
 
         $scope      = SecurityNodeHelper::enclosingFunctionLike($call);
-        // User view: missing data becomes a safe findings list default.
         $statements = $scope instanceof Node\FunctionLike ? ($scope->getStmts() ?? []) : $analysisUnit->statements;
         $nodeFinder = new NodeFinder();
         $writes     = $nodeFinder->find(
@@ -236,10 +222,8 @@ final class UnsafeXmlLoadingRule implements RuleInterface
         $isPossiblyXml   = false;
 
         // Replay the writes in order; the possibly-XML state left at the call is what counts.
-        // User view: add each item that can appear in findings list.
         foreach ($writes as $write) {
             // Writes from nested closures do not bind this scope's variable.
-            // User view: choose the findings list branch for this case.
             if (!$write instanceof Expr\Assign || SecurityNodeHelper::enclosingFunctionLike($write) !== $scope) {
                 continue;
             }
@@ -257,10 +241,8 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     }
 
     /**
-     * Trace whether a `$this->property` receiver can hold an XML parser at the loader call.
+     * Reports whether a `$this->property` receiver can hold an XML parser at the loader call.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit       $analysisUnit - Parsed unit supplying statements for same-scope property assignment tracing.
      * @param Expr\PropertyFetch $receiver     - Receiver property fetch from the loader call.
      * @param Expr\MethodCall    $call         - Loader call whose receiver is being classified.
@@ -271,14 +253,13 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     private function isPropertyXmlParser(AnalysisUnit $analysisUnit, Expr\PropertyFetch $receiver, Expr\MethodCall $call): bool
     {
         $propertyName = $this->thisPropertyName($receiver);
-        // User view: choose the findings list branch for this case.
-        // User view: missing data becomes the expected findings list state.
+        // A dynamic or non-this property fetch gives no name to trace.
         if ($propertyName === null) {
             return false;
         }
 
         $classLike = $this->enclosingClassLike($receiver);
-        // User view: choose the findings list branch for this case.
+        // The class either types the property as a parser or builds one in its constructor.
         if (
             $classLike instanceof Node\Stmt\ClassLike
             && (
@@ -293,17 +274,15 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     }
 
     /**
-     * Resolve a statically named `$this->property` fetch.
+     * Resolves a statically named `$this->property` fetch to its property name.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Expr $expr - Expression that may be a property fetch.
      *
      * @return string|null - Property name when the expression is `$this->property`, null for dynamic or non-this fetches.
      */
     private function thisPropertyName(Expr $expr): ?string
     {
-        // User view: choose the findings list branch for this case.
+        // Only a statically named property fetch on the current object yields a name.
         if (
             !$expr instanceof Expr\PropertyFetch
             || !$expr->var instanceof Expr\Variable
@@ -317,19 +296,18 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     }
 
     /**
-     * Find the class-like declaration containing a node.
+     * Returns the class-like declaration containing a node.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node $node - Node whose containing class-like declaration is needed.
      *
      * @return Node\Stmt\ClassLike|null - Nearest class, trait, interface, or enum ancestor, or null at file scope.
      */
     private function enclosingClassLike(Node $node): ?Node\Stmt\ClassLike
     {
+        // Climb the parent chain to the nearest class-like declaration.
         $current = $node;
         while ($current instanceof Node) {
-            // User view: choose the findings list branch for this case.
+            // The first class-like ancestor owns this node.
             if ($current instanceof Node\Stmt\ClassLike) {
                 return $current;
             }
@@ -342,10 +320,8 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     }
 
     /**
-     * Check same-class property declarations and promoted constructor properties for XML parser types.
+     * Reports whether a same-class or promoted property is typed as an XML parser.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node\Stmt\ClassLike $classLike    - Class-like declaration that owns the `$this` property access.
      * @param string              $propertyName - Property name from the receiver fetch.
      *
@@ -358,10 +334,8 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     }
 
     /**
-     * Check same-class property declarations for XML parser types.
+     * Reports whether a declared same-class property is typed as an XML parser.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node\Stmt\ClassLike $classLike    - Class-like declaration that owns the `$this` property access.
      * @param string              $propertyName - Property name from the receiver fetch.
      *
@@ -369,16 +343,16 @@ final class UnsafeXmlLoadingRule implements RuleInterface
      */
     private function hasDeclaredPropertyXmlParserType(Node\Stmt\ClassLike $classLike, string $propertyName): bool
     {
-        // User view: add each item that can appear in findings list.
+        // Weigh each statement in the class body.
         foreach ($classLike->stmts as $statement) {
-            // User view: choose the findings list branch for this case.
+            // Skip non-property members and properties not typed as a parser.
             if (!$statement instanceof Node\Stmt\Property || $statement->isStatic() || !$this->isXmlParserType($statement->type)) {
                 continue;
             }
 
-            // User view: add each item that can appear in findings list.
+            // One declaration can name several properties; check each.
             foreach ($statement->props as $property) {
-                // User view: choose the findings list branch for this case.
+                // The property is a parser when the matching name carries the type.
                 if ($property->name->toString() === $propertyName) {
                     return true;
                 }
@@ -389,10 +363,8 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     }
 
     /**
-     * Check promoted constructor properties for XML parser types.
+     * Reports whether a promoted constructor property is typed as an XML parser.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node\Stmt\ClassLike $classLike    - Class-like declaration that owns the `$this` property access.
      * @param string              $propertyName - Property name from the receiver fetch.
      *
@@ -401,15 +373,14 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     private function hasPromotedPropertyXmlParserType(Node\Stmt\ClassLike $classLike, string $propertyName): bool
     {
         $constructor = $this->constructor($classLike);
-        // User view: choose the findings list branch for this case.
-        // User view: missing data becomes the expected findings list state.
+        // No constructor means no promoted parameters to check.
         if ($constructor === null) {
             return false;
         }
 
-        // User view: add each item that can appear in findings list.
+        // Weigh each constructor parameter.
         foreach ($constructor->params as $parameter) {
-            // User view: choose the findings list branch for this case.
+            // Skip parameters that are not promoted or do not match the property.
             if (
                 $parameter->flags === 0
                 || !$parameter->var instanceof Expr\Variable
@@ -418,7 +389,7 @@ final class UnsafeXmlLoadingRule implements RuleInterface
                 continue;
             }
 
-            // User view: choose the findings list branch for this case.
+            // The promoted property is a parser when its type names one.
             if ($this->isXmlParserType($parameter->type)) {
                 return true;
             }
@@ -428,37 +399,34 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     }
 
     /**
-     * Check whether a type node can name one of the XML parser classes.
+     * Reports whether a type node can name one of the XML parser classes.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node|null $type - Property or parameter type node.
      *
      * @return bool - true when the type, nullable type, union member, or intersection member names an XML parser class.
      */
     private function isXmlParserType(?Node $type): bool
     {
-        // User view: choose the findings list branch for this case.
-        // User view: missing data becomes the expected findings list state.
+        // An untyped declaration names no class.
         if ($type === null) {
             return false;
         }
 
-        // User view: choose the findings list branch for this case.
+        // A plain class name is a parser when it is on the allowlist.
         if ($type instanceof Node\Name) {
             return SecurityNodeHelper::hasMatchingClassName($type, self::XML_RECEIVER_CLASS_NAMES);
         }
 
-        // User view: choose the findings list branch for this case.
+        // A nullable type is a parser exactly when its inner type is.
         if ($type instanceof Node\NullableType) {
             return $this->isXmlParserType($type->type);
         }
 
-        // User view: choose the findings list branch for this case.
+        // A union or intersection is a parser when any member is.
         if ($type instanceof Node\UnionType || $type instanceof Node\IntersectionType) {
-            // User view: add each item that can appear in findings list.
+            // Weigh each member of the composite type.
             foreach ($type->types as $innerType) {
-                // User view: choose the findings list branch for this case.
+                // One parser member is enough.
                 if ($this->isXmlParserType($innerType)) {
                     return true;
                 }
@@ -469,10 +437,8 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     }
 
     /**
-     * Check constructor writes that initialise an untyped `$this` property to an XML parser.
+     * Reports whether constructor writes initialise an untyped `$this` property to an XML parser.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node\Stmt\ClassLike $classLike    - Class-like declaration whose constructor is inspected.
      * @param string              $propertyName - Property name from the receiver fetch.
      *
@@ -481,20 +447,18 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     private function hasConstructorXmlParserAssignment(Node\Stmt\ClassLike $classLike, string $propertyName): bool
     {
         $constructor = $this->constructor($classLike);
-        // User view: choose the findings list branch for this case.
-        // User view: missing data becomes the expected findings list state.
+        // No constructor means no initialising writes to replay.
         if ($constructor === null) {
             return false;
         }
 
-        // User view: missing data becomes a safe findings list default.
         $assignments = (new NodeFinder())->findInstanceOf($constructor->stmts ?? [], Expr\Assign::class);
         usort($assignments, static fn(Node $left, Node $right): int => $left->getStartFilePos() <=> $right->getStartFilePos());
 
         $isPossiblyXml = false;
-        // User view: add each item that can appear in findings list.
+        // Replay each constructor assignment in source order.
         foreach ($assignments as $assignment) {
-            // User view: choose the findings list branch for this case.
+            // Skip writes from nested scopes or to other properties.
             if (
                 SecurityNodeHelper::enclosingFunctionLike($assignment) !== $constructor
                 || $this->thisPropertyName($assignment->var) !== $propertyName
@@ -514,19 +478,17 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     }
 
     /**
-     * Find a class-like declaration's constructor.
+     * Returns a class-like declaration's constructor, or null when it has none.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node\Stmt\ClassLike $classLike - Class-like declaration to inspect.
      *
      * @return Node\Stmt\ClassMethod|null - Constructor method, or null when the class-like has none.
      */
     private function constructor(Node\Stmt\ClassLike $classLike): ?Node\Stmt\ClassMethod
     {
-        // User view: add each item that can appear in findings list.
+        // Weigh each statement in the class body.
         foreach ($classLike->stmts as $statement) {
-            // User view: choose the findings list branch for this case.
+            // The __construct method is the constructor.
             if ($statement instanceof Node\Stmt\ClassMethod && strtolower($statement->name->toString()) === '__construct') {
                 return $statement;
             }
@@ -536,10 +498,8 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     }
 
     /**
-     * Trace same-scope writes to a `$this` property before the loader call.
+     * Reports whether same-scope writes bind a `$this` property to an XML parser before the loader call.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit    $analysisUnit - Parsed unit supplying top-level statements when the call has no enclosing method.
      * @param string          $propertyName - Receiver property name at the loader call.
      * @param Expr\MethodCall $call         - Loader call whose byte offset bounds the assignment search.
@@ -549,13 +509,12 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     private function isPropertyAssignedXmlParserInScope(AnalysisUnit $analysisUnit, string $propertyName, Expr\MethodCall $call): bool
     {
         $callPosition = $call->getStartFilePos();
-        // User view: choose the findings list branch for this case.
+        // Without byte offsets the assignment order cannot be proven; stay silent.
         if ($callPosition < 0) {
             return false;
         }
 
         $scope      = SecurityNodeHelper::enclosingFunctionLike($call);
-        // User view: missing data becomes a safe findings list default.
         $statements = $scope instanceof Node\FunctionLike ? ($scope->getStmts() ?? []) : $analysisUnit->statements;
         $writes     = (new NodeFinder())->find(
             array_values($statements),
@@ -569,9 +528,9 @@ final class UnsafeXmlLoadingRule implements RuleInterface
         $sinkAncestorIds = SecurityNodeHelper::ancestorIdsWithin($call, $scope);
         $isPossiblyXml   = false;
 
-        // User view: add each item that can appear in findings list.
+        // Replay the writes in order; the state left at the call is what counts.
         foreach ($writes as $write) {
-            // User view: choose the findings list branch for this case.
+            // Writes from nested closures do not bind this scope's property.
             if (!$write instanceof Expr\Assign || SecurityNodeHelper::enclosingFunctionLike($write) !== $scope) {
                 continue;
             }
@@ -588,10 +547,8 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     }
 
     /**
-     * Check whether an assignment is a direct statement in a method body.
+     * Reports whether an assignment is a direct statement in a method body.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node              $node  - Assignment node being classified.
      * @param Node\FunctionLike $scope - Function-like scope expected to own the statement directly.
      *
@@ -600,7 +557,7 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     private function isDirectStatementInScope(Node $node, Node\FunctionLike $scope): bool
     {
         $parent = $node->getAttribute('parent');
-        // User view: choose the findings list branch for this case.
+        // Unwrap the expression-statement wrapper to reach the owning scope.
         if ($parent instanceof Node\Stmt\Expression) {
             $parent = $parent->getAttribute('parent');
         }
@@ -609,10 +566,8 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     }
 
     /**
-     * Check whether any positional options argument at or after the given index passes LIBXML_NONET.
+     * Reports whether any positional options argument at or after the given index passes LIBXML_NONET.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param array<int|string, Node\Arg|Node\VariadicPlaceholder> $args       - Call args; string-keyed named args are skipped.
      * @param int                                                  $startIndex - First positional index the options flags can appear at; varies by
      *                                                                         loader signature.
@@ -621,14 +576,13 @@ final class UnsafeXmlLoadingRule implements RuleInterface
      */
     private function hasLibxmlNonetArgument(array $args, int $startIndex): bool
     {
-        // User view: add each item that can appear in findings list.
+        // Weigh each argument from the options index onward.
         foreach ($args as $index => $arg) {
-            // User view: choose the findings list branch for this case.
+            // Skip named args and positions before the options slot.
             if (!is_int($index) || $index < $startIndex || !$arg instanceof Node\Arg) {
                 continue;
             }
 
-            // User view: choose the findings list branch for this case.
             if ($this->containsLibxmlNonet($arg->value)) {
                 // A flags argument carries LIBXML_NONET, so the network-blocking guardrail is present; report safe.
                 return true;
@@ -640,10 +594,8 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     }
 
     /**
-     * Test whether an argument expression mentions the LIBXML_NONET constant anywhere in its subtree.
+     * Reports whether an argument expression mentions the LIBXML_NONET constant anywhere in its subtree.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node $node - Argument value node to search (a bare constant, a bitmask expression, etc.).
      *
      * @return bool - True when the node contains the LIBXML_NONET constant.
@@ -660,10 +612,8 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     }
 
     /**
-     * Build the unsafe XML loading finding for one flagged loader call.
+     * Builds the unsafe-XML-loading finding for one flagged loader call.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit supplying the display path recorded on the finding.
      * @param Node         $node         - Loader call node; its start line locates the finding in source.
      * @param string       $sink         - Loader name (e.g. `loadXML`) put in the message and metadata so triage knows the call.

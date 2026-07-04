@@ -17,7 +17,13 @@ use GruffPhp\Engine\Source\IgnoredPath;
 use GruffPhp\Results\Trend\TrendReport;
 
 /**
- * Carries the full analysis result used by every reporter format.
+ * The complete result of one analysis run - everything every reporter format needs to render, in one place.
+ *
+ * When gruff finishes analysing, it packs the whole outcome into this readonly report: the findings,
+ * the file counts, the score, and every optional section a run might have produced (mutation, diff,
+ * trend, baseline, branch review). Whichever way the user asked to see results - terminal text, JSON,
+ * SARIF, HTML - the reporter reads from this one object, so the text they read and the JSON their CI
+ * parses always describe the same run.
  *
  * @phpstan-type ReportScalar bool|float|int|object|string|null
  * @phpstan-type ReportValue ReportScalar|array<array-key, ReportScalar|array<array-key, ReportScalar|array<array-key, ReportScalar|array<array-key,
@@ -36,8 +42,8 @@ final readonly class AnalysisReport
     public const SCHEMA_VERSION = 'gruff.analysis.v2';
 
     /**
-      * User flow: Moves analysis state toward the output users review.
-      *
+     * Gathers everything one analysis run produced into the single object every reporter renders from.
+     *
      * @param string                      $toolVersion - Gruff version used to produce the report.
      * @param list<string>                $requestedPaths - Paths requested for analysis.
      * @param string                      $format - Output format requested for report serialization.
@@ -49,19 +55,19 @@ final readonly class AnalysisReport
      * @param list<RunDiagnostic>         $diagnostics - Non-finding diagnostics emitted during the run.
      * @param list<Finding>               $findings - Findings included in the report.
      * @param int                         $exitCode - Process exit code represented by the report.
-     * @param string|null                 $configPath - Config file path used for the run, when available.
-     * @param MutationAnalysisResult|null $mutation - Mutation analysis result attached to the report.
-     * @param ScoreReport|null            $score - Score summary attached to the report.
-     * @param DiffResult|null             $diff - Diff context attached to the report.
-     * @param TrendReport|null            $trend - Trend history attached to the report.
-     * @param BaselineReport|null         $baseline - Baseline application result attached to the report.
-     * @param BranchReviewResult|null     $review - Branch review result attached to the report.
-     * @param FindingDisplayFilter|null   $filters - Display filters applied to the report output.
-     * @param int|null                    $suppressedCount - Findings excluded by changed-region filtering.
+     * @param string|null                 $configPath - Config file path used for the run; null when the run used no config.
+     * @param MutationAnalysisResult|null $mutation - Mutation analysis result; null when mutation analysis was not run.
+     * @param ScoreReport|null            $score - Score summary; null when scoring was not produced for the run.
+     * @param DiffResult|null             $diff - Diff context; null when the run was not scoped to changed regions.
+     * @param TrendReport|null            $trend - Trend history; null when no trend recording was requested.
+     * @param BaselineReport|null         $baseline - Baseline application result; null when no baseline was applied.
+     * @param BranchReviewResult|null     $review - Branch review result; null when the run was not a --diff-vs review.
+     * @param FindingDisplayFilter|null   $filters - Display filters applied to the output; null when none were active.
+     * @param int|null                    $suppressedCount - Findings hidden by changed-region filtering; null when no such filtering ran.
      * @param list<IgnoredPath>           $ignoredPathDetails - Ignored paths enriched with source and matching pattern.
      * @param bool                        $shouldListAbsentBaseline - Whether reporters should list resolved (absent) baseline entries.
-     * @param ThresholdTrip|null          $failureReason - Gate threshold that tripped, when the run failed a count threshold.
-     * @param int|null                    $newFindingsCount - Size of the new-findings set, when a new-findings gate is active.
+     * @param ThresholdTrip|null          $failureReason - Gate threshold that tripped; null when the run did not fail a count threshold.
+     * @param int|null                    $newFindingsCount - Size of the new-findings set; null when no new-findings gate is active.
      */
     public function __construct(
         public string                  $toolVersion,
@@ -92,12 +98,10 @@ final readonly class AnalysisReport
     }
 
     /**
-     * Count findings by severity for report metadata.
+     * Tallies findings by severity for the report's headline summary line.
      *
-      * User flow: Moves analysis state toward the output users review.
-      *
      * @return array{advisory: int, warning: int, error: int, total: int} - per-severity finding tallies plus a precomputed total; each count is zero
-     *                         when no finding hit that severity
+     *                         when no finding hit that severity.
      */
     public function findingCounts(): array
     {
@@ -108,7 +112,7 @@ final readonly class AnalysisReport
             'total'    => count($this->findings),
         ];
 
-        // User view: add each item that can appear in analysis output.
+        // Sort each finding into its severity bucket.
         foreach ($this->findings as $finding) {
             $counts[$finding->severity->value]++;
         }
@@ -117,20 +121,20 @@ final readonly class AnalysisReport
     }
 
     /**
-     * Count findings by rule id with per-severity breakdown for triage views.
+     * Tallies findings per rule with a severity breakdown for triage views, surfacing the noisiest rule
+     * first.
+     *
      * Sorted by total descending then ruleId ascending so the noisiest rules surface first
      * and ordering stays deterministic across runs.
      *
-      * User flow: Moves analysis state toward the output users review.
-      *
      * @return list<array{ruleId: string, total: int, advisory: int, warning: int, error: int}> - one row per triggered rule, ordered noisiest-first
-     *                            (total descending, then ruleId ascending); empty when there are no findings
+     *                            (total descending, then ruleId ascending); empty when there are no findings.
      */
     public function findingCountsByRule(): array
     {
         $byRule = [];
 
-        // User view: add each item that can appear in analysis output.
+        // Tally each finding under its rule, with a per-severity breakdown.
         foreach ($this->findings as $finding) {
             $byRule[$finding->ruleId] ??= ['total' => 0, 'advisory' => 0, 'warning' => 0, 'error' => 0];
             $byRule[$finding->ruleId]['total']++;
@@ -139,7 +143,7 @@ final readonly class AnalysisReport
 
         $rows = [];
 
-        // User view: add each item that can appear in analysis output.
+        // Flatten the per-rule tallies into rows ready for sorting.
         foreach ($byRule as $ruleId => $counts) {
             $rows[] = [
                 'ruleId'   => $ruleId,
@@ -160,12 +164,10 @@ final readonly class AnalysisReport
     }
 
     /**
-     * Count parse diagnostics emitted while loading analysed files.
+     * Counts how many files failed to parse, so the summary can warn the user some code went unscanned.
      *
-      * User flow: Moves analysis state toward the output users review.
-      *
      * @return int - count of parse-error diagnostics only; other diagnostic types (e.g. baseline-error) are not tallied here, so zero means every
-     *             file parsed cleanly
+     *             file parsed cleanly.
      */
     public function parseErrorCount(): int
     {
@@ -176,12 +178,11 @@ final readonly class AnalysisReport
     }
 
     /**
-     * Serialize this value object into the array shape used by reports.
+     * Flattens the whole report into the reporter wire shape, so JSON, SARIF, and HTML all serialise the
+     * same run - with each optional section present only when the run actually produced it.
      *
-      * User flow: Moves analysis state toward the output users review.
-      *
      * @return array<string, ReportValue> - the report serialized to the reporter wire shape; optional sections (mutation, score, diff, etc.) are
-     *                       present only when populated
+     *                       present only when populated.
      */
     public function toArray(): array
     {
@@ -223,49 +224,47 @@ final readonly class AnalysisReport
             ),
         ];
 
-        // User view: choose the analysis output branch for this case.
-        // User view: missing data becomes the expected analysis output state.
+        // Include the suppressed count only when changed-region filtering actually hid some findings.
         if ($this->suppressedCount !== null) {
             $report['suppressedCount'] = $this->suppressedCount;
         }
 
-        // User view: choose the analysis output branch for this case.
+        // Include the failure reason only when the run tripped a count threshold.
         if ($this->failureReason instanceof ThresholdTrip) {
             $report['failureReason'] = $this->failureReason->toArray();
         }
 
-        // User view: choose the analysis output branch for this case.
-        // User view: missing data becomes the expected analysis output state.
+        // Include the new-findings count only when a new-findings gate was active.
         if ($this->newFindingsCount !== null) {
             $report['newFindingsCount'] = $this->newFindingsCount;
         }
 
-        // User view: choose the analysis output branch for this case.
+        // Attach the mutation section only when mutation analysis ran.
         if ($this->mutation instanceof MutationAnalysisResult) {
             $report['mutation'] = $this->mutation->toArray();
         }
 
-        // User view: choose the analysis output branch for this case.
+        // Attach the score section only when scoring was produced.
         if ($this->score instanceof ScoreReport) {
             $report['score'] = $this->score->toArray();
         }
 
-        // User view: choose the analysis output branch for this case.
+        // Attach the diff section only on a changed-region run.
         if ($this->diff instanceof DiffResult) {
             $report['diff'] = $this->diff->toArray();
         }
 
-        // User view: choose the analysis output branch for this case.
+        // Attach the trend section only when trend history was recorded.
         if ($this->trend instanceof TrendReport) {
             $report['trend'] = $this->trend->toArray();
         }
 
-        // User view: choose the analysis output branch for this case.
+        // Attach the baseline section only when a baseline was applied.
         if ($this->baseline instanceof BaselineReport) {
             $report['baseline'] = $this->baseline->toArray();
         }
 
-        // User view: choose the analysis output branch for this case.
+        // Attach the branch-review section only on a --diff-vs review run.
         if ($this->review instanceof BranchReviewResult) {
             $report['review'] = $this->review->toArray();
         }
@@ -274,20 +273,19 @@ final readonly class AnalysisReport
     }
 
     /**
-     * Check whether any finding in the report matches the requested severity.
+     * Reports whether any finding reached a given severity - the check the exit-code gate uses to decide
+     * whether the run passed or failed.
      *
-      * User flow: Moves analysis state toward the output users review.
-      *
      * @param Severity $severity - Severity level to look for in the finding list.
      *
      * @return bool - true on the first finding at the requested severity (the gate only needs one); false means nothing in the report reached that
-     *              level
+     *              level.
      */
     public function hasFindingsAtSeverity(Severity $severity): bool
     {
-        // User view: add each item that can appear in analysis output.
+        // Scan for the first finding at the requested severity - one is all the gate needs.
         foreach ($this->findings as $finding) {
-            // User view: choose the analysis output branch for this case.
+            // A finding at exactly this severity is enough to answer yes.
             if ($finding->severity === $severity) {
                 return true;
             }

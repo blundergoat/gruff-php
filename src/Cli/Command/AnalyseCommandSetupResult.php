@@ -9,7 +9,7 @@ use GruffPhp\Output\Reporter\OutputFormat;
 use Symfony\Component\Console\Command\Command;
 
 /**
- * Result of preparing the `analyse` command — either a ready-to-run setup or an early stop.
+ * Result of preparing the `analyse` command - either a ready-to-run setup or an early stop.
  *
  * The setup phase can succeed, fail with a plain console error, fail with a report-formatted error
  * (so `--format=json` still returns structured output), or bow out after another component already
@@ -49,7 +49,7 @@ final readonly class AnalyseCommandSetupResult
     }
 
     /**
-     * Stops with an unformatted console message — for setup failures before an output format is known.
+     * Stops with an unformatted console message - for setup failures before an output format is known.
      *
      * @param string $message  - Plain error message for console output.
      * @param int    $exitCode - Symfony command exit code for the failure.

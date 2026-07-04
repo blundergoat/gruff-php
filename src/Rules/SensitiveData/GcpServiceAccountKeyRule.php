@@ -14,7 +14,8 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\SourceTextRuleInterface;
 
 /**
- * Detects committed GCP service-account key JSON.
+ * Flags committed GCP service-account key JSON, so the user can remove it, rotate the key in IAM, and load
+ * credentials from a secret manager instead.
  *
  * A service-account key is the JSON object Google issues with
  * `"type": "service_account"` and an embedded RSA `private_key`. The finding is
@@ -28,11 +29,9 @@ final readonly class GcpServiceAccountKeyRule implements SourceTextRuleInterface
     public const ID = 'sensitive-data.gcp-service-account-key';
 
     /**
-     * Describe the GCP service-account-key rule.
+     * Describes the GCP service-account-key rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
-     * @return RuleDefinition - Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults (warning severity, high confidence).
      */
     public function definition(): RuleDefinition
     {
@@ -49,10 +48,8 @@ final readonly class GcpServiceAccountKeyRule implements SourceTextRuleInterface
     }
 
     /**
-     * Find service-account key JSON that embeds a private key.
+     * Reports committed GCP service-account key JSON, anchored at the service-account marker.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -63,37 +60,33 @@ final readonly class GcpServiceAccountKeyRule implements SourceTextRuleInterface
         $source = $analysisUnit->source;
 
         // Fast bail: both the service-account marker and a private key must be present.
-        // User view: choose the findings list branch for this case.
         if (!str_contains($source, 'service_account') || !$this->hasPrivateKeyBody($source)) {
             // Without both markers, the generic private-key rule owns any remaining PEM evidence.
             return [];
         }
 
         $privateKeyValue = $this->privateKeyValue($source);
-        // User view: choose the findings list branch for this case.
         if ($this->looksLikePlaceholderKey($privateKeyValue, $source)) {
             // Placeholder fixtures intentionally carry key-shaped fields without real key material.
             return [];
         }
 
         // Match the service-account marker that anchors this rule's distinct finding.
-        // User view: choose the findings list branch for this case.
         if (preg_match_all('/"type"\s*:\s*"service_account"/', $source, $matches, PREG_OFFSET_CAPTURE) < 1) {
             // The initial substring check was insufficient; no concrete JSON marker was found.
             return [];
         }
 
-        // User view: missing data becomes the expected findings list state.
         $preview       = $privateKeyValue !== null
             ? SecretScannerHelper::redactedPreview($privateKeyValue)
             : '<redacted GCP service-account key>';
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
 
         $findings = [];
-        // User view: add each item that can appear in findings list.
+        // Report each service-account marker found outside a comment.
         foreach ($matches[0] as $match) {
             [, $offset] = $match;
-            // User view: choose the findings list branch for this case.
+            // A marker inside a comment is an example, not a committed key.
             if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
                 continue;
             }
@@ -114,10 +107,8 @@ final readonly class GcpServiceAccountKeyRule implements SourceTextRuleInterface
     }
 
     /**
-     * Decide whether the source carries a private-key body.
+     * Reports whether the source carries a private-key body (PEM armor or a JSON private_key field).
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param string $source - Raw source text.
      *
      * @return bool - True when a PEM private-key block or a JSON private_key field is present.
@@ -134,15 +125,13 @@ final readonly class GcpServiceAccountKeyRule implements SourceTextRuleInterface
     }
 
     /**
-     * Decide whether the embedded key is a placeholder rather than real material.
+     * Reports whether the embedded key is a placeholder rather than real material.
      *
      * Real private-key bodies are long base64 blobs; placeholders are short
      * marker phrases. A length test on the armor-stripped body separates them
      * without the substring false-matches that a generic dummy check hits on
      * base64.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param string|null $privateKeyValue - Extracted JSON private_key value, if any.
      * @param string      $source - Raw source text (PEM fallback).
      *
@@ -150,18 +139,13 @@ final readonly class GcpServiceAccountKeyRule implements SourceTextRuleInterface
      */
     private function looksLikePlaceholderKey(?string $privateKeyValue, string $source): bool
     {
-        // User view: missing data becomes a safe findings list default.
         $keyText = $privateKeyValue ?? $this->pemBlock($source);
-        // User view: choose the findings list branch for this case.
-        // User view: missing data becomes the expected findings list state.
         if ($keyText === null) {
             // No extractable key body means there is no placeholder proof.
             return false;
         }
 
-        // User view: missing data becomes a safe findings list default.
         $withoutArmor = preg_replace('/-----[^-]*-----/', '', $keyText) ?? $keyText;
-        // User view: missing data becomes a safe findings list default.
         $body         = preg_replace('#[^A-Za-z0-9+/=]#', '', $withoutArmor) ?? '';
 
         // Real private keys have long armor-stripped bodies; short bodies are placeholders.
@@ -169,10 +153,8 @@ final readonly class GcpServiceAccountKeyRule implements SourceTextRuleInterface
     }
 
     /**
-     * Extract the first PEM private-key block from source text.
+     * Extracts the first PEM private-key block from the source, or null when none is present.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param string $source - Raw source text.
      *
      * @return string|null - The PEM block, or null when none is present.
@@ -180,7 +162,6 @@ final readonly class GcpServiceAccountKeyRule implements SourceTextRuleInterface
     private function pemBlock(string $source): ?string
     {
         // Match one PEM private-key block for placeholder-length inspection.
-        // User view: choose the findings list branch for this case.
         if (preg_match('/-----BEGIN[^-]*PRIVATE KEY-----.*?-----END[^-]*PRIVATE KEY-----/s', $source, $matches) === 1) {
             // The full PEM block is needed so armor can be stripped consistently.
             return $matches[0];
@@ -191,10 +172,8 @@ final readonly class GcpServiceAccountKeyRule implements SourceTextRuleInterface
     }
 
     /**
-     * Extract the JSON private_key field value when present.
+     * Extracts the JSON private_key field value when present, or null when absent.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param string $source - Raw source text.
      *
      * @return string|null - The (still-escaped) private_key value, or null when absent.
@@ -202,7 +181,6 @@ final readonly class GcpServiceAccountKeyRule implements SourceTextRuleInterface
     private function privateKeyValue(string $source): ?string
     {
         // Capture the JSON string body without terminating on escaped quote characters.
-        // User view: choose the findings list branch for this case.
         if (preg_match('/"private_key"\s*:\s*"((?:\\\\.|[^"\\\\])*)"/', $source, $matches) === 1) {
             // The escaped value is enough for redacted preview and placeholder checks.
             return $matches[1];

@@ -5,73 +5,75 @@ declare(strict_types=1);
 namespace GruffPhp\Output\Reporter;
 
 /**
- * Represents the report formats supported by the analyse command.
+ * The closed set of report shapes the `analyse` command can emit - every value a user may pass to
+ * `--format`, from the plain terminal report a person reads to machine outputs like JSON, SARIF,
+ * and the GitHub annotation stream other tools consume. Reach for this enum wherever a raw
+ * `--format` string must be validated into a real choice, or wherever the pipeline decides between
+ * addressing a human and handing structured data to a script. Anything outside this list - a bad
+ * flag like `--format=xml` - is unsupported and gets rejected at the CLI boundary rather than guessed.
  */
 enum OutputFormat: string
 {
     /**
-     * Plain terminal report for local runs.
+     * The default `--format text` report a person reads straight in their terminal after a local run.
      */
     case Text = 'text';
 
     /**
-     * Machine-readable JSON report with the full analysis payload.
+     * `--format json` - the full analysis payload as machine-readable JSON for CI gates and editors.
      */
     case Json = 'json';
 
     /**
-     * Browser-friendly HTML report.
+     * `--format html` - a self-contained report a user opens in a browser to share or browse findings.
      */
     case Html = 'html';
 
     /**
-     * Markdown report for issue and pull request comments.
+     * `--format markdown` - report text a user pastes into an issue or pull-request comment.
      */
     case Markdown = 'markdown';
 
     /**
-     * GitHub workflow annotation output.
+     * `--format github` - workflow annotations so findings surface inline on a pull request's diff.
      */
     case Github = 'github';
 
     /**
-     * JSON hotspot map for file offender ranking.
+     * `--format hotspot` - a JSON map ranking the files that most need attention, worst offenders first.
      */
     case Hotspot = 'hotspot';
 
     /**
-     * SARIF report for code scanning consumers.
+     * `--format sarif` - the standard SARIF document a code-scanning dashboard ingests.
      */
     case Sarif = 'sarif';
 
     /**
-     * Report whether this format feeds a parser or artifact store rather than a human terminal.
+     * Reports whether this format hands structured output to a tool rather than to a person at a
+     * terminal. The pipeline reads it to stay silent in machine modes - suppressing chatter like the
+     * missing-config init offer - so nothing corrupts a JSON or SARIF payload a script is about to parse.
      *
-     * Machine-readable output suppresses interactive chatter such as the
-     * missing-config init offer so the payload stays parseable.
-     *
-      * User flow: Shapes the report output people read after analysis finishes.
-      *
-     * @return bool - True for every format except the human-oriented text report.
+     * @return bool - True for every format except the human-oriented text report; false only for the plain text case.
      */
     public function isMachineReadable(): bool
     {
-        // Only the plain text report targets a human at a terminal; json/sarif/github/hotspot/markdown/html feed tooling.
+        // Only the plain text report speaks to a human at a terminal; every other format feeds a tool, so it counts as machine-readable.
         return $this !== self::Text;
     }
 
     /**
-     * Convert a CLI format string into the matching output format.
+     * Turns the raw `--format` string a user typed into the matching enum case, or reports that it
+     * matched nothing. Called at the CLI boundary so an unsupported flag fails fast with a usage
+     * error instead of silently defaulting to a format the user never asked for.
      *
-      * User flow: Shapes the report output people read after analysis finishes.
-      *
-     * @param string $rawInput - CLI format value to parse.
+     * @param string $rawInput - The raw `--format` value the user typed; an empty or unknown string matches no case and returns null.
      *
-     * @return self|null - Matching format, or null for unsupported input.
+     * @return self|null - The matching format; null when the string names no supported format, so the caller rejects the flag rather than guessing.
      */
     public static function fromInput(string $rawInput): ?self
     {
-        // Unrecognised format strings yield null so the caller can reject CLI input rather than guess a default.
+        // A typo or unsupported flag like `--format=xml` matches no arm and falls to `null`, so the caller can reject it instead of guessing a default.
         return match ($rawInput) {
             self::Text->value => self::Text,
             self::Json->value => self::Json,

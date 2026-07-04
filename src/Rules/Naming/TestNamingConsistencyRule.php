@@ -18,7 +18,11 @@ use PhpParser\Node\Stmt\Class_;
 use PhpParser\Node\Stmt\ClassMethod;
 
 /**
- * Detects test classes that mix camelCase and snake_case test method names.
+ * Flags a test class that names some of its test methods in camelCase and others in snake_case, so the user
+ * sees the split and settles on one convention instead of leaving a mixed, harder-to-scan suite.
+ *
+ * Fires only when a class has at least two test methods and both styles actually appear. Advisory but high
+ * confidence: the mix is unambiguous, yet which single style to adopt is the team's call.
  */
 final readonly class TestNamingConsistencyRule implements RuleInterface
 {
@@ -28,10 +32,8 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
     public const ID = 'naming.test-naming-consistency';
 
     /**
-     * Describe the test naming consistency rule.
+     * Describes the test-naming-consistency rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -48,10 +50,8 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
     }
 
     /**
-     * Find test method names that do not follow the configured convention.
+     * Reports a test class that mixes camelCase and snake_case method names.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -64,21 +64,20 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
 
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Check every class declared in the file.
         foreach ($classes as $class) {
             /** @var Class_ $class Finder predicate restricts results to class declarations. */
             $testMethods = $this->testMethods($class);
 
-            // User view: choose the findings list branch for this case.
+            // A single test method cannot disagree with itself, so there is nothing to compare.
             if (count($testMethods) < 2) {
                 continue;
             }
 
             $counts = $this->namingCounts($testMethods);
 
-            // User view: choose the findings list branch for this case.
+            // Both styles present in one class is exactly the inconsistency to report.
             if ($counts['camelCase'] > 0 && $counts['snake_case'] > 0) {
-                // User view: missing data becomes a safe findings list default.
                 $className = $class->name?->toString() ?? sprintf('class@anonymous:%d', $class->getStartLine());
 
                 $findings[] = new Finding(
@@ -106,10 +105,8 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
     }
 
     /**
-     * Collect test methods declared directly on a class.
+     * Collects the test methods declared directly on a class.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Class_ $class - Class declaration whose statement list is scanned.
      *
      * @return list<ClassMethod> - methods whose names start with `test`, in declaration order
@@ -118,9 +115,9 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
     {
         $testMethods = [];
 
-        // User view: add each item that can appear in findings list.
+        // Look at each statement in the class body.
         foreach ($class->stmts as $stmt) {
-            // User view: choose the findings list branch for this case.
+            // A method whose name starts with "test" counts as a test method.
             if ($stmt instanceof ClassMethod && str_starts_with($stmt->name->toString(), 'test')) {
                 $testMethods[] = $stmt;
             }
@@ -130,10 +127,8 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
     }
 
     /**
-     * Count camelCase and snake_case test method names.
+     * Counts the camelCase and snake_case test method names.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param list<ClassMethod> $testMethods - Test methods being classified by naming style.
      *
      * @return array{camelCase: int, snake_case: int} - method counts keyed by naming style
@@ -142,17 +137,16 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
     {
         $counts = ['camelCase' => 0, 'snake_case' => 0];
 
-        // User view: add each item that can appear in findings list.
+        // Classify each test method by the style of the part after "test".
         foreach ($testMethods as $method) {
             $afterTest = substr($method->name->toString(), 4);
 
-            // User view: choose the findings list branch for this case.
-            // User view: an empty value becomes a clear findings list fallback.
+            // A bare "test" with nothing after it has no style to classify.
             if ($afterTest === '') {
                 continue;
             }
 
-            // User view: choose the findings list branch for this case.
+            // An underscore marks snake_case; anything else is treated as camelCase.
             if (str_contains($afterTest, '_')) {
                 $counts['snake_case']++;
             } else {

@@ -141,7 +141,7 @@ final readonly class MissingConfigPrompt
     }
 
     /**
-     * Probes whether the process's real STDIN is a terminal — the fallback check for whether a live
+     * Probes whether the process's real STDIN is a terminal - the fallback check for whether a live
      * user is present to answer the prompt.
      *
      * @return bool - True when STDIN exists and is a TTY.

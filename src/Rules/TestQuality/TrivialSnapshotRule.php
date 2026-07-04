@@ -15,7 +15,9 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
 
 /**
- * Detects snapshot assertions that only lock down trivial values.
+ * Flags a snapshot assertion (`toMatchSnapshot`, `assertMatchesSnapshot`) whose captured value is a short
+ * scalar - the kind of value a direct `assertSame` would check more clearly, with none of a snapshot's
+ * benefit. Runs over every test's assertions; the length cap is tunable. Advisory, medium confidence.
  */
 final readonly class TrivialSnapshotRule implements RuleInterface
 {
@@ -25,10 +27,8 @@ final readonly class TrivialSnapshotRule implements RuleInterface
     public const ID = 'test-quality.trivial-snapshot';
 
     /**
-     * Describe the trivial snapshot rule.
+     * Describes the trivial-snapshot rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -46,10 +46,8 @@ final readonly class TrivialSnapshotRule implements RuleInterface
     }
 
     /**
-     * Find snapshot assertions that lack supporting behavioral assertions.
+     * Reports snapshot assertions that only capture a tiny literal value.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -61,24 +59,23 @@ final readonly class TrivialSnapshotRule implements RuleInterface
         $maxLength  = (int) $ruleContext->settingsFor($definition)->numericThreshold('maxLiteralLength');
         $findings   = [];
 
-        // User view: add each item that can appear in findings list.
+        // Weigh every test scope in the file.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
-            // User view: add each item that can appear in findings list.
+            // Inspect each assertion the test makes.
             foreach (TestQualityNodeHelper::assertionCalls($scope) as $call) {
                 $name = TestQualityNodeHelper::callName($call);
-                // User view: choose the findings list branch for this case.
-                // User view: missing data becomes the expected findings list state.
+                // Only snapshot-style assertions are in scope here.
                 if ($name === null || !str_contains($name, 'snapshot')) {
                     continue;
                 }
 
                 $literal = TestQualityNodeHelper::literalValue(TestQualityNodeHelper::firstArgValue($call));
-                // User view: choose the findings list branch for this case.
+                // A Pest expectation carries its value on the expect() receiver, so read that too.
                 if (!is_string($literal) && $call instanceof \PhpParser\Node\Expr\MethodCall) {
                     $literal = TestQualityNodeHelper::literalValue(TestQualityNodeHelper::pestExpectationValue($call));
                 }
 
-                // User view: choose the findings list branch for this case.
+                // Leave real snapshots alone; only a short scalar literal is the smell.
                 if (!is_string($literal) || strlen($literal) > $maxLength) {
                     continue;
                 }

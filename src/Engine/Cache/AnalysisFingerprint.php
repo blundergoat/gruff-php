@@ -12,28 +12,27 @@ use JsonException;
 /**
  * Computes the content-addressed cache-key inputs for a run and its files.
  *
- * The run digest folds in every input that affects a per-unit rule's findings —
+ * The run digest folds in every input that affects a per-unit rule's findings -
  * the gruff version, the PHP version floor, the naming/secret allowlists, and the
- * full enabled-rule set with each rule's resolved settings — so any change to what
+ * full enabled-rule set with each rule's resolved settings - so any change to what
  * gruff checks, or how, yields a new key (a guaranteed cache miss). On any doubt,
  * a superset of inputs is safe: it only invalidates more, never serves stale.
  */
 final readonly class AnalysisFingerprint
 {
     /**
-      * User flow: Moves analysis state toward the output users review.
-      *
-     * @param string $runDigest - Digest of every analysis input shared across files in a run.
+     * Wraps a precomputed run digest; build one from a run's inputs with forRun().
+     *
+     * @param string $runDigest - Digest of every analysis input shared across the files in a run.
      */
     private function __construct(private string $runDigest)
     {
     }
 
     /**
-     * Build the run fingerprint from the resolved config, enabled rules, and tool version.
+     * Builds the run fingerprint by folding every input that affects findings - tool version, PHP floor,
+     * allowlists, and the full resolved rule set - into one digest, so any change forces a fresh cache key.
      *
-      * User flow: Moves analysis state toward the output users review.
-      *
      * @param RuleRegistry   $registry - Registry whose enabled-rule set is part of the key.
      * @param AnalysisConfig $config - Resolved configuration whose settings affect findings.
      * @param string         $toolVersion - gruff version string folded into the key.
@@ -44,7 +43,7 @@ final readonly class AnalysisFingerprint
     public static function forRun(RuleRegistry $registry, AnalysisConfig $config, string $toolVersion): self
     {
         $rules = [];
-        // User view: add each item that can appear in analysis output.
+        // Fold each enabled rule and its resolved settings into the key, so changing any rule's config busts the cache.
         foreach ($registry->enabledRules($config) as $rule) {
             $ruleId         = $rule->definition()->id;
             $settings       = $config->ruleSettings($ruleId);
@@ -77,17 +76,16 @@ final readonly class AnalysisFingerprint
     }
 
     /**
-     * Build the cache key for one file's per-unit findings.
+     * Builds the cache key for one file's findings, binding the run digest, the file's display path, and
+     * its content hash so the same bytes at a different path never share an entry.
      *
      * The display path is part of the key because it is part of every finding's
      * identity, so two byte-identical files at different paths never share an entry.
      *
-      * User flow: Moves analysis state toward the output users review.
-      *
      * @param string $displayPath - Project-relative display path.
      * @param string $contents - Raw file bytes.
      *
-     * @return string - Hex cache key.
+     * @return string - Hex cache key for the file's per-unit findings.
      */
     public function forFile(string $displayPath, string $contents): string
     {

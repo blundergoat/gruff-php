@@ -19,7 +19,9 @@ use PhpParser\Node\Name;
 use PhpParser\NodeFinder;
 
 /**
- * Detects test names that imply a subject call absent from the body.
+ * Flags a PHPUnit test whose name implies a specific behaviour (`testParsesHeader...`) yet whose body never
+ * calls a method matching that name - a hint the test drifted from what it claims to exercise, or that its
+ * name overstates its coverage. A camelCase-name heuristic; subprocess tests are exempt. Error severity, low confidence.
  */
 final readonly class SutNotCalledRule implements RuleInterface
 {
@@ -118,10 +120,8 @@ final readonly class SutNotCalledRule implements RuleInterface
     ];
 
     /**
-     * Describe the SUT-not-called test rule.
+     * Describes the sut-not-called rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - rule identity, pillar, tier, and the low-confidence Error default callers may downgrade
      */
     public function definition(): RuleDefinition
@@ -137,10 +137,8 @@ final readonly class SutNotCalledRule implements RuleInterface
     }
 
     /**
-     * Find tests whose name implies a SUT call that is absent from the body.
+     * Reports tests whose name implies a SUT call that is absent from the body.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -150,21 +148,20 @@ final readonly class SutNotCalledRule implements RuleInterface
     {
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Weigh every test scope in the file.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             $candidates = $this->candidateSutNames($scope->name);
-            // User view: choose the findings list branch for this case.
-            // User view: an empty value becomes a clear findings list fallback.
+            // Skip Pest scopes, names with no inferable SUT, and tests that assert nothing.
             if ($scope->isPest || $candidates === [] || TestQualityNodeHelper::assertionCalls($scope) === []) {
                 continue;
             }
 
-            // User view: choose the findings list branch for this case.
+            // A subprocess test may run the SUT off the AST graph, so treat it as covered.
             if ($this->invokesSubprocess($scope)) {
                 continue;
             }
 
-            // User view: choose the findings list branch for this case.
+            // A call matching the inferred SUT name means the test does exercise it.
             if ($this->hasNamedSutCall($scope, $candidates)) {
                 continue;
             }
@@ -188,8 +185,8 @@ final readonly class SutNotCalledRule implements RuleInterface
     }
 
     /**
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
+     * Reports whether the test calls a method matching one of the inferred SUT names.
+     *
      * @param TestQualityScope $scope - Test body whose calls are scanned for a SUT invocation.
      * @param list<string>     $candidates - Normalised SUT names any non-assertion call must match.
      *
@@ -199,16 +196,15 @@ final readonly class SutNotCalledRule implements RuleInterface
     {
         $candidateLookup = array_fill_keys($candidates, true);
 
-        // User view: add each item that can appear in findings list.
+        // Weigh every call the test makes.
         foreach (TestQualityNodeHelper::calls($scope) as $call) {
-            // User view: choose the findings list branch for this case.
+            // Assertions and mock plumbing are not SUT calls.
             if (TestQualityNodeHelper::isAssertionCall($call) || TestQualityNodeHelper::isMockCreationCall($call) || TestQualityNodeHelper::isMockVerificationCall($call)) {
                 continue;
             }
 
             $name = TestQualityNodeHelper::callName($call);
-            // User view: choose the findings list branch for this case.
-            // User view: missing data becomes the expected findings list state.
+            // A call whose name matches a candidate proves the SUT is exercised.
             if ($name !== null && isset($candidateLookup[TestQualityNodeHelper::normalizedTestName($name)])) {
                 return true;
             }
@@ -218,10 +214,8 @@ final readonly class SutNotCalledRule implements RuleInterface
     }
 
     /**
-     * Detect subprocess-based tests that may invoke the SUT outside the AST call graph.
+     * Reports whether the test invokes a subprocess that could run the SUT off the AST graph.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param TestQualityScope $scope - Test body searched for Process construction or subprocess functions.
      *
      * @return bool - true when a Process object or shell/exec call may run the SUT off the AST graph (treat as covered)
@@ -233,7 +227,6 @@ final readonly class SutNotCalledRule implements RuleInterface
         $hasProcessNew = $nodeFinder->find(
                 $scope->statements,
                 static function (Node $node): bool {
-                    // User view: choose the findings list branch for this case.
                     if (!$node instanceof Expr\New_ || !$node->class instanceof Name) {
                         // Not a class instantiation by name, so it cannot be a Process construction.
                         return false;
@@ -244,22 +237,18 @@ final readonly class SutNotCalledRule implements RuleInterface
                     // Match Symfony Process or PhpProcess, which run the SUT outside the static call graph.
                     return $short === 'process' || $short === 'phpprocess';
                 },
-            // User view: an empty value becomes a clear findings list fallback.
             ) !== [];
 
-        // User view: choose the findings list branch for this case.
         if ($hasProcessNew) {
             // A Process object is built, so assume the SUT may run in the subprocess and skip the test.
             return true;
         }
 
-        // User view: add each item that can appear in findings list.
+        // Also weigh the test's calls for a subprocess function.
         foreach (TestQualityNodeHelper::calls($scope) as $call) {
-            // User view: choose the findings list branch for this case.
+            // Only a global function call can be a subprocess launcher.
             if ($call instanceof Expr\FuncCall) {
                 $name = TestQualityNodeHelper::functionName($call);
-                // User view: choose the findings list branch for this case.
-                // User view: missing data becomes the expected findings list state.
                 if ($name !== null && in_array($name, self::SUBPROCESS_FUNCTIONS, true)) {
                     // A shell/exec-family call can invoke the SUT indirectly; treat the test as covered.
                     return true;
@@ -272,51 +261,39 @@ final readonly class SutNotCalledRule implements RuleInterface
     }
 
     /**
-     * List variable names that likely represent the system under test.
+     * Lists the SUT method-name candidates inferred from a test method name.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param string $testName - PHPUnit method name; only camelCase `test`-prefixed names yield candidates.
      *
      * @return list<string> - normalised SUT method-name candidates to match against calls; empty when the name yields no inferable SUT
      */
     private function candidateSutNames(string $testName): array
     {
-        // User view: choose the findings list branch for this case.
         if (!str_starts_with($testName, 'test') || str_contains($testName, '_')) {
             // Snake_case or non-test names fall outside this camelCase heuristic; yield no candidates.
             return [];
         }
 
         $afterTest = substr($testName, 4);
-        // User view: choose the findings list branch for this case.
-        // User view: an empty value becomes a clear findings list fallback.
         if ($afterTest === '') {
             // Bare "test" with no trailing phrase names no behaviour, so there is no SUT to infer.
             return [];
         }
 
         $tokens = $this->camelCaseTokens($afterTest);
-        // User view: choose the findings list branch for this case.
-        // User view: an empty value becomes a clear findings list fallback.
         if ($tokens === []) {
             // The remainder produced no word tokens, leaving nothing to interpret as a method phrase.
             return [];
         }
 
         $markerIndex = $this->firstOutcomeMarkerIndex($tokens);
-        // User view: choose the findings list branch for this case.
-        // User view: missing data becomes the expected findings list state.
         if ($markerIndex === null || $markerIndex === 0) {
             // No outcome marker, or one leading the name, means no method phrase precedes it: give up.
             return [];
         }
 
         $methodTokens = array_slice($tokens, 0, $markerIndex);
-        // User view: missing data becomes a safe findings list default.
         $verb         = $this->methodVerb($methodTokens[0] ?? '');
-        // User view: choose the findings list branch for this case.
-        // User view: missing data becomes the expected findings list state.
         if ($verb === null) {
             // The leading word is not a known method verb, so the phrase is prose, not a SUT call.
             return [];
@@ -324,7 +301,7 @@ final readonly class SutNotCalledRule implements RuleInterface
 
         $candidates = [TestQualityNodeHelper::normalizedTestName(implode('', $methodTokens))];
 
-        // User view: choose the findings list branch for this case.
+        // A multi-word phrase also yields the bare leading verb as a candidate.
         if (count($methodTokens) > 1) {
             $candidates[] = TestQualityNodeHelper::normalizedTestName($verb);
         }
@@ -333,17 +310,14 @@ final readonly class SutNotCalledRule implements RuleInterface
     }
 
     /**
-     * Split an identifier into lowercase tokens for test-name heuristics.
+     * Splits an identifier into word tokens for test-name heuristics.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param string $identifierName - CamelCase fragment after the `test` prefix to break into word tokens.
      *
      * @return list<string> - word and digit tokens in source order with original casing preserved; empty when nothing tokenised
      */
     private function camelCaseTokens(string $identifierName): array
     {
-        // User view: choose the findings list branch for this case.
         if (preg_match_all('/[A-Z]+(?=[A-Z][a-z]|\d|$)|[A-Z]?[a-z]+|\d+/', $identifierName, $matches) < 1) {
             // The fragment held no word or digit runs to tokenise; signal an empty split.
             return [];
@@ -353,19 +327,17 @@ final readonly class SutNotCalledRule implements RuleInterface
     }
 
     /**
-     * Find the first token that marks the expected outcome in a test name.
+     * Returns the index of the first outcome-marker token, or null when none is present.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param list<string> $tokens - Method-name tokens in source order, already normalised for marker comparison.
      *
      * @return int|null - index of the first outcome-marker token splitting method phrase from outcome; null when none is present
      */
     private function firstOutcomeMarkerIndex(array $tokens): ?int
     {
-        // User view: add each item that can appear in findings list.
+        // Scan the tokens for the first outcome marker.
         foreach ($tokens as $index => $token) {
-            // User view: choose the findings list branch for this case.
+            // The first marker splits the method phrase from the outcome text.
             if (in_array($token, self::OUTCOME_MARKERS, true)) {
                 return $index;
             }
@@ -375,10 +347,8 @@ final readonly class SutNotCalledRule implements RuleInterface
     }
 
     /**
-     * Extract the leading verb token from a test method name.
+     * Returns the canonical method verb a token resolves to, or null.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param string $token - Leading name token; matched case-insensitively against known method verbs and aliases.
      *
      * @return string|null - canonical lowercase method verb the token resolves to; null when the token is not a recognised verb
@@ -386,7 +356,6 @@ final readonly class SutNotCalledRule implements RuleInterface
     private function methodVerb(string $token): ?string
     {
         $verb = strtolower($token);
-        // User view: missing data becomes a safe findings list default.
         $verb = self::VERB_ALIASES[$verb] ?? $verb;
 
         return in_array($verb, self::METHOD_VERBS, true) ? $verb : null;

@@ -16,7 +16,9 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
 
 /**
- * Detects PHPUnit configs without explicit coverage source paths.
+ * Flags a PHPUnit config that declares no coverage source (`<source>` in PHPUnit 10+, or the legacy
+ * `<filter><whitelist>`) - without it a coverage run measures nothing useful and the numbers mislead. Fires
+ * once per project when a PHPUnit test file is seen. Advisory, medium confidence.
  */
 final class PhpUnitCoverageSourceMissingRule implements RuleInterface
 {
@@ -34,23 +36,18 @@ final class PhpUnitCoverageSourceMissingRule implements RuleInterface
     private array $emittedRoots = [];
 
     /**
-     * Create the rule with injectable PHPUnit config discovery for tests.
+     * Creates the rule with injectable PHPUnit config discovery for tests.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
-     * @param PhpUnitConfigDiscovery|null $discovery - Discovery service override for tests.
+     * @param PhpUnitConfigDiscovery|null $discovery - Discovery service override for tests, or null to use the default discovery.
      */
     public function __construct(?PhpUnitConfigDiscovery $discovery = null)
     {
-        // User view: missing data becomes a safe findings list default.
         $this->discovery = $discovery ?? new PhpUnitConfigDiscovery();
     }
 
     /**
-     * Describe the PHPUnit coverage source rule.
+     * Describes the phpunit-coverage-source-missing rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -66,10 +63,8 @@ final class PhpUnitCoverageSourceMissingRule implements RuleInterface
     }
 
     /**
-     * Report a project once when its PHPUnit config lacks coverage source configuration.
+     * Reports a project once when its PHPUnit config lacks coverage source configuration.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit used to decide whether the project has PHPUnit tests.
      * @param RuleContext  $ruleContext - Rule context carrying project root.
      *
@@ -78,21 +73,17 @@ final class PhpUnitCoverageSourceMissingRule implements RuleInterface
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $root = $ruleContext->projectRoot;
-        // User view: choose the findings list branch for this case.
         if (isset($this->emittedRoots[$root])) {
             // One config maps to many test files; emit per project root once so the finding is not duplicated.
             return [];
         }
 
-        // User view: choose the findings list branch for this case.
         if (!TestQualityNodeHelper::looksLikePhpUnitTestFile($analysisUnit)) {
             // Wait for an actual PHPUnit test file before judging the config, so non-test projects stay silent.
             return [];
         }
 
         $config = $this->discovery->discover($root);
-        // User view: choose the findings list branch for this case.
-        // User view: missing data becomes the expected findings list state.
         if ($config === null) {
             // No discoverable phpunit.xml means there is no coverage config to fault; treat as not applicable.
             return [];
@@ -100,7 +91,6 @@ final class PhpUnitCoverageSourceMissingRule implements RuleInterface
 
         $this->emittedRoots[$root] = true;
 
-        // User view: choose the findings list branch for this case.
         if ($this->hasCoverageSource($config->root)
             || isset($config->root->filter->whitelist) && $config->root->filter->whitelist->count() > 0
         ) {
@@ -129,29 +119,24 @@ final class PhpUnitCoverageSourceMissingRule implements RuleInterface
     }
 
     /**
-     * Check for PHPUnit 10 coverage source declarations.
+     * Reports whether the PHPUnit config declares a coverage source/include block.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param \SimpleXMLElement $root - Parsed <phpunit> root element whose coverage children are probed.
      *
      * @return bool - True when a supported coverage source/include block exists.
      */
     private function hasCoverageSource(\SimpleXMLElement $root): bool
     {
-        // User view: choose the findings list branch for this case.
         if (isset($root->source) && $root->source->count() > 0) {
             // Newer schemas place <source> directly on the root; its presence alone scopes coverage.
             return true;
         }
 
-        // User view: choose the findings list branch for this case.
         if (isset($root->coverage->source) && $root->coverage->source->count() > 0) {
             // Some schemas nest <source> under <coverage>; accept that placement as equivalent.
             return true;
         }
 
-        // User view: choose the findings list branch for this case.
         if (isset($root->coverage->include) && $root->coverage->include->count() > 0) {
             // The older <coverage><include> form still declares an include path, so honour it too.
             return true;

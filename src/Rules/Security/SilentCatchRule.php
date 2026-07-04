@@ -17,7 +17,11 @@ use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Node\Stmt;
 
 /**
- * Detects catch blocks that swallow exceptions without handling or reporting them.
+ * Flags a catch block that swallows its exception without logging, rethrowing, or otherwise acting on it, so
+ * the user does not lose a failure to a silent empty handler.
+ *
+ * Runs per file over every catch clause, treating a body of only no-op placeholders as silent. Warning,
+ * high confidence.
  */
 final class SilentCatchRule implements RuleInterface
 {
@@ -27,10 +31,8 @@ final class SilentCatchRule implements RuleInterface
     public const ID = 'security.silent-catch';
 
     /**
-     * Describe the silent catch rule.
+     * Describes the silent-catch rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -46,10 +48,8 @@ final class SilentCatchRule implements RuleInterface
     }
 
     /**
-     * Find catch blocks that only contain no-op statements.
+     * Reports each catch block that swallows the exception without acting on it.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -59,9 +59,9 @@ final class SilentCatchRule implements RuleInterface
     {
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Check every catch block in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Catch_::class) as $catch) {
-            // User view: choose the findings list branch for this case.
+            // A catch that does real work is fine.
             if (!$this->isSilent($catch)) {
                 continue;
             }
@@ -83,19 +83,16 @@ final class SilentCatchRule implements RuleInterface
     }
 
     /**
-     * Check whether a catch block has no executable handling statements.
+     * Reports whether a catch block has no executable handling statements.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Stmt\Catch_ $catch - Parsed catch block whose body statements are inspected for any real handling.
      *
      * @return bool - True when the catch body is silent.
      */
     private function isSilent(Stmt\Catch_ $catch): bool
     {
-        // User view: add each item that can appear in findings list.
+        // Weigh each statement in the catch body.
         foreach ($catch->stmts as $statement) {
-            // User view: choose the findings list branch for this case.
             if (!$statement instanceof Stmt\Nop) {
                 // A non-Nop statement is real handling, so the catch is not silent.
                 return false;

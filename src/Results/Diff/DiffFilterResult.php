@@ -7,15 +7,20 @@ namespace GruffPhp\Results\Diff;
 use GruffPhp\Results\Finding\Finding;
 
 /**
- * Carries findings retained by changed-region filtering plus the suppression count.
+ * The tallied outcome of narrowing a run's findings to the code the user actually changed.
+ *
+ * Holds the findings that survived changed-region filtering alongside a count of those dropped
+ * as out of scope. `DiffFindingFilter` builds it on a changed-region scan (`--diff`, `--since`, or
+ * `--changed-ranges`), narrowing a report toward the code around the user's edit.
  */
 final readonly class DiffFilterResult
 {
     /**
-      * User flow: Narrows analysis feedback to the code under review.
-      *
-     * @param list<Finding> $findings - Findings retained in the changed scope.
-     * @param int           $suppressedCount - Findings excluded as out of scope.
+     * Wraps the changed-region filter's two outputs - the kept findings and how many were dropped - as
+     * one value. Callers rarely build this directly; `DiffFindingFilter::apply()` returns it.
+     *
+     * @param list<Finding> $findings - Findings inside the changed region; empty means the changed code tripped no rules.
+     * @param int           $suppressedCount - Pre-existing findings dropped as out of scope; zero if none were filtered.
      */
     public function __construct(
         public array $findings,

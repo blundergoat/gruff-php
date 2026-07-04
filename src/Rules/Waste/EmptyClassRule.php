@@ -17,7 +17,12 @@ use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Node\Stmt\Class_;
 
 /**
- * Detects concrete classes that declare no members and are not marker exceptions.
+ * Flags a concrete class with no members at all, catching a leftover stub or placeholder - while
+ * exempting marker exception subtypes, whose empty body is the whole point.
+ *
+ * Runs per file over every class, skipping abstract and anonymous ones. A class with an empty body that
+ * does not extend an Exception/Throwable type is reported at advisory, since an empty class is sometimes
+ * a deliberate stub.
  */
 final readonly class EmptyClassRule implements RuleInterface
 {
@@ -27,10 +32,8 @@ final readonly class EmptyClassRule implements RuleInterface
     public const ID = 'waste.empty-class';
 
     /**
-     * Describe the empty class rule.
+     * Describes the empty-class rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -47,10 +50,8 @@ final readonly class EmptyClassRule implements RuleInterface
     }
 
     /**
-     * Find concrete classes that declare no members and are not exception markers.
+     * Reports each concrete, member-less class that is not an exception marker.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -63,25 +64,23 @@ final readonly class EmptyClassRule implements RuleInterface
 
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Check each class in the file.
         foreach ($classes as $class) {
-            // User view: choose the findings list branch for this case.
+            // Abstract and anonymous classes are exempt; an empty body is legitimate there.
             if ($class->isAbstract() || $class->isAnonymous()) {
                 continue;
             }
 
-            // User view: choose the findings list branch for this case.
-            // User view: an empty value becomes a clear findings list fallback.
+            // A class with any members is not empty.
             if ($class->stmts !== []) {
                 continue;
             }
 
-            // User view: choose the findings list branch for this case.
+            // Marker exception subtypes are meant to be empty, so skip them.
             if ($this->isEmptyExceptionMarker($class)) {
                 continue;
             }
 
-            // User view: missing data becomes a safe findings list default.
             $symbol = $class->name?->toString() ?? sprintf('class@anonymous:%d', $class->getStartLine());
 
             $findings[] = new Finding(
@@ -103,20 +102,16 @@ final readonly class EmptyClassRule implements RuleInterface
     }
 
     /**
-     * Allow empty classes that exist as exception marker types.
+     * Reports whether an empty class is a marker exception subtype, whose empty body is intentional.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Class_ $class - Class declaration to test; only a parent type can make an empty body legitimate.
      *
      * @return bool - True when the class extends an exception/throwable type.
      */
     private function isEmptyExceptionMarker(Class_ $class): bool
     {
-        // User view: choose the findings list branch for this case.
-        // User view: missing data becomes the expected findings list state.
+        // No parent means it cannot be a marker subtype, so an empty body is not excused.
         if ($class->extends === null) {
-            // No parent means it cannot be a marker subtype, so an empty body is not excused.
             return false;
         }
 

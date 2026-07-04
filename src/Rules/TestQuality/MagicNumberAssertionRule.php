@@ -18,7 +18,9 @@ use PhpParser\Node\Expr;
 use PhpParser\Node\Scalar;
 
 /**
- * Detects assertions that compare against unexplained numeric literals.
+ * Flags an assertion that compares against a bare numeric literal whose meaning is not explained - a magic
+ * number that leaves a reader guessing what the test expects and why. Well-known codes (HTTP statuses) and
+ * counts/named getters are exempt; the allowlist is tunable. Runs over every test. Advisory, low confidence.
  */
 final readonly class MagicNumberAssertionRule implements RuleInterface
 {
@@ -99,10 +101,8 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
     ];
 
     /**
-     * Describe the magic number assertion rule.
+     * Describes the magic-number-assertion rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - this rule's id, pillar/tier, default Advisory severity, and allowed-literal allowlist
      */
     public function definition(): RuleDefinition
@@ -119,10 +119,8 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
     }
 
     /**
-     * Find assertions that compare against unexplained numeric literals.
+     * Reports assertions that compare against unexplained numeric literals.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -133,13 +131,12 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
         $allowed  = $this->loadAllowedLiterals($ruleContext);
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Weigh every test scope in the file.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
-            // User view: add each item that can appear in findings list.
+            // Inspect each assertion the test makes.
             foreach (TestQualityNodeHelper::assertionCalls($scope) as $call) {
                 $number = TestQualityNodeHelper::isAssertionMagicNumber($call);
-                // User view: choose the findings list branch for this case.
-                // User view: missing data becomes the expected findings list state.
+                // Skip literals that are allowlisted or already explained by context.
                 if ($number === null || in_array($number, $allowed, true) || $this->hasContextualNumericTarget($call)) {
                     continue;
                 }
@@ -164,10 +161,8 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
     }
 
     /**
-     * Load configured assertion literals, falling back to the default self-explanatory values.
+     * Loads the allowed literals, falling back to the default self-explanatory set.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param RuleContext $ruleContext - Source of the per-rule `allowedLiterals` option for this run.
      *
      * @return list<int> - allowlisted literals treated as self-explanatory; defaults when no valid override is set
@@ -175,16 +170,15 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
     private function loadAllowedLiterals(RuleContext $ruleContext): array
     {
         $configuredLiterals = $ruleContext->settingsFor($this->definition())->option('allowedLiterals');
-        // User view: choose the findings list branch for this case.
         if (!is_array($configuredLiterals)) {
             // No (or malformed) override configured, so fall back to the built-in self-explanatory set.
             return self::DEFAULT_ALLOWED_LITERALS;
         }
 
         $allowedLiterals = [];
-        // User view: add each item that can appear in findings list.
+        // Keep only the integer entries from the configured list.
         foreach ($configuredLiterals as $configuredLiteral) {
-            // User view: choose the findings list branch for this case.
+            // A non-integer entry is not a literal we can match.
             if (is_int($configuredLiteral)) {
                 $allowedLiterals[] = $configuredLiteral;
             }
@@ -194,8 +188,8 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
     }
 
     /**
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
+     * Reports whether an assertion's numeric literal is already explained by its context.
+     *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Assertion call whose numeric literal is judged.
      *
      * @return bool - true when the call is a cardinality assertion or its compared value labels the number's meaning
@@ -203,14 +197,11 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
     private function hasContextualNumericTarget(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
     {
         $name = TestQualityNodeHelper::callName($call);
-        // User view: choose the findings list branch for this case.
-        // User view: missing data becomes the expected findings list state.
         if ($name === null) {
             // A dynamic call target has no resolvable name, so it cannot be a known contextual assertion.
             return false;
         }
 
-        // User view: choose the findings list branch for this case.
         if (in_array($name, self::CARDINALITY_ASSERTIONS, true)) {
             // A cardinality assertion's literal is the expected count itself, so it needs no separate name.
             return true;
@@ -219,13 +210,12 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
         $actual = $this->actualAssertionExpression($call, $name);
 
         // Contextual only when the compared-against expression labels what the number means.
-        // User view: missing data becomes the expected findings list state.
         return $actual !== null && $this->isContextualNumericExpression($actual);
     }
 
     /**
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
+     * Returns the actual value an assertion compares against the literal, or null.
+     *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Assertion or Pest expectation call to read from.
      * @param string                                        $name - Lowercased call name that selects the extraction path.
      *
@@ -233,7 +223,6 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
      */
     private function actualAssertionExpression(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call, string $name): ?Expr
     {
-        // User view: choose the findings list branch for this case.
         if ($call instanceof Expr\MethodCall && in_array($name, ['tobe', 'toequal', 'tohavecount'], true)) {
             // Pest puts the value under test on expect(value), not in the matcher's arguments.
             return TestQualityNodeHelper::pestExpectationValue($call);
@@ -244,43 +233,38 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
     }
 
     /**
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
+     * Reports whether an expression labels what the compared number means.
+     *
      * @param Expr $expr - Expression compared against the numeric literal; wrappers are unwrapped recursively.
      *
      * @return bool - true when the expression (count call, named getter, or contextual property/key) labels the number
      */
     private function isContextualNumericExpression(Expr $expr): bool
     {
-        // User view: choose the findings list branch for this case.
         if ($expr instanceof Expr\BinaryOp\Coalesce) {
             // A `value ?? fallback` is contextual when its primary (left) side names the number.
             return $this->isContextualNumericExpression($expr->left);
         }
 
-        // User view: choose the findings list branch for this case.
         if ($expr instanceof Expr\FuncCall) {
             // A bare count(...) already declares the literal is a cardinality.
             return TestQualityNodeHelper::functionName($expr) === 'count';
         }
 
-        // User view: choose the findings list branch for this case.
+        // A named getter can label what the number means.
         if ($expr instanceof Expr\MethodCall || $expr instanceof Expr\StaticCall) {
             $name = TestQualityNodeHelper::callName($expr);
 
             // A getter such as coverageRate() or getExitCode() names what the number means.
-            // User view: missing data becomes the expected findings list state.
             return $name !== null && in_array($name, self::CONTEXTUAL_METHOD_NAMES, true);
         }
 
-        // User view: choose the findings list branch for this case.
         if ($expr instanceof Expr\PropertyFetch) {
             // Contextual when the property name names the number, or the receiver chain does.
             return $this->isContextualName($expr->name)
                    || $this->isContextualNumericExpression($expr->var);
         }
 
-        // User view: choose the findings list branch for this case.
         if ($expr instanceof Expr\ArrayDimFetch) {
             // Contextual when the array key names the number, or the receiver chain does.
             return $this->isContextualArrayKey($expr->dim)
@@ -292,15 +276,14 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
     }
 
     /**
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
+     * Reports whether a property name is a contextual numeric name.
+     *
      * @param Node $node - Property-name node to inspect; only a literal identifier carries a comparable name.
      *
      * @return bool - true when the property is a static identifier with a contextual name; false for dynamic names
      */
     private function isContextualName(Node $node): bool
     {
-        // User view: choose the findings list branch for this case.
         if (!$node instanceof Node\Identifier) {
             // A dynamic property such as $obj->$prop has no static name to match against the allowlist.
             return false;
@@ -310,15 +293,14 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
     }
 
     /**
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
+     * Reports whether an array key is a contextual numeric name.
+     *
      * @param Expr|null $expr - Array-dimension node; only a literal string key carries a comparable name.
      *
      * @return bool - true when the key is a literal string with a contextual normalized value; false for computed keys
      */
     private function isContextualArrayKey(?Expr $expr): bool
     {
-        // User view: choose the findings list branch for this case.
         if (!$expr instanceof Scalar\String_) {
             // A computed, variable, or absent key has no static string to match against the allowlist.
             return false;
@@ -328,8 +310,8 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
     }
 
     /**
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
+     * Normalises an identifier or key for case- and separator-insensitive lookup.
+     *
      * @param string $name - Raw identifier or array key whose case and separators are insignificant for matching.
      *
      * @return string - the name lowercased with non-alphanumeric characters stripped, for case-insensitive lookup

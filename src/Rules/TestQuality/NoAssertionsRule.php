@@ -16,7 +16,9 @@ use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Node\Stmt\ClassMethod;
 
 /**
- * Detects tests that execute without making a verifiable assertion.
+ * Flags a test that runs without a single observable check - no PHPUnit/Pest assertion, no mock
+ * verification, no expectException, no explicit assertion-count marker - so it proves nothing and passes
+ * as long as the code does not throw. Runs over every test in the file. Error severity, medium confidence.
  */
 final readonly class NoAssertionsRule implements RuleInterface
 {
@@ -26,10 +28,8 @@ final readonly class NoAssertionsRule implements RuleInterface
     public const ID = 'test-quality.no-assertions';
 
     /**
-     * Describe the no-assertions rule.
+     * Describes the no-assertions rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -46,10 +46,8 @@ final readonly class NoAssertionsRule implements RuleInterface
     }
 
     /**
-     * Find tests that do not contain an observable assertion or expectation.
+     * Reports tests that do not contain an observable assertion or expectation.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -59,9 +57,9 @@ final readonly class NoAssertionsRule implements RuleInterface
     {
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Weigh every test scope in the file.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
-            // User view: choose the findings list branch for this case.
+            // A test with any observable expectation is already proving something.
             if ($this->hasObservableExpectation($scope)) {
                 continue;
             }
@@ -85,39 +83,32 @@ final readonly class NoAssertionsRule implements RuleInterface
     }
 
     /**
-     * Detect assertions, mock verifications, or explicit PHPUnit expectation markers.
+     * Reports whether a test has any observable assertion, verification, or expectation marker.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param TestQualityScope $scope - Test scope whose body is searched for any observable expectation.
      *
      * @return bool - True when the test has an observable expectation.
      */
     private function hasObservableExpectation(TestQualityScope $scope): bool
     {
-        // User view: choose the findings list branch for this case.
-        // User view: an empty value becomes a clear findings list fallback.
         if (TestQualityNodeHelper::assertionCalls($scope) !== []) {
             // A direct assertion call is the clearest proof of intent, so the test is already covered.
             return true;
         }
 
-        // User view: choose the findings list branch for this case.
         if ($scope->node instanceof ClassMethod && $this->hasExpectedExceptionAnnotation($scope->node)) {
             // A legacy @expectedException docblock asserts a throw, so count it as an observable expectation.
             return true;
         }
 
-        // User view: add each item that can appear in findings list.
+        // Fall back to scanning the test's calls for a mock check or explicit marker.
         foreach (TestQualityNodeHelper::calls($scope) as $call) {
-            // User view: choose the findings list branch for this case.
             if (TestQualityNodeHelper::isMockVerificationCall($call)) {
                 // A mock verification (such as a Mockery expectation) is checked at teardown, so it counts.
                 return true;
             }
 
             $name = TestQualityNodeHelper::callName($call);
-            // User view: choose the findings list branch for this case.
             if (in_array($name, ['addtoassertioncount', 'marktestincomplete', 'marktestskipped'], true)) {
                 // These PHPUnit calls register an explicit expectation or deliberate skip, not an empty test.
                 return true;
@@ -129,17 +120,14 @@ final readonly class NoAssertionsRule implements RuleInterface
     }
 
     /**
-     * Detect legacy `@expectedException` annotations.
+     * Reports whether a method docblock declares a legacy `@expectedException` annotation.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param ClassMethod $classMethod - Test method whose docblock is checked for the legacy annotation.
      *
      * @return bool - True when the method docblock declares an expected exception.
      */
     private function hasExpectedExceptionAnnotation(ClassMethod $classMethod): bool
     {
-        // User view: missing data becomes a safe findings list default.
         $docText = strtolower($classMethod->getDocComment()?->getText() ?? '');
 
         // Lower-cased match so the legacy annotation is recognised regardless of how the author cased it.

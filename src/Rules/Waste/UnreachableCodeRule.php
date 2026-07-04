@@ -20,7 +20,12 @@ use PhpParser\Node\Expr;
 use PhpParser\Node\Stmt;
 
 /**
- * Detects statements that cannot run after a terminating control-flow statement.
+ * Flags a statement that can never run because a `return`, `throw`, or `exit`/`die` before it always
+ * ends the block - a real logic error worth surfacing to the user.
+ *
+ * Runs per file over every callable body, scanning each block left to right and reporting the first
+ * statement after a terminator. It recurses into nested blocks so dead code inside an if or loop is also
+ * caught, but reachability never crosses a block boundary.
  */
 final readonly class UnreachableCodeRule implements RuleInterface
 {
@@ -30,10 +35,8 @@ final readonly class UnreachableCodeRule implements RuleInterface
     public const ID = 'waste.unreachable-code';
 
     /**
-     * Describe the unreachable code rule.
+     * Describes the unreachable-code rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -50,10 +53,8 @@ final readonly class UnreachableCodeRule implements RuleInterface
     }
 
     /**
-     * Find statements that appear after a terminating statement in function-like bodies.
+     * Reports each statement that follows a terminator in any callable body.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -66,10 +67,9 @@ final readonly class UnreachableCodeRule implements RuleInterface
 
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Scan each function, method, and closure body.
         foreach ($functions as $fn) {
             /** @var Stmt\ClassMethod|Stmt\Function_|Expr\Closure $fn Finder predicate restricts results to executable function-like nodes. */
-            // User view: missing data becomes a safe findings list default.
             $this->checkBlock($fn->stmts ?? [], $analysisUnit, $findings);
         }
 
@@ -77,14 +77,12 @@ final readonly class UnreachableCodeRule implements RuleInterface
     }
 
     /**
-     * Scan one statement list left to right and flag the first statement that follows a terminator.
+     * Scans one block left to right, flagging the first statement that follows a terminator.
      *
      * Only the first unreachable statement in a block is reported (reporting every trailing statement
      * would be redundant noise once the block is known dead); child blocks are still recursed so nested
      * unreachable code is not missed.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param array<Node\Stmt> $stmts - Sibling statements of a single block, in source order.
      * @param AnalysisUnit     $analysisUnit - Unit supplying the display path stamped onto any finding.
      * @param list<Finding>    &$findings - Accumulator the caller owns; appended to in place, never reset.
@@ -96,9 +94,9 @@ final readonly class UnreachableCodeRule implements RuleInterface
         $definition = $this->definition();
         $terminated = false;
 
-        // User view: add each item that can appear in findings list.
+        // Walk the block in source order, tracking whether it has already terminated.
         foreach ($stmts as $stmt) {
-            // User view: choose the findings list branch for this case.
+            // A positioned statement after a terminator is unreachable.
             if ($terminated && $stmt->getStartLine() > 0) {
                 $findings[] = new Finding(
                     ruleId:      $definition->id,
@@ -117,7 +115,7 @@ final readonly class UnreachableCodeRule implements RuleInterface
                 return;
             }
 
-            // User view: choose the findings list branch for this case.
+            // A return/throw/exit here ends the block for anything after it.
             if ($this->isTerminating($stmt)) {
                 $terminated = true;
             }
@@ -127,12 +125,11 @@ final readonly class UnreachableCodeRule implements RuleInterface
     }
 
     /**
-     * Recurse into every nested block a statement owns (if/else arms, loop bodies, try/catch) so
-     * reachability is evaluated independently inside each one. Reachability does not cross block
-     * boundaries: a return inside an `if` does not make the statement after the `if` unreachable.
+     * Recurses into every nested block a statement owns, so reachability is judged inside each one.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
+     * Reachability does not cross block boundaries: a return inside an `if` does
+     * not make the statement after the `if` unreachable.
+     *
      * @param Node\Stmt     $node - Statement whose child blocks (via StmtChildVisitor) get scanned.
      * @param AnalysisUnit  $analysisUnit - Unit forwarded unchanged so nested findings carry the same path.
      * @param list<Finding> &$findings - Accumulator the caller owns; nested findings are appended in place.
@@ -141,34 +138,31 @@ final readonly class UnreachableCodeRule implements RuleInterface
      */
     private function walkChildren(Node\Stmt $node, AnalysisUnit $analysisUnit, array &$findings): void
     {
-        // User view: add each item that can appear in findings list.
+        // Scan each nested block on its own.
         foreach (StmtChildVisitor::childBlocks($node) as $block) {
             $this->checkBlock($block->statements, $analysisUnit, $findings);
         }
     }
 
     /**
-     * Decide whether a statement ends the enclosing block so any sibling after it is unreachable.
+     * Reports whether a statement ends its block, making any sibling after it unreachable.
      *
      * Deliberately conservative: only `return`, `exit`/`die`, and `throw` count. Control flow that
      * terminates only sometimes (break/continue/goto, or a match/if where every arm returns) is not
      * treated as terminating, so the rule under-reports rather than risk a false positive.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node $stmt - Statement to classify; non-statement nodes simply fall through to false.
      *
      * @return bool - True when no following sibling statement can run after this one.
      */
     private function isTerminating(Node $stmt): bool
     {
-        // User view: choose the findings list branch for this case.
+        // A bare `return` hands control back to the caller, so nothing after it in this block runs.
         if ($stmt instanceof Stmt\Return_) {
-            // A bare `return` hands control back to the caller, so nothing after it in this block runs.
             return true;
         }
 
-        // User view: choose the findings list branch for this case.
+        // An expression statement can itself be a terminator.
         if ($stmt instanceof Stmt\Expression) {
             $expr = $stmt->expr;
 

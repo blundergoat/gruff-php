@@ -14,7 +14,12 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\SourceTextRuleInterface;
 
 /**
- * Detects database URLs that embed password credentials.
+ * Flags a database connection URL that embeds a password inline (`mysql://user:pass@host`), so the user can
+ * move the credential into a secret store or environment variable.
+ *
+ * A source-text rule covering the common DB schemes (mysql, mariadb, mongodb, pgsql/postgres, redis). It
+ * skips matches inside comments and obvious dummy passwords, and the reported URL has its password
+ * redacted. Warning severity, high confidence - a literal `:password@` is an unambiguous credential.
  */
 final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
 {
@@ -24,11 +29,9 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
     public const ID = 'sensitive-data.database-url-password';
 
     /**
-     * Describe the database URL password sensitive-data rule.
+     * Describes the database-URL-password sensitive-data rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
-     * @return RuleDefinition - Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults (warning severity, high confidence).
      */
     public function definition(): RuleDefinition
     {
@@ -46,10 +49,8 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
     }
 
     /**
-     * Find database connection URLs that embed passwords.
+     * Reports each database URL that embeds a password, redacting the password in the preview.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -59,12 +60,12 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
     {
         // Fast bail: a credential-bearing DB URL needs scheme://...:...@...
         // Skip the alternation when no supported scheme prefix appears.
-        // User view: choose the findings list branch for this case.
         if (preg_match('#(?:mysql|mariadb|mongodb|pgsql|postgres|postgresql|redis)://#i', $analysisUnit->source) !== 1) {
             // No supported DB scheme in the source means there can be no inline credential to report.
             return [];
         }
 
+        // Match every credential-bearing DB URL, capturing the scheme, user, password, and host.
         preg_match_all(
             '#\b(?<scheme>mysql|mariadb|mongodb|pgsql|postgres|postgresql|redis)://(?<user>[^:\s/@]+):(?<password>[^@\s"\']+)@(?<host>[^"\']+)#i',
             $analysisUnit->source,
@@ -74,22 +75,23 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
 
         $findings      = [];
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
-        // User view: add each item that can appear in findings list.
+        // Weigh each URL the scan found.
         foreach ($matches[0] as $index => $match) {
             [$databaseUrl, $offset] = $match;
-            // User view: choose the findings list branch for this case.
+            // A URL inside a comment is an example, not a live credential.
             if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
                 continue;
             }
 
             $password = $matches['password'][$index][0];
-            // User view: choose the findings list branch for this case.
+            // An obvious placeholder password is not a real secret.
             if (SecretScannerHelper::isLikelyDummyValue($password)) {
                 continue;
             }
 
+            // Redact the password in the preview so the finding never carries the real value.
             $preview = preg_replace('#:' . preg_quote($password, '#') . '@#', ':<redacted:' . strlen($password) . ' chars>@', $databaseUrl);
-            // User view: choose the findings list branch for this case.
+            // Fall back to a fully redacted URL if the replace could not run.
             if (!is_string($preview)) {
                 $preview = '<redacted database URL>';
             }

@@ -18,7 +18,11 @@ use PhpParser\Node;
 use PhpParser\Node\Expr;
 
 /**
- * Detects HTTP client options that disable SSL certificate verification.
+ * Flags a cURL call that turns off certificate verification - `CURLOPT_SSL_VERIFYPEER` or
+ * `CURLOPT_SSL_VERIFYHOST` set false - the toggle that lets a man-in-the-middle impersonate the remote host.
+ *
+ * Runs per file over `curl_setopt` calls and `curl_setopt_array` option maps. Warning, high confidence -
+ * a literal verify-off toggle is unambiguous.
  */
 final class DisabledSslVerificationRule implements RuleInterface
 {
@@ -28,10 +32,8 @@ final class DisabledSslVerificationRule implements RuleInterface
     public const ID = 'security.disabled-ssl-verification';
 
     /**
-     * Describe the disabled SSL verification rule.
+     * Describes the disabled-SSL-verification rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -48,10 +50,8 @@ final class DisabledSslVerificationRule implements RuleInterface
     }
 
     /**
-     * Find cURL calls that disable peer or hostname verification.
+     * Reports each cURL call that turns peer or hostname verification off.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -61,15 +61,15 @@ final class DisabledSslVerificationRule implements RuleInterface
     {
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Check every function call in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
             $name = SecurityNodeHelper::globalFunctionName($call);
-            // User view: choose the findings list branch for this case.
+            // A single curl_setopt disabling a verify option is a finding.
             if ($name === 'curl_setopt' && $this->isDisabledCurlSetopt($call)) {
                 $findings[] = $this->finding($analysisUnit, $call);
             }
 
-            // User view: choose the findings list branch for this case.
+            // An options map disabling a verify option is a finding too.
             if ($name === 'curl_setopt_array' && $this->isDisabledCurlSetoptArray($call)) {
                 $findings[] = $this->finding($analysisUnit, $call);
             }
@@ -79,10 +79,8 @@ final class DisabledSslVerificationRule implements RuleInterface
     }
 
     /**
-     * Detect disabled verification in a `curl_setopt` call.
+     * Reports whether a `curl_setopt` call disables SSL verification.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Expr\FuncCall $call - Parsed `curl_setopt($handle, $option, $value)` call whose option/value pair is read.
      *
      * @return bool - True when SSL verification is disabled.
@@ -92,21 +90,17 @@ final class DisabledSslVerificationRule implements RuleInterface
         $optionArg = SecurityNodeHelper::argumentValue($call->args, 1);
         $valueArg  = SecurityNodeHelper::argumentValue($call->args, 2);
 
-        // User view: choose the findings list branch for this case.
-        // User view: missing data becomes the expected findings list state.
         if ($optionArg === null || $valueArg === null) {
             // Without both an option and a value argument the call cannot be the two-arg form this rule inspects.
             return false;
         }
 
         $option = SecurityNodeHelper::constantName($optionArg);
-        // User view: choose the findings list branch for this case.
         if ($option === 'CURLOPT_SSL_VERIFYPEER') {
             // Verification is disabled exactly when the peer-verify option is set to a false-like value.
             return SecurityNodeHelper::isFalseLike($valueArg);
         }
 
-        // User view: choose the findings list branch for this case.
         if ($option === 'CURLOPT_SSL_VERIFYHOST') {
             // Verification is disabled exactly when the hostname-verify option is set to a false-like value.
             return SecurityNodeHelper::isFalseLike($valueArg);
@@ -117,10 +111,8 @@ final class DisabledSslVerificationRule implements RuleInterface
     }
 
     /**
-     * Detect disabled verification in a `curl_setopt_array` option map.
+     * Reports whether a `curl_setopt_array` option map disables SSL verification.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Expr\FuncCall $call - Parsed `curl_setopt_array($handle, $options)` call; its options array is scanned.
      *
      * @return bool - True when the option array disables SSL verification.
@@ -128,32 +120,29 @@ final class DisabledSslVerificationRule implements RuleInterface
     private function isDisabledCurlSetoptArray(Expr\FuncCall $call): bool
     {
         $optionsArg = SecurityNodeHelper::argumentValue($call->args, 1);
-        // User view: choose the findings list branch for this case.
         if (!$optionsArg instanceof Expr\Array_) {
             // A non-literal options argument (variable, spread) is opaque to static inspection; assume nothing is off.
             return false;
         }
 
-        // User view: add each item that can appear in findings list.
+        // Weigh each option in the map.
         foreach ($optionsArg->items as $arrayItem) {
-            // User view: choose the findings list branch for this case.
+            // A spread entry has no key to read.
             if (!$arrayItem->key instanceof Node) {
                 continue;
             }
 
             $option = SecurityNodeHelper::constantName($arrayItem->key);
-            // User view: choose the findings list branch for this case.
-            // User view: missing data becomes the expected findings list state.
+            // Skip an entry whose key is not a named constant.
             if ($option === null) {
                 continue;
             }
 
-            // User view: choose the findings list branch for this case.
+            // Only the two SSL verification options matter here.
             if (!in_array($option, ['CURLOPT_SSL_VERIFYHOST', 'CURLOPT_SSL_VERIFYPEER'], true)) {
                 continue;
             }
 
-            // User view: choose the findings list branch for this case.
             if (SecurityNodeHelper::isFalseLike($arrayItem->value)) {
                 // A single verify-peer/verify-host entry set to a false-like value is enough to disable verification.
                 return true;
@@ -165,10 +154,8 @@ final class DisabledSslVerificationRule implements RuleInterface
     }
 
     /**
-     * Build the SSL verification finding for a cURL call.
+     * Builds the SSL-verification finding for a cURL call.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit supplying the display path recorded on the finding.
      * @param Node         $node - cURL call node whose start line localises the finding for the reviewer.
      *

@@ -5,7 +5,13 @@ declare(strict_types=1);
 namespace GruffPhp\Results\Finding;
 
 /**
- * Groups rules by the quality dimension they primarily assess.
+ * The quality dimension a rule belongs to - the bucket its findings are grouped and scored under.
+ *
+ * Every rule declares one pillar, and gruff uses it to shape what the user sees: the report groups
+ * findings by pillar, the score breakdown grades each dimension on its own, and a user can tune or
+ * mute a whole area (say, quiet `documentation` while tightening `security`) by naming its pillar in
+ * config. The cases below are the complete set of dimensions gruff assesses, from raw size through
+ * security, testing, and architecture.
  */
 enum Pillar: string
 {

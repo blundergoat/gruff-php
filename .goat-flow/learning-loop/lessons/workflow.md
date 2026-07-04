@@ -5,6 +5,20 @@ last_reviewed: 2026-07-04
 
 # Workflow Lessons
 
+## Lesson: Fan-out author agents fabricate rationale in generated comments — a mechanical gate proves shape, not accuracy
+
+**Created:** 2026-07-04
+
+**What happened:** To rewrite every comment/docblock in a 50-file `src/` batch to the UI-focused style spec, the agent ran a dynamic Workflow as an author→verify pipeline (one author agent per file restores the clean `bea1b6c` baseline, injects comments, and loops on a per-file gate; then a verifier checks quality). All 50 files passed the mechanical gate — `php -l` clean, zero non-comment code delta vs baseline, `@param`/`@return`/`@throws` counts preserved, `analyse --fail-on advisory` exit 0, no templated-junk residue — proving the change was comments-only and CI-safe. But the adversarial verify stage flagged **42 of 50 files with ~156 comment-accuracy defects**: fabricated UI rationale, wrong null-meanings (e.g. a docblock claiming a null `$reviewDiff` means "a plain scan" when a plain scan yields a non-null *inactive* `DiffResult` and null actually means a `--diff-vs` Git lookup threw — verified in `AnalysisPipeline.php`/`AnalyseCommand::buildDiffResult`), reversed logic, `Every`/`only`/`first` overstatements (the "first usage error" that `AnalyseCommandOptions::fromInput` actually keeps last-wins), and templated-across-branches phrasing the spec forbids. The author agents wrote plausible, confident prose without grounding each claim in the code — the exact failure this analyser exists to catch. All 156 had to be hand-fixed against the real control flow.
+
+**Root cause:** Conflating "structurally correct + CI-safe" with "accurate." The mechanical gate answers *"did only comments change, and does it still pass CI?"* — it is blind to whether the comments are *true*. Fan-out author agents optimise for producing spec-shaped text; with no requirement to cite the specific code line backing each rationale claim, they hallucinate confident, wrong explanations. Comment accuracy is the one dimension that requires reading the actual control flow, and it is precisely the dimension a shape-checking gate cannot see. This is the same family as [[project_workflow_selfreport_unreliable]] (agents no-op files and judges rubber-stamp): never trust fan-out self-reports on a quality dimension the gate does not mechanically enforce.
+
+**Prevention:** For any task that generates *prose about code* (comments, docblocks, docs, changelogs, commit bodies), never treat a mechanical/structural gate as sufficient evidence of correctness.
+- Pair generation with an adversarial verify stage that re-reads the code and checks each claim, defaulting to "needs-work" when unsure. The verifier's grounded defect list is often the workflow's most valuable output — worth more than the generated text.
+- Run your own gate over every file after the workflow; do not trust author-agent self-reports (`gatePassed` in the result is an author claim).
+- For accuracy-sensitive prose, prefer hand-authoring by an agent that reads each code path, or require author agents to quote the exact code line justifying every rationale claim. When the user bans further fan-out for such a task, that is the correct call — the fabrication failure is inherent to ungrounded parallel generation, not a tuning problem.
+- To prove the edit stayed comments-only under a format-on-save environment, gate on a whitespace-insensitive diff — see `.goat-flow/learning-loop/patterns/verification.md` "Pattern: Prove a comment-only edit with a whitespace-insensitive diff against the pre-edit baseline".
+
 ## Lesson: Comment codemods must not insert null-check comments after terminating statements inside closures
 
 **Created:** 2026-07-04

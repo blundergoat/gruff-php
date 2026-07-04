@@ -17,7 +17,11 @@ use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Node\Expr;
 
 /**
- * Detects random sources that are unsuitable for security-sensitive decisions.
+ * Flags a non-cryptographic random source - `rand()`, `mt_rand()`, `lcg_value()` - used where predictability
+ * matters, so the user swaps in a secure generator before a token, password, or key becomes guessable.
+ *
+ * Runs per file over global calls to the known weak random functions. Warning, high confidence - the flagged
+ * names are unambiguous.
  */
 final class InsecureRandomRule implements RuleInterface
 {
@@ -27,15 +31,15 @@ final class InsecureRandomRule implements RuleInterface
     public const ID = 'security.insecure-random';
 
     /**
+     * Global random functions that are not cryptographically secure.
+     *
      * @var list<string>
      */
     private const INSECURE_RANDOM_FUNCTIONS = ['lcg_value', 'mt_rand', 'rand'];
 
     /**
-     * Describe the insecure random security rule.
+     * Describes the insecure-random rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -52,10 +56,8 @@ final class InsecureRandomRule implements RuleInterface
     }
 
     /**
-     * Find random APIs that are unsuitable for security-sensitive values.
+     * Reports each non-cryptographic random call used in the unit.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -65,11 +67,10 @@ final class InsecureRandomRule implements RuleInterface
     {
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Check every function call in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
             $name = SecurityNodeHelper::globalFunctionName($call);
-            // User view: choose the findings list branch for this case.
-            // User view: missing data becomes the expected findings list state.
+            // Only the known non-cryptographic random functions are flagged.
             if ($name === null || !in_array($name, self::INSECURE_RANDOM_FUNCTIONS, true)) {
                 continue;
             }

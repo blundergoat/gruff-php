@@ -15,7 +15,11 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\SourceTextRuleInterface;
 
 /**
- * Flags Composer VCS repositories that resolve dependencies outside Packagist.
+ * Flags a Composer VCS repository (git, svn, and the like), which resolves a dependency straight from a
+ * version-control source outside Packagist - so the user verifies the source is trusted and pinned.
+ *
+ * Scans `composer.json` as text over each `repositories` entry whose type pulls from version control.
+ * Warning, medium confidence - a VCS source is a supply-chain smell to review, not proof of harm.
  */
 final class DependencyComposerVcsRule implements SourceTextRuleInterface
 {
@@ -32,10 +36,8 @@ final class DependencyComposerVcsRule implements SourceTextRuleInterface
     private const VCS_TYPES = ['vcs', 'git', 'svn', 'hg', 'fossil', 'perforce'];
 
     /**
-     * Describe the Composer VCS-repository rule.
+     * Describes the Composer VCS-repository rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -52,10 +54,8 @@ final class DependencyComposerVcsRule implements SourceTextRuleInterface
     }
 
     /**
-     * Find `repositories` entries that resolve dependencies from version control.
+     * Reports each Composer repository that resolves dependencies from version control.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -63,30 +63,27 @@ final class DependencyComposerVcsRule implements SourceTextRuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        // User view: choose the findings list branch for this case.
         if (!ComposerManifest::isManifest($analysisUnit->file->displayPath)) {
             // This rule only applies to composer.json; every other file yields no findings.
             return [];
         }
 
         $manifest = ComposerManifest::decode($analysisUnit->source);
-        // User view: choose the findings list branch for this case.
-        // User view: missing data becomes the expected findings list state.
         if ($manifest === null || !isset($manifest['repositories']) || !is_array($manifest['repositories'])) {
             // Unparseable manifest or no repositories block means there is nothing of this shape to flag.
             return [];
         }
 
         $findings = [];
-        // User view: add each item that can appear in findings list.
+        // Check each declared repository entry.
         foreach ($manifest['repositories'] as $repository) {
-            // User view: choose the findings list branch for this case.
+            // A malformed, non-object entry cannot be a VCS repository.
             if (!is_array($repository)) {
                 continue;
             }
 
             $type = isset($repository['type']) && is_string($repository['type']) ? strtolower($repository['type']) : '';
-            // User view: choose the findings list branch for this case.
+            // Only a version-control repository type is flagged.
             if (!in_array($type, self::VCS_TYPES, true)) {
                 continue;
             }

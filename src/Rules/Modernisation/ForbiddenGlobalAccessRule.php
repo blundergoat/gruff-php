@@ -18,11 +18,12 @@ use PhpParser\Node\Expr;
 use PhpParser\Node\Stmt;
 
 /**
- * Detects direct reads from global request and environment arrays.
+ * Flags a direct read from a request/session superglobal (`$_GET`, `$_POST`, `$_SESSION`) in domain code,
+ * so the user can route request state through a boundary abstraction instead of reaching for globals.
  *
- * Write-position superglobals (assignment targets and unset arguments) are
- * skipped: they mutate request state rather than read it, so only reads -
- * including compound assignments, which read before writing - report.
+ * Write-position superglobals (assignment targets and unset arguments) are skipped: they mutate request
+ * state rather than read it, so only reads - including compound assignments, which read before writing -
+ * report. Controller files are exempt as the sanctioned request-handling boundary.
  */
 final readonly class ForbiddenGlobalAccessRule implements RuleInterface
 {
@@ -37,11 +38,9 @@ final readonly class ForbiddenGlobalAccessRule implements RuleInterface
     private const FORBIDDEN_GLOBALS = ['_GET', '_POST', '_SESSION'];
 
     /**
-     * Describe the forbidden global access rule.
+     * Describes the forbidden-global-access rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
-     * @return RuleDefinition - Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults (warning severity, medium confidence).
      */
     public function definition(): RuleDefinition
     {
@@ -57,18 +56,15 @@ final readonly class ForbiddenGlobalAccessRule implements RuleInterface
     }
 
     /**
-     * Find direct superglobal reads outside controller boundaries.
+     * Reports each direct superglobal read that sits outside a controller boundary.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> - Findings for forbidden global reads.
+     * @return list<Finding> - One finding per forbidden global read; empty in controller files or when none are read.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        // User view: choose the findings list branch for this case.
         if ($this->isControllerPath($analysisUnit->file->displayPath)) {
             // Controllers are the sanctioned boundary for superglobals, so exempt the whole file there.
             return [];
@@ -78,21 +74,20 @@ final readonly class ForbiddenGlobalAccessRule implements RuleInterface
         $seen         = [];
         $writeTargets = $this->writePositionVariableIds($analysisUnit);
 
-        // User view: add each item that can appear in findings list.
+        // Scan every variable occurrence in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\Variable::class) as $variable) {
-            // User view: choose the findings list branch for this case.
+            // Only a literal superglobal name ($_GET/$_POST/$_SESSION) is in scope here.
             if (!is_string($variable->name) || !in_array($variable->name, self::FORBIDDEN_GLOBALS, true)) {
                 continue;
             }
 
-            // User view: choose the findings list branch for this case.
             if (isset($writeTargets[spl_object_id($variable)])) {
                 // Write position: the superglobal is being assigned or unset, not read.
                 continue;
             }
 
             $key = $variable->name . ':' . $variable->getStartLine();
-            // User view: choose the findings list branch for this case.
+            // Report each superglobal at most once per line, even if it appears more than once.
             if (isset($seen[$key])) {
                 continue;
             }
@@ -118,14 +113,12 @@ final readonly class ForbiddenGlobalAccessRule implements RuleInterface
     }
 
     /**
-     * Index variables that appear in write position across the unit.
+     * Indexes the variables that appear in write position, so reads can be told apart from writes.
      *
      * Plain assignment targets and unset arguments are writes; compound
      * assignments (`.=`, `+=`) are AssignOp nodes, stay out of this set, and
      * therefore keep reporting because they read the current value first.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit whose assignments and unsets are scanned.
      *
      * @return array<int, true> - spl_object_id set of base variables written by assignments or unsets.
@@ -134,14 +127,14 @@ final readonly class ForbiddenGlobalAccessRule implements RuleInterface
     {
         $writtenVariableIds = [];
 
-        // User view: add each item that can appear in findings list.
+        // Every plain assignment target is a write, not a read.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\Assign::class) as $assign) {
             $this->markWriteTarget($assign->var, $writtenVariableIds);
         }
 
-        // User view: add each item that can appear in findings list.
+        // Every unset argument is a write position too.
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Unset_::class) as $unset) {
-            // User view: add each item that can appear in findings list.
+            // A single unset can clear several targets at once.
             foreach ($unset->vars as $target) {
                 $this->markWriteTarget($target, $writtenVariableIds);
             }
@@ -151,10 +144,8 @@ final readonly class ForbiddenGlobalAccessRule implements RuleInterface
     }
 
     /**
-     * Record the base variable of one write target.
+     * Records the base variable of one write target so a later read of it can be recognised.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Expr             $target - Assignment left-hand side or unset argument.
      * @param array<int, true> $writtenVariableIds - Output set keyed by spl_object_id, appended in place.
      *
@@ -167,20 +158,18 @@ final readonly class ForbiddenGlobalAccessRule implements RuleInterface
             $target = $target->var;
         }
 
-        // User view: choose the findings list branch for this case.
+        // Record the base variable once the dimension chain has been peeled away.
         if ($target instanceof Expr\Variable) {
             $writtenVariableIds[spl_object_id($target)] = true;
         }
     }
 
     /**
-     * Check whether a file path is treated as a controller boundary.
+     * Reports whether a file path is treated as a controller boundary where superglobals are allowed.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param string $displayPath - File path as shown in findings; matched by convention to spot controller code.
      *
-     * @return bool - True when direct request/session access is allowed.
+     * @return bool - True when direct request/session access is allowed for this path, false otherwise.
      */
     private function isControllerPath(string $displayPath): bool
     {

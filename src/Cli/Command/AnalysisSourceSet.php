@@ -10,7 +10,7 @@ use GruffPhp\Engine\Source\SourceDiscoveryResult;
 use GruffPhp\Engine\Source\SourceFile;
 
 /**
- * The parsed sources for one analysis run — units, diagnostics, and discovery metadata.
+ * The parsed sources for one analysis run - units, diagnostics, and discovery metadata.
  *
  * Sits between source loading and rule execution: it holds the parsed `AnalysisUnit`s the rules
  * inspect, the diagnostics (like parse errors) surfaced to the user, and the discovery result behind
@@ -42,7 +42,7 @@ final readonly class AnalysisSourceSet
     }
 
     /**
-     * Lists the project-relative paths of the discovered files — the paths shown beside each finding.
+     * Lists the project-relative paths of the discovered files - the paths shown beside each finding.
      *
      * @return list<string> - Project-relative source file paths in discovery order.
      */

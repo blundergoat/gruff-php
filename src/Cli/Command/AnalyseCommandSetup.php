@@ -15,7 +15,7 @@ use GruffPhp\Rules\RuleRegistry;
  *
  * Built once the command has validated the user's flags and loaded config: it carries the project
  * root, parsed options, output format, the fail thresholds that decide the exit code, the effective
- * config, and the rule registry — so the analysis pipeline runs without re-reading CLI input.
+ * config, and the rule registry - so the analysis pipeline runs without re-reading CLI input.
  */
 final readonly class AnalyseCommandSetup
 {

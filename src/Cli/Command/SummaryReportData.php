@@ -10,8 +10,8 @@ use GruffPhp\Results\Scoring\ScoreReport;
 /**
  * Immutable payload the `summary` command hands to its renderers.
  *
- * Bundles everything one summary needs — scanned paths, file counts, composite score, severity
- * totals, and the top-rules/top-offenders lists — so the text and JSON renderers read identical
+ * Bundles everything one summary needs - scanned paths, file counts, composite score, severity
+ * totals, and the top-rules/top-offenders lists - so the text and JSON renderers read identical
  * numbers and the user sees a consistent digest whichever format they chose.
  */
 final readonly class SummaryReportData

@@ -20,13 +20,13 @@ use PhpParser\Token;
 final class AnalysisUnit
 {
     /**
-      * User flow: Prepares source files so findings point at the right code.
-      *
+     * Bundles a parsed file's source, statements, comment tokens, and any parse diagnostics.
+     *
      * @param SourceFile            $file - Source file that produced this analysis unit.
      * @param string                $source - Raw source text.
      * @param list<Stmt>            $statements - Parsed top-level statements.
      * @param list<Token>           $tokens - Comment tokens emitted by the parser.
-     * @param list<ParseDiagnostic> $diagnostics - Parse diagnostics collected for the file.
+     * @param list<ParseDiagnostic> $diagnostics - Parse diagnostics collected for the file; empty when it parsed cleanly.
      */
     public function __construct(
         public readonly SourceFile $file,
@@ -38,30 +38,24 @@ final class AnalysisUnit
     }
 
     /**
-     * Report whether parsing produced diagnostics for the source file.
+     * Reports whether this file hit any parse trouble, which is what marks it as unanalysed in reports.
      *
-      * User flow: Prepares source files so findings point at the right code.
-      *
      * @return bool - True when the unit has at least one parse diagnostic.
      */
     public function hasParseErrors(): bool
     {
         // A non-empty diagnostics list is the recorded signal that parsing failed for this file.
-        // User view: an empty value becomes a clear source analysis fallback.
         return $this->diagnostics !== [];
     }
 
     /**
-     * Count source lines in the raw file contents.
+     * Counts the source lines, used by size rules and reporting to describe how big the file is.
      *
-      * User flow: Prepares source files so findings point at the right code.
-      *
-     * @return int - Number of lines, or zero for an empty source string.
+     * @return int - Number of lines; zero for an empty source string.
      */
     public function lineCount(): int
     {
-        // User view: choose the source analysis branch for this case.
-        // User view: an empty value becomes a clear source analysis fallback.
+        // An empty file has no lines at all.
         if ($this->source === '') {
             // An empty file has no lines; count zero rather than reporting a phantom first line.
             return 0;
@@ -72,13 +66,13 @@ final class AnalysisUnit
     }
 
     /**
-     * Release the unit's parsed contents so the AST, token, and source memory
-     * can be reclaimed. Project rules that have already extracted what they
+     * Releases the unit's heavy parsed contents so the AST, token, and source memory can be reclaimed
+     * once per-file rules are done, keeping only the file/diagnostics shell that reporting still needs.
+     *
+     * Project rules that have already extracted what they
      * need from this unit will not touch it again; the `file` and `diagnostics`
      * shell stays intact for reporting.
      *
-      * User flow: Prepares source files so findings point at the right code.
-      *
      * @return void - Unit is left in a released state with empty contents.
      */
     public function release(): void
@@ -88,7 +82,6 @@ final class AnalysisUnit
         // cycle collector. This matters at scale (4-5GB peak on large-project
         // scans without it) because every AST node holds a `parent`
         // attribute pointing up the tree.
-        // User view: add each item that can appear in source analysis.
         foreach ($this->statements as $statement) {
             self::breakParentLinks($statement);
         }
@@ -98,11 +91,9 @@ final class AnalysisUnit
     }
 
     /**
-     * Recursively clear the `parent` attribute every node carries from
-     * ParentConnectingVisitor so the AST is no longer a cycle.
+     * Recursively nulls the `parent` attribute every node carries from ParentConnectingVisitor, so the
+     * AST stops being a reference cycle and PHP can free it promptly.
      *
-      * User flow: Prepares source files so findings point at the right code.
-      *
      * @param Node $node - Subtree root to descend; its `parent` back-edge and every descendant's are nulled in
      * place.
      *
@@ -111,19 +102,19 @@ final class AnalysisUnit
     private static function breakParentLinks(Node $node): void
     {
         $node->setAttribute('parent', null);
-        // User view: add each item that can appear in source analysis.
+        // Walk every child of this node, clearing parent links as we descend.
         foreach ($node->getSubNodeNames() as $subNodeName) {
             $subNodeValue = $node->{$subNodeName};
-            // User view: choose the source analysis branch for this case.
+            // A single child node: recurse straight into it.
             if ($subNodeValue instanceof Node) {
                 self::breakParentLinks($subNodeValue);
                 continue;
             }
-            // User view: choose the source analysis branch for this case.
+            // A list of children: recurse into each node it holds.
             if (is_array($subNodeValue)) {
-                // User view: add each item that can appear in source analysis.
+                // Descend into each node element of the child list.
                 foreach ($subNodeValue as $item) {
-                    // User view: choose the source analysis branch for this case.
+                    // Only actual nodes carry the parent links we need to clear.
                     if ($item instanceof Node) {
                         self::breakParentLinks($item);
                     }

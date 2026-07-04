@@ -21,7 +21,7 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * Backs the `gruff-php summary` command — the one-screen health verdict on a codebase.
+ * Backs the `gruff-php summary` command - the one-screen health verdict on a codebase.
  *
  * Reach for this when a user wants "how good is this code?" at a glance instead of scrolling
  * through every finding: it runs the analyser once, then prints the composite grade, per-pillar
@@ -41,7 +41,7 @@ final class SummaryCommand extends Command
     private const DEFAULT_TOP = 10;
 
     /**
-     * Registers the `summary` command's paths argument, flags, and `--help` text — everything the
+     * Registers the `summary` command's paths argument, flags, and `--help` text - everything the
      * user can type after `gruff-php summary`.
      *
      * @return void
@@ -264,7 +264,7 @@ final class SummaryCommand extends Command
     }
 
     /**
-     * Builds the settings that decide which rules run and which paths are ignored — the difference
+     * Builds the settings that decide which rules run and which paths are ignored - the difference
      * between the scan the user configured and a bare default run.
      *
      * @param bool            $noConfig - When true, skip the YAML file and build defaults straight from the registry.
@@ -399,7 +399,7 @@ final class SummaryCommand extends Command
     }
 
     /**
-     * Builds the "top rules" list — which checks the user's code trips most often, ranked worst-first
+     * Builds the "top rules" list - which checks the user's code trips most often, ranked worst-first
      * so the biggest problems sit at the top.
      *
      * @param list<Finding>         $findings - Findings to aggregate into per-rule summary rows.
@@ -487,8 +487,8 @@ final class SummaryCommand extends Command
     }
 
     /**
-     * Lays out the terminal digest the user reads: header, composite grade, and pillar table, plus —
-     * only when there are findings — the top rules, worst files, and a baseline nudge.
+     * Lays out the terminal digest the user reads: header, composite grade, and pillar table, plus -
+     * only when there are findings - the top rules, worst files, and a baseline nudge.
      *
      * @param SummaryReportData $summaryReportData - Aggregated run data to format as aligned console text.
      *
@@ -530,7 +530,7 @@ final class SummaryCommand extends Command
         });
 
         $pillarWidth = $this->columnWidth(array_map(static fn($pillar): string => $pillar->pillar, $sortedPillars), 14);
-        // One aligned row per pillar (naming, complexity, security, …) — the grades users scan first.
+        // One aligned row per pillar (naming, complexity, security, …) - the grades users scan first.
         foreach ($sortedPillars as $pillar) {
             $grade     = $pillar->grade === null ? 'n/a' : $pillar->grade->letter;
             // A pillar with no applicable rules has no grade, so show "n/a" rather than a misleading zero.

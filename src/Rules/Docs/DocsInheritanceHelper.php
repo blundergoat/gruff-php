@@ -13,13 +13,18 @@ use PhpParser\Node\Stmt\Interface_;
 use PhpParser\NodeFinder;
 
 /**
- * Resolves inherited method documentation contracts for docs rules.
+ * Resolves whether a method inherits its documentation contract from a parent or interface, so the docs
+ * rules can exempt an override that legitimately relies on the ancestor's documented contract.
+ *
+ * Used by the missing-throws and missing-param rules: an `@inheritdoc` marker, an `#[Override]` attribute,
+ * or a documented same-file ancestor method all count as an inherited contract. Only ancestors declared in
+ * the same parsed unit are resolved; cross-file inheritance is out of scope.
  */
 final readonly class DocsInheritanceHelper
 {
     /**
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
+     * Reports whether a method inherits its documentation contract from a parent, interface, or marker.
+     *
      * @param ClassMethod     $classMethod - Method node whose inherited contract should be inspected.
      * @param list<Node\Stmt> $statements - Parsed statements used to find ancestor declarations.
      * @param NodeFinder      $nodeFinder - Node finder used to search inherited method candidates.
@@ -28,14 +33,12 @@ final readonly class DocsInheritanceHelper
      */
     public function hasInheritedContractDoc(ClassMethod $classMethod, array $statements, NodeFinder $nodeFinder): bool
     {
-        // User view: choose the findings list branch for this case.
         if ($this->hasInheritDoc($classMethod) || $this->hasOverrideAttribute($classMethod)) {
             // An explicit @inheritdoc or #[Override] is the author asserting the parent owns the contract.
             return true;
         }
 
         $class = $this->enclosingClass($classMethod);
-        // User view: choose the findings list branch for this case.
         if (!$class instanceof Class_) {
             // Only Class_ nodes can extend or implement, so nothing else can inherit a contract.
             return false;
@@ -44,7 +47,6 @@ final readonly class DocsInheritanceHelper
         $ancestorNames = $this->ancestorNames($class);
 
         // Inherited docs only count when a named ancestor in this same unit actually documents the method.
-        // User view: an empty value becomes a clear findings list fallback.
         return $ancestorNames !== [] && $this->hasDocumentedAncestorMethod(
             ancestorNames: $ancestorNames,
             methodName:    strtolower($classMethod->name->toString()),
@@ -54,10 +56,8 @@ final readonly class DocsInheritanceHelper
     }
 
     /**
-     * Return short parent and implemented interface names for a class.
+     * Returns the short parent and implemented-interface names declared directly on a class.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Class_ $class - Class declaration whose direct parent and interfaces should be collected.
      *
      * @return list<string> - Ancestor names declared directly on the class.
@@ -65,12 +65,12 @@ final readonly class DocsInheritanceHelper
     private function ancestorNames(Class_ $class): array
     {
         $ancestorNames = [];
-        // User view: choose the findings list branch for this case.
+        // A named parent class is a direct ancestor.
         if ($class->extends instanceof Name) {
             $ancestorNames[] = $this->shortName($class->extends);
         }
 
-        // User view: add each item that can appear in findings list.
+        // Each implemented interface is a direct ancestor too.
         foreach ($class->implements as $interface) {
             $ancestorNames[] = $this->shortName($interface);
         }
@@ -80,10 +80,8 @@ final readonly class DocsInheritanceHelper
     }
 
     /**
-     * Check direct ancestors in the same parsed unit for a documented method contract.
+     * Reports whether a same-file direct ancestor documents the given method.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param list<string>    $ancestorNames - Short names of direct ancestors.
      * @param string          $methodName - Lowercase method name to find.
      * @param list<Node\Stmt> $statements - Parsed statements used to find ancestor declarations.
@@ -97,16 +95,15 @@ final readonly class DocsInheritanceHelper
         array $statements,
         NodeFinder $nodeFinder,
     ): bool {
-        // User view: add each item that can appear in findings list.
+        // Search every class-like in the unit for a matching ancestor.
         foreach ($nodeFinder->findInstanceOf($statements, ClassLike::class) as $candidate) {
-            // User view: choose the findings list branch for this case.
+            // Only the class's named ancestors are worth searching.
             if (!$this->isNamedAncestorCandidate($candidate, $ancestorNames)) {
                 continue;
             }
 
-            // User view: add each item that can appear in findings list.
+            // Look for the overridden method on the ancestor.
             foreach ($candidate->getMethods() as $ancestorMethod) {
-                // User view: choose the findings list branch for this case.
                 if ($this->isDocumentedMethod($ancestorMethod, $methodName)) {
                     // First documented ancestor override is enough; the contract is inherited.
                     return true;
@@ -119,10 +116,8 @@ final readonly class DocsInheritanceHelper
     }
 
     /**
-     * Check whether a class-like node is a named direct ancestor candidate.
+     * Reports whether a class-like node is a named direct ancestor worth searching for methods.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param ClassLike    $candidate - Class-like node found in the unit, tested against the ancestor list.
      * @param list<string> $ancestorNames - Short names of direct ancestors.
      *
@@ -130,7 +125,6 @@ final readonly class DocsInheritanceHelper
      */
     private function isNamedAncestorCandidate(ClassLike $candidate, array $ancestorNames): bool
     {
-        // User view: choose the findings list branch for this case.
         if (!$candidate instanceof Class_ && !$candidate instanceof Interface_) {
             // Traits and enums cannot be ancestors, so they never supply inherited method contracts.
             return false;
@@ -139,15 +133,12 @@ final readonly class DocsInheritanceHelper
         $candidateName = $candidate->name?->toString();
 
         // Anonymous classes (null name) and unrelated types are excluded; only listed ancestors match.
-        // User view: missing data becomes the expected findings list state.
         return $candidateName !== null && in_array($candidateName, $ancestorNames, true);
     }
 
     /**
-     * Check whether an ancestor method matches the target name and has PHPDoc.
+     * Reports whether an ancestor method matches the target name and carries a docblock.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param ClassMethod $ancestorMethod - Candidate ancestor method to compare by name and docblock.
      * @param string      $methodName - Already-lowercased name of the overriding method to match.
      *
@@ -157,15 +148,12 @@ final readonly class DocsInheritanceHelper
     {
         // Match is case-insensitive and requires a docblock; an undocumented ancestor inherits nothing.
         return strtolower($ancestorMethod->name->toString()) === $methodName
-            // User view: missing data becomes the expected findings list state.
             && $ancestorMethod->getDocComment() !== null;
     }
 
     /**
-     * Check whether a method docblock declares inheritdoc.
+     * Reports whether a method's own docblock declares inheritdoc.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param ClassMethod $classMethod - Method whose own docblock is scanned for an inheritdoc marker.
      *
      * @return bool - True when inheritdoc is present.
@@ -175,27 +163,23 @@ final readonly class DocsInheritanceHelper
         $doc = $classMethod->getDocComment();
 
         // Match both block `@inheritdoc` and inline `{@inheritdoc}` inheritance markers.
-        // User view: missing data becomes the expected findings list state.
         return $doc !== null && preg_match('/@inheritdoc|{@inheritdoc}/i', $doc->getText()) === 1;
     }
 
     /**
-     * Check whether a method has an Override attribute.
+     * Reports whether a method carries an #[Override] attribute.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param ClassMethod $classMethod - Method whose attribute groups are scanned for #[Override].
      *
      * @return bool - True when an Override attribute is present.
      */
     private function hasOverrideAttribute(ClassMethod $classMethod): bool
     {
-        // User view: add each item that can appear in findings list.
+        // Scan each attribute group on the method.
         foreach ($classMethod->attrGroups as $group) {
-            // User view: add each item that can appear in findings list.
+            // Check each attribute for the Override marker.
             foreach ($group->attrs as $attribute) {
                 $shortName = strtolower($this->shortName($attribute->name));
-                // User view: choose the findings list branch for this case.
                 if ($shortName === 'override') {
                     // Comparison is case-insensitive so #[Override] and #[override] both signal an override.
                     return true;
@@ -208,10 +192,8 @@ final readonly class DocsInheritanceHelper
     }
 
     /**
-     * Walk parent attributes to find the enclosing class.
+     * Walks the parent chain to the enclosing class, or null when the method lives outside a class.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param ClassMethod $classMethod - Method whose ancestor chain is walked outward to its class.
      *
      * @return Class_|null - Enclosing class node, or null outside a class.
@@ -220,8 +202,8 @@ final readonly class DocsInheritanceHelper
     {
         $parent = $classMethod->getAttribute('parent');
 
+        // Walk outward through the parent chain looking for the enclosing class.
         while ($parent instanceof Node) {
-            // User view: choose the findings list branch for this case.
             if ($parent instanceof Class_) {
                 // Nearest enclosing Class_ wins; interfaces and traits are skipped by the loop condition.
                 return $parent;
@@ -235,10 +217,8 @@ final readonly class DocsInheritanceHelper
     }
 
     /**
-     * Return the final segment of a name node.
+     * Returns the final, unqualified segment of a name node.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Name $name - Possibly namespaced name whose last segment is wanted.
      *
      * @return string - Unqualified name.

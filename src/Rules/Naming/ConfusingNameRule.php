@@ -17,7 +17,11 @@ use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Node\Stmt\Class_;
 
 /**
- * Detects standalone class names that hide responsibility.
+ * Flags a class whose entire name is a vague catch-all - `Manager`, `Handler`, `Helper`, `Data`, and the
+ * like - because a standalone grab-bag name tells the reader nothing about what the class is responsible for.
+ *
+ * Advisory and medium confidence: these names are suspects, not certainties, so the finding invites a rename
+ * to something domain-specific rather than demanding one.
  */
 final readonly class ConfusingNameRule implements RuleInterface
 {
@@ -35,10 +39,8 @@ final readonly class ConfusingNameRule implements RuleInterface
     ];
 
     /**
-     * Describe the confusing name rule.
+     * Describes the confusing-name rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -55,10 +57,8 @@ final readonly class ConfusingNameRule implements RuleInterface
     }
 
     /**
-     * Find identifiers whose names are ambiguous or visually confusing.
+     * Reports each class whose standalone name is too vague to convey responsibility.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -71,18 +71,17 @@ final readonly class ConfusingNameRule implements RuleInterface
 
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Check every class declared in the file.
         foreach ($classes as $class) {
             /** @var Class_ $class Finder predicate restricts results to class declarations. */
             $name = $class->name?->toString();
 
-            // User view: choose the findings list branch for this case.
-            // User view: missing data becomes the expected findings list state.
+            // An anonymous class has no name to judge.
             if ($name === null) {
                 continue;
             }
 
-            // User view: choose the findings list branch for this case.
+            // Only the known vague standalone names are flagged.
             if (!in_array($name, self::CONFUSING_STANDALONE, true)) {
                 continue;
             }

@@ -15,7 +15,7 @@ use GruffPhp\Cli\Command\SummaryCommand;
 use Symfony\Component\Console\Application as SymfonyApplication;
 
 /**
- * The gruff-php CLI entry point — wires every subcommand into Symfony Console.
+ * The gruff-php CLI entry point - wires every subcommand into Symfony Console.
  *
  * This is what `bin/gruff-php` boots: it registers the commands a user can type (`analyse`,
  * `summary`, `report`, `dashboard`, `init`, `hook`, `list-rules`, `check-ignore`) and stamps the

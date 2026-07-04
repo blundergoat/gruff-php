@@ -13,16 +13,23 @@ use GruffPhp\Rules\RuleRegistry;
 use JsonException;
 
 /**
- * Renders analysis reports in SARIF format.
+ * Renders a finished analysis run as a SARIF 2.1.0 JSON document - the format GitHub Code Scanning
+ * and similar platforms ingest to show findings inline on a pull request and in the Security tab.
+ *
+ * Reach for this when the run's consumer is a code-scanning platform rather than a person reading the
+ * terminal: the user asks for it with `gruff-php analyse --format sarif`, redirects it to a `.sarif`
+ * file, and uploads that file so each finding lands as an annotation on the line it flags. It sits
+ * beside the other `OutputFormat` renderers (text, JSON, HTML, Markdown, hotspot, GitHub) as the code-scanning
+ * option, and stamps every result with two fingerprints so an alert survives unrelated line drift.
  */
 final readonly class SarifReporter
 {
     /**
-     * Render findings as a SARIF 2.1.0 JSON document.
+     * Turns the whole finished run into the single SARIF string `analyse --format sarif` prints, so a
+     * code-scanning upload receives every rule and finding - with line locations and fingerprints - in
+     * one document instead of the human-readable terminal report.
      *
-      * User flow: Shapes the report output people read after analysis finishes.
-      *
-     * @param AnalysisReport $report - Analysis report to render.
+     * @param AnalysisReport $report - Completed analysis run whose rules and findings become the SARIF body.
      *
      * @return string - the SARIF 2.1.0 JSON document with trailing newline; on encode failure a minimal JSON
      *                  error object instead, so the caller always gets parseable output rather than an exception
@@ -30,13 +37,15 @@ final readonly class SarifReporter
     public function render(AnalysisReport $report): string
     {
         $rules = [];
-        // User view: add each item that can appear in report output.
+        // Seed the SARIF rule catalogue with every built-in rule, so a Code Scanning alert can always
+        // link back to a full rule description even for rules this run never tripped.
         foreach (RuleRegistry::defaults()->all() as $rule) {
             $definition             = $rule->definition();
             $rules[$definition->id] = $this->rule($definition);
         }
 
-        // User view: add each item that can appear in report output.
+        // Backfill a minimal rule entry for any finding whose rule isn't built-in - the `??=` leaves the
+        // richer definitions from the first loop untouched, so no result points at a rule we never list.
         foreach ($report->findings as $finding) {
             $rules[$finding->ruleId] ??= [
                 'id'               => $finding->ruleId,
@@ -59,8 +68,8 @@ final readonly class SarifReporter
         $properties  = [
             'gruffSchemaVersion' => AnalysisReport::SCHEMA_VERSION,
         ];
-        // User view: choose the report output branch for this case.
-        // User view: missing data becomes the expected report output state.
+        // Publish the composite score and grade only when the run produced them; a null score means
+        // scoring was skipped, so we omit the fields rather than show a misleading zero.
         if ($report->score !== null) {
             $properties['score'] = $report->score->composite->score;
             $properties['grade'] = $report->score->composite->letter;
@@ -93,10 +102,10 @@ final readonly class SarifReporter
     }
 
     /**
-     * Render one registry definition as a SARIF driver rule.
+     * Describes one registered rule as a SARIF driver rule, so every check gruff can emit appears in the
+     * report's rule catalogue with its pillar, tier, and threshold - the metadata a Code Scanning UI
+     * shows beside each alert. Called once per rule while `render()` builds that catalogue.
      *
-      * User flow: Shapes the report output people read after analysis finishes.
-      *
      * @param RuleDefinition $definition - Native rule definition.
      *
      * @return array{
@@ -118,8 +127,8 @@ final readonly class SarifReporter
             'confidence'      => $definition->confidence->value,
             'defaultEnabled'  => $definition->isEnabledByDefault,
         ];
-        // User view: choose the report output branch for this case.
-        // User view: an empty value becomes a clear report output fallback.
+        // Some rules also feed secondary pillars; list them when present so a consumer sees every
+        // quality area the rule touches. The common empty case maps to a single pillar and omits the key.
         if ($definition->secondaryPillars !== []) {
             $properties['secondaryPillars'] = array_map(
                 static fn(Pillar $pillar): string => $pillar->value,
@@ -127,18 +136,17 @@ final readonly class SarifReporter
             );
         }
         $single = $definition->severityThreshold;
-        // User view: choose the report output branch for this case.
+        // A rule with a single threshold-plus-severity (size, complexity, and the like) publishes its
+        // default threshold and the severity label it trips at, so a reviewer sees the rule's configured limit.
         if ($single instanceof \GruffPhp\Engine\Config\SeverityThreshold) {
             $properties['threshold'] = $single->threshold;
             $properties['severity']  = $single->severity->value;
-        }
-        // User view: an empty value becomes a clear report output fallback.
-        // User view: choose the next report output branch for this case.
-        elseif ($definition->defaultThresholds !== []) {
+        // A rule that instead exposes a map of named thresholds passes that map straight through.
+        } elseif ($definition->defaultThresholds !== []) {
             $properties['thresholds'] = $definition->defaultThresholds;
         }
-        // User view: choose the report output branch for this case.
-        // User view: an empty value becomes a clear report output fallback.
+        // When a rule ships tunable options, expose their defaults so a reader can see what's
+        // configurable; a rule with none omits the key entirely.
         if ($definition->defaultOptions !== []) {
             $properties['options'] = $definition->defaultOptions;
         }
@@ -161,10 +169,9 @@ final readonly class SarifReporter
     }
 
     /**
-     * Build one SARIF result payload for a finding.
+     * Turns one finding into a single SARIF result - the object that becomes an annotation on a pull
+     * request line. Called once per finding while `render()` assembles the run's results list.
      *
-      * User flow: Shapes the report output people read after analysis finishes.
-      *
      * @param Finding $finding - Finding to serialize into a single SARIF result entry.
      * @param int     $ruleIndex - Zero-based offset of this finding's rule in the driver `rules` array, so the
      *                           result can reference its rule by index rather than repeating the descriptor.
@@ -175,6 +182,8 @@ final readonly class SarifReporter
      */
     private function result(Finding $finding, int $ruleIndex): array
     {
+        // SARIF wants forward-slash, repo-relative paths, so flip Windows separators and strip any
+        // leading `./` - otherwise Code Scanning would annotate the wrong path, or none at all.
         $uri = str_replace('\\', '/', $finding->filePath);
         $uri = (string)preg_replace('/^(?:\\.\\/)+/', '', $uri);
 
@@ -183,19 +192,18 @@ final readonly class SarifReporter
                 'uri' => $uri,
             ],
         ];
-        // User view: choose the report output branch for this case.
-        // User view: missing data becomes the expected report output state.
+        // A line-anchored finding gets a region so the alert lands on the exact spot; a null line is a
+        // file-level finding, left without a region so it attaches to the file as a whole.
         if ($finding->line !== null) {
             $region = [
                 'startLine' => $finding->line,
             ];
-            // User view: choose the report output branch for this case.
-            // User view: missing data becomes the expected report output state.
+            // Narrow the highlight to a column when the rule pinpointed one, rather than the line start.
             if ($finding->column !== null) {
                 $region['startColumn'] = $finding->column;
             }
-            // User view: choose the report output branch for this case.
-            // User view: missing data becomes the expected report output state.
+            // Stretch the region to an end line for a multi-line finding, so the highlight covers the
+            // whole offending block instead of only its first line.
             if ($finding->endLine !== null) {
                 $region['endLine'] = $finding->endLine;
             }
@@ -208,26 +216,26 @@ final readonly class SarifReporter
             'tier'       => $finding->tier->value,
             'confidence' => $finding->confidence->value,
         ];
-        // User view: choose the report output branch for this case.
-        // User view: an empty value becomes a clear report output fallback.
+        // Carry any extra pillars this finding touches, so a Code Scanning reader sees every quality
+        // area it affects; the empty case belongs to just its primary pillar.
         if ($finding->secondaryPillars !== []) {
             $properties['secondaryPillars'] = array_map(
                 static fn(Pillar $pillar): string => $pillar->value,
                 $finding->secondaryPillars,
             );
         }
-        // User view: choose the report output branch for this case.
-        // User view: missing data becomes the expected report output state.
+        // Attach the named symbol (class, method, …) the finding is about when there is one, giving the
+        // alert a human anchor; a null symbol means the finding isn't tied to a specific name.
         if ($finding->symbol !== null) {
             $properties['symbol'] = $finding->symbol;
         }
-        // User view: choose the report output branch for this case.
-        // User view: missing data becomes the expected report output state.
+        // Include the remediation hint when the rule offers one, so the alert tells the user how to fix
+        // it; null means this finding ships no canned advice.
         if ($finding->remediation !== null) {
             $properties['remediation'] = $finding->remediation;
         }
-        // User view: choose the report output branch for this case.
-        // User view: an empty value becomes a clear report output fallback.
+        // Attach rule-specific extras (measured values, limits, names, candidates) when present, so the alert
+        // can show the detail behind the verdict; an empty map means the finding needs no extra context.
         if ($finding->metadata !== []) {
             $properties['metadata'] = $finding->metadata;
         }
@@ -252,10 +260,9 @@ final readonly class SarifReporter
     }
 
     /**
-     * Map gruff-php severities onto SARIF result levels.
+     * Translates a gruff severity into the SARIF level name a Code Scanning UI colours by, so an error
+     * shows as an error and an advisory as the quieter `note`. Called for every result `render()` emits.
      *
-      * User flow: Shapes the report output people read after analysis finishes.
-      *
      * @param Severity $severity - Gruff severity to translate; advisory collapses to SARIF `note`, which has no peer.
      *
      * @return string - one of SARIF's `error`/`warning`/`note` level names; advisory collapses to `note`

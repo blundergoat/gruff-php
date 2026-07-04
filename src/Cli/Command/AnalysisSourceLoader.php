@@ -19,7 +19,7 @@ use GruffPhp\Engine\Source\SourceDiscoveryResult;
 final readonly class AnalysisSourceLoader
 {
     /**
-     * Discovers and parses every requested file in one pass — the simple path for smaller scans.
+     * Discovers and parses every requested file in one pass - the simple path for smaller scans.
      *
      * @param string       $projectRoot          - Root used for source discovery and parsing.
      * @param list<string> $paths                - Project-relative paths requested by the CLI.

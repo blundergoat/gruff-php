@@ -15,7 +15,9 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
 
 /**
- * Detects skipped tests that do not include an explicit reason.
+ * Flags a `markTestSkipped()`/`markTestIncomplete()` call with no message - a test that silently drops out
+ * of the run, so a reviewer never learns why it stopped guarding its behaviour. Runs over every test in the
+ * file. Warning, high confidence: the missing reason is unambiguous.
  */
 final readonly class SkippedWithoutReasonRule implements RuleInterface
 {
@@ -25,10 +27,8 @@ final readonly class SkippedWithoutReasonRule implements RuleInterface
     public const ID = 'test-quality.skipped-without-reason';
 
     /**
-     * Describe the skipped test without reason rule.
+     * Describes the skipped-test-without-reason rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -45,10 +45,8 @@ final readonly class SkippedWithoutReasonRule implements RuleInterface
     }
 
     /**
-     * Find skipped or incomplete tests without an explanatory reason.
+     * Reports skipped or incomplete tests without an explanatory reason.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -58,18 +56,17 @@ final readonly class SkippedWithoutReasonRule implements RuleInterface
     {
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Weigh every test scope in the file.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
-            // User view: add each item that can appear in findings list.
+            // Inspect each call the test makes.
             foreach (TestQualityNodeHelper::calls($scope) as $call) {
-                // User view: choose the findings list branch for this case.
+                // Only a markTestSkipped() call can skip the test here.
                 if (TestQualityNodeHelper::callName($call) !== 'marktestskipped') {
                     continue;
                 }
 
                 $reason = TestQualityNodeHelper::literalValue(TestQualityNodeHelper::firstArgValue($call));
-                // User view: choose the findings list branch for this case.
-                // User view: an empty value becomes a clear findings list fallback.
+                // A non-empty string reason explains the skip, so leave it alone.
                 if (is_string($reason) && trim($reason) !== '') {
                     continue;
                 }

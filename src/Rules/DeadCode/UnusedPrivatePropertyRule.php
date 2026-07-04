@@ -24,7 +24,13 @@ use PhpParser\Node\Stmt\Trait_;
 use PhpParser\NodeFinder;
 
 /**
- * Detects private properties that are never meaningfully read or written.
+ * Flags a private property that its class never meaningfully uses - never read, never written, or
+ * untouched entirely - so the user can drop dead state or fix a missing access.
+ *
+ * Runs per file: for each class, trait, or enum it collects the private properties (including
+ * constructor-promoted ones and declared defaults), then walks every `$this->`/`self::`/`static::`
+ * access to record reads and writes. A property that is not both read and written is reported, with a
+ * message tuned to which half is missing.
  */
 final readonly class UnusedPrivatePropertyRule implements RuleInterface
 {
@@ -34,11 +40,9 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
     public const ID = 'dead-code.unused-private-property';
 
     /**
-     * Describe the unused private property rule.
+     * Describes the unused-private-property rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
-     * @return RuleDefinition - the rule's stable id, name, pillar, tier, and the default severity/confidence the registry applies unless overridden
+     * @return RuleDefinition - the rule's stable id, name, pillar, tier, and the default severity/confidence the registry applies unless overridden.
      */
     public function definition(): RuleDefinition
     {
@@ -53,15 +57,13 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
     }
 
     /**
-     * Find private properties that are never read, never written, or unused entirely.
+     * Reports each private property that is unread, unwritten, or fully unused, class by class.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
      * @return list<Finding> - one finding per private property that is unread, unwritten, or fully unused across every class-like in the unit; empty
-     *                       when all are live
+     *                       when all are live.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -71,13 +73,12 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
 
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Check each class, trait, or enum in the file.
         foreach ($classLikes as $classLike) {
             /** @var Class_|Trait_|Enum_ $classLike Finder predicate restricts results to class-like declarations. */
             $privateProps = $this->privateProperties($classLike);
 
-            // User view: choose the findings list branch for this case.
-            // User view: an empty value becomes a clear findings list fallback.
+            // Nothing to check when the class declares no private properties.
             if ($privateProps === []) {
                 continue;
             }
@@ -99,51 +100,49 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
     }
 
     /**
-     * Collect private properties declared on a class-like node.
+     * Collects a class-like's private properties - declared and constructor-promoted - with their write state.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Class_|Trait_|Enum_ $classLike - Class-like declaration whose private properties are collected.
      *
      * @return array<string, array{line: int, writtenByDeclaration: bool}> - private property names mapped to their declaration line and whether a
-     *                       default or promotion already writes them; empty when the class-like has none
+     *                       default or promotion already writes them; empty when the class-like has none.
      */
     private function privateProperties(Class_|Trait_|Enum_ $classLike): array
     {
         $privateProps = [];
 
-        // User view: add each item that can appear in findings list.
+        // First pass: the explicitly declared private properties.
         foreach ($classLike->stmts as $stmt) {
-            // User view: choose the findings list branch for this case.
+            // Only private property declarations count.
             if (!$stmt instanceof Stmt\Property || !$stmt->isPrivate()) {
                 continue;
             }
 
-            // User view: add each item that can appear in findings list.
+            // One declaration can define several properties; key each by name.
             foreach ($stmt->props as $prop) {
                 $privateProps[$prop->name->toString()] = [
                     'line'                 => $prop->getStartLine(),
-                    // User view: missing data becomes the expected findings list state.
+                    // A declared default already counts as a write.
                     'writtenByDeclaration' => $prop->default !== null,
                 ];
             }
         }
 
-        // User view: add each item that can appear in findings list.
+        // Second pass: constructor-promoted private properties.
         foreach ($classLike->stmts as $stmt) {
-            // User view: choose the findings list branch for this case.
+            // Only the constructor can promote properties.
             if (!$stmt instanceof Stmt\ClassMethod || strtolower($stmt->name->toString()) !== '__construct') {
                 continue;
             }
 
-            // User view: add each item that can appear in findings list.
+            // Check each promoted parameter.
             foreach ($stmt->params as $param) {
-                // User view: choose the findings list branch for this case.
+                // Skip non-private promotions.
                 if (($param->flags & Modifiers::PRIVATE) === 0) {
                     continue;
                 }
 
-                // User view: choose the findings list branch for this case.
+                // Skip a malformed parameter with no plain name.
                 if (!$param->var instanceof Expr\Variable || !is_string($param->var->name)) {
                     continue;
                 }
@@ -159,31 +158,27 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
     }
 
     /**
-     * Track reads and writes for collected private properties.
+     * Records which tracked private properties are read and which are written across the class body.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param NodeFinder                                                  $nodeFinder - Walks the body for accesses.
      * @param Class_|Trait_|Enum_                                         $classLike - Owner of the accesses.
      * @param array<string, array{line: int, writtenByDeclaration: bool}> $privateProps - Names to track; rest ignored.
      *
      * @return array{reads: array<string, true>, writes: array<string, true>} - two name-keyed sets flagging which tracked properties were read and
-     *                      which were written; a name absent from both was never accessed
+     *                      which were written; a name absent from both was never accessed.
      */
     private function propertyUsage(NodeFinder $nodeFinder, Class_|Trait_|Enum_ $classLike, array $privateProps): array
     {
         $reads        = [];
         $writes       = [];
         $allNodes     = $nodeFinder->find($classLike->stmts, static fn(): bool => true);
-        // User view: missing data becomes a safe findings list default.
         $ownClassName = $classLike instanceof Class_ ? $classLike->name?->toString() : ($classLike->name?->toString() ?? null);
 
-        // User view: add each item that can appear in findings list.
+        // Walk every node, resolving any self-referential property access.
         foreach ($allNodes as $node) {
             $name = $this->propertyAccessName($node, $ownClassName);
 
-            // User view: choose the findings list branch for this case.
-            // User view: missing data becomes the expected findings list state.
+            // Ignore anything that is not an access to one of our tracked properties.
             if ($name === null || !isset($privateProps[$name])) {
                 continue;
             }
@@ -195,10 +190,8 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
     }
 
     /**
-     * Record read/write usage for a private property access node.
+     * Marks one property access as a read, a write, or both, by looking at its parent node.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node                $node - Access node already matched to $name; its parent decides read vs write.
      * @param string              $name - Property whose usage flag to set.
      * @param array<string, true> $reads - Accumulator, keyed by name; receives true when this access reads.
@@ -210,7 +203,6 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
     {
         $parent = $node->getAttribute('parent');
 
-        // User view: choose the findings list branch for this case.
         if ($parent instanceof Expr\Assign && $parent->var === $node) {
             $writes[$name] = true;
 
@@ -218,7 +210,6 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
             return;
         }
 
-        // User view: choose the findings list branch for this case.
         if ($parent instanceof Expr\AssignOp && $parent->var === $node) {
             $writes[$name] = true;
             $reads[$name]  = true;
@@ -231,17 +222,15 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
     }
 
     /**
-     * Build findings for properties in the dead-code rule.
+     * Builds one finding per private property that is not both read and written.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit                                                   $analysisUnit - Path stamped on findings.
      * @param RuleDefinition                                                 $definition - Source of id and severity.
      * @param Class_|Trait_|Enum_                                            $classLike - Owner; name prefixes ids.
      * @param array<string, array{line: int, writtenByDeclaration: bool}>    $privateProps - Defaulted means written.
      * @param array{reads: array<string, true>, writes: array<string, true>} $usage - Reads/writes per name.
      *
-     * @return list<Finding> - one finding per property that failed the read-and-written test; empty when every private property is live
+     * @return list<Finding> - one finding per property that failed the read-and-written test; empty when every private property is live.
      */
     private function findingsForProperties(
         AnalysisUnit        $analysisUnit,
@@ -253,12 +242,12 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
         $findings  = [];
         $className = $this->resolveClassName($classLike);
 
-        // User view: add each item that can appear in findings list.
+        // Report each property that fails the read-and-written test.
         foreach ($privateProps as $name => $property) {
             $isRead    = isset($usage['reads'][$name]);
             $isWritten = isset($usage['writes'][$name]) || $property['writtenByDeclaration'];
 
-            // User view: choose the findings list branch for this case.
+            // A property both read and written is live, so skip it.
             if ($isRead && $isWritten) {
                 continue;
             }
@@ -283,27 +272,23 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
     }
 
     /**
-     * Build the finding message for a private property usage state.
+     * Phrases the finding message for a property's usage state: never used, write-only, or read-only.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param string $symbol - Fully qualified property symbol to name in the message.
      * @param bool   $isRead - Whether any read of the property was seen.
      * @param bool   $isWritten - Whether the property is ever written: true if an assignment was seen OR the
      *                          declaration carries a default, so true with zero observed writes means default-only.
      *
      * @return string - the finding message phrased for the property's usage state: never used, written-but-never-read, or
-     *                read-but-never-explicitly-written
+     *                read-but-never-explicitly-written.
      */
     private function propertyMessage(string $symbol, bool $isRead, bool $isWritten): string
     {
-        // User view: choose the findings list branch for this case.
         if (!$isRead && !$isWritten) {
             // Neither read nor written: the strongest claim, so report it first.
             return sprintf('Private property %s is never used.', $symbol);
         }
 
-        // User view: choose the findings list branch for this case.
         if (!$isRead) {
             // Written somewhere but never consumed; the value computed into it is dead.
             return sprintf('Private property %s is written but never read.', $symbol);
@@ -315,41 +300,35 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
     }
 
     /**
-     * Resolve a display name for a class-like node.
+     * Returns a display name for the class-like, using a stable placeholder when it is unnamed.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Class_|Trait_|Enum_ $node - Class-like declaration whose display symbol is needed for finding text.
      *
      * @return string - the declared class/trait/enum name, or a stable placeholder (class@anonymous, or unknown@line for a malformed tree) when no
-     *                name node exists
+     *                name node exists.
      */
     private function resolveClassName(Node $node): string
     {
-        // User view: choose the findings list branch for this case.
         if ($node instanceof Class_) {
-            // User view: missing data becomes a safe findings list default.
+            // Anonymous classes have no name node, so fall back to a stable placeholder.
             return $node->name?->toString() ?? 'class@anonymous';
         }
 
-        // User view: missing data becomes a safe findings list default.
+        // Traits and enums are always named; the line-tagged fallback only guards against malformed input.
         return $node->name?->toString() ?? sprintf('unknown@%d', $node->getStartLine());
     }
 
     /**
-     * Extract the private property name from `$this` or own-class static access.
+     * Reads the property name from a `$this->` or own-class static access, or null for anything else.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node        $node - Candidate access node; only $this-> and own-class static fetches qualify.
      * @param string|null $ownClassName - Enclosing class name, or null inside a trait/anonymous scope.
      *
      * @return string|null - the accessed property name for $this-> or own-class static fetches; null means the node is not a self-referential
-     *                     property access and carries no usage signal
+     *                     property access and carries no usage signal.
      */
     private function propertyAccessName(Node $node, ?string $ownClassName): ?string
     {
-        // User view: choose the findings list branch for this case.
         if ($node instanceof Expr\PropertyFetch
             && $node->var instanceof Expr\Variable
             && $node->var->name === 'this'
@@ -359,7 +338,6 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
             return $node->name->toString();
         }
 
-        // User view: choose the findings list branch for this case.
         if ($node instanceof Expr\StaticPropertyFetch
             && $node->name instanceof Node\VarLikeIdentifier
             && $this->refersToOwnClass($node->class, $ownClassName)
@@ -373,19 +351,16 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
     }
 
     /**
-     * Check whether a static access target refers to the current class-like scope.
+     * Reports whether a static-access target points back at the enclosing class-like scope.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node        $class - Class reference from a static fetch; non-Name targets never match.
      * @param string|null $ownClassName - Enclosing class name to compare against, or null when there is none.
      *
      * @return bool - true when the static target is self::/static:: or matches the enclosing class name; false for dynamic targets and for
-     *              trait/anonymous scopes that have no name
+     *              trait/anonymous scopes that have no name.
      */
     private function refersToOwnClass(Node $class, ?string $ownClassName): bool
     {
-        // User view: choose the findings list branch for this case.
         if (!$class instanceof Node\Name) {
             // Dynamic targets (variables, expressions) can't be resolved statically, so treat as foreign.
             return false;
@@ -393,14 +368,12 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
 
         $reference = strtolower($class->toString());
 
-        // User view: choose the findings list branch for this case.
         if ($reference === 'self' || $reference === 'static') {
             // self:: and static:: always point at the enclosing class, regardless of its name.
             return true;
         }
 
         // Otherwise match the unqualified class name; null scope (trait/anonymous) can never match.
-        // User view: missing data becomes the expected findings list state.
         return $ownClassName !== null && strtolower($class->getLast()) === strtolower($ownClassName);
     }
 }

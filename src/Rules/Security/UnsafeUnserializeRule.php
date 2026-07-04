@@ -18,7 +18,11 @@ use PhpParser\Node\Expr;
 use PhpParser\Node\Scalar;
 
 /**
- * Detects unserialize calls that can hydrate attacker-controlled payloads.
+ * Flags an `unserialize()` call whose payload is not a fixed literal, the shape that can hydrate an
+ * attacker-controlled object and trigger a gadget chain - so the user gates it before it reaches the sink.
+ *
+ * Runs per file over global unserialize() calls, skipping literal payloads and calls that disable object
+ * hydration with `allowed_classes => false`. Warning, medium confidence.
  */
 final class UnsafeUnserializeRule implements RuleInterface
 {
@@ -28,10 +32,8 @@ final class UnsafeUnserializeRule implements RuleInterface
     public const ID = 'security.unsafe-unserialize';
 
     /**
-     * Describe the unsafe unserialize security rule.
+     * Describes the unsafe-unserialize rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -48,10 +50,8 @@ final class UnsafeUnserializeRule implements RuleInterface
     }
 
     /**
-     * Find unserialize calls that can deserialize untrusted data.
+     * Reports each `unserialize()` call that can hydrate untrusted data.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -61,21 +61,20 @@ final class UnsafeUnserializeRule implements RuleInterface
     {
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Check every function call in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
-            // User view: choose the findings list branch for this case.
+            // Only a global unserialize() is an object-hydration sink.
             if (SecurityNodeHelper::globalFunctionName($call) !== 'unserialize') {
                 continue;
             }
 
             $firstArg = SecurityNodeHelper::argumentValue($call->args, 0);
-            // User view: choose the findings list branch for this case.
-            // User view: missing data becomes the expected findings list state.
+            // A literal-string payload is fixed, not attacker-controlled.
             if ($firstArg === null || SecurityNodeHelper::isStringLiteral($firstArg)) {
                 continue;
             }
 
-            // User view: choose the findings list branch for this case.
+            // Object hydration disabled by allowed_classes => false is already safe.
             if ($this->hasAllowedClassesFalse($call)) {
                 continue;
             }
@@ -97,10 +96,8 @@ final class UnsafeUnserializeRule implements RuleInterface
     }
 
     /**
-     * Detect `unserialize($payload, ['allowed_classes' => false])` object-hydration guardrails.
+     * Reports whether the call disables object hydration via `allowed_classes => false`.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Expr\FuncCall $call - unserialize() call whose second argument is checked for an options array.
      *
      * @return bool - True when object deserialization has been disabled by options.
@@ -108,20 +105,18 @@ final class UnsafeUnserializeRule implements RuleInterface
     private function hasAllowedClassesFalse(Expr\FuncCall $call): bool
     {
         $options = SecurityNodeHelper::argumentValue($call->args, 1);
-        // User view: choose the findings list branch for this case.
         if (!$options instanceof Expr\Array_) {
             // No literal options array means we cannot prove the guardrail is set, so treat the call as unguarded.
             return false;
         }
 
-        // User view: add each item that can appear in findings list.
+        // Weigh each key in the options array.
         foreach ($options->items as $item) {
-            // User view: choose the findings list branch for this case.
+            // Only a string key can be the allowed_classes option.
             if (!$item->key instanceof Scalar\String_) {
                 continue;
             }
 
-            // User view: choose the findings list branch for this case.
             if ($item->key->value === 'allowed_classes' && SecurityNodeHelper::isFalseLike($item->value)) {
                 // allowed_classes => false disables object hydration entirely, which neutralises the gadget-chain risk.
                 return true;

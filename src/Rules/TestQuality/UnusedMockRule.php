@@ -19,7 +19,9 @@ use PhpParser\Node\Expr;
 use PhpParser\NodeFinder;
 
 /**
- * Detects mock variables that are created but never used by the test.
+ * Flags a variable assigned a freshly created mock that the test then never reads - dead scaffolding that
+ * suggests a collaborator was mocked and forgotten, or the test drifted from what it set up. Runs over every
+ * test in the file. Advisory, high confidence - an unread assignment is unambiguous.
  */
 final readonly class UnusedMockRule implements RuleInterface
 {
@@ -29,10 +31,8 @@ final readonly class UnusedMockRule implements RuleInterface
     public const ID = 'test-quality.unused-mock';
 
     /**
-     * Describe the unused mock rule.
+     * Describes the unused-mock rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - identity, pillar, tier, and the advisory severity plus high confidence callers register
      *                          and surface this rule by
      */
@@ -50,10 +50,8 @@ final readonly class UnusedMockRule implements RuleInterface
     }
 
     /**
-     * Find mock variables that are assigned but never read.
+     * Reports mock variables that are assigned but never read.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -64,13 +62,12 @@ final readonly class UnusedMockRule implements RuleInterface
     {
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Weigh every test scope in the file.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             $assignedVarObjectIds = [];
             $mockAssignments      = $this->mockAssignments($scope, $assignedVarObjectIds);
 
-            // User view: choose the findings list branch for this case.
-            // User view: an empty value becomes a clear findings list fallback.
+            // Nothing to check when the test creates no mocks.
             if ($mockAssignments === []) {
                 continue;
             }
@@ -85,10 +82,8 @@ final readonly class UnusedMockRule implements RuleInterface
     }
 
     /**
-     * Collect mock variables created in the test scope.
+     * Collects the mock variables created in a test scope.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param TestQualityScope $scope - Test method scope whose assignments are scanned for mock creation.
      * @param array<int, true> $assignedVarObjectIds - Receives, by reference, the object id of every assigned variable
      *                                                 node so reads can later exclude the assignment target itself.
@@ -104,16 +99,16 @@ final readonly class UnusedMockRule implements RuleInterface
         $mockAssignments = [];
         $assignments     = NodeIndex::descendantsOfAny($scope->node, [Expr\Assign::class]);
 
-        // User view: add each item that can appear in findings list.
+        // Weigh every assignment in the test body.
         foreach ($assignments as $assign) {
-            // User view: choose the findings list branch for this case.
+            // Only a plainly named variable target can be tracked.
             if (!$assign->var instanceof Expr\Variable || !is_string($assign->var->name)) {
                 continue;
             }
 
             $assignedVarObjectIds[spl_object_id($assign->var)] = true;
 
-            // User view: choose the findings list branch for this case.
+            // Record the target only when the right-hand side creates a mock.
             if (!$this->isMockCreationExpression($assign->expr)) {
                 continue;
             }
@@ -129,10 +124,8 @@ final readonly class UnusedMockRule implements RuleInterface
     }
 
     /**
-     * Collect reads of variables created as mocks.
+     * Collects the variable reads in a test scope, excluding assignment targets.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param TestQualityScope $scope - Test method scope to scan for variable reads.
      * @param array<int, true> $assignedVarObjectIds - Object ids of assignment-target variable nodes to skip, so the
      *                                                 left-hand side of `$mock = ...` is not mistaken for a read.
@@ -144,14 +137,14 @@ final readonly class UnusedMockRule implements RuleInterface
     {
         $reads = [];
 
-        // User view: add each item that can appear in findings list.
+        // Weigh every variable node in the test body.
         foreach (NodeIndex::descendantsOfAny($scope->node, [Expr\Variable::class]) as $var) {
-            // User view: choose the findings list branch for this case.
+            // Skip variable-variables with no static name.
             if (!is_string($var->name)) {
                 continue;
             }
 
-            // User view: choose the findings list branch for this case.
+            // Skip the assignment target itself; that write is not a read.
             if (isset($assignedVarObjectIds[spl_object_id($var)])) {
                 continue;
             }
@@ -163,10 +156,8 @@ final readonly class UnusedMockRule implements RuleInterface
     }
 
     /**
-     * Build findings for unread mocks in the test-quality rule.
+     * Builds findings for the mocks that were created but never read.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit                                  $analysisUnit - Unit supplying the display path for findings.
      * @param TestQualityScope                              $scope - Test scope whose symbol names the offending test.
      * @param array<string, array{line: int, name: string}> $mockAssignments - Mock creations keyed by variable name,
@@ -184,9 +175,9 @@ final readonly class UnusedMockRule implements RuleInterface
     ): array {
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Weigh each mock the test created.
         foreach ($mockAssignments as $varName => $assignment) {
-            // User view: choose the findings list branch for this case.
+            // A mock that is read somewhere is genuinely used.
             if (isset($reads[$varName])) {
                 continue;
             }
@@ -210,10 +201,8 @@ final readonly class UnusedMockRule implements RuleInterface
     }
 
     /**
-     * Detect whether an expression contains a recognised mock creation call.
+     * Reports whether an expression contains a recognised mock-creation call.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Expr $expr - Right-hand side of an assignment to test for a nested mock-creation call.
      *
      * @return bool - true as soon as any descendant call is a recognised mock factory, so creators wrapped in other
@@ -230,7 +219,6 @@ final readonly class UnusedMockRule implements RuleInterface
         );
 
         // True as soon as any descendant call is a recognised mock factory, so wrapped creators still count.
-        // User view: an empty value becomes a clear findings list fallback.
         return $matches !== [];
     }
 }

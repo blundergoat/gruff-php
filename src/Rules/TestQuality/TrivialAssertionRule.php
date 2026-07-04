@@ -15,7 +15,9 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
 
 /**
- * Detects assertions whose expected and actual values make the check tautological.
+ * Flags an assertion that compares two known literals or a value against itself - `assertSame(2, 2)`,
+ * `assertTrue(true)` - so a reviewer notices a test that passes by construction and proves nothing about
+ * the system under test. Runs over every PHPUnit and Pest assertion in the file. Warning, high confidence.
  */
 final readonly class TrivialAssertionRule implements RuleInterface
 {
@@ -25,10 +27,8 @@ final readonly class TrivialAssertionRule implements RuleInterface
     public const ID = 'test-quality.trivial-assertion';
 
     /**
-     * Describe the trivial assertion rule.
+     * Describes the trivial-assertion rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -45,10 +45,8 @@ final readonly class TrivialAssertionRule implements RuleInterface
     }
 
     /**
-     * Find assertions that can pass without checking meaningful behavior.
+     * Reports assertions that can pass without checking meaningful behaviour.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -58,11 +56,11 @@ final readonly class TrivialAssertionRule implements RuleInterface
     {
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Weigh every test scope in the file.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
-            // User view: add each item that can appear in findings list.
+            // Inspect each assertion the test makes.
             foreach (TestQualityNodeHelper::assertionCalls($scope) as $call) {
-                // User view: choose the findings list branch for this case.
+                // Skip assertions that genuinely check behaviour; only tautological ones matter.
                 if (!TestQualityNodeHelper::isTrivialAssertion($call)) {
                     continue;
                 }

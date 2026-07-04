@@ -14,7 +14,12 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\SourceTextRuleInterface;
 
 /**
- * Detects string literals that match JWT token structure.
+ * Flags a string that matches the three-segment JWT shape (`eyJ....eyJ....sig`), so the user can move
+ * embedded tokens out of source fixtures and config and mint them at runtime instead.
+ *
+ * A source-text rule that skips matches inside comments and obvious dummy values and redacts the reported
+ * token. It shares its shape check with the high-entropy rule so each dotted secret reports exactly once.
+ * Warning severity, medium confidence - test fixtures do legitimately embed sample tokens.
  */
 final readonly class JwtTokenRule implements SourceTextRuleInterface
 {
@@ -29,13 +34,11 @@ final readonly class JwtTokenRule implements SourceTextRuleInterface
     private const JWT_SHAPE_PATTERN = 'eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}';
 
     /**
-     * Decide whether a whole literal is JWT-shaped.
+     * Reports whether a whole literal is JWT-shaped.
      *
      * Shared with the high-entropy rule so each dotted secret reports exactly once:
      * real JWTs under this rule, opaque dotted tokens under high-entropy.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param string $literal - Candidate string literal.
      *
      * @return bool - true when the entire literal matches the three-segment `eyJ` JWT shape this rule scans for
@@ -47,11 +50,9 @@ final readonly class JwtTokenRule implements SourceTextRuleInterface
     }
 
     /**
-     * Describe the JWT token sensitive-data rule.
+     * Describes the JWT-token sensitive-data rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
-     * @return RuleDefinition - Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults (warning severity, medium confidence).
      */
     public function definition(): RuleDefinition
     {
@@ -68,10 +69,8 @@ final readonly class JwtTokenRule implements SourceTextRuleInterface
     }
 
     /**
-     * Find string literals that resemble embedded JWT tokens.
+     * Reports each string that resembles an embedded JWT token, redacting the value.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -79,25 +78,25 @@ final readonly class JwtTokenRule implements SourceTextRuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        // User view: choose the findings list branch for this case.
         if (!str_contains($analysisUnit->source, 'eyJ')) {
             // Every JWT header segment begins "eyJ"; without it no token can match, so skip the scan.
             return [];
         }
 
+        // Match every JWT-shaped token in the source, capturing each one's byte offset.
         preg_match_all('/\b' . self::JWT_SHAPE_PATTERN . '\b/', $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
         $findings      = [];
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
-        // User view: add each item that can appear in findings list.
+        // Weigh each candidate the scan found.
         foreach ($matches[0] as $match) {
             [$candidateSecret, $offset] = $match;
-            // User view: choose the findings list branch for this case.
+            // A token inside a comment is an example, not a live secret.
             if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
                 continue;
             }
 
-            // User view: choose the findings list branch for this case.
+            // An obvious sample or dummy token is not a real secret.
             if (SecretScannerHelper::isLikelyDummyValue($candidateSecret)) {
                 continue;
             }

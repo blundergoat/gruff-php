@@ -9,18 +9,26 @@ use GruffPhp\Results\Finding\Pillar;
 use GruffPhp\Results\Finding\Severity;
 
 /**
- * Applies display filters before findings are rendered.
+ * The last gate findings pass through before they reach the user's screen or saved report.
+ *
+ * A scan usually turns up far more findings than someone wants to read at once, so `analyse` lets
+ * the user narrow the view with `--min-severity`, `--include-pillar` / `--exclude-pillar`, and
+ * `--include-rule` / `--exclude-rule` (the `report` command forwards the same flags). This object
+ * captures that chosen view and, handed the full finding list, returns only the ones that clear
+ * every active filter. When the user sets no display flags it is inert and passes everything
+ * straight through, so `analyse` can always run it without checking first.
  */
 final readonly class FindingDisplayFilter
 {
     /**
-      * User flow: Shapes the report output people read after analysis finishes.
-      *
-     * @param Severity|null $minSeverity - Minimum severity that should be displayed.
-     * @param list<Pillar>  $includePillars - Pillars explicitly included in output.
-     * @param list<Pillar>  $excludePillars - Pillars explicitly excluded from output.
-     * @param list<string>  $includeRules - Rule ids explicitly included in output.
-     * @param list<string>  $excludeRules - Rule ids explicitly excluded from output.
+     * Captures the display flags exactly as the user set them; every argument defaults to "unset",
+     * which is what a bare `analyse` with no filter flags passes.
+     *
+     * @param Severity|null $minSeverity - Severity floor from `--min-severity`; null means no floor, so even advisory findings show.
+     * @param list<Pillar>  $includePillars - Allowlist of pillars from `--include-pillar`; empty means every pillar is shown.
+     * @param list<Pillar>  $excludePillars - Pillars to hide from `--exclude-pillar`; empty means no pillar is hidden.
+     * @param list<string>  $includeRules - Allowlist of rule ids from `--include-rule`; empty means every rule's findings are shown.
+     * @param list<string>  $excludeRules - Rule ids to hide from `--exclude-rule`; empty means no rule is hidden.
      */
     public function __construct(
         public ?Severity $minSeverity = null,
@@ -32,13 +40,12 @@ final readonly class FindingDisplayFilter
     }
 
     /**
-     * Keep only findings visible under the selected display filter.
+     * Winnows the full finding list down to just what the active filters allow - `analyse` applies this
+     * before it builds the report, so the user sees only the findings their flags asked for.
      *
-      * User flow: Shapes the report output people read after analysis finishes.
-      *
-     * @param list<Finding> $findings - Candidate findings before severity, pillar, and rule filters are applied.
+     * @param list<Finding> $findings - Every finding the run produced, before display filtering; an empty list simply yields an empty result.
      *
-     * @return list<Finding> - findings that pass every active filter, re-keyed to a 0-indexed list; empty when all are filtered out
+     * @return list<Finding> - Findings that clear every active filter, re-keyed to a 0-indexed list; empty when the filters (or an empty input) leave nothing to show.
      */
     public function apply(array $findings): array
     {
@@ -46,29 +53,25 @@ final readonly class FindingDisplayFilter
     }
 
     /**
-     * Check whether any display filter is configured.
+     * Reports whether the user narrowed the view at all, so a reporter can note that the score and exit
+     * code still reflect the full finding set even though the displayed list is filtered.
      *
-      * User flow: Shapes the report output people read after analysis finishes.
-      *
-     * @return bool - true when at least one filter dimension is configured; callers use it to decide whether to annotate filtered output
+     * @return bool - True when any one filter dimension is set; false on a bare run where nothing was hidden.
      */
     public function isActive(): bool
     {
-        // User view: missing data becomes the expected report output state.
+        // Any single dimension being set counts as active - one `--exclude-rule` is enough to filter the view.
         return $this->minSeverity !== null
-               // User view: an empty value becomes a clear report output fallback.
                || $this->includePillars !== []
-               // User view: an empty value becomes a clear report output fallback.
                || $this->excludePillars !== []
-               // User view: an empty value becomes a clear report output fallback.
                || $this->includeRules !== []
-               // User view: an empty value becomes a clear report output fallback.
                || $this->excludeRules !== [];
     }
 
     /**
-      * User flow: Shapes the report output people read after analysis finishes.
-      *
+     * Flattens the filter into a plain array for the report's `run.filters` block, so a saved JSON or
+     * Markdown report records exactly which flags shaped the findings it lists.
+     *
      * @return array{
      *     active: bool,
      *     minSeverity: string|null,
@@ -76,8 +79,8 @@ final readonly class FindingDisplayFilter
      *     excludePillars: list<string>,
      *     includeRules: list<string>,
      *     excludeRules: list<string>
-     * } - JSON-serialisable snapshot of the filter; enums flattened to string values, null minSeverity means no floor, empty lists mean that
-     * dimension is unfiltered
+     * } - JSON-serialisable snapshot of the filter; enums flattened to string values, null `minSeverity` means no floor, and an empty list means that
+     * dimension is unfiltered.
      */
     public function toArray(): array
     {
@@ -92,59 +95,50 @@ final readonly class FindingDisplayFilter
     }
 
     /**
-     * Determine whether one finding passes all configured filters.
+     * Decides a single finding's fate against every filter in turn - the per-finding test behind
+     * `apply()`, returning true only when the finding earns a place in what the user sees.
      *
-      * User flow: Shapes the report output people read after analysis finishes.
-      *
-     * @param Finding $finding - Finding under test against severity floor and pillar/rule include-exclude sets.
+     * @param Finding $finding - The finding being tested against the severity floor and the pillar and rule include/exclude lists.
      *
-     * @return bool - true when the finding clears the severity floor and every pillar/rule include-exclude gate; false drops it from output
+     * @return bool - True when the finding clears the severity floor and every pillar/rule gate; false quietly drops it from the output.
      */
     private function allows(Finding $finding): bool
     {
-        // User view: choose the report output branch for this case.
-        // User view: missing data becomes the expected report output state.
+        // The finding sits below the `--min-severity` floor, so it is muted before any pillar or rule check runs.
         if ($this->minSeverity !== null && $this->severityRank($finding->severity) < $this->severityRank($this->minSeverity)) {
-            // Below the severity floor: drop it before any pillar or rule check runs.
             return false;
         }
 
-        // User view: choose the report output branch for this case.
-        // User view: an empty value becomes a clear report output fallback.
+        // The user pinned the view to certain pillars with `--include-pillar`, and this finding's pillar is not among them.
         if ($this->includePillars !== [] && !in_array($finding->pillar, $this->includePillars, true)) {
-            // An include set is an allowlist; a pillar outside it is excluded.
             return false;
         }
 
-        // User view: choose the report output branch for this case.
+        // The user hid this pillar with `--exclude-pillar`, which wins even though it cleared the include check above.
         if (in_array($finding->pillar, $this->excludePillars, true)) {
-            // Exclude wins over include for pillars already passed above.
             return false;
         }
 
-        // User view: choose the report output branch for this case.
-        // User view: an empty value becomes a clear report output fallback.
+        // The user narrowed the view to specific rule ids with `--include-rule`, and this finding came from a different rule.
         if ($this->includeRules !== [] && !in_array($finding->ruleId, $this->includeRules, true)) {
-            // Same allowlist semantics at the rule-id granularity.
             return false;
         }
 
-        // Survived every gate; display unless the rule id is explicitly excluded.
+        // It cleared every earlier gate, so show it unless the user muted this exact rule with `--exclude-rule`.
         return !in_array($finding->ruleId, $this->excludeRules, true);
     }
 
     /**
-     * Convert severity to a comparable rank.
+     * Turns a severity into a plain number so the `--min-severity` floor can be applied with a simple
+     * comparison; ranks rise with seriousness, advisory lowest and error highest.
      *
-      * User flow: Shapes the report output people read after analysis finishes.
-      *
-     * @param Severity $severity - Severity whose ordering position is needed for the minimum-severity comparison.
+     * @param Severity $severity - The finding severity being ranked for the minimum-severity comparison.
      *
-     * @return int - ordering rank where a larger value is more severe, so the minimum-severity floor can be compared with a numeric >=
+     * @return int - Ordering rank where a larger value is more severe, letting the severity floor compare with a numeric `>=`.
      */
     private function severityRank(Severity $severity): int
     {
-        // Explicit ranks let severities be compared as integers since the enum itself has no inherent ordering.
+        // Severities carry no built-in order, so map each to an explicit rank the `--min-severity` floor can compare numerically.
         return match ($severity) {
             Severity::Advisory => 1,
             Severity::Warning => 2,

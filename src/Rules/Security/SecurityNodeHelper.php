@@ -15,15 +15,18 @@ use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
 /**
- * Provides shared AST helpers for security rules.
+ * Shared AST helpers that back every security rule - taint tracking, receiver/class resolution, argument
+ * unwrapping, and the branch-reachability model that decides when an earlier write can hide a finding.
+ *
+ * Rules delegate here so `gruff-php analyse --pillar security` applies one consistent notion of "request
+ * input", "same-scope taint", and "skippable write" across header injection, XSS, SSRF, and the rest.
+ * All methods are static and side-effect free; taint analysis is bounded to a single function-like scope.
  */
 final class SecurityNodeHelper
 {
     /**
-     * List PHP superglobals treated as request-controlled input.
+     * Lists the PHP superglobals treated as request-controlled input.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return list<string> - superglobal variable names without the leading `$`, treated as tainted sources
      */
     public static function userInputSuperglobals(): array
@@ -33,7 +36,7 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Match the assignment shapes local taint tracking understands.
+     * Reports whether a node is one of the assignment shapes local taint tracking understands.
      *
      * This decides which writes every security sink sees when a user runs, for example,
      * `gruff-php analyse src --include-rule security.header-injection`. Concat assignment
@@ -43,8 +46,6 @@ final class SecurityNodeHelper
      * aliased flows stay out of scope rather than mislead the user. Arithmetic operators
      * stay out until a concrete sink justifies them.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node $node - Candidate node from a scope walk.
      *
      * @return bool - true for plain assignment or concat assignment nodes
@@ -56,10 +57,8 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Resolve the plain local variable a taint-tracked assignment writes to.
+     * Resolves the plain local variable a taint-tracked assignment writes to.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Expr\Assign|Expr\AssignOp\Concat $assignment - Assignment node from a scope walk.
      *
      * @return string|null - the written variable name, or null for property/offset/dynamic targets that local
@@ -73,24 +72,20 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Resolve a non-namespaced function call to its lower-case name.
+     * Resolves a non-namespaced function call to its lower-case name.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param FuncCall $call - Function call node to inspect.
      *
      * @return string|null - lower-cased global function name, or null for dynamic or namespaced calls that cannot match
      */
     public static function globalFunctionName(FuncCall $call): ?string
     {
-        // User view: choose the findings list branch for this case.
         if (!$call->name instanceof Name) {
             // A dynamic callee (variable/expression) has no static name to match against the rule's allowlist.
             return null;
         }
 
         $parts = $call->name->getParts();
-        // User view: choose the findings list branch for this case.
         if (count($parts) !== 1) {
             // Namespaced calls are not the global builtins these rules guard, so they never match.
             return null;
@@ -101,8 +96,8 @@ final class SecurityNodeHelper
     }
 
     /**
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
+     * Returns the unwrapped value of a positional call argument by index.
+     *
      * @param array<int|string, Node\Arg|Node\VariadicPlaceholder> $args - Call argument nodes to inspect.
      * @param int                                                  $index - Zero-based argument index.
      *
@@ -110,9 +105,8 @@ final class SecurityNodeHelper
      */
     public static function argumentValue(array $args, int $index): ?Expr
     {
-        // User view: missing data becomes a safe findings list default.
         $arg = $args[$index] ?? null;
-        // User view: choose the findings list branch for this case.
+        // A missing slot or a variadic spread has no plain value to hand back.
         if (!$arg instanceof Node\Arg) {
             return null;
         }
@@ -121,24 +115,20 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Resolve a constant fetch to its normalized constant name.
+     * Resolves a constant fetch to its normalized constant name.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node $node - Node to inspect.
      *
      * @return string|null - upper-cased constant name, or null for namespaced or non-constant-fetch expressions
      */
     public static function constantName(Node $node): ?string
     {
-        // User view: choose the findings list branch for this case.
         if (!$node instanceof Expr\ConstFetch) {
             // Only a bare constant fetch carries a name; anything else has no constant to normalise.
             return null;
         }
 
         $parts = $node->name->getParts();
-        // User view: choose the findings list branch for this case.
         if (count($parts) !== 1) {
             // Namespaced constants are out of scope for these flag checks, so report no name.
             return null;
@@ -149,23 +139,19 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Determine whether a node statically represents a false-like value.
+     * Reports whether a node statically represents a false-like value.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node $node - Node to inspect.
      *
      * @return bool - true when the node is the literal `false` or integer 0 (the disabled-flag values rules look for)
      */
     public static function isFalseLike(Node $node): bool
     {
-        // User view: choose the findings list branch for this case.
         if ($node instanceof Expr\ConstFetch) {
             // The literal `false` keyword (case-insensitive) is the disabled-flag value rules look for.
             return strtolower($node->name->toString()) === 'false';
         }
 
-        // User view: choose the findings list branch for this case.
         if ($node instanceof Scalar\Int_) {
             // Integer 0 is the other common "off" literal, e.g. CURLOPT_SSL_VERIFYPEER set to 0.
             return $node->value === 0;
@@ -176,20 +162,17 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Detect whether an expression reads from user-input superglobals.
+     * Reports whether an expression reads from user-input superglobals.
      *
      * Also follows simple same-scope local assignments before the inspected
      * expression so sinks catch `$next = $_GET["next"]; header($next);`.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node $node - Node tree to inspect.
      *
      * @return bool - true when the tree reads request input directly or via a same-scope laundered local; false if clean
      */
     public static function containsUserInput(Node $node): bool
     {
-        // User view: choose the findings list branch for this case.
         if (self::containsDirectUserInput($node)) {
             // A direct superglobal read is request-tainted with no further analysis needed.
             return true;
@@ -200,10 +183,8 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Detect direct reads from request superglobals within a node tree.
+     * Reports whether a node tree directly reads a request superglobal.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node $node - Node tree to inspect.
      *
      * @return bool - true when the tree directly reads a request superglobal; false ignores laundered locals
@@ -221,10 +202,8 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Detect local variables that were assigned request data earlier in the same scope.
+     * Reports whether a node reads a local that was assigned request data earlier in the same scope.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node $node - Node tree to inspect.
      *
      * @return bool - true when the node reads a local filled from request input by an earlier same-scope assignment
@@ -232,30 +211,24 @@ final class SecurityNodeHelper
     private static function containsTaintedLocal(Node $node): bool
     {
         $referencedVariables = self::referencedVariableNames($node);
-        // User view: choose the findings list branch for this case.
-        // User view: an empty value becomes a clear findings list fallback.
         if ($referencedVariables === []) {
             // No local variables to trace, so there is nothing that could have been laundered from a superglobal.
             return false;
         }
 
         $scope = self::enclosingFunctionLike($node);
-        // User view: choose the findings list branch for this case.
         if (!$scope instanceof FunctionLike) {
             // Without an owning function body the same-scope flow analysis has no statements to walk.
             return false;
         }
 
         $statements = $scope->getStmts();
-        // User view: choose the findings list branch for this case.
-        // User view: missing data becomes the expected findings list state.
         if ($statements === null) {
             // Abstract or interface methods have no body, so no assignment could taint a local here.
             return false;
         }
 
         $sinkPosition = $node->getStartFilePos();
-        // User view: choose the findings list branch for this case.
         if ($sinkPosition < 0) {
             // A missing byte offset means we cannot order assignments before the sink; stay safe and bail.
             return false;
@@ -263,9 +236,8 @@ final class SecurityNodeHelper
 
         $taintedVariables = self::taintedVariableNamesBefore(array_values($statements), $scope, $sinkPosition);
 
-        // User view: add each item that can appear in findings list.
+        // A sink that reads any tainted local is carrying laundered request data.
         foreach ($referencedVariables as $variableName) {
-            // User view: choose the findings list branch for this case.
             if (isset($taintedVariables[$variableName])) {
                 // The sink reads a local that an earlier same-scope assignment filled from request input.
                 return true;
@@ -277,8 +249,8 @@ final class SecurityNodeHelper
     }
 
     /**
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
+     * Computes the set of local variable names tainted before the sink position.
+     *
      * @param list<Node\Stmt> $statements - Statements in the owning function-like scope, walked up to the sink position.
      * @param FunctionLike    $scope - Scope that owns the sink expression.
      * @param int             $sinkPosition - Byte offset of the sink expression.
@@ -297,30 +269,24 @@ final class SecurityNodeHelper
         );
 
         // Replay each write in source order so the taint state at the sink reflects what really ran.
-        // User view: add each item that can appear in findings list.
         foreach ($assignments as $assignment) {
             // Narrow to the tracked assignment shapes; the finder predicate already matched them.
-            // User view: choose the findings list branch for this case.
             if (!$assignment instanceof Expr\Assign && !$assignment instanceof Expr\AssignOp\Concat) {
                 continue;
             }
 
             // Writes inside nested closures cannot affect this scope's locals at the sink.
-            // User view: choose the findings list branch for this case.
             if (self::enclosingFunctionLike($assignment) !== $scope) {
                 continue;
             }
 
             $variableName = self::assignmentTargetName($assignment);
             // Property and array-offset targets are beyond same-scope local tracking; skip them.
-            // User view: choose the findings list branch for this case.
-            // User view: missing data becomes the expected findings list state.
             if ($variableName === null) {
                 continue;
             }
 
             // Request data on the right side, direct or via an already-tainted local, taints the target.
-            // User view: choose the findings list branch for this case.
             if (
                 self::containsDirectUserInput($assignment->expr)
                 || self::hasTaintedVariableReference($assignment->expr, $taintedVariables)
@@ -330,7 +296,6 @@ final class SecurityNodeHelper
             }
 
             // A clean concat append neither taints nor cleans: the variable keeps whatever it held.
-            // User view: choose the findings list branch for this case.
             if ($assignment instanceof Expr\AssignOp\Concat) {
                 continue;
             }
@@ -344,10 +309,8 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Check whether a node references a known tainted variable.
+     * Reports whether a node references a known tainted variable.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node                $node - Node tree to inspect.
      * @param array<string, true> $taintedVariables - Tainted local-variable names known at the current sink or assignment.
      *
@@ -355,9 +318,8 @@ final class SecurityNodeHelper
      */
     private static function hasTaintedVariableReference(Node $node, array $taintedVariables): bool
     {
-        // User view: add each item that can appear in findings list.
+        // Any referenced name that is already tainted pulls request data into this expression.
         foreach (self::referencedVariableNames($node) as $variableName) {
-            // User view: choose the findings list branch for this case.
             if (isset($taintedVariables[$variableName])) {
                 // The expression reads an already-tainted local, so taint propagates to this assignment.
                 return true;
@@ -369,10 +331,8 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Return non-superglobal variable names referenced by a node tree.
+     * Returns the non-superglobal variable names referenced by a node tree.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node $node - Node tree to inspect.
      *
      * @return list<string> - deduplicated local variable names touched by the tree, superglobals excluded; empty when none
@@ -383,14 +343,14 @@ final class SecurityNodeHelper
         $nodeFinder = new NodeFinder();
         $variables  = $nodeFinder->find($node, static fn(Node $candidate): bool => $candidate instanceof Expr\Variable);
 
-        // User view: add each item that can appear in findings list.
+        // Collect every variable leaf the finder returned beneath the tree.
         foreach ($variables as $variable) {
-            // User view: choose the findings list branch for this case.
+            // Guard the finder's loose node type before reading the name.
             if (!$variable instanceof Expr\Variable) {
                 continue;
             }
 
-            // User view: choose the findings list branch for this case.
+            // Keep plainly named locals only; superglobals are sources, not laundered aliases.
             if (is_string($variable->name) && !in_array($variable->name, self::userInputSuperglobals(), true)) {
                 $names[$variable->name] = true;
             }
@@ -401,10 +361,8 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Collect the identities of every ancestor between a node and its scope boundary.
+     * Collects the identities of every ancestor between a node and its scope boundary.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node      $node - Node whose ancestor chain is captured (typically a sink call).
      * @param Node|null $scopeBoundary - Enclosing function-like to stop at, or null to walk to the file root.
      *
@@ -425,15 +383,13 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Decide whether a finding can still reach the report without this earlier write running.
+     * Reports whether a finding can still reach the report without this earlier write running.
      *
      * A write inside a branch the sink does not share may be skipped on the path that
      * reaches the sink, so trackers let such writes add evidence toward a finding but
      * never erase what an earlier write established. A write inside the sink's own
      * branch chain always runs before the sink and counts as unconditional.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node            $node - Write/event node whose reachability is being classified.
      * @param Node            $sink - Sink node whose runtime path must be reached.
      * @param Node|null       $scopeBoundary - Enclosing function-like boundary, or null for file scope.
@@ -448,18 +404,15 @@ final class SecurityNodeHelper
         // Walk outward from the write until the sink's scope boundary is reached.
         while ($parent instanceof Node && $parent !== $scopeBoundary) {
             // A skipping ancestor means the CLI must not let this write erase a possible finding.
-            // User view: choose the findings list branch for this case.
             if (self::isPotentialSkippingConstruct($parent)) {
                 $parentId = spl_object_id($parent);
 
                 // If the sink is outside this branch, users can reach the sink without this write.
-                // User view: choose the findings list branch for this case.
                 if (!isset($sinkAncestorIds[$parentId])) {
                     return true;
                 }
 
                 // Sibling if/else paths also keep earlier taint visible in the report.
-                // User view: choose the findings list branch for this case.
                 if ($parent instanceof Stmt\If_ && self::hasDifferentIfBranches($node, $sink, $parent)) {
                     return true;
                 }
@@ -472,10 +425,8 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Decide whether a node can skip code that would affect a user-facing finding.
+     * Reports whether a node can skip code that would affect a user-facing finding.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node $node - Candidate ancestor node between a write and sink.
      *
      * @return bool - true when this ancestor can make the write optional before the sink
@@ -500,10 +451,8 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Decide whether two nodes sit in different branches of one if-chain.
+     * Reports whether two nodes sit in different branches of one if-chain.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node     $node - Write/event node being classified.
      * @param Node     $sink - Sink node whose path is being compared.
      * @param Stmt\If_ $ifStatement - Shared if-chain ancestor.
@@ -515,17 +464,14 @@ final class SecurityNodeHelper
         $nodeBranch = self::ifBranchKey($node, $ifStatement);
         $sinkBranch = self::ifBranchKey($sink, $ifStatement);
 
-        // User view: missing data becomes the expected findings list state.
         return $nodeBranch !== null && $sinkBranch !== null && $nodeBranch !== $sinkBranch;
     }
 
     /**
-     * Identify which if-chain body a node belongs to for reporting decisions.
+     * Identifies which if-chain body a node belongs to for reporting decisions.
      *
      * Conditions return null because they run before the body the user can reach.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node     $node - Descendant candidate.
      * @param Stmt\If_ $ifStatement - If-chain ancestor to classify against.
      *
@@ -536,28 +482,24 @@ final class SecurityNodeHelper
         $current = $node;
         $parent  = $current->getAttribute('parent');
 
+        // Climb toward the shared if-chain, then classify which branch body this node sits in.
         while ($parent instanceof Node) {
             // Once the shared if-chain is reached, classify the direct child branch.
-            // User view: choose the findings list branch for this case.
             if ($parent === $ifStatement) {
                 // The main if body is one possible path to the user-facing sink.
-                // User view: choose the findings list branch for this case.
                 if (in_array($current, $ifStatement->stmts, true)) {
                     return 'if';
                 }
 
                 // Each elseif body is a separate path in the report's runtime story.
-                // User view: add each item that can appear in findings list.
                 foreach ($ifStatement->elseifs as $elseIf) {
                     // A matching elseif node means the write and sink may be mutually exclusive.
-                    // User view: choose the findings list branch for this case.
                     if ($current === $elseIf) {
                         return 'elseif:' . spl_object_id($elseIf);
                     }
                 }
 
                 // The else body is the fallback path a user can reach when earlier tests fail.
-                // User view: choose the findings list branch for this case.
                 if ($ifStatement->else instanceof Stmt\Else_ && $current === $ifStatement->else) {
                     return 'else:' . spl_object_id($ifStatement->else);
                 }
@@ -574,19 +516,17 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Find the function, method, or closure scope containing a node.
+     * Returns the function, method, or closure scope containing a node.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node $node - Node whose containing function-like scope is needed.
      *
      * @return FunctionLike|null - nearest enclosing function/method/closure, or null when the node lives at file scope
      */
     public static function enclosingFunctionLike(Node $node): ?FunctionLike
     {
+        // Climb the parent chain to the nearest function-like owner.
         $current = $node;
         while ($current instanceof Node) {
-            // User view: choose the findings list branch for this case.
             if ($current instanceof FunctionLike) {
                 // The nearest enclosing function/method/closure; this is the scope taint analysis is bounded to.
                 return $current;
@@ -601,10 +541,8 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Detect string construction patterns that can hide unsafe concatenation.
+     * Reports whether a node tree builds a string via concatenation or interpolation.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node $node - Node tree to inspect.
      *
      * @return bool - true when the tree builds a string via `.` concatenation or interpolation, which can splice in untrusted data
@@ -621,10 +559,8 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Identify literal string nodes for security-rule exemptions.
+     * Reports whether a node is a literal string, for security-rule exemptions.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node $node - Node to inspect.
      *
      * @return bool - true when the node is a literal string scalar, so rules can exempt statically-trusted constant args
@@ -635,10 +571,8 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Build the display name used when reporting a function call.
+     * Builds the display name used when reporting a function call.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param FuncCall $call - Function call node to describe.
      *
      * @return string - the resolved function name, or the label "dynamic function call" so findings never show an empty name
@@ -647,22 +581,19 @@ final class SecurityNodeHelper
     {
         $name = self::globalFunctionName($call);
 
-        // User view: missing data becomes a safe findings list default.
         return $name ?? 'dynamic function call';
     }
 
     /**
-     * Resolve a method name to its lower-case string when statically known.
+     * Resolves a method name to its lower-case string when statically known.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Expr\MethodCall|Expr\StaticCall $call - Call node to inspect.
      *
      * @return string|null - lower-cased method name, or null when the name is computed (e.g. $obj->$method())
      */
     public static function methodName(Expr\MethodCall|Expr\StaticCall $call): ?string
     {
-        // User view: choose the findings list branch for this case.
+        // A computed method name (e.g. $obj->$method()) has no static string to resolve.
         if (!$call->name instanceof Identifier) {
             return null;
         }
@@ -671,24 +602,20 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Resolve a class node to a lower-case class name when statically known.
+     * Resolves a class node to a lower-case class name when statically known.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node $class - Class node from a new/static call.
      *
      * @return string|null - lower-cased class name, FQCN-resolved when available, or null for dynamic/anonymous classes
      */
     public static function className(Node $class): ?string
     {
-        // User view: choose the findings list branch for this case.
         if (!$class instanceof Name) {
             // Anonymous classes and dynamic `new $cls` have no static name to resolve.
             return null;
         }
 
         $resolvedName = $class->getAttribute('resolvedName');
-        // User view: choose the findings list branch for this case.
         if ($resolvedName instanceof Name) {
             // Prefer the import/namespace-resolved FQCN so short aliases match their fully-qualified target.
             return strtolower($resolvedName->toString());
@@ -699,10 +626,8 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Match a class node against exact FQCNs or short class names.
+     * Reports whether a class node matches any exact FQCN or short class name.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node         $class - Class node from a new/static call.
      * @param list<string> $classNames - FQCNs or short class names to match.
      *
@@ -714,22 +639,20 @@ final class SecurityNodeHelper
         // class sharing a built-in's short name matches too. Callers accept name evidence, not resolved
         // types, so imported and fully-qualified spellings keep matching without a name-resolution pass.
         $resolvedName = self::className($class);
-        // User view: choose the findings list branch for this case.
-        // User view: missing data becomes the expected findings list state.
         if ($resolvedName === null) {
             // An unresolvable class name can never equal a configured target, so it cannot match.
             return false;
         }
 
-        // User view: add each item that can appear in findings list.
+        // Weigh the resolved name against each configured target.
         foreach ($classNames as $className) {
             $normalized = strtolower(ltrim($className, '\\'));
-            // User view: choose the findings list branch for this case.
+            // An exact match on the normalised name is a direct hit.
             if ($resolvedName === $normalized) {
                 return true;
             }
 
-            // User view: choose the findings list branch for this case.
+            // A short target also matches when it is the final segment of the resolved FQCN.
             if (!str_contains($normalized, '\\') && str_ends_with($resolvedName, '\\' . $normalized)) {
                 return true;
             }
@@ -739,10 +662,8 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Detect whether a node tree contains an HTTP(S) literal.
+     * Reports whether a node tree contains an HTTP(S) literal.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node $node - Node tree to inspect.
      *
      * @return bool - true when a literal string in the tree starts with http:// or https://, used to gate URL-only sinks
@@ -752,7 +673,6 @@ final class SecurityNodeHelper
         $nodeFinder = new NodeFinder();
 
         return $nodeFinder->findFirst($node, static function (Node $candidate): bool {
-                // User view: choose the findings list branch for this case.
                 if (!$candidate instanceof Scalar\String_) {
                     // Only literal strings can be inspected for a scheme; non-literals are never a URL match here.
                     return false;
@@ -764,10 +684,8 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Detect whether an expression references likely sensitive data.
+     * Reports whether an expression references likely sensitive data.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node $node - Node tree to inspect.
      *
      * @return bool - true when a variable name, property, array key, string literal, or env read in the tree names a secret
@@ -777,31 +695,26 @@ final class SecurityNodeHelper
         $nodeFinder = new NodeFinder();
 
         return $nodeFinder->findFirst($node, static function (Node $candidate): bool {
-                // User view: choose the findings list branch for this case.
                 if ($candidate instanceof Expr\Variable && is_string($candidate->name)) {
                     // A variable name like $apiKey signals secret context.
                     return self::hasSensitiveContext($candidate->name);
                 }
 
-                // User view: choose the findings list branch for this case.
                 if ($candidate instanceof Expr\PropertyFetch && $candidate->name instanceof Identifier) {
                     // A property access like $config->secret signals secret context.
                     return self::hasSensitiveContext($candidate->name->toString());
                 }
 
-                // User view: choose the findings list branch for this case.
                 if ($candidate instanceof Expr\ArrayDimFetch && $candidate->dim instanceof Scalar\String_) {
                     // A literal array key like $env['password'] signals secret context.
                     return self::hasSensitiveContext($candidate->dim->value);
                 }
 
-                // User view: choose the findings list branch for this case.
                 if ($candidate instanceof Scalar\String_) {
                     // A bare string literal whose text itself names a secret signals secret context.
                     return self::hasSensitiveContext($candidate->value);
                 }
 
-                // User view: choose the findings list branch for this case.
                 if ($candidate instanceof Expr\FuncCall) {
                     // A call may be an env reader pulling a secret-named key; defer to that check.
                     return self::isSensitiveEnvironmentRead($candidate);
@@ -813,10 +726,8 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Detect env-reader calls that request a sensitive key.
+     * Reports whether a call is an env reader requesting a sensitive key.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param FuncCall $call - Call node to inspect; only env readers (getenv/env/apache_getenv) are considered.
      *
      * @return bool - true when an env reader requests a secret-like key, or reads the whole environment via no argument
@@ -824,16 +735,12 @@ final class SecurityNodeHelper
     private static function isSensitiveEnvironmentRead(FuncCall $call): bool
     {
         $name = self::globalFunctionName($call);
-        // User view: choose the findings list branch for this case.
-        // User view: missing data becomes the expected findings list state.
         if ($name === null || !in_array($name, ['apache_getenv', 'env', 'getenv'], true)) {
             // Not one of the recognised env readers, so it cannot be a sensitive environment lookup.
             return false;
         }
 
         $firstArg = self::argumentValue($call->args, 0);
-        // User view: choose the findings list branch for this case.
-        // User view: missing data becomes the expected findings list state.
         if ($firstArg === null) {
             // A no-argument getenv() returns the whole environment, which is treated as sensitive wholesale.
             return true;
@@ -844,10 +751,8 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Detect secret-like words in identifiers or string keys.
+     * Reports whether text contains a secret-like word (identifier or string key).
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param string $contextText - Identifier or string-key text to scan; the value itself, never a read secret.
      *
      * @return bool - true when the text matches the secret-name pattern (api key, token, password, secret, etc.)

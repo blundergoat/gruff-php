@@ -22,10 +22,12 @@ use PhpParser\Node\Stmt\Enum_;
 use PhpParser\Node\Stmt\Trait_;
 
 /**
- * Detects types whose methods are long on average, even if no single method dominates.
+ * Flags a class, trait, or enum whose methods are long on average, catching a type that is bloated
+ * across the board even when no single method is big enough to trip the method-length rule.
  *
- * Measures logical lines - distinct start lines of non-`Nop` statements - averaged
- * across all methods in the class. See ADR-012 for the container/content metric split.
+ * Runs per file over every class-like scope, averaging logical lines - distinct start lines of non-`Nop`
+ * statements - across all its methods, and reporting an average past the threshold (default error above
+ * 50). See ADR-012 for the container/content metric split.
  */
 final readonly class AverageMethodLengthRule implements RuleInterface
 {
@@ -35,10 +37,8 @@ final readonly class AverageMethodLengthRule implements RuleInterface
     public const ID = 'size.average-method-length';
 
     /**
-     * Describe the average-method-length rule.
+     * Describes the average-method-length rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - Rule metadata and thresholds.
      */
     public function definition(): RuleDefinition
@@ -56,10 +56,8 @@ final readonly class AverageMethodLengthRule implements RuleInterface
     }
 
     /**
-     * Find class-like scopes whose average method length exceeds thresholds.
+     * Reports each class-like scope whose average method length runs over the configured budget.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -74,7 +72,7 @@ final readonly class AverageMethodLengthRule implements RuleInterface
 
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Measure each class, trait, and enum in the file.
         foreach ($classLikes as $classLike) {
             /** @var Class_|Trait_|Enum_ $classLike Finder predicate restricts results to class-like declarations. */
             $methods = array_filter(
@@ -82,15 +80,14 @@ final readonly class AverageMethodLengthRule implements RuleInterface
                 static fn (Node $stmt): bool => $stmt instanceof ClassMethod,
             );
 
-            // User view: choose the findings list branch for this case.
-            // User view: an empty value becomes a clear findings list fallback.
+            // A type with no methods has no average to measure.
             if ($methods === []) {
                 continue;
             }
 
             $totalLines = 0;
 
-            // User view: add each item that can appear in findings list.
+            // Sum the logical length of every method.
             foreach ($methods as $method) {
                 $totalLines += NodeIndex::logicalStatementLineCount($method);
             }
@@ -98,8 +95,7 @@ final readonly class AverageMethodLengthRule implements RuleInterface
             $average        = $totalLines / count($methods);
             $thresholdMatch = $settings->highValueThresholdMatch($average);
 
-            // User view: choose the findings list branch for this case.
-            // User view: missing data becomes the expected findings list state.
+            // An average within budget is fine, so skip it.
             if ($thresholdMatch === null) {
                 continue;
             }
@@ -140,34 +136,26 @@ final readonly class AverageMethodLengthRule implements RuleInterface
     }
 
     /**
-     * Build a display symbol for a class-like node.
+     * Builds a display name for a class-like node, synthesising a label when it is unnamed.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node $node - Class-like node (Class_, Trait_, or Enum_) whose declared name labels the finding.
      *
      * @return string - Class-like display symbol.
      */
     private function resolveSymbol(Node $node): string
     {
-        // User view: choose the findings list branch for this case.
         if ($node instanceof Class_) {
             // Anonymous classes carry no name node, so synthesise a label keyed to the declaration line.
-            // User view: missing data becomes a safe findings list default.
             return $node->name?->toString() ?? sprintf('class@anonymous:%d', $node->getStartLine());
         }
 
-        // User view: choose the findings list branch for this case.
         if ($node instanceof Trait_) {
             // Traits are always named in valid PHP; the fallback only guards against an unparsed name node.
-            // User view: missing data becomes a safe findings list default.
             return $node->name?->toString() ?? sprintf('trait@%d', $node->getStartLine());
         }
 
-        // User view: choose the findings list branch for this case.
         if ($node instanceof Enum_) {
             // Enums are always named in valid PHP; the fallback only guards against an unparsed name node.
-            // User view: missing data becomes a safe findings list default.
             return $node->name?->toString() ?? sprintf('enum@%d', $node->getStartLine());
         }
 
@@ -176,17 +164,15 @@ final readonly class AverageMethodLengthRule implements RuleInterface
     }
 
     /**
-     * Format threshold numbers without unnecessary decimal places.
+     * Formats a threshold number for the message, dropping a whole number's ".0" tail.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param int|float $number - Threshold value to render; whole floats are shown without a trailing decimal.
      *
      * @return string - Human-readable threshold value with fractional values preserved and whole values stripped.
      */
     private function formatNumber(int|float $number): string
     {
-        // User view: choose the findings list branch for this case.
+        // A genuine fraction keeps its decimals; a whole value is shown without them.
         if (is_float($number) && floor($number) !== $number) {
             return (string) $number;
         }

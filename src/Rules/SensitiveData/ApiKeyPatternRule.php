@@ -14,7 +14,12 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\SourceTextRuleInterface;
 
 /**
- * Detects common API key assignment patterns in source text.
+ * Flags a hardcoded API key from a known provider (Stripe, GitHub, OpenAI, Anthropic, Slack, npm, Google,
+ * Azure, GitLab), so the user can pull the committed credential from source and rotate it.
+ *
+ * A source-text rule: it runs each provider's prefix pattern over the raw file, skipping matches inside
+ * comments and obvious dummy values, and redacts every reported key. Warning severity, high confidence -
+ * the published provider prefixes make a non-dummy match very likely a real key.
  */
 final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
 {
@@ -24,10 +29,8 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
     public const ID = 'sensitive-data.api-key-pattern';
 
     /**
-     * List the regex patterns enforced by this rule.
+     * Lists the provider key patterns this rule scans for, in scan order.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return list<array{name: string, pattern: string}> - each entry pairs a provider label with its detection regex; ordering is the scan order
      *                          applied per source unit
      */
@@ -51,10 +54,8 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
     }
 
     /**
-     * Describe the API key pattern sensitive-data rule.
+     * Describes the API-key-pattern sensitive-data rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - identity, pillar, tier, and the Warning/High defaults the engine applies unless a config override raises or silences
      *                        this rule
      */
@@ -72,10 +73,8 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
     }
 
     /**
-     * Find string literals that resemble hardcoded API keys.
+     * Reports each string that resembles a hardcoded provider API key, redacting the value.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -89,7 +88,6 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
         // Fast bail: real API keys for the supported providers all contain one
         // of these distinctive prefixes. Skipping the per-pattern regex when
         // none are present makes this rule near-free for the common case.
-        // User view: choose the findings list branch for this case.
         if (preg_match('/sk_live_|ghp_|github_pat_|gh[ours]_|sk-proj-|sk-ant-|xox[baprs]-|hooks\.slack\.com\/services|npm_|AIza|[?&]sv=|glpat-/i', $analysisUnit->source) !== 1) {
             // No supported prefix in the source means no provider pattern can match, so skip the per-pattern scan.
             return [];
@@ -97,19 +95,20 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
 
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
 
-        // User view: add each item that can appear in findings list.
+        // Run each provider's key pattern over the source.
         foreach ($this->patterns() as $definition) {
+            // Match every occurrence of this provider's key shape, capturing each offset.
             preg_match_all($definition['pattern'], $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
-            // User view: add each item that can appear in findings list.
+            // Weigh each candidate this pattern found.
             foreach ($matches[0] as $match) {
                 [$candidateSecret, $offset] = $match;
-                // User view: choose the findings list branch for this case.
+                // A key inside a comment is an example, not a live secret.
                 if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
                     continue;
                 }
 
-                // User view: choose the findings list branch for this case.
+                // An obvious placeholder key is not a real secret.
                 if (SecretScannerHelper::isLikelyDummyValue($candidateSecret)) {
                     continue;
                 }

@@ -19,7 +19,12 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 
 /**
- * Detects documented methods that omit an explicit @return contract.
+ * Flags a documented method or function that omits an explicit `@return` tag, so the user gets a complete
+ * contract - every documented callable states what it hands back, even when that is void or never.
+ *
+ * Runs per file over documented function-likes, skipping constructors and destructors (which have no
+ * meaningful return). Advisory, high confidence. The companion return-comment rule then checks the tag
+ * actually describes the value rather than restating the type.
  */
 final readonly class MissingReturnTagRule implements RuleInterface
 {
@@ -29,11 +34,9 @@ final readonly class MissingReturnTagRule implements RuleInterface
     public const ID = 'docs.missing-return-tag';
 
     /**
-     * Describe the missing @return tag rule.
+     * Describes the missing `@return` tag rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
-     * @return RuleDefinition - Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults (advisory severity, high confidence).
      */
     public function definition(): RuleDefinition
     {
@@ -49,10 +52,8 @@ final readonly class MissingReturnTagRule implements RuleInterface
     }
 
     /**
-     * Find documented function-like declarations that lack an @return tag.
+     * Reports each documented function-like declaration that lacks an `@return` tag.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -65,25 +66,24 @@ final readonly class MissingReturnTagRule implements RuleInterface
 
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Check every method and function in the file.
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
-            // User view: choose the findings list branch for this case.
+            // A constructor or destructor has no meaningful return to document.
             if ($node instanceof ClassMethod && in_array($node->name->toString(), ['__construct', '__destruct'], true)) {
                 continue;
             }
 
             $docComment = $node->getDocComment();
 
-            // User view: choose the findings list branch for this case.
-            // User view: missing data becomes the expected findings list state.
+            // An undocumented callable is out of scope; a separate rule covers missing docblocks.
             if ($docComment === null) {
                 continue;
             }
 
             $docText = $docComment->getText();
 
-            // User view: choose the findings list branch for this case.
+            // A docblock that already declares its return contract is fine.
             if (str_contains($docText, '@return')) {
                 continue;
             }

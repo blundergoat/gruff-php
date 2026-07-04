@@ -25,7 +25,13 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 
 /**
- * Measures the deepest nested control-flow level inside function-like bodies.
+ * Flags a function or method whose control flow nests too deeply, since deep nesting is one of the
+ * clearest signals that logic has become hard to follow.
+ *
+ * Runs per file over every function-like node with a body. It measures the deepest level of nested ifs,
+ * loops, switches, and closures (try/finally bodies do not add a level), and reports anything past the
+ * configured maximum (default error above 4). The finding names the depth and suggests early returns or
+ * extraction.
  */
 final readonly class NestingDepthRule implements RuleInterface
 {
@@ -35,10 +41,8 @@ final readonly class NestingDepthRule implements RuleInterface
     public const ID = 'complexity.nesting-depth';
 
     /**
-     * Describe the nesting-depth rule for the registry and reports.
+     * Describes the nesting-depth rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - Rule metadata and default thresholds.
      */
     public function definition(): RuleDefinition
@@ -55,10 +59,8 @@ final readonly class NestingDepthRule implements RuleInterface
     }
 
     /**
-     * Detect functions and methods whose control flow nests too deeply.
+     * Reports each function-like node whose deepest nesting exceeds the configured maximum.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -73,10 +75,10 @@ final readonly class NestingDepthRule implements RuleInterface
 
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Measure every function and method in the file.
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
-            // User view: choose the findings list branch for this case.
+            // An abstract or bodyless declaration has nothing to measure.
             if (!CyclomaticComplexityRule::hasExecutableBody($node)) {
                 continue;
             }
@@ -84,8 +86,7 @@ final readonly class NestingDepthRule implements RuleInterface
             $maxDepth       = self::computeMaximumNestingDepth($node);
             $thresholdMatch = $settings->highValueThresholdMatch($maxDepth);
 
-            // User view: choose the findings list branch for this case.
-            // User view: missing data becomes the expected findings list state.
+            // A depth within the limit is fine, so skip it.
             if ($thresholdMatch === null) {
                 continue;
             }
@@ -123,21 +124,20 @@ final readonly class NestingDepthRule implements RuleInterface
     }
 
     /**
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
+     * Computes the deepest control-flow nesting level inside one function-like node.
+     *
      * @param ClassMethod|Function_ $node - Function-like node whose body is measured.
      *
      * @return int - The maximum nesting depth inside the function-like node.
      */
     public static function computeMaximumNestingDepth(Node $node): int
     {
-        // User view: missing data becomes a safe findings list default.
         return self::walkStatements($node->stmts ?? [], 0);
     }
 
     /**
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
+     * Returns the deepest nesting any statement in a list reaches, from the list's own depth.
+     *
      * @param array<Node> $stmts - Statements to measure in sequence.
      * @param int         $depth - Nesting depth this statement list sits at.
      *
@@ -147,7 +147,7 @@ final readonly class NestingDepthRule implements RuleInterface
     {
         $maximumDepth = $depth;
 
-        // User view: add each item that can appear in findings list.
+        // Take the deepest level any statement in this list reaches.
         foreach ($stmts as $stmt) {
             $maximumDepth = max($maximumDepth, self::walkNode($stmt, $depth));
         }
@@ -156,10 +156,8 @@ final readonly class NestingDepthRule implements RuleInterface
     }
 
     /**
-     * Measure nesting contribution for a statement node.
+     * Returns the deepest nesting reachable from one statement node.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node $node - Statement node to measure.
      * @param int  $depth - Nesting depth this node sits at.
      *
@@ -167,13 +165,11 @@ final readonly class NestingDepthRule implements RuleInterface
      */
     private static function walkNode(Node $node, int $depth): int
     {
-        // User view: choose the findings list branch for this case.
         if ($node instanceof Stmt\Expression) {
             // An expression statement only deepens nesting through a closure it may contain.
             return self::walkExprNesting($node->expr, $depth);
         }
 
-        // User view: choose the findings list branch for this case.
         if (!StmtChildVisitor::isControlFlowStmt($node)) {
             // A non-control-flow statement adds no nesting, so the depth is unchanged.
             return $depth;
@@ -182,7 +178,7 @@ final readonly class NestingDepthRule implements RuleInterface
         // A switch construct contributes one nesting level even when it has no cases.
         $maximumDepth = $node instanceof Stmt\Switch_ ? $depth + 1 : $depth;
 
-        // User view: add each item that can appear in findings list.
+        // Each control block adds a level, except try and finally bodies.
         foreach (StmtChildVisitor::childBlocks($node) as $block) {
             $blockDepth = match ($block->kind) {
                 StmtChildBlock::KIND_TRY_BODY, StmtChildBlock::KIND_FINALLY_BODY => $depth,
@@ -195,10 +191,8 @@ final readonly class NestingDepthRule implements RuleInterface
     }
 
     /**
-     * Measure nested closures inside expression statements.
+     * Returns the deepest nesting a closure inside an expression contributes (other expressions add none).
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Expr $expr - Expression to measure; only a closure body adds nesting.
      * @param int  $depth - Nesting depth this expression sits at.
      *
@@ -206,20 +200,18 @@ final readonly class NestingDepthRule implements RuleInterface
      */
     private static function walkExprNesting(Expr $expr, int $depth): int
     {
-        // User view: choose the findings list branch for this case.
         if ($expr instanceof Closure) {
             // A closure body nests one level below the expression that holds it.
-            // User view: missing data becomes a safe findings list default.
             return self::walkStatements($expr->stmts ?? [], $depth + 1);
         }
 
         $maximumDepth = $depth;
 
-        // User view: add each item that can appear in findings list.
+        // Descend into sub-expressions to find any nested closure.
         foreach ($expr->getSubNodeNames() as $name) {
             $subExpression = $expr->$name;
 
-            // User view: choose the findings list branch for this case.
+            // Only recurse into actual expression children.
             if ($subExpression instanceof Expr) {
                 $maximumDepth = max($maximumDepth, self::walkExprNesting($subExpression, $depth));
             }
@@ -229,17 +221,15 @@ final readonly class NestingDepthRule implements RuleInterface
     }
 
     /**
-     * Render a configured numeric threshold for finding messages.
+     * Formats a threshold number for the message, dropping a whole number's ".0" tail.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param int|float $number - Threshold to render; a genuine fraction is kept, a whole value loses its ".0".
      *
      * @return string - The threshold without unnecessary decimal places.
      */
     private static function formatNumber(int|float $number): string
     {
-        // User view: choose the findings list branch for this case.
+        // A genuine fraction keeps its decimals; a whole value is shown without them.
         if (is_float($number) && floor($number) !== $number) {
             return (string) $number;
         }

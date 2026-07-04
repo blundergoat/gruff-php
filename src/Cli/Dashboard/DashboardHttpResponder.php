@@ -16,7 +16,7 @@ use RuntimeException;
 final class DashboardHttpResponder
 {
     /**
-     * Sends one response to the browser — status line, headers, then body (omitted for HEAD requests).
+     * Sends one response to the browser - status line, headers, then body (omitted for HEAD requests).
      *
      * @param resource              $client        - Socket client receiving the dashboard response.
      * @param DashboardHttpResponse $response      - HTTP response to write to the client.

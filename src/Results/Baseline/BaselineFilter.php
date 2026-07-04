@@ -7,74 +7,67 @@ namespace GruffPhp\Results\Baseline;
 use GruffPhp\Results\Finding\Finding;
 
 /**
- * Filters live findings against baseline groups and optional diff scope.
+ * Reconciles a fresh scan against the debt the user already accepted, so only genuinely new problems stop the run.
+ *
+ * This is the engine behind `gruff-php analyse --baseline gruff-baseline.json`: it keys every live
+ * finding by (file, rule, message), matches each group against the counts the user previously signed
+ * off, and splits the run into accepted debt (kept quiet), problems that are actually new (still
+ * fail), and - on a full-project scan - accepted debt that has since been fixed. Matching is purely
+ * count-based and ignores line numbers, so reformatting or moving code never resurrects debt the user
+ * already accepted.
  */
 final readonly class BaselineFilter
 {
     /**
-     * Match live findings against baseline groups by count.
+     * Sorts one scan's findings into accepted debt, genuinely new problems, and (on a full scan) debt
+     * the user has since fixed. This is the per-group work every `gruff-php analyse --baseline
+     * gruff-baseline.json` run does so the user is only stopped by findings they have not signed off.
      *
-     * This is the heart of a `gruff-php analyse --baseline gruff-baseline.json` run: it decides
-     * which findings the user already accepted (suppressed), which are new (still fail the run),
-     * and which accepted debt got fixed (resolved). Per group with B accepted and C live
-     * instances: unchanged = min(B, C), new = max(0, C - B), resolved = max(0, B - C). Line
-     * numbers never participate, so accepted debt survives edits that shift lines.
-     *
-      * User flow: Keeps known findings separate from new feedback in reports.
-      *
-     * @param BaselineData  $baseline - Loaded baseline data to apply.
-     * @param list<Finding> $findings - Findings to compare against the baseline.
-     * @param bool          $hasDiffScope - Whether diff filtering is active for this baseline pass.
+     * @param BaselineData  $baseline - The debt the user previously accepted, grouped by file, rule, and message.
+     * @param list<Finding> $findings - This run's live findings to reconcile; empty means this run found nothing to match, so the findings/new/unchanged lists come back empty - though on a full scan the report then marks every accepted group resolved.
+     * @param bool          $hasDiffScope - True when the scan covered only changed files, which turns off fixed-debt detection because unscanned files would look falsely resolved.
      *
      * @return array{findings: list<Finding>, new: list<Finding>, unchanged: list<Finding>, report: BaselineReport} - partitioned result: "findings"
-     *                         and "new" both hold the unsuppressed findings callers act on (empty when every finding matched the baseline),
-     *                         "unchanged" the baseline-suppressed ones, and "report" the summary with absent-group accounting
+     *                         and "new" both hold the unsuppressed findings the user must still fix (both empty when every finding matched accepted debt),
+     *                         "unchanged" the baseline-suppressed ones, and "report" the summary with fixed-debt accounting.
      */
     public function apply(BaselineData $baseline, array $findings, bool $hasDiffScope): array
     {
         $entriesByGroup = $baseline->byGroup();
 
-        // Bucket live findings into the same (file, ruleId, message) groups the baseline stores.
         $liveByGroup = [];
-        // User view: add each item that can appear in baseline feedback.
+        // Group every live finding by the (file, rule, message) key the baseline uses, so each group can be matched by count alone.
         foreach ($findings as $finding) {
             $liveByGroup[BaselineEntry::groupKeyForFinding($finding)][] = $finding;
         }
 
-        // Within each group the first `count` instances in (line, column) order stay suppressed;
-        // any instances beyond the accepted count surface as new.
         $suppressedFindingIds = [];
-        // User view: add each item that can appear in baseline feedback.
+        // Within each group, keep the first `count` findings the user accepted (the smaller of accepted vs live) suppressed;
+        // anything past that accepted budget is new debt that still fails the run.
         foreach ($liveByGroup as $groupKey => $groupFindings) {
-            // User view: missing data becomes a safe baseline feedback default.
             $acceptedGroup = $entriesByGroup[$groupKey] ?? null;
             // No baseline row for this group: the user never accepted these findings, so all stay new.
-            // User view: choose the baseline feedback branch for this case.
             if (!$acceptedGroup instanceof BaselineEntry) {
                 continue;
             }
 
             usort(
                 $groupFindings,
-                // User view: missing data becomes a safe baseline feedback default.
                 static fn(Finding $left, Finding $right): int => [$left->line ?? 0, $left->column ?? 0]
-                    // User view: missing data becomes a safe baseline feedback default.
                     <=> [$right->line ?? 0, $right->column ?? 0],
             );
 
-            // User view: add each item that can appear in baseline feedback.
+            // Slice off that group's first `count` findings (or all of them, if fewer turned up) and mark them suppressed; anything past that accepted budget stays new.
             foreach (array_slice($groupFindings, 0, $acceptedGroup->count) as $suppressedFinding) {
                 $suppressedFindingIds[spl_object_id($suppressedFinding)] = true;
             }
         }
 
-        // Partition in original input order so the user's report lists findings deterministically.
         $newFindings       = [];
         $unchangedFindings = [];
-        // User view: add each item that can appear in baseline feedback.
+        // Partition in original input order so the user's report lists findings deterministically.
         foreach ($findings as $finding) {
             // Suppressed findings are accepted debt: they disappear from the run's failing set.
-            // User view: choose the baseline feedback branch for this case.
             if (isset($suppressedFindingIds[spl_object_id($finding)])) {
                 $unchangedFindings[] = $finding;
                 continue;
@@ -87,29 +80,25 @@ final readonly class BaselineFilter
         $absentInstanceCount = 0;
         $staleEvaluation     = 'full-project';
 
-        // User view: choose the baseline feedback branch for this case.
+        // Only a full-project scan can prove accepted debt was fixed; a diff-scoped run (e.g. `analyse --baseline gruff-baseline.json --diff`) never opened the unchanged files, so it records the fixed-debt check as skipped rather than guess a resolution.
         if ($hasDiffScope) {
-            // A partial scan cannot prove a group resolved: unscanned files simply produced no findings.
             $staleEvaluation = 'not-evaluated-diff-scope';
         } else {
-            // Full-project scans can tell the user which accepted debt they actually fixed.
-            // User view: add each item that can appear in baseline feedback.
+            // A full-project scan saw every file, so walk each accepted group to find debt the user has since cleared.
             foreach ($entriesByGroup as $groupKey => $acceptedGroup) {
-                // User view: missing data becomes a safe baseline feedback default.
                 $resolvedCount = $acceptedGroup->count - count($liveByGroup[$groupKey] ?? []);
-                // Live instances still cover this group's budget, so nothing resolved here.
-                // User view: choose the baseline feedback branch for this case.
+                // Resolved is accepted-count minus still-live count; when live instances still fill the accepted budget the user fixed nothing here, so skip the group.
                 if ($resolvedCount <= 0) {
                     continue;
                 }
 
-                // Absent rows reuse the group shape with count meaning "instances resolved this run".
+                // Record the cleared debt as an absent row - same group shape, but its count now means "instances the user resolved this run".
                 $absentEntries[]      = new BaselineEntry($acceptedGroup->filePath, $acceptedGroup->ruleId, $acceptedGroup->message, $resolvedCount);
                 $absentInstanceCount += $resolvedCount;
             }
         }
 
-        // "findings" carries the unsuppressed (new) set callers act on; the buckets and report drive reporting.
+        // Hand back the new set the user still has to fix, both partition buckets, and the report that drives the reporters' multi-line Baseline block.
         return [
             'findings'  => $newFindings,
             'new'       => $newFindings,

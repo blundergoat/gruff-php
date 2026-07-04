@@ -22,7 +22,11 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 
 /**
- * Detects function and method names that are too generic.
+ * Flags a function or method whose name is a vague verb - `process`, `handle`, `run`, `execute`, and the
+ * like - because such names say that something happens without saying what, forcing the reader into the body.
+ *
+ * Framework-mandated names, such as a Symfony Console command's `execute()`, are exempt so the rule does not
+ * fight contracts the author cannot rename. Advisory, medium confidence.
  */
 final readonly class GenericMethodNameRule implements RuleInterface
 {
@@ -40,10 +44,8 @@ final readonly class GenericMethodNameRule implements RuleInterface
     ];
 
     /**
-     * Describe the generic method name rule.
+     * Describes the generic-method-name rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -60,10 +62,8 @@ final readonly class GenericMethodNameRule implements RuleInterface
     }
 
     /**
-     * Find functions and methods whose names are too generic to communicate intent.
+     * Reports a function or method whose name is too generic to convey intent.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -76,17 +76,17 @@ final readonly class GenericMethodNameRule implements RuleInterface
 
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Check every function and method in the file.
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
             $name = $node->name->toString();
 
-            // User view: choose the findings list branch for this case.
+            // Only the known vague verbs are candidates for this rule.
             if (!in_array(strtolower($name), array_map('strtolower', self::GENERIC_NAMES), true)) {
                 continue;
             }
 
-            // User view: choose the findings list branch for this case.
+            // A framework-required name such as Symfony's execute() is left alone.
             if ($node instanceof ClassMethod && $this->matchesFrameworkOverride($node)) {
                 continue;
             }
@@ -111,10 +111,8 @@ final readonly class GenericMethodNameRule implements RuleInterface
     }
 
     /**
-     * Allow known framework-required generic method names.
+     * Reports whether a framework requires this otherwise-generic method name.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param ClassMethod $classMethod - Method whose name and signature decide whether a framework forces it.
      *
      * @return bool - True when the method matches a supported framework override.
@@ -123,7 +121,6 @@ final readonly class GenericMethodNameRule implements RuleInterface
     {
         $name = strtolower($classMethod->name->toString());
 
-        // User view: choose the findings list branch for this case.
         if ($name === 'execute' && $this->matchesSymfonyConsoleExecute($classMethod)) {
             // Symfony forces this name, so exempting it keeps the rule from fighting the framework contract.
             return true;
@@ -134,25 +131,20 @@ final readonly class GenericMethodNameRule implements RuleInterface
     }
 
     /**
-     * Detect Symfony Console command `execute()` overrides.
+     * Reports whether a method matches the Symfony Console command `execute()` signature.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param ClassMethod $classMethod - Candidate `execute` method to match against the Symfony command signature.
      *
      * @return bool - True when parameters match the Symfony command signature.
      */
     private function matchesSymfonyConsoleExecute(ClassMethod $classMethod): bool
     {
-        // User view: choose the findings list branch for this case.
         if (count($classMethod->params) !== 2) {
             // Symfony's execute() takes exactly InputInterface and OutputInterface, so any other arity rules it out.
             return false;
         }
 
-        // User view: missing data becomes a safe findings list default.
         $first  = $classMethod->params[0]->type ?? null;
-        // User view: missing data becomes a safe findings list default.
         $second = $classMethod->params[1]->type ?? null;
 
         // Both positional types must match the Symfony signature for this to count as the framework override.
@@ -161,10 +153,8 @@ final readonly class GenericMethodNameRule implements RuleInterface
     }
 
     /**
-     * Compare a parameter type node against an unqualified class/interface name.
+     * Reports whether a parameter type node matches an unqualified class or interface name.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node|null $type - Declared parameter type node, or null when the parameter is untyped.
      * @param string    $shortName - Unqualified class or interface name to match, ignoring any namespace prefix.
      *
@@ -172,17 +162,14 @@ final readonly class GenericMethodNameRule implements RuleInterface
      */
     private function hasParameterTypeShortName(?Node $type, string $shortName): bool
     {
-        // User view: choose the findings list branch for this case.
         if ($type instanceof Name) {
             $parts = $type->getParts();
-            // User view: missing data becomes a safe findings list default.
             $last  = $parts[count($parts) - 1] ?? null;
 
             // Compare only the final namespace segment so a fully-qualified type still matches the short name.
             return $last === $shortName;
         }
 
-        // User view: choose the findings list branch for this case.
         if ($type instanceof Identifier) {
             // A bare identifier type (no namespace) compares directly against the wanted short name.
             return $type->toString() === $shortName;

@@ -5,7 +5,12 @@ declare(strict_types=1);
 namespace GruffPhp\Engine\Source;
 
 /**
- * Describes one source file discovered for analysis.
+ * One file picked up for analysis, tagged with how gruff should read it - as parsed PHP or as plain text.
+ *
+ * Discovery produces one of these per in-scope file. The type decides the path each file takes: PHP
+ * files go through the AST parser so structural rules can inspect them, while other files (config, YAML,
+ * lock files) are scanned as text by the rules that opt into text. The display path is what any finding
+ * on the file shows the user.
  */
 final readonly class SourceFile
 {
@@ -20,13 +25,11 @@ final readonly class SourceFile
     public const TYPE_TEXT = 'text';
 
     /**
-     * Capture a discovered source file and the type gruff should apply to it.
+     * Captures a discovered file and the type that decides how gruff reads it.
      *
-      * User flow: Prepares source files so findings point at the right code.
-      *
-     * @param string $absolutePath - Absolute filesystem path.
-     * @param string $displayPath - Project-relative display path.
-     * @param string $type - Source type used to choose parsing or text scanning.
+     * @param string $absolutePath - Absolute filesystem path to the file.
+     * @param string $displayPath - Project-relative path shown to the user in findings.
+     * @param string $type - Source type that selects PHP parsing or plain-text scanning; defaults to PHP.
      */
     public function __construct(
         public string $absolutePath,
@@ -36,11 +39,9 @@ final readonly class SourceFile
     }
 
     /**
-     * Report whether the source file should be parsed as PHP.
+     * Reports whether this file should go through the PHP parser rather than be scanned as text.
      *
-      * User flow: Prepares source files so findings point at the right code.
-      *
-     * @return bool - True when the file type is PHP.
+     * @return bool - True when the file is PHP-typed and takes the AST parser path.
      */
     public function isPhp(): bool
     {

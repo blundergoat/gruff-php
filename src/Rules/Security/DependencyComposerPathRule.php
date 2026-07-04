@@ -15,7 +15,11 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\SourceTextRuleInterface;
 
 /**
- * Flags Composer `path` repositories that link local code into the dependency tree.
+ * Flags a Composer `path` repository, which symlinks local code straight into the dependency tree - so the
+ * user confirms the linked path is trusted before it ships as if it were a published package.
+ *
+ * Scans `composer.json` as text over each `repositories` entry of type `path`. Warning, medium confidence -
+ * a path repo is a posture smell to review, not proof of a vulnerability.
  */
 final class DependencyComposerPathRule implements SourceTextRuleInterface
 {
@@ -25,10 +29,8 @@ final class DependencyComposerPathRule implements SourceTextRuleInterface
     public const ID = 'security.dependency-composer-path';
 
     /**
-     * Describe the Composer path-repository rule.
+     * Describes the Composer path-repository rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -45,10 +47,8 @@ final class DependencyComposerPathRule implements SourceTextRuleInterface
     }
 
     /**
-     * Find `repositories` entries of type `path`.
+     * Reports each Composer `path` repository declared in the manifest.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -56,30 +56,27 @@ final class DependencyComposerPathRule implements SourceTextRuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        // User view: choose the findings list branch for this case.
         if (!ComposerManifest::isManifest($analysisUnit->file->displayPath)) {
             // This rule only applies to composer.json; every other file yields no findings.
             return [];
         }
 
         $manifest = ComposerManifest::decode($analysisUnit->source);
-        // User view: choose the findings list branch for this case.
-        // User view: missing data becomes the expected findings list state.
         if ($manifest === null || !isset($manifest['repositories']) || !is_array($manifest['repositories'])) {
             // Unparseable manifest or no repositories block means there is nothing of this shape to flag.
             return [];
         }
 
         $findings = [];
-        // User view: add each item that can appear in findings list.
+        // Check each declared repository entry.
         foreach ($manifest['repositories'] as $repository) {
-            // User view: choose the findings list branch for this case.
+            // A malformed, non-object entry cannot be a path repository.
             if (!is_array($repository)) {
                 continue;
             }
 
             $type = isset($repository['type']) && is_string($repository['type']) ? strtolower($repository['type']) : '';
-            // User view: choose the findings list branch for this case.
+            // Only a `path` repository links local code into the tree.
             if ($type !== 'path') {
                 continue;
             }

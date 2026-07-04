@@ -12,7 +12,11 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * Serves the local browser dashboard for interactive analysis.
+ * Backs the `gruff-php dashboard` command - the interactive browser UI for analysis.
+ *
+ * Validates the user's launch flags (project root, host, port, scan timeout, config and baseline
+ * options), then starts a local HTTP server they drive from a browser: pick paths and options in a
+ * form, hit scan, read the rendered report. The interactive alternative to one-shot `analyse`.
  */
 final class DashboardCommand extends Command
 {
@@ -22,15 +26,13 @@ final class DashboardCommand extends Command
     private const DEFAULT_HOST = '127.0.0.1';
 
     /**
-     * Default dashboard port used when no port option is supplied.
+     * Default dashboard port used when the user supplies no --port option.
      */
     private const DEFAULT_PORT = 8765;
 
     /**
-     * Configure the dashboard command arguments and options.
+     * Registers the dashboard command's flags and help - everything the user types after `gruff-php dashboard`.
      *
-      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
-      *
      * @return void
      */
     protected function configure(): void
@@ -59,11 +61,9 @@ final class DashboardCommand extends Command
     }
 
     /**
-     * Validate dashboard options and start the local dashboard server.
+     * Validates the launch flags and starts the dashboard server when the user runs `gruff-php dashboard`.
      *
-      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
-      *
-     * @param InputInterface  $input - Parsed dashboard arguments and options: paths, host, port, and scan flags.
+     * @param InputInterface  $input  - Parsed dashboard arguments and options: paths, host, port, and scan flags.
      * @param OutputInterface $output - Destination for validation error messages shown before the server starts.
      *
      * @return int - Symfony command exit code.
@@ -72,39 +72,34 @@ final class DashboardCommand extends Command
     {
         $cwd = getcwd();
 
-        // User view: choose the dashboard view branch for this case.
+        // No resolvable working directory means paths can't be resolved, so fail before binding a server.
         if ($cwd === false) {
             $output->writeln('<error>Unable to determine current working directory.</error>');
 
-            // The process has no resolvable working directory, so path resolution is impossible; fail before binding.
             return Command::FAILURE;
         }
 
         $dashboardStateFactory = new DashboardStateFactory();
         $projectRoot           = $dashboardStateFactory->initialProjectRoot($input, $cwd);
 
-        // User view: choose the dashboard view branch for this case.
-        // User view: missing data becomes the expected dashboard view state.
+        // The user pointed --project at something that isn't a real directory: reject as misconfiguration.
         if ($projectRoot === null) {
             $output->writeln('<error>Initial --project/--project-root must resolve to an existing directory.</error>');
 
-            // A non-existent project root is operator misconfiguration, not a runtime fault, so reject as invalid.
             return Command::INVALID;
         }
 
         $port = $this->port($input, $output);
 
-        // User view: choose the dashboard view branch for this case.
+        // --port wasn't a valid 1-65535 number (port() already said why): stop as invalid usage.
         if ($port === false) {
-            // port() already reported the reason; false signals an invalid --port value, so reject as invalid usage.
             return Command::INVALID;
         }
 
         $scanTimeout = $this->scanTimeout($input, $output);
 
-        // User view: choose the dashboard view branch for this case.
+        // --scan-timeout wasn't a non-negative integer (scanTimeout() already said why): stop as invalid usage.
         if ($scanTimeout === false) {
-            // scanTimeout() already reported the reason; false signals an invalid --scan-timeout, so reject as invalid.
             return Command::INVALID;
         }
 
@@ -116,14 +111,11 @@ final class DashboardCommand extends Command
             explicitConfigPath: $dashboardStateFactory->optionalStringOption($input, 'config'),
             shouldSkipConfig:   (bool) $input->getOption('no-config'),
         );
-        // User view: choose the dashboard view branch for this case.
-        // User view: missing data becomes the expected dashboard view state.
+        // The first-run "create a config?" prompt handled the user itself, so return whatever it decided.
         if ($promptExitCode !== null) {
-            // A non-null code means the missing-config prompt resolved the run itself, so honour its exit code.
             return $promptExitCode;
         }
 
-        // User view: missing data becomes a safe dashboard view default.
         $host                    = $dashboardStateFactory->optionalStringOption($input, 'host') ?? self::DEFAULT_HOST;
         $dashboardRequestContext = new DashboardRequestContext($input, $cwd, $projectRoot, $scanTimeout, $host, $port);
         $dashboardServer         = new DashboardServer($dashboardStateFactory, $this->gruffBinary());
@@ -132,34 +124,30 @@ final class DashboardCommand extends Command
     }
 
     /**
-     * Parse and validate the dashboard port option.
+     * Validates the `--port` option, returning false (after a message) when it isn't a bindable port.
      *
-      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
-      *
-     * @param InputInterface  $input - Source of the raw --port option, expected to be a digit string.
+     * @param InputInterface  $input  - Source of the raw --port option, expected to be a digit string.
      * @param OutputInterface $output - Destination for the validation error shown when the port is out of range.
      *
-     * @return int|false - Valid port, or false when input is invalid.
+     * @return int|false - Valid port; false when `--port` wasn't a bindable 1-65535 integer (the reason is already printed).
      */
     private function port(InputInterface $input, OutputInterface $output): int|false
     {
         $rawPort = $input->getOption('port');
 
-        // User view: choose the dashboard view branch for this case.
+        // A non-digit --port (e.g. `--port=abc`) can't be a TCP port, so reject it rather than coerce it to 0.
         if (!is_string($rawPort) || !ctype_digit($rawPort)) {
             $output->writeln('<error>--port must be an integer from 1 to 65535.</error>');
 
-            // A non-digit option cannot be a TCP port, so signal invalid input rather than coercing to 0.
             return false;
         }
 
         $port = (int) $rawPort;
 
-        // User view: choose the dashboard view branch for this case.
+        // Ports outside 1-65535 can't be bound, so reject now instead of letting the bind fail later.
         if ($port < 1 || $port > 65535) {
             $output->writeln('<error>--port must be an integer from 1 to 65535.</error>');
 
-            // Ports outside 1-65535 are unbindable, so reject them instead of letting the bind fail later.
             return false;
         }
 
@@ -167,38 +155,33 @@ final class DashboardCommand extends Command
     }
 
     /**
-     * Parse and validate the dashboard scan timeout option.
+     * Validates `--scan-timeout`: 0 disables the per-scan limit, other values become a second budget.
      *
-      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
-      *
-     * @param InputInterface  $input - Source of the raw --scan-timeout option, expected to be a non-negative integer.
+     * @param InputInterface  $input  - Source of the raw --scan-timeout option, expected to be a non-negative integer.
      * @param OutputInterface $output - Destination for the validation error shown when the timeout is invalid.
      *
-     * @return float|false|null - Timeout seconds, null for disabled timeout, or false for invalid input.
+     * @return float|false|null - Timeout seconds; null when the user disabled it with 0, false when the value was invalid.
      */
     private function scanTimeout(InputInterface $input, OutputInterface $output): float|false|null
     {
         $rawTimeout = $input->getOption('scan-timeout');
 
-        // User view: choose the dashboard view branch for this case.
+        // A non-digit --scan-timeout can't be a timeout, so flag it invalid, distinct from the 0 "disable" value.
         if (!is_string($rawTimeout) || !ctype_digit($rawTimeout)) {
             $output->writeln('<error>--scan-timeout must be a non-negative integer.</error>');
 
-            // A non-digit option cannot be a timeout, so signal invalid input distinctly from the 0 disable value.
             return false;
         }
 
         $timeout = (int) $rawTimeout;
 
-        // Treat 0 as the documented "no timeout" sentinel (null); any other value becomes a per-scan second budget.
+        // The user passed 0, the documented "no timeout" sentinel (null); any other value is a per-scan second budget.
         return $timeout === 0 ? null : (float) $timeout;
     }
 
     /**
-     * Return the package-local gruff-php executable path.
+     * Resolves this package's own gruff-php binary, so dashboard scans run the same build as the server.
      *
-      * User flow: Supports dashboard requests, refreshes, and browser-visible state.
-      *
      * @return string - Absolute gruff-php binary path.
      */
     private function gruffBinary(): string

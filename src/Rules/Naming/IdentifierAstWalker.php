@@ -11,15 +11,18 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 
 /**
- * Scope-bounded AST walker used by IdentifierQualityRule. Stops at function-like
- * boundaries (closures, arrow functions, nested methods) so the parent scope's
- * locals do not pick up declarations from inner callables.
+ * Scope-bounded AST walker used by the identifier-quality rule to gather the descendant nodes inside a
+ * single function-like scope. Stops at function-like boundaries (closures, arrow functions, nested methods)
+ * so the parent scope's locals do not pick up declarations from inner callables.
+ *
+ * Keeping scopes separate is what lets the naming rules attribute a badly named variable to the exact method
+ * or closure that declared it, instead of blaming an unrelated outer function.
  */
 final readonly class IdentifierAstWalker
 {
     /**
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
+     * Collects every descendant across the given roots that satisfies the predicate.
+     *
      * @param list<Node>           $nodes - Roots to traverse.
      * @param callable(Node): bool $predicate - Predicate that selects matching descendants.
      *
@@ -29,7 +32,7 @@ final readonly class IdentifierAstWalker
     {
         $matches = [];
 
-        // User view: add each item that can appear in findings list.
+        // Walk each root scope in turn.
         foreach ($nodes as $node) {
             $this->collectMatchingNodes($node, $predicate, $matches);
         }
@@ -38,8 +41,8 @@ final readonly class IdentifierAstWalker
     }
 
     /**
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
+     * Recursively collects predicate-matching descendants, stopping at any nested scope.
+     *
      * @param Node                 $node - Current node to test; recursion stops at function-like boundaries.
      * @param callable(Node): bool $predicate - Predicate that selects matching descendants.
      * @param list<Node>           $matches - Output list of matching descendant nodes.
@@ -48,28 +51,25 @@ final readonly class IdentifierAstWalker
      */
     private function collectMatchingNodes(Node $node, callable $predicate, array &$matches): void
     {
-        // User view: choose the findings list branch for this case.
         if ($node instanceof ClassMethod || $node instanceof Function_ || $node instanceof Closure || $node instanceof ArrowFunction) {
             // Stop at a function-like boundary so inner-callable declarations stay out of the parent scope.
             return;
         }
 
-        // User view: choose the findings list branch for this case.
+        // Keep the node when it matches the caller's predicate.
         if ($predicate($node)) {
             $matches[] = $node;
         }
 
-        // User view: add each item that can appear in findings list.
+        // Descend into the node's own children, staying inside this scope.
         foreach ($this->childNodes($node) as $child) {
             $this->collectMatchingNodes($child, $predicate, $matches);
         }
     }
 
     /**
-     * List direct child nodes that can be recursively traversed.
+     * Lists the direct child nodes that can be recursively traversed.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Node $node - Parent node whose declared sub-node slots are flattened into traversable children.
      *
      * @return list<Node> - the node's immediate child Nodes in sub-node declaration order; empty when it has no Node-valued slots
@@ -78,7 +78,7 @@ final readonly class IdentifierAstWalker
     {
         $children = [];
 
-        // User view: add each item that can appear in findings list.
+        // Flatten every sub-node slot the parser exposes for this node.
         foreach ($node->getSubNodeNames() as $name) {
             $this->collectChildNodes($node->{$name}, $children);
         }
@@ -87,10 +87,8 @@ final readonly class IdentifierAstWalker
     }
 
     /**
-     * Append traversable child nodes to the current collection.
+     * Appends the traversable child nodes found in one sub-node slot.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param mixed      $subNode - One sub-node slot value: a Node, an array of them, or a scalar/null that is skipped.
      * @param list<Node> $children - Accumulator mutated in place; discovered child nodes are appended in traversal order.
      *
@@ -98,7 +96,6 @@ final readonly class IdentifierAstWalker
      */
     private function collectChildNodes(mixed $subNode, array &$children): void
     {
-        // User view: choose the findings list branch for this case.
         if ($subNode instanceof Node) {
             $children[] = $subNode;
 
@@ -106,13 +103,12 @@ final readonly class IdentifierAstWalker
             return;
         }
 
-        // User view: choose the findings list branch for this case.
         if (!is_array($subNode)) {
             // Scalars, strings, and null are leaf slot values with no traversable children, so skip them.
             return;
         }
 
-        // User view: add each item that can appear in findings list.
+        // An array slot can hold several children, so recurse into each entry.
         foreach ($subNode as $childSubNode) {
             $this->collectChildNodes($childSubNode, $children);
         }

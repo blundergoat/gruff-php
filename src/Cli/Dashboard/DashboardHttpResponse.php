@@ -8,7 +8,7 @@ namespace GruffPhp\Cli\Dashboard;
  * One HTTP reply the dashboard server is about to send back to the browser.
  *
  * Bundles the status, headers, and body for a single response so the responder can write it to the
- * socket in one place — the shape behind every page, scan result, or error the dashboard shows a user.
+ * socket in one place - the shape behind every page, scan result, or error the dashboard shows a user.
  */
 final readonly class DashboardHttpResponse
 {

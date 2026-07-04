@@ -22,7 +22,9 @@ use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
 /**
- * Detects data providers that return no test cases.
+ * Flags a test bound to a data provider that the AST proves yields no rows - an empty array, a body with
+ * no yields or returns - so PHPUnit silently skips the test and its coverage quietly vanishes. Runs per
+ * test class; only provably empty providers fire. Error severity, high confidence.
  */
 final readonly class EmptyDataProviderRule implements RuleInterface
 {
@@ -32,10 +34,8 @@ final readonly class EmptyDataProviderRule implements RuleInterface
     public const ID = 'test-quality.empty-data-provider';
 
     /**
-     * Describe the empty data provider rule.
+     * Describes the empty-data-provider rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -51,10 +51,8 @@ final readonly class EmptyDataProviderRule implements RuleInterface
     }
 
     /**
-     * Find tests linked to data providers that cannot yield any rows.
+     * Reports tests linked to data providers that cannot yield any rows.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -64,7 +62,7 @@ final readonly class EmptyDataProviderRule implements RuleInterface
     {
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Weigh every class declaration in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Class_::class) as $class) {
             array_push($findings, ...$this->classFindings($analysisUnit, $class));
         }
@@ -73,10 +71,8 @@ final readonly class EmptyDataProviderRule implements RuleInterface
     }
 
     /**
-     * Build empty-provider findings for one test class.
+     * Builds the empty-provider findings for one test class.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit that owns the test class.
      * @param Stmt\Class_  $class - Test class declaration being inspected.
      *
@@ -85,8 +81,7 @@ final readonly class EmptyDataProviderRule implements RuleInterface
     private function classFindings(AnalysisUnit $analysisUnit, Stmt\Class_ $class): array
     {
         $className = $class->name?->toString();
-        // User view: choose the findings list branch for this case.
-        // User view: missing data becomes the expected findings list state.
+        // An anonymous class has no name to report against.
         if ($className === null) {
             return [];
         }
@@ -94,9 +89,9 @@ final readonly class EmptyDataProviderRule implements RuleInterface
         $methodsByName = $this->methodsByLowerName($class);
         $findings      = [];
 
-        // User view: add each item that can appear in findings list.
+        // Inspect each test method for a data-provider binding.
         foreach ($class->getMethods() as $testMethod) {
-            // User view: choose the findings list branch for this case.
+            // Only real test methods can name a provider.
             if (!TestQualityNodeHelper::isTestMethod($testMethod)) {
                 continue;
             }
@@ -108,10 +103,8 @@ final readonly class EmptyDataProviderRule implements RuleInterface
     }
 
     /**
-     * Key class methods by lower-cased method name for case-insensitive provider lookup.
+     * Indexes class methods by lower-cased name for case-insensitive provider lookup.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Stmt\Class_ $class - Class declaration whose methods are indexed.
      *
      * @return array<string, Stmt\ClassMethod> - class methods keyed by lower-cased name
@@ -120,7 +113,7 @@ final readonly class EmptyDataProviderRule implements RuleInterface
     {
         $methodsByName = [];
 
-        // User view: add each item that can appear in findings list.
+        // Index every method so a provider name resolves case-insensitively.
         foreach ($class->getMethods() as $classMethod) {
             $methodsByName[strtolower($classMethod->name->toString())] = $classMethod;
         }
@@ -129,10 +122,8 @@ final readonly class EmptyDataProviderRule implements RuleInterface
     }
 
     /**
-     * Build empty-provider findings for one test method.
+     * Builds the empty-provider findings for one test method.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit                    $analysisUnit - Parsed unit that owns the test class.
      * @param string                          $className - Test class name used in messages and symbols.
      * @param Stmt\ClassMethod                $testMethod - Test method whose provider bindings are checked.
@@ -148,12 +139,10 @@ final readonly class EmptyDataProviderRule implements RuleInterface
     ): array {
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Weigh each provider the test names.
         foreach ($this->dataProviderNames($testMethod) as $providerName) {
-            // User view: missing data becomes a safe findings list default.
             $providerMethod = $methodsByName[strtolower($providerName)] ?? null;
-            // User view: choose the findings list branch for this case.
-            // User view: missing data becomes the expected findings list state.
+            // Only a resolvable, provably empty provider is a finding.
             if ($providerMethod === null || !$this->isProvablyEmpty($providerMethod)) {
                 continue;
             }
@@ -182,10 +171,8 @@ final readonly class EmptyDataProviderRule implements RuleInterface
     }
 
     /**
-     * List data provider method names referenced by test attributes.
+     * Lists the data-provider method names a test method references.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Stmt\ClassMethod $classMethod - Test method whose provider bindings are read - both the #[DataProvider]
      *                                      attribute and the legacy @dataProvider docblock annotation are scanned.
      *
@@ -195,29 +182,27 @@ final readonly class EmptyDataProviderRule implements RuleInterface
     {
         $names = [];
 
-        // User view: add each item that can appear in findings list.
+        // Read provider names from the modern DataProvider attributes.
         foreach ($classMethod->attrGroups as $group) {
-            // User view: add each item that can appear in findings list.
+            // One group can hold several attributes.
             foreach ($group->attrs as $attr) {
-                // User view: choose the findings list branch for this case.
+                // Only a DataProvider attribute names a provider.
                 if (strtolower($attr->name->getLast()) !== 'dataprovider') {
                     continue;
                 }
 
-                // User view: missing data becomes a safe findings list default.
                 $first = $attr->args[0] ?? null;
-                // User view: choose the findings list branch for this case.
+                // A string literal argument names the provider method.
                 if ($first instanceof Arg && $first->value instanceof Scalar\String_) {
                     $names[] = $first->value->value;
                 }
             }
         }
 
-        // User view: missing data becomes a safe findings list default.
         $doc = $classMethod->getDocComment()?->getText() ?? '';
-        // User view: choose the findings list branch for this case.
+        // Also read provider names from the legacy docblock annotation.
         if (preg_match_all('/@dataProvider\s+(\w+)/', $doc, $matches) > 0) {
-            // User view: add each item that can appear in findings list.
+            // Record every annotated provider name.
             foreach ($matches[1] as $name) {
                 $names[] = $name;
             }
@@ -228,24 +213,19 @@ final readonly class EmptyDataProviderRule implements RuleInterface
     }
 
     /**
-     * Determine whether a provider method is statically guaranteed to produce no rows.
+     * Reports whether a provider method is statically guaranteed to produce no rows.
      *
      * Conservative: only returns true when the AST proves emptiness; anything dynamic is treated as possibly non-empty
      * so the Error-severity finding cannot fire on a false positive.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param Stmt\ClassMethod $classMethod - Provider method to inspect by AST shape, without executing it.
      *
      * @return bool - True when the provider is empty by simple AST inspection.
      */
     private function isProvablyEmpty(Stmt\ClassMethod $classMethod): bool
     {
-        // User view: missing data becomes a safe findings list default.
         $stmts = $classMethod->stmts ?? [];
 
-        // User view: choose the findings list branch for this case.
-        // User view: an empty value becomes a clear findings list fallback.
         if ($stmts === []) {
             // Abstract or interface providers have no body to inspect; an empty body can yield nothing.
             return true;
@@ -254,8 +234,6 @@ final readonly class EmptyDataProviderRule implements RuleInterface
         $nodeFinder = new NodeFinder();
 
         $yields = $nodeFinder->find($stmts, static fn (Node $node): bool => $node instanceof Expr\Yield_ || $node instanceof Expr\YieldFrom);
-        // User view: choose the findings list branch for this case.
-        // User view: an empty value becomes a clear findings list fallback.
         if ($yields !== []) {
             // A generator provider yields rows we cannot enumerate statically, so we must assume it produces data.
             return false;
@@ -263,26 +241,22 @@ final readonly class EmptyDataProviderRule implements RuleInterface
 
         $returns = $nodeFinder->find($stmts, static fn (Node $node): bool => $node instanceof Stmt\Return_);
 
-        // User view: choose the findings list branch for this case.
-        // User view: an empty value becomes a clear findings list fallback.
         if ($returns === []) {
             // No yields and no returns means control falls off the end returning null: a provider yielding nothing.
             return true;
         }
 
-        // User view: add each item that can appear in findings list.
+        // Weigh each return the provider makes.
         foreach ($returns as $return) {
-            // User view: choose the findings list branch for this case.
+            // Guard the finder's loose node type before reading the returned value.
             if (!$return instanceof Stmt\Return_) {
                 continue;
             }
 
             $expr = $return->expr;
 
-            // User view: choose the findings list branch for this case.
+            // A returned array is empty only when it has no elements.
             if ($expr instanceof Expr\Array_) {
-                // User view: choose the findings list branch for this case.
-                // User view: an empty value becomes a clear findings list fallback.
                 if ($expr->items !== []) {
                     // A returned array literal with at least one element supplies real rows, so not empty.
                     return false;

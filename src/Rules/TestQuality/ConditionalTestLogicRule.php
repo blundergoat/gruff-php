@@ -17,7 +17,9 @@ use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Node\Stmt;
 
 /**
- * Detects branches in tests that make outcomes depend on local control flow.
+ * Flags an `if` statement inside a test body - branching means the test can take a path that quietly skips
+ * its assertions, so its outcome depends on control flow rather than a fixed scenario. Runs over every test;
+ * matrix-style suites can exempt paths via `ignoredPathPatterns`. Advisory, high confidence.
  */
 final readonly class ConditionalTestLogicRule implements RuleInterface
 {
@@ -27,10 +29,8 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
     public const ID = 'test-quality.conditional-logic';
 
     /**
-     * Describe the conditional test logic rule.
+     * Describes the conditional-test-logic rule for the registry and reports.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
@@ -48,10 +48,8 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
     }
 
     /**
-     * Find test cases that hide behavior behind conditionals.
+     * Reports test cases that hide behaviour behind conditionals.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
@@ -62,7 +60,6 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
         $definition = $this->definition();
         $settings   = $ruleContext->settingsFor($definition);
 
-        // User view: choose the findings list branch for this case.
         if ($this->isPathIgnored($analysisUnit->file->displayPath, $settings->stringListOption('ignoredPathPatterns'))) {
             // Project opted this path out of the rule, so emit nothing rather than reporting expected branching.
             return [];
@@ -70,9 +67,9 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
 
         $findings = [];
 
-        // User view: add each item that can appear in findings list.
+        // Weigh every test scope in the file.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
-            // User view: add each item that can appear in findings list.
+            // Every if statement inside the test body is a branch worth flagging.
             foreach (NodeIndex::descendantsOfAny($scope->node, [Stmt\If_::class]) as $conditional) {
                 $findings[] = new Finding(
                     ruleId:      self::ID,
@@ -93,10 +90,8 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
     }
 
     /**
-     * Check whether a project-configured path exemption applies.
+     * Reports whether a project-configured path exemption applies.
      *
-      * User flow: Decides whether this rule adds a finding to the user report.
-      *
      * @param string       $displayPath - Repository-relative path of the analysed file, used as the fnmatch subject.
      * @param list<string> $patterns - Glob patterns the caller configured to exempt known matrix-style test paths.
      *
@@ -106,9 +101,9 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
     {
         $normalizedPath = str_replace('\\', '/', $displayPath);
 
-        // User view: add each item that can appear in findings list.
+        // Weigh the display path against each configured exemption glob.
         foreach ($patterns as $pattern) {
-            // User view: choose the findings list branch for this case.
+            // A matching pattern opts this path out of the rule.
             if (fnmatch($pattern, $normalizedPath, FNM_NOESCAPE)) {
                 return true;
             }
