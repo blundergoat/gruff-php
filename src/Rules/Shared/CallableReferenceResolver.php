@@ -19,9 +19,7 @@ use PhpParser\Node\Stmt\Trait_;
  */
 final class CallableReferenceResolver
 {
-    /**
-     * Number of ordered values in PHP's callable-array form.
-     */
+    /** Number of runtime slots in PHP's callable-array form. */
     private const CALLABLE_PART_COUNT = 2;
 
     /**
@@ -159,6 +157,28 @@ final class CallableReferenceResolver
     }
 
     /**
+     * Report whether a keyed callable array can dynamically select any same-class method.
+     *
+     * @param Node $node - Candidate array node whose runtime method expression may be unknown.
+     * @param Class_|Trait_|Enum_ $classLike - Scope whose private methods could be selected.
+     *
+     * @return bool - True only for a valid callable key layout, same-class receiver, and computed method slot.
+     */
+    public static function hasUnresolvedSameClassCallableArrayMethod(
+        Node $node,
+        Class_|Trait_|Enum_ $classLike,
+    ): bool {
+        $expressions = self::callableArrayExpressions($node);
+
+        // Invalid arrays and literal methods do not create an unresolved dispatch boundary.
+        if ($expressions === null || $expressions['method'] instanceof Node\Scalar\String_) {
+            return false;
+        }
+
+        return self::isSameClassCallableTarget($expressions['target'], $classLike);
+    }
+
+    /**
      * Decide whether a callable-array receiver resolves to its surrounding declaration.
      *
      * @param Expr $target - First value from a two-element callable array.
@@ -246,28 +266,68 @@ final class CallableReferenceResolver
      */
     private static function callableArrayParts(Node $node): ?array
     {
-        // PHP callable arrays contain exactly a receiver and a method slot.
-        if (!$node instanceof Expr\Array_ || count($node->items) !== self::CALLABLE_PART_COUNT) {
-            return null;
-        }
+        $expressions = self::callableArrayExpressions($node);
 
-        $targetItem = $node->items[0] ?? null;
-        $methodItem = $node->items[1] ?? null;
-
-        // Array holes cannot form a usable callable and provide no receiver or method value.
-        if (!$targetItem instanceof Node\ArrayItem || !$methodItem instanceof Node\ArrayItem) {
+        // Invalid key layouts and incomplete values cannot name a usable callback.
+        if ($expressions === null) {
             return null;
         }
 
         // A computed method slot is intentionally left to the user's explicit symbol allowlist.
-        if (!$methodItem->value instanceof Node\Scalar\String_) {
+        if (!$expressions['method'] instanceof Node\Scalar\String_) {
             return null;
         }
 
         return [
-            'target' => $targetItem->value,
-            'method' => $methodItem->value->value,
+            'target' => $expressions['target'],
+            'method' => $expressions['method']->value,
         ];
+    }
+
+    /**
+     * Resolve PHP callable slots zero and one without assuming their source order.
+     *
+     * @param Node $node - Candidate literal array whose runtime key layout is simulated.
+     *
+     * @return array{target: Expr, method: Expr}|null - Receiver and method expressions, or null when keys cannot form a callable pair.
+     */
+    private static function callableArrayExpressions(Node $node): ?array
+    {
+        // PHP callable arrays have exactly two source items before their runtime keys are resolved.
+        if (!$node instanceof Expr\Array_ || count($node->items) !== self::CALLABLE_PART_COUNT) {
+            return null;
+        }
+
+        $slots = [];
+
+        // Apply PHP's integer, numeric-string, and automatic array-key behavior in source order.
+        foreach ($node->items as $arrayItem) {
+            // Unpacking can add runtime slots, so it cannot prove an exact two-slot callable.
+            if ($arrayItem->unpack) {
+                return null;
+            }
+
+            // An unkeyed item receives PHP's next automatic integer key.
+            if ($arrayItem->key === null) {
+                $slots[] = $arrayItem;
+                continue;
+            }
+
+            // Literal integer and string keys are the only key conversions proven without evaluation.
+            if (!$arrayItem->key instanceof Node\Scalar\Int_ && !$arrayItem->key instanceof Node\Scalar\String_) {
+                return null;
+            }
+
+            $slots[$arrayItem->key->value] = $arrayItem;
+        }
+
+        // PHP recognizes a callable pair only when runtime keys zero and one both survive exactly once.
+        if (count($slots) !== self::CALLABLE_PART_COUNT
+            || !isset($slots[0], $slots[1])) {
+            return null;
+        }
+
+        return ['target' => $slots[0]->value, 'method' => $slots[1]->value];
     }
 
     /**

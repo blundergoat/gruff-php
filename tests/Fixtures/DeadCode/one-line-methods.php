@@ -226,6 +226,7 @@ final class NamedCallbackBoundaryFixture
         $fromStatic = array_map([static::class, 'formatStaticRow'], $rows);
         $fromClass  = array_map([\Fixtures\DeadCode\NamedCallbackBoundaryFixture::class, 'formatClassRow'], $rows);
         $fromMagic  = array_map([__CLASS__, 'formatMagicRow'], $rows);
+        $fromReorderedKeys = array_map([1 => 'formatReorderedRow', 0 => self::class], $rows);
 
         return [
             ...$serialised,
@@ -234,6 +235,7 @@ final class NamedCallbackBoundaryFixture
             ...$fromStatic,
             ...$fromClass,
             ...$fromMagic,
+            ...$fromReorderedKeys,
         ];
     }
 
@@ -321,6 +323,18 @@ final class NamedCallbackBoundaryFixture
     {
         return trim($promptLabel);
     }
+
+    /**
+     * Format a row referenced through explicit callable keys written in reverse source order.
+     *
+     * @param string $promptLabel - Raw prompt label; an empty string remains empty.
+     *
+     * @return string - Trimmed row value; empty when the row contains only whitespace.
+     */
+    private static function formatReorderedRow(string $promptLabel): string
+    {
+        return trim($promptLabel);
+    }
 }
 
 /**
@@ -353,6 +367,7 @@ final class ConservativeCallbackBoundaryFixture
             'Fixtures\\DeadCode\\ConservativeCallbackBoundaryFixture::stringCallbackTarget',
             $rows,
         );
+        $callbackMetadata = ['class' => self::class, 'method' => 'metadataOnlyTarget'];
 
         return [
             ...$fromForeign,
@@ -361,6 +376,7 @@ final class ConservativeCallbackBoundaryFixture
             ...$fromMissing,
             ...$fromCollision,
             ...$stringCallbackRows,
+            ...array_values($callbackMetadata),
         ];
     }
 
@@ -432,6 +448,18 @@ final class ConservativeCallbackBoundaryFixture
      * @return string - Trimmed row value; empty when the row contains only whitespace.
      */
     private static function stringCallbackTarget(string $promptLabel): string
+    {
+        return trim($promptLabel);
+    }
+
+    /**
+     * Stay visible when an associative metadata record resembles a callback by value only.
+     *
+     * @param string $promptLabel - Raw prompt label; an empty string remains empty.
+     *
+     * @return string - Trimmed row value; empty when the row contains only whitespace.
+     */
+    private static function metadataOnlyTarget(string $promptLabel): string
     {
         return trim($promptLabel);
     }

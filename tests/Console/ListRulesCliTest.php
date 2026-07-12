@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GruffPhp\Tests\Console;
 
 use GruffPhp\Cli\Application;
+use GruffPhp\Rules\Naming\BooleanPrefixRule;
 use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
 
@@ -109,6 +110,40 @@ final class ListRulesCliTest extends CliTestCase
         self::assertArrayHasKey('falsePositiveShapes', $payload);
         self::assertIsArray($payload['escapeHatches']);
         self::assertNotEmpty($payload['escapeHatches']);
+    }
+
+    /**
+     * Verify Boolean detail JSON preserves the documented option semantics added for configuration users.
+     *
+     * @return void
+     */
+    public function testBooleanRuleDetailJsonKeepsDocumentedOptionSemantics(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            self::PROJECT_ROOT . '/bin/gruff-php',
+            'list-rules',
+            BooleanPrefixRule::ID,
+            '--format',
+            'json',
+        ]);
+        $process->run();
+
+        $payload = json_decode($process->getOutput(), associative: true, flags: JSON_THROW_ON_ERROR);
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        self::assertIsArray($payload);
+        self::assertSame(BooleanPrefixRule::ID, $payload['id'] ?? null);
+        self::assertSame(
+            [
+                'allowedPrefixes' => 'Leading predicate words accepted at camelCase or snake_case word boundaries.',
+                'stateAdjectiveAllowlist' => 'Exact whole Boolean names accepted for typed properties and parameters only.',
+                'stateSuffixAllowlist' => 'Final whole tokens accepted on Boolean names containing at least two tokens across methods, functions, properties, and parameters.',
+                'propositionVerbAllowlist' => 'Internal whole verbs accepted only with a subject token before and a context token after.',
+                'acceptedBooleanNames' => 'Exact case-insensitive Boolean names accepted across receivers for compatibility.',
+            ],
+            $payload['optionDescriptions'] ?? null,
+        );
     }
 
     /**

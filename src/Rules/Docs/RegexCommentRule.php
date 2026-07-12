@@ -13,6 +13,7 @@ use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Rules\Complexity\CyclomaticComplexityRule;
 use GruffPhp\Rules\Shared\NodeIndex;
+use GruffPhp\Rules\Shared\PhysicalCommentAttachment;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
@@ -91,6 +92,9 @@ final readonly class RegexCommentRule implements RuleInterface
     /** A complete preg_replace transformation has pattern, replacement, and subject arguments. */
     private const WHITESPACE_REPLACE_ARGUMENT_COUNT = 3;
 
+    /** Semantic parameter order used when positional and named preg_replace arguments are resolved. */
+    private const WHITESPACE_REPLACE_ARGUMENT_NAMES = ['pattern', 'replacement', 'subject'];
+
     /**
      * Describes the regex-comment rule for the registry and reports.
      *
@@ -149,7 +153,7 @@ final readonly class RegexCommentRule implements RuleInterface
             }
 
             // Documented calls produce no finding, whichever ordered coverage route explains them.
-            if ($this->coverageReason($sourceLines, $regexCallNode, $functionName, $functionNames) !== null) {
+            if ($this->coverageReason($sourceLines, $analysisUnit->source, $regexCallNode, $functionName, $functionNames) !== null) {
                 continue;
             }
 
@@ -178,6 +182,7 @@ final readonly class RegexCommentRule implements RuleInterface
      * Classifies the first deterministic documentation route covering one configured call.
      *
      * @param list<string> $sourceLines - Whole-file source split on newlines, indexed from zero.
+     * @param string       $source - Whole-file source used to prove physical owner-comment placement.
      * @param FuncCall     $regexCallNode - Configured call whose nearest user explanation is being resolved.
      * @param string       $functionName - Lowercase configured function name used by callable contracts.
      * @param list<string> $functionNames - Lowercase configured names used to bound broad callable contracts.
@@ -186,6 +191,7 @@ final readonly class RegexCommentRule implements RuleInterface
      */
     private function coverageReason(
         array $sourceLines,
+        string $source,
         FuncCall $regexCallNode,
         string $functionName,
         array $functionNames,
@@ -196,7 +202,7 @@ final readonly class RegexCommentRule implements RuleInterface
         }
 
         // Multiline formatting can move the call below a comment attached to its nearest statement.
-        if ($this->hasAdjacentStatementOwnerComment($sourceLines, $regexCallNode)) {
+        if ($this->hasAdjacentStatementOwnerComment($source, $regexCallNode)) {
             return 'statement_owner';
         }
 
@@ -216,12 +222,12 @@ final readonly class RegexCommentRule implements RuleInterface
     /**
      * Reports whether the call's nearest statement has an own-line comment directly above it.
      *
-     * @param list<string> $sourceLines - Whole-file source used to reject trailing same-line comments.
-     * @param FuncCall     $regexCallNode - Configured call whose statement owner is being checked.
+     * @param string   $source - Whole-file source used to reject trailing same-line comments.
+     * @param FuncCall $regexCallNode - Configured call whose statement owner is being checked.
      *
      * @return bool - True only for a physically adjacent comment belonging to the nearest statement.
      */
-    private function hasAdjacentStatementOwnerComment(array $sourceLines, FuncCall $regexCallNode): bool
+    private function hasAdjacentStatementOwnerComment(string $source, FuncCall $regexCallNode): bool
     {
         $statementOwner = $this->nearestStatementOwner($regexCallNode);
 
@@ -232,24 +238,8 @@ final readonly class RegexCommentRule implements RuleInterface
 
         // PHP-Parser may attach several comments, so inspect each while enforcing physical adjacency ourselves.
         foreach ($statementOwner->getComments() as $comment) {
-            // Only the comment ending immediately above the owner can explain this statement.
-            if ($comment->getEndLine() !== $statementOwner->getStartLine() - 1) {
-                continue;
-            }
-
-            $commentLine = $sourceLines[$comment->getStartLine() - 1] ?? null;
-
-            // A missing source line cannot prove that the token began on its own physical line.
-            if ($commentLine === null) {
-                continue;
-            }
-
-            $trimmedLine = ltrim($commentLine);
-
-            // Leading comment syntax proves only indentation appeared before the token, never prior code.
-            if (str_starts_with($trimmedLine, '//')
-                || str_starts_with($trimmedLine, '#')
-                || str_starts_with($trimmedLine, '/*')) {
+            // The shared physical check rejects blank separation and a previous statement's trailing comment.
+            if (PhysicalCommentAttachment::isOwnLineImmediatelyAbove($comment, $statementOwner, $source)) {
                 return true;
             }
         }
@@ -535,16 +525,15 @@ final readonly class RegexCommentRule implements RuleInterface
             return false;
         }
 
-        $patternArgument     = $regexCallNode->args[0];
-        $replacementArgument = $regexCallNode->args[1];
+        $arguments = $this->whitespaceReplaceArguments($regexCallNode);
 
-        // First and second slots must be real arguments, never first-class-callable placeholders.
-        if (!$patternArgument instanceof Arg || !$replacementArgument instanceof Arg) {
+        // Invalid, incomplete, or ambiguous argument mappings cannot prove the promised transformation.
+        if ($arguments === null) {
             return false;
         }
 
-        $pattern     = $patternArgument->value;
-        $replacement = $replacementArgument->value;
+        $pattern     = $arguments['pattern']->value;
+        $replacement = $arguments['replacement']->value;
 
         // Literal pattern and replacement values are required so no runtime guess enters suppression.
         if (!$pattern instanceof Scalar\String_ || !$replacement instanceof Scalar\String_) {
@@ -553,6 +542,62 @@ final readonly class RegexCommentRule implements RuleInterface
 
         return $pattern->value === self::WHITESPACE_COLLAPSE_PATTERN
             && $replacement->value === ' ';
+    }
+
+    /**
+     * Resolve the three required preg_replace arguments by their PHP parameter names.
+     *
+     * @param FuncCall $regexCallNode - Exact three-argument call whose positional and named arguments are mapped.
+     *
+     * @return array{pattern: Arg, replacement: Arg, subject: Arg}|null - Semantic arguments, or null for an invalid/unsupported mapping.
+     */
+    private function whitespaceReplaceArguments(FuncCall $regexCallNode): ?array
+    {
+        $resolvedArguments  = [];
+        $nextPositionalSlot = 0;
+        $hasNamedArgument   = false;
+
+        // Resolve source-order arguments into PHP's semantic parameter slots.
+        foreach ($regexCallNode->args as $argument) {
+            // Placeholders and unpacking cannot prove three exact static argument values.
+            if (!$argument instanceof Arg || $argument->unpack) {
+                return null;
+            }
+
+            // Positional arguments fill the next slot only before any named argument appears.
+            if ($argument->name === null) {
+                $argumentName = self::WHITESPACE_REPLACE_ARGUMENT_NAMES[$nextPositionalSlot] ?? null;
+
+                // A positional argument after named syntax, or beyond the known slots, is not a valid exact call.
+                if ($hasNamedArgument || $argumentName === null) {
+                    return null;
+                }
+
+                ++$nextPositionalSlot;
+            } else {
+                $hasNamedArgument = true;
+                $argumentName     = $argument->name->toString();
+            }
+
+            // Unknown or duplicate parameter names cannot establish the required transformation.
+            if (!in_array($argumentName, self::WHITESPACE_REPLACE_ARGUMENT_NAMES, true)
+                || isset($resolvedArguments[$argumentName])) {
+                return null;
+            }
+
+            $resolvedArguments[$argumentName] = $argument;
+        }
+
+        $pattern     = $resolvedArguments['pattern'] ?? null;
+        $replacement = $resolvedArguments['replacement'] ?? null;
+        $subject     = $resolvedArguments['subject'] ?? null;
+
+        // Every semantic slot must resolve to a concrete argument before the caller reads literal values.
+        if (!$pattern instanceof Arg || !$replacement instanceof Arg || !$subject instanceof Arg) {
+            return null;
+        }
+
+        return ['pattern' => $pattern, 'replacement' => $replacement, 'subject' => $subject];
     }
 
     /**

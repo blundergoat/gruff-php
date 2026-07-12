@@ -244,6 +244,52 @@ final class RegexCommentFixture
     }
 
     /**
+     * Return whitespace-folded text while naming each transformation input by its semantic role.
+     *
+     * @param string $message - User text whose repeated whitespace is collapsed.
+     *
+     * @return string - Folded text, or an empty string when replacement yields no text.
+     */
+    public function foldWhitespaceWithReorderedNamedArguments(string $message): string
+    {
+        $foldedMessage = (string) preg_replace(
+            subject: $message,
+            replacement: ' ',
+            pattern: '/\s+/',
+        );
+
+        // An empty fold remains empty so callers can distinguish it from visible comparison text.
+        if ($foldedMessage === '') {
+            return '';
+        }
+
+        return $foldedMessage;
+    }
+
+    /**
+     * Describe whitespace-folding intent around a call whose named values do not perform that fold.
+     *
+     * @param string $message - User text passed through the misleading replacement shape.
+     *
+     * @return string - Replaced text, or an empty string when replacement yields no text.
+     */
+    public function misleadingNamedWhitespaceFold(string $message): string
+    {
+        $replacedMessage = (string) preg_replace(
+            replacement: '/\s+/',
+            pattern: ' ',
+            subject: $message,
+        );
+
+        // An empty replacement remains empty rather than becoming synthetic visible text.
+        if ($replacedMessage === '') {
+            return '';
+        }
+
+        return $replacedMessage;
+    }
+
+    /**
      * Apply the fixture patterns before deciding whether text can be indexed.
      *
      * @param string $candidateName - Candidate text being classified and cleaned.

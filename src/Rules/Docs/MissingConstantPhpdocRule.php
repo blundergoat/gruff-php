@@ -13,6 +13,7 @@ use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Rules\Shared\NodeIndex;
+use GruffPhp\Rules\Shared\PhysicalCommentAttachment;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
@@ -181,7 +182,7 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
                 continue;
             }
 
-            $groupContext = $this->statementGroupContext($statement, $groupState);
+            $groupContext = $this->statementGroupContext($statement, $groupState, $analysisUnit->source);
             array_push(
                 $findings,
                 ...$this->classConstantStatementFindings(
@@ -204,14 +205,15 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
      *
      * @param ClassConst $statement - Constant declaration being classified.
      * @param array{commentKind: ?string, classification: ?string, endLine: ?int, nameCount: int, visibility: ?int} $groupState - Active preceding group; nullable fields mean no group is open.
+     * @param string $source - Whole-file source used to reject comments trailing an earlier declaration.
      *
      * @return array{attachedCommentKind: ?string, meaningfulLocalKind: ?string, attachedGroupClassification: ?string, groupClassification: ?string, groupCommentKind: ?string, namesBefore: int, inheritsGroup: bool, visibility: int} - Coverage context for each name and the next state transition.
      */
-    private function statementGroupContext(ClassConst $statement, array $groupState): array
+    private function statementGroupContext(ClassConst $statement, array $groupState, string $source): array
     {
-        $attachedCommentKind         = $this->localCommentKind($statement, false);
-        $meaningfulLocalKind         = $this->localCommentKind($statement, true);
-        $attachedGroupClassification = $this->groupLocalCommentClassification($statement);
+        $attachedCommentKind         = $this->localCommentKind($statement, false, $source);
+        $meaningfulLocalKind         = $this->localCommentKind($statement, true, $source);
+        $attachedGroupClassification = $this->groupLocalCommentClassification($statement, $source);
 
         // Treat implicit and explicit public declarations as the same visibility boundary.
         $statementVisibility = $statement->isPublic()
@@ -502,7 +504,7 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
                 line:           $statement->getStartLine(),
                 definition:     $definition,
                 analysisUnit:   $analysisUnit,
-                commentKind:    $this->localCommentKind($statement, meaningfulOnly: true),
+                commentKind:    $this->localCommentKind($statement, meaningfulOnly: true, source: $analysisUnit->source),
             );
         }
 
@@ -572,15 +574,16 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
      *
      * @param Node\Stmt $statement - Const or case statement whose attached leading comments are examined.
      * @param bool      $meaningfulOnly - Whether generic/restating comments should be ignored.
+     * @param string    $source - Whole-file source used to reject comments trailing earlier code.
      *
-     * @return string|null - `line`/`block` for an attached local comment, or null when absent or not meaningful enough
+     * @return string|null - `line`/`block` for an attached local comment, or null when absent or not meaningful enough.
      */
-    private function localCommentKind(Node\Stmt $statement, bool $meaningfulOnly): ?string
+    private function localCommentKind(Node\Stmt $statement, bool $meaningfulOnly, string $source): ?string
     {
         // Look at each comment the parser attached to the statement.
         foreach ($statement->getComments() as $comment) {
-            // Only a non-doc comment on the line directly above counts as attached to this constant.
-            if ($comment instanceof Doc || $comment->getEndLine() !== $statement->getStartLine() - 1) {
+            // Only a non-doc comment physically placed above the declaration can explain it.
+            if ($comment instanceof Doc || !PhysicalCommentAttachment::isOwnLineImmediatelyAbove($comment, $statement, $source)) {
                 continue;
             }
 
@@ -603,22 +606,21 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
      * Classifies an attached meaningful group comment for inheritance and budgeting.
      *
      * @param ClassConst $statement - Constant statement with an attached comment candidate.
+     * @param string $source - Whole-file source used to reject comments trailing earlier code.
      *
      * @return string|null - Shipped or bounded classification; null when no qualifying family comment exists.
      */
-    private function groupLocalCommentClassification(ClassConst $statement): ?string
+    private function groupLocalCommentClassification(ClassConst $statement, string $source): ?string
     {
         // Scan the attached comments for a meaningful group-style note.
         foreach ($statement->getComments() as $comment) {
-            // Only an immediately preceding non-doc comment qualifies.
-            if ($comment instanceof Doc || $comment->getEndLine() !== $statement->getStartLine() - 1) {
+            // Only an immediately preceding own-line non-doc comment qualifies.
+            if ($comment instanceof Doc || !PhysicalCommentAttachment::isOwnLineImmediatelyAbove($comment, $statement, $source)) {
                 continue;
             }
 
             // A meaningful comment that names a category can cover this declaration and constants that follow it.
-            if ($this->commentKind($comment) !== null
-                && $this->isMeaningfulCommentText($comment->getText(), $statement)
-            ) {
+            if ($this->commentKind($comment) !== null && $this->isMeaningfulCommentText($comment->getText(), $statement)) {
                 $classification = $this->groupCommentClassification($comment->getText());
 
                 // Keep looking when this useful comment describes one value rather than a family.

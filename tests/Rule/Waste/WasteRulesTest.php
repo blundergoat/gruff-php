@@ -312,6 +312,7 @@ final class WasteRulesTest extends TestCase
             'NamedCallbackBoundaryFixture::formatStaticRow()',
             'NamedCallbackBoundaryFixture::formatClassRow()',
             'NamedCallbackBoundaryFixture::formatMagicRow()',
+            'NamedCallbackBoundaryFixture::formatReorderedRow()',
         ];
         self::assertSame([], array_values(array_intersect($supportedCallbackSymbols, $symbols)));
 
@@ -321,6 +322,7 @@ final class WasteRulesTest extends TestCase
         self::assertContains('ConservativeCallbackBoundaryFixture::missingClassTarget()', $symbols);
         self::assertContains('ConservativeCallbackBoundaryFixture::shortNameCollisionTarget()', $symbols);
         self::assertContains('ConservativeCallbackBoundaryFixture::stringCallbackTarget()', $symbols);
+        self::assertContains('ConservativeCallbackBoundaryFixture::metadataOnlyTarget()', $symbols);
         self::assertContains('ParentDeclaredCallbackBoundaryFixture::parentDeclaredTarget()', $symbols);
 
         $ordinaryWrapperFindings = array_values(array_filter(

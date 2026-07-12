@@ -249,12 +249,8 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
                 return true;
             }
 
-            // A same-class callable array whose method slot is computed can invoke any private method here.
-            if ($node instanceof Expr\Array_
-                && count($node->items) === 2
-                && !$node->items[1]->value instanceof Node\Scalar\String_
-                && CallableReferenceResolver::isSameClassCallableTarget($node->items[0]->value, $classLike)
-            ) {
+            // A valid same-class callable array with a computed method can invoke any private method here.
+            if (CallableReferenceResolver::hasUnresolvedSameClassCallableArrayMethod($node, $classLike)) {
                 return true;
             }
         }

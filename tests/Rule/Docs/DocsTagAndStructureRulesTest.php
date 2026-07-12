@@ -230,6 +230,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
                 'RegexCommentFixture::isSeparatedRegexMatch()',
                 'RegexCommentFixture::isUndocumentedRegexMatch()',
                 'RegexCommentFixture::matchTheRouteUncommentedRegex()',
+                'RegexCommentFixture::misleadingNamedWhitespaceFold()',
                 'RegexCommentFixture::safelyValidateText()',
                 'RegexCommentFixture::unrelatedReplacementUnderWhitespaceContract()',
             ],
@@ -245,6 +246,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
                 'preg_match',
                 'preg_match',
                 'preg_match',
+                'preg_replace',
                 'preg_replace',
                 'preg_replace',
                 'preg_replace',
@@ -523,6 +525,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
                 'BLANK_AFTER_GROUP_PATTERN',
                 'METHOD_AFTER_GROUP_PATTERN',
                 'PHPDOC_AFTER_GROUP_PATTERN',
+                'TRAILING_COMMENT_FOLLOWER',
                 'SEARCH_RESULT_LIMIT',
                 'DATE_OF_BIRTH_PATTERN',
             ],
@@ -538,6 +541,8 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
         self::assertSame('low-quality', $byConstant['PRIVATE_USELESS_COMMENT']->metadata['commentQuality'] ?? null);
         self::assertStringContainsString('does not explain the constant\'s purpose', $byConstant['PRIVATE_USELESS_COMMENT']->message);
         self::assertArrayNotHasKey('commentKind', $byConstant['PRIVATE_DETACHED_COMMENT']->metadata);
+        self::assertSame('missing', $byConstant['TRAILING_COMMENT_FOLLOWER']->metadata['commentQuality'] ?? null);
+        self::assertArrayNotHasKey('commentKind', $byConstant['TRAILING_COMMENT_FOLLOWER']->metadata);
     }
 
     /**
