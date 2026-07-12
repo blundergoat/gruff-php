@@ -87,9 +87,15 @@ useful local documentation. By default, constants may use an immediately
 preceding meaningful `//`, `#`, or block comment when the prose is useful
 to a human reviewer and attached directly to the constant. A short
 consecutive constant group can share one local group comment when the
-comment names the group, such as supported roles or keys. Missing
-comments, detached comments, generic comments such as `// constant`, and
-comments that only duplicate the constant name still fire.
+comment names the group, such as supported roles or keys. Existing group
+words such as `keys` and `values` retain contiguous uncapped coverage. New
+`patterns` and `regexes` family comments cover at most five declared names,
+including multiple names in one statement; the sixth and later names need a
+new group comment, and a visibility change ends the bounded family. A mixed
+comment such as `keys and patterns` uses the shipped uncapped behavior.
+Missing comments, detached comments, structural boundaries, generic comments
+such as `// constant`, and comments that only duplicate the constant name
+still fire.
 
 Projects that publish constants as API documentation can opt back into
 PHPDoc for public/protected constants with

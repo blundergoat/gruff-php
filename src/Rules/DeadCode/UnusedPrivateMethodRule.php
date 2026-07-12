@@ -10,6 +10,7 @@ use GruffPhp\Results\Finding\Pillar;
 use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
+use GruffPhp\Rules\Shared\CallableReferenceResolver;
 use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
@@ -159,7 +160,8 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
 
         // Walk every node, resolving any call or callable array to a method name.
         foreach ($allNodes as $node) {
-            $name = $this->calledMethodName($node) ?? $this->callableArrayName($node, $classLike);
+            $name = $this->calledMethodName($node)
+                ?? CallableReferenceResolver::sameClassCallableArrayMethodName($node, $classLike);
 
             // Record any method name a call resolved to.
             if ($name !== null) {
@@ -251,36 +253,13 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
             if ($node instanceof Expr\Array_
                 && count($node->items) === 2
                 && !$node->items[1]->value instanceof Node\Scalar\String_
-                && $this->isSameClassCallableTarget($node->items[0]->value, $classLike)
+                && CallableReferenceResolver::isSameClassCallableTarget($node->items[0]->value, $classLike)
             ) {
                 return true;
             }
         }
 
         return false;
-    }
-
-    /**
-     * Reads the method name from a same-class callable array, or null when the node is not that shape.
-     *
-     * @param Node                $node - Arbitrary node from the class-like body; only callable arrays yield a name.
-     * @param Class_|Trait_|Enum_ $classLike - Declaring scope used to match `ClassName::class` callable targets.
-     *
-     * @return string|null - method name from a supported callable array, or null when the node is not that shape.
-     */
-    private function callableArrayName(Node $node, Class_|Trait_|Enum_ $classLike): ?string
-    {
-        if (!$node instanceof Expr\Array_) {
-            // Only array literals can spell callable-array syntax; nothing else qualifies.
-            return null;
-        }
-
-        // A same-class callable array's second slot names the method.
-        if ($this->isCallableReference($node, $classLike)) {
-            return $this->extractCallableName($node);
-        }
-
-        return null;
     }
 
     /**
@@ -329,120 +308,6 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
         }
 
         return $findings;
-    }
-
-    /**
-     * Reports whether an expression is a same-class `[target, 'method']` callable pair.
-     *
-     * @param Expr                $expr - Candidate expression to test for the callable pair.
-     * @param Class_|Trait_|Enum_ $classLike - Declaring scope used to match explicit class-name callables.
-     *
-     * @return bool - true for same-class `[$this, 'method']`, `[self::class, 'method']`, and `[__CLASS__, 'method']` pairs.
-     */
-    private function isCallableReference(Expr $expr, Class_|Trait_|Enum_ $classLike): bool
-    {
-        if (!$expr instanceof Expr\Array_ || count($expr->items) !== 2) {
-            // Only a two-element array can be the `[$this, 'method']` pair; anything else is not a reference.
-            return false;
-        }
-
-        // The method slot must be a string literal for the name to be knowable.
-        if (!$expr->items[1]->value instanceof Node\Scalar\String_) {
-            return false;
-        }
-
-        return $this->isSameClassCallableTarget($expr->items[0]->value, $classLike);
-    }
-
-    /**
-     * Reports whether a callable array's first element resolves to the declaring class itself.
-     *
-     * @param Expr                $first - First element of a two-item array literal.
-     * @param Class_|Trait_|Enum_ $classLike - Declaring scope used to match explicit class-name callables.
-     *
-     * @return bool - true for `$this`, `__CLASS__`, `self::class`, `static::class`, and the declaring class's own
-     *              `Name::class` reference; false for every other receiver expression.
-     */
-    private function isSameClassCallableTarget(Expr $first, Class_|Trait_|Enum_ $classLike): bool
-    {
-        // The object itself is always the defining class.
-        if ($first instanceof Expr\Variable && $first->name === 'this') {
-            return true;
-        }
-
-        // `[__CLASS__, 'method']` names the defining class, the same as `[self::class, 'method']`.
-        if ($first instanceof Node\Scalar\MagicConst\Class_) {
-            return true;
-        }
-
-        // Beyond those two shapes, only a `SomeName::class` constant can still target this class.
-        if (!$first instanceof Expr\ClassConstFetch
-            || !$first->name instanceof Node\Identifier
-            || strtolower($first->name->toString()) !== 'class'
-        ) {
-            return false;
-        }
-
-        // Dynamic class expressions carry no name to compare against.
-        if (!$first->class instanceof Node\Name) {
-            return false;
-        }
-
-        $shortName = strtolower($first->class->getLast());
-        // self::class and static::class resolve to the defining class by definition.
-        if ($shortName === 'self' || $shortName === 'static') {
-            return true;
-        }
-
-        // Compare fully-qualified names so a same-short-name class in another namespace cannot mask real dead code.
-        return strtolower($this->resolvedReferenceName($first->class)) === strtolower($this->declaringClassName($classLike));
-    }
-
-    /**
-     * Resolves a class-name node to its fully-qualified form, falling back to the written name.
-     *
-     * @param Node\Name $name - Class name node from a callable-array target.
-     *
-     * @return string - Resolved fully-qualified name, or the written name when no resolution is attached.
-     */
-    private function resolvedReferenceName(Node\Name $name): string
-    {
-        $resolved = $name->getAttribute('resolvedName');
-
-        return $resolved instanceof Node\Name ? $resolved->toString() : $name->toString();
-    }
-
-    /**
-     * Resolves the declaring class-like's fully-qualified name, or its short name when none is attached.
-     *
-     * @param Class_|Trait_|Enum_ $classLike - Declaring scope whose qualified name anchors callable comparisons.
-     *
-     * @return string - Fully-qualified declaration name, or the short name when no namespace is resolved.
-     */
-    private function declaringClassName(Class_|Trait_|Enum_ $classLike): string
-    {
-        $namespacedName = $classLike->namespacedName ?? null;
-
-        return $namespacedName instanceof Node\Name ? $namespacedName->toString() : $this->resolveClassName($classLike);
-    }
-
-    /**
-     * Reads the method name from a vetted `[target, 'method']` callable array, or null when absent.
-     *
-     * @param Expr $expr - Callable-array value already vetted by isCallableReference for the `[$this, 'method']` shape.
-     *
-     * @return string|null - the string in the array's second slot, or null when that slot is not a string literal.
-     */
-    private function extractCallableName(Expr $expr): ?string
-    {
-        if (!$expr instanceof Expr\Array_ || count($expr->items) !== 2) {
-            // Guard against callers that skipped the shape check; only a two-element array carries a name.
-            return null;
-        }
-
-        $second = $expr->items[1]->value;
-
-        return $second instanceof Node\Scalar\String_ ? $second->value : null;
     }
 
     /**

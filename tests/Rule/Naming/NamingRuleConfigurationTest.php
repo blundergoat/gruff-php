@@ -115,6 +115,19 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
         self::assertNotContains('silent', $names);
         self::assertNotContains('interactive', $names);
         self::assertNotContains('flag', $names);
+        self::assertContains('data', $names);
+        self::assertContains('result', $names);
+        self::assertContains('mode', $names);
+        self::assertContains('required', $names);
+        self::assertNotContains('focusModePayloadPresent', $names);
+        self::assertNotContains('printableTodayScheduleRequested', $names);
+        self::assertNotContains('bookingRequiresConfirmation', $names);
+        self::assertNotContains('limited', $names);
+        self::assertNotContains('printable', $names);
+        self::assertNotContains('paymentRequested', $names);
+        self::assertNotContains('assistantIntentRequiresContext', $names);
+        self::assertNotContains('resolved', $names);
+        self::assertNotContains('declineCodeExplanationRequested', $names);
     }
 
     /**
@@ -151,7 +164,7 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
         $settings = AnalysisConfig::fromRegistry($registry)->ruleSettings(BooleanPrefixRule::ID);
         $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
             BooleanPrefixRule::ID,
-            new RuleSettings(true, $settings->thresholds, array_merge($settings->options, ['acceptedBooleanNames' => ['active', 'check']])),
+            new RuleSettings(true, $settings->thresholds, array_merge($settings->options, ['acceptedBooleanNames' => ['ACTIVE', 'CHECK']])),
         );
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
         $symbols  = array_map(static fn($finding): ?string => $finding->symbol, array_filter(
@@ -163,6 +176,46 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
         self::assertNotContains('BooleanPrefixFixture::check()', $symbols);
         self::assertContains('BooleanPrefixFixture::enabled()', $symbols);
         self::assertContains('BooleanPrefixFixture::didRun()', $symbols);
+    }
+
+    /**
+     * Verify suffix, proposition, adjective, and exact-name configuration stay independent.
+     *
+     * @return void
+     */
+    public function testBooleanPrefixStateAndPropositionAllowlistsCanBeConfigured(): void
+    {
+        $registry = RuleRegistry::defaults();
+        $settings = AnalysisConfig::fromRegistry($registry)->ruleSettings(BooleanPrefixRule::ID);
+        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+            BooleanPrefixRule::ID,
+            new RuleSettings(true, $settings->thresholds, array_merge($settings->options, [
+                'stateSuffixAllowlist' => ['requested'],
+                'stateAdjectiveAllowlist' => ['active', 'required'],
+                'propositionVerbAllowlist' => ['requires'],
+                'acceptedBooleanNames' => ['status'],
+            ])),
+        );
+        $units = [
+            $this->parseFixture('boolean-prefix.php'),
+            $this->parseFixture('boolean-prefix-properties.php'),
+        ];
+        $findings        = $registry->analyse($units, new RuleContext(__DIR__ . '/../../..', $config));
+        $booleanFindings = array_values(array_filter(
+            $findings,
+            static fn($finding): bool => $finding->ruleId === BooleanPrefixRule::ID,
+        ));
+        $symbols = array_map(static fn($finding): ?string => $finding->symbol, $booleanFindings);
+        $names   = array_map(static fn($finding): mixed => $finding->metadata['identifierName'] ?? null, $booleanFindings);
+
+        self::assertNotContains('BooleanStateVocabularyFixture::paymentRequested()', $symbols);
+        self::assertNotContains('BooleanStateVocabularyFixture::assistantIntentRequiresContext()', $symbols);
+        self::assertNotContains('BooleanPrefixFixture::status()', $symbols);
+        self::assertContains('BooleanStateVocabularyFixture::valid()', $symbols);
+        self::assertContains('focusModePayloadPresent', $names);
+        self::assertNotContains('required', $names);
+        self::assertContains('resolved', $names);
+        self::assertNotContains('assistantIntentRequiresContext', $names);
     }
 
     /**

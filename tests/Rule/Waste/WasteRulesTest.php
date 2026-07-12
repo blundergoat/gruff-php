@@ -289,6 +289,43 @@ final class WasteRulesTest extends TestCase
     }
 
     /**
+     * Verify exact named callbacks are exempt while conservative callback shapes and ordinary wrappers remain visible.
+     *
+     * @return void
+     */
+    public function testOneLineMethodRulePreservesNamedCallbackBoundaries(): void
+    {
+        $findings = $this->analyseRule('one-line-methods.php', OneLineMethodRule::ID);
+        $symbols  = array_map(static fn($finding): ?string => $finding->symbol, $findings);
+
+        $supportedCallbackSymbols = [
+            'NamedCallbackBoundaryFixture::compareRows()',
+            'NamedCallbackBoundaryFixture::serialiseRow()',
+            'NamedCallbackBoundaryFixture::formatThisRow()',
+            'NamedCallbackBoundaryFixture::formatSelfRow()',
+            'NamedCallbackBoundaryFixture::formatStaticRow()',
+            'NamedCallbackBoundaryFixture::formatClassRow()',
+            'NamedCallbackBoundaryFixture::formatMagicRow()',
+        ];
+        self::assertSame([], array_values(array_intersect($supportedCallbackSymbols, $symbols)));
+
+        self::assertContains('ConservativeCallbackBoundaryFixture::foreignClassTarget()', $symbols);
+        self::assertContains('ConservativeCallbackBoundaryFixture::dynamicReceiverTarget()', $symbols);
+        self::assertContains('ConservativeCallbackBoundaryFixture::computedMethodTarget()', $symbols);
+        self::assertContains('ConservativeCallbackBoundaryFixture::missingClassTarget()', $symbols);
+        self::assertContains('ConservativeCallbackBoundaryFixture::shortNameCollisionTarget()', $symbols);
+        self::assertContains('ConservativeCallbackBoundaryFixture::stringCallbackTarget()', $symbols);
+        self::assertContains('ParentDeclaredCallbackBoundaryFixture::parentDeclaredTarget()', $symbols);
+
+        $ordinaryWrapperFindings = array_values(array_filter(
+            $findings,
+            static fn($finding): bool => $finding->symbol === 'PrivatePassThroughFixture::oneShotHelper()',
+        ));
+        self::assertCount(1, $ordinaryWrapperFindings);
+        self::assertSame('b785028ab40a58c3', $ordinaryWrapperFindings[0]->stableIdentity());
+    }
+
+    /**
      * Verify one line method rule skips pure expressions and no argument accessors.
      *
      * @return void

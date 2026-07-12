@@ -177,7 +177,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify preg_match calls require immediate explanatory comments.
+     * Verify call, statement-owner, match-arm, and narrow callable coverage while retained calls report.
      *
      * @return void
      */
@@ -188,23 +188,81 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
         $symbols = array_map(static fn ($finding): ?string => $finding->symbol, $findings);
         sort($symbols);
 
+        $functionNames = array_map(
+            static fn ($finding): mixed => $finding->metadata['function'] ?? null,
+            $findings,
+        );
+        sort($functionNames);
+
+        $messages = array_values(array_unique(array_map(static fn ($finding): string => $finding->message, $findings)));
+        sort($messages);
+
+        $ruleIds     = array_values(array_unique(array_map(static fn ($finding): string => $finding->ruleId, $findings)));
+        $severities  = array_values(array_unique(array_map(static fn ($finding): string => $finding->severity->value, $findings)));
+        $confidences = array_values(array_unique(array_map(static fn ($finding): string => $finding->confidence->value, $findings)));
+
+        $stableIdentities = [];
+        // Retained user-facing defects keep their line-independent identities across fixture expansion.
+        foreach ($findings as $finding) {
+            $stableIdentities[$finding->symbol ?? ''] = $finding->stableIdentity();
+        }
+
         self::assertSame(
             [
+                'RegexCommentFixture::hasBroadPatternsContract()',
+                'RegexCommentFixture::hasBroadPatternsContract()',
+                'RegexCommentFixture::hasNestedCallableWithoutInnerComment()',
+                'RegexCommentFixture::hasPreviousStatementCommentOnly()',
+                'RegexCommentFixture::hasTrailingPreviousStatementComment()',
                 'RegexCommentFixture::isSeparatedRegexMatch()',
                 'RegexCommentFixture::isUndocumentedRegexMatch()',
                 'RegexCommentFixture::matchTheRouteUncommentedRegex()',
+                'RegexCommentFixture::safelyValidateText()',
+                'RegexCommentFixture::unrelatedReplacementUnderWhitespaceContract()',
             ],
             $symbols,
         );
-        self::assertSame(
-            ['preg_match', 'preg_match', 'preg_match'],
-            array_map(static function ($finding): ?string {
-                $functionName = $finding->metadata['function'] ?? null;
 
-                // Normalise a missing or non-string metadata value to null so the comparison stays typed.
-                return is_string($functionName) ? $functionName : null;
-            }, $findings),
+        self::assertSame(
+            [
+                'preg_match',
+                'preg_match',
+                'preg_match',
+                'preg_match',
+                'preg_match',
+                'preg_match',
+                'preg_match',
+                'preg_replace',
+                'preg_replace',
+                'preg_replace',
+            ],
+            $functionNames,
         );
+
+        self::assertSame(
+            [
+                'preg_match() should have a one-line comment above it explaining what the regex checks.',
+                'preg_replace() should have a one-line comment above it explaining what the regex checks.',
+            ],
+            $messages,
+        );
+
+        self::assertSame(
+            [RegexCommentRule::ID],
+            $ruleIds,
+        );
+        self::assertSame(
+            ['advisory'],
+            $severities,
+        );
+        self::assertSame(
+            ['medium'],
+            $confidences,
+        );
+
+        self::assertSame('784f88c1d188c09f', $stableIdentities['RegexCommentFixture::isUndocumentedRegexMatch()'] ?? null);
+        self::assertSame('71689c0f4f3d8560', $stableIdentities['RegexCommentFixture::isSeparatedRegexMatch()'] ?? null);
+        self::assertSame('05f644587976fa95', $stableIdentities['RegexCommentFixture::matchTheRouteUncommentedRegex()'] ?? null);
     }
 
     /**
@@ -415,7 +473,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify constants accept useful local comments by default.
+     * Verify local comments cover only the intended constant and group shapes.
      *
      * @return void
      */
@@ -425,19 +483,27 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
 
         $byConstant = $this->constantFindingsByName($findings);
 
-        self::assertArrayNotHasKey('CSV_BYTE_CAP', $byConstant);
-        self::assertArrayNotHasKey('TELEMETRY_KEY', $byConstant);
-        self::assertArrayNotHasKey('ROLE_USER', $byConstant);
-        self::assertArrayNotHasKey('ROLE_ASSISTANT', $byConstant);
-        self::assertArrayHasKey('PLAIN_NO_COMMENT', $byConstant);
-        self::assertArrayHasKey('PRIVATE_NO_COMMENT', $byConstant);
-        self::assertArrayHasKey('PRIVATE_USELESS_COMMENT', $byConstant);
-        self::assertArrayHasKey('MAX_PAGES', $byConstant);
-        self::assertArrayHasKey('PRIVATE_TODO_COMMENT', $byConstant);
-        self::assertArrayHasKey('PRIVATE_DETACHED_COMMENT', $byConstant);
-        self::assertArrayNotHasKey('PRIVATE_CACHE_PREFIX', $byConstant);
-        self::assertArrayNotHasKey('PAYLOAD_VERSION_KEY', $byConstant);
-        self::assertArrayNotHasKey('IDEMPOTENCY_KEY', $byConstant);
+        self::assertSame(
+            [
+                'PLAIN_NO_COMMENT',
+                'PRIVATE_NO_COMMENT',
+                'PRIVATE_USELESS_COMMENT',
+                'MAX_PAGES',
+                'PRIVATE_TODO_COMMENT',
+                'PRIVATE_DETACHED_COMMENT',
+                'PATIENT_OVERFLOW_PATTERN',
+                'COMPARISON_ZETA_PATTERN',
+                'VISIBILITY_PROTECTED_PATTERN',
+                'SINGLE_MATCHER_FOLLOWER',
+                'RESET_AFTER_LOCAL_PATTERN',
+                'BLANK_AFTER_GROUP_PATTERN',
+                'METHOD_AFTER_GROUP_PATTERN',
+                'PHPDOC_AFTER_GROUP_PATTERN',
+                'SEARCH_RESULT_LIMIT',
+                'DATE_OF_BIRTH_PATTERN',
+            ],
+            array_keys($byConstant),
+        );
 
         $plain = $byConstant['PLAIN_NO_COMMENT'];
         self::assertArrayNotHasKey('commentKind', $plain->metadata);
@@ -469,6 +535,9 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
         self::assertArrayHasKey('TELEMETRY_KEY', $byConstant);
         self::assertArrayHasKey('ROLE_USER', $byConstant);
         self::assertArrayHasKey('ROLE_ASSISTANT', $byConstant);
+        self::assertArrayHasKey('PATIENT_NAME_PATTERN', $byConstant);
+        self::assertArrayHasKey('PATIENT_REFERENCE_PATTERN', $byConstant);
+        self::assertArrayHasKey('PATIENT_OVERFLOW_PATTERN', $byConstant);
         self::assertArrayNotHasKey('DOCUMENTED_TELEMETRY_KEY', $byConstant);
 
         $telemetry = $byConstant['TELEMETRY_KEY'];
@@ -478,6 +547,17 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
         self::assertStringContainsString('requires PHPDoc for exported constants', $telemetry->message);
 
         self::assertTrue($byConstant['ROLE_ASSISTANT']->metadata['groupedLocalComment'] ?? null);
+
+        $patientReference = $byConstant['PATIENT_REFERENCE_PATTERN'];
+        self::assertSame('line', $patientReference->metadata['commentKind'] ?? null);
+        self::assertSame('meaningful', $patientReference->metadata['commentQuality'] ?? null);
+        self::assertTrue($patientReference->metadata['requiresApiPhpdoc'] ?? null);
+        self::assertTrue($patientReference->metadata['groupedLocalComment'] ?? null);
+
+        $patientOverflow = $byConstant['PATIENT_OVERFLOW_PATTERN'];
+        self::assertSame('missing', $patientOverflow->metadata['commentQuality'] ?? null);
+        self::assertTrue($patientOverflow->metadata['requiresApiPhpdoc'] ?? null);
+        self::assertArrayNotHasKey('groupedLocalComment', $patientOverflow->metadata);
     }
 
     /**

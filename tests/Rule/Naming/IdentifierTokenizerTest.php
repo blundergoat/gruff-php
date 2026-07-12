@@ -26,6 +26,9 @@ final class IdentifierTokenizerTest extends TestCase
         self::assertSame(['http', 'response', 'code'], $identifierTokenizer->tokenize('HTTPResponseCode'));
         self::assertSame(['order', 'item', '2'], $identifierTokenizer->tokenize('order_item2'));
         self::assertSame(['temp'], $identifierTokenizer->tokenize('_temp'));
+        self::assertSame(['assistant', 'intent', 'requires', 'context'], $identifierTokenizer->tokenize('assistantIntentRequiresContext'));
+        self::assertSame(['focus', 'mode', 'payload', 'present'], $identifierTokenizer->tokenize('focus_mode_payload_present'));
+        self::assertSame(['unrequested'], $identifierTokenizer->tokenize('unrequested'));
     }
 
     /**

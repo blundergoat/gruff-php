@@ -133,6 +133,14 @@ final class NamingRulesTest extends NamingRuleTestCase
         // A prefix followed by a lowercase letter is no word boundary, so these still flag.
         self::assertContains('BooleanPrefixFixture::hasty()', $symbols);
         self::assertContains('BooleanPrefixFixture::isolate()', $symbols);
+        self::assertContains('BooleanStateVocabularyFixture::valid()', $symbols);
+        self::assertContains('BooleanStateVocabularyFixture::available()', $symbols);
+        self::assertContains('BooleanStateVocabularyFixture::resolved()', $symbols);
+        self::assertContains('BooleanStateVocabularyFixture::printable()', $symbols);
+        self::assertContains('BooleanStateVocabularyFixture::unrequested()', $symbols);
+        self::assertContains('BooleanStateVocabularyFixture::assistantRequirementsContext()', $symbols);
+        self::assertContains('BooleanStateVocabularyFixture::assistantIntentRequires()', $symbols);
+        self::assertContains('printable()', $symbols);
     }
 
     /**
@@ -169,6 +177,12 @@ final class NamingRulesTest extends NamingRuleTestCase
         // An underscore after the prefix is a snake_case word boundary, so these read as predicates.
         self::assertNotContains('BooleanPrefixFixture::has_note_been_actioned()', $symbols);
         self::assertNotContains('BooleanPrefixFixture::is_valid_state()', $symbols);
+        self::assertNotContains('BooleanStateVocabularyFixture::paymentRequested()', $symbols);
+        self::assertNotContains('BooleanStateVocabularyFixture::printableTodayScheduleRequested()', $symbols);
+        self::assertNotContains('BooleanStateVocabularyFixture::declineCodeExplanationRequested()', $symbols);
+        self::assertNotContains('BooleanStateVocabularyFixture::assistantIntentRequiresContext()', $symbols);
+        self::assertNotContains('report_requested()', $symbols);
+        self::assertNotContains('assistant_intent_requires_context()', $symbols);
     }
 
     /**
