@@ -6,8 +6,11 @@ namespace GruffPhp\Tests\Rule\Modernisation;
 
 use GruffPhp\Engine\Config\AnalysisConfig;
 use GruffPhp\Engine\Config\ConfigLoader;
+use GruffPhp\Results\Finding\Confidence;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Pillar;
+use GruffPhp\Results\Finding\RemediationAction;
+use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Engine\Parser\PhpFileParser;
 use GruffPhp\Rules\Modernisation\ConstructorPromotionCandidateRule;
@@ -93,6 +96,41 @@ final class ModernisationRulesTest extends TestCase
         self::assertRuleCount(MixedTypeOveruseRule::ID, 1, $findings);
         self::assertRuleCount(NamedArgumentOpportunityRule::ID, 4, $findings);
         self::assertRuleCount(ForbiddenGlobalAccessRule::ID, 2, $findings);
+
+        $namedArgumentFindings = array_values(array_filter(
+            $findings,
+            static fn(Finding $finding): bool => $finding->ruleId === NamedArgumentOpportunityRule::ID,
+        ));
+        self::assertSame(
+            [RemediationAction::Consider->value],
+            array_values(array_unique(array_map(
+                static fn(Finding $finding): string => is_string($finding->metadata['remediationAction'] ?? null)
+                    ? $finding->metadata['remediationAction']
+                    : '',
+                $namedArgumentFindings,
+            ))),
+        );
+        self::assertSame(
+            [Severity::Advisory->value],
+            array_values(array_unique(array_map(
+                static fn(Finding $finding): string => $finding->severity->value,
+                $namedArgumentFindings,
+            ))),
+        );
+        self::assertSame(
+            [Confidence::Low->value],
+            array_values(array_unique(array_map(
+                static fn(Finding $finding): string => $finding->confidence->value,
+                $namedArgumentFindings,
+            ))),
+        );
+        self::assertSame(
+            ['Consider named arguments only for stable APIs where parameter names are part of the intended contract; gruff-php reports only.'],
+            array_values(array_unique(array_map(
+                static fn(Finding $finding): ?string => $finding->remediation,
+                $namedArgumentFindings,
+            ))),
+        );
     }
 
     /**

@@ -6,6 +6,7 @@ namespace GruffPhp\Tests\Rule\Naming;
 
 use GruffPhp\Engine\Config\AnalysisConfig;
 use GruffPhp\Engine\Config\RuleSettings;
+use GruffPhp\Results\Finding\RemediationAction;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\PhpFileParser;
 use GruffPhp\Rules\Naming\BooleanPrefixRule;
@@ -121,10 +122,21 @@ final class NamingRulesTest extends NamingRuleTestCase
     public function testBooleanPrefixMissing(): void
     {
         $findings = $this->analyseRule('boolean-prefix.php', BooleanPrefixRule::ID);
+        $symbols  = array_map(static fn($finding) => $finding->symbol, $findings);
+        $actions  = array_values(array_unique(array_map(
+            static fn($finding): string => is_string($finding->metadata['remediationAction'] ?? null)
+                ? $finding->metadata['remediationAction']
+                : '',
+            $findings,
+        )));
+        $configurationKeys = array_values(array_unique(array_map(
+            static fn($finding): string => is_string($finding->metadata['configurationKey'] ?? null)
+                ? $finding->metadata['configurationKey']
+                : '',
+            $findings,
+        )));
 
         self::assertNotSame([], $findings);
-
-        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
         self::assertContains('BooleanPrefixFixture::active()', $symbols);
         self::assertContains('BooleanPrefixFixture::enabled()', $symbols);
         self::assertContains('BooleanPrefixFixture::status()', $symbols);
@@ -141,6 +153,12 @@ final class NamingRulesTest extends NamingRuleTestCase
         self::assertContains('BooleanStateVocabularyFixture::assistantRequirementsContext()', $symbols);
         self::assertContains('BooleanStateVocabularyFixture::assistantIntentRequires()', $symbols);
         self::assertContains('printable()', $symbols);
+
+        self::assertSame([RemediationAction::Consider->value], $actions);
+        self::assertSame(
+            ['rules.naming.boolean-prefix.options.acceptedBooleanNames'],
+            $configurationKeys,
+        );
     }
 
     /**

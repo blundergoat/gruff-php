@@ -9,6 +9,7 @@ use GruffPhp\Results\Diff\DiffResult;
 use GruffPhp\Results\Finding\Confidence;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Pillar;
+use GruffPhp\Results\Finding\RemediationAction;
 use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Results\Mutation\InfectionMutant;
@@ -62,7 +63,10 @@ final class SarifReporterTest extends TestCase
             symbol:           'run',
             remediation:      'Avoid eval.',
             secondaryPillars: [Pillar::Maintainability],
-            metadata:         ['target' => 'eval'],
+            metadata:         array_merge(
+                ['target' => 'eval'],
+                RemediationAction::Consider->metadata('allowlists.acceptedAbbreviations'),
+            ),
         );
         $findings = [$finding];
         $score    = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive());
@@ -122,12 +126,20 @@ final class SarifReporterTest extends TestCase
         self::assertArrayNotHasKey('primary', $partialFingerprints);
         $resultProperties = $this->stringKeyedArray($result, 'properties');
         self::assertSame(['maintainability'], $this->listValue($resultProperties, 'secondaryPillars'));
-        self::assertSame('eval', $this->stringKeyedArray($resultProperties, 'metadata')['target'] ?? null);
+        $resultMetadata = $this->stringKeyedArray($resultProperties, 'metadata');
+        self::assertSame('eval', $resultMetadata['target'] ?? null);
+        self::assertSame('CONSIDER', $resultMetadata['remediationAction'] ?? null);
+        self::assertSame('allowlists.acceptedAbbreviations', $resultMetadata['configurationKey'] ?? null);
         $runProperties = $this->stringKeyedArray($sarifRun, 'properties');
         self::assertSame('gruff.analysis.v2', $this->stringValue($runProperties, 'gruffSchemaVersion'));
         self::assertSame($score->composite->score, $runProperties['score'] ?? null);
         self::assertSame($score->composite->letter, $runProperties['grade'] ?? null);
-        self::assertSame('gruff.analysis.v2', $this->stringValue($this->decode((new JsonReporter())->render($report)), 'schemaVersion'));
+        $jsonPayload = $this->decode((new JsonReporter())->render($report));
+        self::assertSame('gruff.analysis.v2', $this->stringValue($jsonPayload, 'schemaVersion'));
+        $jsonFinding  = $this->stringKeyedArray($this->listValue($jsonPayload, 'findings')[0] ?? null);
+        $jsonMetadata = $this->stringKeyedArray($jsonFinding, 'metadata');
+        self::assertSame('CONSIDER', $jsonMetadata['remediationAction'] ?? null);
+        self::assertSame('allowlists.acceptedAbbreviations', $jsonMetadata['configurationKey'] ?? null);
         self::assertArrayNotHasKey('codeFlows', $result);
         self::assertArrayNotHasKey('threadFlows', $result);
         self::assertArrayNotHasKey('fixes', $result);

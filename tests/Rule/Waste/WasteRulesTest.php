@@ -7,6 +7,7 @@ namespace GruffPhp\Tests\Rule\Waste;
 use GruffPhp\Engine\Config\AnalysisConfig;
 use GruffPhp\Engine\Config\RuleSettings;
 use GruffPhp\Results\Finding\Pillar;
+use GruffPhp\Results\Finding\RemediationAction;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\PhpFileParser;
 use GruffPhp\Rules\Contracts\RuleContext;
@@ -286,6 +287,11 @@ final class WasteRulesTest extends TestCase
         self::assertSame(Severity::Advisory, $rowsFinding->severity);
         self::assertSame(Pillar::Maintainability, $rowsFinding->pillar);
         self::assertSame('return', $rowsFinding->metadata['statementKind']);
+        self::assertSame(RemediationAction::Apply->value, $rowsFinding->metadata['remediationAction'] ?? null);
+        self::assertSame(
+            'rules.waste.one-line-method.options.allowedSymbols',
+            $rowsFinding->metadata['configurationKey'] ?? null,
+        );
     }
 
     /**

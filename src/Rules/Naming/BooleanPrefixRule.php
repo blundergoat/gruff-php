@@ -7,6 +7,7 @@ namespace GruffPhp\Rules\Naming;
 use GruffPhp\Results\Finding\Confidence;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Pillar;
+use GruffPhp\Results\Finding\RemediationAction;
 use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
@@ -16,14 +17,18 @@ use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Node;
+use PhpParser\Node\Expr\ArrowFunction;
+use PhpParser\Node\Expr\Closure;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\Node\NullableType;
+use PhpParser\Node\Param;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 use PhpParser\Node\Stmt\Property;
 use PhpParser\Node\UnionType;
+use PhpParser\Modifiers;
 
 /**
  * Flags a bool-returning function or method, or a typed bool property or parameter, whose name does not read
@@ -35,6 +40,9 @@ use PhpParser\Node\UnionType;
  */
 final readonly class BooleanPrefixRule implements RuleInterface
 {
+    /** Full configuration path for intentional caller-visible Boolean names. */
+    private const ACCEPTED_NAMES_CONFIGURATION_KEY = 'rules.naming.boolean-prefix.options.acceptedBooleanNames';
+
     /**
      * Minimum token count for a subject, proposition verb, and trailing context.
      */
@@ -200,6 +208,7 @@ final readonly class BooleanPrefixRule implements RuleInterface
                     kind:         'property',
                     name:         $name,
                     symbol:       '$' . $name,
+                    action:       $property->isPrivate() ? RemediationAction::Apply : RemediationAction::Consider,
                 );
             }
         }
@@ -248,6 +257,8 @@ final readonly class BooleanPrefixRule implements RuleInterface
             return [];
         }
 
+        $action = $this->functionLikeAction($node);
+
         return [
             new Finding(
                 ruleId:      $definition->id,
@@ -259,7 +270,10 @@ final readonly class BooleanPrefixRule implements RuleInterface
                 tier:        $definition->tier,
                 confidence:  $definition->confidence,
                 symbol:      $symbol,
-                remediation: 'Rename to use a boolean prefix, e.g. isActive(), hasPermission(). If a project-specific prefix is intentional, add it to `rules.naming.boolean-prefix.options.allowedPrefixes`; to accept a caller-visible name without renaming it, add the exact name to `rules.naming.boolean-prefix.options.acceptedBooleanNames` in `.gruff-php.yaml`.',
+                remediation: $action === RemediationAction::Apply
+                    ? 'Rename to use a boolean prefix, e.g. isActive(), hasPermission().'
+                    : 'Rename to use a boolean prefix, e.g. isActive(), hasPermission(). If a project-specific prefix is intentional, add it to `rules.naming.boolean-prefix.options.allowedPrefixes`; to accept a caller-visible name without renaming it, add the exact name to `rules.naming.boolean-prefix.options.acceptedBooleanNames` in `.gruff-php.yaml`.',
+                metadata:    $action->metadata(self::ACCEPTED_NAMES_CONFIGURATION_KEY),
             ),
         ];
     }
@@ -318,6 +332,7 @@ final readonly class BooleanPrefixRule implements RuleInterface
                 kind:         $param->flags === 0 ? 'parameter' : 'property',
                 name:         $name,
                 symbol:       $symbol,
+                action:       $this->parameterAction($scope, $param),
             );
         }
 
@@ -333,6 +348,7 @@ final readonly class BooleanPrefixRule implements RuleInterface
      * @param string         $kind - Identifier kind label, either "property" or "parameter".
      * @param string         $name - Identifier name without the leading dollar sign.
      * @param string|null    $symbol - Owning callable symbol, or null for a bare property.
+     * @param RemediationAction $action - Direct fix for private/local declarations, or review for caller-visible declarations.
      *
      * @return Finding - Finding for a boolean identifier without clear predicate naming.
      */
@@ -343,6 +359,7 @@ final readonly class BooleanPrefixRule implements RuleInterface
         string $kind,
         string $name,
         ?string $symbol,
+        RemediationAction $action,
     ): Finding {
         return new Finding(
             ruleId:      $definition->id,
@@ -354,12 +371,55 @@ final readonly class BooleanPrefixRule implements RuleInterface
             tier:        $definition->tier,
             confidence:  $definition->confidence,
             symbol:      $symbol,
-            remediation: 'Rename to use a boolean prefix such as is/has/can, configure stateAdjectiveAllowlist for clear state adjectives, or add a caller-visible name to acceptedBooleanNames to accept it without renaming.',
-            metadata:    [
-                'identifierKind' => $kind,
-                'identifierName' => $name,
-            ],
+            remediation: $action === RemediationAction::Apply
+                ? 'Rename to use a boolean prefix such as is/has/can or configure stateAdjectiveAllowlist for a clear local state adjective.'
+                : 'Rename to use a boolean prefix such as is/has/can, configure stateAdjectiveAllowlist for clear state adjectives, or add a caller-visible name to acceptedBooleanNames to accept it without renaming.',
+            metadata:    array_merge(
+                [
+                    'identifierKind' => $kind,
+                    'identifierName' => $name,
+                ],
+                $action->metadata(self::ACCEPTED_NAMES_CONFIGURATION_KEY),
+            ),
         );
+    }
+
+    /**
+     * Classifies a named Boolean callable by whether renaming can break callers.
+     *
+     * @param ClassMethod|Function_ $node - Method or function that produced the finding.
+     *
+     * @return RemediationAction - APPLY for private methods; CONSIDER for public/protected methods and functions.
+     */
+    private function functionLikeAction(ClassMethod|Function_ $node): RemediationAction
+    {
+        return $node instanceof ClassMethod && $node->isPrivate()
+            ? RemediationAction::Apply
+            : RemediationAction::Consider;
+    }
+
+    /**
+     * Classifies a Boolean parameter using promotion flags and its owning callable.
+     *
+     * @param FunctionLikeScope $scope - Callable that owns the parameter.
+     * @param Param             $param - Parameter declaration, including promoted-property flags.
+     *
+     * @return RemediationAction - APPLY for private promoted state and local/private callables; otherwise CONSIDER.
+     */
+    private function parameterAction(FunctionLikeScope $scope, Param $param): RemediationAction
+    {
+        // A promoted parameter is stored state, so its own declared visibility decides compatibility risk.
+        if ($param->isPromoted()) {
+            return ($param->flags & Modifiers::PRIVATE) !== 0
+                ? RemediationAction::Apply
+                : RemediationAction::Consider;
+        }
+
+        return $scope->node instanceof Closure
+            || $scope->node instanceof ArrowFunction
+            || ($scope->node instanceof ClassMethod && $scope->node->isPrivate())
+                ? RemediationAction::Apply
+                : RemediationAction::Consider;
     }
 
     /**

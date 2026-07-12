@@ -7,6 +7,7 @@ namespace GruffPhp\Rules\Waste;
 use GruffPhp\Results\Finding\Confidence;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Pillar;
+use GruffPhp\Results\Finding\RemediationAction;
 use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
@@ -42,6 +43,9 @@ use PhpParser\NodeFinder;
  */
 final readonly class OneLineMethodRule implements RuleInterface
 {
+    /** Full configuration path for intentional thin-method symbols. */
+    private const ALLOWED_SYMBOLS_CONFIGURATION_KEY = 'rules.waste.one-line-method.options.allowedSymbols';
+
     /**
      * Stable identifier for the one-line method rule.
      */
@@ -197,6 +201,7 @@ final readonly class OneLineMethodRule implements RuleInterface
                     'method' => $classMethod->name->toString(),
                     'parameterCount' => count($classMethod->params),
                     'statementKind' => $statement instanceof Return_ ? 'return' : 'expression',
+                    ...RemediationAction::Apply->metadata(self::ALLOWED_SYMBOLS_CONFIGURATION_KEY),
                 ],
             );
         }

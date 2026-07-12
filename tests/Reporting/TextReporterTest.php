@@ -8,6 +8,7 @@ use GruffPhp\Engine\Analysis\AnalysisReport;
 use GruffPhp\Results\Finding\Confidence;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Pillar;
+use GruffPhp\Results\Finding\RemediationAction;
 use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Output\Reporter\TextReporter;
@@ -50,13 +51,33 @@ final class TextReporterTest extends TestCase
     }
 
     /**
+     * Verify action metadata does not alter the family-frozen text finding block.
+     *
+     * @return void
+     */
+    public function testRemediationActionMetadataDoesNotChangeTextOutput(): void
+    {
+        $reporter   = new TextReporter();
+        $plain      = $reporter->render($this->reportWithFindings(1));
+        $classified = $reporter->render($this->reportWithFindings(
+            1,
+            RemediationAction::Apply->metadata(),
+        ));
+
+        self::assertSame($plain, $classified);
+        self::assertStringNotContainsString('remediationAction', $classified);
+        self::assertStringNotContainsString('APPLY', $classified);
+    }
+
+    /**
      * Build a synthetic AnalysisReport with the requested number of findings.
      *
-     * @param int $findingCount - Number of synthetic findings to embed.
+     * @param int                  $findingCount - Number of synthetic findings to embed.
+     * @param array<string, bool|float|int|string|null|array<array-key, bool|float|int|string|null>> $metadata - Machine-readable fields attached to every synthetic finding; empty keeps findings unclassified.
      *
      * @return AnalysisReport - report carrying exactly $findingCount advisory findings over one discovered/parsed file, exit code 0
      */
-    private function reportWithFindings(int $findingCount): AnalysisReport
+    private function reportWithFindings(int $findingCount, array $metadata = []): AnalysisReport
     {
         $findings = [];
         for ($index = 0; $index < $findingCount; $index++) {
@@ -69,6 +90,7 @@ final class TextReporterTest extends TestCase
                 pillar:     Pillar::Documentation,
                 tier:       RuleTier::V01,
                 confidence: Confidence::High,
+                metadata:   $metadata,
             );
         }
 

@@ -7,6 +7,7 @@ namespace GruffPhp\Tests\Finding;
 use GruffPhp\Results\Finding\Confidence;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Pillar;
+use GruffPhp\Results\Finding\RemediationAction;
 use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
 use PHPUnit\Framework\TestCase;
@@ -60,6 +61,40 @@ final class FindingTest extends TestCase
                          ], $finding->toArray());
         self::assertMatchesRegularExpression('/^[a-f0-9]{16}$/', $finding->fingerprint());
         self::assertMatchesRegularExpression('/^[a-f0-9]{16}$/', $finding->stableIdentity());
+    }
+
+    /**
+     * Verify remediation metadata round-trips without becoming part of finding identity.
+     *
+     * @return void
+     */
+    public function testRemediationMetadataIsAdditiveAndIdentityNeutral(): void
+    {
+        $plain      = $this->finding(line: 10, symbol: 'Example::doWork()');
+        $serialized = $plain->toArray();
+        $serialized['metadata'] = RemediationAction::Consider->metadata(
+            'rules.naming.boolean-prefix.options.acceptedBooleanNames',
+        );
+        $classified = Finding::fromArray($serialized);
+
+        self::assertSame(
+            ['remediationAction' => 'APPLY'],
+            RemediationAction::Apply->metadata(),
+        );
+        self::assertSame(
+            ['remediationAction' => 'CONFIGURE'],
+            RemediationAction::Configure->metadata(),
+        );
+        self::assertSame(
+            [
+                'remediationAction' => 'CONSIDER',
+                'configurationKey' => 'rules.naming.boolean-prefix.options.acceptedBooleanNames',
+            ],
+            $classified->metadata,
+        );
+        self::assertSame($plain->fingerprint(), $classified->fingerprint());
+        self::assertSame($plain->stableIdentity(), $classified->stableIdentity());
+        self::assertSame($classified->metadata, Finding::fromArray($classified->toArray())->metadata);
     }
 
     /**

@@ -50,7 +50,7 @@ final class RuleRegressionSnapshotTest extends TestCase
         self::assertCount(176, $units);
         self::assertCount(2736, $findings);
         self::assertSame(
-            '0275d0162949db5de301fcde16d3671777f987b5a23b9cd860e312e146f3915a',
+            '28945fe1971b1cc85a30bb093799d7acd0175c058c4aa726dc438f06f75a7e54',
             hash('sha256', $json),
         );
     }

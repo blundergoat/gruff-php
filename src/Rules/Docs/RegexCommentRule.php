@@ -7,6 +7,7 @@ namespace GruffPhp\Rules\Docs;
 use GruffPhp\Results\Finding\Confidence;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Pillar;
+use GruffPhp\Results\Finding\RemediationAction;
 use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
@@ -37,6 +38,9 @@ use PhpParser\NodeFinder;
  */
 final readonly class RegexCommentRule implements RuleInterface
 {
+    /** Full configuration path for the set of functions treated as regex matchers. */
+    private const FUNCTION_NAMES_CONFIGURATION_KEY = 'rules.docs.regex-comment.options.functionNames';
+
     /** Stable identifier for regex-comment findings. */
     public const ID = 'docs.regex-comment';
 
@@ -160,7 +164,10 @@ final readonly class RegexCommentRule implements RuleInterface
                 confidence:  $definition->confidence,
                 symbol:      $this->symbol($regexCallNode),
                 remediation: sprintf('Add a one-line comment immediately above the %s() call explaining the regex intent. If this function is not a regex matcher in your codebase, remove it from `rules.docs.regex-comment.options.functionNames` in `.gruff-php.yaml`.', $functionName),
-                metadata:    ['function' => $functionName],
+                metadata:    array_merge(
+                    ['function' => $functionName],
+                    RemediationAction::Apply->metadata(self::FUNCTION_NAMES_CONFIGURATION_KEY),
+                ),
             );
         }
 

@@ -6,6 +6,7 @@ namespace GruffPhp\Tests\Rule\Docs;
 
 use GruffPhp\Engine\Config\AnalysisConfig;
 use GruffPhp\Engine\Config\RuleSettings;
+use GruffPhp\Results\Finding\RemediationAction;
 use GruffPhp\Rules\Docs\BarePhpdocTagsRule;
 use GruffPhp\Rules\Docs\MissingClassPhpdocRule;
 use GruffPhp\Rules\Docs\MissingConstantPhpdocRule;
@@ -200,6 +201,18 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
         $ruleIds     = array_values(array_unique(array_map(static fn ($finding): string => $finding->ruleId, $findings)));
         $severities  = array_values(array_unique(array_map(static fn ($finding): string => $finding->severity->value, $findings)));
         $confidences = array_values(array_unique(array_map(static fn ($finding): string => $finding->confidence->value, $findings)));
+        $actions     = array_values(array_unique(array_map(
+            static fn ($finding): string => is_string($finding->metadata['remediationAction'] ?? null)
+                ? $finding->metadata['remediationAction']
+                : '',
+            $findings,
+        )));
+        $configurationKeys = array_values(array_unique(array_map(
+            static fn ($finding): string => is_string($finding->metadata['configurationKey'] ?? null)
+                ? $finding->metadata['configurationKey']
+                : '',
+            $findings,
+        )));
 
         $stableIdentities = [];
         // Retained user-facing defects keep their line-independent identities across fixture expansion.
@@ -259,6 +272,8 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
             ['medium'],
             $confidences,
         );
+        self::assertSame([RemediationAction::Apply->value], $actions);
+        self::assertSame(['rules.docs.regex-comment.options.functionNames'], $configurationKeys);
 
         self::assertSame('784f88c1d188c09f', $stableIdentities['RegexCommentFixture::isUndocumentedRegexMatch()'] ?? null);
         self::assertSame('71689c0f4f3d8560', $stableIdentities['RegexCommentFixture::isSeparatedRegexMatch()'] ?? null);
@@ -456,6 +471,15 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
         $kinds = array_map(static fn ($finding) => $finding->metadata['kind'], $findings);
         sort($kinds);
         self::assertSame(['class-constant', 'enum-case', 'enum-case'], $kinds);
+        self::assertSame(
+            [RemediationAction::Apply->value],
+            array_values(array_unique(array_map(
+                static fn ($finding): string => is_string($finding->metadata['remediationAction'] ?? null)
+                    ? $finding->metadata['remediationAction']
+                    : '',
+                $findings,
+            ))),
+        );
     }
 
     /**

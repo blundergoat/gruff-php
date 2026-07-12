@@ -6,6 +6,7 @@ namespace GruffPhp\Tests\Rule\Naming;
 
 use GruffPhp\Engine\Config\AnalysisConfig;
 use GruffPhp\Engine\Config\RuleSettings;
+use GruffPhp\Results\Finding\RemediationAction;
 use GruffPhp\Rules\Naming\AbbreviationAllowlistRule;
 use GruffPhp\Rules\Naming\BooleanPrefixRule;
 use GruffPhp\Rules\Naming\HungarianNotationRule;
@@ -62,6 +63,56 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
         self::assertNotContains('row', $names);
         self::assertNotContains('end', $names);
         self::assertNotContains('ex', $names);
+
+        $decisionFindings = $this->analyseSourceRule(<<<'PHP'
+<?php
+final class DomainTerms
+{
+    public function labels(): array
+    {
+        $dob = '2000-01-01';
+        $tmp = 'transient';
+
+        return [$dob, $tmp];
+    }
+}
+PHP, AbbreviationAllowlistRule::ID);
+        $tmpFindings = array_values(array_filter(
+            $findings,
+            static fn($finding): bool => ($finding->metadata['identifierName'] ?? null) === 'tmp',
+        ));
+        $decisionFindings = array_merge($decisionFindings, $tmpFindings);
+        $decisionNames    = array_map(
+            static fn($finding): mixed => $finding->metadata['identifierName'] ?? null,
+            $decisionFindings,
+        );
+        sort($decisionNames);
+        self::assertSame(['dob', 'tmp'], $decisionNames);
+        self::assertSame(
+            [RemediationAction::Consider->value],
+            array_values(array_unique(array_map(
+                static fn($finding): string => is_string($finding->metadata['remediationAction'] ?? null)
+                    ? $finding->metadata['remediationAction']
+                    : '',
+                $decisionFindings,
+            ))),
+        );
+        self::assertSame(
+            ['allowlists.acceptedAbbreviations'],
+            array_values(array_unique(array_map(
+                static fn($finding): string => is_string($finding->metadata['configurationKey'] ?? null)
+                    ? $finding->metadata['configurationKey']
+                    : '',
+                $decisionFindings,
+            ))),
+        );
+        self::assertSame(
+            ['Rename the identifier or add the abbreviation to allowlists.acceptedAbbreviations with a documented meaning.'],
+            array_values(array_unique(array_map(
+                static fn($finding): ?string => $finding->remediation,
+                $decisionFindings,
+            ))),
+        );
     }
 
     /**
@@ -128,6 +179,36 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
         self::assertNotContains('assistantIntentRequiresContext', $names);
         self::assertNotContains('resolved', $names);
         self::assertNotContains('declineCodeExplanationRequested', $names);
+
+        $privatePromotion = array_values(array_filter(
+            $findings,
+            static fn($finding): bool => $finding->metadata['identifierName'] === 'infectionRunCtor',
+        ))[0] ?? null;
+        $publicProperty = array_values(array_filter(
+            $findings,
+            static fn($finding): bool => $finding->symbol === '$changedOnly',
+        ))[0] ?? null;
+        $publicParameter = array_values(array_filter(
+            $findings,
+            static fn($finding): bool => $finding->symbol === 'BooleanPrefixPropertiesFixture::configure()'
+                && $finding->metadata['identifierName'] === 'changedOnly',
+        ))[0] ?? null;
+        $localClosure = $this->analyseRule('closure-coverage.php', BooleanPrefixRule::ID)[0] ?? null;
+
+        self::assertNotNull($privatePromotion);
+        self::assertNotNull($publicProperty);
+        self::assertNotNull($publicParameter);
+        self::assertNotNull($localClosure);
+        self::assertSame(RemediationAction::Apply->value, $privatePromotion->metadata['remediationAction'] ?? null);
+        self::assertSame(RemediationAction::Consider->value, $publicProperty->metadata['remediationAction'] ?? null);
+        self::assertSame(RemediationAction::Consider->value, $publicParameter->metadata['remediationAction'] ?? null);
+        self::assertSame(RemediationAction::Apply->value, $localClosure->metadata['remediationAction'] ?? null);
+
+        $expectedConfigurationKey = 'rules.naming.boolean-prefix.options.acceptedBooleanNames';
+        self::assertSame($expectedConfigurationKey, $privatePromotion->metadata['configurationKey'] ?? null);
+        self::assertSame($expectedConfigurationKey, $publicProperty->metadata['configurationKey'] ?? null);
+        self::assertSame($expectedConfigurationKey, $publicParameter->metadata['configurationKey'] ?? null);
+        self::assertSame($expectedConfigurationKey, $localClosure->metadata['configurationKey'] ?? null);
     }
 
     /**

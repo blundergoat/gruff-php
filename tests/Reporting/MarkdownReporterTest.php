@@ -9,6 +9,7 @@ use GruffPhp\Results\Diff\DiffResult;
 use GruffPhp\Results\Finding\Confidence;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Pillar;
+use GruffPhp\Results\Finding\RemediationAction;
 use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Output\Reporter\MarkdownReporter;
@@ -230,6 +231,35 @@ final class MarkdownReporterTest extends TestCase
         $markdown = (new MarkdownReporter())->render($this->report([], $scoreReport));
 
         self::assertStringContainsString('| a\\|b | F | 0.00 | 1 | 0 | 0 | 1 |', $markdown);
+    }
+
+    /**
+     * Verify action metadata does not alter the family-frozen Markdown finding block.
+     *
+     * @return void
+     */
+    public function testRemediationActionMetadataDoesNotChangeMarkdownOutput(): void
+    {
+        $plain = new Finding(
+            ruleId:      'docs.regex-comment',
+            message:     'A regular expression needs a purpose comment.',
+            filePath:    'src/Example.php',
+            line:        12,
+            severity:    Severity::Advisory,
+            pillar:      Pillar::Documentation,
+            tier:        RuleTier::V01,
+            confidence:  Confidence::Medium,
+            remediation: 'Add a purpose comment.',
+        );
+        $serialized             = $plain->toArray();
+        $serialized['metadata'] = RemediationAction::Apply->metadata();
+        $classified             = Finding::fromArray($serialized);
+        $reporter               = new MarkdownReporter();
+
+        self::assertSame(
+            $reporter->render($this->report([$plain])),
+            $reporter->render($this->report([$classified])),
+        );
     }
 
     /**

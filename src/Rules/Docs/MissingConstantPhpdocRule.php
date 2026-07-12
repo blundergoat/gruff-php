@@ -8,6 +8,7 @@ use GruffPhp\Engine\Config\RuleSettings;
 use GruffPhp\Results\Finding\Confidence;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Pillar;
+use GruffPhp\Results\Finding\RemediationAction;
 use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
@@ -432,6 +433,7 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
             'kind' => 'class-constant',
             'className' => $className,
             'commentQuality' => $hasUsefulComment ? 'meaningful' : ($commentKind !== null ? 'low-quality' : 'missing'),
+            ...RemediationAction::Apply->metadata(),
         ];
 
         // Record which comment style was found, when there was one.
@@ -541,6 +543,7 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
             'constantName' => $caseName,
             'kind' => 'enum-case',
             'className' => $className,
+            ...RemediationAction::Apply->metadata(),
         ];
 
         // Record the existing comment style when the case already had one.
