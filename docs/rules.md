@@ -14,6 +14,25 @@ Use that command for the full machine-readable metadata, including thresholds an
 
 Total rules: 128
 
+### Remediation action metadata
+
+Selected findings carry a machine-readable `metadata.remediationAction` without
+changing their message, severity, score, or exit-code behaviour:
+
+- `APPLY` marks a direct source fix.
+- `CONSIDER` marks optional or compatibility-sensitive advice that needs human
+  judgement.
+- `CONFIGURE` is reserved for a deterministic configuration-only resolution;
+  no rule emits it unconditionally in 0.5.1.
+
+When a deliberate configuration hatch exists, `metadata.configurationKey`
+contains its full path. Regex comments, missing constant documentation, and
+one-line wrappers emit `APPLY`; abbreviation and named-argument findings emit
+`CONSIDER`; Boolean naming emits `APPLY` for private/local declarations and
+`CONSIDER` for caller-visible ones.
+JSON, hook, and SARIF transport these fields. Text and Markdown keep their
+existing finding presentation in 0.5.1.
+
 ## Summary By Pillar
 
 | Pillar | Rules |
@@ -102,6 +121,21 @@ PHPDoc for public/protected constants with
 `requirePhpdocForApiConstants: true`, or only for exported paths with
 `apiPathPatterns`.
 
+`docs.regex-comment` resolves purpose documentation from the narrowest source
+outwards: an own-line comment immediately above the configured call, an
+own-line comment directly above its nearest statement owner, a string-labelled
+`match (true)` arm, then the nearest callable's contract. Statement ownership
+never crosses a nested callable boundary. Blank-line-separated comments and a
+previous statement's trailing same-line comment do not count even when
+PHP-Parser attaches them to the next node.
+
+A callable docblock containing `regex`, `pattern`, `preg_`, or the configured
+function name covers only a callable that directly owns exactly one configured
+regex call. Plain-language whitespace-fold prose is accepted only when the
+call is statically the exact three-argument
+`preg_replace('/\s+/', ' ', $subject)` transformation. Larger or unrelated
+callables still need local purpose comments for their configured calls.
+
 ### `maintainability` (2)
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
@@ -121,6 +155,14 @@ Private pass-through helpers with no contract or semantic boundary still
 fire, including zero-argument wrappers around another call. Override via
 the per-rule `options` block; the `allowedSymbols` list is the
 per-project escape hatch for named helpers that intentionally stay thin.
+
+An exact same-class named callback is also a contract boundary. The rule
+recognises PHP first-class callable syntax and two-element callable arrays whose
+receiver resolves to `$this`, `self::class`, `static::class`, `__CLASS__`, or
+the fully resolved declaring class. Resolution uses declaring class plus a
+case-insensitive method name. Foreign, unresolved, computed, string, and
+child-class-name references to a parent declaration remain conservative and
+still need `allowedSymbols` when framework wiring makes them intentional.
 
 `complexity.cyclomatic` and `complexity.cognitive` keep their raw metric
 values in metadata, but flat validation flows made of top-level guard
@@ -173,8 +215,11 @@ interfaces.
 `modernisation.named-argument-opportunity` reports only when positional
 arguments are likely to hide meaning: many positional arguments, adjacent
 same-type scalar values, or boolean/null flags. Short obvious calls stay
-quiet; the rule remains advisory because named arguments are safest on
-stable APIs where parameter names are an intentional contract.
+quiet. Findings remain advisory, low-confidence `CONSIDER` suggestions because
+named arguments are safest only when parameter names are a stable, intentional
+API contract. An unstable API or one whose parameter names are not promised can
+keep positional arguments; the finding is not evidence that the call is
+incorrect.
 
 ### `naming` (11)
 
@@ -192,6 +237,12 @@ stable APIs where parameter names are an intentional contract.
 | `naming.suffix-hungarian` | Suffix Hungarian notation | `advisory` | `medium` | yes |
 | `naming.test-naming-consistency` | Test method naming consistency | `advisory` | `high` | yes |
 
+`naming.abbreviation-allowlist` keeps short lowercase names as findings until
+the project accepts them through `allowlists.acceptedAbbreviations`. A domain
+term such as `dob` is not added to universal defaults automatically: retain the
+advisory and either rename it or document the project vocabulary. These
+findings carry `CONSIDER` plus the full configuration key.
+
 `naming.boolean-prefix` recognises both camelCase and snake_case word
 boundaries after an allowed prefix: `isReady()` and `is_ready()` both
 read as predicates. Common domain predicate verbs are accepted by
@@ -200,6 +251,23 @@ default, including `supports*`, `allows*`, `accepts*`, `permits*`,
 `enables*`, and `disables*`. A prefix followed by a
 lowercase letter (`hasty`, `isolate`) is not a word, and a prefix that
 does not lead the name (`$force`, `$forceShould`) still fires.
+
+The state options use tokenizer-defined whole words, never raw substrings.
+`stateAdjectiveAllowlist` applies exact whole-name matching only to typed
+properties and parameters; its shipped values are single-token adjectives and
+now include `resolved`, `limited`, and `printable`. `stateSuffixAllowlist`
+defaults to `requested` and `present` and
+accepts them only as the final token of a name with at least two tokens across
+methods, functions, parameters, promoted properties, and declared properties.
+`propositionVerbAllowlist` defaults to `requires` and accepts a subject-first
+name only when the verb has at least one token on each side, such as
+`assistantIntentRequiresContext()`.
+
+`acceptedBooleanNames` defaults to an empty list and matches exact whole names
+case-insensitively. It is the non-breaking hatch for an intentional public
+contract. Single-token Boolean callables such as `valid()`, `available()`,
+`resolved()`, and `printable()` still report by default, as do vague names such
+as `$data`, `$result`, `$mode`, and `status()`.
 
 `naming.identifier-quality` applies its `loopBodyThreshold` escape hatch
 to inline iteration callbacks as well as foreach loops: the sole

@@ -159,9 +159,37 @@ Use allowlists for deliberate naming or sensitive-data exceptions:
 
 ```yaml
 allowlists:
-  acceptedAbbreviations: [HTTP, API]
+  acceptedAbbreviations:
+    - age
+    - api
+    - app
+    - db
+    - dob
+    - fs
+    - http
+    - id
+    - io
+    - key
+    - log
+    - max
+    - min
+    - now
+    - raw
+    - rx
+    - tx
+    - ui
+    - url
   secretPreviews: []
 ```
+
+`allowlists.acceptedAbbreviations` is matched case-insensitively by
+`naming.abbreviation-allowlist`. Gruff seeds the universal programming terms
+`age`, `app`, `db`, `fs`, `id`, `io`, `key`, `log`, `max`, `min`, `now`, `raw`,
+`rx`, `tx`, `ui`, and `url` when this key is absent. Supplying the key replaces
+that seeded list, so include every universal term the project still accepts as
+well as domain vocabulary such as `dob`. An unaccepted short name remains an
+advisory `CONSIDER` finding; the allowlist is a deliberate project decision,
+not an automatic classification of the name as good or bad.
 
 ## Selection
 
@@ -187,6 +215,52 @@ rules:
 
 Run `vendor/bin/gruff-php list-rules --format json` to inspect rule IDs and
 available defaults.
+
+### Boolean naming options
+
+`naming.boolean-prefix` separates whole-name state adjectives, multi-token
+suffixes, subject-first propositions, and exact compatibility names:
+
+| Option | Default | Matching semantics |
+| --- | --- | --- |
+| `stateAdjectiveAllowlist` | `active`, `enabled`, `disabled`, `applicable`, `generated`, `interactive`, `emitted`, `visible`, `available`, `valid`, `strict`, `silent`, `resolved`, `limited`, `printable` | Exact whole-name property and parameter matching. Shipped values are single-token adjectives; it does not exempt methods or functions. |
+| `stateSuffixAllowlist` | `requested`, `present` | Final whole token on names with at least two tokens, across methods, functions, parameters, promoted properties, and declared properties. |
+| `propositionVerbAllowlist` | `requires` | Internal whole token with at least one subject token before it and one context token after it. Verb-first names remain the `allowedPrefixes` mechanism. |
+| `acceptedBooleanNames` | empty | Exact whole-name, case-insensitive compatibility hatch across receivers. |
+
+Override the options under the rule's `options` block:
+
+```yaml
+rules:
+  naming.boolean-prefix:
+    options:
+      stateSuffixAllowlist: [requested, present]
+      propositionVerbAllowlist: [requires]
+      acceptedBooleanNames: [legacyReady]
+```
+
+Each configured list replaces that option's default list; options omitted from
+the block keep their defaults. Matching uses identifier word boundaries, so a
+configured token never accepts an unrelated substring. Use
+`php bin/gruff-php list-rules naming.boolean-prefix --format json` to inspect
+the complete effective default surface, including `allowedPrefixes`.
+
+### Finding action metadata
+
+Classified findings keep their existing messages, severities, scoring, and
+`--fail-on` behaviour, while machine-readable consumers receive two optional
+metadata keys:
+
+- `remediationAction` is `APPLY`, `CONSIDER`, or the reserved `CONFIGURE` value.
+- `configurationKey` is the full config path when the rule offers a deliberate
+  hatch, for example `allowlists.acceptedAbbreviations` or
+  `rules.naming.boolean-prefix.options.acceptedBooleanNames`.
+
+`CONFIGURE` is not emitted unconditionally by any 0.5.1 rule. Abbreviation and
+caller-visible Boolean findings use `CONSIDER` because configuration or a
+rename can both be valid, while private/local Boolean findings use `APPLY`.
+JSON, hook, and SARIF transport the keys; text and Markdown presentation is
+unchanged in this release.
 
 ### Visibility without scoring
 

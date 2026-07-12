@@ -123,6 +123,14 @@ final readonly class BooleanPrefixRule implements RuleInterface
                 'propositionVerbAllowlist' => self::PROPOSITION_VERBS,
                 'acceptedBooleanNames' => self::DEFAULT_ACCEPTED_BOOLEAN_NAMES,
             ],
+            description: 'Accepts predicate prefixes, property/parameter state adjectives, multi-token state suffixes, subject-first propositions, and exact compatibility names while flagging vague Boolean identifiers.',
+            optionDescriptions: [
+                'allowedPrefixes' => 'Leading predicate words accepted at camelCase or snake_case word boundaries.',
+                'stateAdjectiveAllowlist' => 'Exact whole Boolean names accepted for typed properties and parameters only.',
+                'stateSuffixAllowlist' => 'Final whole tokens accepted on Boolean names containing at least two tokens across methods, functions, properties, and parameters.',
+                'propositionVerbAllowlist' => 'Internal whole verbs accepted only with a subject token before and a context token after.',
+                'acceptedBooleanNames' => 'Exact case-insensitive Boolean names accepted across receivers for compatibility.',
+            ],
         );
     }
 
