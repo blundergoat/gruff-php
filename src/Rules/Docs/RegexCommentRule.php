@@ -34,8 +34,8 @@ use PhpParser\NodeFinder;
  * checks, so the user documents the intent of regexes a reviewer would otherwise have to decode by hand.
  *
  * Runs per file over the configured regex functions. A call is exempt when a comment sits immediately
- * above it or its nearest statement owner, when a string-labelled `match (true)` arm names it, or when
- * the enclosing callable carries a narrowly applicable regex contract. Advisory, medium confidence.
+ * above it, its nearest statement owner, or the first statement in a contiguous regex-owning sibling
+ * group; string-labelled `match (true)` arms and narrow callable contracts also count. Advisory, medium confidence.
  */
 final readonly class RegexCommentRule implements RuleInterface
 {
@@ -104,14 +104,14 @@ final readonly class RegexCommentRule implements RuleInterface
     {
         // functionNames defaults to the five PCRE calls; exposed via defaultOptions so projects can retarget it.
         return new RuleDefinition(
-            id:              self::ID,
-            name:            'Regex comment',
-            pillar:          Pillar::Documentation,
-            tier:            RuleTier::V01,
-            defaultSeverity: Severity::Advisory,
-            confidence:      Confidence::Medium,
-            defaultOptions:  ['functionNames' => self::REGEX_FUNCTIONS],
-            description:     'Requires an explanatory comment immediately above configured PCRE calls or their nearest statement owner. String-labelled match arms and narrow, call-specific callable contracts can provide equivalent context.',
+            id:                 self::ID,
+            name:               'Regex comment',
+            pillar:             Pillar::Documentation,
+            tier:               RuleTier::V01,
+            defaultSeverity:    Severity::Advisory,
+            confidence:         Confidence::Medium,
+            defaultOptions:     ['functionNames' => self::REGEX_FUNCTIONS],
+            description:        'Requires an explanatory comment immediately above configured PCRE calls, their nearest statement owner, or a contiguous sibling group of regex-owning statements. String-labelled match arms and narrow, call-specific callable contracts can provide equivalent context.',
             optionDescriptions: [
                 'functionNames' => 'Function names treated as regex calls that require reviewer-facing purpose documentation.',
             ],
@@ -119,6 +119,10 @@ final readonly class RegexCommentRule implements RuleInterface
                 [
                     'shape' => 'Multiline formatting separates a configured call from an own-line comment explaining the enclosing statement.',
                     'mitigation' => 'Keep the comment directly above the owning statement; blank-line-separated and previous-statement comments remain findings.',
+                ],
+                [
+                    'shape' => 'One adjacent comment explains a contiguous run of statements that each perform part of the same regex check.',
+                    'mitigation' => 'Keep the regex-owning statements physically contiguous. Blank lines, unrelated statements, and new comments end the shared group.',
                 ],
                 [
                     'shape' => 'A callable contract documents one regex operation or a statically visible whitespace-fold transformation.',
@@ -143,6 +147,8 @@ final readonly class RegexCommentRule implements RuleInterface
         $sourceLines    = explode("\n", str_replace(["\r\n", "\r"], "\n", $analysisUnit->source));
         $regexCallNodes = NodeIndex::nodesOf($analysisUnit, FuncCall::class);
         $findings       = [];
+        $statementContexts      = [];
+        $statementGroupCoverage = [];
 
         // Weigh each function call in the file.
         foreach ($regexCallNodes as $regexCallNode) {
@@ -153,7 +159,16 @@ final readonly class RegexCommentRule implements RuleInterface
             }
 
             // Documented calls produce no finding, whichever ordered coverage route explains them.
-            if ($this->coverageReason($sourceLines, $analysisUnit->source, $regexCallNode, $functionName, $functionNames) !== null) {
+            if ($this->coverageReason(
+                $sourceLines,
+                $analysisUnit->source,
+                $analysisUnit->statements,
+                $statementContexts,
+                $statementGroupCoverage,
+                $regexCallNode,
+                $functionName,
+                $functionNames,
+            ) !== null) {
                 continue;
             }
 
@@ -180,18 +195,22 @@ final readonly class RegexCommentRule implements RuleInterface
 
     /**
      * Classifies the first deterministic documentation route covering one configured call.
-     *
-     * @param list<string> $sourceLines - Whole-file source split on newlines, indexed from zero.
-     * @param string       $source - Whole-file source used to prove physical owner-comment placement.
-     * @param FuncCall     $regexCallNode - Configured call whose nearest user explanation is being resolved.
-     * @param string       $functionName - Lowercase configured function name used by callable contracts.
-     * @param list<string> $functionNames - Lowercase configured names used to bound broad callable contracts.
-     *
-     * @return 'immediate'|'statement_owner'|'match_arm'|'function_contract'|null - First matching route, or null when the user still needs a finding.
+     * @param list<string> $sourceLines    - Whole-file source split on newlines, indexed from zero.
+     * @param string       $source         - Whole-file source used to prove physical owner-comment placement.
+     * @param list<Stmt>   $rootStatements - Top-level statements used when the owner has no parent node.
+     * @param array<int, array{siblings: list<Stmt>, index: int}|null> $statementContexts - Cached sibling context per statement id.
+     * @param array<int, bool> $statementGroupCoverage - Cached inherited group coverage per statement id.
+     * @param FuncCall     $regexCallNode  - Configured call whose nearest user explanation is being resolved.
+     * @param string       $functionName   - Lowercase configured function name used by callable contracts.
+     * @param list<string> $functionNames  - Lowercase configured names used to bound broad callable contracts.
+     * @return 'immediate'|'statement_owner'|'statement_group'|'match_arm'|'function_contract'|null - First matching route, or null when the user still needs a finding.
      */
     private function coverageReason(
         array $sourceLines,
         string $source,
+        array $rootStatements,
+        array &$statementContexts,
+        array &$statementGroupCoverage,
         FuncCall $regexCallNode,
         string $functionName,
         array $functionNames,
@@ -204,6 +223,18 @@ final readonly class RegexCommentRule implements RuleInterface
         // Multiline formatting can move the call below a comment attached to its nearest statement.
         if ($this->hasAdjacentStatementOwnerComment($source, $regexCallNode)) {
             return 'statement_owner';
+        }
+
+        // Consecutive regex-owning statements can share the first statement's adjacent group comment.
+        if ($this->hasContiguousStatementGroupComment(
+            $source,
+            $rootStatements,
+            $statementContexts,
+            $statementGroupCoverage,
+            $regexCallNode,
+            $functionNames,
+        )) {
+            return 'statement_group';
         }
 
         // A string-labelled match arm names the condition without a duplicate inline comment.
@@ -221,25 +252,179 @@ final readonly class RegexCommentRule implements RuleInterface
 
     /**
      * Reports whether the call's nearest statement has an own-line comment directly above it.
-     *
-     * @param string   $source - Whole-file source used to reject trailing same-line comments.
+     * @param string   $source        - Whole-file source used to reject trailing same-line comments.
      * @param FuncCall $regexCallNode - Configured call whose statement owner is being checked.
-     *
      * @return bool - True only for a physically adjacent comment belonging to the nearest statement.
      */
     private function hasAdjacentStatementOwnerComment(string $source, FuncCall $regexCallNode): bool
     {
         $statementOwner = $this->nearestStatementOwner($regexCallNode);
 
-        // Calls outside a statement or inside a nearer nested callable have no eligible owner comment.
+        return $statementOwner !== null && $this->hasOwnLineAdjacentComment($source, $statementOwner);
+    }
+
+    /**
+     * Reports whether a call belongs to a contiguous sibling run documented above its first regex statement.
+     * @param string       $source         - Whole-file source used to prove own-line comment placement.
+     * @param list<Stmt>   $rootStatements - Top-level statements used for file-scope statement groups.
+     * @param array<int, array{siblings: list<Stmt>, index: int}|null> $statementContexts - Cached sibling context per statement id.
+     * @param array<int, bool> $statementGroupCoverage - Cached inherited coverage per statement id.
+     * @param FuncCall     $regexCallNode  - Configured call whose owning statement is the end of the candidate group.
+     * @param list<string> $functionNames  - Lowercase configured function names required on every grouped statement.
+     * @return bool - True when the call is covered by the first contiguous regex statement's adjacent comment.
+     */
+    private function hasContiguousStatementGroupComment(
+        string $source,
+        array $rootStatements,
+        array &$statementContexts,
+        array &$statementGroupCoverage,
+        FuncCall $regexCallNode,
+        array $functionNames,
+    ): bool {
+        $statementOwner = $this->nearestStatementOwner($regexCallNode);
+        // Calls without a statement owner cannot inherit a sibling statement's documentation.
         if ($statementOwner === null) {
             return false;
         }
+        $statementId = spl_object_id($statementOwner);
+        // Reuse the established answer when another configured call shares this statement.
+        if (array_key_exists($statementId, $statementGroupCoverage)) {
+            return $statementGroupCoverage[$statementId];
+        }
+        $context = $this->statementContext($statementOwner, $rootStatements, $statementContexts);
+        // An unresolved statement list has no safe previous-sibling boundary.
+        if ($context === null) {
+            $statementGroupCoverage[$statementId] = false;
 
-        // PHP-Parser may attach several comments, so inspect each while enforcing physical adjacency ourselves.
-        foreach ($statementOwner->getComments() as $comment) {
-            // The shared physical check rejects blank separation and a previous statement's trailing comment.
-            if (PhysicalCommentAttachment::isOwnLineImmediatelyAbove($comment, $statementOwner, $source)) {
+            return false;
+        }
+        $previousIndex = $context['index'] - 1;
+        // The first statement in a list has no earlier group member from which to inherit coverage.
+        if (!isset($context['siblings'][$previousIndex])) {
+            $statementGroupCoverage[$statementId] = false;
+
+            return false;
+        }
+        $previousStatement = $context['siblings'][$previousIndex];
+        $isCovered = $statementOwner->getStartLine() === $previousStatement->getEndLine() + 1
+            && $statementOwner->getComments() === []
+            && $this->hasConfiguredRegexCall($previousStatement, $functionNames)
+            && ($this->hasOwnLineAdjacentComment($source, $previousStatement)
+                || ($statementGroupCoverage[spl_object_id($previousStatement)] ?? false));
+        $statementGroupCoverage[$statementId] = $isCovered;
+        return $isCovered;
+    }
+
+    /**
+     * Resolves and caches the exact sibling list and index containing one statement.
+     * @param Stmt       $statement      - Statement whose sibling boundary is required.
+     * @param list<Stmt> $rootStatements - Top-level statement list for file-scope owners.
+     * @param array<int, array{siblings: list<Stmt>, index: int}|null> $statementContexts - Context cache populated for each resolved sibling.
+     * @return array{siblings: list<Stmt>, index: int}|null - Exact sibling context, or null when the statement-list owner cannot be resolved.
+     */
+    private function statementContext(Stmt $statement, array $rootStatements, array &$statementContexts): ?array
+    {
+        $statementId = spl_object_id($statement);
+        // Previously resolved statements keep their exact list identity and source index.
+        if (array_key_exists($statementId, $statementContexts)) {
+            return $statementContexts[$statementId];
+        }
+        // Top-level statements use the analysis unit's root list because they have no parent node.
+        foreach ($rootStatements as $rootStatement) {
+            // Finding the target proves that every root sibling can be cached together.
+            if ($rootStatement === $statement) {
+                $this->cacheStatementContexts($rootStatements, $statementContexts);
+
+                return $statementContexts[$statementId];
+            }
+        }
+
+        $parent = $statement->getAttribute('parent');
+        // Missing parser parent links prevent a safe sibling-boundary decision.
+        if (!$parent instanceof Node) {
+            return null;
+        }
+        // A parent can expose several arrays, so locate the exact all-statement child list.
+        foreach ($parent->getSubNodeNames() as $subNodeName) {
+            $subNode = $parent->{$subNodeName};
+            // Scalar and single-node fields cannot contain statement siblings.
+            if (!is_array($subNode)) {
+                continue;
+            }
+            $siblings          = [];
+            $containsStatement = false;
+            // Mixed child arrays are not statement lists and must not form documentation groups.
+            foreach ($subNode as $childNode) {
+                // One non-statement member disqualifies the whole candidate sibling list.
+                if (!$childNode instanceof Stmt) {
+                    $siblings          = [];
+                    $containsStatement = false;
+                    break;
+                }
+                $siblings[]        = $childNode;
+                $containsStatement = $containsStatement || $childNode === $statement;
+            }
+
+            // The matching all-statement array defines the only eligible sibling boundary.
+            if ($containsStatement) {
+                $this->cacheStatementContexts($siblings, $statementContexts);
+
+                return $statementContexts[$statementId];
+            }
+        }
+        $statementContexts[$statementId] = null;
+        return null;
+    }
+
+    /**
+     * Caches one statement list by object id so later calls resolve sibling context in constant time.
+     * @param list<Stmt> $statements - Exact sibling list in source order.
+     * @param array<int, array{siblings: list<Stmt>, index: int}|null> $statementContexts - Context cache populated in place.
+     * @return void
+     */
+    private function cacheStatementContexts(array $statements, array &$statementContexts): void
+    {
+        // Cache every sibling together so each statement list is scanned at most once.
+        foreach ($statements as $index => $statement) {
+            $statementContexts[spl_object_id($statement)] = ['siblings' => $statements, 'index' => $index];
+        }
+    }
+
+    /**
+     * Reports whether one statement directly owns at least one configured regex call.
+     * @param Stmt         $statement     - Sibling statement being considered for group membership.
+     * @param list<string> $functionNames - Lowercase configured regex function names.
+     * @return bool - True when a configured call resolves back to this exact nearest statement owner.
+     */
+    private function hasConfiguredRegexCall(Stmt $statement, array $functionNames): bool
+    {
+        $calls = (new NodeFinder())->findInstanceOf($statement, FuncCall::class);
+        // A group member must directly own a configured call, not merely contain one in a nested scope.
+        foreach ($calls as $call) {
+            $functionName = $this->functionName($call);
+            // Only configured calls whose nearest statement is this sibling qualify it for the group.
+            if ($functionName !== null
+                && in_array($functionName, $functionNames, true)
+                && $this->nearestStatementOwner($call) === $statement) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Reports whether one statement carries a physically adjacent own-line comment.
+     * @param string $source    - Whole-file source used for physical placement checks.
+     * @param Stmt   $statement - Statement whose attached comments are tested.
+     * @return bool - True when any attached comment is its own line immediately above the statement.
+     */
+    private function hasOwnLineAdjacentComment(string $source, Stmt $statement): bool
+    {
+        // Parser-attached comments still need a physical own-line and adjacency check.
+        foreach ($statement->getComments() as $comment) {
+            // The first qualifying attachment supplies reviewer-facing context for the statement.
+            if (PhysicalCommentAttachment::isOwnLineImmediatelyAbove($comment, $statement, $source)) {
                 return true;
             }
         }

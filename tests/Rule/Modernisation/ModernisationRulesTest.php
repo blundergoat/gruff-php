@@ -6,6 +6,7 @@ namespace GruffPhp\Tests\Rule\Modernisation;
 
 use GruffPhp\Engine\Config\AnalysisConfig;
 use GruffPhp\Engine\Config\ConfigLoader;
+use GruffPhp\Engine\Config\RuleSettings;
 use GruffPhp\Results\Finding\Confidence;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Pillar;
@@ -131,6 +132,68 @@ final class ModernisationRulesTest extends TestCase
                 $namedArgumentFindings,
             ))),
         );
+    }
+
+    /**
+     * Verify direct constructor calls stay outside named-argument advice.
+     *
+     * @return void
+     */
+    public function testNamedArgumentOpportunityExcludesConstructorCalls(): void
+    {
+        $unit = $this->inlineUnit(<<<'PHP'
+<?php
+final class ConfiguredService
+{
+    public function __construct(string $host, string $user, string $password, string $database)
+    {
+    }
+}
+new ConfiguredService('host', 'user', 'pass', 'database');
+PHP);
+
+        $registry = RuleRegistry::defaults();
+        $config   = AnalysisConfig::fromRegistry($registry);
+        $results  = (new NamedArgumentOpportunityRule())->analyse($unit, new RuleContext(self::PROJECT_ROOT, $config));
+
+        self::assertSame([], $results);
+    }
+
+    /**
+     * Verify an ambiguous function call retains advice until its configured floor rises.
+     *
+     * @return void
+     */
+    public function testNamedArgumentOpportunityHonoursRaisedThreshold(): void
+    {
+        $unit = $this->inlineUnit(<<<'PHP'
+<?php
+function configureService(string $host, string $user, string $password, string $database): void
+{
+}
+configureService('host', 'user', 'pass', 'database');
+PHP);
+        $registry       = RuleRegistry::defaults();
+        $defaultConfig  = AnalysisConfig::fromRegistry($registry);
+        $rule           = new NamedArgumentOpportunityRule();
+        $defaultResults = $rule->analyse($unit, new RuleContext(self::PROJECT_ROOT, $defaultConfig));
+
+        self::assertCount(1, $defaultResults);
+        self::assertSame(5, $defaultResults[0]->line);
+
+        $settings     = $defaultConfig->ruleSettings(NamedArgumentOpportunityRule::ID);
+        $raisedConfig = $defaultConfig->withRuleSettings(
+            NamedArgumentOpportunityRule::ID,
+            new RuleSettings(
+                $settings->enabled,
+                ['minPositionalArguments' => 6],
+                $settings->options,
+                $settings->severityThreshold,
+                $settings->excludeFromScore,
+            ),
+        );
+
+        self::assertSame([], $rule->analyse($unit, new RuleContext(self::PROJECT_ROOT, $raisedConfig)));
     }
 
     /**
@@ -304,6 +367,21 @@ final class ModernisationRulesTest extends TestCase
         $sourceFile = new SourceFile(self::PROJECT_ROOT . '/' . $path, $path);
 
         return (new PhpFileParser())->parse($sourceFile);
+    }
+
+    /**
+     * Parse inline PHP source without adding a fixture-corpus unit.
+     *
+     * @param string $source - Complete PHP source for one focused rule assertion.
+     *
+     * @return AnalysisUnit - Parsed inline source with a stable display path.
+     */
+    private function inlineUnit(string $source): AnalysisUnit
+    {
+        return (new PhpFileParser())->parse(new SourceFile(
+            'data://text/plain;base64,' . base64_encode($source),
+            'tests/Fixtures/Modernisation/named-argument-inline.php',
+        ));
     }
 
     /**

@@ -165,6 +165,7 @@ allowlists:
     - app
     - db
     - dob
+    - dto
     - fs
     - http
     - id
@@ -179,13 +180,14 @@ allowlists:
     - tx
     - ui
     - url
+    - utc
   secretPreviews: []
 ```
 
 `allowlists.acceptedAbbreviations` is matched case-insensitively by
 `naming.abbreviation-allowlist`. Gruff seeds the universal programming terms
-`age`, `app`, `db`, `fs`, `id`, `io`, `key`, `log`, `max`, `min`, `now`, `raw`,
-`rx`, `tx`, `ui`, and `url` when this key is absent. Supplying the key replaces
+`age`, `app`, `db`, `dto`, `fs`, `id`, `io`, `key`, `log`, `max`, `min`, `now`,
+`raw`, `rx`, `tx`, `ui`, `url`, and `utc` when this key is absent. Supplying the key replaces
 that seeded list, so include every universal term the project still accepts as
 well as domain vocabulary such as `dob`. An unaccepted short name remains an
 advisory `CONSIDER` finding; the allowlist is a deliberate project decision,
@@ -224,9 +226,10 @@ suffixes, subject-first propositions, and exact compatibility names:
 | Option | Default | Matching semantics |
 | --- | --- | --- |
 | `stateAdjectiveAllowlist` | `active`, `enabled`, `disabled`, `applicable`, `generated`, `interactive`, `emitted`, `visible`, `available`, `valid`, `strict`, `silent`, `resolved`, `limited`, `printable` | Exact whole-name property and parameter matching. Shipped values are single-token adjectives; it does not exempt methods or functions. |
-| `stateSuffixAllowlist` | `requested`, `present` | Final whole token on names with at least two tokens, across methods, functions, parameters, promoted properties, and declared properties. |
+| `stateSuffixAllowlist` | `requested`, `present`, `enabled`, `allowed` | Final whole token on names with at least two tokens, across methods, functions, parameters, promoted properties, and declared properties. |
 | `propositionVerbAllowlist` | `requires` | Internal whole token with at least one subject token before it and one context token after it. Verb-first names remain the `allowedPrefixes` mechanism. |
 | `acceptedBooleanNames` | empty | Exact whole-name, case-insensitive compatibility hatch across receivers. |
+| `includePublicApi` | `true` | When false, skips public/protected methods and properties, named functions, and their parameters; private methods/properties and closure/arrow parameters remain checked. |
 
 Override the options under the rule's `options` block:
 
@@ -234,9 +237,10 @@ Override the options under the rule's `options` block:
 rules:
   naming.boolean-prefix:
     options:
-      stateSuffixAllowlist: [requested, present]
+      stateSuffixAllowlist: [requested, present, enabled, allowed]
       propositionVerbAllowlist: [requires]
       acceptedBooleanNames: [legacyReady]
+      includePublicApi: false
 ```
 
 Each configured list replaces that option's default list; options omitted from
@@ -244,6 +248,11 @@ the block keep their defaults. Matching uses identifier word boundaries, so a
 configured token never accepts an unrelated substring. Use
 `php bin/gruff-php list-rules naming.boolean-prefix --format json` to inspect
 the complete effective default surface, including `allowedPrefixes`.
+
+`includePublicApi: false` is the compatibility-safe library mode: it avoids
+asking for caller-visible renames while retaining findings on private/local
+implementation details. Public constructor parameters are caller-visible named-
+argument API even when they promote a private property, so this mode skips them.
 
 ### Finding action metadata
 

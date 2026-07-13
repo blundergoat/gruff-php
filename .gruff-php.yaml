@@ -33,6 +33,7 @@ allowlists:
         - cwd
         - db
         - doc
+        - dto
         - fn
         - fqn
         - fs
@@ -53,11 +54,12 @@ allowlists:
         - ui
         - uri
         - url
+        - utc
     # The fixture-corpus snapshot digest asserted in tests/Rule/RuleRegressionSnapshotTest.php is a
     # 64-char hex hash that reads as a high-entropy secret; it is test data, not a credential. Keep this
     # preview in sync if that digest rotates (it changes whenever rules or fixtures change).
     secretPreviews:
-        - 'fdc5...642d (redacted, 64 chars)'
+        - 'e381...83f7 (redacted, 64 chars)'
 selection:
     tiers: []
     pillars: []
@@ -247,12 +249,16 @@ rules:
             stateSuffixAllowlist:
                 - requested
                 - present
+                - enabled
+                - allowed
             # Whole-token verbs accepted inside subject-first propositions with context on both sides.
             propositionVerbAllowlist:
                 - requires
             acceptedBooleanNames:
                 - excludeFromScore
                 - meaningfulOnly
+            # Set false to check only private methods/properties and closure-local declarations.
+            includePublicApi: true
     # Class/file name mismatch
     naming.class-file-mismatch:
         enabled: true

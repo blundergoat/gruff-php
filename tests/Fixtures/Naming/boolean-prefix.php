@@ -66,6 +66,20 @@ final class BooleanStateVocabularyFixture
     public function printableTodayScheduleRequested(): bool { return true; }
 
     /**
+     * Report whether the schedule-link feature is enabled through a participle suffix.
+     *
+     * @return bool - True when the feature is enabled; false otherwise.
+     */
+    public function scheduleLinkEnabled(): bool { return true; }
+
+    /**
+     * Report whether read-only schedule access is allowed through a participle suffix.
+     *
+     * @return bool - True when schedule access is allowed; false otherwise.
+     */
+    public function readOnlyScheduleAllowed(): bool { return true; }
+
+    /**
      * Report whether an explanation was requested through another multi-token suffix.
      *
      * @return bool - True when the explanation was requested; false otherwise.

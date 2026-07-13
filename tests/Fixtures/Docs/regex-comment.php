@@ -174,6 +174,40 @@ final class RegexCommentFixture
     }
 
     /**
+     * Apply one adjacent comment to a contiguous run of regex-owning statements.
+     *
+     * @param string $message - User text being classified by both route constraints.
+     *
+     * @return bool - True when all documented route constraints match.
+     */
+    public function hasAdjacentRegexStatementGroup(string $message): bool
+    {
+        // All expressions constrain the same printable schedule route.
+        $hasTodayPhrase    = preg_match('/today/i', $message) === 1;
+        $hasSchedulePhrase = preg_match('/schedule/i', $message) === 1;
+        $hasReadOnlyPhrase = preg_match('/read-only/i', $message) === 1;
+
+        return $hasTodayPhrase && $hasSchedulePhrase && $hasReadOnlyPhrase;
+    }
+
+    /**
+     * Keep a blank line from lending one statement's comment to a later regex statement.
+     *
+     * @param string $message - User text being classified by separate route constraints.
+     *
+     * @return bool - True when both independently documented route constraints match.
+     */
+    public function hasBlankSeparatedRegexStatementGroup(string $message): bool
+    {
+        // The first expression recognises today's route wording only.
+        $hasTodayPhrase = preg_match('/today/i', $message) === 1;
+
+        $hasSchedulePhrase = preg_match('/schedule/i', $message) === 1;
+
+        return $hasTodayPhrase && $hasSchedulePhrase;
+    }
+
+    /**
      * Keep preparation context attached only to the statement it describes.
      *
      * @param string $message - User text prepared before the later check.

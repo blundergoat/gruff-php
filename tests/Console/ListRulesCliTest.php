@@ -141,6 +141,7 @@ final class ListRulesCliTest extends CliTestCase
                 'stateSuffixAllowlist' => 'Final whole tokens accepted on Boolean names containing at least two tokens across methods, functions, properties, and parameters.',
                 'propositionVerbAllowlist' => 'Internal whole verbs accepted only with a subject token before and a context token after.',
                 'acceptedBooleanNames' => 'Exact case-insensitive Boolean names accepted across receivers for compatibility.',
+                'includePublicApi' => 'Whether to inspect public/protected methods, properties, named functions, and their caller-visible parameters; false limits findings to private/local declarations.',
             ],
             $payload['optionDescriptions'] ?? null,
         );

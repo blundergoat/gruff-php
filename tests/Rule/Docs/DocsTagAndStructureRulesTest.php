@@ -222,6 +222,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
 
         self::assertSame(
             [
+                'RegexCommentFixture::hasBlankSeparatedRegexStatementGroup()',
                 'RegexCommentFixture::hasBroadPatternsContract()',
                 'RegexCommentFixture::hasBroadPatternsContract()',
                 'RegexCommentFixture::hasNestedCallableWithoutInnerComment()',
@@ -239,6 +240,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
 
         self::assertSame(
             [
+                'preg_match',
                 'preg_match',
                 'preg_match',
                 'preg_match',

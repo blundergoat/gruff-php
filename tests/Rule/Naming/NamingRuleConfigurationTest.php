@@ -116,6 +116,28 @@ PHP, AbbreviationAllowlistRule::ID);
     }
 
     /**
+     * Verify universal DTO and UTC vocabulary stays quiet while domain and out-of-band names retain their contracts.
+     *
+     * @return void
+     */
+    public function testAbbreviationAllowlistShipsUniversalDtoAndUtcDefaults(): void
+    {
+        $findings = $this->analyseSourceRule(<<<'PHP'
+<?php
+function mapDomainValues(string $dto, string $utc, string $dob, string $uuid): void
+{
+}
+PHP, AbbreviationAllowlistRule::ID);
+        $names = array_map(
+            static fn($finding): mixed => $finding->metadata['identifierName'] ?? null,
+            $findings,
+        );
+        sort($names);
+
+        self::assertSame(['dob'], $names);
+    }
+
+    /**
      * Verify projects can opt in additional boolean prefixes.
      *
      * @return void
@@ -257,6 +279,61 @@ PHP, AbbreviationAllowlistRule::ID);
         self::assertNotContains('BooleanPrefixFixture::check()', $symbols);
         self::assertContains('BooleanPrefixFixture::enabled()', $symbols);
         self::assertContains('BooleanPrefixFixture::didRun()', $symbols);
+    }
+
+    /**
+     * Verify projects can limit Boolean naming checks to private and local declarations.
+     *
+     * @return void
+     */
+    public function testBooleanPrefixCanSkipCallerVisibleApi(): void
+    {
+        $registry = RuleRegistry::defaults();
+        $settings = AnalysisConfig::fromRegistry($registry)->ruleSettings(BooleanPrefixRule::ID);
+        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+            BooleanPrefixRule::ID,
+            new RuleSettings(true, $settings->thresholds, array_merge($settings->options, ['includePublicApi' => false])),
+        );
+        $findings = $this->analyseSourceRule(<<<'PHP'
+<?php
+final class ApiFlags
+{
+    public bool $publicState = false;
+    private bool $privateState = false;
+
+    public function publicStatus(bool $publicFlag): bool
+    {
+        return $publicFlag;
+    }
+
+    private function privateStatus(bool $privateFlag): bool
+    {
+        return $privateFlag;
+    }
+
+    public function registerCallback(): void
+    {
+        $callback = static fn (bool $closureFlag): bool => $closureFlag;
+    }
+}
+
+function publicFunctionStatus(bool $functionFlag): bool
+{
+    return $functionFlag;
+}
+PHP, BooleanPrefixRule::ID, config: $config);
+        $symbols = array_map(static fn($finding): ?string => $finding->symbol, $findings);
+        $names   = array_map(static fn($finding): mixed => $finding->metadata['identifierName'] ?? null, $findings);
+
+        self::assertNotContains('$publicState', $symbols);
+        self::assertNotContains('ApiFlags::publicStatus()', $symbols);
+        self::assertNotContains('publicFunctionStatus()', $symbols);
+        self::assertNotContains('publicFlag', $names);
+        self::assertNotContains('functionFlag', $names);
+        self::assertContains('$privateState', $symbols);
+        self::assertContains('ApiFlags::privateStatus()', $symbols);
+        self::assertContains('privateFlag', $names);
+        self::assertContains('closureFlag', $names);
     }
 
     /**

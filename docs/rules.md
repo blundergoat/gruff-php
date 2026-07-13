@@ -123,11 +123,14 @@ PHPDoc for public/protected constants with
 
 `docs.regex-comment` resolves purpose documentation from the narrowest source
 outwards: an own-line comment immediately above the configured call, an
-own-line comment directly above its nearest statement owner, a string-labelled
-`match (true)` arm, then the nearest callable's contract. Statement ownership
-never crosses a nested callable boundary. Blank-line-separated comments and a
-previous statement's trailing same-line comment do not count even when
-PHP-Parser attaches them to the next node.
+own-line comment directly above its nearest statement owner, an own-line
+comment directly above the first statement in a physically contiguous sibling
+run where every statement owns a configured regex call, a string-labelled
+`match (true)` arm, then the nearest callable's contract. Group coverage ends
+at a blank line, new comment, unrelated statement, branch, or callable
+boundary. Statement ownership never crosses a nested callable boundary.
+Blank-line-separated comments and a previous statement's trailing same-line
+comment do not count even when PHP-Parser attaches them to the next node.
 
 A callable docblock containing `regex`, `pattern`, `preg_`, or the configured
 function name covers only a callable that directly owns exactly one configured
@@ -219,7 +222,9 @@ quiet. Findings remain advisory, low-confidence `CONSIDER` suggestions because
 named arguments are safest only when parameter names are a stable, intentional
 API contract. An unstable API or one whose parameter names are not promised can
 keep positional arguments; the finding is not evidence that the call is
-incorrect.
+incorrect. Direct `new ClassName(...)` constructor calls are outside this rule;
+functions, methods, and static calls remain eligible. Raise
+`minPositionalArguments` when a project wants a higher ambiguity floor.
 
 ### `naming` (11)
 
@@ -238,9 +243,11 @@ incorrect.
 | `naming.test-naming-consistency` | Test method naming consistency | `advisory` | `high` | yes |
 
 `naming.abbreviation-allowlist` keeps short lowercase names as findings until
-the project accepts them through `allowlists.acceptedAbbreviations`. A domain
-term such as `dob` is not added to universal defaults automatically: retain the
-advisory and either rename it or document the project vocabulary. These
+the project accepts them through `allowlists.acceptedAbbreviations`. Universal
+programming/time vocabulary includes `dto` and `utc`; a domain term such as
+`dob` is not added automatically, while four-character `uuid` lies outside the
+default two-to-three-character band. Retain a domain advisory and either rename
+it or document the project vocabulary. These
 findings carry `CONSIDER` plus the full configuration key.
 
 `naming.boolean-prefix` recognises both camelCase and snake_case word
@@ -256,7 +263,7 @@ The state options use tokenizer-defined whole words, never raw substrings.
 `stateAdjectiveAllowlist` applies exact whole-name matching only to typed
 properties and parameters; its shipped values are single-token adjectives and
 now include `resolved`, `limited`, and `printable`. `stateSuffixAllowlist`
-defaults to `requested` and `present` and
+defaults to `requested`, `present`, `enabled`, and `allowed`, and
 accepts them only as the final token of a name with at least two tokens across
 methods, functions, parameters, promoted properties, and declared properties.
 `propositionVerbAllowlist` defaults to `requires` and accepts a subject-first
@@ -268,6 +275,11 @@ case-insensitively. It is the non-breaking hatch for an intentional public
 contract. Single-token Boolean callables such as `valid()`, `available()`,
 `resolved()`, and `printable()` still report by default, as do vague names such
 as `$data`, `$result`, `$mode`, and `status()`.
+
+`includePublicApi` defaults to `true`. Setting it to `false` limits this rule to
+private methods/properties and closure/arrow-local parameters, skipping named
+functions, public/protected declarations, and their caller-visible parameters.
+Public constructor parameters remain API even when they promote private state.
 
 `naming.identifier-quality` applies its `loopBodyThreshold` escape hatch
 to inline iteration callbacks as well as foreach loops: the sole

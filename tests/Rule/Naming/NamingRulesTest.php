@@ -197,6 +197,8 @@ final class NamingRulesTest extends NamingRuleTestCase
         self::assertNotContains('BooleanPrefixFixture::is_valid_state()', $symbols);
         self::assertNotContains('BooleanStateVocabularyFixture::paymentRequested()', $symbols);
         self::assertNotContains('BooleanStateVocabularyFixture::printableTodayScheduleRequested()', $symbols);
+        self::assertNotContains('BooleanStateVocabularyFixture::scheduleLinkEnabled()', $symbols);
+        self::assertNotContains('BooleanStateVocabularyFixture::readOnlyScheduleAllowed()', $symbols);
         self::assertNotContains('BooleanStateVocabularyFixture::declineCodeExplanationRequested()', $symbols);
         self::assertNotContains('BooleanStateVocabularyFixture::assistantIntentRequiresContext()', $symbols);
         self::assertNotContains('report_requested()', $symbols);

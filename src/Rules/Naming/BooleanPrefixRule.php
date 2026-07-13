@@ -29,6 +29,7 @@ use PhpParser\Node\Stmt\Function_;
 use PhpParser\Node\Stmt\Property;
 use PhpParser\Node\UnionType;
 use PhpParser\Modifiers;
+use LogicException;
 
 /**
  * Flags a bool-returning function or method, or a typed bool property or parameter, whose name does not read
@@ -80,7 +81,7 @@ final readonly class BooleanPrefixRule implements RuleInterface
     /**
      * State words accepted only at the end of identifiers containing multiple tokens.
      */
-    private const STATE_SUFFIXES = ['requested', 'present'];
+    private const STATE_SUFFIXES = ['requested', 'present', 'enabled', 'allowed'];
 
     /**
      * Verbs accepted only between a subject token and trailing predicate or context tokens.
@@ -122,14 +123,16 @@ final readonly class BooleanPrefixRule implements RuleInterface
                 'stateSuffixAllowlist' => self::STATE_SUFFIXES,
                 'propositionVerbAllowlist' => self::PROPOSITION_VERBS,
                 'acceptedBooleanNames' => self::DEFAULT_ACCEPTED_BOOLEAN_NAMES,
+                'includePublicApi' => true,
             ],
-            description: 'Accepts predicate prefixes, property/parameter state adjectives, multi-token state suffixes, subject-first propositions, and exact compatibility names while flagging vague Boolean identifiers.',
+            description:        'Accepts predicate prefixes, property/parameter state adjectives, multi-token state suffixes, subject-first propositions, and exact compatibility names while flagging vague Boolean identifiers.',
             optionDescriptions: [
                 'allowedPrefixes' => 'Leading predicate words accepted at camelCase or snake_case word boundaries.',
                 'stateAdjectiveAllowlist' => 'Exact whole Boolean names accepted for typed properties and parameters only.',
                 'stateSuffixAllowlist' => 'Final whole tokens accepted on Boolean names containing at least two tokens across methods, functions, properties, and parameters.',
                 'propositionVerbAllowlist' => 'Internal whole verbs accepted only with a subject token before and a context token after.',
                 'acceptedBooleanNames' => 'Exact case-insensitive Boolean names accepted across receivers for compatibility.',
+                'includePublicApi' => 'Whether to inspect public/protected methods, properties, named functions, and their caller-visible parameters; false limits findings to private/local declarations.',
             ],
         );
     }
@@ -141,6 +144,7 @@ final readonly class BooleanPrefixRule implements RuleInterface
      * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
      *
      * @return list<Finding> - Findings for poorly named boolean callables.
+     * @throws LogicException When programmatic rule settings provide a non-boolean includePublicApi value.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -151,14 +155,21 @@ final readonly class BooleanPrefixRule implements RuleInterface
         $stateSuffixes    = array_map(static fn (string $name): string => strtolower($name), $settings->stringListOption('stateSuffixAllowlist'));
         $propositionVerbs = array_map(static fn (string $name): string => strtolower($name), $settings->stringListOption('propositionVerbAllowlist'));
         $acceptedNames    = array_map(static fn (string $name): string => strtolower($name), $settings->stringListOption('acceptedBooleanNames'));
+        $includePublicApi = $settings->options['includePublicApi'] ?? true;
+        // Programmatic RuleSettings callers receive the same strict type contract as YAML configuration.
+        if (!is_bool($includePublicApi)) {
+            throw new LogicException('Option "includePublicApi" must be a boolean.');
+        }
 
         $findings = [];
 
         // Judge each function-like scope for its callable name and its bool parameters.
         foreach ((new FunctionLikeScopeWalker())->scopes($analysisUnit->statements) as $scope) {
-            $node                 = $scope->node;
-            $symbol               = $this->symbol($scope);
-            $functionLikeFindings = $node instanceof ClassMethod || $node instanceof Function_
+            $node                       = $scope->node;
+            $symbol                     = $this->symbol($scope);
+            $isCallerVisibleApiExcluded = !$includePublicApi && $this->isCallerVisibleScope($node);
+            $functionLikeFindings       = !$isCallerVisibleApiExcluded
+                && ($node instanceof ClassMethod || $node instanceof Function_)
                 ? $this->functionLikeFindings(
                     definition:       $definition,
                     analysisUnit:     $analysisUnit,
@@ -170,11 +181,9 @@ final readonly class BooleanPrefixRule implements RuleInterface
                     acceptedNames:    $acceptedNames,
                 )
                 : [];
-
-            array_push(
-                $findings,
-                ...$functionLikeFindings,
-                ...$this->parameterFindings(
+            $parameterFindings = $isCallerVisibleApiExcluded
+                ? []
+                : $this->parameterFindings(
                     definition:       $definition,
                     analysisUnit:     $analysisUnit,
                     scope:            $scope,
@@ -183,12 +192,22 @@ final readonly class BooleanPrefixRule implements RuleInterface
                     stateSuffixes:    $stateSuffixes,
                     propositionVerbs: $propositionVerbs,
                     acceptedNames:    $acceptedNames,
-                ),
+                );
+
+            array_push(
+                $findings,
+                ...$functionLikeFindings,
+                ...$parameterFindings,
             );
         }
 
         // Also judge every typed boolean property declared in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, Property::class) as $property) {
+            // Private/local-only mode excludes public and protected stored API state.
+            if (!$includePublicApi && !$property->isPrivate()) {
+                continue;
+            }
+
             // Skip a property that is not typed bool.
             if (!$this->isBoolType($property->type)) {
                 continue;
@@ -428,6 +447,26 @@ final readonly class BooleanPrefixRule implements RuleInterface
             || ($scope->node instanceof ClassMethod && $scope->node->isPrivate())
                 ? RemediationAction::Apply
                 : RemediationAction::Consider;
+    }
+
+    /**
+     * Reports whether a function-like declaration exposes caller-visible names.
+     *
+     * Named functions are always callable API. Public and protected methods are visible to callers or
+     * subclasses, while private methods, closures, and arrow functions remain local implementation details.
+     *
+     * @param ClassMethod|Function_|Closure|ArrowFunction $node - Function-like declaration to classify.
+     *
+     * @return bool - True for named functions and non-private methods; false for private/local callables.
+     */
+    private function isCallerVisibleScope(ClassMethod|Function_|Closure|ArrowFunction $node): bool
+    {
+        // Named functions expose their name and parameters directly to callers.
+        if ($node instanceof Function_) {
+            return true;
+        }
+
+        return $node instanceof ClassMethod && !$node->isPrivate();
     }
 
     /**
