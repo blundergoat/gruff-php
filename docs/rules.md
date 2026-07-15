@@ -14,10 +14,11 @@ Use that command for the full machine-readable metadata, including thresholds an
 
 Total rules: 128
 
-### Remediation action metadata
+## Remediation action metadata
 
-Selected findings carry a machine-readable `metadata.remediationAction` without
-changing their message, severity, score, or exit-code behaviour:
+Selected findings carry a machine-readable `metadata.remediationAction`. The
+action classification itself does not change severity, score, or exit-code
+behaviour:
 
 - `APPLY` marks a direct source fix.
 - `CONSIDER` marks optional or compatibility-sensitive advice that needs human
@@ -28,8 +29,11 @@ changing their message, severity, score, or exit-code behaviour:
 When a deliberate configuration hatch exists, `metadata.configurationKey`
 contains its full path. Regex comments, missing constant documentation, and
 one-line wrappers emit `APPLY`; abbreviation and named-argument findings emit
-`CONSIDER`; Boolean naming emits `APPLY` for private/local declarations and
-`CONSIDER` for caller-visible ones.
+`CONSIDER`; Boolean naming emits `APPLY` for private property and private
+callable names, while every parameter and other caller-visible declaration
+emits `CONSIDER`. PHP named arguments make parameter-only renames
+compatibility-sensitive even for private methods, promoted private state,
+closures, and arrow functions.
 JSON, hook, and SARIF transport these fields. Text and Markdown keep their
 existing finding presentation in 0.5.1.
 
@@ -112,6 +116,9 @@ words such as `keys` and `values` retain contiguous uncapped coverage. New
 including multiple names in one statement; the sixth and later names need a
 new group comment, and a visibility change ends the bounded family. A mixed
 comment such as `keys and patterns` uses the shipped uncapped behavior.
+Findings beyond that five-name cap retain the nearby comment kind and expose
+`commentQuality: bounded-group-overflow`, `groupCoverageExceeded: true`, and
+`groupCoverageLimit: 5`, instead of claiming that no nearby comment exists.
 Missing comments, detached comments, structural boundaries, generic comments
 such as `// constant`, and comments that only duplicate the constant name
 still fire.
@@ -130,7 +137,9 @@ run where every statement owns a configured regex call, a string-labelled
 at a blank line, new comment, unrelated statement, branch, or callable
 boundary. Statement ownership never crosses a nested callable boundary.
 Blank-line-separated comments and a previous statement's trailing same-line
-comment do not count even when PHP-Parser attaches them to the next node.
+comment do not count even when PHP-Parser attaches them to the next node. A
+block comment followed by executable code on the same line documents that code,
+not a regex statement on the next line.
 
 A callable docblock containing `regex`, `pattern`, `preg_`, or the configured
 function name covers only a callable that directly owns exactly one configured
@@ -279,7 +288,10 @@ as `$data`, `$result`, `$mode`, and `status()`.
 `includePublicApi` defaults to `true`. Setting it to `false` limits this rule to
 private methods/properties and closure/arrow-local parameters, skipping named
 functions, public/protected declarations, and their caller-visible parameters.
-Public constructor parameters remain API even when they promote private state.
+Retained parameter findings still carry `CONSIDER`: named arguments can target
+private methods from inside their class and can target closures or arrow
+functions through callable variables. Public constructor parameters likewise
+remain API even when they promote private state.
 
 `naming.identifier-quality` applies its `loopBodyThreshold` escape hatch
 to inline iteration callbacks as well as foreach loops: the sole

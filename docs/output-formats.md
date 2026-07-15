@@ -99,7 +99,9 @@ class aggregate findings whose reported span overlaps the changed hunk.
 `metadata.remediationAction` / `metadata.configurationKey` fields in each
 `gruff.hook.v1` finding. The hook presenter passes non-threshold metadata
 through unchanged; its existing threshold normalisation preserves the action
-keys alongside measured values.
+keys alongside measured values. Hook new-only fingerprints deliberately omit
+both action keys, so a finding accepted before action metadata was introduced
+remains suppressed when the underlying problem is otherwise unchanged.
 
 ## HTML
 

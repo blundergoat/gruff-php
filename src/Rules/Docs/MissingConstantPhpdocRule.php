@@ -291,6 +291,8 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
                     $groupContext['groupClassification'],
                     $groupContext['namesBefore'] + $constantOffset,
                 );
+            $isBoundedGroupOverflow = $groupContext['groupClassification'] === self::GROUP_COMMENT_BOUNDED
+                && !$isCoveredByGroup;
 
             // A useful single-value comment applies directly only when it did not open a family group.
             $hasDirectUsefulComment = $groupContext['meaningfulLocalKind'] !== null
@@ -309,34 +311,16 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
                 $definition,
                 $analysisUnit,
                 [
-                    'kind' => $this->findingCommentKind($groupContext, $isCoveredByGroup),
+                    'kind' => $groupContext['attachedCommentKind'] ?? $groupContext['groupCommentKind'],
                     'useful' => $hasUsefulComment,
                     'apiRequired' => $requiresApiPhpdoc,
                     'grouped' => $groupContext['inheritsGroup'] && $isCoveredByGroup,
+                    'boundedOverflow' => $isBoundedGroupOverflow,
                 ],
             );
         }
 
         return $findings;
-    }
-
-    /**
-     * Selects the accepted comment style to expose on one finding.
-     *
-     * @param array{attachedCommentKind: ?string, meaningfulLocalKind: ?string, attachedGroupClassification: ?string, groupClassification: ?string, groupCommentKind: ?string, namesBefore: int, inheritsGroup: bool, visibility: int} $groupContext - Resolved declaration coverage.
-     * @param bool $isCoveredByGroup - Whether this specific name remains inside the group budget.
-     *
-     * @return string|null - Line/block style for an accepted or low-quality local comment; null beyond the cap or without a comment.
-     */
-    private function findingCommentKind(array $groupContext, bool $isCoveredByGroup): ?string
-    {
-        // A bounded attached family comment stops applying once this name crosses its budget.
-        if ($groupContext['attachedGroupClassification'] !== null) {
-            return $isCoveredByGroup ? $groupContext['attachedCommentKind'] : null;
-        }
-
-        return $groupContext['attachedCommentKind']
-            ?? ($isCoveredByGroup ? $groupContext['groupCommentKind'] : null);
     }
 
     /**
@@ -399,7 +383,7 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
      * @param int            $line - 1-based line of the `const` statement the finding points the reviewer at.
      * @param RuleDefinition $definition - Rule defaults supplying the id, severity, tier, pillar, and confidence.
      * @param AnalysisUnit   $analysisUnit - Parsed unit whose display path is recorded on the finding.
-     * @param array{kind: ?string, useful: bool, apiRequired: bool, grouped: bool} $comment - Comment classification: the attached/grouped comment kind, whether it is meaningful, whether strict API PHPDoc applies, and whether it was inherited from a short constant group.
+     * @param array{kind: ?string, useful: bool, apiRequired: bool, grouped: bool, boundedOverflow: bool} $comment - Comment classification: nearby comment kind, usefulness, strict API mode, inherited coverage, and bounded-family overflow.
      *
      * @return Finding - Finding for an undocumented class constant.
      */
@@ -415,9 +399,19 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
         $commentKind       = $comment['kind'];
         $hasUsefulComment  = $comment['useful'];
         $requiresApiPhpdoc = $comment['apiRequired'];
+        $boundedOverflow   = $comment['boundedOverflow'];
 
-        // An exported constant with only a local comment still needs promotion to PHPDoc.
-        if ($requiresApiPhpdoc && $hasUsefulComment) {
+        // A nearby bounded-family comment still exists after its coverage budget is exhausted.
+        if ($boundedOverflow) {
+            $message = sprintf('Constant %s exceeds the %d-name coverage limit of its nearby patterns/regexes group comment.', $symbol, self::MAX_BOUNDED_GROUP_NAMES);
+            $remediation = sprintf('Start a new adjacent patterns/regexes group comment before %s, or add PHPDoc that explains this constant\'s purpose.', $symbol);
+
+            if ($requiresApiPhpdoc) {
+                $message .= ' This project also requires PHPDoc for exported constants.';
+                $remediation = sprintf('Add PHPDoc above %s explaining its purpose; a new local group comment would not satisfy this project\'s exported-API requirement.', $symbol);
+            }
+        } elseif ($requiresApiPhpdoc && $hasUsefulComment) {
+            // An exported constant with only a local comment still needs promotion to PHPDoc.
             $message     = sprintf('Constant %s has a local comment, but this project requires PHPDoc for exported constants.', $symbol);
             $remediation = sprintf('Promote the local comment above %s into a `/** ... */` block, or narrow `rules.docs.missing-constant-phpdoc.options.apiPathPatterns` / disable `requirePhpdocForApiConstants` if this is not exported API.', $symbol);
         } elseif ($commentKind !== null) {
@@ -434,7 +428,8 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
             'constantName' => $constantName,
             'kind' => 'class-constant',
             'className' => $className,
-            'commentQuality' => $hasUsefulComment ? 'meaningful' : ($commentKind !== null ? 'low-quality' : 'missing'),
+            'commentQuality' => $boundedOverflow ? 'bounded-group-overflow' : ($hasUsefulComment ? 'meaningful' : ($commentKind !== null ? 'low-quality' : 'missing')),
+            ...($boundedOverflow ? ['groupCoverageExceeded' => true, 'groupCoverageLimit' => self::MAX_BOUNDED_GROUP_NAMES] : []),
             ...RemediationAction::Apply->metadata(),
         ];
 

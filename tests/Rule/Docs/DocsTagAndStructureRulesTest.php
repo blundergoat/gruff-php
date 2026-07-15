@@ -6,6 +6,7 @@ namespace GruffPhp\Tests\Rule\Docs;
 
 use GruffPhp\Engine\Config\AnalysisConfig;
 use GruffPhp\Engine\Config\RuleSettings;
+use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\RemediationAction;
 use GruffPhp\Rules\Docs\BarePhpdocTagsRule;
 use GruffPhp\Rules\Docs\MissingClassPhpdocRule;
@@ -19,12 +20,16 @@ use GruffPhp\Rules\Docs\StaleParamTagRule;
 use GruffPhp\Rules\Docs\TodoDensityRule;
 use GruffPhp\Rules\Docs\VarAnnotationDescriptionRule;
 use GruffPhp\Rules\RuleRegistry;
+use GruffPhp\Rules\Shared\PhysicalCommentAttachment;
 
 /**
  * Covers documentation tag, file, class, property, and constant rules.
  */
 final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
 {
+    /** Expected maximum names covered by one bounded pattern-family comment. */
+    private const BOUNDED_GROUP_LIMIT = 5;
+
     /**
      * Verify stale param tag detected.
      *
@@ -282,6 +287,8 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
         self::assertSame('784f88c1d188c09f', $stableIdentities['RegexCommentFixture::isUndocumentedRegexMatch()'] ?? null);
         self::assertSame('71689c0f4f3d8560', $stableIdentities['RegexCommentFixture::isSeparatedRegexMatch()'] ?? null);
         self::assertSame('05f644587976fa95', $stableIdentities['RegexCommentFixture::matchTheRouteUncommentedRegex()'] ?? null);
+
+        $this->assertRegexCommentLineWithTrailingCodeReports();
     }
 
     /**
@@ -545,6 +552,10 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
         self::assertArrayNotHasKey('commentKind', $byConstant['PRIVATE_DETACHED_COMMENT']->metadata);
         self::assertSame('missing', $byConstant['TRAILING_COMMENT_FOLLOWER']->metadata['commentQuality'] ?? null);
         self::assertArrayNotHasKey('commentKind', $byConstant['TRAILING_COMMENT_FOLLOWER']->metadata);
+
+        $this->assertBoundedGroupOverflow($byConstant['PATIENT_OVERFLOW_PATTERN']);
+        $this->assertBoundedGroupOverflow($byConstant['COMPARISON_ZETA_PATTERN']);
+        $this->assertSameStatementGroupOverflow();
     }
 
     /**
@@ -586,9 +597,10 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
         self::assertTrue($patientReference->metadata['groupedLocalComment'] ?? null);
 
         $patientOverflow = $byConstant['PATIENT_OVERFLOW_PATTERN'];
-        self::assertSame('missing', $patientOverflow->metadata['commentQuality'] ?? null);
+        $this->assertBoundedGroupOverflow($patientOverflow);
         self::assertTrue($patientOverflow->metadata['requiresApiPhpdoc'] ?? null);
         self::assertArrayNotHasKey('groupedLocalComment', $patientOverflow->metadata);
+        self::assertStringContainsString('also requires PHPDoc', $patientOverflow->message);
     }
 
     /**
@@ -609,6 +621,81 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
         self::assertArrayHasKey('TELEMETRY_KEY', $byConstant);
         self::assertTrue($byConstant['TELEMETRY_KEY']->metadata['requiresApiPhpdoc'] ?? null);
         self::assertArrayNotHasKey('DOCUMENTED_TELEMETRY_KEY', $byConstant);
+    }
+
+    /**
+     * Verify an immediate block comment stops at its closing token instead of hiding trailing code.
+     *
+     * @return void
+     */
+    private function assertRegexCommentLineWithTrailingCodeReports(): void
+    {
+        $commentOnlyFindings = $this->analyseSourceRule(<<<'PHP'
+<?php
+final class CommentOnlyRegex
+{
+    public function matches(string $subject): bool
+    {
+        /* Match the supported marker. */
+        return preg_match('/marker/', $subject) === 1;
+    }
+}
+PHP, RegexCommentRule::ID);
+        $trailingCodeFindings = $this->analyseSourceRule(<<<'PHP'
+<?php
+final class TrailingCodeRegex
+{
+    public function matches(string $subject): bool
+    {
+        /* Match the supported marker. */ $unrelated = 1;
+        return preg_match('/marker/', $subject) === 1;
+    }
+}
+PHP, RegexCommentRule::ID);
+
+        self::assertSame([], $commentOnlyFindings);
+        self::assertCount(1, $trailingCodeFindings);
+        self::assertSame('TrailingCodeRegex::matches()', $trailingCodeFindings[0]->symbol);
+        self::assertTrue(PhysicalCommentAttachment::isCommentOnlyLine('    /* Match the supported marker. */'));
+        self::assertFalse(PhysicalCommentAttachment::isCommentOnlyLine('    /* Match the supported marker. */ $unrelated = 1;'));
+    }
+
+    /**
+     * Verify one multi-name declaration reports only the names beyond a bounded group comment.
+     *
+     * @return void
+     */
+    private function assertSameStatementGroupOverflow(): void
+    {
+        $findings = $this->analyseSourceRule(<<<'PHP'
+<?php
+final class PatternBag
+{
+    // Validation patterns used by the supported inputs.
+    public const A = 'a', B = 'b', C = 'c', D = 'd', E = 'e', F = 'f';
+}
+PHP, MissingConstantPhpdocRule::ID);
+
+        self::assertCount(1, $findings);
+        self::assertSame('PatternBag::F', $findings[0]->symbol);
+        $this->assertBoundedGroupOverflow($findings[0]);
+        self::assertStringContainsString('Start a new adjacent patterns/regexes group comment', $findings[0]->remediation ?? '');
+    }
+
+    /**
+     * Assert the shared machine-readable shape for a name beyond a bounded group comment.
+     *
+     * @param Finding $finding - Overflow finding to inspect.
+     *
+     * @return void
+     */
+    private function assertBoundedGroupOverflow(Finding $finding): void
+    {
+        self::assertSame('bounded-group-overflow', $finding->metadata['commentQuality'] ?? null);
+        self::assertSame('line', $finding->metadata['commentKind'] ?? null);
+        self::assertTrue($finding->metadata['groupCoverageExceeded'] ?? null);
+        self::assertSame(self::BOUNDED_GROUP_LIMIT, $finding->metadata['groupCoverageLimit'] ?? null);
+        self::assertStringContainsString('exceeds the 5-name coverage limit', $finding->message);
     }
 
     /**

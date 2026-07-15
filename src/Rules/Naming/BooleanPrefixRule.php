@@ -23,12 +23,10 @@ use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\Node\NullableType;
-use PhpParser\Node\Param;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 use PhpParser\Node\Stmt\Property;
 use PhpParser\Node\UnionType;
-use PhpParser\Modifiers;
 use LogicException;
 
 /**
@@ -359,7 +357,9 @@ final readonly class BooleanPrefixRule implements RuleInterface
                 kind:         $param->flags === 0 ? 'parameter' : 'property',
                 name:         $name,
                 symbol:       $symbol,
-                action:       $this->parameterAction($scope, $param),
+                // PHP named arguments make every parameter name caller-observable, including private,
+                // promoted, closure, and arrow-function parameters, so a rename always needs review.
+                action:       RemediationAction::Consider,
             );
         }
 
@@ -375,7 +375,7 @@ final readonly class BooleanPrefixRule implements RuleInterface
      * @param string         $kind - Identifier kind label, either "property" or "parameter".
      * @param string         $name - Identifier name without the leading dollar sign.
      * @param string|null    $symbol - Owning callable symbol, or null for a bare property.
-     * @param RemediationAction $action - Direct fix for private/local declarations, or review for caller-visible declarations.
+     * @param RemediationAction $action - Direct fix for private stored/callable names, or review for every parameter and caller-visible declaration.
      *
      * @return Finding - Finding for a boolean identifier without clear predicate naming.
      */
@@ -423,30 +423,6 @@ final readonly class BooleanPrefixRule implements RuleInterface
         return $node instanceof ClassMethod && $node->isPrivate()
             ? RemediationAction::Apply
             : RemediationAction::Consider;
-    }
-
-    /**
-     * Classifies a Boolean parameter using promotion flags and its owning callable.
-     *
-     * @param FunctionLikeScope $scope - Callable that owns the parameter.
-     * @param Param             $param - Parameter declaration, including promoted-property flags.
-     *
-     * @return RemediationAction - APPLY for private promoted state and local/private callables; otherwise CONSIDER.
-     */
-    private function parameterAction(FunctionLikeScope $scope, Param $param): RemediationAction
-    {
-        // A promoted parameter is stored state, so its own declared visibility decides compatibility risk.
-        if ($param->isPromoted()) {
-            return ($param->flags & Modifiers::PRIVATE) !== 0
-                ? RemediationAction::Apply
-                : RemediationAction::Consider;
-        }
-
-        return $scope->node instanceof Closure
-            || $scope->node instanceof ArrowFunction
-            || ($scope->node instanceof ClassMethod && $scope->node->isPrivate())
-                ? RemediationAction::Apply
-                : RemediationAction::Consider;
     }
 
     /**

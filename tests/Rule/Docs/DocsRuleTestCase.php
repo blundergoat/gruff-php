@@ -65,6 +65,38 @@ abstract class DocsRuleTestCase extends TestCase
     }
 
     /**
+     * Analyse inline PHP without adding it to the snapshot-locked fixture corpus.
+     *
+     * @param string              $source - Inline PHP written to a throwaway file before parsing.
+     * @param string              $ruleId - Rule id to keep; findings from every other rule are discarded.
+     * @param AnalysisConfig|null $config - Effective config override; null uses registry defaults.
+     *
+     * @return list<\GruffPhp\Results\Finding\Finding> - Findings emitted by the named rule for the inline source.
+     */
+    protected function analyseSourceRule(string $source, string $ruleId, ?AnalysisConfig $config = null): array
+    {
+        $path = tempnam(sys_get_temp_dir(), 'gruff-docs-');
+        self::assertIsString($path);
+
+        try {
+            file_put_contents($path, $source);
+
+            $unit     = $this->parser->parse(new SourceFile($path, 'tests/Fixtures/Docs/inline.php'));
+            $registry = RuleRegistry::defaults();
+            $findings = $registry->analyse(
+                [$unit],
+                new RuleContext(__DIR__ . '/../../..', $config ?? AnalysisConfig::fromRegistry($registry)),
+            );
+
+            return array_values(array_filter($findings, static fn($finding): bool => $finding->ruleId === $ruleId));
+        } finally {
+            if (is_file($path)) {
+                unlink($path);
+            }
+        }
+    }
+
+    /**
      * Parse the named fixture into an analysis unit.
      *
      * @param string $filename - Fixture filename.

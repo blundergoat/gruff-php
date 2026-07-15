@@ -467,7 +467,7 @@ final readonly class RegexCommentRule implements RuleInterface
      * @param list<string> $sourceLines - Whole-file source split on newlines, indexed from zero.
      * @param int          $regexCallLine - 1-based line of the regex call whose preceding line is checked.
      *
-     * @return bool - True when the previous physical line is a comment.
+     * @return bool - True when the previous physical line contains only a comment and whitespace.
      */
     private function hasImmediateCommentAbove(array $sourceLines, int $regexCallLine): bool
     {
@@ -477,12 +477,8 @@ final readonly class RegexCommentRule implements RuleInterface
             return false;
         }
 
-        $trimmedLine = ltrim($previousLine);
-
-        // A leading // # or single-line /* */ on the prior line counts as the required inline explanation.
-        return str_starts_with($trimmedLine, '//')
-            || str_starts_with($trimmedLine, '#')
-            || (str_starts_with($trimmedLine, '/*') && str_contains($trimmedLine, '*/'));
+        // A comment followed by executable code documents that code, not the regex statement below it.
+        return PhysicalCommentAttachment::isCommentOnlyLine($previousLine);
     }
 
     /**

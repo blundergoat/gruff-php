@@ -221,10 +221,10 @@ PHP, AbbreviationAllowlistRule::ID);
         self::assertNotNull($publicProperty);
         self::assertNotNull($publicParameter);
         self::assertNotNull($localClosure);
-        self::assertSame(RemediationAction::Apply->value, $privatePromotion->metadata['remediationAction'] ?? null);
+        self::assertSame(RemediationAction::Consider->value, $privatePromotion->metadata['remediationAction'] ?? null);
         self::assertSame(RemediationAction::Consider->value, $publicProperty->metadata['remediationAction'] ?? null);
         self::assertSame(RemediationAction::Consider->value, $publicParameter->metadata['remediationAction'] ?? null);
-        self::assertSame(RemediationAction::Apply->value, $localClosure->metadata['remediationAction'] ?? null);
+        self::assertSame(RemediationAction::Consider->value, $localClosure->metadata['remediationAction'] ?? null);
 
         $expectedConfigurationKey = 'rules.naming.boolean-prefix.options.acceptedBooleanNames';
         self::assertSame($expectedConfigurationKey, $privatePromotion->metadata['configurationKey'] ?? null);
@@ -334,6 +334,33 @@ PHP, BooleanPrefixRule::ID, config: $config);
         self::assertContains('ApiFlags::privateStatus()', $symbols);
         self::assertContains('privateFlag', $names);
         self::assertContains('closureFlag', $names);
+
+        $privateProperty = array_values(array_filter(
+            $findings,
+            static fn($finding): bool => $finding->symbol === '$privateState',
+        ))[0] ?? null;
+        $privateCallable = array_values(array_filter(
+            $findings,
+            static fn($finding): bool => $finding->symbol === 'ApiFlags::privateStatus()'
+                && !isset($finding->metadata['identifierKind']),
+        ))[0] ?? null;
+        $privateParameter = array_values(array_filter(
+            $findings,
+            static fn($finding): bool => ($finding->metadata['identifierName'] ?? null) === 'privateFlag',
+        ))[0] ?? null;
+        $closureParameter = array_values(array_filter(
+            $findings,
+            static fn($finding): bool => ($finding->metadata['identifierName'] ?? null) === 'closureFlag',
+        ))[0] ?? null;
+
+        self::assertNotNull($privateProperty);
+        self::assertNotNull($privateCallable);
+        self::assertNotNull($privateParameter);
+        self::assertNotNull($closureParameter);
+        self::assertSame(RemediationAction::Apply->value, $privateProperty->metadata['remediationAction'] ?? null);
+        self::assertSame(RemediationAction::Apply->value, $privateCallable->metadata['remediationAction'] ?? null);
+        self::assertSame(RemediationAction::Consider->value, $privateParameter->metadata['remediationAction'] ?? null);
+        self::assertSame(RemediationAction::Consider->value, $closureParameter->metadata['remediationAction'] ?? null);
     }
 
     /**

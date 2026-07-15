@@ -253,6 +253,9 @@ the complete effective default surface, including `allowedPrefixes`.
 asking for caller-visible renames while retaining findings on private/local
 implementation details. Public constructor parameters are caller-visible named-
 argument API even when they promote a private property, so this mode skips them.
+Parameter findings retained in private methods, closures, and arrow functions
+still use `CONSIDER`, because those callables can also be invoked with named
+arguments.
 
 ### Finding action metadata
 
@@ -265,9 +268,10 @@ metadata keys:
   hatch, for example `allowlists.acceptedAbbreviations` or
   `rules.naming.boolean-prefix.options.acceptedBooleanNames`.
 
-`CONFIGURE` is not emitted unconditionally by any 0.5.1 rule. Abbreviation and
-caller-visible Boolean findings use `CONSIDER` because configuration or a
-rename can both be valid, while private/local Boolean findings use `APPLY`.
+`CONFIGURE` is not emitted unconditionally by any 0.5.1 rule. Abbreviation,
+every Boolean parameter, and other caller-visible Boolean findings use
+`CONSIDER` because configuration or a compatibility-sensitive rename can both
+be valid. Only private property and private callable names use `APPLY`.
 JSON, hook, and SARIF transport the keys; text and Markdown presentation is
 unchanged in this release.
 
