@@ -56,28 +56,38 @@ final class PhysicalCommentAttachment
     }
 
     /**
-     * Report whether a physical line contains an indented comment and no trailing code.
+     * Report whether a physical span contains one or more comments and no executable code.
      *
      * @param string $line - One physical source line, or a complete multi-line block-comment span.
      *
-     * @return bool - True for `//`, `#`, or a closed `/* ... *\/` comment with only trailing whitespace.
+     * @return bool - True when whitespace-separated line or closed block comments consume the complete span.
      */
     public static function isCommentOnlyLine(string $line): bool
     {
-        $trimmedLine = ltrim($line);
-
-        // Everything after a line-comment delimiter is comment text by PHP syntax.
-        if (str_starts_with($trimmedLine, '//') || str_starts_with($trimmedLine, '#')) {
-            return true;
-        }
-
-        if (!str_starts_with($trimmedLine, '/*')) {
+        $remaining = ltrim($line);
+        if ($remaining === '') {
             return false;
         }
 
-        $closingDelimiter = strrpos($trimmedLine, '*/');
+        while ($remaining !== '') {
+            // Everything after a line-comment delimiter is comment text by PHP syntax.
+            if (str_starts_with($remaining, '//') || str_starts_with($remaining, '#')) {
+                return true;
+            }
 
-        return $closingDelimiter !== false
-            && trim(substr($trimmedLine, $closingDelimiter + 2)) === '';
+            if (!str_starts_with($remaining, '/*')) {
+                return false;
+            }
+
+            // Consume the first block comment so code cannot hide before a later closing delimiter.
+            $closingDelimiter = strpos($remaining, '*/', 2);
+            if ($closingDelimiter === false) {
+                return false;
+            }
+
+            $remaining = ltrim(substr($remaining, $closingDelimiter + 2));
+        }
+
+        return true;
     }
 }

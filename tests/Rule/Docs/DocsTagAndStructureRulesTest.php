@@ -288,7 +288,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
         self::assertSame('71689c0f4f3d8560', $stableIdentities['RegexCommentFixture::isSeparatedRegexMatch()'] ?? null);
         self::assertSame('05f644587976fa95', $stableIdentities['RegexCommentFixture::matchTheRouteUncommentedRegex()'] ?? null);
 
-        $this->assertRegexCommentLineWithTrailingCodeReports();
+        $this->assertRegexCommentLineClassification();
     }
 
     /**
@@ -624,11 +624,11 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify an immediate block comment stops at its closing token instead of hiding trailing code.
+     * Verify comment-only delimiter chains cover a regex while executable segments still report.
      *
      * @return void
      */
-    private function assertRegexCommentLineWithTrailingCodeReports(): void
+    private function assertRegexCommentLineClassification(): void
     {
         $commentOnlyFindings = $this->analyseSourceRule(<<<'PHP'
 <?php
@@ -637,6 +637,17 @@ final class CommentOnlyRegex
     public function matches(string $subject): bool
     {
         /* Match the supported marker. */
+        return preg_match('/marker/', $subject) === 1;
+    }
+}
+PHP, RegexCommentRule::ID);
+        $commentChainFindings = $this->analyseSourceRule(<<<'PHP'
+<?php
+final class CommentChainRegex
+{
+    public function matches(string $subject): bool
+    {
+        /* Context. */ // Match the supported marker.
         return preg_match('/marker/', $subject) === 1;
     }
 }
@@ -652,12 +663,31 @@ final class TrailingCodeRegex
     }
 }
 PHP, RegexCommentRule::ID);
+        $sandwichedCodeFindings = $this->analyseSourceRule(<<<'PHP'
+<?php
+final class SandwichedCodeRegex
+{
+    public function matches(string $subject): bool
+    {
+        /* Context. */ $unrelated = 1; /* Match the supported marker. */
+        return preg_match('/marker/', $subject) === 1;
+    }
+}
+PHP, RegexCommentRule::ID);
 
         self::assertSame([], $commentOnlyFindings);
+        self::assertSame([], $commentChainFindings);
         self::assertCount(1, $trailingCodeFindings);
         self::assertSame('TrailingCodeRegex::matches()', $trailingCodeFindings[0]->symbol);
+        self::assertCount(1, $sandwichedCodeFindings);
+        self::assertSame('SandwichedCodeRegex::matches()', $sandwichedCodeFindings[0]->symbol);
         self::assertTrue(PhysicalCommentAttachment::isCommentOnlyLine('    /* Match the supported marker. */'));
+        self::assertTrue(PhysicalCommentAttachment::isCommentOnlyLine('    /* Context. */ // Match the supported marker.'));
+        self::assertTrue(PhysicalCommentAttachment::isCommentOnlyLine('    /* Context. */ # Match the supported marker.'));
+        self::assertTrue(PhysicalCommentAttachment::isCommentOnlyLine('    /* Context. */ /* Match the supported marker. */'));
         self::assertFalse(PhysicalCommentAttachment::isCommentOnlyLine('    /* Match the supported marker. */ $unrelated = 1;'));
+        self::assertFalse(PhysicalCommentAttachment::isCommentOnlyLine('    /* Context. */ $unrelated = 1; /* Match the supported marker. */'));
+        self::assertFalse(PhysicalCommentAttachment::isCommentOnlyLine('    /* Unclosed context.'));
     }
 
     /**
