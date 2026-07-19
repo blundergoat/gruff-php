@@ -16,7 +16,7 @@ Last reviewed 2026-07-04. Captures the current source surface as wired in `compo
 |-- phpunit.xml.dist          = PHPUnit 12 test suite config
 |-- package.json              = harness-only Node manifest (no app code consumes it)
 |-- package-lock.json         = npm lockfile for harness Node tooling
-|-- node_modules/             = harness Node tooling install (gitignored)
+|-- node_modules/             = harness Node tooling install, gitignored; the vendored @blundergoat/goat-flow package is dist-only, so its upstream src/dashboard/views/ HTML view files (about, home, hooks, plans, projects, prompts, quality, settings, setup, skills, workspace) are not on disk here
 |-- vendor/                   = Composer install (gitignored)
 |-- bin/                      = PHP CLI entrypoint
 |-- scripts/                  = local maintenance scripts
@@ -187,7 +187,7 @@ tests/
 |-- skill-docs/
 |   |-- skill-conventions.md                  = shared full-depth skill conventions
 |   |-- skill-preamble.md                     = shared goat-* skill preamble
-|   |-- playbooks/                            = tool and discipline playbooks, including gruff-code-quality and code-comments
+|   |-- playbooks/                            = tool and discipline playbooks: browser-use.md, changelog.md, code-comments.md, gruff-code-quality.md, hook-policy-testing.md, observability.md, page-capture.md, release-notes.md, skill-playbook-authoring-sync.md, plus the README.md index
 |   `-- skill-quality-testing/                = supporting docs for skill-quality-testing
 |-- plans/                                    = local milestone/task workspace (gitignored content under it)
 |-- scratchpad/                               = local temporary notes (gitignored content under it)

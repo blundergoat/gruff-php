@@ -130,4 +130,4 @@ shape without bumping the schema version.
 - [`gruff-cli-agent-instructions.md`](gruff-cli-agent-instructions.md) - for agents wrapping the CLI.
 - [`gruff-cli-branch-review.md`](gruff-cli-branch-review.md) - diff-aware review workflow.
 - [`README.md`](../README.md) - main project overview.
-- [`src/Command/SummaryCommand.php`](../src/Command/SummaryCommand.php) - source of truth.
+- [`src/Cli/Command/SummaryCommand.php`](../src/Cli/Command/SummaryCommand.php) - source of truth.

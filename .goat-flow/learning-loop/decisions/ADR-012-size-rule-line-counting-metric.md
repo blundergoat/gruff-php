@@ -32,7 +32,7 @@ A worked example: `src/Command/AnalyseCommand.php::execute` is 169 raw lines (wo
 | --- | --- | --- |
 | All-raw across the four rules | Orchestration methods that delegate cleanly score the same as cramped methods with deep nesting; the rule fires on disciplined long-but-flat callers. | Rejected. Method density is what the rule should be measuring. |
 | All-logical across the four rules | Class-length and file-length become dependent on statement density rather than visual size; whitespace-heavy classes pass that would fail an all-raw check, and cosmetic reformatting changes whether a file is "too long." | Rejected. Containers' burden is visual, not density-shaped. |
-| Current mix (containers raw, contents logical) | Two metrics in one rule family that adopters must remember. Mitigation: this ADR plus the per-rule docblocks plus the per-rule comments in `.gruff-php.yaml` make the choice explicit. | Accepted. The metric choice matches what each rule is actually measuring. |
+| Current mix (containers raw, contents logical) | Two metrics in one rule family that adopters must track. Mitigation: this ADR plus the per-rule docblocks plus the per-rule comments in `.gruff-php.yaml` make the choice explicit. | Accepted. The metric choice matches what each rule is actually measuring. |
 | Document the mix without changing anything else | Resolves the surprise but does not address PHPMD/Sonar anchor narratives elsewhere. | Insufficient on its own. ADR-009's anchor section is amended in the same milestone to acknowledge the unit transform for `size.method-length`. |
 
 ## Industry-anchor caveat

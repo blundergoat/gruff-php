@@ -1,9 +1,19 @@
 ---
 category: setup
-last_reviewed: 2026-06-07
+last_reviewed: 2026-07-20
 ---
 
 # Setup Footguns
+
+## Footgun: goat-flow content audit requires a goat-flow-dashboard-views line in a consumer code map
+
+**Status:** active | **Created:** 2026-07-20 | **Evidence:** OBSERVED
+
+goat-flow 1.14.0's `audit --check-content` runs `code-map-dashboard-view-drift` unconditionally on any project with `.goat-flow/code-map.md`. When the target has no `src/dashboard/views/*.html` (true for every consumer project - the npm package ships dist-only), the check falls back to goat-flow's own manifest view list and fails unless the code map contains a line with `views/`, the phrase `HTML view`, and a first parenthesised group listing exactly the goat-flow dashboard view names. `.goat-flow/code-map.md` (search: `src/dashboard/views/ HTML view files`) carries that line on the `node_modules/` entry, phrased truthfully as describing the upstream package.
+
+**Evidence:** This session's 1.13.0 to 1.14.0 upgrade: `audit . --agent claude --check-content` reported `code-map-dashboard-view-drift` ("Code map lists dashboard views as none") with no `src/dashboard/views` on disk. Check source: `node_modules/@blundergoat/goat-flow/dist/cli/audit/check-factual-semantic-drift.js` (search: `readDashboardViewFiles`) - the manifest fallback fires whenever the glob returns zero files.
+
+**Prevention:** Do not strip the odd-looking dashboard-views sentence from the `node_modules/` line in `.goat-flow/code-map.md` during cleanup passes; removing it re-fails the content gate. Keep any other parenthesised text on that line after the view-name list, because the checker parses only the first parenthesised group. This is an upstream check leaking goat-flow self-repo facts into consumer audits - worth reporting to goat-flow; drop the line only after upstream gates the check.
 
 ## Footgun: Package bin bootstraps must use Composer's consumer autoloader
 
