@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Finding;
 
+use GruffPhp\Output\Hook\HookFindingFilter;
+use GruffPhp\Output\Hook\HookFindingIdentity;
 use GruffPhp\Results\Finding\Confidence;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Pillar;
+use GruffPhp\Results\Finding\RemediationAction;
 use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
 use PHPUnit\Framework\TestCase;
@@ -60,6 +63,71 @@ final class FindingTest extends TestCase
                          ], $finding->toArray());
         self::assertMatchesRegularExpression('/^[a-f0-9]{16}$/', $finding->fingerprint());
         self::assertMatchesRegularExpression('/^[a-f0-9]{16}$/', $finding->stableIdentity());
+    }
+
+    /**
+     * Verify remediation metadata round-trips without becoming part of finding identity.
+     *
+     * @return void
+     */
+    public function testRemediationMetadataIsAdditiveAndIdentityNeutral(): void
+    {
+        $plain      = $this->finding(line: 10, symbol: 'Example::doWork()', ruleId: 'naming.boolean-prefix');
+        $serialized = $plain->toArray();
+        $serialized['metadata'] = RemediationAction::Consider->metadata(
+            'rules.naming.boolean-prefix.options.acceptedBooleanNames',
+        );
+        $classified = Finding::fromArray($serialized);
+
+        self::assertSame(
+            ['remediationAction' => 'APPLY'],
+            RemediationAction::Apply->metadata(),
+        );
+        self::assertSame(
+            ['remediationAction' => 'CONFIGURE'],
+            RemediationAction::Configure->metadata(),
+        );
+        self::assertSame(
+            [
+                'remediationAction' => 'CONSIDER',
+                'configurationKey' => 'rules.naming.boolean-prefix.options.acceptedBooleanNames',
+            ],
+            $classified->metadata,
+        );
+        self::assertSame($plain->fingerprint(), $classified->fingerprint());
+        self::assertSame($plain->stableIdentity(), $classified->stableIdentity());
+        self::assertSame($classified->metadata, Finding::fromArray($classified->toArray())->metadata);
+    }
+
+    /**
+     * Verify hook new-only filtering ignores additive remediation metadata.
+     *
+     * @return void
+     */
+    public function testHookBaselineIdentityIgnoresRemediationMetadata(): void
+    {
+        $plain      = $this->finding(line: 10, symbol: 'Example::doWork()', ruleId: 'naming.boolean-prefix');
+        $serialized = $plain->toArray();
+        $serialized['metadata'] = RemediationAction::Consider->metadata(
+            'rules.naming.boolean-prefix.options.acceptedBooleanNames',
+        );
+        $classified                 = Finding::fromArray($serialized);
+
+        $plainHookIdentities      = HookFindingIdentity::forFindings([$plain]);
+        $classifiedHookIdentities = HookFindingIdentity::forFindings([$classified]);
+        $plainHookIdentity        = $plainHookIdentities[spl_object_id($plain)];
+        $classifiedHookIdentity   = $classifiedHookIdentities[spl_object_id($classified)];
+
+        $filterResult = (new HookFindingFilter())->apply(
+            [$classified],
+            null,
+            [$plainHookIdentity => true],
+            true,
+        );
+
+        self::assertSame($plainHookIdentity, $classifiedHookIdentity);
+        self::assertSame([], $filterResult->findings);
+        self::assertSame(1, $filterResult->suppressedCount);
     }
 
     /**

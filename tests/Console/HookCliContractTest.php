@@ -150,6 +150,28 @@ final class HookCliContractTest extends CliTestCase
     }
 
     /**
+     * Verify hook findings transport canonical remediation action metadata unchanged.
+     *
+     * @return void
+     * @throws JsonException
+     */
+    public function testHookTransportsRemediationActionMetadata(): void
+    {
+        [$process, $report] = $this->runHook(self::PROJECT_ROOT, [
+            'hook', 'tests/Fixtures/Naming/abbreviation-allowlist.php', '--no-config',
+            '--include-rule', 'naming.abbreviation-allowlist', '--format', 'json',
+        ]);
+        $finding = $this->firstFindingByRule($this->findingRows($report), 'naming.abbreviation-allowlist');
+        $metadata = $finding['metadata'] ?? null;
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        self::assertNotNull($finding);
+        self::assertIsArray($metadata);
+        self::assertSame('CONSIDER', $metadata['remediationAction'] ?? null);
+        self::assertSame('allowlists.acceptedAbbreviations', $metadata['configurationKey'] ?? null);
+    }
+
+    /**
      * Verify hook new-only matching is stable across measured-value changes but reports newly crossing findings.
      *
      * @return void

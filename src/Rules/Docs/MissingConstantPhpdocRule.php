@@ -8,15 +8,18 @@ use GruffPhp\Engine\Config\RuleSettings;
 use GruffPhp\Results\Finding\Confidence;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Pillar;
+use GruffPhp\Results\Finding\RemediationAction;
 use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Rules\Shared\NodeIndex;
+use GruffPhp\Rules\Shared\PhysicalCommentAttachment;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Comment;
 use PhpParser\Comment\Doc;
+use PhpParser\Modifiers;
 use PhpParser\Node;
 use PhpParser\Node\Stmt\Class_;
 use PhpParser\Node\Stmt\ClassConst;
@@ -31,13 +34,41 @@ use PhpParser\Node\Stmt\Trait_;
  * what each value means and why it exists instead of decoding a bare literal.
  *
  * Runs per file over classes, traits, interfaces, and enums. A meaningful attached line or block comment
- * satisfies a constant, and a short group comment can cover a run of consecutive constants; enum cases are
- * reported only when the enum itself is undocumented. Turn on `requirePhpdocForApiConstants`, or list
- * `apiPathPatterns`, to demand real PHPDoc on exported public and protected constants. Advisory, medium
- * confidence.
+ * satisfies a constant. Shipped group categories cover contiguous declarations, while an explicit patterns
+ * or regexes family comment covers at most five declared names. Enum cases are reported only when the enum
+ * itself is undocumented. Turn on `requirePhpdocForApiConstants`, or list `apiPathPatterns`, to demand real
+ * PHPDoc on exported public and protected constants. Advisory, medium confidence.
  */
 final readonly class MissingConstantPhpdocRule implements RuleInterface
 {
+    /** Bounded classification for newly recognised pattern-family comments. */
+    private const GROUP_COMMENT_BOUNDED = 'bounded';
+
+    /** Uncapped classification preserving the rule's already-shipped group words. */
+    private const GROUP_COMMENT_SHIPPED = 'shipped';
+
+    /** Maximum declared names covered by one bounded pattern-family comment. */
+    private const MAX_BOUNDED_GROUP_NAMES = 5;
+
+    /** Newly recognised group words whose inherited coverage is deliberately bounded. */
+    private const BOUNDED_GROUP_WORDS = ['patterns' => true, 'regexes' => true];
+
+    /** Existing group words whose contiguous coverage remains uncapped for compatibility. */
+    private const SHIPPED_GROUP_WORDS = [
+        'fields' => true,
+        'keys' => true,
+        'modes' => true,
+        'options' => true,
+        'roles' => true,
+        'scopes' => true,
+        'sources' => true,
+        'states' => true,
+        'statuses' => true,
+        'tabs' => true,
+        'types' => true,
+        'values' => true,
+    ];
+
     /**
      * Stable rule identifier for missing constant PHPDoc findings.
      */
@@ -61,6 +92,7 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
                 'requirePhpdocForApiConstants' => false,
                 'apiPathPatterns' => [],
             ],
+            description: 'Requires constants to explain their purpose with PHPDoc or meaningful local comments; explicit patterns/regexes families cover at most five names while shipped group categories keep contiguous coverage.',
             optionDescriptions: [
                 'requirePhpdocForApiConstants' => 'When true, public and protected constants require PHPDoc even when they have useful local comments.',
                 'apiPathPatterns' => 'Project-relative glob patterns whose public/protected constants require PHPDoc for exported API documentation.',
@@ -68,7 +100,7 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
             falsePositiveShapes: [
                 [
                     'shape' => 'Application constants use concise local `//` comments rather than PHPDoc.',
-                    'mitigation' => 'Default behaviour accepts meaningful attached local comments; enable `requirePhpdocForApiConstants` only for exported API surfaces.',
+                    'mitigation' => 'Default behaviour accepts meaningful attached local comments, contiguous shipped categories, and the first five names under explicit patterns/regexes family comments; enable `requirePhpdocForApiConstants` only for exported API surfaces.',
                 ],
             ],
         );
@@ -139,70 +171,208 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
         AnalysisUnit $analysisUnit,
         RuleSettings $settings,
     ): array {
-        $findings            = [];
-        $groupCommentKind    = null;
-        $groupCommentEndLine = null;
+        $findings   = [];
+        $groupState = $this->emptyGroupState();
 
         // Walk the class body in order so a group comment can carry to the constants beneath it.
         foreach ($classLike->stmts as $statement) {
             // A non-constant statement, or one already carrying PHPDoc, ends any open comment group.
             if (!$statement instanceof ClassConst || $statement->getDocComment() !== null) {
-                $groupCommentKind    = null;
-                $groupCommentEndLine = null;
+                $groupState = $this->emptyGroupState();
                 continue;
             }
 
-            $attachedCommentKind  = $this->localCommentKind($statement, false);
-            $meaningfulLocalKind  = $this->localCommentKind($statement, true);
-            $groupedCommentKind   = null;
-            $isConsecutiveInGroup = $groupCommentKind !== null
-                && $groupCommentEndLine !== null
-                && $statement->getStartLine() === $groupCommentEndLine + 1;
-
-            // An otherwise-bare constant directly below a group comment inherits that shared explanation.
-            if ($meaningfulLocalKind === null && $attachedCommentKind === null && $isConsecutiveInGroup) {
-                $meaningfulLocalKind = $groupCommentKind;
-                $groupedCommentKind  = $groupCommentKind;
-            }
-
-            $requiresApiPhpdoc = $this->requiresPhpdocForApiConstants($statement, $analysisUnit->file->displayPath, $settings);
-            $hasUsefulComment  = $meaningfulLocalKind !== null;
-
-            // Report the constant when it has no useful comment, or when this path demands PHPDoc for it.
-            if (!$hasUsefulComment || $requiresApiPhpdoc) {
-                // One statement can declare several constants, so flag each name in it.
-                foreach ($statement->consts as $const) {
-                    $findings[] = $this->classConstantFinding(
-                        $const->name->toString(),
-                        $className,
-                        $statement->getStartLine(),
-                        $definition,
-                        $analysisUnit,
-                        [
-                            'kind'        => $attachedCommentKind ?? $groupedCommentKind,
-                            'useful'      => $hasUsefulComment,
-                            'apiRequired' => $requiresApiPhpdoc,
-                            'grouped'     => $groupedCommentKind !== null,
-                        ],
-                    );
-                }
-            }
-
-            // Carry the group-comment state forward once; the emit and skip paths shared this logic.
-            if ($hasUsefulComment && $attachedCommentKind !== null && $this->hasGroupLocalComment($statement)) {
-                $groupCommentKind    = $attachedCommentKind;
-                $groupCommentEndLine = $statement->getEndLine();
-            } elseif ($groupedCommentKind !== null) {
-                // A constant that borrowed the group comment extends the group's reach to its own end line.
-                $groupCommentEndLine = $statement->getEndLine();
-            } else {
-                // Anything else closes the group so a later constant cannot borrow a stale comment.
-                $groupCommentKind    = null;
-                $groupCommentEndLine = null;
-            }
+            $groupContext = $this->statementGroupContext($statement, $groupState, $analysisUnit->source);
+            array_push(
+                $findings,
+                ...$this->classConstantStatementFindings(
+                    statement:    $statement,
+                    className:    $className,
+                    definition:   $definition,
+                    analysisUnit: $analysisUnit,
+                    settings:     $settings,
+                    groupContext: $groupContext,
+                ),
+            );
+            $groupState = $this->nextGroupState($statement, $groupState, $groupContext);
         }
 
         return $findings;
+    }
+
+    /**
+     * Describes how one declaration relates to its attached or inherited group comment.
+     *
+     * @param ClassConst $statement - Constant declaration being classified.
+     * @param array{commentKind: ?string, classification: ?string, endLine: ?int, nameCount: int, visibility: ?int} $groupState - Active preceding group; nullable fields mean no group is open.
+     * @param string $source - Whole-file source used to reject comments trailing an earlier declaration.
+     *
+     * @return array{attachedCommentKind: ?string, meaningfulLocalKind: ?string, attachedGroupClassification: ?string, groupClassification: ?string, groupCommentKind: ?string, namesBefore: int, inheritsGroup: bool, visibility: int} - Coverage context for each name and the next state transition.
+     */
+    private function statementGroupContext(ClassConst $statement, array $groupState, string $source): array
+    {
+        $attachedCommentKind         = $this->localCommentKind($statement, false, $source);
+        $meaningfulLocalKind         = $this->localCommentKind($statement, true, $source);
+        $attachedGroupClassification = $this->groupLocalCommentClassification($statement, $source);
+
+        // Treat implicit and explicit public declarations as the same visibility boundary.
+        $statementVisibility = $statement->isPublic()
+            ? Modifiers::PUBLIC
+            : $statement->flags & Modifiers::VISIBILITY_MASK;
+
+        // Shipped categories retain their existing cross-visibility behavior; a new bounded family does not.
+        $visibilityContinuesGroup = $groupState['classification'] === self::GROUP_COMMENT_SHIPPED
+            || $groupState['visibility'] === $statementVisibility;
+
+        // Only a live group immediately above this declaration can be inherited.
+        $isConsecutiveInGroup = $groupState['classification'] !== null
+            && $groupState['commentKind'] !== null
+            && $groupState['endLine'] !== null
+            && $visibilityContinuesGroup
+            && $statement->getStartLine() === $groupState['endLine'] + 1;
+
+        // Any attached comment owns this declaration and prevents stale group inheritance.
+        $inheritsGroup = $meaningfulLocalKind === null
+            && $attachedCommentKind === null
+            && $isConsecutiveInGroup;
+
+        // Prefer a new family comment; otherwise retain only the immediately inherited group.
+        $groupClassification = $attachedGroupClassification
+            ?? ($inheritsGroup ? $groupState['classification'] : null);
+
+        // A new family uses its attached comment style, while an inherited family keeps the original style.
+        $groupCommentKind = $attachedGroupClassification !== null
+            ? $attachedCommentKind
+            : ($inheritsGroup ? $groupState['commentKind'] : null);
+
+        // A newly attached family starts at zero; inherited coverage resumes after the names already declared.
+        $namesBefore = $attachedGroupClassification !== null ? 0 : $groupState['nameCount'];
+
+        return [
+            'attachedCommentKind' => $attachedCommentKind,
+            'meaningfulLocalKind' => $meaningfulLocalKind,
+            'attachedGroupClassification' => $attachedGroupClassification,
+            'groupClassification' => $groupClassification,
+            'groupCommentKind' => $groupCommentKind,
+            'namesBefore' => $namesBefore,
+            'inheritsGroup' => $inheritsGroup,
+            'visibility' => $statementVisibility,
+        ];
+    }
+
+    /**
+     * Builds findings for each name in one constant declaration using its resolved comment coverage.
+     *
+     * @param ClassConst     $statement - Declaration whose names may cross the bounded group edge.
+     * @param string         $className - Owning class name used in finding symbols.
+     * @param RuleDefinition $definition - Rule metadata stamped onto findings.
+     * @param AnalysisUnit   $analysisUnit - Parsed unit supplying the display path.
+     * @param RuleSettings   $settings - Effective strict-API settings.
+     * @param array{attachedCommentKind: ?string, meaningfulLocalKind: ?string, attachedGroupClassification: ?string, groupClassification: ?string, groupCommentKind: ?string, namesBefore: int, inheritsGroup: bool, visibility: int} $groupContext - Attached and inherited coverage; nullable group fields mean no family comment applies.
+     *
+     * @return list<Finding> - Findings for uncovered or strict-API names; empty when all names are sufficiently documented.
+     */
+    private function classConstantStatementFindings(
+        ClassConst $statement,
+        string $className,
+        RuleDefinition $definition,
+        AnalysisUnit $analysisUnit,
+        RuleSettings $settings,
+        array $groupContext,
+    ): array {
+        $findings          = [];
+        $requiresApiPhpdoc = $this->requiresPhpdocForApiConstants($statement, $analysisUnit->file->displayPath, $settings);
+
+        // One declaration can cross the fifth-name edge, so judge every declared name separately.
+        foreach ($statement->consts as $constantOffset => $const) {
+            // A null classification means this name cannot borrow group coverage.
+            $isCoveredByGroup = $groupContext['groupClassification'] !== null
+                && $this->isGroupNameCovered(
+                    $groupContext['groupClassification'],
+                    $groupContext['namesBefore'] + $constantOffset,
+                );
+            $isBoundedGroupOverflow = $groupContext['groupClassification'] === self::GROUP_COMMENT_BOUNDED
+                && !$isCoveredByGroup;
+
+            // A useful single-value comment applies directly only when it did not open a family group.
+            $hasDirectUsefulComment = $groupContext['meaningfulLocalKind'] !== null
+                && $groupContext['attachedGroupClassification'] === null;
+            $hasUsefulComment = $hasDirectUsefulComment || $isCoveredByGroup;
+
+            // A sufficiently documented non-API name produces no finding for the user.
+            if ($hasUsefulComment && !$requiresApiPhpdoc) {
+                continue;
+            }
+
+            $findings[] = $this->classConstantFinding(
+                $const->name->toString(),
+                $className,
+                $statement->getStartLine(),
+                $definition,
+                $analysisUnit,
+                [
+                    'kind' => $groupContext['attachedCommentKind'] ?? $groupContext['groupCommentKind'],
+                    'useful' => $hasUsefulComment,
+                    'apiRequired' => $requiresApiPhpdoc,
+                    'grouped' => $groupContext['inheritsGroup'] && $isCoveredByGroup,
+                    'boundedOverflow' => $isBoundedGroupOverflow,
+                ],
+            );
+        }
+
+        return $findings;
+    }
+
+    /**
+     * Advances or closes the active group after one declaration has been judged.
+     *
+     * @param ClassConst $statement - Declaration whose end line and name count advance an active group.
+     * @param array{commentKind: ?string, classification: ?string, endLine: ?int, nameCount: int, visibility: ?int} $groupState - State inherited from the preceding declaration.
+     * @param array{attachedCommentKind: ?string, meaningfulLocalKind: ?string, attachedGroupClassification: ?string, groupClassification: ?string, groupCommentKind: ?string, namesBefore: int, inheritsGroup: bool, visibility: int} $groupContext - Current declaration's resolved group relationship.
+     *
+     * @return array{commentKind: ?string, classification: ?string, endLine: ?int, nameCount: int, visibility: ?int} - State for the next declaration; nullable fields mean the group is closed.
+     */
+    private function nextGroupState(ClassConst $statement, array $groupState, array $groupContext): array
+    {
+        // A new qualifying comment restarts coverage and its name budget at this declaration.
+        if ($groupContext['attachedGroupClassification'] !== null && $groupContext['attachedCommentKind'] !== null) {
+            return [
+                'commentKind' => $groupContext['attachedCommentKind'],
+                'classification' => $groupContext['attachedGroupClassification'],
+                'endLine' => $statement->getEndLine(),
+                'nameCount' => count($statement->consts),
+                'visibility' => $groupContext['visibility'],
+            ];
+        }
+
+        // A contiguous declaration consumes every name even after bounded coverage is exhausted.
+        if ($groupContext['inheritsGroup']) {
+            return [
+                'commentKind' => $groupState['commentKind'],
+                'classification' => $groupState['classification'],
+                'endLine' => $statement->getEndLine(),
+                'nameCount' => $groupState['nameCount'] + count($statement->consts),
+                'visibility' => $groupContext['visibility'],
+            ];
+        }
+
+        return $this->emptyGroupState();
+    }
+
+    /**
+     * Creates the closed state used before a group begins or after a boundary.
+     *
+     * @return array{commentKind: null, classification: null, endLine: null, nameCount: 0, visibility: null} - Empty state that cannot cover a following declaration.
+     */
+    private function emptyGroupState(): array
+    {
+        return [
+            'commentKind' => null,
+            'classification' => null,
+            'endLine' => null,
+            'nameCount' => 0,
+            'visibility' => null,
+        ];
     }
 
     /**
@@ -213,7 +383,7 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
      * @param int            $line - 1-based line of the `const` statement the finding points the reviewer at.
      * @param RuleDefinition $definition - Rule defaults supplying the id, severity, tier, pillar, and confidence.
      * @param AnalysisUnit   $analysisUnit - Parsed unit whose display path is recorded on the finding.
-     * @param array{kind: ?string, useful: bool, apiRequired: bool, grouped: bool} $comment - Comment classification: the attached/grouped comment kind, whether it is meaningful, whether strict API PHPDoc applies, and whether it was inherited from a short constant group.
+     * @param array{kind: ?string, useful: bool, apiRequired: bool, grouped: bool, boundedOverflow: bool} $comment - Comment classification: nearby comment kind, usefulness, strict API mode, inherited coverage, and bounded-family overflow.
      *
      * @return Finding - Finding for an undocumented class constant.
      */
@@ -229,9 +399,19 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
         $commentKind       = $comment['kind'];
         $hasUsefulComment  = $comment['useful'];
         $requiresApiPhpdoc = $comment['apiRequired'];
+        $boundedOverflow   = $comment['boundedOverflow'];
 
-        // An exported constant with only a local comment still needs promotion to PHPDoc.
-        if ($requiresApiPhpdoc && $hasUsefulComment) {
+        // A nearby bounded-family comment still exists after its coverage budget is exhausted.
+        if ($boundedOverflow) {
+            $message = sprintf('Constant %s exceeds the %d-name coverage limit of its nearby patterns/regexes group comment.', $symbol, self::MAX_BOUNDED_GROUP_NAMES);
+            $remediation = sprintf('Start a new adjacent patterns/regexes group comment before %s, or add PHPDoc that explains this constant\'s purpose.', $symbol);
+
+            if ($requiresApiPhpdoc) {
+                $message .= ' This project also requires PHPDoc for exported constants.';
+                $remediation = sprintf('Add PHPDoc above %s explaining its purpose; a new local group comment would not satisfy this project\'s exported-API requirement.', $symbol);
+            }
+        } elseif ($requiresApiPhpdoc && $hasUsefulComment) {
+            // An exported constant with only a local comment still needs promotion to PHPDoc.
             $message     = sprintf('Constant %s has a local comment, but this project requires PHPDoc for exported constants.', $symbol);
             $remediation = sprintf('Promote the local comment above %s into a `/** ... */` block, or narrow `rules.docs.missing-constant-phpdoc.options.apiPathPatterns` / disable `requirePhpdocForApiConstants` if this is not exported API.', $symbol);
         } elseif ($commentKind !== null) {
@@ -248,7 +428,9 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
             'constantName' => $constantName,
             'kind' => 'class-constant',
             'className' => $className,
-            'commentQuality' => $hasUsefulComment ? 'meaningful' : ($commentKind !== null ? 'low-quality' : 'missing'),
+            'commentQuality' => $boundedOverflow ? 'bounded-group-overflow' : ($hasUsefulComment ? 'meaningful' : ($commentKind !== null ? 'low-quality' : 'missing')),
+            ...($boundedOverflow ? ['groupCoverageExceeded' => true, 'groupCoverageLimit' => self::MAX_BOUNDED_GROUP_NAMES] : []),
+            ...RemediationAction::Apply->metadata(),
         ];
 
         // Record which comment style was found, when there was one.
@@ -317,7 +499,7 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
                 line:           $statement->getStartLine(),
                 definition:     $definition,
                 analysisUnit:   $analysisUnit,
-                commentKind:    $this->localCommentKind($statement, meaningfulOnly: true),
+                commentKind:    $this->localCommentKind($statement, meaningfulOnly: true, source: $analysisUnit->source),
             );
         }
 
@@ -358,6 +540,7 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
             'constantName' => $caseName,
             'kind' => 'enum-case',
             'className' => $className,
+            ...RemediationAction::Apply->metadata(),
         ];
 
         // Record the existing comment style when the case already had one.
@@ -386,15 +569,16 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
      *
      * @param Node\Stmt $statement - Const or case statement whose attached leading comments are examined.
      * @param bool      $meaningfulOnly - Whether generic/restating comments should be ignored.
+     * @param string    $source - Whole-file source used to reject comments trailing earlier code.
      *
-     * @return string|null - `line`/`block` for an attached local comment, or null when absent or not meaningful enough
+     * @return string|null - `line`/`block` for an attached local comment, or null when absent or not meaningful enough.
      */
-    private function localCommentKind(Node\Stmt $statement, bool $meaningfulOnly): ?string
+    private function localCommentKind(Node\Stmt $statement, bool $meaningfulOnly, string $source): ?string
     {
         // Look at each comment the parser attached to the statement.
         foreach ($statement->getComments() as $comment) {
-            // Only a non-doc comment on the line directly above counts as attached to this constant.
-            if ($comment instanceof Doc || $comment->getEndLine() !== $statement->getStartLine() - 1) {
+            // Only a non-doc comment physically placed above the declaration can explain it.
+            if ($comment instanceof Doc || !PhysicalCommentAttachment::isOwnLineImmediatelyAbove($comment, $statement, $source)) {
                 continue;
             }
 
@@ -414,31 +598,48 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
     }
 
     /**
-     * Reports whether a meaningful local comment reads as a short constant-group comment.
+     * Classifies an attached meaningful group comment for inheritance and budgeting.
      *
      * @param ClassConst $statement - Constant statement with an attached comment candidate.
+     * @param string $source - Whole-file source used to reject comments trailing earlier code.
      *
-     * @return bool - True when the comment can cover immediately consecutive constants in the same group.
+     * @return string|null - Shipped or bounded classification; null when no qualifying family comment exists.
      */
-    private function hasGroupLocalComment(ClassConst $statement): bool
+    private function groupLocalCommentClassification(ClassConst $statement, string $source): ?string
     {
         // Scan the attached comments for a meaningful group-style note.
         foreach ($statement->getComments() as $comment) {
-            // Only an immediately preceding non-doc comment qualifies.
-            if ($comment instanceof Doc || $comment->getEndLine() !== $statement->getStartLine() - 1) {
+            // Only an immediately preceding own-line non-doc comment qualifies.
+            if ($comment instanceof Doc || !PhysicalCommentAttachment::isOwnLineImmediatelyAbove($comment, $statement, $source)) {
                 continue;
             }
 
-            // A meaningful comment that names a category can cover the constants that follow it.
-            if ($this->commentKind($comment) !== null
-                && $this->isMeaningfulCommentText($comment->getText(), $statement)
-                && $this->isGroupCommentText($comment->getText())
-            ) {
-                return true;
+            // A meaningful comment that names a category can cover this declaration and constants that follow it.
+            if ($this->commentKind($comment) !== null && $this->isMeaningfulCommentText($comment->getText(), $statement)) {
+                $classification = $this->groupCommentClassification($comment->getText());
+
+                // Keep looking when this useful comment describes one value rather than a family.
+                if ($classification !== null) {
+                    return $classification;
+                }
             }
         }
 
-        return false;
+        return null;
+    }
+
+    /**
+     * Reports whether one zero-based group-name position is covered by its classification.
+     *
+     * @param string $classification - Shipped or bounded group classification.
+     * @param int    $nameOffset - Zero-based name position across the contiguous group.
+     *
+     * @return bool - True for every shipped-group name or the first five bounded-group names.
+     */
+    private function isGroupNameCovered(string $classification, int $nameOffset): bool
+    {
+        return $classification === self::GROUP_COMMENT_SHIPPED
+            || $nameOffset < self::MAX_BOUNDED_GROUP_NAMES;
     }
 
     /**
@@ -568,31 +769,27 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
     }
 
     /**
-     * Detects prose likely intended to cover a short consecutive constant group.
+     * Classifies prose that names a consecutive constant family.
      *
      * @param string $rawText - Raw parser comment text, delimiters included.
      *
-     * @return bool - True when the comment names a group/category rather than a single value.
+     * @return string|null - Shipped or bounded classification; null for a single-value or generic comment.
      */
-    private function isGroupCommentText(string $rawText): bool
+    private function groupCommentClassification(string $rawText): ?string
     {
-        $words      = array_fill_keys($this->commentWords($this->plainCommentText($rawText)), true);
-        $groupWords = [
-            'fields' => true,
-            'keys' => true,
-            'modes' => true,
-            'options' => true,
-            'roles' => true,
-            'scopes' => true,
-            'sources' => true,
-            'states' => true,
-            'statuses' => true,
-            'tabs' => true,
-            'types' => true,
-            'values' => true,
-        ];
+        $words = array_fill_keys($this->commentWords($this->plainCommentText($rawText)), true);
 
-        return count(array_intersect_key($words, $groupWords)) > 0;
+        // Existing group vocabulary wins whenever a mixed comment also names a new pattern family.
+        if (array_intersect_key($words, self::SHIPPED_GROUP_WORDS) !== []) {
+            return self::GROUP_COMMENT_SHIPPED;
+        }
+
+        // Pattern-family words receive the newly approved bounded behavior.
+        if (array_intersect_key($words, self::BOUNDED_GROUP_WORDS) !== []) {
+            return self::GROUP_COMMENT_BOUNDED;
+        }
+
+        return null;
     }
 
     /**

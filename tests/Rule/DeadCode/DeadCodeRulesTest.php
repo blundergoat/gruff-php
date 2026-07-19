@@ -82,6 +82,8 @@ final class DeadCodeRulesTest extends TestCase
         self::assertNotContains('EventRouter::handleDeleted()', $symbols);
         self::assertNotContains('HooksTrait::bootHook()', $symbols);
         self::assertNotContains('CallableMapRouter::mappedHandler()', $symbols);
+        self::assertContains('AssociativeCallbackMetadataRouter::unusedMetadataHelper()', $symbols);
+        self::assertNotContains('ReorderedCallableMapRouter::possibleTarget()', $symbols);
         // A string-literal dynamic name resolves precisely, so siblings still report...
         self::assertNotContains('LiteralDynamicCaller::invokeExact()', $symbols);
         self::assertContains('LiteralDynamicCaller::stillUnused()', $symbols);
@@ -89,7 +91,7 @@ final class DeadCodeRulesTest extends TestCase
         self::assertContains('ForeignDispatcher::neverCalled()', $symbols);
         self::assertNotContains('Signal::labelFor()', $symbols);
         self::assertContains('Signal::unusedInEnum()', $symbols);
-        self::assertCount(3, $findings);
+        self::assertCount(4, $findings);
     }
 
     /**

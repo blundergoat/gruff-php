@@ -33,6 +33,7 @@ allowlists:
         - cwd
         - db
         - doc
+        - dto
         - fn
         - fqn
         - fs
@@ -53,11 +54,12 @@ allowlists:
         - ui
         - uri
         - url
+        - utc
     # The fixture-corpus snapshot digest asserted in tests/Rule/RuleRegressionSnapshotTest.php is a
     # 64-char hex hash that reads as a high-entropy secret; it is test data, not a credential. Keep this
     # preview in sync if that digest rotates (it changes whenever rules or fixtures change).
     secretPreviews:
-        - '249e...f066 (redacted, 64 chars)'
+        - 'b2ab...beca (redacted, 64 chars)'
 selection:
     tiers: []
     pillars: []
@@ -137,7 +139,7 @@ rules:
     # Missing @throws tag
     docs.missing-throws-tag:
         enabled: true
-    # Requires a one-line explanatory comment immediately above configured PCRE calls (preg_match, preg_match_all, preg_replace, preg_replace_callback, preg_split by default). Exempt when the call is inside a `match (true) { ... => "label" }` arm with a string-literal label, or when the enclosing function-like docblock references the regex behaviour.
+    # Requires an explanatory comment immediately above configured PCRE calls or their nearest statement owner. String-labelled match arms and narrow, call-specific callable contracts can provide equivalent context.
     docs.regex-comment:
         enabled: true
         options:
@@ -225,6 +227,7 @@ rules:
                 - supports
                 - touches
                 - uses
+            # Whole-name state adjectives accepted for typed Boolean properties and parameters only.
             stateAdjectiveAllowlist:
                 - active
                 - enabled
@@ -239,9 +242,23 @@ rules:
                 - valid
                 - strict
                 - silent
+                - resolved
+                - limited
+                - printable
+            # Whole-token state endings accepted only on multi-token Boolean names across receivers.
+            stateSuffixAllowlist:
+                - requested
+                - present
+                - enabled
+                - allowed
+            # Whole-token verbs accepted inside subject-first propositions with context on both sides.
+            propositionVerbAllowlist:
+                - requires
             acceptedBooleanNames:
                 - excludeFromScore
                 - meaningfulOnly
+            # Set false to check only private methods/properties and closure-local declarations.
+            includePublicApi: true
     # Class/file name mismatch
     naming.class-file-mismatch:
         enabled: true

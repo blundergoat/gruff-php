@@ -1,6 +1,6 @@
 ---
 category: rules
-last_reviewed: 2026-07-04
+last_reviewed: 2026-07-20
 ---
 
 # Rule Footguns
@@ -142,9 +142,9 @@ PHP resolves method names case-insensitively but property names case-sensitively
 
 **Status:** active | **Created:** 2026-06-14 | **Evidence:** OBSERVED
 
-`src/Rules/DeadCode/UnusedPrivateMethodRule.php` (search: `isCallableReference`) treats a private method as used when it appears in a callable array `[$this, 'm']`, `[self::class, 'm']`, `[static::class, 'm']`, or `[ClassName::class, 'm']`. The `__CLASS__` magic constant parses to `Node\Scalar\MagicConst\Class_` — NOT an `Expr\ClassConstFetch` — so a `ClassConstFetch`-only check silently misses `[__CLASS__, 'm']`, even though it is semantically identical to `[self::class, 'm']` (both name the defining class). `array(__CLASS__, 'method')` is a common WordPress/static-callback idiom: a final pre-ship scan of the dogfood corpora flagged 10 genuinely-used private methods as unused — 4 in woocommerce, 6 in jetpack, 0 in the Symfony-based shopware/mautic — e.g. `WC_Meta_Box_Product_Data::product_data_tabs_sort()`, used via `uasort( $tabs, array( __CLASS__, 'product_data_tabs_sort' ) )`.
+`src/Rules/DeadCode/UnusedPrivateMethodRule.php` (search: `sameClassCallableArrayMethodName`) treats a private method as used when it appears in a callable array `[$this, 'm']`, `[self::class, 'm']`, `[static::class, 'm']`, or `[ClassName::class, 'm']`; the same-class target matching now lives in `src/Rules/Shared/CallableReferenceResolver.php` (search: `isSameClassCallableTarget`). The `__CLASS__` magic constant parses to `Node\Scalar\MagicConst\Class_` — NOT an `Expr\ClassConstFetch` — so a `ClassConstFetch`-only check silently misses `[__CLASS__, 'm']`, even though it is semantically identical to `[self::class, 'm']` (both name the defining class). `array(__CLASS__, 'method')` is a common WordPress/static-callback idiom: a final pre-ship scan of the dogfood corpora flagged 10 genuinely-used private methods as unused — 4 in woocommerce, 6 in jetpack, 0 in the Symfony-based shopware/mautic — e.g. `WC_Meta_Box_Product_Data::product_data_tabs_sort()`, used via `uasort( $tabs, array( __CLASS__, 'product_data_tabs_sort' ) )`.
 
-**Evidence:** Fix accepts `$first instanceof Node\Scalar\MagicConst\Class_` (search: `names the defining class`). Regression case at `tests/Fixtures/DeadCode/unused-private-method.php` (search: `comparePromptRowsByType`) is referenced only via `usort($rows, [__CLASS__, 'comparePromptRowsByType'])`; `tests/Rule/DeadCode/DeadCodeRulesTest.php` (search: `comparePromptRowsByType`) asserts it is not flagged, and the file's `assertCount(2)` would become 3 without the fix. `get_class($this)` and `get_called_class()` callable forms produced 0 corpus false positives, so they are deliberately not handled.
+**Evidence:** Fix accepts the `Node\Scalar\MagicConst\Class_` callable target in `src/Rules/Shared/CallableReferenceResolver.php` (search: `MagicConst\Class_`). Regression case at `tests/Fixtures/DeadCode/unused-private-method.php` (search: `comparePromptRowsByType`) is referenced only via `usort($rows, [__CLASS__, 'comparePromptRowsByType'])`; `tests/Rule/DeadCode/DeadCodeRulesTest.php` (search: `comparePromptRowsByType`) asserts it is not flagged, and the file's `assertCount(2)` would become 3 without the fix. `get_class($this)` and `get_called_class()` callable forms produced 0 corpus false positives, so they are deliberately not handled.
 
 **Prevention:** The canonical same-class callable set any callable-aware rule must accept is `[$this, …]`, `[self::class, …]`, `[static::class, …]`, `[ClassName::class, …]` (FQ-compared), and `[__CLASS__, …]`. When adding or reviewing a rule that treats array callables as references (dead-code, first-class-callable, hook detection), include a `[__CLASS__, 'method']` fixture — `MagicConst\Class_` is the easy form to miss because it shares no node type with `Foo::class`.
 

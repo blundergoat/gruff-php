@@ -7,6 +7,7 @@ namespace GruffPhp\Rules\Naming;
 use GruffPhp\Results\Finding\Confidence;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Pillar;
+use GruffPhp\Results\Finding\RemediationAction;
 use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
@@ -16,6 +17,8 @@ use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Node;
+use PhpParser\Node\Expr\ArrowFunction;
+use PhpParser\Node\Expr\Closure;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
@@ -24,17 +27,31 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 use PhpParser\Node\Stmt\Property;
 use PhpParser\Node\UnionType;
+use LogicException;
 
 /**
  * Flags a bool-returning function or method, or a typed bool property or parameter, whose name does not read
  * as a yes/no question - so `active()` should become `isActive()` and a `$ready` flag should read as a predicate.
  *
- * Accepts predicate prefixes (`is`, `has`, `can`, ...), a configurable list of clear state adjectives for
- * typed booleans, and an exact-name allowlist for caller-visible names a rename would break. Negative-flag
- * names are handed to the negative-boolean rule instead. Advisory, medium confidence.
+ * Accepts predicate prefixes, clear whole-name state adjectives for typed properties and parameters,
+ * multi-token state suffixes, subject-first proposition verbs, and exact caller-visible names. Negative
+ * flags remain owned by the negative-boolean rule. Advisory, medium confidence.
  */
 final readonly class BooleanPrefixRule implements RuleInterface
 {
+    /** Full configuration path for intentional caller-visible Boolean names. */
+    private const ACCEPTED_NAMES_CONFIGURATION_KEY = 'rules.naming.boolean-prefix.options.acceptedBooleanNames';
+
+    /**
+     * Minimum token count for a subject, proposition verb, and trailing context.
+     */
+    private const MIN_PROPOSITION_TOKENS = 3;
+
+    /**
+     * Minimum token count that distinguishes a state suffix from a whole-name adjective.
+     */
+    private const MIN_STATE_SUFFIX_TOKENS = 2;
+
     /**
      * Stable identifier for the boolean prefix rule.
      */
@@ -56,7 +73,18 @@ final readonly class BooleanPrefixRule implements RuleInterface
     private const STATE_ADJECTIVES = [
         'active', 'enabled', 'disabled', 'applicable', 'generated', 'interactive',
         'emitted', 'visible', 'available', 'valid', 'strict', 'silent',
+        'resolved', 'limited', 'printable',
     ];
+
+    /**
+     * State words accepted only at the end of identifiers containing multiple tokens.
+     */
+    private const STATE_SUFFIXES = ['requested', 'present', 'enabled', 'allowed'];
+
+    /**
+     * Verbs accepted only between a subject token and trailing predicate or context tokens.
+     */
+    private const PROPOSITION_VERBS = ['requires'];
 
     /**
      * Exact boolean identifier names accepted as-is, regardless of prefix.
@@ -90,7 +118,19 @@ final readonly class BooleanPrefixRule implements RuleInterface
             defaultOptions:  [
                 'allowedPrefixes' => self::GOOD_PREFIXES,
                 'stateAdjectiveAllowlist' => self::STATE_ADJECTIVES,
+                'stateSuffixAllowlist' => self::STATE_SUFFIXES,
+                'propositionVerbAllowlist' => self::PROPOSITION_VERBS,
                 'acceptedBooleanNames' => self::DEFAULT_ACCEPTED_BOOLEAN_NAMES,
+                'includePublicApi' => true,
+            ],
+            description:        'Accepts predicate prefixes, property/parameter state adjectives, multi-token state suffixes, subject-first propositions, and exact compatibility names while flagging vague Boolean identifiers.',
+            optionDescriptions: [
+                'allowedPrefixes' => 'Leading predicate words accepted at camelCase or snake_case word boundaries.',
+                'stateAdjectiveAllowlist' => 'Exact whole Boolean names accepted for typed properties and parameters only.',
+                'stateSuffixAllowlist' => 'Final whole tokens accepted on Boolean names containing at least two tokens across methods, functions, properties, and parameters.',
+                'propositionVerbAllowlist' => 'Internal whole verbs accepted only with a subject token before and a context token after.',
+                'acceptedBooleanNames' => 'Exact case-insensitive Boolean names accepted across receivers for compatibility.',
+                'includePublicApi' => 'Whether to inspect public/protected methods, properties, named functions, and their caller-visible parameters; false limits findings to private/local declarations.',
             ],
         );
     }
@@ -99,52 +139,73 @@ final readonly class BooleanPrefixRule implements RuleInterface
      * Reports bool-returning callables and typed bool properties or parameters that lack a predicate-style name.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
      *
      * @return list<Finding> - Findings for poorly named boolean callables.
+     * @throws LogicException When programmatic rule settings provide a non-boolean includePublicApi value.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $definition      = $this->definition();
-        $settings        = $ruleContext->settingsFor($definition);
-        $prefixes        = $settings->stringListOption('allowedPrefixes');
-        $stateAdjectives = array_map(static fn (string $name): string => strtolower($name), $settings->stringListOption('stateAdjectiveAllowlist'));
-        $acceptedNames   = array_map(static fn (string $name): string => strtolower($name), $settings->stringListOption('acceptedBooleanNames'));
+        $definition       = $this->definition();
+        $settings         = $ruleContext->settingsFor($definition);
+        $prefixes         = $settings->stringListOption('allowedPrefixes');
+        $stateAdjectives  = array_map(static fn (string $name): string => strtolower($name), $settings->stringListOption('stateAdjectiveAllowlist'));
+        $stateSuffixes    = array_map(static fn (string $name): string => strtolower($name), $settings->stringListOption('stateSuffixAllowlist'));
+        $propositionVerbs = array_map(static fn (string $name): string => strtolower($name), $settings->stringListOption('propositionVerbAllowlist'));
+        $acceptedNames    = array_map(static fn (string $name): string => strtolower($name), $settings->stringListOption('acceptedBooleanNames'));
+        $includePublicApi = $settings->options['includePublicApi'] ?? true;
+        // Programmatic RuleSettings callers receive the same strict type contract as YAML configuration.
+        if (!is_bool($includePublicApi)) {
+            throw new LogicException('Option "includePublicApi" must be a boolean.');
+        }
 
         $findings = [];
 
         // Judge each function-like scope for its callable name and its bool parameters.
         foreach ((new FunctionLikeScopeWalker())->scopes($analysisUnit->statements) as $scope) {
-            $node                 = $scope->node;
-            $symbol               = $this->symbol($scope);
-            $functionLikeFindings = $node instanceof ClassMethod || $node instanceof Function_
+            $node                       = $scope->node;
+            $symbol                     = $this->symbol($scope);
+            $isCallerVisibleApiExcluded = !$includePublicApi && $this->isCallerVisibleScope($node);
+            $functionLikeFindings       = !$isCallerVisibleApiExcluded
+                && ($node instanceof ClassMethod || $node instanceof Function_)
                 ? $this->functionLikeFindings(
-                    definition:    $definition,
-                    analysisUnit:  $analysisUnit,
-                    node:          $node,
-                    symbol:        $symbol,
-                    prefixes:      $prefixes,
-                    acceptedNames: $acceptedNames,
+                    definition:       $definition,
+                    analysisUnit:     $analysisUnit,
+                    node:             $node,
+                    symbol:           $symbol,
+                    prefixes:         $prefixes,
+                    stateSuffixes:    $stateSuffixes,
+                    propositionVerbs: $propositionVerbs,
+                    acceptedNames:    $acceptedNames,
                 )
                 : [];
+            $parameterFindings = $isCallerVisibleApiExcluded
+                ? []
+                : $this->parameterFindings(
+                    definition:       $definition,
+                    analysisUnit:     $analysisUnit,
+                    scope:            $scope,
+                    prefixes:         $prefixes,
+                    stateAdjectives:  $stateAdjectives,
+                    stateSuffixes:    $stateSuffixes,
+                    propositionVerbs: $propositionVerbs,
+                    acceptedNames:    $acceptedNames,
+                );
 
             array_push(
                 $findings,
                 ...$functionLikeFindings,
-                ...$this->parameterFindings(
-                    definition:      $definition,
-                    analysisUnit:    $analysisUnit,
-                    scope:           $scope,
-                    symbol:          $symbol,
-                    prefixes:        $prefixes,
-                    stateAdjectives: $stateAdjectives,
-                    acceptedNames:   $acceptedNames,
-                ),
+                ...$parameterFindings,
             );
         }
 
         // Also judge every typed boolean property declared in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, Property::class) as $property) {
+            // Private/local-only mode excludes public and protected stored API state.
+            if (!$includePublicApi && !$property->isPrivate()) {
+                continue;
+            }
+
             // Skip a property that is not typed bool.
             if (!$this->isBoolType($property->type)) {
                 continue;
@@ -154,7 +215,14 @@ final readonly class BooleanPrefixRule implements RuleInterface
             foreach ($property->props as $prop) {
                 $name = $prop->name->toString();
                 // A predicate-style or negative-flag name already reads clearly.
-                if ($this->hasBooleanStyleName($name, $prefixes, $stateAdjectives, $acceptedNames) || $this->hasNegativeFlagName($name)) {
+                if ($this->hasBooleanStyleName(
+                    name:             $name,
+                    prefixes:         $prefixes,
+                    stateAdjectives:  $stateAdjectives,
+                    stateSuffixes:    $stateSuffixes,
+                    propositionVerbs: $propositionVerbs,
+                    acceptedNames:    $acceptedNames,
+                ) || $this->hasNegativeFlagName($name)) {
                     continue;
                 }
 
@@ -165,6 +233,7 @@ final readonly class BooleanPrefixRule implements RuleInterface
                     kind:         'property',
                     name:         $name,
                     symbol:       '$' . $name,
+                    action:       $property->isPrivate() ? RemediationAction::Apply : RemediationAction::Consider,
                 );
             }
         }
@@ -175,12 +244,14 @@ final readonly class BooleanPrefixRule implements RuleInterface
     /**
      * Reports a bool-returning function or method whose name is not predicate-style.
      *
-     * @param RuleDefinition        $definition - Rule metadata stamped onto any finding produced here.
-     * @param AnalysisUnit          $analysisUnit - Parsed unit supplying the display path and line numbers.
-     * @param ClassMethod|Function_ $node - Callable whose return type and name are checked.
-     * @param string                $symbol - Human-readable symbol used as the finding subject.
-     * @param list<string>          $prefixes - Configured predicate prefixes.
-     * @param list<string>          $acceptedNames - Lowercased exact names accepted as-is.
+     * @param RuleDefinition        $definition       - Rule metadata stamped onto any finding produced here.
+     * @param AnalysisUnit          $analysisUnit     - Parsed unit supplying the display path and line numbers.
+     * @param ClassMethod|Function_ $node             - Callable whose return type and name are checked.
+     * @param string                $symbol           - Human-readable symbol used as the finding subject.
+     * @param list<string>          $prefixes         - Configured predicate prefixes.
+     * @param list<string>          $stateSuffixes    - Lowercased state words accepted only as multi-token suffixes.
+     * @param list<string>          $propositionVerbs - Lowercased verbs accepted between subject and context tokens.
+     * @param list<string>          $acceptedNames    - Lowercased exact names accepted as-is.
      *
      * @return list<Finding> - Findings for bool-returning callables.
      */
@@ -190,6 +261,8 @@ final readonly class BooleanPrefixRule implements RuleInterface
         ClassMethod|Function_ $node,
         string $symbol,
         array $prefixes,
+        array $stateSuffixes,
+        array $propositionVerbs,
         array $acceptedNames,
     ): array
     {
@@ -199,10 +272,17 @@ final readonly class BooleanPrefixRule implements RuleInterface
         }
 
         $name = $node->name->toString();
-        if ($this->hasAllowedPrefix($name, $prefixes) || $this->isAcceptedBooleanName($name, $acceptedNames)) {
+        // Accept only the configured prefix, token grammar, or exact public-name hatches.
+        if ($this->hasAllowedPrefix($name, $prefixes)
+            || $this->hasMultiTokenStateSuffix($name, $stateSuffixes)
+            || $this->hasSubjectFirstProposition($name, $propositionVerbs)
+            || $this->isAcceptedBooleanName($name, $acceptedNames)
+        ) {
             // Name already reads as a predicate or is on the accepted allowlist, so it is clear.
             return [];
         }
+
+        $action = $this->functionLikeAction($node);
 
         return [
             new Finding(
@@ -215,7 +295,10 @@ final readonly class BooleanPrefixRule implements RuleInterface
                 tier:        $definition->tier,
                 confidence:  $definition->confidence,
                 symbol:      $symbol,
-                remediation: 'Rename to use a boolean prefix, e.g. isActive(), hasPermission(). If a project-specific prefix is intentional, add it to `rules.naming.boolean-prefix.options.allowedPrefixes`; to accept a caller-visible name without renaming it, add the exact name to `rules.naming.boolean-prefix.options.acceptedBooleanNames` in `.gruff-php.yaml`.',
+                remediation: $action === RemediationAction::Apply
+                    ? 'Rename to use a boolean prefix, e.g. isActive(), hasPermission().'
+                    : 'Rename to use a boolean prefix, e.g. isActive(), hasPermission(). If a project-specific prefix is intentional, add it to `rules.naming.boolean-prefix.options.allowedPrefixes`; to accept a caller-visible name without renaming it, add the exact name to `rules.naming.boolean-prefix.options.acceptedBooleanNames` in `.gruff-php.yaml`.',
+                metadata:    $action->metadata(self::ACCEPTED_NAMES_CONFIGURATION_KEY),
             ),
         ];
     }
@@ -223,13 +306,14 @@ final readonly class BooleanPrefixRule implements RuleInterface
     /**
      * Reports typed bool parameters that lack a predicate prefix or approved state adjective.
      *
-     * @param RuleDefinition    $definition - Rule metadata stamped onto any finding produced here.
-     * @param AnalysisUnit      $analysisUnit - Parsed unit supplying the display path and line numbers.
-     * @param FunctionLikeScope $scope - Scope whose declared parameters are inspected.
-     * @param string            $symbol - Owning callable symbol attributed to each parameter finding.
-     * @param list<string>      $prefixes - Configured predicate prefixes.
-     * @param list<string>      $stateAdjectives - Configured state-adjective names.
-     * @param list<string>      $acceptedNames - Lowercased exact names accepted as-is.
+     * @param RuleDefinition    $definition       - Rule metadata stamped onto any finding produced here.
+     * @param AnalysisUnit      $analysisUnit     - Parsed unit supplying the display path and line numbers.
+     * @param FunctionLikeScope $scope            - Scope whose declared parameters are inspected.
+     * @param list<string>      $prefixes         - Configured predicate prefixes.
+     * @param list<string>      $stateAdjectives  - Configured state-adjective names.
+     * @param list<string>      $stateSuffixes    - Lowercased state words accepted only as multi-token suffixes.
+     * @param list<string>      $propositionVerbs - Lowercased verbs accepted between subject and context tokens.
+     * @param list<string>      $acceptedNames    - Lowercased exact names accepted as-is.
      *
      * @return list<Finding> - Findings for bool parameters.
      */
@@ -237,12 +321,14 @@ final readonly class BooleanPrefixRule implements RuleInterface
         RuleDefinition $definition,
         AnalysisUnit $analysisUnit,
         FunctionLikeScope $scope,
-        string $symbol,
         array $prefixes,
         array $stateAdjectives,
+        array $stateSuffixes,
+        array $propositionVerbs,
         array $acceptedNames,
     ): array {
         $findings = [];
+        $symbol   = $this->symbol($scope);
 
         // Weigh each declared parameter.
         foreach ($scope->node->params as $param) {
@@ -253,7 +339,14 @@ final readonly class BooleanPrefixRule implements RuleInterface
 
             $name = $param->var->name;
             // A predicate-style or negative-flag name already reads clearly.
-            if ($this->hasBooleanStyleName($name, $prefixes, $stateAdjectives, $acceptedNames) || $this->hasNegativeFlagName($name)) {
+            if ($this->hasBooleanStyleName(
+                name:             $name,
+                prefixes:         $prefixes,
+                stateAdjectives:  $stateAdjectives,
+                stateSuffixes:    $stateSuffixes,
+                propositionVerbs: $propositionVerbs,
+                acceptedNames:    $acceptedNames,
+            ) || $this->hasNegativeFlagName($name)) {
                 continue;
             }
 
@@ -264,6 +357,9 @@ final readonly class BooleanPrefixRule implements RuleInterface
                 kind:         $param->flags === 0 ? 'parameter' : 'property',
                 name:         $name,
                 symbol:       $symbol,
+                // PHP named arguments make every parameter name caller-observable, including private,
+                // promoted, closure, and arrow-function parameters, so a rename always needs review.
+                action:       RemediationAction::Consider,
             );
         }
 
@@ -279,6 +375,7 @@ final readonly class BooleanPrefixRule implements RuleInterface
      * @param string         $kind - Identifier kind label, either "property" or "parameter".
      * @param string         $name - Identifier name without the leading dollar sign.
      * @param string|null    $symbol - Owning callable symbol, or null for a bare property.
+     * @param RemediationAction $action - Direct fix for private stored/callable names, or review for every parameter and caller-visible declaration.
      *
      * @return Finding - Finding for a boolean identifier without clear predicate naming.
      */
@@ -289,6 +386,7 @@ final readonly class BooleanPrefixRule implements RuleInterface
         string $kind,
         string $name,
         ?string $symbol,
+        RemediationAction $action,
     ): Finding {
         return new Finding(
             ruleId:      $definition->id,
@@ -300,12 +398,51 @@ final readonly class BooleanPrefixRule implements RuleInterface
             tier:        $definition->tier,
             confidence:  $definition->confidence,
             symbol:      $symbol,
-            remediation: 'Rename to use a boolean prefix such as is/has/can, configure stateAdjectiveAllowlist for clear state adjectives, or add a caller-visible name to acceptedBooleanNames to accept it without renaming.',
-            metadata:    [
-                'identifierKind' => $kind,
-                'identifierName' => $name,
-            ],
+            remediation: $action === RemediationAction::Apply
+                ? 'Rename to use a boolean prefix such as is/has/can or configure stateAdjectiveAllowlist for a clear local state adjective.'
+                : 'Rename to use a boolean prefix such as is/has/can, configure stateAdjectiveAllowlist for clear state adjectives, or add a caller-visible name to acceptedBooleanNames to accept it without renaming.',
+            metadata:    array_merge(
+                [
+                    'identifierKind' => $kind,
+                    'identifierName' => $name,
+                ],
+                $action->metadata(self::ACCEPTED_NAMES_CONFIGURATION_KEY),
+            ),
         );
+    }
+
+    /**
+     * Classifies a named Boolean callable by whether renaming can break callers.
+     *
+     * @param ClassMethod|Function_ $node - Method or function that produced the finding.
+     *
+     * @return RemediationAction - APPLY for private methods; CONSIDER for public/protected methods and functions.
+     */
+    private function functionLikeAction(ClassMethod|Function_ $node): RemediationAction
+    {
+        return $node instanceof ClassMethod && $node->isPrivate()
+            ? RemediationAction::Apply
+            : RemediationAction::Consider;
+    }
+
+    /**
+     * Reports whether a function-like declaration exposes caller-visible names.
+     *
+     * Named functions are always callable API. Public and protected methods are visible to callers or
+     * subclasses, while private methods, closures, and arrow functions remain local implementation details.
+     *
+     * @param ClassMethod|Function_|Closure|ArrowFunction $node - Function-like declaration to classify.
+     *
+     * @return bool - True for named functions and non-private methods; false for private/local callables.
+     */
+    private function isCallerVisibleScope(ClassMethod|Function_|Closure|ArrowFunction $node): bool
+    {
+        // Named functions expose their name and parameters directly to callers.
+        if ($node instanceof Function_) {
+            return true;
+        }
+
+        return $node instanceof ClassMethod && !$node->isPrivate();
     }
 
     /**
@@ -350,18 +487,70 @@ final readonly class BooleanPrefixRule implements RuleInterface
     /**
      * Reports whether a typed boolean identifier already reads clearly.
      *
-     * @param string       $name - Identifier name to test, matched case-insensitively.
-     * @param list<string> $prefixes - Configured predicate prefixes.
-     * @param list<string> $stateAdjectives - Configured state-adjective names.
-     * @param list<string> $acceptedNames - Lowercased exact names accepted as-is.
+     * @param string       $name             - Identifier name to test, matched case-insensitively.
+     * @param list<string> $prefixes         - Configured predicate prefixes.
+     * @param list<string> $stateAdjectives  - Configured state-adjective names.
+     * @param list<string> $stateSuffixes    - Lowercased state words accepted only as multi-token suffixes.
+     * @param list<string> $propositionVerbs - Lowercased verbs accepted between subject and context tokens.
+     * @param list<string> $acceptedNames    - Lowercased exact names accepted as-is.
      *
      * @return bool - True when the identifier is allowed.
      */
-    private function hasBooleanStyleName(string $name, array $prefixes, array $stateAdjectives, array $acceptedNames): bool
-    {
+    private function hasBooleanStyleName(
+        string $name,
+        array $prefixes,
+        array $stateAdjectives,
+        array $stateSuffixes,
+        array $propositionVerbs,
+        array $acceptedNames,
+    ): bool {
         return $this->hasAllowedPrefix($name, $prefixes)
             || in_array(strtolower($name), $stateAdjectives, true)
+            || $this->hasMultiTokenStateSuffix($name, $stateSuffixes)
+            || $this->hasSubjectFirstProposition($name, $propositionVerbs)
             || $this->isAcceptedBooleanName($name, $acceptedNames);
+    }
+
+    /**
+     * Reports whether a multi-token identifier ends with one configured state word.
+     *
+     * @param string       $name          - Identifier whose tokenizer-defined final word is inspected.
+     * @param list<string> $stateSuffixes - Lowercased whole tokens accepted in the final position.
+     *
+     * @return bool - True only for a two-or-more-token name ending in an accepted state token.
+     */
+    private function hasMultiTokenStateSuffix(string $name, array $stateSuffixes): bool
+    {
+        $tokens = (new IdentifierTokenizer())->tokenize($name);
+
+        // A single token belongs to whole-name adjective configuration, never suffix matching.
+        if (count($tokens) < self::MIN_STATE_SUFFIX_TOKENS) {
+            return false;
+        }
+
+        return in_array($tokens[count($tokens) - 1], $stateSuffixes, true);
+    }
+
+    /**
+     * Reports whether a subject-first name contains a configured verb with context on both sides.
+     *
+     * @param string       $name             - Identifier whose tokenizer-defined words are inspected in order.
+     * @param list<string> $propositionVerbs - Lowercased whole verbs accepted inside the proposition.
+     *
+     * @return bool - True when an accepted verb has at least one subject and one trailing context token.
+     */
+    private function hasSubjectFirstProposition(string $name, array $propositionVerbs): bool
+    {
+        $tokens = (new IdentifierTokenizer())->tokenize($name);
+
+        // Subject-first grammar needs a leading subject, an internal verb, and trailing context.
+        if (count($tokens) < self::MIN_PROPOSITION_TOKENS) {
+            return false;
+        }
+
+        $internalTokens = array_slice($tokens, 1, -1);
+
+        return array_intersect($internalTokens, $propositionVerbs) !== [];
     }
 
     /**

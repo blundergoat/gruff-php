@@ -6,6 +6,7 @@ namespace GruffPhp\Tests\Rule\Naming;
 
 use GruffPhp\Engine\Config\AnalysisConfig;
 use GruffPhp\Engine\Config\RuleSettings;
+use GruffPhp\Results\Finding\RemediationAction;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\PhpFileParser;
 use GruffPhp\Rules\Naming\BooleanPrefixRule;
@@ -121,10 +122,21 @@ final class NamingRulesTest extends NamingRuleTestCase
     public function testBooleanPrefixMissing(): void
     {
         $findings = $this->analyseRule('boolean-prefix.php', BooleanPrefixRule::ID);
+        $symbols  = array_map(static fn($finding) => $finding->symbol, $findings);
+        $actions  = array_values(array_unique(array_map(
+            static fn($finding): string => is_string($finding->metadata['remediationAction'] ?? null)
+                ? $finding->metadata['remediationAction']
+                : '',
+            $findings,
+        )));
+        $configurationKeys = array_values(array_unique(array_map(
+            static fn($finding): string => is_string($finding->metadata['configurationKey'] ?? null)
+                ? $finding->metadata['configurationKey']
+                : '',
+            $findings,
+        )));
 
         self::assertNotSame([], $findings);
-
-        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
         self::assertContains('BooleanPrefixFixture::active()', $symbols);
         self::assertContains('BooleanPrefixFixture::enabled()', $symbols);
         self::assertContains('BooleanPrefixFixture::status()', $symbols);
@@ -133,6 +145,20 @@ final class NamingRulesTest extends NamingRuleTestCase
         // A prefix followed by a lowercase letter is no word boundary, so these still flag.
         self::assertContains('BooleanPrefixFixture::hasty()', $symbols);
         self::assertContains('BooleanPrefixFixture::isolate()', $symbols);
+        self::assertContains('BooleanStateVocabularyFixture::valid()', $symbols);
+        self::assertContains('BooleanStateVocabularyFixture::available()', $symbols);
+        self::assertContains('BooleanStateVocabularyFixture::resolved()', $symbols);
+        self::assertContains('BooleanStateVocabularyFixture::printable()', $symbols);
+        self::assertContains('BooleanStateVocabularyFixture::unrequested()', $symbols);
+        self::assertContains('BooleanStateVocabularyFixture::assistantRequirementsContext()', $symbols);
+        self::assertContains('BooleanStateVocabularyFixture::assistantIntentRequires()', $symbols);
+        self::assertContains('printable()', $symbols);
+
+        self::assertSame([RemediationAction::Consider->value], $actions);
+        self::assertSame(
+            ['rules.naming.boolean-prefix.options.acceptedBooleanNames'],
+            $configurationKeys,
+        );
     }
 
     /**
@@ -169,6 +195,14 @@ final class NamingRulesTest extends NamingRuleTestCase
         // An underscore after the prefix is a snake_case word boundary, so these read as predicates.
         self::assertNotContains('BooleanPrefixFixture::has_note_been_actioned()', $symbols);
         self::assertNotContains('BooleanPrefixFixture::is_valid_state()', $symbols);
+        self::assertNotContains('BooleanStateVocabularyFixture::paymentRequested()', $symbols);
+        self::assertNotContains('BooleanStateVocabularyFixture::printableTodayScheduleRequested()', $symbols);
+        self::assertNotContains('BooleanStateVocabularyFixture::scheduleLinkEnabled()', $symbols);
+        self::assertNotContains('BooleanStateVocabularyFixture::readOnlyScheduleAllowed()', $symbols);
+        self::assertNotContains('BooleanStateVocabularyFixture::declineCodeExplanationRequested()', $symbols);
+        self::assertNotContains('BooleanStateVocabularyFixture::assistantIntentRequiresContext()', $symbols);
+        self::assertNotContains('report_requested()', $symbols);
+        self::assertNotContains('assistant_intent_requires_context()', $symbols);
     }
 
     /**

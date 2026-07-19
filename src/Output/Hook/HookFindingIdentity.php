@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GruffPhp\Output\Hook;
 
 use GruffPhp\Results\Finding\Finding;
+use GruffPhp\Results\Finding\RemediationAction;
 use JsonException;
 
 /**
@@ -31,6 +32,7 @@ final readonly class HookFindingIdentity
         'complexity' => true,
         'count' => true,
         'depth' => true,
+        'groupCoverageLimit' => true,
         'lines' => true,
         'maintainabilityIndex' => true,
         'measured' => true,
@@ -43,6 +45,18 @@ final readonly class HookFindingIdentity
         'totalLines' => true,
         'unit' => true,
         'volume' => true,
+    ];
+
+    /**
+     * Agent-facing remediation transport describes what to do with a finding, not which finding it is.
+     * These keys are additive output metadata and must not resurface accepted hook debt when a rule
+     * gains or changes its action classification.
+     *
+     * @var array<string, true>
+     */
+    private const REMEDIATION_KEYS = [
+        RemediationAction::CONFIGURATION_KEY => true,
+        RemediationAction::METADATA_KEY => true,
     ];
 
     /**
@@ -135,9 +149,8 @@ final readonly class HookFindingIdentity
         // Sift the finding's metadata for stable descriptive details - the entries that name what the
         // finding is about rather than measure how big it is.
         foreach ($finding->metadata as $key => $value) {
-            // Skip anything that is a measured value or threshold; folding those in would make the identity
-            // lurch every time the underlying number moves, which is exactly what we are avoiding.
-            if (isset(self::VALUE_KEYS[$key])) {
+            // Skip measured values and agent-facing action hints; neither changes the underlying problem.
+            if (isset(self::VALUE_KEYS[$key]) || isset(self::REMEDIATION_KEYS[$key])) {
                 continue;
             }
 

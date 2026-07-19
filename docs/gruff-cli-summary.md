@@ -36,7 +36,7 @@ php bin/gruff-php summary tests/Fixtures/Source/mixed --no-config --top=3
 ```
 
 ```
-gruff-php 0.5.0 summary
+gruff-php 0.5.1 summary
 
 Paths     tests/Fixtures/Source/mixed
 Config    (none)
@@ -77,7 +77,7 @@ php bin/gruff-php summary tests/Fixtures/Source/mixed --no-config --format=json 
 ```json
 {
   "schemaVersion": "gruff.summary.v2",
-  "tool": { "name": "gruff-php", "version": "0.5.0" },
+  "tool": { "name": "gruff-php", "version": "0.5.1" },
   "scope": {
     "paths": ["tests/Fixtures/Source/mixed"],
     "configPath": null,
@@ -130,4 +130,4 @@ shape without bumping the schema version.
 - [`gruff-cli-agent-instructions.md`](gruff-cli-agent-instructions.md) - for agents wrapping the CLI.
 - [`gruff-cli-branch-review.md`](gruff-cli-branch-review.md) - diff-aware review workflow.
 - [`README.md`](../README.md) - main project overview.
-- [`src/Command/SummaryCommand.php`](../src/Command/SummaryCommand.php) - source of truth.
+- [`src/Cli/Command/SummaryCommand.php`](../src/Cli/Command/SummaryCommand.php) - source of truth.

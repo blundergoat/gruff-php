@@ -7,6 +7,7 @@ namespace GruffPhp\Rules\Naming;
 use GruffPhp\Results\Finding\Confidence;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Pillar;
+use GruffPhp\Results\Finding\RemediationAction;
 use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
@@ -34,6 +35,9 @@ use PhpParser\Node\Stmt\Property;
  */
 final readonly class AbbreviationAllowlistRule implements RuleInterface
 {
+    /** Full configuration path for documented project abbreviations. */
+    private const ACCEPTED_ABBREVIATIONS_CONFIGURATION_KEY = 'allowlists.acceptedAbbreviations';
+
     /** Stable identifier for the abbreviation allowlist rule. */
     public const ID = 'naming.abbreviation-allowlist';
 
@@ -56,6 +60,12 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
             confidence:      Confidence::High,
             defaultOptions:  ['ignoredNames' => self::DEFAULT_IGNORED_NAMES, 'minLength' => 2, 'maxLength' => 3],
             description:     'Flags short lowercase identifiers that are not declared in acceptedAbbreviations.',
+            falsePositiveShapes: [
+                [
+                    'shape' => 'A short healthcare or project abbreviation such as `dob` is intentional domain vocabulary.',
+                    'mitigation' => 'Document intentional vocabulary in `allowlists.acceptedAbbreviations`; rename an unclear or disposable name such as `tmp` instead.',
+                ],
+            ],
         );
     }
 
@@ -365,7 +375,10 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
             confidence:  $definition->confidence,
             symbol:      $symbol,
             remediation: 'Rename the identifier or add the abbreviation to allowlists.acceptedAbbreviations with a documented meaning.',
-            metadata:    ['identifierKind' => $kind, 'identifierName' => $name, 'minLength' => $minLength, 'maxLength' => $maxLength],
+            metadata:    array_merge(
+                ['identifierKind' => $kind, 'identifierName' => $name, 'minLength' => $minLength, 'maxLength' => $maxLength],
+                RemediationAction::Consider->metadata(self::ACCEPTED_ABBREVIATIONS_CONFIGURATION_KEY),
+            ),
         );
     }
 

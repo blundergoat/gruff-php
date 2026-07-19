@@ -7,6 +7,7 @@ namespace GruffPhp\Rules\Modernisation;
 use GruffPhp\Results\Finding\Confidence;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Pillar;
+use GruffPhp\Results\Finding\RemediationAction;
 use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
@@ -50,6 +51,13 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
             defaultSeverity:   Severity::Advisory,
             confidence:        Confidence::Low,
             defaultThresholds: ['minPositionalArguments' => 5],
+            description:       'Optionally highlights ambiguous positional calls where named arguments may help, but only when parameter names belong to a stable API contract.',
+            falsePositiveShapes: [
+                [
+                    'shape' => 'The target API is unstable or its parameter names are not a compatibility promise.',
+                    'mitigation' => 'Keep positional arguments; named arguments are optional advice only for stable APIs whose parameter names are intended contracts.',
+                ],
+            ],
         );
     }
 
@@ -101,6 +109,7 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
                 metadata:    [
                     'requiresPhp' => 8.0,
                     'reason' => $reason,
+                    ...RemediationAction::Consider->metadata(),
                 ],
             );
         }

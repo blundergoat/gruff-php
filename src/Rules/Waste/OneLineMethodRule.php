@@ -7,10 +7,12 @@ namespace GruffPhp\Rules\Waste;
 use GruffPhp\Results\Finding\Confidence;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Pillar;
+use GruffPhp\Results\Finding\RemediationAction;
 use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Rules\Complexity\CyclomaticComplexityRule;
+use GruffPhp\Rules\Shared\CallableReferenceResolver;
 use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
@@ -41,6 +43,9 @@ use PhpParser\NodeFinder;
  */
 final readonly class OneLineMethodRule implements RuleInterface
 {
+    /** Full configuration path for intentional thin-method symbols. */
+    private const ALLOWED_SYMBOLS_CONFIGURATION_KEY = 'rules.waste.one-line-method.options.allowedSymbols';
+
     /**
      * Stable identifier for the one-line method rule.
      */
@@ -98,7 +103,7 @@ final readonly class OneLineMethodRule implements RuleInterface
                 'minParameters' => 'Minimum parameter count before flagging non-private methods (private zero-arg pass-through helpers can still fire).',
                 'minInFileCallers' => 'Skip when the wrapper is called from this many sites in the same file (default 2).',
                 'namedAlternativeFactoryExempt' => 'Skip public static factory pairs like Money::fromCents()/fromDollars() that exist for naming clarity.',
-                'allowedSymbols' => 'Qualified symbols that intentionally stay thin (API contracts, security helpers); see remediation.',
+                'allowedSymbols' => 'Qualified symbols that intentionally stay thin (API contracts, security helpers, dynamic/framework callbacks, string callables, or inherited callbacks referenced through a child class name); see remediation.',
             ],
             falsePositiveShapes: [
                 [
@@ -108,6 +113,10 @@ final readonly class OneLineMethodRule implements RuleInterface
                 [
                     'shape' => 'Named-alternative factory pairs (Money::fromCents(), Money::fromDollars()) where each factory wraps `new self(...)`.',
                     'mitigation' => 'namedAlternativeFactoryExempt defaults to true; verify both factories return new instances of the same class.',
+                ],
+                [
+                    'shape' => 'A first-class/callable-array callback boundary where a named comparator or serializer is the intentional contract.',
+                    'mitigation' => 'Exact same-class first-class and supported callable-array references are exempt automatically. Dynamic/framework callbacks, string callables, and parent-declared methods referenced through a child class name stay conservative; add their qualified declarations to options.allowedSymbols.',
                 ],
             ],
         );
@@ -133,11 +142,14 @@ final readonly class OneLineMethodRule implements RuleInterface
         $allowedSymbols     = array_fill_keys($settings->stringListOption('allowedSymbols'), true);
         $nodeFinder         = new NodeFinder();
         $selfCallCounts     = $this->selfCallCountsByClass($analysisUnit, $nodeFinder);
+        $callbackReferences = $this->callbackReferences($analysisUnit);
+        $classMethods       = $this->methodsWithoutCallbackReferences($analysisUnit, $callbackReferences);
         $factoryMethodIds   = $factoryExempt ? $this->namedAlternativeFactoryMethodIds($analysisUnit) : [];
         $contractMethodIds  = $this->contractMethodIds($analysisUnit);
         $findings           = [];
 
-        foreach (NodeIndex::nodesOf($analysisUnit, ClassMethod::class) as $classMethod) {
+        // Evaluate only declarations that were not already proven to be named callback boundaries.
+        foreach ($classMethods as $classMethod) {
             $enclosingClassId = $this->enclosingClassId($classMethod);
             $selfCallerCount  = $enclosingClassId !== null
                 ? ($selfCallCounts[$enclosingClassId][strtolower($classMethod->name->toString())] ?? 0)
@@ -189,11 +201,69 @@ final readonly class OneLineMethodRule implements RuleInterface
                     'method' => $classMethod->name->toString(),
                     'parameterCount' => count($classMethod->params),
                     'statementKind' => $statement instanceof Return_ ? 'return' : 'expression',
+                    ...RemediationAction::Apply->metadata(self::ALLOWED_SYMBOLS_CONFIGURATION_KEY),
                 ],
             );
         }
 
         return $findings;
+    }
+
+    /**
+     * Index exact same-class first-class and callable-array references in this parsed unit.
+     *
+     * @param AnalysisUnit $analysisUnit - Parsed unit whose supported callback-bearing nodes are inspected.
+     *
+     * @return array<string, true> - Lowercase class-and-method keys; empty when no exact callback is present.
+     */
+    private function callbackReferences(AnalysisUnit $analysisUnit): array
+    {
+        $references = [];
+
+        // Inspect only calls and array literals that can carry one of the supported callback forms.
+        foreach (NodeIndex::nodesOfAny(
+            $analysisUnit,
+            [Expr\MethodCall::class, Expr\StaticCall::class, Expr\Array_::class],
+        ) as $callbackNode) {
+            $referenceKey = CallableReferenceResolver::firstClassReferenceKey($callbackNode)
+                ?? CallableReferenceResolver::callableArrayReferenceKey($callbackNode);
+
+            // Ordinary, dynamic, unresolved, and foreign calls do not establish an exact callback declaration.
+            if ($referenceKey === null) {
+                continue;
+            }
+
+            $references[$referenceKey] = true;
+        }
+
+        return $references;
+    }
+
+    /**
+     * Remove exact named callback declarations before caller-count and allowlist decisions.
+     *
+     * @param AnalysisUnit $analysisUnit - Parsed unit whose method declarations are filtered.
+     * @param array<string, true> $callbackReferences - Exact lowercase callback identities found in the unit.
+     *
+     * @return list<ClassMethod> - Declarations without a supported exact callback reference; empty when all are callbacks.
+     */
+    private function methodsWithoutCallbackReferences(AnalysisUnit $analysisUnit, array $callbackReferences): array
+    {
+        $classMethods = [];
+
+        // Compare each declaration's fully resolved identity before any candidate-specific rule logic runs.
+        foreach (NodeIndex::nodesOf($analysisUnit, ClassMethod::class) as $classMethod) {
+            $declarationKey = CallableReferenceResolver::declarationKey($classMethod);
+
+            // A proven callback boundary is intentionally absent from later caller and allowlist fallbacks.
+            if ($declarationKey !== null && isset($callbackReferences[$declarationKey])) {
+                continue;
+            }
+
+            $classMethods[] = $classMethod;
+        }
+
+        return $classMethods;
     }
 
     /**

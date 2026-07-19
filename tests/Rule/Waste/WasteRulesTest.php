@@ -7,6 +7,7 @@ namespace GruffPhp\Tests\Rule\Waste;
 use GruffPhp\Engine\Config\AnalysisConfig;
 use GruffPhp\Engine\Config\RuleSettings;
 use GruffPhp\Results\Finding\Pillar;
+use GruffPhp\Results\Finding\RemediationAction;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\PhpFileParser;
 use GruffPhp\Rules\Contracts\RuleContext;
@@ -286,6 +287,50 @@ final class WasteRulesTest extends TestCase
         self::assertSame(Severity::Advisory, $rowsFinding->severity);
         self::assertSame(Pillar::Maintainability, $rowsFinding->pillar);
         self::assertSame('return', $rowsFinding->metadata['statementKind']);
+        self::assertSame(RemediationAction::Apply->value, $rowsFinding->metadata['remediationAction'] ?? null);
+        self::assertSame(
+            'rules.waste.one-line-method.options.allowedSymbols',
+            $rowsFinding->metadata['configurationKey'] ?? null,
+        );
+    }
+
+    /**
+     * Verify exact named callbacks are exempt while conservative callback shapes and ordinary wrappers remain visible.
+     *
+     * @return void
+     */
+    public function testOneLineMethodRulePreservesNamedCallbackBoundaries(): void
+    {
+        $findings = $this->analyseRule('one-line-methods.php', OneLineMethodRule::ID);
+        $symbols  = array_map(static fn($finding): ?string => $finding->symbol, $findings);
+
+        $supportedCallbackSymbols = [
+            'NamedCallbackBoundaryFixture::compareRows()',
+            'NamedCallbackBoundaryFixture::serialiseRow()',
+            'NamedCallbackBoundaryFixture::formatThisRow()',
+            'NamedCallbackBoundaryFixture::formatSelfRow()',
+            'NamedCallbackBoundaryFixture::formatStaticRow()',
+            'NamedCallbackBoundaryFixture::formatClassRow()',
+            'NamedCallbackBoundaryFixture::formatMagicRow()',
+            'NamedCallbackBoundaryFixture::formatReorderedRow()',
+        ];
+        self::assertSame([], array_values(array_intersect($supportedCallbackSymbols, $symbols)));
+
+        self::assertContains('ConservativeCallbackBoundaryFixture::foreignClassTarget()', $symbols);
+        self::assertContains('ConservativeCallbackBoundaryFixture::dynamicReceiverTarget()', $symbols);
+        self::assertContains('ConservativeCallbackBoundaryFixture::computedMethodTarget()', $symbols);
+        self::assertContains('ConservativeCallbackBoundaryFixture::missingClassTarget()', $symbols);
+        self::assertContains('ConservativeCallbackBoundaryFixture::shortNameCollisionTarget()', $symbols);
+        self::assertContains('ConservativeCallbackBoundaryFixture::stringCallbackTarget()', $symbols);
+        self::assertContains('ConservativeCallbackBoundaryFixture::metadataOnlyTarget()', $symbols);
+        self::assertContains('ParentDeclaredCallbackBoundaryFixture::parentDeclaredTarget()', $symbols);
+
+        $ordinaryWrapperFindings = array_values(array_filter(
+            $findings,
+            static fn($finding): bool => $finding->symbol === 'PrivatePassThroughFixture::oneShotHelper()',
+        ));
+        self::assertCount(1, $ordinaryWrapperFindings);
+        self::assertSame('b785028ab40a58c3', $ordinaryWrapperFindings[0]->stableIdentity());
     }
 
     /**

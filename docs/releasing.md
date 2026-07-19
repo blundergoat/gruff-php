@@ -36,8 +36,8 @@ drift:
 ```sh
 composer check
 bash scripts/preflight-checks.sh --release-version X.Y.Z
-vendor/bin/gruff-php --help
-vendor/bin/gruff-php list-rules --format json
+php bin/gruff-php --help
+php bin/gruff-php list-rules --format json
 ```
 
 ## CLI Contract

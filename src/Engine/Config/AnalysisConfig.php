@@ -35,7 +35,7 @@ final readonly class AnalysisConfig
      * @var list<string>
      */
     public const DEFAULT_ACCEPTED_ABBREVIATIONS = [
-        'age', 'app', 'db', 'fs', 'id', 'io', 'key', 'log', 'max', 'min', 'now', 'raw', 'rx', 'tx', 'ui', 'url',
+        'age', 'app', 'db', 'dto', 'fs', 'id', 'io', 'key', 'log', 'max', 'min', 'now', 'raw', 'rx', 'tx', 'ui', 'url', 'utc',
     ];
 
     /**

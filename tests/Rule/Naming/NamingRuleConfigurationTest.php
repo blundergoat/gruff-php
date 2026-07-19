@@ -6,6 +6,7 @@ namespace GruffPhp\Tests\Rule\Naming;
 
 use GruffPhp\Engine\Config\AnalysisConfig;
 use GruffPhp\Engine\Config\RuleSettings;
+use GruffPhp\Results\Finding\RemediationAction;
 use GruffPhp\Rules\Naming\AbbreviationAllowlistRule;
 use GruffPhp\Rules\Naming\BooleanPrefixRule;
 use GruffPhp\Rules\Naming\HungarianNotationRule;
@@ -62,6 +63,78 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
         self::assertNotContains('row', $names);
         self::assertNotContains('end', $names);
         self::assertNotContains('ex', $names);
+
+        $decisionFindings = $this->analyseSourceRule(<<<'PHP'
+<?php
+final class DomainTerms
+{
+    public function labels(): array
+    {
+        $dob = '2000-01-01';
+        $tmp = 'transient';
+
+        return [$dob, $tmp];
+    }
+}
+PHP, AbbreviationAllowlistRule::ID);
+        $tmpFindings = array_values(array_filter(
+            $findings,
+            static fn($finding): bool => ($finding->metadata['identifierName'] ?? null) === 'tmp',
+        ));
+        $decisionFindings = array_merge($decisionFindings, $tmpFindings);
+        $decisionNames    = array_map(
+            static fn($finding): mixed => $finding->metadata['identifierName'] ?? null,
+            $decisionFindings,
+        );
+        sort($decisionNames);
+        self::assertSame(['dob', 'tmp'], $decisionNames);
+        self::assertSame(
+            [RemediationAction::Consider->value],
+            array_values(array_unique(array_map(
+                static fn($finding): string => is_string($finding->metadata['remediationAction'] ?? null)
+                    ? $finding->metadata['remediationAction']
+                    : '',
+                $decisionFindings,
+            ))),
+        );
+        self::assertSame(
+            ['allowlists.acceptedAbbreviations'],
+            array_values(array_unique(array_map(
+                static fn($finding): string => is_string($finding->metadata['configurationKey'] ?? null)
+                    ? $finding->metadata['configurationKey']
+                    : '',
+                $decisionFindings,
+            ))),
+        );
+        self::assertSame(
+            ['Rename the identifier or add the abbreviation to allowlists.acceptedAbbreviations with a documented meaning.'],
+            array_values(array_unique(array_map(
+                static fn($finding): ?string => $finding->remediation,
+                $decisionFindings,
+            ))),
+        );
+    }
+
+    /**
+     * Verify universal DTO and UTC vocabulary stays quiet while domain and out-of-band names retain their contracts.
+     *
+     * @return void
+     */
+    public function testAbbreviationAllowlistShipsUniversalDtoAndUtcDefaults(): void
+    {
+        $findings = $this->analyseSourceRule(<<<'PHP'
+<?php
+function mapDomainValues(string $dto, string $utc, string $dob, string $uuid): void
+{
+}
+PHP, AbbreviationAllowlistRule::ID);
+        $names = array_map(
+            static fn($finding): mixed => $finding->metadata['identifierName'] ?? null,
+            $findings,
+        );
+        sort($names);
+
+        self::assertSame(['dob'], $names);
     }
 
     /**
@@ -115,6 +188,49 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
         self::assertNotContains('silent', $names);
         self::assertNotContains('interactive', $names);
         self::assertNotContains('flag', $names);
+        self::assertContains('data', $names);
+        self::assertContains('result', $names);
+        self::assertContains('mode', $names);
+        self::assertContains('required', $names);
+        self::assertNotContains('focusModePayloadPresent', $names);
+        self::assertNotContains('printableTodayScheduleRequested', $names);
+        self::assertNotContains('bookingRequiresConfirmation', $names);
+        self::assertNotContains('limited', $names);
+        self::assertNotContains('printable', $names);
+        self::assertNotContains('paymentRequested', $names);
+        self::assertNotContains('assistantIntentRequiresContext', $names);
+        self::assertNotContains('resolved', $names);
+        self::assertNotContains('declineCodeExplanationRequested', $names);
+
+        $privatePromotion = array_values(array_filter(
+            $findings,
+            static fn($finding): bool => $finding->metadata['identifierName'] === 'infectionRunCtor',
+        ))[0] ?? null;
+        $publicProperty = array_values(array_filter(
+            $findings,
+            static fn($finding): bool => $finding->symbol === '$changedOnly',
+        ))[0] ?? null;
+        $publicParameter = array_values(array_filter(
+            $findings,
+            static fn($finding): bool => $finding->symbol === 'BooleanPrefixPropertiesFixture::configure()'
+                && $finding->metadata['identifierName'] === 'changedOnly',
+        ))[0] ?? null;
+        $localClosure = $this->analyseRule('closure-coverage.php', BooleanPrefixRule::ID)[0] ?? null;
+
+        self::assertNotNull($privatePromotion);
+        self::assertNotNull($publicProperty);
+        self::assertNotNull($publicParameter);
+        self::assertNotNull($localClosure);
+        self::assertSame(RemediationAction::Consider->value, $privatePromotion->metadata['remediationAction'] ?? null);
+        self::assertSame(RemediationAction::Consider->value, $publicProperty->metadata['remediationAction'] ?? null);
+        self::assertSame(RemediationAction::Consider->value, $publicParameter->metadata['remediationAction'] ?? null);
+        self::assertSame(RemediationAction::Consider->value, $localClosure->metadata['remediationAction'] ?? null);
+
+        $expectedConfigurationKey = 'rules.naming.boolean-prefix.options.acceptedBooleanNames';
+        self::assertSame($expectedConfigurationKey, $privatePromotion->metadata['configurationKey'] ?? null);
+        self::assertSame($expectedConfigurationKey, $publicProperty->metadata['configurationKey'] ?? null);
+        self::assertSame($expectedConfigurationKey, $publicParameter->metadata['configurationKey'] ?? null);
+        self::assertSame($expectedConfigurationKey, $localClosure->metadata['configurationKey'] ?? null);
     }
 
     /**
@@ -151,7 +267,7 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
         $settings = AnalysisConfig::fromRegistry($registry)->ruleSettings(BooleanPrefixRule::ID);
         $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
             BooleanPrefixRule::ID,
-            new RuleSettings(true, $settings->thresholds, array_merge($settings->options, ['acceptedBooleanNames' => ['active', 'check']])),
+            new RuleSettings(true, $settings->thresholds, array_merge($settings->options, ['acceptedBooleanNames' => ['ACTIVE', 'CHECK']])),
         );
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
         $symbols  = array_map(static fn($finding): ?string => $finding->symbol, array_filter(
@@ -163,6 +279,128 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
         self::assertNotContains('BooleanPrefixFixture::check()', $symbols);
         self::assertContains('BooleanPrefixFixture::enabled()', $symbols);
         self::assertContains('BooleanPrefixFixture::didRun()', $symbols);
+    }
+
+    /**
+     * Verify projects can limit Boolean naming checks to private and local declarations.
+     *
+     * @return void
+     */
+    public function testBooleanPrefixCanSkipCallerVisibleApi(): void
+    {
+        $registry = RuleRegistry::defaults();
+        $settings = AnalysisConfig::fromRegistry($registry)->ruleSettings(BooleanPrefixRule::ID);
+        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+            BooleanPrefixRule::ID,
+            new RuleSettings(true, $settings->thresholds, array_merge($settings->options, ['includePublicApi' => false])),
+        );
+        $findings = $this->analyseSourceRule(<<<'PHP'
+<?php
+final class ApiFlags
+{
+    public bool $publicState = false;
+    private bool $privateState = false;
+
+    public function publicStatus(bool $publicFlag): bool
+    {
+        return $publicFlag;
+    }
+
+    private function privateStatus(bool $privateFlag): bool
+    {
+        return $privateFlag;
+    }
+
+    public function registerCallback(): void
+    {
+        $callback = static fn (bool $closureFlag): bool => $closureFlag;
+    }
+}
+
+function publicFunctionStatus(bool $functionFlag): bool
+{
+    return $functionFlag;
+}
+PHP, BooleanPrefixRule::ID, config: $config);
+        $symbols = array_map(static fn($finding): ?string => $finding->symbol, $findings);
+        $names   = array_map(static fn($finding): mixed => $finding->metadata['identifierName'] ?? null, $findings);
+
+        self::assertNotContains('$publicState', $symbols);
+        self::assertNotContains('ApiFlags::publicStatus()', $symbols);
+        self::assertNotContains('publicFunctionStatus()', $symbols);
+        self::assertNotContains('publicFlag', $names);
+        self::assertNotContains('functionFlag', $names);
+        self::assertContains('$privateState', $symbols);
+        self::assertContains('ApiFlags::privateStatus()', $symbols);
+        self::assertContains('privateFlag', $names);
+        self::assertContains('closureFlag', $names);
+
+        $privateProperty = array_values(array_filter(
+            $findings,
+            static fn($finding): bool => $finding->symbol === '$privateState',
+        ))[0] ?? null;
+        $privateCallable = array_values(array_filter(
+            $findings,
+            static fn($finding): bool => $finding->symbol === 'ApiFlags::privateStatus()'
+                && !isset($finding->metadata['identifierKind']),
+        ))[0] ?? null;
+        $privateParameter = array_values(array_filter(
+            $findings,
+            static fn($finding): bool => ($finding->metadata['identifierName'] ?? null) === 'privateFlag',
+        ))[0] ?? null;
+        $closureParameter = array_values(array_filter(
+            $findings,
+            static fn($finding): bool => ($finding->metadata['identifierName'] ?? null) === 'closureFlag',
+        ))[0] ?? null;
+
+        self::assertNotNull($privateProperty);
+        self::assertNotNull($privateCallable);
+        self::assertNotNull($privateParameter);
+        self::assertNotNull($closureParameter);
+        self::assertSame(RemediationAction::Apply->value, $privateProperty->metadata['remediationAction'] ?? null);
+        self::assertSame(RemediationAction::Apply->value, $privateCallable->metadata['remediationAction'] ?? null);
+        self::assertSame(RemediationAction::Consider->value, $privateParameter->metadata['remediationAction'] ?? null);
+        self::assertSame(RemediationAction::Consider->value, $closureParameter->metadata['remediationAction'] ?? null);
+    }
+
+    /**
+     * Verify suffix, proposition, adjective, and exact-name configuration stay independent.
+     *
+     * @return void
+     */
+    public function testBooleanPrefixStateAndPropositionAllowlistsCanBeConfigured(): void
+    {
+        $registry = RuleRegistry::defaults();
+        $settings = AnalysisConfig::fromRegistry($registry)->ruleSettings(BooleanPrefixRule::ID);
+        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+            BooleanPrefixRule::ID,
+            new RuleSettings(true, $settings->thresholds, array_merge($settings->options, [
+                'stateSuffixAllowlist' => ['requested'],
+                'stateAdjectiveAllowlist' => ['active', 'required'],
+                'propositionVerbAllowlist' => ['requires'],
+                'acceptedBooleanNames' => ['status'],
+            ])),
+        );
+        $units = [
+            $this->parseFixture('boolean-prefix.php'),
+            $this->parseFixture('boolean-prefix-properties.php'),
+        ];
+        $findings        = $registry->analyse($units, new RuleContext(__DIR__ . '/../../..', $config));
+        $booleanFindings = array_values(array_filter(
+            $findings,
+            static fn($finding): bool => $finding->ruleId === BooleanPrefixRule::ID,
+        ));
+        $symbols = array_map(static fn($finding): ?string => $finding->symbol, $booleanFindings);
+        $names   = array_map(static fn($finding): mixed => $finding->metadata['identifierName'] ?? null, $booleanFindings);
+
+        self::assertNotContains('BooleanStateVocabularyFixture::paymentRequested()', $symbols);
+        self::assertNotContains('BooleanStateVocabularyFixture::assistantIntentRequiresContext()', $symbols);
+        self::assertNotContains('BooleanPrefixFixture::status()', $symbols);
+        self::assertContains('BooleanStateVocabularyFixture::valid()', $symbols);
+        self::assertContains('focusModePayloadPresent', $names);
+        self::assertNotContains('required', $names);
+        self::assertContains('resolved', $names);
+        self::assertNotContains('assistantIntentRequiresContext', $names);
     }
 
     /**

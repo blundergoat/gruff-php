@@ -50,14 +50,20 @@ abstract class NamingRuleTestCase extends TestCase
     /**
      * Analyse naming fixtures and return findings for assertions.
      *
-     * @param string $source - Inline PHP written to a throwaway temp file before parsing.
-     * @param string $ruleId - Rule id to keep; findings from every other rule are discarded.
-     * @param string $displayPath - Path the rule sees, letting a test exercise path-sensitive naming checks.
+     * @param string              $source      - Inline PHP written to a throwaway temp file before parsing.
+     * @param string              $ruleId      - Rule id to keep; findings from every other rule are discarded.
+     * @param string              $displayPath - Path the rule sees, letting a test exercise path-sensitive naming checks.
+     * @param AnalysisConfig|null $config      - Effective config override; null uses registry defaults.
      *
      * @return list<\GruffPhp\Results\Finding\Finding> - findings emitted by the named rule for the inline source, in detection order; empty when no
      *                                         violation fires
      */
-    protected function analyseSourceRule(string $source, string $ruleId, string $displayPath = 'tests/Fixtures/Naming/inline.php'): array
+    protected function analyseSourceRule(
+        string $source,
+        string $ruleId,
+        string $displayPath = 'tests/Fixtures/Naming/inline.php',
+        ?AnalysisConfig $config = null,
+    ): array
     {
         $path = tempnam(sys_get_temp_dir(), 'gruff-naming-');
         self::assertIsString($path);
@@ -67,8 +73,10 @@ abstract class NamingRuleTestCase extends TestCase
 
             $unit     = $this->parser->parse(new SourceFile($path, $displayPath));
             $registry = RuleRegistry::defaults();
-            $config   = AnalysisConfig::fromRegistry($registry);
-            $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
+            $findings = $registry->analyse(
+                [$unit],
+                new RuleContext(__DIR__ . '/../../..', $config ?? AnalysisConfig::fromRegistry($registry)),
+            );
 
             return array_values(array_filter($findings, static fn($finding): bool => $finding->ruleId === $ruleId));
         } finally {

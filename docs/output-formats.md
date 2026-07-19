@@ -11,6 +11,10 @@ Use `text` for local terminal scans:
 vendor/bin/gruff-php analyse src --format text --fail-on warning
 ```
 
+Text keeps the established finding block in 0.5.1. Machine-readable
+`remediationAction` and `configurationKey` metadata is not added to this
+presentation.
+
 ## JSON
 
 Use `json` for automation. JSON reports use `gruff.analysis.v2`.
@@ -30,6 +34,26 @@ Each finding carries two identifier fields:
   to track "the same finding" across unrelated edits that shift line
   numbers. Two findings of the same rule on the same symbol and message
   share a `stableIdentity` but have different `fingerprint` values.
+
+Classified findings keep their human-readable top-level `remediation` string
+and add action data inside the existing `metadata` object:
+
+```json
+{
+  "remediation": "Rename the identifier or add the abbreviation to allowlists.acceptedAbbreviations with a documented meaning.",
+  "metadata": {
+    "remediationAction": "CONSIDER",
+    "configurationKey": "allowlists.acceptedAbbreviations"
+  }
+}
+```
+
+`remediationAction` is `APPLY` for a direct source fix, `CONSIDER` for optional
+or compatibility-sensitive advice, or `CONFIGURE` for a deterministic
+configuration-only resolution. `CONFIGURE` is part of the contract but no
+0.5.1 rule emits it unconditionally. `configurationKey` is optional and, when
+present, is the full config path for an available hatch. These additive fields
+do not change `gruff.analysis.v2`, finding identities, scoring, or exit gates.
 
 Baselines do not match on either hash: `gruff.baseline.v2` files store grouped
 count rows `{file, ruleId, message, count}` and matching is count arithmetic
@@ -69,6 +93,16 @@ only when the hunk touches their reported anchor. Use `--changed-scope=file` for
 changed-file review workflows that intentionally want file-level aggregates and
 class aggregate findings whose reported span overlaps the changed hunk.
 
+## Hook
+
+`gruff-php hook --format json` carries the same `remediation` string and
+`metadata.remediationAction` / `metadata.configurationKey` fields in each
+`gruff.hook.v1` finding. The hook presenter passes non-threshold metadata
+through unchanged; its existing threshold normalisation preserves the action
+keys alongside measured values. Hook new-only fingerprints deliberately omit
+both action keys, so a finding accepted before action metadata was introduced
+remains suppressed when the underlying problem is otherwise unchanged.
+
 ## HTML
 
 Use `html` for archived human review or dashboard scan output:
@@ -90,6 +124,10 @@ and `--file` (pass paths positionally instead).
 ## Markdown
 
 Use `markdown` for pull request comments and release notes.
+
+Markdown keeps its established finding rows in 0.5.1 and does not render the
+new action metadata. Use JSON, hook, or SARIF when a consumer needs the
+machine-readable action distinction.
 
 ## GitHub
 
@@ -117,6 +155,12 @@ JSON finding identity fields:
   unrelated edits that shift line numbers, so SARIF consumers (for example
   GitHub Code Scanning) can keep an alert open across line drift instead of
   closing and reopening it.
+
+When a finding is classified, SARIF carries the human remediation at
+`result.properties.remediation` and the action fields at
+`result.properties.metadata.remediationAction` and, when available,
+`result.properties.metadata.configurationKey`. The SARIF result message,
+levels, locations, and partial fingerprints are unchanged.
 
 ## Exit Codes
 

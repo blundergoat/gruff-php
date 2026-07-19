@@ -6,6 +6,8 @@ namespace GruffPhp\Tests\Rule\Docs;
 
 use GruffPhp\Engine\Config\AnalysisConfig;
 use GruffPhp\Engine\Config\RuleSettings;
+use GruffPhp\Results\Finding\Finding;
+use GruffPhp\Results\Finding\RemediationAction;
 use GruffPhp\Rules\Docs\BarePhpdocTagsRule;
 use GruffPhp\Rules\Docs\MissingClassPhpdocRule;
 use GruffPhp\Rules\Docs\MissingConstantPhpdocRule;
@@ -18,12 +20,16 @@ use GruffPhp\Rules\Docs\StaleParamTagRule;
 use GruffPhp\Rules\Docs\TodoDensityRule;
 use GruffPhp\Rules\Docs\VarAnnotationDescriptionRule;
 use GruffPhp\Rules\RuleRegistry;
+use GruffPhp\Rules\Shared\PhysicalCommentAttachment;
 
 /**
  * Covers documentation tag, file, class, property, and constant rules.
  */
 final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
 {
+    /** Expected maximum names covered by one bounded pattern-family comment. */
+    private const BOUNDED_GROUP_LIMIT = 5;
+
     /**
      * Verify stale param tag detected.
      *
@@ -177,7 +183,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify preg_match calls require immediate explanatory comments.
+     * Verify call, statement-owner, match-arm, and narrow callable coverage while retained calls report.
      *
      * @return void
      */
@@ -188,23 +194,101 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
         $symbols = array_map(static fn ($finding): ?string => $finding->symbol, $findings);
         sort($symbols);
 
+        $functionNames = array_map(
+            static fn ($finding): mixed => $finding->metadata['function'] ?? null,
+            $findings,
+        );
+        sort($functionNames);
+
+        $messages = array_values(array_unique(array_map(static fn ($finding): string => $finding->message, $findings)));
+        sort($messages);
+
+        $ruleIds     = array_values(array_unique(array_map(static fn ($finding): string => $finding->ruleId, $findings)));
+        $severities  = array_values(array_unique(array_map(static fn ($finding): string => $finding->severity->value, $findings)));
+        $confidences = array_values(array_unique(array_map(static fn ($finding): string => $finding->confidence->value, $findings)));
+        $actions     = array_values(array_unique(array_map(
+            static fn ($finding): string => is_string($finding->metadata['remediationAction'] ?? null)
+                ? $finding->metadata['remediationAction']
+                : '',
+            $findings,
+        )));
+        $configurationKeys = array_values(array_unique(array_map(
+            static fn ($finding): string => is_string($finding->metadata['configurationKey'] ?? null)
+                ? $finding->metadata['configurationKey']
+                : '',
+            $findings,
+        )));
+
+        $stableIdentities = [];
+        // Retained user-facing defects keep their line-independent identities across fixture expansion.
+        foreach ($findings as $finding) {
+            $stableIdentities[$finding->symbol ?? ''] = $finding->stableIdentity();
+        }
+
         self::assertSame(
             [
+                'RegexCommentFixture::hasBlankSeparatedRegexStatementGroup()',
+                'RegexCommentFixture::hasBroadPatternsContract()',
+                'RegexCommentFixture::hasBroadPatternsContract()',
+                'RegexCommentFixture::hasNestedCallableWithoutInnerComment()',
+                'RegexCommentFixture::hasPreviousStatementCommentOnly()',
+                'RegexCommentFixture::hasTrailingPreviousStatementComment()',
                 'RegexCommentFixture::isSeparatedRegexMatch()',
                 'RegexCommentFixture::isUndocumentedRegexMatch()',
                 'RegexCommentFixture::matchTheRouteUncommentedRegex()',
+                'RegexCommentFixture::misleadingNamedWhitespaceFold()',
+                'RegexCommentFixture::safelyValidateText()',
+                'RegexCommentFixture::unrelatedReplacementUnderWhitespaceContract()',
             ],
             $symbols,
         );
-        self::assertSame(
-            ['preg_match', 'preg_match', 'preg_match'],
-            array_map(static function ($finding): ?string {
-                $functionName = $finding->metadata['function'] ?? null;
 
-                // Normalise a missing or non-string metadata value to null so the comparison stays typed.
-                return is_string($functionName) ? $functionName : null;
-            }, $findings),
+        self::assertSame(
+            [
+                'preg_match',
+                'preg_match',
+                'preg_match',
+                'preg_match',
+                'preg_match',
+                'preg_match',
+                'preg_match',
+                'preg_match',
+                'preg_replace',
+                'preg_replace',
+                'preg_replace',
+                'preg_replace',
+            ],
+            $functionNames,
         );
+
+        self::assertSame(
+            [
+                'preg_match() should have a one-line comment above it explaining what the regex checks.',
+                'preg_replace() should have a one-line comment above it explaining what the regex checks.',
+            ],
+            $messages,
+        );
+
+        self::assertSame(
+            [RegexCommentRule::ID],
+            $ruleIds,
+        );
+        self::assertSame(
+            ['advisory'],
+            $severities,
+        );
+        self::assertSame(
+            ['medium'],
+            $confidences,
+        );
+        self::assertSame([RemediationAction::Apply->value], $actions);
+        self::assertSame(['rules.docs.regex-comment.options.functionNames'], $configurationKeys);
+
+        self::assertSame('784f88c1d188c09f', $stableIdentities['RegexCommentFixture::isUndocumentedRegexMatch()'] ?? null);
+        self::assertSame('71689c0f4f3d8560', $stableIdentities['RegexCommentFixture::isSeparatedRegexMatch()'] ?? null);
+        self::assertSame('05f644587976fa95', $stableIdentities['RegexCommentFixture::matchTheRouteUncommentedRegex()'] ?? null);
+
+        $this->assertRegexCommentLineClassification();
     }
 
     /**
@@ -398,6 +482,15 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
         $kinds = array_map(static fn ($finding) => $finding->metadata['kind'], $findings);
         sort($kinds);
         self::assertSame(['class-constant', 'enum-case', 'enum-case'], $kinds);
+        self::assertSame(
+            [RemediationAction::Apply->value],
+            array_values(array_unique(array_map(
+                static fn ($finding): string => is_string($finding->metadata['remediationAction'] ?? null)
+                    ? $finding->metadata['remediationAction']
+                    : '',
+                $findings,
+            ))),
+        );
     }
 
     /**
@@ -415,7 +508,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify constants accept useful local comments by default.
+     * Verify local comments cover only the intended constant and group shapes.
      *
      * @return void
      */
@@ -425,19 +518,28 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
 
         $byConstant = $this->constantFindingsByName($findings);
 
-        self::assertArrayNotHasKey('CSV_BYTE_CAP', $byConstant);
-        self::assertArrayNotHasKey('TELEMETRY_KEY', $byConstant);
-        self::assertArrayNotHasKey('ROLE_USER', $byConstant);
-        self::assertArrayNotHasKey('ROLE_ASSISTANT', $byConstant);
-        self::assertArrayHasKey('PLAIN_NO_COMMENT', $byConstant);
-        self::assertArrayHasKey('PRIVATE_NO_COMMENT', $byConstant);
-        self::assertArrayHasKey('PRIVATE_USELESS_COMMENT', $byConstant);
-        self::assertArrayHasKey('MAX_PAGES', $byConstant);
-        self::assertArrayHasKey('PRIVATE_TODO_COMMENT', $byConstant);
-        self::assertArrayHasKey('PRIVATE_DETACHED_COMMENT', $byConstant);
-        self::assertArrayNotHasKey('PRIVATE_CACHE_PREFIX', $byConstant);
-        self::assertArrayNotHasKey('PAYLOAD_VERSION_KEY', $byConstant);
-        self::assertArrayNotHasKey('IDEMPOTENCY_KEY', $byConstant);
+        self::assertSame(
+            [
+                'PLAIN_NO_COMMENT',
+                'PRIVATE_NO_COMMENT',
+                'PRIVATE_USELESS_COMMENT',
+                'MAX_PAGES',
+                'PRIVATE_TODO_COMMENT',
+                'PRIVATE_DETACHED_COMMENT',
+                'PATIENT_OVERFLOW_PATTERN',
+                'COMPARISON_ZETA_PATTERN',
+                'VISIBILITY_PROTECTED_PATTERN',
+                'SINGLE_MATCHER_FOLLOWER',
+                'RESET_AFTER_LOCAL_PATTERN',
+                'BLANK_AFTER_GROUP_PATTERN',
+                'METHOD_AFTER_GROUP_PATTERN',
+                'PHPDOC_AFTER_GROUP_PATTERN',
+                'TRAILING_COMMENT_FOLLOWER',
+                'SEARCH_RESULT_LIMIT',
+                'DATE_OF_BIRTH_PATTERN',
+            ],
+            array_keys($byConstant),
+        );
 
         $plain = $byConstant['PLAIN_NO_COMMENT'];
         self::assertArrayNotHasKey('commentKind', $plain->metadata);
@@ -448,6 +550,12 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
         self::assertSame('low-quality', $byConstant['PRIVATE_USELESS_COMMENT']->metadata['commentQuality'] ?? null);
         self::assertStringContainsString('does not explain the constant\'s purpose', $byConstant['PRIVATE_USELESS_COMMENT']->message);
         self::assertArrayNotHasKey('commentKind', $byConstant['PRIVATE_DETACHED_COMMENT']->metadata);
+        self::assertSame('missing', $byConstant['TRAILING_COMMENT_FOLLOWER']->metadata['commentQuality'] ?? null);
+        self::assertArrayNotHasKey('commentKind', $byConstant['TRAILING_COMMENT_FOLLOWER']->metadata);
+
+        $this->assertBoundedGroupOverflow($byConstant['PATIENT_OVERFLOW_PATTERN']);
+        $this->assertBoundedGroupOverflow($byConstant['COMPARISON_ZETA_PATTERN']);
+        $this->assertSameStatementGroupOverflow();
     }
 
     /**
@@ -469,6 +577,9 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
         self::assertArrayHasKey('TELEMETRY_KEY', $byConstant);
         self::assertArrayHasKey('ROLE_USER', $byConstant);
         self::assertArrayHasKey('ROLE_ASSISTANT', $byConstant);
+        self::assertArrayHasKey('PATIENT_NAME_PATTERN', $byConstant);
+        self::assertArrayHasKey('PATIENT_REFERENCE_PATTERN', $byConstant);
+        self::assertArrayHasKey('PATIENT_OVERFLOW_PATTERN', $byConstant);
         self::assertArrayNotHasKey('DOCUMENTED_TELEMETRY_KEY', $byConstant);
 
         $telemetry = $byConstant['TELEMETRY_KEY'];
@@ -478,6 +589,18 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
         self::assertStringContainsString('requires PHPDoc for exported constants', $telemetry->message);
 
         self::assertTrue($byConstant['ROLE_ASSISTANT']->metadata['groupedLocalComment'] ?? null);
+
+        $patientReference = $byConstant['PATIENT_REFERENCE_PATTERN'];
+        self::assertSame('line', $patientReference->metadata['commentKind'] ?? null);
+        self::assertSame('meaningful', $patientReference->metadata['commentQuality'] ?? null);
+        self::assertTrue($patientReference->metadata['requiresApiPhpdoc'] ?? null);
+        self::assertTrue($patientReference->metadata['groupedLocalComment'] ?? null);
+
+        $patientOverflow = $byConstant['PATIENT_OVERFLOW_PATTERN'];
+        $this->assertBoundedGroupOverflow($patientOverflow);
+        self::assertTrue($patientOverflow->metadata['requiresApiPhpdoc'] ?? null);
+        self::assertArrayNotHasKey('groupedLocalComment', $patientOverflow->metadata);
+        self::assertStringContainsString('also requires PHPDoc', $patientOverflow->message);
     }
 
     /**
@@ -498,6 +621,111 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
         self::assertArrayHasKey('TELEMETRY_KEY', $byConstant);
         self::assertTrue($byConstant['TELEMETRY_KEY']->metadata['requiresApiPhpdoc'] ?? null);
         self::assertArrayNotHasKey('DOCUMENTED_TELEMETRY_KEY', $byConstant);
+    }
+
+    /**
+     * Verify comment-only delimiter chains cover a regex while executable segments still report.
+     *
+     * @return void
+     */
+    private function assertRegexCommentLineClassification(): void
+    {
+        $commentOnlyFindings = $this->analyseSourceRule(<<<'PHP'
+<?php
+final class CommentOnlyRegex
+{
+    public function matches(string $subject): bool
+    {
+        /* Match the supported marker. */
+        return preg_match('/marker/', $subject) === 1;
+    }
+}
+PHP, RegexCommentRule::ID);
+        $commentChainFindings = $this->analyseSourceRule(<<<'PHP'
+<?php
+final class CommentChainRegex
+{
+    public function matches(string $subject): bool
+    {
+        /* Context. */ // Match the supported marker.
+        return preg_match('/marker/', $subject) === 1;
+    }
+}
+PHP, RegexCommentRule::ID);
+        $trailingCodeFindings = $this->analyseSourceRule(<<<'PHP'
+<?php
+final class TrailingCodeRegex
+{
+    public function matches(string $subject): bool
+    {
+        /* Match the supported marker. */ $unrelated = 1;
+        return preg_match('/marker/', $subject) === 1;
+    }
+}
+PHP, RegexCommentRule::ID);
+        $sandwichedCodeFindings = $this->analyseSourceRule(<<<'PHP'
+<?php
+final class SandwichedCodeRegex
+{
+    public function matches(string $subject): bool
+    {
+        /* Context. */ $unrelated = 1; /* Match the supported marker. */
+        return preg_match('/marker/', $subject) === 1;
+    }
+}
+PHP, RegexCommentRule::ID);
+
+        self::assertSame([], $commentOnlyFindings);
+        self::assertSame([], $commentChainFindings);
+        self::assertCount(1, $trailingCodeFindings);
+        self::assertSame('TrailingCodeRegex::matches()', $trailingCodeFindings[0]->symbol);
+        self::assertCount(1, $sandwichedCodeFindings);
+        self::assertSame('SandwichedCodeRegex::matches()', $sandwichedCodeFindings[0]->symbol);
+        self::assertTrue(PhysicalCommentAttachment::isCommentOnlyLine('    /* Match the supported marker. */'));
+        self::assertTrue(PhysicalCommentAttachment::isCommentOnlyLine('    /* Context. */ // Match the supported marker.'));
+        self::assertTrue(PhysicalCommentAttachment::isCommentOnlyLine('    /* Context. */ # Match the supported marker.'));
+        self::assertTrue(PhysicalCommentAttachment::isCommentOnlyLine('    /* Context. */ /* Match the supported marker. */'));
+        self::assertFalse(PhysicalCommentAttachment::isCommentOnlyLine('    /* Match the supported marker. */ $unrelated = 1;'));
+        self::assertFalse(PhysicalCommentAttachment::isCommentOnlyLine('    /* Context. */ $unrelated = 1; /* Match the supported marker. */'));
+        self::assertFalse(PhysicalCommentAttachment::isCommentOnlyLine('    /* Unclosed context.'));
+    }
+
+    /**
+     * Verify one multi-name declaration reports only the names beyond a bounded group comment.
+     *
+     * @return void
+     */
+    private function assertSameStatementGroupOverflow(): void
+    {
+        $findings = $this->analyseSourceRule(<<<'PHP'
+<?php
+final class PatternBag
+{
+    // Validation patterns used by the supported inputs.
+    public const A = 'a', B = 'b', C = 'c', D = 'd', E = 'e', F = 'f';
+}
+PHP, MissingConstantPhpdocRule::ID);
+
+        self::assertCount(1, $findings);
+        self::assertSame('PatternBag::F', $findings[0]->symbol);
+        $this->assertBoundedGroupOverflow($findings[0]);
+        self::assertStringContainsString('Start a new adjacent patterns/regexes group comment', $findings[0]->remediation ?? '');
+    }
+
+    /**
+     * Assert the shared machine-readable shape for a name beyond a bounded group comment.
+     *
+     * @param Finding $finding - Overflow finding to inspect.
+     *
+     * @return void
+     */
+    private function assertBoundedGroupOverflow(Finding $finding): void
+    {
+        self::assertSame('bounded-group-overflow', $finding->metadata['commentQuality'] ?? null);
+        self::assertSame('line', $finding->metadata['commentKind'] ?? null);
+        self::assertTrue($finding->metadata['groupCoverageExceeded'] ?? null);
+        self::assertSame(self::BOUNDED_GROUP_LIMIT, $finding->metadata['groupCoverageLimit'] ?? null);
+        self::assertStringContainsString('exceeds the 5-name coverage limit', $finding->message);
     }
 
     /**
