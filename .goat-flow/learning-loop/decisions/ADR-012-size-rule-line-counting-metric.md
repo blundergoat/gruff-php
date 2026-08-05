@@ -55,3 +55,14 @@ Two-way door, but with downstream impact. Standardising on a single metric would
 3. Migrating shipped configs in a single deprecation cycle.
 
 Until then, the split is the durable choice.
+
+
+## Amendment (2026-08-05, family ratification)
+
+`size.class-length` now counts substantive lines through the shared
+`GruffPhp\Rules\Size\SubstantiveLineCounter`, the same metric `size.file-length` adopted in the
+family-wide ratification: blank lines and comment-only lines are free. The original
+container-measure rationale (scroll distance) is superseded by the family principle that required
+documentation must never push a unit over a size budget - the same argument that ended raw
+counting at the file level applies to the class span under PSR-4's one-class-per-file reality.
+`size.method-length` is unchanged: it already counts statements, a substantive measure.

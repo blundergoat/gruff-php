@@ -25,7 +25,8 @@ use PhpParser\Node\Stmt\Trait_;
  * measure that tells the user a single type has grown too large to sit comfortably in one file.
  *
  * Runs per file over every class-like scope, measuring raw lines between its declaration and closing
- * brace (whitespace and comments count) against the threshold (default error above 1000). Class-length
+ * brace, counting substantive lines only - blank and comment-only lines are free (family
+ * ratification, 2026-08-05) - against the threshold (default error above 1000). Class-length
  * is a container measure, not a density measure. See ADR-012.
  */
 final readonly class ClassLengthRule implements RuleInterface
@@ -42,7 +43,7 @@ final readonly class ClassLengthRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Error at 1000 physical lines: the catalogue default callers inherit unless .gruff-php.yaml overrides it.
+        // Error at 1000 substantive lines: the catalogue default callers inherit unless .gruff-php.yaml overrides it.
         return new RuleDefinition(
             id:                self::ID,
             name:              'Class length',
@@ -55,10 +56,10 @@ final readonly class ClassLengthRule implements RuleInterface
     }
 
     /**
-     * Reports each class-like scope whose physical length runs over the configured budget.
+     * Reports each class-like scope whose substantive length runs over the configured budget.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
      *
      * @return list<Finding> - One finding per oversized class-like scope; empty when every type is within budget.
      */
@@ -81,7 +82,7 @@ final readonly class ClassLengthRule implements RuleInterface
                 continue;
             }
 
-            $length         = $endLine - $startLine + 1;
+            $length         = SubstantiveLineCounter::countRange($analysisUnit, $startLine, $endLine);
             $thresholdMatch = $settings->highValueThresholdMatch($length);
 
             // A scope within budget is fine, so skip it.
@@ -94,7 +95,7 @@ final readonly class ClassLengthRule implements RuleInterface
             $findings[] = new Finding(
                 ruleId:  $definition->id,
                 message: sprintf(
-                    '%s is %d lines, above the %s threshold of %s.',
+                    '%s is %d substantive lines, above the %s threshold of %s.',
                     $symbol,
                     $length,
                     $thresholdMatch->severity->value,

@@ -2,6 +2,10 @@
 
 Notable user-facing changes to `gruff-php` are listed here.
 
+## Unreleased
+
+- **file-length and class-length count substantive lines (family ratification, 2026-08-05)** - blank and comment-only lines are free via the shared parser-token counter, so required docblocks cannot push a file or class over its bar (ADR-012 amended). Thresholds and error severity are unchanged; both messages now report substantive lines.
+
 ## 0.5.1 - 2026-07-20
 
 0.5.1 removes the documented false-positive shapes while retaining their counterexamples: multiline regex ownership, exact named callback boundaries, clear Boolean state/proposition names, and short bounded pattern families gain conservative matching, while abbreviation and named-argument advisories gain machine-readable decision context. Rule IDs, severities, thresholds, scoring, `gruff.analysis.v2`, and `--fail-on` behaviour are unchanged. The bounded-group overflow message is deliberately more precise; its baseline impact is noted below.
