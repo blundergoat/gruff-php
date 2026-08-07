@@ -1,6 +1,6 @@
 ---
 category: setup
-last_reviewed: 2026-07-20
+last_reviewed: 2026-08-07
 ---
 
 # Setup Footguns
@@ -53,6 +53,12 @@ goat-flow 1.14.0's `audit --check-content` runs `code-map-dashboard-view-drift` 
 
 `README.md` (search: `# gruff-php`) names the project, but the repository currently has no `composer.json`, `src/`, `tests/`, or PHP runtime configuration. The name makes it easy for agents to assume Composer, PHPUnit, or PHPStan commands exist. They do not exist until real app structure is added.
 
-**Resolution:** M01 added `composer.json` (search: `"bin": [`), `bin/gruff-php` (search: `new Application()`), `src/Cli/Application.php` (search: `final class Application`), `src/Cli/Command/AnalyseCommand.php` (search: `final class AnalyseCommand`), and `tests/Console/ListRulesCliTest.php` (search: `testVersionCommandRunsThroughBinary`).
+**Resolution:** M01 added the application surfaces:
+
+- `composer.json` (search: `"bin": [`) declares the package binary.
+- `bin/gruff-php` (search: `(new Application())->run()`) boots the console application.
+- `src/Cli/Application.php` (search: `final class Application`) registers the command surface.
+- `src/Cli/Command/AnalyseCommand.php` (search: `final class AnalyseCommand`) implements the analyser command.
+- `tests/Console/ListRulesCliTest.php` (search: `testVersionCommandRunsThroughBinary`) proves the binary runs.
 
 **Prevention:** Before listing app commands or describing runtime architecture, check for the actual files that define them. If a future scaffold has no app surface, say "no application command configured yet" instead of inventing PHP defaults.

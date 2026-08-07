@@ -1,6 +1,6 @@
 # Code Map - gruff-php
 
-Last reviewed 2026-07-04. Captures the current source surface as wired in `composer.json`, `bin/gruff-php`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
+Last reviewed 2026-08-07. Captures the current source surface as wired in `composer.json`, `bin/gruff-php`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
 
 ## Top-level layout
 
@@ -187,7 +187,7 @@ tests/
 |-- skill-docs/
 |   |-- skill-conventions.md                  = shared full-depth skill conventions
 |   |-- skill-preamble.md                     = shared goat-* skill preamble
-|   |-- playbooks/                            = tool and discipline playbooks: browser-use.md, changelog.md, code-comments.md, gruff-code-quality.md, hook-policy-testing.md, observability.md, page-capture.md, release-notes.md, skill-playbook-authoring-sync.md, plus the README.md index
+|   |-- playbooks/                            = tool and discipline playbooks: browser-use.md, changelog.md, code-comments.md, gruff-code-quality.md, hook-policy-testing.md, observability.md, page-capture.md, release-notes.md, skill-playbook-authoring-sync.md, writing-style.md, plus the README.md index
 |   `-- skill-quality-testing/                = supporting docs for skill-quality-testing
 |-- plans/                                    = local milestone/task workspace (gitignored content under it)
 |-- scratchpad/                               = local temporary notes (gitignored content under it)
@@ -207,7 +207,7 @@ tests/
 
 .codex/
 |-- config.toml                               = Codex hooks feature config
-`-- hooks.json                                = Codex PreToolUse hook registration for the shared deny-dangerous hook; Codex post-tool/Stop hooks are unsupported in goat-flow 1.13.0
+`-- hooks.json                                = Codex PreToolUse hook registration for the shared deny-dangerous hook; Codex post-tool/Stop hooks are unsupported in goat-flow 1.15.0
 
 .agents/
 `-- skills/                                   = peer-agent skills mirroring `.claude/skills/`

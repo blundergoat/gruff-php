@@ -1,6 +1,6 @@
 # Architecture - gruff-php
 
-Last reviewed 2026-07-13. All claims map to a real file in `src/`, `tests/`, or top-level config; cross-check before broadening any of them.
+Last reviewed 2026-08-07. All claims map to a real file in `src/`, `tests/`, or top-level config; cross-check before broadening any of them.
 
 ## System Overview
 
@@ -8,7 +8,7 @@ Last reviewed 2026-07-13. All claims map to a real file in `src/`, `tests/`, or 
 
 `gruff-php` is a Composer-distributed PHP CLI for opinionated code-quality analysis. The package boundary is `composer.json`: it declares dependencies (`nikic/php-parser`, `symfony/console`, `symfony/finder`, `symfony/process`, `symfony/yaml`), the `bin/gruff-php` entrypoint, the `GruffPhp\` PSR-4 root, and the `check`, `phpstan`, `security:scan`, and `test` Composer scripts. The runtime exposes `analyse`, `summary`, `report`, `dashboard`, `hook`, `list-rules`, `check-ignore`, and `init` Symfony Console commands. `analyse` discovers source files, parses PHP through `nikic/php-parser`, runs a deterministic registry of rules, optionally ingests Infection mutation JSON, scores the result, optionally filters to Git diff ranges or compares against a base Git snapshot, and emits a schema-versioned report (`gruff.analysis.v2`) as text, JSON, HTML, Markdown, GitHub annotations, hotspot JSON, or SARIF. `summary` runs the same analyser pipeline and prints the compact `gruff.summary.v2` digest without per-finding output. `report` is the static report convenience command: it delegates to `analyse` and can emit HTML or JSON to stdout or `--output`. `dashboard` is the local interactive server for refreshing scans and pointing gruff-php at other local project roots. `hook` is the coding-agent changed-scope JSON endpoint used by the gruff code-quality hook. `init` writes a default `.gruff-php.yaml` populated from registry defaults, preserving existing path ignores when forced over an existing config. `check-ignore` reports, for each supplied path, whether gruff would ignore it and via which configured pattern, using the same config resolution and ignore engine as `analyse` but without running analysis (ADR-019).
 
-The agent harness is intentionally separate from the app. `.goat-flow/` holds durable project knowledge, tool playbooks, and the shared agent hook policy (`.goat-flow/hooks/`); `.claude/`, `.codex/`, and `.agents/skills/` hold the per-agent skill and settings surfaces. The playbook pack under `.goat-flow/skill-docs/playbooks/` currently ships browser-use.md, changelog.md, code-comments.md, gruff-code-quality.md, hook-policy-testing.md, observability.md, page-capture.md, release-notes.md, and skill-playbook-authoring-sync.md, plus the README.md index. Harness changes do not touch the analyser binary or the Composer package.
+The agent harness is intentionally separate from the app. `.goat-flow/` holds durable project knowledge, tool playbooks, and the shared agent hook policy (`.goat-flow/hooks/`); `.claude/`, `.codex/`, and `.agents/skills/` hold the per-agent skill and settings surfaces. The playbook pack under `.goat-flow/skill-docs/playbooks/` currently ships browser-use.md, changelog.md, code-comments.md, gruff-code-quality.md, hook-policy-testing.md, observability.md, page-capture.md, release-notes.md, skill-playbook-authoring-sync.md, and writing-style.md, plus the README.md index. Harness changes do not touch the analyser binary or the Composer package.
 
 ## Layered Composition
 
@@ -81,6 +81,10 @@ There is no runtime authentication or authorisation surface. The analyser only r
 - **Config loading** treats `.gruff-php.yaml`, legacy `.gruff.yaml`, and `--config` as user-trusted but validates strictly: unknown root keys, invalid `minimumPhpVersion`, path ignore patterns, allowlist entries, rule selection entries, rule ids, rule sub-keys, invalid threshold/severity pairs, unknown named thresholds, and non-numeric thresholds all raise `ConfigException`.
 - **Baselines** are explicit JSON files supplied by the user. They suppress findings by grouped `(file, ruleId, message)` counts and report suppression counts plus absent-group status; inline suppression comments are not supported in v0.1.
 - **Agent tooling** is gated by the shared `.goat-flow/hooks/deny-dangerous.sh` policy (registered per agent via `.claude/settings.json` and `.codex/hooks.json`), which rejects dangerous shell commands before agent execution.
+
+## Local Data and Evidence Budget
+
+`.goat-flow/plans/`, `.goat-flow/scratchpad/`, and `.goat-flow/logs/` hold checkout-local continuity artifacts. Their nested `.gitignore` files keep generated plans, reports, events, and session notes out of committed project knowledge while retaining the directory contracts. These artifacts may orient a later session, but they do not prove current behaviour or authorize an external action. Re-run live checks before relying on them, promote only verified reusable conclusions into `.goat-flow/learning-loop/`, and leave retention or deletion to the user.
 
 ## Data Flow
 
