@@ -36,7 +36,7 @@ The Never tier and accepted architecture/ADR safety constraints are non-overrida
 
 ## Commit Messages
 
-Use concise free-form subjects unless the project owner chooses a stricter convention. Full guidance lives in `docs/coding-standards/git-commit.md`.
+Use concise free-form subjects unless the project owner chooses a stricter convention. Full guidance lives in `docs/coding-standards/git-commit-message.md`.
 
 ## Essential Commands
 
@@ -105,6 +105,6 @@ Footguns go in `.goat-flow/learning-loop/footguns/<category>.md`; lessons in `.g
 | Codex skills/config | `.agents/skills/`, `.codex/config.toml`, `.codex/hooks.json` |
 | Shared hook scripts | `.goat-flow/hooks/` |
 | Local workspace notes | `.goat-flow/logs/sessions/`, `.goat-flow/plans/`, `.goat-flow/scratchpad/` |
-| Commit guidance | `docs/coding-standards/git-commit.md` |
+| Commit guidance | `docs/coding-standards/git-commit-message.md` |
 | Project entry docs | `README.md` |
 | Mission / philosophy | `docs/mission.md` (rationale); `.goat-flow/learning-loop/decisions/ADR-017-mission-govern-ai-generated-code.md` (decision) |
