@@ -5,14 +5,14 @@
 
 ## Decision
 
-The `size.*` rule family uses **two different line-counting metrics** by deliberate design, partitioned along the container/content axis:
+The `size.*` rule family uses **two different line-counting metrics** by deliberate design. Neither metric charges a unit for its own documentation; they differ in what they measure once blank and comment lines are discounted. The container/content partition below was the original rationale and is superseded by the 2026-08-05 amendment at the end of this record.
 
 | Rule | Metric | Implementation anchor |
 | --- | --- | --- |
-| `size.file-length` | **raw** lines | `src/Parser/AnalysisUnit.php` (search: `lineCount`) — `substr_count($source, "\n") + 1` |
-| `size.class-length` | **raw** lines | `src/Rule/Size/ClassLengthRule.php` (search: `$length = $endLine`) — `endLine - startLine + 1` |
-| `size.method-length` | **logical** lines | `src/Rule/Size/MethodLengthRule.php` (search: `logicalLineCount`) — distinct start lines of non-`Nop` statements |
-| `size.average-method-length` | **logical** lines | `src/Rule/Size/AverageMethodLengthRule.php` (search: `logicalLineCount`) — same mechanic |
+| `size.file-length` | **substantive** lines | `src/Rules/Size/SubstantiveLineCounter.php` (search: `countAll`) — blank and comment-only lines are free |
+| `size.class-length` | **substantive** lines | `src/Rules/Size/SubstantiveLineCounter.php` (search: `countRange`) — same counter over the declaration-to-closing-brace span |
+| `size.method-length` | **logical** lines | `src/Rules/Shared/NodeIndex.php` (search: `logicalStatementLineCount`) — distinct start lines of non-`Nop` statements |
+| `size.average-method-length` | **logical** lines | `src/Rules/Shared/NodeIndex.php` (search: `logicalStatementLineCount`) — same mechanic, averaged across the type's methods |
 
 The `size.parameter-count`, `size.property-count`, and `size.public-method-count` rules count discrete entities and are unaffected by this metric question.
 
@@ -24,7 +24,7 @@ Method bodies are different. PHP's call-and-attribute idiom encourages multi-lin
 
 The mix is therefore: **containers as visual objects, methods as density measures.**
 
-A worked example: `src/Command/AnalyseCommand.php::execute` is 169 raw lines (would exceed any conventional method-length cap) but 59 logical lines (passes `size.method-length: 70`). Inspection confirms it delegates every step to helpers, with no inline business logic. Under an all-raw metric this would fire as a god method despite being a textbook orchestration. Under an all-logical metric on classes, refactors that compress whitespace without changing behavior would silently relax the class-length gate.
+A worked example, measured at this ADR's date: `src/Cli/Command/AnalyseCommand.php::execute` was 169 raw lines (would exceed any conventional method-length cap) but 59 logical lines (passes `size.method-length: 70`). Inspection confirms it delegates every step to helpers, with no inline business logic. Under an all-raw metric this would fire as a god method despite being a textbook orchestration. Under an all-logical metric on classes, refactors that compress whitespace without changing behavior would silently relax the class-length gate.
 
 ## Failure Mode Comparison
 
@@ -42,7 +42,7 @@ ADR-009 cites PHPMD's raw-line method-length cap as the basis for `size.method-l
 ## Consequences
 
 - Rule docblocks for `MethodLengthRule`, `AverageMethodLengthRule`, `ClassLengthRule`, and `FileLengthRule` each state which metric they use in one sentence.
-- `.gruff-php.yaml` per-rule inline comments on those four rules mention "logical lines" or "raw lines" so config readers do not have to read the rule source to understand the metric.
+- `.gruff-php.yaml` per-rule inline comments on those four rules name the metric ("substantive lines" or "logical lines") so config readers do not have to read the rule source to understand it.
 - ADR-009's `## Context` carries a paragraph acknowledging the unit transform from PHPMD's raw anchor to gruff's logical measurement, with the empirical multiplier range stated.
 - Future rubric authors adding a new size-shaped rule must declare which metric they use, with the container/content axis as the default decision boundary.
 

@@ -8,6 +8,7 @@ Notable user-facing changes to `gruff-php` are listed here.
 ## 0.5.2 - 2026-08-06
 
 - **File and class lengths count substantive lines** - Blank and comment-only lines are free; thresholds stay unchanged and messages name the metric.
+- **Regenerate size baselines** - `size.file-length` and `size.class-length` messages changed; accepted findings reappear until you re-run `--generate-baseline`.
 
 ## 0.5.1 - 2026-07-20
 

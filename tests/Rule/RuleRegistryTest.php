@@ -411,13 +411,6 @@ final class RuleRegistryTest extends TestCase
     }
 
     /**
-     * Parse the named fixture into an analysis unit.
-     *
-     * @param string $displayPath - Fixture display path.
-     *
-     * @return AnalysisUnit - the parsed fixture ready for rule analysis
-     */
-    /**
      * Verify class-length counts substantive lines: docblock padding is free, code still fires.
      *
      * @return void
@@ -463,7 +456,11 @@ final class RuleRegistryTest extends TestCase
      */
     private function parseInline(string $source): AnalysisUnit
     {
-        $path = tempnam(sys_get_temp_dir(), 'gruff-php-inline-') . '.php';
+        // tempnam() never appends a suffix, so renaming keeps one file on disk instead of
+        // stranding the extension-less original in the temp directory on every call.
+        $reservedPath = tempnam(sys_get_temp_dir(), 'gruff-php-inline-');
+        $path         = $reservedPath . '.php';
+        rename($reservedPath, $path);
         file_put_contents($path, $source);
 
         try {
@@ -473,6 +470,13 @@ final class RuleRegistryTest extends TestCase
         }
     }
 
+    /**
+     * Parse the named fixture into an analysis unit.
+     *
+     * @param string $displayPath - Fixture display path.
+     *
+     * @return AnalysisUnit - the parsed fixture ready for rule analysis
+     */
     private function parseFixture(string $displayPath): AnalysisUnit
     {
         $absolutePath = __DIR__ . '/../..' . '/' . $displayPath;

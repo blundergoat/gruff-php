@@ -49,7 +49,7 @@ final readonly class FileLengthRule implements RuleInterface
     }
 
     /**
-     * Reports the file when its line count runs over the configured budget.
+     * Reports the file when its substantive line count runs over the configured budget.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext  - Rule context for this analysis pass.

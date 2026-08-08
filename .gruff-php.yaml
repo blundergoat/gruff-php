@@ -462,22 +462,22 @@ rules:
     # HTTP(S) URL with an inline user:password@host credential.
     sensitive-data.url-credentials:
         enabled: true
-    # Average method length
+    # Average method length (logical lines: statements only, averaged across the type's methods)
     size.average-method-length:
         enabled: true
         threshold: 50
         severity: error
-    # Class length
+    # Class length (substantive lines: blank and comment-only lines are free)
     size.class-length:
         enabled: true
         threshold: 800
         severity: error
-    # File length
+    # File length (substantive lines: blank and comment-only lines are free)
     size.file-length:
         enabled: true
         threshold: 1000
         severity: error
-    # Method length
+    # Method length (logical lines: statements, not blank or comment lines)
     size.method-length:
         enabled: true
         threshold: 70

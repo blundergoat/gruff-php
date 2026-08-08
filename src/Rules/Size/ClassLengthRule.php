@@ -21,13 +21,13 @@ use PhpParser\Node\Stmt\Enum_;
 use PhpParser\Node\Stmt\Trait_;
 
 /**
- * Flags a class, trait, or enum whose physical span runs past the configured budget - the container
+ * Flags a class, trait, or enum whose substantive length runs past the configured budget - the container
  * measure that tells the user a single type has grown too large to sit comfortably in one file.
  *
- * Runs per file over every class-like scope, measuring raw lines between its declaration and closing
- * brace, counting substantive lines only - blank and comment-only lines are free (family
- * ratification, 2026-08-05) - against the threshold (default error above 1000). Class-length
- * is a container measure, not a density measure. See ADR-012.
+ * Runs per file over every class-like scope, counting substantive lines between its declaration and
+ * closing brace - blank and comment-only lines are free (family ratification, 2026-08-05) - against
+ * the threshold (default error above 1000), so required documentation can never push a type over the
+ * size bar. Class-length is a container measure, not a density measure. See ADR-012.
  */
 final readonly class ClassLengthRule implements RuleInterface
 {

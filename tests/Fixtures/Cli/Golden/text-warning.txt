@@ -1,4 +1,4 @@
-gruff-php 0.4.1 analyse
+gruff-php 0.5.2 analyse
 Composite: A (96.10 / 100)
 Findings: 4 total · 0 error · 2 warning · 2 advisory
 Format: text
@@ -29,7 +29,7 @@ Score
 Findings
   [warning] size.file-length
     tests/Fixtures/Source/mixed/alpha.php:1
-    File has 27 lines, above the warning threshold of 3.
+    File has 11 substantive lines, above the warning threshold of 3.
   [warning] naming.class-file-mismatch
     tests/Fixtures/Source/mixed/alpha.php:12
     Class Alpha does not match file name alpha.php.
