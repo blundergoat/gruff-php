@@ -15,8 +15,15 @@
 #
 # Exit codes:
 #   0  clean scan, no findings
-#   1  hook cannot run (no git root or work dir); stderr explains
-#   2  findings blocked, or the scan hit its wall-clock budget before completion
+#   2  findings blocked; the scan could not run (no git root or work dir); or the scan hit its wall-clock budget before
+#      completion. Every one of those blocks, because a scan that did not finish cannot report a clean turn, and hosts
+#      treat a non-blocking status as "nothing found". stderr explains which case applied.
+#
+# Scan boundary:
+#   Coverage is relative to HEAD. The hook scans unstaged worktree changes, the staged index, and untracked files that Git
+#   does not ignore. It deliberately does not scan content already committed into HEAD, so a hazard introduced by an
+#   earlier commit is out of scope here and belongs to review or a history scanner. In a repository with no commits yet,
+#   every tracked file is read in full because there is no HEAD to diff against.
 #
 # Bash 4+ performance architecture (Windows Git Bash ships fork costs 10-40x
 # Linux, so its optimized scan must not spawn per line or per file):
@@ -529,6 +536,9 @@ fallback_scan_diff() {
   local diff_line
   local scan_changed_file=0
   local uses_staged_blob=0
+  # A destination header is legal only directly after a section start. Without this, added content shaped like "+++ b/x"
+  # is mistaken for a header and never scanned, because its source line began with "++ ".
+  local expect_header=0
 
   # Detect whether this diff represents the user's staged snapshot.
   for diff_argument in "$@"; do
@@ -545,21 +555,38 @@ fallback_scan_diff() {
   while IFS= read -r diff_line || [ -n "$diff_line" ]; do
     fallback_budget_check || break
     case "$diff_line" in
-      '+++ /dev/null')
+      'diff --git '*)
+        # Only a section start can be followed by a destination header, and in a --unified=0 stream this prefix cannot be
+        # added content (that would render as "+diff --git ").
+        expect_header=1
         changed_file_path=""
         scan_changed_file=0
         ;;
       '+++ '*)
-        if fallback_decode_diff_path "$diff_line"; then
-          changed_file_path="$FALLBACK_DIFF_PATH"
-        else
-          changed_file_path=""
-        fi
-        # Scan this file only when its selected content fits the user's byte cap.
-        if [ -n "$changed_file_path" ] && fallback_diff_path_within_byte_cap "$repository_root" "$changed_file_path" "$uses_staged_blob"; then
-          scan_changed_file=1
-        else
-          scan_changed_file=0
+        if [ "$expect_header" -eq 1 ]; then
+          expect_header=0
+          case "$diff_line" in
+            '+++ /dev/null')
+              changed_file_path=""
+              scan_changed_file=0
+              ;;
+            *)
+              if fallback_decode_diff_path "$diff_line"; then
+                changed_file_path="$FALLBACK_DIFF_PATH"
+              else
+                changed_file_path=""
+              fi
+              # Scan this file only when its selected content fits the user's byte cap.
+              if [ -n "$changed_file_path" ] && fallback_diff_path_within_byte_cap "$repository_root" "$changed_file_path" "$uses_staged_blob"; then
+                scan_changed_file=1
+              else
+                scan_changed_file=0
+              fi
+              ;;
+          esac
+        elif [ -n "$changed_file_path" ] && [ "$scan_changed_file" -eq 1 ]; then
+          # Not a header in this position, so it is an added line whose own source text starts with "++ ".
+          fallback_scan_line "$changed_file_path" "${diff_line#+}"
         fi
         ;;
       +*)
@@ -610,8 +637,10 @@ fallback_main() {
 
   root=$(git rev-parse --show-toplevel 2>/dev/null) || root=""
   if [ -z "$root" ]; then
+    # A scan that cannot run must block, matching the Bash 4+ path and the
+    # incomplete-scan guard below.
     printf 'post-turn-safety: git repository root unavailable; cannot scan changed content.\n' >&2
-    return 1
+    return 2
   fi
 
   if git -C "$root" rev-parse --verify HEAD >/dev/null 2>&1; then
@@ -1099,9 +1128,10 @@ scan_line() {
 #                         real section start (added lines render as "+diff...",
 #                         removed as "--diff...", and no context lines exist),
 #                         so a "+++ b/..." header is accepted only directly
-#                         after one; content that merely looks like a header
-#                         (e.g. an added line "++ b/x") is skipped exactly like
-#                         the original per-line reader skipped "+++"* lines.
+#                         after one. Position is the only thing separating a header from added content of the same shape:
+#                         an added source line "++ b/x" also renders as "+++ b/x", so outside that position it is scanned
+#                         as content rather than skipped. Skipping every "+++" prefix, as an earlier reader did, silently
+#                         dropped any added line whose own text began with "++".
 #   <<<<<<< , =======, >>>>>>>   The only three line shapes that can advance,
 #                         complete, or reset the merge-conflict state machine
 #                         (case arms "<<<<<<< "*, exact "=======", ">>>>>>> "*).
@@ -1304,8 +1334,12 @@ scan_diff_stream() {
     fi
 
     ((cur_active)) || continue
+    # Only a hunk header can be skipped here. Real "+++ b/path" and "--- a/path" headers are already consumed above
+    # (guarded by expect_header) or start with "-", so every remaining "+" line is added content. Skipping any "+++"
+    # prefix instead would drop an added line whose own text starts with "++", because --unified=0 renders that source
+    # line as "+++...".
     case "$line" in
-      "+++"* | "---"* | "@@"*) continue ;;
+      "@@ "*) continue ;;
       +*) ;;
       *) continue ;;
     esac
@@ -1440,12 +1474,12 @@ main() {
   root="$(repo_root)"
   if [ -z "$root" ]; then
     printf 'post-turn-safety: git repository root unavailable; cannot scan changed content.\n' >&2
-    return 1
+    return 2
   fi
 
   cd "$root" || {
     printf 'post-turn-safety: cannot enter repository root %s.\n' "$root" >&2
-    return 1
+    return 2
   }
 
   local head_present=0
@@ -1473,7 +1507,7 @@ main() {
   WORKDIR="$(mktemp -d 2>/dev/null)" || WORKDIR=""
   if [ -z "$WORKDIR" ]; then
     printf 'post-turn-safety: cannot create scan work directory; cannot scan changed content.\n' >&2
-    return 1
+    return 2
   fi
   # shellcheck disable=SC2064
   trap "rm -rf '$WORKDIR'" EXIT

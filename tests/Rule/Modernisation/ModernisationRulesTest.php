@@ -247,6 +247,40 @@ PHP);
     }
 
     /**
+     * Verify PHP 8.4 restricted-set properties stay quiet while an open write side still reports.
+     *
+     * @return void
+     */
+    public function testPublicPropertyRuleSkipsAsymmetricVisibilityWriteRestrictions(): void
+    {
+        $unit = $this->inlineUnit(<<<'PHP'
+<?php
+final class AsymmetricService
+{
+    public private(set) string $privateSetDeclared = '';
+    public protected(set) string $protectedSetDeclared = '';
+    public string $openDeclared = '';
+
+    public function __construct(
+        public private(set) string $privateSetPromoted,
+        public protected(set) string $protectedSetPromoted,
+        public string $openPromoted,
+    ) {
+    }
+}
+PHP);
+        $registry = RuleRegistry::defaults();
+        $config   = AnalysisConfig::fromRegistry($registry);
+        $findings = (new PublicPropertyRule())->analyse($unit, new RuleContext(self::PROJECT_ROOT, $config));
+
+        self::assertSame([], $unit->diagnostics);
+        self::assertSame(
+            ['openDeclared', 'openPromoted'],
+            array_map(static fn(Finding $finding): mixed => $finding->metadata['property'] ?? null, $findings),
+        );
+    }
+
+    /**
      * Verify an exact configured class exemption leaves other mutable classes reportable.
      *
      * @return void

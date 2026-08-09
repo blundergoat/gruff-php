@@ -22,9 +22,10 @@ use PhpParser\Node\Stmt;
  * user can move to readonly properties or accessor methods that keep the class's invariants intact.
  *
  * Runs per file over every class, skipping readonly owners and DTO-style data carriers. Readonly owners
- * cannot expose mutable properties, while DTO public state is intentional. Each remaining public,
- * non-static, non-readonly declared or promoted property is reported at warning - gruff-php only surfaces
- * it, it never rewrites the property for you.
+ * cannot expose mutable properties, while DTO public state is intentional. Each remaining declared or
+ * promoted property is reported at warning when it is public, non-static, and still writable from
+ * outside; `readonly`, `private(set)`, and `protected(set)` all close that write side. gruff-php only
+ * surfaces the property, it never rewrites it for you.
  */
 final readonly class PublicPropertyRule implements RuleInterface
 {
@@ -149,8 +150,8 @@ final readonly class PublicPropertyRule implements RuleInterface
 
         // Check each property the class declares.
         foreach ($class->getProperties() as $property) {
-            // Only a plain public, non-static, non-readonly property exposes overwritable state.
-            if (!$property->isPublic() || $property->isStatic() || $property->isReadonly()) {
+            // Only a plain public, non-static property with an open write side exposes overwritable state.
+            if (!$property->isPublic() || $property->isStatic() || !$this->hasOpenWriteSide($property)) {
                 continue;
             }
 
@@ -161,6 +162,22 @@ final readonly class PublicPropertyRule implements RuleInterface
         }
 
         return $findings;
+    }
+
+    /**
+     * Reports whether a declaration still lets an outside caller assign to the property.
+     *
+     * @param Stmt\Property|Node\Param $declaration - Property statement or promoted constructor parameter.
+     *
+     * @return bool - True when no readonly or restricted-set modifier closes the write side.
+     */
+    private function hasOpenWriteSide(Stmt\Property|Node\Param $declaration): bool
+    {
+        // PHP 8.4 asymmetric visibility keeps the read side public while closing the write side, so a
+        // `private(set)` or `protected(set)` property leaves an outside caller nothing to overwrite.
+        return !$declaration->isReadonly()
+            && !$declaration->isPrivateSet()
+            && !$declaration->isProtectedSet();
     }
 
     /**
@@ -182,8 +199,8 @@ final readonly class PublicPropertyRule implements RuleInterface
         $findings = [];
 
         foreach ($constructor->params as $parameter) {
-            // Only a public mutable promotion exposes writable object state.
-            if (!$parameter->isPromoted() || !$parameter->isPublic() || $parameter->isReadonly()) {
+            // Only a public promotion with an open write side exposes writable object state.
+            if (!$parameter->isPromoted() || !$parameter->isPublic() || !$this->hasOpenWriteSide($parameter)) {
                 continue;
             }
 

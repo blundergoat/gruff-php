@@ -11,7 +11,7 @@ gruff-php is an opinionated PHP code-quality analyzer; its mission is to govern 
 
 ## Autonomy Tiers
 
-**Always:** Read files, inspect git status, run goat-flow audits, and edit `.github/copilot-instructions.md`, `.github/skills/`, `.github/hooks/`, `docs/coding-standards/git-commit.md`, and `.goat-flow/**` when asked to maintain Copilot/goat-flow setup.
+**Always:** Read files, inspect git status, run goat-flow audits, and edit `.github/copilot-instructions.md`, `.github/skills/`, `.github/hooks/`, `docs/coding-standards/git-commit-message.md`, and `.goat-flow/**` when asked to maintain Copilot/goat-flow setup.
 
 **Ask First:** Before changing `README.md`, deleting files, changing peer agent surfaces (`CLAUDE.md`, `AGENTS.md`, `.claude/**`, `.codex/**`, `.agents/**`), or adding application structure beyond the user's request, state the boundary, files read, learning-loop check, local instruction check, and rollback command.
 
@@ -28,7 +28,7 @@ gruff-php is an opinionated PHP code-quality analyzer; its mission is to govern 
 
 ## Commit Messages
 
-Use concise free-form subjects unless the project owner chooses a stricter convention. Full guidance lives in `docs/coding-standards/git-commit.md`.
+Use concise free-form subjects unless the project owner chooses a stricter convention. Full guidance lives in `docs/coding-standards/git-commit-message.md`.
 
 ## Key Resources
 
@@ -100,10 +100,10 @@ Footguns go in `.goat-flow/learning-loop/footguns/<category>.md`; lessons in `.g
 | Skill reference (meta) | `.goat-flow/skill-docs/` |
 | Tool playbooks (README index for CLI/MCP availability checks; examples: browser-use, page-capture, skill-quality-testing) | `.goat-flow/skill-docs/playbooks/` - read BEFORE declaring a tool unavailable |
 | Orientation | `.goat-flow/architecture.md`, `.goat-flow/code-map.md`, `.goat-flow/glossary.md` |
-| Copilot skills/config | `.github/skills/`, `.github/hooks/hooks.json`, `docs/coding-standards/git-commit.md` |
+| Copilot skills/config | `.github/skills/`, `.github/hooks/hooks.json`, `docs/coding-standards/git-commit-message.md` |
 | Claude skills/config | `.claude/skills/`, `.claude/settings.json` |
 | Codex skills/config | `.agents/skills/`, `.codex/config.toml`, `.codex/hooks.json` |
 | Local workspace notes | `.goat-flow/logs/sessions/`, `.goat-flow/plans/`, `.goat-flow/scratchpad/` |
-| Commit guidance | `docs/coding-standards/git-commit.md` |
+| Commit guidance | `docs/coding-standards/git-commit-message.md` |
 | Project entry docs | `README.md` |
 | Mission / philosophy | `docs/mission.md` (rationale); `.goat-flow/learning-loop/decisions/ADR-017-mission-govern-ai-generated-code.md` (decision) |

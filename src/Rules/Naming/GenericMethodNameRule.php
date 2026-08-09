@@ -124,14 +124,16 @@ final readonly class GenericMethodNameRule implements RuleInterface
      *
      * @param list<string> $genericNames - Replacement list supplied by effective rule settings.
      *
-     * @return list<string> - Lowercase, de-duplicated names.
+     * @return list<string> - Lowercase, trimmed, de-duplicated names with blank entries dropped.
      */
     private function normalisedGenericNames(array $genericNames): array
     {
-        return array_values(array_unique(array_map(
-            static fn (string $genericName): string => strtolower($genericName),
+        // Trim before matching so a YAML entry indented or padded by hand still matches a callable
+        // name, and drop the blanks that leaves behind; `additionalFunctions` normalises the same way.
+        return array_values(array_unique(array_filter(array_map(
+            static fn (string $genericName): string => strtolower(trim($genericName)),
             $genericNames,
-        )));
+        ), static fn (string $genericName): bool => $genericName !== '')));
     }
 
     /**

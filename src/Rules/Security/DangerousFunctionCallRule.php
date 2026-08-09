@@ -84,8 +84,8 @@ final class DangerousFunctionCallRule implements RuleInterface
      *
      * @param AnalysisUnit $analysisUnit - single parsed file the caller wants scanned; its AST and token
      *                                   stream are the only source consulted, so cross-file callable definitions are invisible here
-     * @param RuleContext  $ruleContext  - shared per-run context; this rule reads no settings from it but
-     *                                   the interface requires it, so callers pass the same instance used for every rule in the pass
+     * @param RuleContext  $ruleContext  - shared per-run context; this rule reads `additionalFunctions`
+     *                                   from it, which is unioned with the non-removable built-in execution list
      *
      * @return list<Finding> - one Finding per suspicious call site, empty when none match; callers treat
      *   the list as advisory evidence for review, not a proven vulnerability
