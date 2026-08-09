@@ -12,8 +12,9 @@ use GruffPhp\Engine\Parser\AnalysisUnit;
  * a size budget.
  *
  * Comment tokens from the parser are masked out of the source (newlines preserved) before counting
- * non-blank lines, so a line holding both code and a trailing comment still counts. Parse-failed
- * units have no tokens and fall back to counting non-blank raw lines.
+ * non-blank lines, so a line holding both code and a trailing comment still counts. Units without
+ * parser tokens fall back to counting non-blank raw lines; syntax-error units can retain tokens and
+ * receive the same comment masking as successfully parsed source.
  */
 final readonly class SubstantiveLineCounter
 {

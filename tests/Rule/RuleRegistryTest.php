@@ -417,15 +417,15 @@ final class RuleRegistryTest extends TestCase
      */
     public function testClassLengthCountsSubstantiveLinesOnly(): void
     {
-        $docHeavy = "<?php\nfinal class DocHeavy\n{\n";
+        $docHeavy = "<?php\nfinal class DocHeavy\n{\n    /**\n";
         for ($index = 0; $index < 30; ++$index) {
-            $docHeavy .= "    /** doc line {$index} */\n";
+            $docHeavy .= "     * doc line {$index}\n";
         }
-        $docHeavy .= "    public int \$value = 1;\n}\n";
+        $docHeavy .= "     */\n    public int \$value = 1;\n}\n";
 
         $codeHeavy = "<?php\nfinal class CodeHeavy\n{\n";
         for ($index = 0; $index < 30; ++$index) {
-            $codeHeavy .= "    public int \$value{$index} = {$index};\n";
+            $codeHeavy .= "    public int \$value{$index} = {$index}; // trailing comment\n";
         }
         $codeHeavy .= "}\n";
 
@@ -456,17 +456,16 @@ final class RuleRegistryTest extends TestCase
      */
     private function parseInline(string $source): AnalysisUnit
     {
-        // tempnam() never appends a suffix, so renaming keeps one file on disk instead of
-        // stranding the extension-less original in the temp directory on every call.
-        $reservedPath = tempnam(sys_get_temp_dir(), 'gruff-php-inline-');
-        $path         = $reservedPath . '.php';
-        rename($reservedPath, $path);
-        file_put_contents($path, $source);
+        // SourceFile marks the fixture as PHP explicitly, so the allocated path needs no suffix or rename.
+        $path = tempnam(sys_get_temp_dir(), 'gruff-php-inline-');
+        self::assertNotFalse($path);
 
         try {
+            self::assertNotFalse(file_put_contents($path, $source));
+
             return (new PhpFileParser())->parse(new SourceFile($path, 'inline.php'));
         } finally {
-            unlink($path);
+            self::assertTrue(unlink($path));
         }
     }
 
