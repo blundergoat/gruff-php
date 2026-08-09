@@ -22,7 +22,7 @@ Containers (files and classes) are navigated visually. A reviewer's friction wit
 
 Method bodies are different. PHP's call-and-attribute idiom encourages multi-line constructor invocations and array literals, and modern formatters split arguments one-per-line. Under raw line counting, an orchestration method composed of a few delegated calls scores the same as a tight method full of inline logic. The signal a reviewer actually wants — *how much branching and state lives in this method?* — tracks statement density, not vertical extent. Empirically on this codebase (601 methods with raw≥10 and logical≥5), the raw/logical ratio has median 2.39× and p25–p75 range 2.14×–2.88× (computed 2026-05-19). A 169-raw / 59-logical orchestrator (`AnalyseCommand::execute`) reads as long but disciplined; a 50-raw / 35-logical method with deep nesting reads as cramped.
 
-The mix is therefore: **containers as visual objects, methods as density measures.**
+The original rationale therefore treated containers as visual objects and methods as density measures.
 
 A worked example, measured at this ADR's date: `src/Cli/Command/AnalyseCommand.php::execute` was 169 raw lines (would exceed any conventional method-length cap) but 59 logical lines (passes `size.method-length: 70`). Inspection confirms it delegates every step to helpers, with no inline business logic. Under an all-raw metric this would fire as a god method despite being a textbook orchestration. Under an all-logical metric on classes, refactors that compress whitespace without changing behavior would silently relax the class-length gate.
 
@@ -32,7 +32,7 @@ A worked example, measured at this ADR's date: `src/Cli/Command/AnalyseCommand.p
 | --- | --- | --- |
 | All-raw across the four rules | Orchestration methods that delegate cleanly score the same as cramped methods with deep nesting; the rule fires on disciplined long-but-flat callers. | Rejected. Method density is what the rule should be measuring. |
 | All-logical across the four rules | Class-length and file-length become dependent on statement density rather than visual size; whitespace-heavy classes pass that would fail an all-raw check, and cosmetic reformatting changes whether a file is "too long." | Rejected. Containers' burden is visual, not density-shaped. |
-| Current mix (containers raw, contents logical) | Two metrics in one rule family that adopters must track. Mitigation: this ADR plus the per-rule docblocks plus the per-rule comments in `.gruff-php.yaml` make the choice explicit. | Accepted. The metric choice matches what each rule is actually measuring. |
+| Current split (containers substantive, method metrics logical) | Source-text line counts and AST statement-line counts share one family, so adopters must distinguish the units. Mitigation: this ADR, the rule docblocks, and the repository config comments name each metric. | Accepted. Each rule measures the unit its review signal requires. |
 | Document the mix without changing anything else | Resolves the surprise but does not address PHPMD/Sonar anchor narratives elsewhere. | Insufficient on its own. ADR-009's anchor section is amended in the same milestone to acknowledge the unit transform for `size.method-length`. |
 
 ## Industry-anchor caveat
@@ -42,9 +42,9 @@ ADR-009 cites PHPMD's raw-line method-length cap as the basis for `size.method-l
 ## Consequences
 
 - Rule docblocks for `MethodLengthRule`, `AverageMethodLengthRule`, `ClassLengthRule`, and `FileLengthRule` each state which metric they use in one sentence.
-- `.gruff-php.yaml` per-rule inline comments on those four rules name the metric ("substantive lines" or "logical lines") so config readers do not have to read the rule source to understand it.
+- This repository's `.gruff-php.yaml` comments name file/class metrics as substantive lines and method metrics as logical lines.
 - ADR-009's `## Context` carries a paragraph acknowledging the unit transform from PHPMD's raw anchor to gruff's logical measurement, with the empirical multiplier range stated.
-- Future rubric authors adding a new size-shaped rule must declare which metric they use, with the container/content axis as the default decision boundary.
+- Future size rules must declare their metric. Physical-span metrics keep blank and comment-only lines free; method metrics default to logical statement lines.
 
 ## Reversibility
 
@@ -65,4 +65,4 @@ family-wide ratification: blank lines and comment-only lines are free. The origi
 container-measure rationale (scroll distance) is superseded by the family principle that required
 documentation must never push a unit over a size budget - the same argument that ended raw
 counting at the file level applies to the class span under PSR-4's one-class-per-file reality.
-`size.method-length` is unchanged: it already counts statements, a substantive measure.
+`size.method-length` is unchanged: it still counts distinct statement start lines, the logical metric defined above.

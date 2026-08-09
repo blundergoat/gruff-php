@@ -30,7 +30,7 @@ final class SubstantiveLineCounterTest extends TestCase
         $classSpanCount = 0;
 
         foreach ($this->phpFixturePaths() as $absolutePath) {
-            $displayPath = $this->displayPath($absolutePath);
+            $displayPath = str_replace($this->projectRoot() . '/', '', $absolutePath);
             $unit        = $parser->parse(new SourceFile($absolutePath, $displayPath));
 
             self::assertSame(
@@ -72,16 +72,18 @@ final class SubstantiveLineCounterTest extends TestCase
             . "    public int \$value = 1; // trailing comment\r\n"
             . "}\r\n";
 
-        $unit = $this->parseInline($source);
+        $unit                   = $this->parseInline($source);
+        $expectedWholeFileCount = 5;
 
-        self::assertSame(5, SubstantiveLineCounter::countAll($unit));
-        self::assertSame(5, SubstantiveLineCounter::countAll($unit));
+        self::assertSame($expectedWholeFileCount, SubstantiveLineCounter::countAll($unit));
+        self::assertSame($expectedWholeFileCount, SubstantiveLineCounter::countAll($unit));
 
         foreach ([[-2, 0], [0, 0], [0, 2], [1, 1], [1, 999], [4, 3], [999, 1000]] as [$startLine, $endLine]) {
             $expected = $this->referenceCountRange($unit, $startLine, $endLine);
+            $context  = sprintf('range %d-%d', $startLine, $endLine);
 
-            self::assertSame($expected, SubstantiveLineCounter::countRange($unit, $startLine, $endLine));
-            self::assertSame($expected, SubstantiveLineCounter::countRange($unit, $startLine, $endLine));
+            self::assertSame($expected, SubstantiveLineCounter::countRange($unit, $startLine, $endLine), $context . ' first count');
+            self::assertSame($expected, SubstantiveLineCounter::countRange($unit, $startLine, $endLine), $context . ' cached count');
         }
     }
 
@@ -103,7 +105,8 @@ final class SubstantiveLineCounterTest extends TestCase
             [],
             [],
         );
-        self::assertSame(2, SubstantiveLineCounter::countAll($raw));
+        $expectedRawCount = 2;
+        self::assertSame($expectedRawCount, SubstantiveLineCounter::countAll($raw));
 
         $syntaxError = $this->parseInline(
             "<?php\n// comment only\nfinal class Broken\n{\n    public function broken(\n}\n",
@@ -119,8 +122,9 @@ final class SubstantiveLineCounterTest extends TestCase
      */
     public function testDoesNotRetainCachedAnalysisUnit(): void
     {
-        $unit = $this->parseInline("<?php\nfinal class Cached {}\n");
-        self::assertSame(2, SubstantiveLineCounter::countAll($unit));
+        $unit                   = $this->parseInline("<?php\nfinal class Cached {}\n");
+        $expectedWholeFileCount = 2;
+        self::assertSame($expectedWholeFileCount, SubstantiveLineCounter::countAll($unit));
 
         $reference = WeakReference::create($unit);
         unset($unit);
@@ -148,18 +152,6 @@ final class SubstantiveLineCounterTest extends TestCase
         }
 
         return $paths;
-    }
-
-    /**
-     * Convert an absolute fixture path to its project-relative display path.
-     *
-     * @param string $absolutePath - Absolute fixture path.
-     *
-     * @return string - Project-relative fixture path.
-     */
-    private function displayPath(string $absolutePath): string
-    {
-        return str_replace($this->projectRoot() . '/', '', $absolutePath);
     }
 
     /**

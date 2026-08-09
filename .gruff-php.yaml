@@ -59,7 +59,7 @@ allowlists:
     # 64-char hex hash that reads as a high-entropy secret; it is test data, not a credential. Keep this
     # preview in sync if that digest rotates (it changes whenever rules or fixtures change).
     secretPreviews:
-        - '429e...b175 (redacted, 64 chars)'
+        - 'db4d...2236 (redacted, 64 chars)'
 selection:
     tiers: []
     pillars: []
@@ -184,9 +184,12 @@ rules:
     # Flags PHPDoc @param/@return/@var/@property tags using mixed where a narrower type would carry more meaning. Unstructured array bags and precise array{...} envelope shapes are exempt.
     modernisation.phpdoc-mixed-overuse:
         enabled: true
-    # Public mutable property
+    # Flags public mutable state unless its fully qualified class is an explicit lifecycle or integration contract.
     modernisation.public-property:
         enabled: true
+        options:
+            allowedClasses:
+                - 'GruffPhp\Engine\Parser\AnalysisUnit'
     # Readonly property candidate
     modernisation.readonly-property-candidate:
         enabled: true

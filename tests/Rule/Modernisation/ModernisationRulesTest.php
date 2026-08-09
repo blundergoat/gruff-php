@@ -247,6 +247,56 @@ PHP);
     }
 
     /**
+     * Verify an exact configured class exemption leaves other mutable classes reportable.
+     *
+     * @return void
+     */
+    public function testPublicPropertyRuleHonoursAllowedClasses(): void
+    {
+        $unit = $this->inlineUnit(<<<'PHP'
+<?php
+namespace App\Parser;
+
+final class AllowedUnit
+{
+    public string $allowed;
+}
+
+final class ReportedUnit
+{
+    public string $reported;
+}
+PHP);
+        $registry      = RuleRegistry::defaults();
+        $defaultConfig = AnalysisConfig::fromRegistry($registry);
+        $rule          = new PublicPropertyRule();
+        $context       = new RuleContext(self::PROJECT_ROOT, $defaultConfig);
+
+        self::assertSame(
+            ['allowed', 'reported'],
+            array_map(static fn(Finding $finding): mixed => $finding->metadata['property'] ?? null, $rule->analyse($unit, $context)),
+        );
+
+        $settings      = $defaultConfig->ruleSettings(PublicPropertyRule::ID);
+        $allowedConfig = $defaultConfig->withRuleSettings(
+            PublicPropertyRule::ID,
+            new RuleSettings(
+                $settings->enabled,
+                $settings->thresholds,
+                array_merge($settings->options, ['allowedClasses' => ['App\\Parser\\AllowedUnit']]),
+                $settings->severityThreshold,
+                $settings->excludeFromScore,
+            ),
+        );
+        $findings = $rule->analyse($unit, new RuleContext(self::PROJECT_ROOT, $allowedConfig));
+
+        self::assertSame(
+            ['reported'],
+            array_map(static fn(Finding $finding): mixed => $finding->metadata['property'] ?? null, $findings),
+        );
+    }
+
+    /**
      * Verify PHP eight one candidates are detected.
      *
      * @return void

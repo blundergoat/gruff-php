@@ -41,12 +41,22 @@ final readonly class PublicPropertyRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id:              self::ID,
-            name:            'Public mutable property',
-            pillar:          Pillar::Modernisation,
-            tier:            RuleTier::V01,
-            defaultSeverity: Severity::Warning,
-            confidence:      Confidence::High,
+            id:                 self::ID,
+            name:               'Public mutable property',
+            pillar:             Pillar::Modernisation,
+            tier:               RuleTier::V01,
+            defaultSeverity:    Severity::Warning,
+            confidence:         Confidence::High,
+            defaultOptions:     ['allowedClasses' => []],
+            optionDescriptions: [
+                'allowedClasses' => 'Fully qualified classes whose intentionally mutable public state is an explicit lifecycle or integration contract.',
+            ],
+            falsePositiveShapes: [
+                [
+                    'shape' => 'Internal lifecycle containers that expose read-mostly parsed state but deliberately clear it after analysis to release memory.',
+                    'mitigation' => 'Add the exact fully qualified class to options.allowedClasses after verifying external mutation is part of the intended contract.',
+                ],
+            ],
         );
     }
 
@@ -60,12 +70,20 @@ final readonly class PublicPropertyRule implements RuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $findings = [];
+        $settings       = $ruleContext->settingsFor($this->definition());
+        $allowedClasses = $this->normalizedClassSet($settings->stringListOption('allowedClasses'));
+        $findings       = [];
 
         // Inspect every class declared in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Class_::class) as $class) {
+            $className = $this->resolvedClassName($class);
+
             // Readonly classes cannot expose mutable instance state, while DTO public fields are intentional.
-            if ($class->isReadonly() || ModernisationNodeHelper::isDtoClass($class)) {
+            if (
+                $class->isReadonly()
+                || ModernisationNodeHelper::isDtoClass($class)
+                || ($className !== null && isset($allowedClasses[strtolower($className)]))
+            ) {
                 continue;
             }
 
@@ -77,6 +95,44 @@ final readonly class PublicPropertyRule implements RuleInterface
         }
 
         return $findings;
+    }
+
+    /**
+     * Normalizes configured class names into an exact case-insensitive lookup set.
+     *
+     * @param list<string> $classNames - Fully qualified class names supplied by rule config.
+     *
+     * @return array<string, true> - Lowercase class names without a leading namespace separator.
+     */
+    private function normalizedClassSet(array $classNames): array
+    {
+        $normalized = [];
+
+        foreach ($classNames as $className) {
+            $className = strtolower(ltrim(trim($className), '\\'));
+            if ($className !== '') {
+                $normalized[$className] = true;
+            }
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * Resolves a declaration to the exact name configured by a consumer.
+     *
+     * @param Stmt\Class_ $class - Named or anonymous class declaration.
+     *
+     * @return string|null - Fully qualified name without a leading separator, or null for anonymous classes.
+     */
+    private function resolvedClassName(Stmt\Class_ $class): ?string
+    {
+        $namespacedName = $class->namespacedName ?? null;
+        if ($namespacedName instanceof Node\Name) {
+            return ltrim($namespacedName->toString(), '\\');
+        }
+
+        return $class->name?->toString();
     }
 
     /**
@@ -161,7 +217,7 @@ final readonly class PublicPropertyRule implements RuleInterface
             pillar:      Pillar::Modernisation,
             tier:        RuleTier::V01,
             confidence:  Confidence::High,
-            remediation: 'Prefer constructor-initialized readonly properties or methods that preserve invariants; DTO-style classes are exempt and gruff-php reports only.',
+            remediation: 'Prefer constructor-initialized readonly properties or methods that preserve invariants. If public mutation is an intentional lifecycle contract, add the fully qualified class to `rules.modernisation.public-property.options.allowedClasses`.',
             metadata:    [
                 'property' => $name,
             ],
