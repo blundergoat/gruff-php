@@ -12,6 +12,7 @@ use GruffPhp\Rules\Docs\BarePhpdocTagsRule;
 use GruffPhp\Rules\Docs\MissingClassPhpdocRule;
 use GruffPhp\Rules\Docs\MissingConstantPhpdocRule;
 use GruffPhp\Rules\Docs\MissingFilePhpdocRule;
+use GruffPhp\Rules\Docs\MissingParamTagRule;
 use GruffPhp\Rules\Docs\MissingPropertyPhpdocRule;
 use GruffPhp\Rules\Docs\MissingPublicPhpdocRule;
 use GruffPhp\Rules\Docs\MissingThrowsTagRule;
@@ -395,48 +396,119 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify missing property phpdoc flags declared and promoted properties.
+     * Verify each promoted-constructor documentation gap has one rule owner.
      *
      * @return void
      */
-    public function testMissingPropertyPhpdocFlagsDeclaredAndPromotedProperties(): void
+    public function testPromotedConstructorDocumentationHasOneOwner(): void
     {
-        $findings = $this->analyseRule('missing-property-phpdoc.php', MissingPropertyPhpdocRule::ID);
+        $source = <<<'PHP'
+<?php
+final class NoDocPromotions
+{
+    public function __construct(
+        public string $first,
+        private int $second,
+    ) {
+    }
+}
+final class ProsePromotion
+{
+    /** Build the instance from its promoted value. */
+    public function __construct(public string $promoted)
+    {
+    }
+}
+final class PromotedSkeleton
+{
+    /**
+     * @api
+     */
+    public function __construct(public string $promoted, string $ordinary)
+    {
+    }
+}
+final class PartialPromotions
+{
+    /**
+     * Build the instance from two promoted values.
+     *
+     * @param string $documentedPromoted - The documented value.
+     */
+    public function __construct(
+        public string $documentedPromoted,
+        protected int $missingPromoted,
+    ) {
+    }
+}
+final class CompletePromotions
+{
+    /**
+     * Build the fully documented instance.
+     *
+     * @param string $first - The first value.
+     * @param int $second - The second value.
+     */
+    public function __construct(public string $first, private int $second)
+    {
+    }
+}
+final class OrdinarySkeleton
+{
+    /**
+     * @api
+     */
+    public function __construct(string $ordinary)
+    {
+    }
+}
+PHP;
 
-        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
-        sort($symbols);
+        $findings = [
+            ...$this->analyseSourceRule($source, MissingPublicPhpdocRule::ID),
+            ...$this->analyseSourceRule($source, MissingParamTagRule::ID),
+            ...$this->analyseSourceRule($source, MissingPropertyPhpdocRule::ID),
+        ];
+        $ownershipRows = array_map(static function (Finding $finding): string {
+            $subject = $finding->metadata['parameter'] ?? $finding->metadata['propertyName'] ?? '';
+
+            return sprintf(
+                '%s|%s|%s',
+                $finding->ruleId,
+                $finding->symbol ?? '',
+                is_string($subject) ? $subject : '',
+            );
+        }, $findings);
+        sort($ownershipRows);
 
         self::assertSame(
             [
-                'DocumentedProperty::$undocumented',
-                'PromotedPropertyNoDoc::__construct($first)',
-                'PromotedPropertyNoDoc::__construct($second)',
-                'PromotedPropertyWithPartialDoc::__construct($undocumentedPromoted)',
+                'docs.missing-param-tag|PartialPromotions::__construct()|missingPromoted',
+                'docs.missing-param-tag|PromotedSkeleton::__construct()|promoted',
+                'docs.missing-param-tag|ProsePromotion::__construct()|promoted',
+                'docs.missing-public-phpdoc|NoDocPromotions::__construct()|',
             ],
-            $symbols,
+            $ownershipRows,
         );
     }
 
     /**
-     * Verify missing property phpdoc records kind metadata.
+     * Verify missing property PHPDoc flags only undocumented declarations.
      *
      * @return void
      */
-    public function testMissingPropertyPhpdocRecordsKindMetadata(): void
+    public function testMissingPropertyPhpdocFlagsOnlyUndocumentedDeclarations(): void
     {
         $findings = $this->analyseRule('missing-property-phpdoc.php', MissingPropertyPhpdocRule::ID);
 
-        $kinds        = array_map(static fn ($finding): mixed => $finding->metadata['kind'] ?? null, $findings);
-        $invalidKinds = array_values(array_filter(
-            $kinds,
-            static fn (mixed $kind): bool => !is_string($kind) || !in_array($kind, ['declared', 'promoted'], true),
-        ));
-        $byKind = array_count_values(array_values(array_filter($kinds, 'is_string')));
-
-        self::assertSame([], $invalidKinds);
-        self::assertSame(1, $byKind['declared'] ?? 0);
-        $expectedPromotedPropertyFindings = 3;
-        self::assertSame($expectedPromotedPropertyFindings, $byKind['promoted'] ?? 0);
+        self::assertSame(
+            ['DocumentedProperty::$undocumented'],
+            array_map(static fn ($finding): ?string => $finding->symbol, $findings),
+        );
+        self::assertSame(
+            ['declared'],
+            array_map(static fn ($finding): mixed => $finding->metadata['kind'] ?? null, $findings),
+        );
     }
 
     /**

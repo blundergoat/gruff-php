@@ -9,6 +9,9 @@ Notable user-facing changes to `gruff-php` are listed here.
 
 - **File and class lengths count substantive lines** - Blank and comment-only lines are free; thresholds stay unchanged and messages name the metric.
 - **Regenerate size baselines** - `size.file-length` and `size.class-length` messages changed; accepted findings reappear until you re-run `--generate-baseline`.
+- **Public-property checks cover promotion** - Readonly classes stay quiet; public mutable promotions now report and may add baseline findings.
+- **Promoted constructor docs have one owner** - Missing tags use `docs.missing-param-tag`; duplicate property-doc findings disappear.
+- **Three rule options added** - Replace generic method names, accept meaningful property line comments, or extend dangerous-function detection.
 
 ## 0.5.1 - 2026-07-20
 

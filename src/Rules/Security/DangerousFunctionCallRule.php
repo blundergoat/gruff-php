@@ -26,9 +26,10 @@ use PhpParser\Node\Stmt\Function_;
 use PhpParser\Node\Stmt\Property;
 
 /**
- * Flags calls into PHP's execution and evaluation surface - `exec`, `shell_exec`, `system`, `eval`,
- * `assert('...')`, and dynamic `$callable()` invocations - so a reviewer can confirm each one runs
- * trusted input rather than attacker-controlled data (command injection / arbitrary code execution).
+ * Flags calls into PHP's execution and evaluation surface - immutable built-ins such as `exec`,
+ * `shell_exec`, and `system`, project-added global functions, `eval`, `assert('...')`, and dynamic
+ * `$callable()` invocations - so a reviewer can confirm each one runs trusted input rather than
+ * attacker-controlled data (command injection / arbitrary code execution).
  *
  * Runs per file. To keep noise down it first learns which local variables, properties, and parameters
  * are known callables (closures, arrow functions, `[obj, 'method']` arrays, or callable type hints and
@@ -64,12 +65,17 @@ final class DangerousFunctionCallRule implements RuleInterface
     {
         // Confidence is Medium, not High: a name match cannot prove the call reaches an attacker-controlled argument.
         return new RuleDefinition(
-            id:              self::ID,
-            name:            'Dangerous function calls',
-            pillar:          Pillar::Security,
-            tier:            RuleTier::V01,
-            defaultSeverity: Severity::Warning,
-            confidence:      Confidence::Medium,
+            id:                 self::ID,
+            name:               'Dangerous function calls',
+            pillar:             Pillar::Security,
+            tier:               RuleTier::V01,
+            defaultSeverity:    Severity::Warning,
+            confidence:         Confidence::Medium,
+            defaultOptions:     ['additionalFunctions' => []],
+            description:        'Flags dynamic execution, built-in shell and evaluation patterns, and configured additive global function names.',
+            optionDescriptions: [
+                'additionalFunctions' => 'Global function names added to the non-removable built-in execution list; matching is case-insensitive.',
+            ],
         );
     }
 
@@ -77,15 +83,19 @@ final class DangerousFunctionCallRule implements RuleInterface
      * Reports dynamic execution, eval, assert-string, and dangerous shell calls.
      *
      * @param AnalysisUnit $analysisUnit - single parsed file the caller wants scanned; its AST and token
-     *   stream are the only source consulted, so cross-file callable definitions are invisible here
-     * @param RuleContext  $ruleContext - shared per-run context; this rule reads no settings from it but
-     *   the interface requires it, so callers pass the same instance used for every rule in the pass
+     *                                   stream are the only source consulted, so cross-file callable definitions are invisible here
+     * @param RuleContext  $ruleContext  - shared per-run context; this rule reads no settings from it but
+     *                                   the interface requires it, so callers pass the same instance used for every rule in the pass
      *
      * @return list<Finding> - one Finding per suspicious call site, empty when none match; callers treat
      *   the list as advisory evidence for review, not a proven vulnerability
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
+        $definition         = $this->definition();
+        $dangerousFunctions = $this->dangerousFunctions(
+            $ruleContext->settingsFor($definition)->stringListOption('additionalFunctions'),
+        );
         $findings           = [];
         $callableParameters = $this->callableParameterNames($analysisUnit);
         $callableProperties = $this->callablePropertyNames($analysisUnit);
@@ -108,7 +118,7 @@ final class DangerousFunctionCallRule implements RuleInterface
             }
 
             // A direct exec/shell family call is the clearest dangerous shape.
-            if (in_array($name, self::DANGEROUS_FUNCTIONS, true)) {
+            if (in_array($name, $dangerousFunctions, true)) {
                 $findings[] = $this->finding($analysisUnit, $call, $name);
             }
 
@@ -126,6 +136,26 @@ final class DangerousFunctionCallRule implements RuleInterface
 
         // Order is by discovery, not severity: the reporter sorts; emitting here in AST order keeps results stable.
         return $findings;
+    }
+
+    /**
+     * Unions normalized configured names with the built-in execution surface.
+     *
+     * @param list<string> $additionalFunctions - Project-supplied global function names.
+     *
+     * @return list<string> - Non-removable built-ins followed by unique normalized additions.
+     */
+    private function dangerousFunctions(array $additionalFunctions): array
+    {
+        $normalizedAdditionalFunctions = array_values(array_filter(array_map(
+            static fn (string $functionName): string => strtolower(trim($functionName)),
+            $additionalFunctions,
+        ), static fn (string $functionName): bool => $functionName !== ''));
+
+        return array_values(array_unique([
+            ...self::DANGEROUS_FUNCTIONS,
+            ...$normalizedAdditionalFunctions,
+        ]));
     }
 
     /**
@@ -311,11 +341,11 @@ final class DangerousFunctionCallRule implements RuleInterface
      * Reports whether a dynamic call target ($var() or $this->prop()) resolves to a slot already
      * proven to hold a callable, which is the gate that turns a finding off.
      *
-     * @param Node                $name - the callee expression from a FuncCall whose
-     *   `name` is not a plain function Name; only Variable and PropertyFetch forms can be vindicated
+     * @param Node                $name               - the callee expression from a FuncCall whose
+     *                                                `name` is not a plain function Name; only Variable and PropertyFetch forms can be vindicated
      * @param array<string, true> $callableParameters - callable-typed parameter names from the file
      * @param array<string, true> $callableProperties - callable-typed or callable-documented property names
-     * @param array<string, true> $callableLocals - local and foreach variable names assigned callables
+     * @param array<string, true> $callableLocals     - local and foreach variable names assigned callables
      *
      * @return bool - true means "trusted callable, do not flag"; false means the target is unproven and the
      *   caller should record a dynamic-call finding (false is the safe default, not a positive denial)
@@ -403,9 +433,9 @@ final class DangerousFunctionCallRule implements RuleInterface
      * Reports whether a foreach subject is a property already known to hold callables, so the loop
      * value variable can be trusted as callable.
      *
-     * @param Expr                $expr - the `foreach (... as $v)` subject expression
+     * @param Expr                $expr                         - the `foreach (... as $v)` subject expression
      * @param array<string, true> $callableCollectionProperties - property names proven to contain callables,
-     *   as produced by callableCollectionPropertyNames
+     *                                                          as produced by callableCollectionPropertyNames
      *
      * @return bool - true when the subject is `$this->prop` for a known-callable property; false for any other
      *   subject (a local array, a method call, a dynamic property name), leaving the loop variable untrusted
@@ -470,9 +500,9 @@ final class DangerousFunctionCallRule implements RuleInterface
      * detection path reports identically.
      *
      * @param AnalysisUnit $analysisUnit - unit being scanned; supplies the display path recorded on the finding
-     * @param Node         $node - the offending node (call or eval) whose start line locates the report
-     * @param string       $function - human-readable label for the pattern (e.g. `exec`, `eval`,
-     *   `dynamic function call`); flows into both the message and the `function` metadata key for grouping
+     * @param Node         $node         - the offending node (call or eval) whose start line locates the report
+     * @param string       $function     - human-readable label for the pattern (e.g. `exec`, `eval`,
+     *                                   `dynamic function call`); flows into both the message and the `function` metadata key for grouping
      *
      * @return Finding - the populated finding the caller appends to its result list; never null, since this is
      *   only called once a pattern has already matched

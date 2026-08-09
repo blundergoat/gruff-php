@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace GruffPhp\Tests\Console;
 
 use GruffPhp\Engine\Config\ConfigLoader;
+use GruffPhp\Rules\Docs\MissingPropertyPhpdocRule;
+use GruffPhp\Rules\Naming\GenericMethodNameRule;
+use GruffPhp\Rules\Security\DangerousFunctionCallRule;
 use Symfony\Component\Process\Process;
 use Symfony\Component\Yaml\Yaml;
 
@@ -62,6 +65,7 @@ final class InitCliTest extends CliTestCase
             $this->assertGeneratedConfigShape($decoded);
             $this->assertIgnoredPaths(self::DEFAULT_IGNORED_PATHS, $decoded);
             $this->assertCognitiveComplexityDefault($decoded);
+            $this->assertRequestedRuleOptionDefaults($decoded);
         } finally {
             $this->removeDir($project);
         }
@@ -442,7 +446,7 @@ final class InitCliTest extends CliTestCase
      * Assert configured path ignores match the expected list.
      *
      * @param list<string>         $expectedPaths - Expected ignored paths.
-     * @param array<string, mixed> $decoded - Parsed config payload.
+     * @param array<string, mixed> $decoded       - Parsed config payload.
      *
      * @return void
      */
@@ -466,6 +470,47 @@ final class InitCliTest extends CliTestCase
         self::assertSame(
             ['enabled' => true, 'threshold' => 20, 'severity' => 'error'],
             $rules['complexity.cognitive'],
+        );
+    }
+
+    /**
+     * Assert the requested configurable rules emit their complete defaults.
+     *
+     * @param array<string, mixed> $decoded - Parsed config payload.
+     *
+     * @return void
+     */
+    private function assertRequestedRuleOptionDefaults(array $decoded): void
+    {
+        $rules = $this->stringKeyedArray($decoded['rules'] ?? null);
+
+        self::assertSame(
+            [
+                'enabled' => true,
+                'options' => [
+                    'genericNames' => [
+                        'process',
+                        'handle',
+                        'execute',
+                        'run',
+                        'manage',
+                        'doIt',
+                        'do',
+                        'perform',
+                        'make',
+                        'compute',
+                    ],
+                ],
+            ],
+            $rules[GenericMethodNameRule::ID] ?? null,
+        );
+        self::assertSame(
+            ['enabled' => true, 'options' => ['acceptLineComments' => false]],
+            $rules[MissingPropertyPhpdocRule::ID] ?? null,
+        );
+        self::assertSame(
+            ['enabled' => true, 'options' => ['additionalFunctions' => []]],
+            $rules[DangerousFunctionCallRule::ID] ?? null,
         );
     }
 

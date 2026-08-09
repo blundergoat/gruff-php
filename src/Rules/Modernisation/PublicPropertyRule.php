@@ -14,15 +14,17 @@ use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
+use PhpParser\Node;
 use PhpParser\Node\Stmt;
 
 /**
  * Flags a public mutable property that lets any caller read and overwrite object state directly, so the
  * user can move to readonly properties or accessor methods that keep the class's invariants intact.
  *
- * Runs per file over every class, skipping DTO-style data carriers where public fields are the whole
- * point. Each remaining public, non-static, non-readonly property is reported at warning - gruff-php only
- * surfaces it, it never rewrites the property for you.
+ * Runs per file over every class, skipping readonly owners and DTO-style data carriers. Readonly owners
+ * cannot expose mutable properties, while DTO public state is intentional. Each remaining public,
+ * non-static, non-readonly declared or promoted property is reported at warning - gruff-php only surfaces
+ * it, it never rewrites the property for you.
  */
 final readonly class PublicPropertyRule implements RuleInterface
 {
@@ -49,10 +51,10 @@ final readonly class PublicPropertyRule implements RuleInterface
     }
 
     /**
-     * Reports each public mutable property that exposes state a caller could overwrite.
+     * Reports each public mutable declared or promoted property that exposes overwritable state.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
      *
      * @return list<Finding> - One finding per exposed public mutable property; empty when every class guards its state.
      */
@@ -62,39 +64,107 @@ final readonly class PublicPropertyRule implements RuleInterface
 
         // Inspect every class declared in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Class_::class) as $class) {
-            // A DTO exists to carry public data, so its public fields are intentional, not a leak.
-            if (ModernisationNodeHelper::isDtoClass($class)) {
+            // Readonly classes cannot expose mutable instance state, while DTO public fields are intentional.
+            if ($class->isReadonly() || ModernisationNodeHelper::isDtoClass($class)) {
                 continue;
             }
 
-            // Check each property the class declares.
-            foreach ($class->getProperties() as $property) {
-                // Only a plain public, non-static, non-readonly property exposes overwritable state.
-                if (!$property->isPublic() || $property->isStatic() || $property->isReadonly()) {
-                    continue;
-                }
+            array_push(
+                $findings,
+                ...$this->declaredPropertyFindings($analysisUnit, $class),
+                ...$this->promotedPropertyFindings($analysisUnit, $class),
+            );
+        }
 
-                // One declaration can name several properties, so report each name separately.
-                foreach ($property->props as $propertyProperty) {
-                    $name       = $propertyProperty->name->toString();
-                    $findings[] = new Finding(
-                        ruleId:      self::ID,
-                        message:     sprintf('Public mutable property $%s exposes state directly.', $name),
-                        filePath:    $analysisUnit->file->displayPath,
-                        line:        $propertyProperty->getStartLine(),
-                        severity:    Severity::Warning,
-                        pillar:      Pillar::Modernisation,
-                        tier:        RuleTier::V01,
-                        confidence:  Confidence::High,
-                        remediation: 'Prefer constructor-initialized readonly properties or methods that preserve invariants; DTO-style classes are exempt and gruff-php reports only.',
-                        metadata:    [
-                            'property' => $name,
-                        ],
-                    );
-                }
+        return $findings;
+    }
+
+    /**
+     * Reports mutable public properties declared with property statements.
+     *
+     * @param AnalysisUnit $analysisUnit - Parsed unit providing the reported display path.
+     * @param Stmt\Class_  $class        - Non-readonly, non-DTO class whose declarations are inspected.
+     *
+     * @return list<Finding> - One finding per public mutable declared property.
+     */
+    private function declaredPropertyFindings(AnalysisUnit $analysisUnit, Stmt\Class_ $class): array
+    {
+        $findings = [];
+
+        // Check each property the class declares.
+        foreach ($class->getProperties() as $property) {
+            // Only a plain public, non-static, non-readonly property exposes overwritable state.
+            if (!$property->isPublic() || $property->isStatic() || $property->isReadonly()) {
+                continue;
+            }
+
+            // One declaration can name several properties, so report each name separately.
+            foreach ($property->props as $propertyProperty) {
+                $findings[] = $this->finding($analysisUnit, $propertyProperty, $propertyProperty->name->toString());
             }
         }
 
         return $findings;
+    }
+
+    /**
+     * Reports mutable public properties promoted by a constructor.
+     *
+     * @param AnalysisUnit $analysisUnit - Parsed unit providing the reported display path.
+     * @param Stmt\Class_  $class        - Non-readonly, non-DTO class whose constructor is inspected.
+     *
+     * @return list<Finding> - One finding per public mutable promoted property.
+     */
+    private function promotedPropertyFindings(AnalysisUnit $analysisUnit, Stmt\Class_ $class): array
+    {
+        // Constructor-promoted properties are parameter nodes, not property statements.
+        $constructor = $class->getMethod('__construct');
+        if ($constructor === null) {
+            return [];
+        }
+
+        $findings = [];
+
+        foreach ($constructor->params as $parameter) {
+            // Only a public mutable promotion exposes writable object state.
+            if (!$parameter->isPromoted() || !$parameter->isPublic() || $parameter->isReadonly()) {
+                continue;
+            }
+
+            if (!$parameter->var instanceof Node\Expr\Variable || !is_string($parameter->var->name)) {
+                continue;
+            }
+
+            $findings[] = $this->finding($analysisUnit, $parameter, $parameter->var->name);
+        }
+
+        return $findings;
+    }
+
+    /**
+     * Builds a public-property finding for one mutable declaration or promoted parameter.
+     *
+     * @param AnalysisUnit $analysisUnit - Parsed unit providing the reported display path.
+     * @param Node         $node         - Property node whose start line anchors the finding.
+     * @param string       $name         - Property name used by the message and metadata.
+     *
+     * @return Finding - Fixed-shape warning for one exposed mutable property.
+     */
+    private function finding(AnalysisUnit $analysisUnit, Node $node, string $name): Finding
+    {
+        return new Finding(
+            ruleId:      self::ID,
+            message:     sprintf('Public mutable property $%s exposes state directly.', $name),
+            filePath:    $analysisUnit->file->displayPath,
+            line:        $node->getStartLine(),
+            severity:    Severity::Warning,
+            pillar:      Pillar::Modernisation,
+            tier:        RuleTier::V01,
+            confidence:  Confidence::High,
+            remediation: 'Prefer constructor-initialized readonly properties or methods that preserve invariants; DTO-style classes are exempt and gruff-php reports only.',
+            metadata:    [
+                'property' => $name,
+            ],
+        );
     }
 }

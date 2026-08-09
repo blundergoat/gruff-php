@@ -80,6 +80,45 @@ final class SecurityRulesTest extends TestCase
     }
 
     /**
+     * Verify configured dangerous functions are normalized and added without removing built-ins.
+     *
+     * @return void
+     */
+    public function testAdditionalDangerousFunctionsAreAdditiveAndNormalized(): void
+    {
+        $unit = $this->parseSource(
+            implode("\n", [
+                '<?php',
+                'function runConfiguredDangerousFunctions(string $command): void',
+                '{',
+                '    custom_runner($command);',
+                '    ' . 'ex' . 'ec' . '($command);',
+                '    harmless_runner($command);',
+                '}',
+            ]) . "\n",
+            'tests/Fixtures/Security/inline-configured-dangerous-functions.php',
+        );
+
+        $registry = RuleRegistry::defaults();
+        $config   = AnalysisConfig::fromRegistry($registry);
+        $settings = $config->ruleSettings(DangerousFunctionCallRule::ID);
+        $config   = $config->withRuleSettings(
+            DangerousFunctionCallRule::ID,
+            new RuleSettings(
+                true,
+                $settings->thresholds,
+                [...$settings->options, 'additionalFunctions' => [' CuStOm_RuNnEr ']],
+            ),
+        );
+
+        $findings = $this->findingsForRule($unit, DangerousFunctionCallRule::ID, $config);
+        self::assertSame(
+            ['custom_runner', 'exec'],
+            array_map(static fn (Finding $finding): mixed => $finding->metadata['function'] ?? null, $findings),
+        );
+    }
+
+    /**
      * Verify typed callable invocations are not dangerous dynamic calls.
      *
      * @return void
@@ -169,19 +208,19 @@ final class SecurityRulesTest extends TestCase
     public static function precisionFixtureCases(): array
     {
         return [
-            'variable include attack shapes'  => ['variable-include-precision.php', VariableIncludeRule::ID, [9, 10, 13, 17, 19, 20, 32]],
+            'variable include attack shapes' => ['variable-include-precision.php', VariableIncludeRule::ID, [9, 10, 13, 17, 19, 20, 32]],
             'sql concatenation attack shapes' => ['sql-concatenation-precision.php', SqlConcatenationRule::ID, [7, 8, 9, 10, 25]],
             // 54/64/82: a conditional rebind never hides a real parser, including sibling-branch sinks,
             // and a conditional construction counts as possibly-XML; the rebind on the sink's own path stays silent.
-            'xml loaders need xml receivers'  => ['xml-receiver-gating.php', UnsafeXmlLoadingRule::ID, [22, 27, 33, 38, 54, 64, 82]],
+            'xml loaders need xml receivers' => ['xml-receiver-gating.php', UnsafeXmlLoadingRule::ID, [22, 27, 33, 38, 54, 64, 82]],
         ];
     }
 
     /**
      * Verify each precision fixture flags exactly its attack-shape lines and nothing else.
      *
-     * @param string    $fixture - Fixture filename under tests/Fixtures/Security to analyse.
-     * @param string    $ruleId - Rule whose findings are pinned.
+     * @param string    $fixture       - Fixture filename under tests/Fixtures/Security to analyse.
+     * @param string    $ruleId        - Rule whose findings are pinned.
      * @param list<int> $expectedLines - Exact finding lines the fixture must produce.
      *
      * @return void
@@ -266,9 +305,9 @@ final class SecurityRulesTest extends TestCase
     /**
      * Verify the strict-project option overrides re-flag exactly the relaxed shapes they target.
      *
-     * @param string                           $ruleId - rule whose options are overridden
-     * @param string                           $fixture - precision fixture to analyse
-     * @param array<string, bool|list<string>> $options - full option map for the override
+     * @param string                           $ruleId        - rule whose options are overridden
+     * @param string                           $fixture       - precision fixture to analyse
+     * @param array<string, bool|list<string>> $options       - full option map for the override
      * @param list<int>                        $expectedLines - lines the rule must flag under the override
      *
      * @return void
@@ -416,9 +455,9 @@ final class SecurityRulesTest extends TestCase
     /**
      * Assert the expected security finding count for a rule.
      *
-     * @param string        $ruleId - rule id whose findings are counted; all other rules' findings are filtered out first
+     * @param string        $ruleId        - rule id whose findings are counted; all other rules' findings are filtered out first
      * @param int           $expectedCount - exact findings expected for that rule, including zero to assert it never fires
-     * @param list<Finding> $findings - Findings to filter down to the requested rule id.
+     * @param list<Finding> $findings      - Findings to filter down to the requested rule id.
      *
      * @return void
      */
@@ -450,8 +489,8 @@ final class SecurityRulesTest extends TestCase
      * Run one security rule against a fixture and return its findings.
      *
      * @param AnalysisUnit        $analysisUnit - already-parsed fixture to run the full default registry over
-     * @param string              $ruleId - rule id to retain; findings from every other rule are discarded
-     * @param AnalysisConfig|null $config - config override for option-behaviour cases, or null for registry defaults
+     * @param string              $ruleId       - rule id to retain; findings from every other rule are discarded
+     * @param AnalysisConfig|null $config       - config override for option-behaviour cases, or null for registry defaults
      *
      * @return list<Finding> - only the findings whose ruleId matches $ruleId, re-indexed from zero; empty when that rule never fired
      */
@@ -804,7 +843,7 @@ PHP,
     /**
      * Parse inline source into an analysis unit.
      *
-     * @param string $source - Source directory.
+     * @param string $source      - Source directory.
      * @param string $displayPath - Fixture display path.
      *
      * @return AnalysisUnit - unit carrying the parsed statements and tokens under $displayPath, with parent attributes connected for rule traversal

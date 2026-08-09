@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace GruffPhp\Tests\Console;
 
 use GruffPhp\Cli\Application;
+use GruffPhp\Rules\Docs\MissingPropertyPhpdocRule;
+use GruffPhp\Rules\Naming\GenericMethodNameRule;
 use GruffPhp\Rules\Naming\BooleanPrefixRule;
+use GruffPhp\Rules\Security\DangerousFunctionCallRule;
 use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
 
@@ -145,6 +148,80 @@ final class ListRulesCliTest extends CliTestCase
             ],
             $payload['optionDescriptions'] ?? null,
         );
+    }
+
+    /**
+     * Verify requested rule detail JSON preserves replacement, toggle, and additive option contracts.
+     *
+     * @return void
+     */
+    public function testRequestedRuleDetailsExposeDocumentedOptionContracts(): void
+    {
+        $expectedByRule = [
+            GenericMethodNameRule::ID => [
+                'options' => [
+                    'genericNames' => [
+                        'process',
+                        'handle',
+                        'execute',
+                        'run',
+                        'manage',
+                        'doIt',
+                        'do',
+                        'perform',
+                        'make',
+                        'compute',
+                    ],
+                ],
+                'optionDescriptions' => [
+                    'genericNames' => 'Replacement list of function and method names treated as generic; matching is case-insensitive.',
+                ],
+            ],
+            MissingPropertyPhpdocRule::ID => [
+                'options' => ['acceptLineComments' => false],
+                'optionDescriptions' => [
+                    'acceptLineComments' => 'When true, a physically attached // or # comment with meaning beyond the property name satisfies the rule.',
+                ],
+            ],
+            DangerousFunctionCallRule::ID => [
+                'options' => ['additionalFunctions' => []],
+                'optionDescriptions' => [
+                    'additionalFunctions' => 'Global function names added to the non-removable built-in execution list; matching is case-insensitive.',
+                ],
+            ],
+        ];
+
+        foreach ($expectedByRule as $ruleId => $expectedPayload) {
+            $process = new Process([
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff-php',
+                'list-rules',
+                $ruleId,
+                '--format',
+                'json',
+            ]);
+            $process->run();
+
+            self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+            $payload = json_decode($process->getOutput(), associative: true, flags: JSON_THROW_ON_ERROR);
+
+            self::assertIsArray($payload, sprintf('Expected JSON array for %s.', $ruleId));
+            self::assertSame(
+                $ruleId,
+                $payload['id'] ?? null,
+                sprintf('Detail payload id mismatch for %s.', $ruleId),
+            );
+            self::assertSame(
+                $expectedPayload['options'],
+                $payload['options'] ?? null,
+                sprintf('Default options mismatch for %s.', $ruleId),
+            );
+            self::assertSame(
+                $expectedPayload['optionDescriptions'],
+                $payload['optionDescriptions'] ?? null,
+                sprintf('Option descriptions mismatch for %s.', $ruleId),
+            );
+        }
     }
 
     /**

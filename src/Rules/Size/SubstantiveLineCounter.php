@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GruffPhp\Rules\Size;
 
 use GruffPhp\Engine\Parser\AnalysisUnit;
+use WeakMap;
 
 /**
  * Shared substantive-line counting for the size rules: blank lines and comment-only lines are free
@@ -16,8 +17,15 @@ use GruffPhp\Engine\Parser\AnalysisUnit;
  * parser tokens fall back to counting non-blank raw lines; syntax-error units can retain tokens and
  * receive the same comment masking as successfully parsed source.
  */
-final readonly class SubstantiveLineCounter
+final class SubstantiveLineCounter
 {
+    /**
+     * Cumulative substantive-line counts keyed by analysis-unit identity.
+     *
+     * @var WeakMap<AnalysisUnit, list<int>>|null
+     */
+    private static ?WeakMap $prefixCache = null;
+
     /**
      * Counts the substantive lines of the whole unit.
      *
@@ -27,7 +35,9 @@ final readonly class SubstantiveLineCounter
      */
     public static function countAll(AnalysisUnit $analysisUnit): int
     {
-        return self::countLines(self::maskedLines($analysisUnit));
+        $prefix = self::substantiveLinePrefix($analysisUnit);
+
+        return $prefix[count($prefix) - 1];
     }
 
     /**
@@ -41,10 +51,53 @@ final readonly class SubstantiveLineCounter
      */
     public static function countRange(AnalysisUnit $analysisUnit, int $startLine, int $endLine): int
     {
-        $lines = self::maskedLines($analysisUnit);
-        $slice = array_slice($lines, max(0, $startLine - 1), max(0, $endLine - $startLine + 1));
+        $prefix          = self::substantiveLinePrefix($analysisUnit);
+        $lineCount       = count($prefix) - 1;
+        $startIndex      = max(0, $startLine - 1);
+        $requestedLength = max(0, $endLine - $startLine + 1);
 
-        return self::countLines($slice);
+        // Preserve the original array-slice bounds: an empty or out-of-source range contributes nothing.
+        if ($requestedLength === 0 || $startIndex >= $lineCount) {
+            return 0;
+        }
+
+        $endIndex = min($lineCount, $startIndex + $requestedLength);
+
+        return $prefix[$endIndex] - $prefix[$startIndex];
+    }
+
+    /**
+     * Builds and memoises cumulative substantive-line counts for one unit.
+     *
+     * Prefix index zero is always zero; index N stores the substantive count through source line N.
+     *
+     * @param AnalysisUnit $analysisUnit - Unit whose comment-masked source is counted.
+     *
+     * @return list<int> - Cumulative substantive-line counts with a leading zero.
+     */
+    private static function substantiveLinePrefix(AnalysisUnit $analysisUnit): array
+    {
+        self::$prefixCache ??= new WeakMap();
+        $cached = self::$prefixCache[$analysisUnit] ?? null;
+        if ($cached !== null) {
+            // A hit means this unit's mask and every range count are already represented by the prefix.
+            return $cached;
+        }
+
+        $count  = 0;
+        $prefix = [0];
+
+        foreach (self::maskedLines($analysisUnit) as $line) {
+            // A line is substantive when anything beyond whitespace survives the comment mask.
+            if (trim($line) !== '') {
+                ++$count;
+            }
+            $prefix[] = $count;
+        }
+
+        self::$prefixCache[$analysisUnit] = $prefix;
+
+        return $prefix;
     }
 
     /**
@@ -56,38 +109,25 @@ final readonly class SubstantiveLineCounter
      */
     private static function maskedLines(AnalysisUnit $analysisUnit): array
     {
-        $masked = $analysisUnit->source;
+        $masked       = '';
+        $sourceOffset = 0;
 
-        // Blank each comment token in place so comment-only lines become whitespace-only lines.
+        // Copy source and masked-comment spans in order so each source byte is visited at most once.
         foreach ($analysisUnit->tokens as $token) {
             if (!$token->is([\T_COMMENT, \T_DOC_COMMENT])) {
                 continue;
             }
-            $blanked = preg_replace('/[^\n]/', ' ', $token->text) ?? $token->text;
-            $masked  = substr_replace($masked, $blanked, $token->pos, strlen($token->text));
+
+            $tokenLength = strlen($token->text);
+            $masked .= substr($analysisUnit->source, $sourceOffset, $token->pos - $sourceOffset);
+            $masked .= preg_replace('/[^\n]/', ' ', $token->text) ?? $token->text;
+            $sourceOffset = $token->pos + $tokenLength;
         }
+
+        // Preserve the untouched tail after the final comment token.
+        $masked .= substr($analysisUnit->source, $sourceOffset);
 
         return explode("\n", $masked);
     }
 
-    /**
-     * Counts the lines that still carry visible characters after masking.
-     *
-     * @param list<string> $lines - Masked source lines to count.
-     *
-     * @return int - Number of non-blank lines.
-     */
-    private static function countLines(array $lines): int
-    {
-        $count = 0;
-
-        foreach ($lines as $line) {
-            // A line is substantive when anything beyond whitespace survives the comment mask.
-            if (trim($line) !== '') {
-                ++$count;
-            }
-        }
-
-        return $count;
-    }
 }

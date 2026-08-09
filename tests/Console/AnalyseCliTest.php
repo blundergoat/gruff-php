@@ -115,6 +115,7 @@ final class AnalyseCliTest extends CliTestCase
                                    '--fail-on',
                                    'error',
                                    '--no-baseline',
+                                   '--no-cache',
                                ], __DIR__ . '/../..');
         $process->run();
 
@@ -190,6 +191,7 @@ final class AnalyseCliTest extends CliTestCase
                                    '--fail-on',
                                    'error',
                                    '--no-baseline',
+                                   '--no-cache',
                                ], __DIR__ . '/../..');
         $process->run();
 

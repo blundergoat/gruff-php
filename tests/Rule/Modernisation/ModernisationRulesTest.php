@@ -197,6 +197,56 @@ PHP);
     }
 
     /**
+     * Verify readonly owners stay quiet while public mutable promoted properties report once.
+     *
+     * @return void
+     */
+    public function testPublicPropertyRuleHandlesReadonlyOwnersAndPromotedProperties(): void
+    {
+        $unit = $this->inlineUnit(<<<'PHP'
+<?php
+readonly class ReadonlyOwner
+{
+    public string $declared;
+
+    public function __construct(public string $promoted)
+    {
+        $this->declared = $promoted;
+    }
+}
+final class MutableService
+{
+    public readonly string $readonlyDeclared;
+    public static string $staticDeclared;
+    public string $mutableDeclared;
+
+    public function __construct(
+        public string $publicPromoted,
+        public readonly string $readonlyPromoted,
+        protected string $protectedPromoted,
+        private string $privatePromoted,
+    ) {
+        $this->readonlyDeclared = $readonlyPromoted;
+    }
+}
+PHP);
+        $registry = RuleRegistry::defaults();
+        $config   = AnalysisConfig::fromRegistry($registry);
+        $findings = (new PublicPropertyRule())->analyse($unit, new RuleContext(self::PROJECT_ROOT, $config));
+
+        self::assertSame([], $unit->diagnostics);
+        self::assertSame(
+            ['mutableDeclared', 'publicPromoted'],
+            array_map(static fn(Finding $finding): mixed => $finding->metadata['property'] ?? null, $findings),
+        );
+        self::assertSame([15, 18], array_map(static fn(Finding $finding): ?int => $finding->line, $findings));
+        self::assertCount(2, array_unique(array_map(
+            static fn(Finding $finding): mixed => $finding->metadata['property'] ?? null,
+            $findings,
+        )));
+    }
+
+    /**
      * Verify PHP eight one candidates are detected.
      *
      * @return void

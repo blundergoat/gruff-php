@@ -59,7 +59,7 @@ allowlists:
     # 64-char hex hash that reads as a high-entropy secret; it is test data, not a credential. Keep this
     # preview in sync if that digest rotates (it changes whenever rules or fixtures change).
     secretPreviews:
-        - 'b2ab...beca (redacted, 64 chars)'
+        - '429e...b175 (redacted, 64 chars)'
 selection:
     tiers: []
     pillars: []
@@ -124,9 +124,11 @@ rules:
     # Missing @param tag
     docs.missing-param-tag:
         enabled: true
-    # Missing property PHPDoc
+    # Requires declared properties to explain their purpose with PHPDoc; an opt-in toggle also accepts meaningful attached line comments.
     docs.missing-property-phpdoc:
         enabled: true
+        options:
+            acceptLineComments: false
     # Missing method PHPDoc
     docs.missing-public-phpdoc:
         enabled: true
@@ -265,9 +267,21 @@ rules:
     # Confusing standalone class name
     naming.confusing-name:
         enabled: true
-    # Generic method name
+    # Flags functions and methods whose names match the configured replacement list of vague verbs.
     naming.generic-method:
         enabled: true
+        options:
+            genericNames:
+                - process
+                - handle
+                - execute
+                - run
+                - manage
+                - doIt
+                - do
+                - perform
+                - make
+                - compute
     # Flags identifiers that duplicate type information with configured prefixes such as arr, obj, str, or bool.
     naming.hungarian-notation:
         enabled: true
@@ -351,9 +365,11 @@ rules:
     # Test method naming consistency
     naming.test-naming-consistency:
         enabled: true
-    # Dangerous function calls
+    # Flags dynamic execution, built-in shell and evaluation patterns, and configured additive global function names.
     security.dangerous-function-call:
         enabled: true
+        options:
+            additionalFunctions: []
     # Forces PHP error display on via ini_set(display_errors, ...), leaking diagnostics in production.
     security.debug-mode-enabled:
         enabled: true

@@ -22,8 +22,9 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 
 /**
- * Flags a function or method whose name is a vague verb - `process`, `handle`, `run`, `execute`, and the
- * like - because such names say that something happens without saying what, forcing the reader into the body.
+ * Flags a function or method whose name appears in a configurable replacement list of vague verbs - `process`,
+ * `handle`, `run`, `execute`, and the like by default - because such names say that something happens
+ * without saying what, forcing the reader into the body.
  *
  * Framework-mandated names, such as a Symfony Console command's `execute()`, are exempt so the rule does not
  * fight contracts the author cannot rename. Advisory, medium confidence.
@@ -38,7 +39,7 @@ final readonly class GenericMethodNameRule implements RuleInterface
     /**
      * Callable names that usually need stronger domain context.
      */
-    private const GENERIC_NAMES = [
+    private const DEFAULT_GENERIC_NAMES = [
         'process', 'handle', 'execute', 'run', 'manage', 'doIt', 'do',
         'perform', 'make', 'compute',
     ];
@@ -52,12 +53,17 @@ final readonly class GenericMethodNameRule implements RuleInterface
     {
         // Advisory and medium confidence: a generic name is a smell, not a defect, and may be deliberate.
         return new RuleDefinition(
-            id:              self::ID,
-            name:            'Generic method name',
-            pillar:          Pillar::Naming,
-            tier:            RuleTier::V01,
-            defaultSeverity: Severity::Advisory,
-            confidence:      Confidence::Medium,
+            id:                 self::ID,
+            name:               'Generic method name',
+            pillar:             Pillar::Naming,
+            tier:               RuleTier::V01,
+            defaultSeverity:    Severity::Advisory,
+            confidence:         Confidence::Medium,
+            defaultOptions:     ['genericNames' => self::DEFAULT_GENERIC_NAMES],
+            description:        'Flags functions and methods whose names match the configured replacement list of vague verbs.',
+            optionDescriptions: [
+                'genericNames' => 'Replacement list of function and method names treated as generic; matching is case-insensitive.',
+            ],
         );
     }
 
@@ -65,14 +71,17 @@ final readonly class GenericMethodNameRule implements RuleInterface
      * Reports a function or method whose name is too generic to convey intent.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
      *
      * @return list<Finding> - Findings for generic callable names.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $definition = $this->definition();
-        $nodes      = NodeIndex::nodesOfAny($analysisUnit, [ClassMethod::class, Function_::class]);
+        $definition   = $this->definition();
+        $nodes        = NodeIndex::nodesOfAny($analysisUnit, [ClassMethod::class, Function_::class]);
+        $genericNames = $this->normalisedGenericNames(
+            $ruleContext->settingsFor($definition)->stringListOption('genericNames'),
+        );
 
         $findings = [];
 
@@ -82,7 +91,7 @@ final readonly class GenericMethodNameRule implements RuleInterface
             $name = $node->name->toString();
 
             // Only the known vague verbs are candidates for this rule.
-            if (!in_array(strtolower($name), array_map('strtolower', self::GENERIC_NAMES), true)) {
+            if (!in_array(strtolower($name), $genericNames, true)) {
                 continue;
             }
 
@@ -108,6 +117,21 @@ final readonly class GenericMethodNameRule implements RuleInterface
         }
 
         return $findings;
+    }
+
+    /**
+     * Normalizes configured generic names for case-insensitive matching.
+     *
+     * @param list<string> $genericNames - Replacement list supplied by effective rule settings.
+     *
+     * @return list<string> - Lowercase, de-duplicated names.
+     */
+    private function normalisedGenericNames(array $genericNames): array
+    {
+        return array_values(array_unique(array_map(
+            static fn (string $genericName): string => strtolower($genericName),
+            $genericNames,
+        )));
     }
 
     /**
@@ -155,7 +179,7 @@ final readonly class GenericMethodNameRule implements RuleInterface
     /**
      * Reports whether a parameter type node matches an unqualified class or interface name.
      *
-     * @param Node|null $type - Declared parameter type node, or null when the parameter is untyped.
+     * @param Node|null $type      - Declared parameter type node, or null when the parameter is untyped.
      * @param string    $shortName - Unqualified class or interface name to match, ignoring any namespace prefix.
      *
      * @return bool - True when the type short name matches.
