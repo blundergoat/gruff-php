@@ -1,149 +1,101 @@
-# Git commit message rules
+# Git commit message standard
 
-Every commit message in this repository follows the same format. These
-rules govern message content only - staging, checks, and process live
-elsewhere.
+## Requirements for the commit message
 
-## Required shape
+### Branch-derived prefix
+
+Read the branch with `git branch --show-current` and match the output against:
 
 ```
-<Imperative title>
-
-<1-3 lines summarising the gist of the change>
+^(feat|fix|chore|refactor|docs|test|perf|build|ci|security)/([0-9]+)([-_].*)?$
 ```
 
-- Subject line, blank separator line, then a body of 1-3 lines.
-- Total length 3-5 lines. Never just a subject. Never more than 5.
-- Plain text only. No footers, co-author tags, emoji, or AI signatures.
+| Branch output | Action |
+| ------------- | ------ |
+| Matches the pattern (`feat/123`, `fix/482-quote-paths`, `feat/91_drift_cache`) | Prefix the subject: `#<digits> type(scope): subject` |
+| Does not match (`main`, `feat/no-number`, `feat/123abc`, `release/1.4`) | No prefix |
+| Empty (detached HEAD: rebase, bisect, CI checkout) | No prefix |
 
-A body MAY be omitted when **all** of these hold: the change is genuinely
-one observable thing, the subject already names what and where, and the
-motivation is self-evident from the diff. In every other case a body is
-required.
+Empty output means no prefix. Do not infer one from history, recent commits, or the diff.
 
-## Subject-line rules
+### Message shape
 
-- ≤ 70 characters, imperative mood, no trailing period.
-- Pattern: `<Area> - <Action>` or `<Action> in <Area>`. Area is usually a
-  rule name, command, or subsystem (`AbbreviationAllowlistRule`, `analyse CLI`,
-  `dashboard scan`).
-- **One observable change per subject.** If the subject contains "and",
-  names two axes, or starts to read like a release-note paragraph - either
-  split the commit or move the second axis into a bulleted body.
+```
+#123 type(scope): subject
 
-### Weak verbs (avoid)
+Body explaining why the change is needed.
+- one fact per bullet, naming real files, behaviours, APIs, commands, or versions
+```
 
-These paraphrase the diff without naming the real change:
+### Subject rules
 
-> *enhance, improve, streamline, clarify, update, tweak, polish, refactor
-> (when used as a verb of last resort), handle, support, work with*
+Subject lines are optimised for `git log`, changelogs, and bisect notes.
 
-### Concrete verbs (prefer)
+- Imperative mood. Test: the subject must complete the sentence "If applied, this commit will
+  ___".
+- One line, as short as it can be while still naming the observable change, and never longer
+  than 72 characters including any `#<digits> ` prefix.
+- Lowercase after the colon unless the word is a proper noun, identifier, or API name.
+- No trailing period.
+- Name the observable change, not the quality aspiration.
+- One observable change per subject; secondary axes go in the body.
+- Backticks around identifiers are permitted.
 
-Name the actual change:
-
-> *add, remove, replace, rename, fix, restore, deny, allow, gate, skip,
-> wire, harden, cache, invalidate, log, retry, tighten, loosen, lock,
-> migrate, split, merge*
+A verb is too weak when it only reports that something changed: *enhance, improve, streamline,
+clarify, polish, tweak*. Use a verb that names the actual edit: *add, remove, replace, rename,
+fix, deny, allow, gate, skip, cache, invalidate, log, retry, bump*. `update` earns its
+place only when the change is literally the update of a pinned value, and `bump` usually says
+that better.
 
 ## Body rules
 
-- **What and why, not how.** A reader should understand the scope and
-  motivation without opening the diff. Skip implementation detail unless
-  it is surprising or load-bearing (a non-obvious dependency, a workaround
-  for a known footgun, a regression source).
-- **Name sources when locking policy or reversing a decision.** Cite the
-  file (`.goat-flow/lessons/...`, an ADR), the prior commit hash, or the
-  rule ID being adjusted.
-- **Bullets are allowed in the body** when the change touches more than
-  one axis - one bullet per axis. Bulleted bodies still count toward the
-  3-5 line total; if you need more bullets, split the commit.
+Write a body when the subject alone does not explain the decision. Common cases:
 
-## Bad → Good rewrites
+- The motivation is not obvious from the diff.
+- The change touches multiple behaviours under one scope.
+- Compatibility, security, migration, platform, or performance context matters.
+- A version bump, dependency change, or rename would be hard to understand from the subject
+  alone.
 
-```
-BAD:  Enhance VarAnnotationDescriptionRule to handle attributes
-GOOD: Switch VarAnnotationDescriptionRule from token walker to AST
-```
+The body explains why the change exists and names the real affected surfaces. Do not restate the
+diff mechanically.
 
-```
-BAD:  Improve abbreviation-allowlist rule and tweak fixture
-GOOD: Add ignoredNames option to naming.abbreviation-allowlist
-```
+- Wrap body prose at 72 columns.
+- Open with the reason or constraint, not an announcement: no "This commit", "This change",
+  "This PR".
+- The weak-verb rule applies to bodies too.
+- Match claims to evidence: no "significantly improves robustness" padding, no hedging verified
+  facts with "should", and never claim a check passed unless it ran.
+- One fact per bullet. Cut bullets that restate the subject or the diff.
+- Quote the essential line of an error message, not the whole dump.
 
 ```
-BAD:  Update tests for various rules
-GOOD: Add tests for attribute-decorated properties and methods
+BAD:  This commit significantly improves installer reliability by enhancing path handling
+      and making various robustness improvements.
+
+GOOD: The installer failed on paths with spaces because $TARGET was unquoted.
+      - quote all path expansions in the hook installer
+      - add a regression test using a spaced tmpdir
 ```
 
-```
-BAD:  Refactor MissingReturnTagRule and update fixtures and docs
-GOOD: Lock docs.missing-return-tag contract to void and never methods
-```
+## Never include
 
-## Examples
+- Secrets, tokens, credentials, or connection strings - in any line, including examples.
+- Machine-local absolute paths (`/home/...`, `C:\Users\...`). Repository-relative paths are
+  encouraged.
+- Agent self-narration: "as requested", "per the instructions", "I have updated".
+- Tool advertisements, generated-by footers, or co-author lines, unless the project's agent
+  instructions declare them.
+- Em dashes (U+2014), typographic quotes, emoji, or gitmoji. Use a spaced hyphen (` - `),
+  straight quotes, and plain ASCII punctuation.
 
-### Good
-
-```
-Switch VarAnnotationDescriptionRule from token walker to AST
-
-The token walker mistook the next token after the docblock for a
-non-declaration when an attribute sat between docblock and property,
-producing a false positive on every attribute-decorated declaration.
-The AST walker keys off Stmt\Property and ClassMethod directly.
-```
+## Worked example
 
 ```
-Tighten RedundantVariableRule to exact assign+return pairs
+fix(installer): quote path expansions in the hook installer
 
-Drops the looser 3-statement pattern that flagged variables used
-once before the return. Behaviour now matches the test fixture's
-intentional negatives and removes the dogfood false positives.
-```
-
-```
-Add ignoredNames option to naming.abbreviation-allowlist
-
-Project glossary entries like $cb, $fn, $ref are valid in
-gruff-php's PHP-Parser AST surface even though they are 2-3
-char lowercase. Default `['this']`; projects opt in their own
-allowlist via .gruff-php.yaml.
-```
-
-```
-Lock docs.missing-return-tag contract to void and never methods
-
-Adds fixture and assertion for the post-M31 behaviour. Cites
-lessons/workflow.md "Respect explicit rule style" so a future
-agent cannot re-narrow the rule.
-```
-
-### Bad
-
-Subject only when the change is non-trivial - fails the 3-5 line rule:
-```
-Add tests for VarAnnotationDescriptionRule
-```
-
-Vague, no scope or motivation:
-```
-fix bug
-```
-
-Multi-axis "and" subject - either split or move the second axis to a body
-bullet:
-```
-Update VarAnnotationDescriptionRule and rename ShortVariableRule fixture
-```
-
-Run-on with implementation detail no reader needs:
-```
-Switch VarAnnotationDescriptionRule from token walker to AST
-
-Drops isLocalVarAssertion, isTrivia, isDeclarationToken; walks
-Stmt\Property and ClassMethod via NodeFinder; skips declaration
-nodes whose docComment contains @var; preserves the local-assertion
-path inside method bodies; adds fixture coverage for the attribute
-decorated property and method shapes.
+The installer failed on paths containing spaces because $TARGET was
+expanded unquoted at three call sites.
+- quote all path expansions in workflow/install-hooks.sh
+- add a regression test using a spaced tmpdir
 ```
