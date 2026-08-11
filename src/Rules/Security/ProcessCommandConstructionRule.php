@@ -18,8 +18,8 @@ use PhpParser\Node;
 use PhpParser\Node\Expr;
 
 /**
- * Flags a process command built from request-controlled data - a tainted backtick string, `new Process(...)`,
- * or `Process::fromShellCommandline(...)` - the shape that lets an attacker inject shell commands (RCE).
+ * Flags process command strings built from dynamic data, including request-tainted backticks, Symfony Process
+ * shell entry points, and procedural command functions - shapes that can let an attacker inject commands (RCE).
  *
  * Runs per file over shell-exec expressions and Symfony Process constructors/factories whose command reaches
  * user input. Warning, medium confidence - a request-tainted command is a likely RCE sink, not a certain one.
@@ -30,6 +30,13 @@ final class ProcessCommandConstructionRule implements RuleInterface
      * Stable rule identifier for request-controlled process commands.
      */
     public const ID = 'security.process-command-construction';
+
+    /**
+     * Procedural functions whose first argument is interpreted as a command string.
+     *
+     * @var list<string>
+     */
+    private const PROCEDURAL_COMMAND_SINKS = ['exec', 'passthru', 'popen', 'proc_open', 'shell_exec', 'system'];
 
     /**
      * Describes the process-command-construction rule for the registry and reports.
@@ -50,12 +57,12 @@ final class ProcessCommandConstructionRule implements RuleInterface
     }
 
     /**
-     * Reports each process command built from request-controlled data.
+     * Reports each process command built from request-controlled or directly concatenated data.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
      *
-     * @return list<Finding> - Findings for request-controlled process commands.
+     * @return list<Finding> - Findings for unsafe process command construction.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -65,9 +72,11 @@ final class ProcessCommandConstructionRule implements RuleInterface
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\ShellExec::class) as $shellExec) {
             // Request-controlled data inside a shell string is the injection risk.
             if (SecurityNodeHelper::containsUserInput($shellExec)) {
-                $findings[] = $this->finding($analysisUnit, $shellExec, 'shell-exec');
+                $findings[] = $this->requestControlledFinding($analysisUnit, $shellExec, 'shell-exec');
             }
         }
+
+        $findings = array_merge($findings, $this->proceduralCommandFindings($analysisUnit));
 
         // Check every object construction for a Symfony Process.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\New_::class) as $new) {
@@ -79,7 +88,7 @@ final class ProcessCommandConstructionRule implements RuleInterface
             $firstArg = SecurityNodeHelper::argumentValue($new->args, 0);
             // A request-controlled command argument is the risk.
             if ($firstArg !== null && SecurityNodeHelper::containsUserInput($firstArg)) {
-                $findings[] = $this->finding($analysisUnit, $new, 'symfony-process');
+                $findings[] = $this->requestControlledFinding($analysisUnit, $new, 'symfony-process');
             }
         }
 
@@ -96,7 +105,7 @@ final class ProcessCommandConstructionRule implements RuleInterface
             $firstArg = SecurityNodeHelper::argumentValue($staticCall->args, 0);
             // A request-controlled command line is the risk.
             if ($firstArg !== null && SecurityNodeHelper::containsUserInput($firstArg)) {
-                $findings[] = $this->finding($analysisUnit, $staticCall, 'process-shell-commandline');
+                $findings[] = $this->requestControlledFinding($analysisUnit, $staticCall, 'process-shell-commandline');
             }
         }
 
@@ -104,30 +113,99 @@ final class ProcessCommandConstructionRule implements RuleInterface
     }
 
     /**
-     * Builds the process-command finding.
+     * Reports procedural command APIs whose command argument is assembled dynamically.
      *
-     * @param AnalysisUnit $analysisUnit - Unit being scanned; supplies the display path reported to the reviewer.
-     * @param Node         $node - Tainted sink node whose start line anchors the finding for the reviewer.
-     * @param string       $sink - Sink discriminator (shell-exec, symfony-process, process-shell-commandline)
-     *                                   echoed into the message and metadata so a reviewer sees which construct fired.
+     * @param AnalysisUnit $analysisUnit - Parsed unit containing candidate function calls.
+     *
+     * @return list<Finding> - Findings for known procedural command boundaries.
+     */
+    private function proceduralCommandFindings(AnalysisUnit $analysisUnit): array
+    {
+        $findings = [];
+
+        foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $functionCall) {
+            $functionName = SecurityNodeHelper::globalFunctionName($functionCall);
+            // Only these APIs give the first argument command-string semantics.
+            if ($functionName === null || !in_array($functionName, self::PROCEDURAL_COMMAND_SINKS, true)) {
+                continue;
+            }
+
+            $commandArgument = SecurityNodeHelper::argumentValue($functionCall->args, 0);
+            // Literal commands are static; concatenation or interpolation creates the injection boundary.
+            if ($commandArgument !== null && SecurityNodeHelper::containsConcatOrInterpolation($commandArgument)) {
+                $findings[] = $this->dynamicCommandFinding($analysisUnit, $functionCall, $functionName);
+            }
+        }
+
+        return $findings;
+    }
+
+    /**
+     * Builds a finding backed by request-taint evidence.
+     *
+     * @param AnalysisUnit $analysisUnit - Unit supplying the reported display path.
+     * @param Node         $sinkNode     - Sink node supplying the reported line.
+     * @param string       $sinkName     - Sink discriminator included in the message and metadata.
      *
      * @return Finding - Security finding.
      */
-    private function finding(AnalysisUnit $analysisUnit, Node $node, string $sink): Finding
+    private function requestControlledFinding(AnalysisUnit $analysisUnit, Node $sinkNode, string $sinkName): Finding
     {
-        // Emit a fixed warning: every caller already confirmed the sink carries request-controlled data.
+        return $this->findingForSink(
+            $analysisUnit,
+            $sinkNode,
+            $sinkName,
+            'Process command construction with request-controlled data detected',
+        );
+    }
+
+    /**
+     * Builds a finding backed by direct dynamic construction evidence.
+     *
+     * @param AnalysisUnit $analysisUnit - Unit supplying the reported display path.
+     * @param Node         $sinkNode     - Sink node supplying the reported line.
+     * @param string       $sinkName     - Sink discriminator included in the message and metadata.
+     *
+     * @return Finding - Security finding.
+     */
+    private function dynamicCommandFinding(AnalysisUnit $analysisUnit, Node $sinkNode, string $sinkName): Finding
+    {
+        return $this->findingForSink(
+            $analysisUnit,
+            $sinkNode,
+            $sinkName,
+            'Dynamic process command construction detected',
+        );
+    }
+
+    /**
+     * Builds the shared process-command finding payload.
+     *
+     * @param AnalysisUnit $analysisUnit   - Unit supplying the reported display path.
+     * @param Node         $sinkNode       - Sink node supplying the reported line.
+     * @param string       $sinkName       - Sink discriminator included in the message and metadata.
+     * @param string       $findingSummary - Evidence-specific message prefix.
+     *
+     * @return Finding - Security finding.
+     */
+    private function findingForSink(
+        AnalysisUnit $analysisUnit,
+        Node $sinkNode,
+        string $sinkName,
+        string $findingSummary,
+    ): Finding {
         return new Finding(
             ruleId:      self::ID,
-            message:     sprintf('Process command construction with request-controlled data detected: %s.', $sink),
+            message:     sprintf('%s: %s.', $findingSummary, $sinkName),
             filePath:    $analysisUnit->file->displayPath,
-            line:        $node->getStartLine(),
+            line:        $sinkNode->getStartLine(),
             severity:    Severity::Warning,
             pillar:      Pillar::Security,
             tier:        RuleTier::V01,
             confidence:  Confidence::Medium,
-            remediation: 'Build process arguments from allow-listed values and avoid shell parsing for request-controlled input.',
+            remediation: 'Build process arguments from allow-listed values and avoid shell parsing for dynamic input.',
             metadata:    [
-                'sink' => $sink,
+                'sink' => $sinkName,
             ],
         );
     }

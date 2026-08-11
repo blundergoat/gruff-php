@@ -189,21 +189,17 @@ final class AnalyseCommand extends Command
             $diagnostics,
             $this->filterSourceDiagnostics($sources->diagnostics, $projectRoot, $options, $reviewDiff),
         );
+        $filesDiscovered = count($sources->discovery->files);
+        $diagnostics     = $this->withEmptyAnalysisDiagnostic($diagnostics, $filesDiscovered);
         $mutationAnalysis    = (new MutationAnalysisBuilder())->build(
             $projectRoot,
             $options->mutation,
             $diagnostics,
         );
 
-        // The user asked to fold in mutation testing (`--infection-report` or `--infection-run`), so add its findings - surviving mutants plus any mutation-budget or MSI-regression flags - to the set.
-        if ($mutationAnalysis instanceof MutationAnalysisResult) {
-            $findings = array_merge($findings, (new MutationFindingFactory())->findingsFor($mutationAnalysis));
-        }
+        $findings = $this->withMutationFindings($findings, $mutationAnalysis);
 
-        // A `--diff-vs` review run narrowed with `--changed-only`: drop findings in files that did not change against the base ref.
-        if ($options->diffVs !== null && $options->isChangedOnly && $reviewDiff instanceof DiffResult) {
-            $findings = $findingSupport->filterFindingsToChangedFiles($findings, $reviewDiff->changedFiles);
-        }
+        $findings = $this->findingsForChangedReview($findings, $options, $reviewDiff, $findingSupport);
 
         $suppressedCount = null;
         // A changed-region scope (`--diff`, `--since`, or `--changed-ranges`) is active: keep only findings inside the changed lines and count how many were hidden.
@@ -246,12 +242,8 @@ final class AnalyseCommand extends Command
             reviewDiff:      $reviewDiff,
             diagnostics:     $diagnostics,
         );
-        $trend          = $this->recordTrend(
-            projectRoot:  $projectRoot,
-            options:      $options,
-            score:        $score,
-            findingCount: count($findings),
-            diagnostics:  $diagnostics,
+        $trend = $this->recordTrendWhenFilesDiscovered(
+            $projectRoot, $options, $score, count($findings), $filesDiscovered, $diagnostics,
         );
 
         $newFindings      = $this->newFindingsForGate($findings, $review, $baselineReport);
@@ -267,7 +259,7 @@ final class AnalyseCommand extends Command
             requestedPaths:           $options->paths,
             format:                   $format->value,
             failOn:                   $failThreshold->value,
-            filesDiscovered:          count($sources->discovery->files),
+            filesDiscovered:          $filesDiscovered,
             filesParsed:              $sources->parsedFileCount(),
             ignoredPaths:             $sources->discovery->ignoredPaths,
             ignoredPathDetails:       $sources->discovery->ignoredPathDetails,
@@ -277,7 +269,7 @@ final class AnalyseCommand extends Command
             exitCode:                 $exitCode,
             configPath:               $setup->configPath,
             mutation:                 $mutationAnalysis,
-            score:                    $score,
+            score:                    $this->scoreForDiscoveredFiles($score, $filesDiscovered),
             diff:                     $diff,
             trend:                    $trend,
             baseline:                 $baselineReport,
@@ -718,7 +710,7 @@ final class AnalyseCommand extends Command
      * Decides the process exit code from the run's diagnostics and whether any configured fail-on
      * gate tripped - the number a CI job reads to pass or fail the build.
      *
-     * @param list<RunDiagnostic>                     $diagnostics    - Run diagnostics; any present force INVALID ahead of findings.
+     * @param list<RunDiagnostic>                     $diagnostics    - Run diagnostics; fatal entries force INVALID ahead of findings.
      * @param list<\GruffPhp\Results\Finding\Finding> $findings       - Post-baseline finding set the all-findings gate inspects.
      * @param list<\GruffPhp\Results\Finding\Finding> $newFindings    - Change-introduced subset the new-findings gate inspects.
      * @param FailThresholds                          $failThresholds - Configured gate that decides which findings cause failure.
@@ -728,9 +720,11 @@ final class AnalyseCommand extends Command
      */
     private function resolveExitCode(array $diagnostics, array $findings, array $newFindings, FailThresholds $failThresholds): array
     {
-        // A run diagnostic (a bad diff ref, an unreadable history file) means the scan itself is untrustworthy, so fail as INVALID before weighing findings.
-        if ($diagnostics !== []) {
-            return ['exitCode' => Command::INVALID, 'trip' => null];
+        // Fatal diagnostics mean the scan is untrustworthy; informational diagnostics stay visible without overriding --fail-on semantics.
+        foreach ($diagnostics as $diagnostic) {
+            if ($diagnostic->isFatal) {
+                return ['exitCode' => Command::INVALID, 'trip' => null];
+            }
         }
 
         $trip = $failThresholds->tripsOnScope($findings, $newFindings);
@@ -739,6 +733,82 @@ final class AnalyseCommand extends Command
             'exitCode' => $trip instanceof ThresholdTrip ? Command::FAILURE : Command::SUCCESS,
             'trip'     => $trip,
         ];
+    }
+
+    /**
+     * Adds the non-fatal diagnostic that distinguishes an empty scan from a clean scan.
+     *
+     * @param list<RunDiagnostic> $diagnostics    - Diagnostics already produced by setup and source parsing.
+     * @param int                 $filesDiscovered - Number of PHP files admitted by discovery.
+     *
+     * @return list<RunDiagnostic> - Original diagnostics plus `empty-analysis` when no source evidence exists.
+     */
+    private function withEmptyAnalysisDiagnostic(array $diagnostics, int $filesDiscovered): array
+    {
+        if ($filesDiscovered !== 0) {
+            return $diagnostics;
+        }
+
+        $diagnostics[] = new RunDiagnostic(
+            type:    'empty-analysis',
+            message: 'No scannable PHP files were discovered; the score is not applicable. Check the requested paths and ignore rules.',
+            isFatal: false,
+        );
+
+        return $diagnostics;
+    }
+
+    /**
+     * Adds findings derived from an explicitly requested Infection result.
+     *
+     * @param list<Finding>               $findings        - Rule findings already produced by source analysis.
+     * @param MutationAnalysisResult|null $mutationAnalysis - Parsed Infection result, or null when mutation analysis was not requested.
+     *
+     * @return list<Finding> - Source findings plus escaped-mutant, budget, and MSI-regression findings when available.
+     */
+    private function withMutationFindings(array $findings, ?MutationAnalysisResult $mutationAnalysis): array
+    {
+        if (!$mutationAnalysis instanceof MutationAnalysisResult) {
+            return $findings;
+        }
+
+        return array_merge($findings, (new MutationFindingFactory())->findingsFor($mutationAnalysis));
+    }
+
+    /**
+     * Narrows a changed-only branch review to files present in the reviewed diff.
+     *
+     * @param list<Finding>          $findings       - Findings produced for the current source set.
+     * @param AnalyseCommandOptions  $options        - Effective review and changed-only options.
+     * @param DiffResult|null        $reviewDiff     - Diff against the requested review base.
+     * @param AnalysisFindingSupport $findingSupport - Path matcher shared with other finding filters.
+     *
+     * @return list<Finding> - Changed-file findings for a narrowed review, otherwise the original set.
+     */
+    private function findingsForChangedReview(
+        array $findings,
+        AnalyseCommandOptions $options,
+        ?DiffResult $reviewDiff,
+        AnalysisFindingSupport $findingSupport,
+    ): array {
+        if ($options->diffVs === null || !$options->isChangedOnly || !$reviewDiff instanceof DiffResult) {
+            return $findings;
+        }
+
+        return $findingSupport->filterFindingsToChangedFiles($findings, $reviewDiff->changedFiles);
+    }
+
+    /**
+     * Suppresses the calculator's synthetic score when discovery supplied no source evidence.
+     *
+     * @param ScoreReport $score           - Score calculated for the run's finding set.
+     * @param int         $filesDiscovered - Number of PHP files admitted by discovery.
+     *
+     * @return ScoreReport|null - Calculated score for a real source set, otherwise null.
+     */
+    private function scoreForDiscoveredFiles(ScoreReport $score, int $filesDiscovered): ?ScoreReport
+    {
+        return $filesDiscovered === 0 ? null : $score;
     }
 
     /**
@@ -845,5 +915,33 @@ final class AnalyseCommand extends Command
 
             return null;
         }
+    }
+
+    /**
+     * Records trend data only when discovery produced a score-bearing source set.
+     *
+     * @param string                $projectRoot    - Project root the history file resolves against.
+     * @param AnalyseCommandOptions $options        - Effective CLI options carrying the history-file path.
+     * @param ScoreReport           $score          - Composite score calculated for the run.
+     * @param int                   $findingCount   - Number of findings recorded alongside the score.
+     * @param int                   $filesDiscovered - Number of PHP files admitted by discovery.
+     * @param list<RunDiagnostic>   $diagnostics    - Run diagnostics; a history error is appended in place.
+     *
+     * @return TrendReport|null - Trend entry, or null when no files made the score applicable.
+     */
+    private function recordTrendWhenFilesDiscovered(
+        string $projectRoot,
+        AnalyseCommandOptions $options,
+        ScoreReport $score,
+        int $findingCount,
+        int $filesDiscovered,
+        array &$diagnostics,
+    ): ?TrendReport {
+        // Persisting the calculator's synthetic empty score would pollute later trend comparisons.
+        if ($filesDiscovered === 0) {
+            return null;
+        }
+
+        return $this->recordTrend($projectRoot, $options, $score, $findingCount, $diagnostics);
     }
 }

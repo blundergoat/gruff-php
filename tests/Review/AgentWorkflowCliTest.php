@@ -479,7 +479,7 @@ final class AgentWorkflowCliTest extends TestCase
 
             self::assertSame(0, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
             $report = $this->decodeJson($process);
-            self::assertSame([], $this->diagnosticTypes($report));
+            self::assertSame(['empty-analysis'], $this->diagnosticTypes($report));
 
             $review = $this->arrayValue($report, 'review');
             $counts = $this->arrayValue($review, 'counts');
@@ -504,7 +504,7 @@ final class AgentWorkflowCliTest extends TestCase
 
             self::assertSame(0, $explicitPathProcess->getExitCode(), $explicitPathProcess->getOutput() . $explicitPathProcess->getErrorOutput());
             $explicitPathReport = $this->decodeJson($explicitPathProcess);
-            self::assertSame([], $this->diagnosticTypes($explicitPathReport));
+            self::assertSame(['empty-analysis'], $this->diagnosticTypes($explicitPathReport));
 
             $explicitPathReview = $this->arrayValue($explicitPathReport, 'review');
             $explicitPathCounts = $this->arrayValue($explicitPathReview, 'counts');

@@ -40,6 +40,54 @@ final class MockWithoutExpectationTest extends TestCase
         self::assertSame('ok', $caller->call($service));
     }
 
+    // Negative: each Prophecy prediction/configuration method makes the double intentional.
+    public function testConfiguresPropheciesWithTheirNativeVocabulary(): void
+    {
+        $returningProphecy = $this->prophesize(OrderService::class);
+        $returningProphecy->name()->willReturn('ok');
+
+        $expectedProphecy = $this->prophesize(OrderService::class);
+        $expectedProphecy->name()->shouldBeCalled();
+
+        $singleCallProphecy = $this->prophesize(OrderService::class);
+        $singleCallProphecy->name()->shouldBeCalledOnce();
+
+        $countedProphecy = $this->prophesize(OrderService::class);
+        $countedProphecy->name()->shouldBeCalledTimes(2);
+
+        $observedProphecy = $this->prophesize(OrderService::class);
+        $observedProphecy->name()->shouldHaveBeenCalled();
+
+        $forbiddenProphecy = $this->prophesize(OrderService::class);
+        $forbiddenProphecy->name()->shouldNotHaveBeenCalled();
+
+        $throwingProphecy = $this->prophesize(OrderService::class);
+        $throwingProphecy->name()->willThrow(\RuntimeException::class);
+
+        $callbackProphecy = $this->prophesize(OrderService::class);
+        $callbackProphecy->name()->willReturnCallback(static fn(): string => 'ok');
+
+        self::assertTrue(true);
+    }
+
+    // Negative: comparing reveal() inside an assertion verifies the exposed double identity.
+    public function testAssertsAgainstRevealedProphecy(): void
+    {
+        $assertedProphecy = $this->prophesize(OrderService::class);
+
+        self::assertSame($assertedProphecy->reveal(), (new Caller())->service());
+    }
+
+    // Positive: reveal() passed only to the subject does not configure or verify the prophecy.
+    public function testPassesBareProphecyToSubject(): void
+    {
+        $bareProphecy = $this->prophesize(OrderService::class);
+
+        (new Caller())->call($bareProphecy->reveal());
+
+        self::assertTrue(true);
+    }
+
     // Negative: variable never read at all - that is unused-mock's territory, not this rule's.
     public function testCreatesMockNeverReferenced(): void
     {

@@ -32,6 +32,7 @@ final class AnalyseCliMutationTest extends CliTestCase
             'json',
             '--fail-on',
             'none',
+            '--no-config',
         ], __DIR__ . '/../..');
         $process->run();
 
@@ -85,6 +86,7 @@ final class AnalyseCliMutationTest extends CliTestCase
             'tests/Fixtures/Mutation/Infection/infection-valid.json',
             '--fail-on',
             'none',
+            '--no-config',
         ], __DIR__ . '/../..');
         $process->run();
 
@@ -115,6 +117,7 @@ final class AnalyseCliMutationTest extends CliTestCase
             'markdown',
             '--fail-on',
             'none',
+            '--no-config',
         ], __DIR__ . '/../..');
         $process->run();
 
@@ -149,6 +152,7 @@ final class AnalyseCliMutationTest extends CliTestCase
             'json',
             '--fail-on',
             'none',
+            '--no-config',
         ], __DIR__ . '/../..');
         $process->run();
 
