@@ -31,6 +31,9 @@ final class PropertyCommentFixture
     // Restated property
     public string $restatedProperty = '';
 
+    // Property fillerName
+    public string $fillerName = '';
+
     // Cache
     public array $singleWord = [];
 
@@ -66,6 +69,7 @@ PHP;
             'PropertyCommentFixture::$attached',
             'PropertyCommentFixture::$block',
             'PropertyCommentFixture::$detached',
+            'PropertyCommentFixture::$fillerName',
             'PropertyCommentFixture::$first',
             'PropertyCommentFixture::$generic',
             'PropertyCommentFixture::$hashAttached',
@@ -95,6 +99,7 @@ PHP;
         self::assertSame([
             'PropertyCommentFixture::$block',
             'PropertyCommentFixture::$detached',
+            'PropertyCommentFixture::$fillerName',
             'PropertyCommentFixture::$generic',
             'PropertyCommentFixture::$restatedProperty',
             'PropertyCommentFixture::$singleWord',

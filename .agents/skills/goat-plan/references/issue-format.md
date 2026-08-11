@@ -17,7 +17,7 @@ Write `ISSUE.md` beside the milestones as the GitHub-facing case for the work. I
 - Write for GitHub readers across technical levels using plain language before implementation terminology.
 - Keep every prose paragraph and list item on one physical line; split independent decisions into separate bullets.
 - Why, What, and How bullets contain 10-20 visible words on one physical line.
-- Count after checkbox and Markdown markers but before ` = <agent-time range>`; punctuation adds no words.
+- Count after checkbox and Markdown markers but before `= <agent-time range>`; punctuation adds no words.
 - Omit empty sections; state an absence only when it protects scope, such as “No database changes.”
 - Keep executor-only file paths, parser grammar, commands, and test protocols in milestone files.
 - Preserve stable requirements in What; completion closes verified How tasks instead of rewriting requirements as history.

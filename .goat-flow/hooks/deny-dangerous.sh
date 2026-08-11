@@ -941,13 +941,13 @@ strip_xargs_payload_command() {
         xargs_word_index=$((xargs_word_index + 1))
         break
         ;;
-      -0|--null|-r|--no-run-if-empty|-t|--verbose|-p|--interactive|-x|--exit|--show-limits)
+      -0|--null|-r|--no-run-if-empty|-t|--verbose|-p|--interactive|-x|--exit|--show-limits|-e|-i|-l|--eof|--replace|--max-lines)
         xargs_word_index=$((xargs_word_index + 1))
         continue
         ;;
       # A separated value must be skipped with its option; otherwise the value itself looks like
       # the payload and hides the real command, as `--process-slot-var VAR git push` once did.
-      -a|--arg-file|-I|-i|-L|-l|-n|-P|-s|-E|-e|-d|--replace|--max-lines|--max-args|--max-procs|--max-chars|--eof|--delimiter|--process-slot-var)
+      -a|--arg-file|-I|-L|-n|-P|-s|-E|-d|--max-args|--max-procs|--max-chars|--delimiter|--process-slot-var)
         xargs_word_index=$((xargs_word_index + 2))
         continue
         ;;

@@ -4,8 +4,9 @@ Notable user-facing changes to `gruff-php` are listed here.
 
 ## Unreleased
 
-- **Procedural injection sinks are covered** - SQL and process rules catch direct dynamic calls; SQL follows one same-scope assignment.
+- **Procedural injection sinks are covered** - SQL and process rules resolve named arguments. SQL follows one unambiguous same-scope assignment; `proc_open()` keeps direct argument vectors safe unless they explicitly start a shell command mode.
 - **Security baselines keep existing identities** - Existing messages stay stable; new procedural findings need review or baselining.
+- **Agent-hook parsers close bypasses** - Protected paths stay blocked through curl form headers, xargs optional flags, escaped filenames, mixed-case environment assignments, and multi-batch scans.
 - **Prophecy expectations stay configured** - Native promises, predictions, and asserted `reveal()` values no longer look like bare mocks.
 - **Prophecy baselines shed false positives** - Obsolete groups disappear; remaining messages and `gruffStableIdentity` values stay stable.
 - **Empty scans are unscored** - `analyse` emits an `empty-analysis` diagnostic and omits the score when no PHP files are discovered.

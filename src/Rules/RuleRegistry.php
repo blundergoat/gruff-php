@@ -80,6 +80,8 @@ use GruffPhp\Rules\Security\UnsafeXmlLoadingRule;
 use GruffPhp\Rules\Security\UnsafeUnserializeRule;
 use GruffPhp\Rules\Security\VariableIncludeRule;
 use GruffPhp\Rules\Security\WeakCryptoRule;
+use GruffPhp\Rules\Shared\NodeIndex;
+use GruffPhp\Rules\Size\SubstantiveLineCounter;
 use GruffPhp\Rules\SensitiveData\ApiKeyPatternRule;
 use GruffPhp\Rules\SensitiveData\AwsAccessKeyRule;
 use GruffPhp\Rules\SensitiveData\DatabaseUrlPasswordRule;
@@ -743,6 +745,8 @@ final class RuleRegistry
                 $this->accumulateForUnit($unit, $ruleContext, $ruleRunnerObserver);
             }
             if ($canReleaseUnits) {
+                NodeIndex::evictUnit($unit);
+                SubstantiveLineCounter::evictUnit($unit);
                 $unit->release();
             }
         }

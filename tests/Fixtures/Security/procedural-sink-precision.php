@@ -53,3 +53,25 @@ function runProcessWithArgumentVector(string $target): Symfony\Component\Process
 {
     return new Symfony\Component\Process\Process(['ping', '-c', '1', $target]);
 }
+
+function exerciseNamedProceduralSinks(mysqli $conn, mixed $pgConnection, string $id, string $target): void
+{
+    mysqli_query(query: "SELECT * FROM users WHERE id = '$id'", mysql: $conn);
+    pg_query(query: "SELECT * FROM users WHERE id = '$id'", connection: $pgConnection);
+    exec(result_code: $resultCode, output: $output, command: 'ping -c 1 ' . $target);
+}
+
+function ignoreDestructuredQueryReassignment(mysqli $conn, string $id): void
+{
+    $query = "SELECT * FROM users WHERE id = '$id'";
+    [$query] = ['SELECT * FROM users WHERE active = 1'];
+
+    mysqli_query($conn, $query);
+}
+
+function exerciseProcOpenArgumentVectors(string $target): void
+{
+    proc_open(command: ['ping', '--host=' . $target], descriptor_spec: [], pipes: $directPipes);
+    proc_open(command: ['/bin/sh', '-c', 'ping -c 1 ' . $target], descriptor_spec: [], pipes: $shellPipes);
+    proc_open(command: ['/bin/sh', '-lc', 'ping -c 1 ' . $target], descriptor_spec: [], pipes: $loginShellPipes);
+}

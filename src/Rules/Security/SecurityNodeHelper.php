@@ -96,22 +96,47 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Returns the unwrapped value of a positional call argument by index.
+     * Returns one call argument by its accepted parameter names or positional index.
      *
-     * @param array<int|string, Node\Arg|Node\VariadicPlaceholder> $args - Call argument nodes to inspect.
-     * @param int                                                  $index - Zero-based argument index.
+     * @param array<int|string, Node\Arg|Node\VariadicPlaceholder> $args - Call arguments; an empty list means the
+     *                                                                    caller omitted every parameter.
+     * @param int                                                  $index - Zero-based position among unnamed
+     *                                                                    arguments.
+     * @param list<string>                                         $parameterNames - Accepted named-argument labels;
+     *                                                                    empty keeps positional-only matching.
      *
-     * @return Expr|null - unwrapped argument value at the index, or null when the slot is absent or a variadic spread
+     * @return Expr|null - Argument value, or null when the parameter is absent or represented by a variadic placeholder.
      */
-    public static function argumentValue(array $args, int $index): ?Expr
+    public static function argumentValue(array $args, int $index, array $parameterNames = []): ?Expr
     {
-        $arg = $args[$index] ?? null;
-        // A missing slot or a variadic spread has no plain value to hand back.
-        if (!$arg instanceof Node\Arg) {
-            return null;
+        $acceptedNames = array_fill_keys(array_map(strtolower(...), $parameterNames), true);
+
+        // A named parameter keeps its API meaning even when the caller reorders the source arguments.
+        foreach ($args as $arg) {
+            if (!$arg instanceof Node\Arg || !$arg->name instanceof Identifier) {
+                continue;
+            }
+
+            if (isset($acceptedNames[strtolower($arg->name->toString())])) {
+                return $arg->value;
+            }
         }
 
-        return $arg->value;
+        $positionalIndex = 0;
+        // Named arguments do not consume positional slots, so mixed calls retain the declared parameter order.
+        foreach ($args as $arg) {
+            if (!$arg instanceof Node\Arg || $arg->name instanceof Identifier) {
+                continue;
+            }
+
+            if ($positionalIndex === $index) {
+                return $arg->value;
+            }
+
+            ++$positionalIndex;
+        }
+
+        return null;
     }
 
     /**

@@ -128,14 +128,33 @@ curl_file_reference_touches_secret() {
       ;;
     form)
       local form_value="$curl_option_value"
+      local primary_form_value=""
+      local form_attribute=""
       # A named form field keeps its file marker after the first equals sign.
       if [[ "$form_value" == *=* ]]; then
         form_value="${form_value#*=}"
       fi
-      # Curl form values use either at-file or less-than-file syntax.
-      [[ "$form_value" == @* || "$form_value" == \<* ]] || return 1
-      referenced_file="${form_value:1}"
-      referenced_file="${referenced_file%%;*}"
+      primary_form_value="${form_value%%;*}"
+      # The primary form value uses either at-file or less-than-file syntax.
+      if [[ "$primary_form_value" == @* || "$primary_form_value" == \<* ]]; then
+        referenced_file="${primary_form_value:1}"
+        if [[ -n "$referenced_file" ]] && is_secret_path_touch "$referenced_file"; then
+          return 0
+        fi
+      fi
+
+      # Curl also lets a multipart field load request headers from a second local file.
+      while [[ "$form_value" == *\;* ]]; do
+        form_value="${form_value#*;}"
+        form_attribute="${form_value%%;*}"
+        if [[ "$form_attribute" == headers=@* ]]; then
+          referenced_file="${form_attribute#headers=@}"
+          if [[ -n "$referenced_file" ]] && is_secret_path_touch "$referenced_file"; then
+            return 0
+          fi
+        fi
+      done
+      return 1
       ;;
     direct)
       referenced_file="$curl_option_value"

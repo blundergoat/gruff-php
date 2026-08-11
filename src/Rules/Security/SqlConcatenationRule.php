@@ -45,18 +45,18 @@ final class SqlConcatenationRule implements RuleInterface
     private const QUERY_METHODS = ['exec', 'query', 'raw', 'select'];
 
     /**
-     * Procedural SQL sinks mapped to the positional index carrying the query string.
+     * Procedural SQL sinks mapped to the position and named parameter carrying the query string.
      *
      * pg_query() also accepts the query as its sole argument; sqlArgumentForSink() handles that overload.
      *
-     * @var array<string, int>
+     * @var array<string, array{index: int, names: list<string>}>
      */
-    private const PROCEDURAL_SQL_ARGUMENT_INDEXES = [
-        'mysqli_query' => 1,
-        'pg_query'     => 1,
-        'mysql_query'  => 0,
-        'sqlsrv_query' => 1,
-        'oci_parse'    => 1,
+    private const PROCEDURAL_SQL_ARGUMENTS = [
+        'mysqli_query' => ['index' => 1, 'names' => ['query']],
+        'pg_query'     => ['index' => 1, 'names' => ['query']],
+        'mysql_query'  => ['index' => 0, 'names' => ['query']],
+        'sqlsrv_query' => ['index' => 1, 'names' => ['sql']],
+        'oci_parse'    => ['index' => 1, 'names' => ['sql']],
     ];
 
     /**
@@ -159,17 +159,22 @@ final class SqlConcatenationRule implements RuleInterface
 
         $functionName = SecurityNodeHelper::globalFunctionName($queryCall);
         // Unknown functions cannot safely inherit another API's argument contract.
-        if ($functionName === null || !isset(self::PROCEDURAL_SQL_ARGUMENT_INDEXES[$functionName])) {
+        if ($functionName === null || !isset(self::PROCEDURAL_SQL_ARGUMENTS[$functionName])) {
             return null;
         }
 
-        $sqlArgumentIndex = self::PROCEDURAL_SQL_ARGUMENT_INDEXES[$functionName];
+        $argumentContract = self::PROCEDURAL_SQL_ARGUMENTS[$functionName];
+        $sqlArgument      = SecurityNodeHelper::argumentValue(
+            $queryCall->args,
+            $argumentContract['index'],
+            $argumentContract['names'],
+        );
         // pg_query($query) is the one supported overload whose query occupies position zero.
-        if ($functionName === 'pg_query' && SecurityNodeHelper::argumentValue($queryCall->args, 1) === null) {
-            $sqlArgumentIndex = 0;
+        if ($functionName === 'pg_query' && $sqlArgument === null) {
+            return SecurityNodeHelper::argumentValue($queryCall->args, 0, $argumentContract['names']);
         }
 
-        return SecurityNodeHelper::argumentValue($queryCall->args, $sqlArgumentIndex);
+        return $sqlArgument;
     }
 
     /**
@@ -334,14 +339,45 @@ final class SqlConcatenationRule implements RuleInterface
             }
 
             if (SecurityNodeHelper::enclosingFunctionLike($write) === $sinkScope
-                && $write->var instanceof Expr\Variable
-                && $write->var->name === $queryVariableName
+                && $this->isVariableWrittenByAssignmentTarget($write->var, $queryVariableName)
             ) {
                 $queryWrites[] = $write;
             }
         }
 
         return $queryWrites;
+    }
+
+    /**
+     * Reports whether an assignment target overwrites any part of one local query value.
+     *
+     * @param Expr   $assignmentTarget - Direct, offset, or destructuring target from a preceding write.
+     * @param string $queryVariableName - Local query name without the leading `$`.
+     *
+     * @return bool - True when the write makes one-hop query provenance ambiguous at the sink.
+     */
+    private function isVariableWrittenByAssignmentTarget(Expr $assignmentTarget, string $queryVariableName): bool
+    {
+        // A direct local write replaces the value the procedural sink later consumes.
+        if ($assignmentTarget instanceof Expr\Variable) {
+            return $assignmentTarget->name === $queryVariableName;
+        }
+
+        // Mutating an offset changes the tracked value, even though the outer variable is not the assignment node.
+        if ($assignmentTarget instanceof Expr\ArrayDimFetch) {
+            return $this->isVariableWrittenByAssignmentTarget($assignmentTarget->var, $queryVariableName);
+        }
+
+        // Destructuring can rebind the query local at any nesting depth and therefore ends shallow tracking.
+        if ($assignmentTarget instanceof Expr\List_) {
+            foreach ($assignmentTarget->items as $item) {
+                if ($item !== null && $this->isVariableWrittenByAssignmentTarget($item->value, $queryVariableName)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

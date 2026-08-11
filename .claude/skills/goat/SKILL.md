@@ -35,7 +35,7 @@ Read `.goat-flow/skill-docs/skill-preamble.md` for shared conventions.
    - Only direct-execution snapshots include the retrieval result
 3. **ROUTE (inferred skill or direct-execution only)** - dispatch using the map. Emit a Route Snapshot:
 
-```
+```text
 Intent: <classified user intent>
 Route: </goat-* skill or direct path>
 Depth: <routing depth>

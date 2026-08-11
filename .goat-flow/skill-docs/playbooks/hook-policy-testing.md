@@ -20,14 +20,18 @@ Availability is proven only when the command exits `0` and ends with a `PASS`
 summary for the requested mode:
 
 ```text
-PASS: deny-dangerous self-test (mode=smoke, executed=<count>, skipped=0)
+PASS: deny-dangerous self-test (mode=smoke, executed=<count>, skipped=<count>)
 ```
 
-`<count>` tracks the installed policy corpus, so it differs by project and grows
-as cases are added. Record this project's number as its baseline and compare
-later runs against that, not against any figure quoted here. Cases skip only
-when a hook filter narrows the run, so an unfiltered `skipped=0` with a non-zero
-count is the passing shape.
+The executed count tracks the installed policy corpus, so it differs by project
+and grows as cases are added. Record this project's numbers as its baseline and
+compare later runs against that, not against any figure quoted here. An
+unfiltered run normally reports `skipped=0`. It may report one skip when the
+optional `timeout` executable is unavailable; confirm that absence with
+`command -v timeout`, record the reduced coverage, and do not claim the
+timeout-backed startup case was proved. Any other unfiltered skip is a failed
+availability check. Hook-filtered maintainer runs can skip out-of-filter cases
+by design, but they do not replace the unfiltered installed-policy check.
 
 If the installed hook is absent, stop and repair setup or select the correct
 project. Do not substitute the workflow-source hook as proof that a consumer's

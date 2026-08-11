@@ -67,6 +67,21 @@ final class SubstantiveLineCounter
     }
 
     /**
+     * Drops the cached prefix for a unit whose source is about to be released.
+     *
+     * @param AnalysisUnit $analysisUnit - Unit to remove from the substantive-line cache.
+     *
+     * @return void
+     */
+    public static function evictUnit(AnalysisUnit $analysisUnit): void
+    {
+        // The lightweight unit shell can outlive its source, so remove the source-derived prefix explicitly.
+        if (self::$prefixCache !== null) {
+            unset(self::$prefixCache[$analysisUnit]);
+        }
+    }
+
+    /**
      * Builds and memoises cumulative substantive-line counts for one unit.
      *
      * Prefix index zero is always zero; index N stores the substantive count through source line N.
@@ -129,5 +144,4 @@ final class SubstantiveLineCounter
 
         return explode("\n", $masked);
     }
-
 }

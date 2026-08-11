@@ -8,7 +8,7 @@
 
 ## Context
 
-The family contract leaves two severity forks open. `/home/devgoat/projects/gruff-workspace/FAMILY-CONTRACT.md` §12 names PHP's `sensitive-data.*` warnings versus Go, Rust, and TypeScript errors. It also records the wider split between Go's advisory-heavy security model, PHP and Rust's uniform warnings, and TypeScript's selected errors.
+The family contract leaves two severity forks open. `<workspace>/FAMILY-CONTRACT.md` §12 names PHP's `sensitive-data.*` warnings versus Go, Rust, and TypeScript errors. It also records the wider split between Go's advisory-heavy security model, PHP and Rust's uniform warnings, and TypeScript's selected errors.
 
 PHP currently reports every `security.*` and `sensitive-data.*` finding at warning or below, while `docs.missing-public-phpdoc` is an error. This ordering matters at an error-threshold gate. The shipped `analyse` default remains advisory, so the current ordering does not make a default scan pass security findings. Operators can, however, select `--fail-on=error` or configure an error minimum.
 
@@ -32,19 +32,19 @@ Ratification belongs in the family contract. A port-local ADR may carry the evid
 
 ## Measurement method and provenance
 
-The scan used `gruff-php 0.5.2` at `278faef9de606298dc161f06f24fd7d29fcf7696` plus the procedural-sink and Prophecy rule fixes delivered with this ADR. The analyzer-source patch used for the replay had SHA-256 `62902f9580794c41ad4c599d2461b08a83c7997c8fbf406d536c88770e94c34f`.
+The 2026-08-12 replay used the immutable gruff-php PR head `c202c771a76ec50bb5e26d88f7664008288305c2` plus the uncommitted analyzer-source delta under review. The complete `src/` delta used for the replay had SHA-256 `6d80163c4e0c0a25004a7ec77e9478f0b90d8ed606488d02ea186923ae40edb3`.
 
 Each target ran from an empty external directory so target-local config could not alter policy:
 
 ```bash
-php /home/devgoat/projects/gruff-workspace/gruff-php/bin/gruff-php analyse \
+php <workspace>/gruff-php/bin/gruff-php analyse \
   --no-config --no-cache --fail-on=none --format=json \
-  /home/devgoat/projects/gruff-workspace/test-scan-repos/php/<repo>
+  <workspace>/test-scan-repos/php/<repo>
 ```
 
-The replay changed only selected finding severities, then recalculated summary counts and scores with the production weights and rounding. The helper was `/home/devgoat/projects/gruff-workspace/gruff-php-corpus-runner/calibrated-severity-options.jq`, SHA-256 `4d98d2bd835fa03d127fc34a0629754dc34694e2178ca8da9384269370556a84`.
+The replay changed only selected finding severities, then recalculated summary counts and scores with the production weights and rounding. `<workspace>/gruff-php-corpus-runner/calibrated-severity-options.jq`, SHA-256 `4d98d2bd835fa03d127fc34a0629754dc34694e2178ca8da9384269370556a84`, modelled the sensitive-data and PHPDoc scenarios. `<workspace>/gruff-php-corpus-runner/severity-options.jq`, SHA-256 `da4dd432f4bcee94e8364193e1c284c88e8ad27013df4800e9a389cb75c9ce8d`, modelled the blanket-security scenarios.
 
-The scan JSON was streamed into the aggregation and was not retained as a durable artifact. The base and corpus revisions are immutable, but the working-tree patch is represented only by a digest until the operator commits it. These measurements support the deferral; they are not sufficient provenance for a future severity implementation. Before proposing one, rerun from an immutable analyzer revision and retain the normalized per-rule result artifact with the family decision package.
+The scan JSON was streamed into the aggregation and was not retained as a durable artifact. The committed analyzer head and corpus revisions are immutable, but the working-tree analyzer delta is represented only by a digest until the operator commits it. These measurements support the deferral; they are not sufficient provenance for a future severity implementation. Before proposing one, rerun from an immutable analyzer revision and retain the normalized per-rule result artifact with the family decision package.
 
 The target revisions were:
 

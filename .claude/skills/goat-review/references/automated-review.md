@@ -85,7 +85,7 @@ Report both deltas explicitly: "Automated findings the local review missed" list
 
 Extend the Review Integrity surface defined in SKILL.md with this line when in PR mode:
 
-```
+```text
 - Automated-review provenance: overlap-confirmed=<K>, local-only=<L>, bot-only-locally-verified=<B>, disputed-match=<D>; automated findings the local review missed: <IDs|none>; local findings every bot missed: <R-IDs|none>
 ```
 

@@ -510,6 +510,36 @@ API_TOKEN_RE='sk-[A-Za-z0-9][A-Za-z0-9_-]{31,}'
 PRIVATE_KEY_RE='-----BEGIN[[:space:]](RSA[[:space:]]|DSA[[:space:]]|EC[[:space:]]|OPENSSH[[:space:]])?PRIVATE[[:space:]]KEY-----'
 PLACEHOLDER_ALL_X_RE='^(gh[pousr]_|github_pat_|npm_|sk-)?x+$'
 PLACEHOLDER_MARKER_RE='(^|[_-])(example|placeholder|changeme|change-me|change_me|dummy|fake|sample|test|redacted|xxxx|your-token|your_token|your-key|your_key|your-api-key|your_api_key|not-a-secret)([_-]|$)'
+CREDENTIAL_ASSIGNMENT_RE='^[[:space:]]*(([eE][xX][pP][oO][rR][tT]|[aA][rR][gG]|[eE][nN][vV])[[:space:]]+)?([A-Za-z_][A-Za-z0-9_-]*)[[:space:]]*[:=][[:space:]]*(.*)$'
+
+# Exclude normalized labels that describe credential metadata rather than credentials.
+is_excluded_credential_key() {
+  local key="$1"
+  case "$key" in
+    tokens | *tokens | tokenizer | tokeniser | tokenize | *tokenizer* | *tokeniser* | *tokenize* | *_count | *_index | *_id | *_name | *_type | *_header | *_url | *_path | *_list | *_re | *_pattern | *_field)
+      return 0
+      ;;
+    *not_secret | *not_a_secret | *non_secret | *no_secret | *not_token | *not_a_token | *non_token | *no_token | *not_password | *not_a_password | *non_password | *no_password | *not_api_key | *not_an_api_key | *non_api_key | *no_api_key | *not_private_key | *not_a_private_key | *non_private_key | *no_private_key)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+# Recognize one already-normalized credential label for both scanner implementations.
+is_normalized_credential_key() {
+  local key="$1"
+  is_excluded_credential_key "$key" && return 1
+  case "$key" in
+    token | secret | secrets | password | passwords | api_key | apikey | private_key | access_token | auth_token | refresh_token | bearer_token | client_secret | client_secrets | secret_key | secret_keys)
+      return 0
+      ;;
+    *_api_key | *_apikey | *_private_key | *_access_token | *_auth_token | *_refresh_token | *_bearer_token | *_client_secret | *_client_secrets | *_secret_key | *_secret_keys | *_password | *_passwords | *_token | *_secret | *_secrets)
+      return 0
+      ;;
+  esac
+  return 1
+}
 
 # Recognize varied literal values so ordinary words do not interrupt the user's turn.
 has_credential_entropy() {
@@ -607,8 +637,22 @@ fallback_trim() {
   FALLBACK_TRIMMED="${FALLBACK_TRIMMED%%+([[:space:]])}"
 }
 
-# Normalize a credential label so equivalent UI/config naming styles get one decision.
-fallback_normalize_key() {
+# Adapt portable trimming to the shared credential classifier.
+# shellcheck disable=SC2317 # Shared policy invokes this adapter before the native path replaces it.
+classifier_trim_text() {
+  fallback_trim "$1"
+  CREDENTIAL_CLASSIFIER_TEXT="$FALLBACK_TRIMMED"
+}
+
+# Adapt portable lowercasing to the shared credential classifier.
+# shellcheck disable=SC2317 # Shared policy invokes this adapter before the native path replaces it.
+classifier_lower_text() {
+  fallback_lower "$1" || return 1
+  CREDENTIAL_CLASSIFIER_TEXT="$FALLBACK_LOWER"
+}
+
+# Normalize a credential label once for both scanner implementations.
+normalize_credential_key() {
   local raw="$1"
   local first=""
   local second=""
@@ -642,8 +686,14 @@ fallback_normalize_key() {
     i=$((i + 1))
   done
 
-  fallback_lower "$second" || return 1
-  FALLBACK_NORMALIZED_KEY="${FALLBACK_LOWER//-/_}"
+  classifier_lower_text "$second" || return 1
+  NORMALIZED_KEY="${CREDENTIAL_CLASSIFIER_TEXT//-/_}"
+}
+
+# Recognize credential labels across common config naming styles.
+is_credential_key() {
+  normalize_credential_key "$1" || return 1
+  is_normalized_credential_key "$NORMALIZED_KEY"
 }
 
 # Emit one compatibility finding per family and path without repeating user guidance.
@@ -666,14 +716,14 @@ $path|$family
   fi
 }
 
-# Keep documented placeholder values usable in examples and setup screens.
-fallback_is_placeholder() {
+# Keep documented placeholder values usable in examples and setup screens on either scanner.
+is_placeholder_token() {
   local value
   # Normalization failure is already incomplete, so do not add a speculative secret finding.
-  if ! fallback_lower "$1"; then
+  if ! classifier_lower_text "$1"; then
     return 0
   fi
-  value="$FALLBACK_LOWER"
+  value="$CREDENTIAL_CLASSIFIER_TEXT"
   case "$value" in
     "" | akiaiosfodnn7example | asiaiosfodnn7example)
       return 0
@@ -694,8 +744,8 @@ suffix_ends_assignment() {
     # A bare statement terminator, as in `export TOKEN="abc123";`.
     ";") return 0 ;;
     ";"*)
-      fallback_trim "${1#;}"
-      after_terminator="$FALLBACK_TRIMMED"
+      classifier_trim_text "${1#;}"
+      after_terminator="$CREDENTIAL_CLASSIFIER_TEXT"
       # Only spacing or a trailing comment after the semicolon, still one value.
       case "$after_terminator" in
         "" | \#*) return 0 ;;
@@ -736,9 +786,9 @@ fallback_is_dockerfile_path() {
   return 1
 }
 
-# Extracts the literal a stock macOS user placed in a credential assignment.
-# Sets FALLBACK_LITERAL_VALUE on success; references and expressions stay allowed.
-fallback_literal_assignment_value() {
+# Extract one literal credential value under the policy shared by both scanners.
+# Sets LITERAL_VALUE on success; references and expressions stay allowed.
+literal_assignment_value() {
   local dotted_identifier_re
   local literal_value
   local operator_expression_re
@@ -750,9 +800,9 @@ fallback_literal_assignment_value() {
   local value_first_segment
   local value_first_segment_lower
 
-  FALLBACK_LITERAL_VALUE=""
-  fallback_trim "$1"
-  raw_assignment_value="$FALLBACK_TRIMMED"
+  LITERAL_VALUE=""
+  classifier_trim_text "$1"
+  raw_assignment_value="$CREDENTIAL_CLASSIFIER_TEXT"
   # Keep language-formatted strings in the allowed expression path.
   case "$raw_assignment_value" in
     [fF]\"* | [fF]\'* | [fF][rR]\"* | [fF][rR]\'* | [rR][fF]\"* | [rR][fF]\'*)
@@ -774,11 +824,11 @@ fallback_literal_assignment_value() {
       # References stay allowed because they do not embed a credential.
       is_reference_or_interpolation "$literal_value" && return 1
       text_after_closing_quote="${text_after_opening_quote#*\"}"
-      fallback_trim "$text_after_closing_quote"
-      text_after_closing_quote="$FALLBACK_TRIMMED"
+      classifier_trim_text "$text_after_closing_quote"
+      text_after_closing_quote="$CREDENTIAL_CLASSIFIER_TEXT"
       # Only an assignment-ending suffix may follow the closing quote.
       suffix_ends_assignment "$text_after_closing_quote" || return 1
-      FALLBACK_LITERAL_VALUE="$literal_value"
+      LITERAL_VALUE="$literal_value"
       return 0
       ;;
     \'*)
@@ -791,19 +841,19 @@ fallback_literal_assignment_value() {
       # References stay allowed because they do not embed a credential.
       is_reference_or_interpolation "$literal_value" && return 1
       text_after_closing_quote="${text_after_opening_quote#*\'}"
-      fallback_trim "$text_after_closing_quote"
-      text_after_closing_quote="$FALLBACK_TRIMMED"
+      classifier_trim_text "$text_after_closing_quote"
+      text_after_closing_quote="$CREDENTIAL_CLASSIFIER_TEXT"
       # Only an assignment-ending suffix may follow the closing quote.
       suffix_ends_assignment "$text_after_closing_quote" || return 1
-      FALLBACK_LITERAL_VALUE="$literal_value"
+      LITERAL_VALUE="$literal_value"
       return 0
       ;;
   esac
 
   # Remove a trailing user comment before classifying an unquoted value.
   unquoted_assignment_value="${raw_assignment_value%%#*}"
-  fallback_trim "$unquoted_assignment_value"
-  unquoted_assignment_value="$FALLBACK_TRIMMED"
+  classifier_trim_text "$unquoted_assignment_value"
+  unquoted_assignment_value="$CREDENTIAL_CLASSIFIER_TEXT"
   # An empty value gives the user no credential to rotate.
   [ -n "$unquoted_assignment_value" ] || return 1
   # Expression punctuation keeps ordinary code out of credential warnings.
@@ -820,8 +870,8 @@ fallback_literal_assignment_value() {
   # Dotted config references stay allowed unless their first segment is token-like.
   if [[ "$unquoted_assignment_value" =~ $dotted_identifier_re ]]; then
     value_first_segment="${unquoted_assignment_value%%.*}"
-    fallback_lower "$value_first_segment" || return 1
-    value_first_segment_lower="$FALLBACK_LOWER"
+    classifier_lower_text "$value_first_segment" || return 1
+    value_first_segment_lower="$CREDENTIAL_CLASSIFIER_TEXT"
     case "$value_first_segment_lower" in
       app | application | cfg | conf | config | configs | configuration | constant | constants | context | credentials | credential | creds | ctx | default | defaults | env | environ | environment | os | process | self | setting | settings | this)
         return 1
@@ -844,7 +894,7 @@ fallback_literal_assignment_value() {
   fi
   # Require enough character variety to avoid warning on ordinary words.
   has_credential_entropy "$unquoted_assignment_value" || return 1
-  FALLBACK_LITERAL_VALUE="$unquoted_assignment_value"
+  LITERAL_VALUE="$unquoted_assignment_value"
   return 0
 }
 
@@ -855,29 +905,17 @@ fallback_scan_literal_assignment() {
   local credential_key_text="$2"
   local assignment_value_text="$3"
   local literal_value
-  local normalized_credential_key
 
-  # An unnormalizable label cannot safely become a user-facing credential family.
-  if ! fallback_normalize_key "$credential_key_text"; then
-    return 0
-  fi
-  normalized_credential_key="$FALLBACK_NORMALIZED_KEY"
-  case "$normalized_credential_key" in
-    tokens | *tokens | tokenizer | tokeniser | tokenize | *tokenizer* | *tokeniser* | *tokenize* | *_count | *_index | *_id | *_name | *_type | *_header | *_url | *_path | *_list | *_re | *_pattern | *_field | *not_secret | *not_a_secret | *non_secret | *no_secret | *not_token | *not_a_token | *non_token | *no_token | *not_password | *not_a_password | *non_password | *no_password | *not_api_key | *not_an_api_key | *non_api_key | *no_api_key | *not_private_key | *not_a_private_key | *non_private_key | *no_private_key)
-      return 0
-      ;;
-    token | secret | secrets | password | passwords | api_key | apikey | private_key | access_token | auth_token | refresh_token | bearer_token | client_secret | client_secrets | secret_key | secret_keys | *_api_key | *_apikey | *_private_key | *_access_token | *_auth_token | *_refresh_token | *_bearer_token | *_client_secret | *_client_secrets | *_secret_key | *_secret_keys | *_password | *_passwords | *_token | *_secret | *_secrets)
-      ;;
-    *) return 0 ;;
-  esac
+  # An unnormalizable or non-credential label cannot become a user-facing credential family.
+  is_credential_key "$credential_key_text" || return 0
 
   # Parse only embedded literals; references remain safe for the user.
-  fallback_literal_assignment_value "$assignment_value_text" || return 0
-  literal_value="$FALLBACK_LITERAL_VALUE"
+  literal_assignment_value "$assignment_value_text" || return 0
+  literal_value="$LITERAL_VALUE"
   # Short values are not credential-shaped enough to interrupt the turn.
   [ "${#literal_value}" -ge 12 ] || return 0
   # Documented placeholders stay usable in examples and setup screens.
-  fallback_is_placeholder "$literal_value" && return 0
+  is_placeholder_token "$literal_value" && return 0
   fallback_report "$changed_file_path" "credential assignment ($credential_key_text)"
 }
 
@@ -885,13 +923,11 @@ fallback_scan_literal_assignment() {
 fallback_scan_assignment() {
   local path="$1"
   local line="$2"
-  local assignment_re='^[[:space:]]*(export[[:space:]]+)?([A-Za-z_][A-Za-z0-9_-]*)[[:space:]]*[:=][[:space:]]*(.+)$'
-
   case "$line" in
     [Ee][Nn][Vv]\ * | [Aa][Rr][Gg]\ *) line="${line#* }" ;;
   esac
-  [[ "$line" =~ $assignment_re ]] || return 0
-  fallback_scan_literal_assignment "$path" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}"
+  [[ "$line" =~ $CREDENTIAL_ASSIGNMENT_RE ]] || return 0
+  fallback_scan_literal_assignment "$path" "${BASH_REMATCH[3]}" "${BASH_REMATCH[4]}"
 }
 
 # Scan Docker ARG and ENV forms so container users receive the same secret warning.
@@ -996,37 +1032,37 @@ fallback_scan_line() {
   # A changed AWS-shaped value tells the user which credential family to rotate.
   if [[ "$line" =~ $AWS_TOKEN_RE ]]; then
     token="${BASH_REMATCH[0]}"
-    fallback_is_placeholder "$token" || fallback_report "$path" "AWS access key"
+    is_placeholder_token "$token" || fallback_report "$path" "AWS access key"
   fi
   # Both legacy and fine-grained GitHub tokens share one user-facing family.
   if [[ "$line" =~ $GITHUB_LEGACY_TOKEN_RE ]]; then
     token="${BASH_REMATCH[0]}"
-    fallback_is_placeholder "$token" || fallback_report "$path" "GitHub token"
+    is_placeholder_token "$token" || fallback_report "$path" "GitHub token"
   # Fine-grained GitHub tokens use a different current provider prefix.
   elif [[ "$line" =~ $GITHUB_FINE_GRAINED_TOKEN_RE ]]; then
     token="${BASH_REMATCH[0]}"
-    fallback_is_placeholder "$token" || fallback_report "$path" "GitHub token"
+    is_placeholder_token "$token" || fallback_report "$path" "GitHub token"
   fi
   # A changed npm token tells the user which registry credential to rotate.
   if [[ "$line" =~ $NPM_TOKEN_RE ]]; then
     token="${BASH_REMATCH[0]}"
-    fallback_is_placeholder "$token" || fallback_report "$path" "npm token"
+    is_placeholder_token "$token" || fallback_report "$path" "npm token"
   fi
   # A changed Slack token tells the user which workspace credential to rotate.
   if [[ "$line" =~ $SLACK_TOKEN_RE ]]; then
     token="${BASH_REMATCH[0]}"
-    fallback_is_placeholder "$token" || fallback_report "$path" "Slack token"
+    is_placeholder_token "$token" || fallback_report "$path" "Slack token"
   fi
   # A labelled provider token takes priority so it is reported only once.
   if [[ "$line" =~ (OPENAI|ANTHROPIC|API_KEY|TOKEN).*($API_TOKEN_RE) ]]; then
     token="${BASH_REMATCH[2]}"
-    fallback_is_placeholder "$token" || fallback_report "$path" "API token"
+    is_placeholder_token "$token" || fallback_report "$path" "API token"
     api_token_reported=1
   fi
   # A bare provider token still blocks when no nearby label was present.
   if [ "$api_token_reported" -eq 0 ] && [[ "$line" =~ (^|[^A-Za-z0-9_])($API_TOKEN_RE)([^A-Za-z0-9_]|$) ]]; then
     token="${BASH_REMATCH[2]}"
-    fallback_is_placeholder "$token" || fallback_report "$path" "API token"
+    is_placeholder_token "$token" || fallback_report "$path" "API token"
   fi
   # A private-key header means the changed file can expose a complete key block.
   if [[ "$line" =~ $PRIVATE_KEY_RE ]]; then
@@ -1063,6 +1099,7 @@ fallback_decode_diff_path() {
   # An empty destination cannot identify the file the user needs to inspect.
   [ -n "$encoded_path" ] || return 1
   # Bash's builtin printf understands Git's octal and escaped-quote notation.
+  encoded_path="${encoded_path//\\\"/\"}"
   printf -v FALLBACK_DIFF_PATH '%b' "$encoded_path" || return 1
   # A decoded empty name still cannot receive a trustworthy finding.
   [ -n "$FALLBACK_DIFF_PATH" ]
@@ -1240,10 +1277,15 @@ fallback_scan_file() {
 # Exercise clean, finding, incomplete, and compatibility outcomes from the installed hook.
 # Users run this after install or upgrade to confirm both scanner paths are operational.
 post_turn_self_test() (
+  local candidate_index
+  local candidate_name
   local hook_result
+  local hook_output
+  local quoted_fixture_path='quoted"name.cfg'
   local scanner_setting
   local self_test_root
   local self_test_script="${BASH_SOURCE[0]}"
+  local synthetic_assignment_secret="Ab3dEf5hIj7lMn9p"
   local synthetic_aws_token="AKIA${POST_TURN_SELF_TEST_TOKEN_SUFFIX:-1234567890ABCDEF}"
 
   # A relative invocation must remain callable after the fixture changes working directory.
@@ -1262,7 +1304,8 @@ post_turn_self_test() (
   # Fixture setup must create a real baseline before any user outcome is asserted.
   if ! git -C "$self_test_root" init -q >/dev/null 2>&1 || \
     ! printf '# post-turn safety self-test\n' >"$self_test_root/README.md" || \
-    ! git -C "$self_test_root" add README.md >/dev/null 2>&1 || \
+    ! printf 'API_KEY=your_api_key_here\n' >"$self_test_root/$quoted_fixture_path" || \
+    ! git -C "$self_test_root" add -- README.md "$quoted_fixture_path" >/dev/null 2>&1 || \
     ! git -C "$self_test_root" -c user.name=goat-flow-self-test \
       -c user.email=goat-flow-self-test@example.invalid commit -qm initial >/dev/null 2>&1; then
     printf 'post-turn-safety self-test: fixture setup failed\n' >&2
@@ -1274,7 +1317,7 @@ post_turn_self_test() (
     return 2
   fi
 
-  # Native and Bash 3 compatibility users must see the same three result classes.
+  # Native and Bash 3 compatibility users must see the same decisions and result classes.
   for scanner_setting in 0 1; do
     printf 'API_KEY=your_api_key_here\n' >"$self_test_root/settings.env"
     GOAT_FLOW_POST_TURN_SAFETY_FORCE_BASH3_FALLBACK="$scanner_setting" \
@@ -1285,6 +1328,45 @@ post_turn_self_test() (
       printf 'post-turn-safety self-test: clean case failed on scanner %s\n' "$scanner_setting" >&2
       return 2
     fi
+
+    printf 'EXPORT API_KEY=%s\n' "$synthetic_assignment_secret" >"$self_test_root/settings.env"
+    GOAT_FLOW_POST_TURN_SAFETY_FORCE_BASH3_FALLBACK="$scanner_setting" \
+      bash "$self_test_script" </dev/null >/dev/null 2>&1
+    hook_result=$?
+    # Assignment prefixes must not create a compatibility-path bypass.
+    if [ "$hook_result" -ne 2 ]; then
+      printf 'post-turn-safety self-test: uppercase export case failed on scanner %s\n' "$scanner_setting" >&2
+      return 2
+    fi
+
+    printf 'API_KEY=your_api_key_here\n' >"$self_test_root/settings.env"
+    printf 'API_KEY=%s\n' "$synthetic_assignment_secret" >"$self_test_root/$quoted_fixture_path"
+    hook_output="$(GOAT_FLOW_POST_TURN_SAFETY_FORCE_BASH3_FALLBACK="$scanner_setting" \
+      bash "$self_test_script" </dev/null 2>&1)"
+    hook_result=$?
+    # A quoted Git header must decode to the actual user-visible path on both scanners.
+    if [ "$hook_result" -ne 2 ] || [[ "$hook_output" != *"$quoted_fixture_path"* ]]; then
+      printf 'post-turn-safety self-test: quoted path case failed on scanner %s\n' "$scanner_setting" >&2
+      return 2
+    fi
+    printf 'API_KEY=your_api_key_here\n' >"$self_test_root/$quoted_fixture_path"
+
+    candidate_index=1
+    while [ "$candidate_index" -le 65 ]; do
+      printf -v candidate_name 'candidate-%03d.cfg' "$candidate_index"
+      printf 'API_KEY=your_api_key_here\n' >"$self_test_root/$candidate_name"
+      candidate_index=$((candidate_index + 1))
+    done
+    printf 'API_KEY=%s\n' "$synthetic_assignment_secret" >"$self_test_root/candidate-065.cfg"
+    GOAT_FLOW_POST_TURN_SAFETY_FORCE_BASH3_FALLBACK="$scanner_setting" \
+      bash "$self_test_script" </dev/null >/dev/null 2>&1
+    hook_result=$?
+    # The first file beyond the native batch boundary must still receive config-stem scanning.
+    if [ "$hook_result" -ne 2 ]; then
+      printf 'post-turn-safety self-test: cross-chunk case failed on scanner %s\n' "$scanner_setting" >&2
+      return 2
+    fi
+    rm -f -- "$self_test_root"/candidate-*.cfg
 
     printf 'AWS_ACCESS_KEY_ID=%s\n' "$synthetic_aws_token" >"$self_test_root/settings.env"
     GOAT_FLOW_POST_TURN_SAFETY_FORCE_BASH3_FALLBACK="$scanner_setting" \
@@ -1567,77 +1649,15 @@ strip_space() {
   STRIPPED="${STRIPPED%%+([[:space:]])}"
 }
 
-# Keep documented placeholder values usable in examples and setup screens.
-is_placeholder_token() {
-  local value
-  value="${1,,}"
-  case "$value" in
-    "" | akiaiosfodnn7example | asiaiosfodnn7example)
-      return 0
-      ;;
-  esac
-  [[ "$value" =~ $PLACEHOLDER_ALL_X_RE ]] && return 0
-  [[ "$value" =~ $PLACEHOLDER_MARKER_RE ]]
+# Replace only the compatibility mechanics; the credential decisions above stay shared.
+classifier_trim_text() {
+  strip_space "$1"
+  CREDENTIAL_CLASSIFIER_TEXT="$STRIPPED"
 }
 
-# Exclude labels such as token counts or secret names that do not hold credentials.
-is_excluded_credential_key() {
-  local key="$1"
-  case "$key" in
-    tokens | *tokens | tokenizer | tokeniser | tokenize | *tokenizer* | *tokeniser* | *tokenize* | *_count | *_index | *_id | *_name | *_type | *_header | *_url | *_path | *_list | *_re | *_pattern | *_field)
-      return 0
-      ;;
-    *not_secret | *not_a_secret | *non_secret | *no_secret | *not_token | *not_a_token | *non_token | *no_token | *not_password | *not_a_password | *non_password | *no_password | *not_api_key | *not_an_api_key | *non_api_key | *no_api_key | *not_private_key | *not_a_private_key | *non_private_key | *no_private_key)
-      return 0
-      ;;
-  esac
-  return 1
-}
-
-# Normalize credential labels so camelCase and kebab-case receive the same verdict.
-# This keeps user feedback consistent across common config styles.
-# $1 is the label; sets NORMALIZED_KEY, which is empty only when the input is empty.
-normalize_credential_key() {
-  local raw="$1" first="" second="" c i n
-  n=${#raw}
-  # Walk the original label so camelCase boundaries become visible to the classifier.
-  for ((i = 0; i < n; i++)); do
-    c=${raw:i:1}
-    # A lowercase-to-uppercase boundary starts a new credential-label word.
-    if ((i > 0)) && [[ ${raw:i-1:1} == [[:lower:][:digit:]] && $c == [[:upper:]] ]]; then
-      first+="_"
-    fi
-    first+="$c"
-  done
-  n=${#first}
-  # Walk the intermediate label so acronym endings also become separate words.
-  for ((i = 0; i < n; i++)); do
-    c=${first:i:1}
-    # The last capital before lowercase text starts the next readable word.
-    if ((i > 0 && i + 1 < n)) && [[ ${first:i-1:1} == [[:upper:]] && $c == [[:upper:]] && ${first:i+1:1} == [[:lower:]] ]]; then
-      second+="_"
-    fi
-    second+="$c"
-  done
-  second="${second,,}"
-  NORMALIZED_KEY="${second//-/_}"
-}
-
-# Recognize credential labels across common config naming styles.
-is_credential_key() {
-  local key
-  normalize_credential_key "$1"
-  key="$NORMALIZED_KEY"
-  is_excluded_credential_key "$key" && return 1
-  case "$key" in
-    token | secret | secrets | password | passwords | api_key | apikey | private_key | access_token | auth_token | refresh_token | bearer_token | client_secret | client_secrets | secret_key | secret_keys)
-      return 0
-      ;;
-    *_api_key | *_apikey | *_private_key | *_access_token | *_auth_token | *_refresh_token | *_bearer_token | *_client_secret | *_client_secrets | *_secret_key | *_secret_keys | *_password | *_passwords | *_token | *_secret | *_secrets)
-      return 0
-      ;;
-  esac
-  return 1
+# Lowercase without a subprocess on the native scanner's per-line path.
+classifier_lower_text() {
+  CREDENTIAL_CLASSIFIER_TEXT="${1,,}"
 }
 
 # Warn when one changed config assignment embeds a literal credential the user can rotate.
@@ -1727,107 +1747,6 @@ scan_dockerfile_assignment() {
   scan_literal_credential_assignment "$path" "$key" "$raw_value"
 }
 
-# Extracts a literal secret-looking value from an assignment right-hand side.
-# On success sets LITERAL_VALUE and returns 0; returns 1 when the value is a
-# reference, expression, identifier, or otherwise not a literal credential.
-literal_assignment_value() {
-  local after
-  local bare
-  local dotted_identifier_re
-  local first_segment
-  local first_segment_lower
-  local operator_expression_re
-  local raw
-  local rest
-  local value
-
-  LITERAL_VALUE=""
-  strip_space "$1"
-  raw="$STRIPPED"
-  case "$raw" in
-    [fF]\"* | [fF]\'* | [fF][rR]\"* | [fF][rR]\'* | [rR][fF]\"* | [rR][fF]\'*)
-      return 1
-      ;;
-  esac
-
-  case "${raw:0:1}" in
-    '"')
-      rest="${raw:1}"
-      [[ "$rest" == *\"* ]] || return 1
-      value="${rest%%\"*}"
-      case "$value" in
-        *[[:space:]]* | *'$'*) return 1 ;;
-      esac
-      is_reference_or_interpolation "$value" && return 1
-      after="${rest#*\"}"
-      strip_space "$after"
-      after="$STRIPPED"
-      # Only an assignment-ending suffix may follow the closing quote.
-      suffix_ends_assignment "$after" || return 1
-      LITERAL_VALUE="$value"
-      return 0
-      ;;
-    "'")
-      rest="${raw:1}"
-      [[ "$rest" == *"'"* ]] || return 1
-      value="${rest%%\'*}"
-      case "$value" in
-        *[[:space:]]*) return 1 ;;
-      esac
-      is_reference_or_interpolation "$value" && return 1
-      after="${rest#*\'}"
-      strip_space "$after"
-      after="$STRIPPED"
-      # Only an assignment-ending suffix may follow the closing quote.
-      suffix_ends_assignment "$after" || return 1
-      LITERAL_VALUE="$value"
-      return 0
-      ;;
-  esac
-
-  bare="${raw%%#*}"
-  strip_space "$bare"
-  bare="$STRIPPED"
-  # An empty assignment gives the user no credential to rotate.
-  [ -n "$bare" ] || return 1
-  case "$bare" in
-    *[[:space:]]* | *"("* | *")"* | *"["* | *"]"* | *"{"* | *"}"* | *","* | *";"* | *"<"* | *">"* | *"|"* | *"&"* | *'`'* | *'$'*)
-      return 1
-      ;;
-  esac
-  # A simple lowercase identifier is a runtime reference, not an embedded user secret.
-  if [[ "$bare" =~ ^[a-z_][a-z0-9_]*$ ]]; then
-    return 1
-  fi
-  dotted_identifier_re='^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)+$'
-  # Common dotted config references stay allowed unless their first segment is token-like.
-  if [[ "$bare" =~ $dotted_identifier_re ]]; then
-    first_segment="${bare%%.*}"
-    first_segment_lower="${first_segment,,}"
-    case "$first_segment_lower" in
-      app | application | cfg | conf | config | configs | configuration | constant | constants | context | credentials | credential | creds | ctx | default | defaults | env | environ | environment | os | process | self | setting | settings | this)
-        return 1
-        ;;
-    esac
-    # Low-entropy dotted prefixes behave like ordinary application references.
-    if ! has_credential_entropy "$first_segment"; then
-      return 1
-    fi
-  fi
-  operator_expression_re='^([A-Za-z_][A-Za-z0-9_]*)([+*/%=]|==|!=)([A-Za-z_][A-Za-z0-9_]*)$'
-  # Identifier-led expressions stay allowed unless the left side itself is token-shaped.
-  if [[ "$bare" =~ $operator_expression_re ]]; then
-    has_credential_entropy "${BASH_REMATCH[1]}" || return 1
-  fi
-  # Short or punctuated expressions are not high-confidence rotatable credentials.
-  if [[ ! "$bare" =~ ^[A-Za-z0-9._+/=~-]{12,}$ ]]; then
-    return 1
-  fi
-  has_credential_entropy "$bare" || return 1
-  LITERAL_VALUE="$bare"
-  return 0
-}
-
 # Identify Dockerfile paths before applying their user-facing assignment grammar.
 is_dockerfile_path() {
   local basename
@@ -1884,7 +1803,6 @@ scan_env_assignment() {
   local line="$2"
   local key
   local raw_value
-  local env_assignment_re='^[[:space:]]*((export|EXPORT|arg|ARG|env|ENV)[[:space:]]+)?([A-Za-z_][A-Za-z0-9_-]*)[[:space:]]*[:=][[:space:]]*(.*)$'
 
   # Docker users need container grammar; other config files use normal assignments.
   if is_dockerfile_path "$path"; then
@@ -1892,7 +1810,7 @@ scan_env_assignment() {
     return 0
   fi
 
-  [[ "$line" =~ $env_assignment_re ]] || return 0
+  [[ "$line" =~ $CREDENTIAL_ASSIGNMENT_RE ]] || return 0
   key="${BASH_REMATCH[3]}"
   raw_value="${BASH_REMATCH[4]}"
   scan_literal_credential_assignment "$path" "$key" "$raw_value"
@@ -2400,101 +2318,102 @@ run_diff_batch() {
 # Arguments are paths; an empty list is clean because there is no declared content.
 # Returns nonzero only when scanning cannot complete; findings feed the final verdict.
 scan_content_files() {
-  local -a files=("$@") env_files=() g_path=() g_ln=() g_line=() s_path=() s_ln=() s_line=()
+  local -a files=("$@") chunk=() env_chunk=() g_path=() g_ln=() g_line=() s_path=() s_ln=() s_line=()
   local -A file_order=()
-  local -a chunk=()
-  local path rest i gi si cur="" grep_output
+  local path rest i gi si cur="" global_output stem_output
 
   ((${#files[@]} > 0)) || return 0
-  # Record stable file order and the subset that admits config assignment checks.
-  for ((i = 0; i < ${#files[@]}; i++)); do
-    file_order["${files[i]}"]=$i
-    # Only config-shaped user files need the credential-stem candidate stream.
-    if is_env_assignment_file "${files[i]}"; then
-      env_files+=("${files[i]}")
-    fi
-  done
-
   set -- "${files[@]}"
-  # Read global detector candidates from each bounded full-content batch.
+  # Select and merge candidates one path chunk at a time so result storage stays bounded.
   while (($# > 0)); do
     budget_check || return 0
     chunk=("${@:1:CHUNK_SIZE}")
     # Advance to the user's next bounded content batch without losing unusual names.
     if (($# > CHUNK_SIZE)); then shift "$CHUNK_SIZE"; else shift $#; fi
+
+    env_chunk=()
+    g_path=()
+    g_ln=()
+    g_line=()
+    s_path=()
+    s_ln=()
+    s_line=()
+    file_order=()
+    cur=""
+    # Record stable order and the config-shaped subset for only this bounded batch.
+    for ((i = 0; i < ${#chunk[@]}; i++)); do
+      file_order["${chunk[i]}"]=$i
+      if is_env_assignment_file "${chunk[i]}"; then
+        env_chunk+=("${chunk[i]}")
+      fi
+    done
+
     next_temp_path "content-global-hits"
-    grep_output="$TEMP_PATH"
+    global_output="$TEMP_PATH"
     # Candidate selection must finish before any file in this batch can pass.
-    if ! capture_grep_output "$grep_output" "content candidate grep failed" -aUHnZE --null -e "$CONTENT_GLOBAL_RE" -- "${chunk[@]}"; then
+    if ! capture_grep_output "$global_output" "content candidate grep failed" -aUHnZE --null -e "$CONTENT_GLOBAL_RE" -- "${chunk[@]}"; then
       return 1
     fi
-    # Preserve each path, line number, and line body for ordered user-facing scanning.
+    # Preserve global candidates only until this batch has been scanned.
     while IFS= read -r -d '' path && IFS= read -r rest; do
       g_path+=("$path")
       g_ln+=("${rest%%:*}")
       g_line+=("${rest#*:}")
-    done <"$grep_output"
-  done
+    done <"$global_output"
 
-  set -- ${env_files[@]+"${env_files[@]}"}
-  # Read config-stem candidates from each bounded admitted-file batch.
-  while (($# > 0)); do
-    budget_check || return 0
-    chunk=("${@:1:CHUNK_SIZE}")
-    # Advance to the user's next bounded config batch without losing unusual names.
-    if (($# > CHUNK_SIZE)); then shift "$CHUNK_SIZE"; else shift $#; fi
-    next_temp_path "content-stem-hits"
-    grep_output="$TEMP_PATH"
-    # Config candidate selection must finish before these files can pass.
-    if ! capture_grep_output "$grep_output" "content candidate grep failed" -iaUHnZE --null -e "$CONTENT_STEM_RE" -- "${chunk[@]}"; then
-      return 1
+    # Only admitted config files need the second, credential-label candidate stream.
+    if ((${#env_chunk[@]} > 0)); then
+      next_temp_path "content-stem-hits"
+      stem_output="$TEMP_PATH"
+      if ! capture_grep_output "$stem_output" "content candidate grep failed" -iaUHnZE --null -e "$CONTENT_STEM_RE" -- "${env_chunk[@]}"; then
+        return 1
+      fi
+      while IFS= read -r -d '' path && IFS= read -r rest; do
+        s_path+=("$path")
+        s_ln+=("${rest%%:*}")
+        s_line+=("${rest#*:}")
+      done <"$stem_output"
     fi
-    # Preserve each config path, line number, and line body for ordered scanning.
-    while IFS= read -r -d '' path && IFS= read -r rest; do
-      s_path+=("$path")
-      s_ln+=("${rest%%:*}")
-      s_line+=("${rest#*:}")
-    done <"$grep_output"
-  done
 
-  gi=0
-  si=0
-  # Merge global and config candidates in the order the user wrote them.
-  while ((gi < ${#g_path[@]} || si < ${#s_path[@]})); do
-    budget_check || return 0
-    local g_ok=0 s_ok=0 g_key=0 s_key=0 pick_path pick_line
-    # A remaining global candidate gets a sortable file-and-line key.
-    if ((gi < ${#g_path[@]})); then
-      g_ok=1
-      g_key=$((${file_order[${g_path[gi]}]:-0} * 10000000 + g_ln[gi]))
-    fi
-    # A remaining config candidate gets the same sortable file-and-line key.
-    if ((si < ${#s_path[@]})); then
-      s_ok=1
-      s_key=$((${file_order[${s_path[si]}]:-0} * 10000000 + s_ln[si]))
-    fi
-    # Select the earlier candidate and consume duplicate matches once.
-    if ((g_ok && s_ok && g_key == s_key)); then
-      pick_path="${g_path[gi]}"
-      pick_line="${g_line[gi]}"
-      gi=$((gi + 1))
-      si=$((si + 1))
-    # A remaining or earlier global candidate is the next user line to scan.
-    elif ((g_ok)) && { ((!s_ok)) || ((g_key < s_key)); }; then
-      pick_path="${g_path[gi]}"
-      pick_line="${g_line[gi]}"
-      gi=$((gi + 1))
-    else
-      pick_path="${s_path[si]}"
-      pick_line="${s_line[si]}"
-      si=$((si + 1))
-    fi
-    # A new user file resets conflict-marker state before its first candidate line.
-    if [ "$pick_path" != "$cur" ]; then
-      cur="$pick_path"
-      reset_merge_conflict_scan "$cur"
-    fi
-    scan_line "$pick_path" "$pick_line"
+    gi=0
+    si=0
+    # Merge both ordered streams before advancing to the next bounded path batch.
+    while ((gi < ${#g_path[@]} || si < ${#s_path[@]})); do
+      budget_check || return 0
+      local g_ok=0 s_ok=0 g_key=0 s_key=0 pick_path pick_line
+      # A remaining global candidate gets a sortable file-and-line key.
+      if ((gi < ${#g_path[@]})); then
+        g_ok=1
+        g_key=$((${file_order[${g_path[gi]}]:-0} * 10000000 + g_ln[gi]))
+      fi
+      # A remaining config candidate gets the same sortable file-and-line key.
+      if ((si < ${#s_path[@]})); then
+        s_ok=1
+        s_key=$((${file_order[${s_path[si]}]:-0} * 10000000 + s_ln[si]))
+      fi
+      # Select the earlier candidate and consume duplicate matches once.
+      if ((g_ok && s_ok && g_key == s_key)); then
+        pick_path="${g_path[gi]}"
+        pick_line="${g_line[gi]}"
+        gi=$((gi + 1))
+        si=$((si + 1))
+      # A remaining or earlier global candidate is the next user line to scan.
+      elif ((g_ok)) && { ((!s_ok)) || ((g_key < s_key)); }; then
+        pick_path="${g_path[gi]}"
+        pick_line="${g_line[gi]}"
+        gi=$((gi + 1))
+      else
+        pick_path="${s_path[si]}"
+        pick_line="${s_line[si]}"
+        si=$((si + 1))
+      fi
+      # A new user file resets conflict-marker state before its first candidate line.
+      if [ "$pick_path" != "$cur" ]; then
+        cur="$pick_path"
+        reset_merge_conflict_scan "$cur"
+      fi
+      scan_line "$pick_path" "$pick_line"
+    done
   done
 }
 

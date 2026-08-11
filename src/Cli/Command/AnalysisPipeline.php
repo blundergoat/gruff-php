@@ -14,6 +14,7 @@ use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Engine\Parser\PhpFileParser;
 use GruffPhp\Rules\Shared\NodeIndex;
+use GruffPhp\Rules\Size\SubstantiveLineCounter;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\RuleRegistry;
 use GruffPhp\Rules\Shared\RuleRunnerObserver;
@@ -268,6 +269,7 @@ final class AnalysisPipeline
                 $cache->put($cacheKey, $unitFindings);
             }
             NodeIndex::evictUnit($unit);
+            SubstantiveLineCounter::evictUnit($unit);
             $unit->release();
             unset($unit);
         }

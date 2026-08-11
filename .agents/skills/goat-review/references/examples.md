@@ -162,7 +162,7 @@ Emit these under `## Direction / Opportunity Audit`, without MUST/SHOULD/MAY tag
 
 Route rejected material by lifespan:
 
-- **Per-run refutations:** draft Pass-2 evidence in memory; the host persists it only through the shared redactor, or preserves the count as persist-skipped.
+- **Per-run refutations:** draft Pass-2 evidence in memory; separate from any refuter-output receipt, persist the counted ledger only through the shared redactor at `.goat-flow/logs/review/goat-review-refutations.<random>.txt`. If the redactor is unavailable, preserve the count as persist-skipped and declare `Refutation ledger: persist-skipped`.
 - **Local cross-run rejections:** record the rationale in the active plan's `backlog.md` or a named plan-local rejection section.
 - **Durable policy decisions:** use an ADR or learning-loop entry only when the decision changes future work beyond the current plan.
 

@@ -235,8 +235,7 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
             return false;
         }
 
-        preg_match_all('/[a-z][a-z0-9]*/i', strtolower($text), $matches);
-        $words = $matches[0];
+        $words = $this->propertyCommentWords($text);
         if (count($words) < 2) {
             return false;
         }
@@ -245,9 +244,18 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
             return false;
         }
 
-        $normalisedComment = $this->normalisedPropertyCommentText($text);
+        $normalisedComment        = $this->normalisedPropertyCommentText($text);
+        $normalisedCommentMeaning = $this->normalisedPropertyCommentMeaning($words);
         foreach ($property->props as $propertyProperty) {
-            if ($normalisedComment === $this->normalisedPropertyCommentText($propertyProperty->name->toString())) {
+            $propertyName          = $propertyProperty->name->toString();
+            $normalisedProperty    = $this->normalisedPropertyCommentText($propertyName);
+            $propertyNameWords     = $this->propertyCommentWords($propertyName);
+            $normalisedNameMeaning = $this->normalisedPropertyCommentMeaning($propertyNameWords);
+
+            if (
+                $normalisedComment === $normalisedProperty
+                || $normalisedCommentMeaning === $normalisedNameMeaning
+            ) {
                 return false;
             }
         }
@@ -265,6 +273,35 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
     private function normalisedPropertyCommentText(string $text): string
     {
         return preg_replace('/[^a-z0-9]+/', '', strtolower($text)) ?? '';
+    }
+
+    /**
+     * Splits prose or an identifier into comparable lowercase words.
+     *
+     * @param string $text - Comment prose or property identifier.
+     *
+     * @return list<string> - Lowercase alphanumeric words, including words split at camel-case boundaries.
+     */
+    private function propertyCommentWords(string $text): array
+    {
+        $separated = preg_replace('/(?<=[a-z0-9])(?=[A-Z])/', ' ', $text) ?? $text;
+        preg_match_all('/[a-z][a-z0-9]*/i', strtolower($separated), $matches);
+
+        return $matches[0];
+    }
+
+    /**
+     * Normalizes meaning-bearing words after generic property labels are removed.
+     *
+     * @param list<string> $words - Lowercase comment or identifier words.
+     *
+     * @return string - Concatenated words that remain after removing property-comment filler.
+     */
+    private function normalisedPropertyCommentMeaning(array $words): string
+    {
+        $meaningWords = array_diff_key(array_fill_keys($words, true), self::PROPERTY_COMMENT_FILLER_WORDS);
+
+        return implode('', array_keys($meaningWords));
     }
 
     /**

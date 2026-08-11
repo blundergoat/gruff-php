@@ -6,7 +6,7 @@
 
 Read the branch with `git branch --show-current` and match the output against:
 
-```
+```text
 ^(feat|fix|chore|refactor|docs|test|perf|build|ci|security)/([0-9]+)([-_].*)?$
 ```
 
@@ -20,7 +20,7 @@ Empty output means no prefix. Do not infer one from history, recent commits, or 
 
 ### Message shape
 
-```
+```text
 #123 type(scope): subject
 
 Body explaining why the change is needed.
@@ -34,7 +34,7 @@ Subject lines are optimised for `git log`, changelogs, and bisect notes.
 - Imperative mood. Test: the subject must complete the sentence "If applied, this commit will
   ___".
 - One line, as short as it can be while still naming the observable change, and never longer
-  than 72 characters including any `#<digits> ` prefix.
+  than 72 characters including the `#<digits>` prefix and its following space.
 - Lowercase after the colon unless the word is a proper noun, identifier, or API name.
 - No trailing period.
 - Name the observable change, not the quality aspiration.
@@ -69,7 +69,7 @@ diff mechanically.
 - One fact per bullet. Cut bullets that restate the subject or the diff.
 - Quote the essential line of an error message, not the whole dump.
 
-```
+```text
 BAD:  This commit significantly improves installer reliability by enhancing path handling
       and making various robustness improvements.
 
@@ -91,7 +91,7 @@ GOOD: The installer failed on paths with spaces because $TARGET was unquoted.
 
 ## Worked example
 
-```
+```text
 fix(installer): quote path expansions in the hook installer
 
 The installer failed on paths containing spaces because $TARGET was

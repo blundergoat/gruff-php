@@ -5,7 +5,7 @@ goat-flow-reference-version: "1.15.1"
 
 Read this reference only when rendering the final response. Select the template matching the mode and gate reached; do not combine templates from different phases.
 
-### Regression Guard mode
+## Regression Guard mode
 
 ```markdown
 ## Regression Guards
@@ -19,7 +19,7 @@ Read this reference only when rendering the final response. Select the template 
 - Evidence limit: [unavailable source, runtime, or tool context]
 ```
 
-### Standard mode - Phase 2 output (diff-driven, present at BLOCKING GATE)
+## Standard mode - Phase 2 output (diff-driven, present at BLOCKING GATE)
 
 ```markdown
 ## TL;DR  <!-- what changed, what's at risk, biggest testing gaps -->
@@ -48,7 +48,7 @@ Read this reference only when rendering the final response. Select the template 
 - Assessed by: [agent]
 ```
 
-### Standard mode - Phase 3 output (generate only after Phase 2 gate approval)
+## Standard mode - Phase 3 output (generate only after Phase 2 gate approval)
 
 ```markdown
 ## Targeted Testing Plan
@@ -65,7 +65,7 @@ Read this reference only when rendering the final response. Select the template 
 ## Flow Diagram  <!-- only on request -->
 ```
 
-### Audit mode (no diff - A1–A4 shape)
+## Audit mode (no diff - A1–A4 shape)
 
 ```markdown
 ## TL;DR  <!-- which files carry load-bearing behaviour, coverage shape, biggest gaps -->
@@ -102,7 +102,7 @@ Read this reference only when rendering the final response. Select the template 
 ## Flow Diagram  <!-- only on request -->
 ```
 
-### Audit post-gate plan (after A4 approval)
+## Audit post-gate plan (after A4 approval)
 
 ```markdown
 ## Targeted Testing Plan

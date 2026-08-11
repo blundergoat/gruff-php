@@ -1117,6 +1117,18 @@ self_test() {
     return 1
   }
 
+  # A multi-line finding belongs to an edit that intersects any part of its reported span.
+  report_output='{"findings":[{"severity":"warning","line":10,"endLine":20,"file":"x.ts","ruleId":"r.span","message":"m"}]}'
+  report_json="$(changed_findings_report "$report_output" "x.ts" "/tmp/x.ts" "15-15" 1 20 0)"
+  [[ "$(printf '%s' "$report_json" | jq -r '.total')" == "1" ]] || {
+    printf 'gruff-code-quality self-test: fallback finding-span overlap failed\n' >&2
+    return 1
+  }
+  [[ "$(suppressed_count "$report_output" "x.ts" "/tmp/x.ts" "15-15")" == "0" ]] || {
+    printf 'gruff-code-quality self-test: fallback finding-span suppression failed\n' >&2
+    return 1
+  }
+
   # Contract render: hook_v1_report surfaces every finding the analyzer returned
   # (it already scoped them), nulls the line for file/project scope, and
   # severity-sorts.
@@ -1132,6 +1144,13 @@ self_test() {
   }
   [[ "$(printf '%s' "$report_json" | jq -r '.lines[1]')" == "- [advisory] x.ts:12 naming.x - rename" ]] || {
     printf 'gruff-code-quality self-test: hook_v1 line-scope rendering failed\n' >&2
+    return 1
+  }
+
+  report_output='{"findings":[{"severity":"warning","scope":"symbol","line":10,"endLine":20,"file":"x.ts","ruleId":"r.span","message":"m"}]}'
+  report_json="$(hook_v1_report "$report_output" 1 20 "15-15")"
+  [[ "$(printf '%s' "$report_json" | jq -r '[.total,.lines[0]] | @tsv')" == $'1\t- [warning] x.ts:10 r.span - m' ]] || {
+    printf 'gruff-code-quality self-test: hook_v1 finding-span overlap failed\n' >&2
     return 1
   }
 
@@ -1270,7 +1289,7 @@ min_severity_rank() {
 
 # Build a single JSON control object describing the changed-line findings:
 #   { total, e, w, a, surfaced, floored, more, lines }
-# `total`/`e`/`w`/`a` count every finding whose primary line intersects the
+# `total`/`e`/`w`/`a` count every finding whose reported span intersects the
 # changed ranges, by severity. `lines` holds the canonical
 # `- [severity] file:line ruleId - message` rows for the findings that survive the
 # severity floor (rank >= $floor_rank), sorted error -> warning -> advisory then
@@ -1291,17 +1310,20 @@ changed_findings_report() {
       tostring | gsub("\\\\"; "/") | sub("^\\./"; "");
     def finding_path:
       .filePath? // .file? // .path? // "";
-    def line_number:
-      (.line? // .location.line? // .location.startLine?) as $line
-      | if ($line | type) == "number" then
-          $line
-        elif ($line | type) == "string" then
-          ($line | tonumber?)
-        else
-          empty
-        end;
+    def numeric_line($value):
+      if ($value | type) == "number" then
+        $value
+      elif ($value | type) == "string" then
+        ($value | tonumber?)
+      else
+        null
+      end;
+    def start_line:
+      numeric_line(.line? // .location.line? // .location.startLine?);
+    def end_line($start):
+      numeric_line(.endLine? // .location.endLine? // .end?) // $start;
     def line_or_null:
-      [line_number] | first // null;
+      start_line;
     def same_file:
       (finding_path | normalize_path) as $path
       | ($path == ($rel | normalize_path)
@@ -1312,9 +1334,9 @@ changed_findings_report() {
       $ranges
       | split(",")
       | map(select(length > 0) | split("-") | {start: (.[0] | tonumber), end: (.[1] | tonumber)});
-    def in_changed_ranges($line):
+    def overlaps_changed_ranges($start; $end):
       parsed_ranges as $parsed
-      | any($parsed[]; $line >= .start and $line <= .end);
+      | any($parsed[]; $end >= .start and $start <= .end);
     def sev_rank($s):
       # error > warning > everything else (advisory, or an unknown/missing severity)
       # so an unrecognised severity still clears the default advisory floor and stays visible.
@@ -1324,7 +1346,12 @@ changed_findings_report() {
     [ (.findings // [])[]
       | . as $finding
       | ($finding | line_or_null) as $line
-      | select(($finding | same_file) and $line != null and ($native == 1 or in_changed_ranges($line)))
+      | ($finding | end_line($line)) as $endLine
+      | select(
+          ($finding | same_file)
+          and $line != null
+          and ($native == 1 or overlaps_changed_ranges($line; $endLine))
+        )
       | { sev: ((.severity // "unknown") | tostring | ascii_downcase),
           rank: sev_rank(.severity // ""),
           line: $line,
@@ -1356,17 +1383,18 @@ suppressed_count() {
       tostring | gsub("\\\\"; "/") | sub("^\\./"; "");
     def finding_path:
       .filePath? // .file? // .path? // "";
-    def line_number:
-      (.line? // .location.line? // .location.startLine?) as $line
-      | if ($line | type) == "number" then
-          $line
-        elif ($line | type) == "string" then
-          ($line | tonumber?)
+    def numeric_line($value):
+      if ($value | type) == "number" then
+        $value
+      elif ($value | type) == "string" then
+        ($value | tonumber?)
         else
-          empty
+        null
         end;
-    def line_or_null:
-      [line_number] | first // null;
+    def start_line:
+      numeric_line(.line? // .location.line? // .location.startLine?);
+    def end_line($start):
+      numeric_line(.endLine? // .location.endLine? // .end?) // $start;
     def same_file:
       (finding_path | normalize_path) as $path
       | ($path == ($rel | normalize_path)
@@ -1377,17 +1405,18 @@ suppressed_count() {
       $ranges
       | split(",")
       | map(select(length > 0) | split("-") | {start: (.[0] | tonumber), end: (.[1] | tonumber)});
-    def in_changed_ranges($line):
+    def overlaps_changed_ranges($start; $end):
       parsed_ranges as $parsed
-      | any($parsed[]; $line >= .start and $line <= .end);
+      | any($parsed[]; $end >= .start and $start <= .end);
 
     [
       (.findings // [])
       | .[]
       | . as $finding
-      | ($finding | line_or_null) as $line
+      | ($finding | start_line) as $line
+      | ($finding | end_line($line)) as $endLine
       | select(same_file)
-      | select($line == null or (in_changed_ranges($line) | not))
+      | select($line == null or (overlaps_changed_ranges($line; $endLine) | not))
     ] | length
   ' 2>/dev/null || printf '0'
 }
@@ -1523,9 +1552,9 @@ hook_capabilities() {
 # Project a gruff.hook.v1 envelope into the same control object
 # changed_findings_report emits ({ total, e, w, a, surfaced, floored, more,
 # lines }), so process_file_contract reuses the existing print block. The
-# analyzer has already scoped the findings (B1), so EVERY returned finding is
-# surfaced - no re-filtering by line. file/project-scope findings render without
-# a `:line` because their line is a synthetic anchor, not a code location.
+# analyzer scopes the file, while this projection intersects each reported span
+# with the edit ranges. File/project-scope findings render without a `:line`
+# because their line is a synthetic anchor, not a code location.
 hook_v1_report() {
   local output="$1" floor_rank="$2" max="$3" ranges="${4:-}"
   printf '%s' "$output" | jq -c --argjson floor_rank "$floor_rank" --argjson max "$max" --arg ranges "$ranges" '
@@ -1536,25 +1565,40 @@ hook_v1_report() {
       $ranges
       | split(",")
       | map(select(length > 0) | split("-") | {start: (.[0] | tonumber), end: (.[1] | tonumber)});
-    def in_changed_ranges($line):
+    def numeric_line($value):
+      if ($value | type) == "number" then
+        $value
+      elif ($value | type) == "string" then
+        ($value | tonumber?)
+      else
+        null
+      end;
+    def start_line:
+      numeric_line(.line? // .location.line? // .location.startLine?);
+    def end_line($start):
+      numeric_line(.endLine? // .location.endLine? // .end?) // $start;
+    def overlaps_changed_ranges($start; $end):
       parsed_ranges as $parsed
-      | ($parsed | length) == 0 or any($parsed[]; $line >= .start and $line <= .end);
+      | ($parsed | length) == 0 or any($parsed[]; $end >= .start and $start <= .end);
     # A file-scope finding describes the file the agent is editing right now - it is too long,
     # it has no overview, it sits in an import cycle. Those never overlap a changed line, so
     # range filtering would hide them forever and let a file grow unbounded while every edit
     # reports clean. They always surface. Line and symbol findings stay range-filtered so the
     # agent is not handed pre-existing debt from parts of the file it did not touch.
     [ (.findings // [])[]
+      | . as $finding
+      | ($finding | start_line) as $startLine
+      | ($finding | end_line($startLine)) as $endLine
       | select(
           ((.scope // "line") == "file" or (.scope // "line") == "project")
-          or in_changed_ranges(.line // 0)
+          or ($startLine != null and overlaps_changed_ranges($startLine; $endLine))
         )
       | { sev: ((.severity // "advisory") | tostring | ascii_downcase),
           rank: sev_rank(.severity // ""),
           scope: (.scope // "line"),
           file: (.file // .filePath // .path // ""),
           line: (if ((.scope // "line") == "file" or (.scope // "line") == "project")
-                 then null else (.line // null) end),
+                 then null else $startLine end),
           ruleId: (.ruleId // "unknown-rule"),
           message: (.message // "") } ] as $all
     | ($all | sort_by([ (3 - .rank), .file, (.line // 0), .ruleId ])) as $sorted

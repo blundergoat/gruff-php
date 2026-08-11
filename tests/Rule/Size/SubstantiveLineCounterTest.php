@@ -134,6 +134,23 @@ final class SubstantiveLineCounterTest extends TestCase
     }
 
     /**
+     * Verify explicit eviction removes source-derived data while the released unit shell remains reachable.
+     *
+     * @return void
+     */
+    public function testEvictsCachedPrefixBeforeUnitRelease(): void
+    {
+        $unit                   = $this->parseInline("<?php\nfinal class Cached {}\n");
+        $expectedWholeFileCount = 2;
+        self::assertSame($expectedWholeFileCount, SubstantiveLineCounter::countAll($unit));
+
+        SubstantiveLineCounter::evictUnit($unit);
+        $unit->release();
+
+        self::assertSame(0, SubstantiveLineCounter::countAll($unit));
+    }
+
+    /**
      * List every PHP fixture in stable path order.
      *
      * @return list<string> - Absolute PHP fixture paths.
