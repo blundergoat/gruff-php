@@ -207,7 +207,7 @@ tests/
 
 .codex/
 |-- config.toml                               = Codex hooks feature config
-`-- hooks.json                                = Codex PreToolUse hook registration for the shared deny-dangerous hook; Codex post-tool/Stop hooks are unsupported in goat-flow 1.15.0
+`-- hooks.json                                = Codex hook registration for the shared hooks: PreToolUse (deny-dangerous), PostToolUse on `apply_patch` (gruff-code-quality), and Stop (post-turn-safety), all added in goat-flow 1.15.1
 
 .agents/
 `-- skills/                                   = peer-agent skills mirroring `.claude/skills/`

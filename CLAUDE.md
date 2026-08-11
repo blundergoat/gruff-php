@@ -1,4 +1,4 @@
-# CLAUDE.md - project v1.5.2 / goat-flow 1.15.0 (2026-08-10)
+# CLAUDE.md - instructions v1.5.2 / goat-flow 1.15.1 (2026-08-11)
 gruff-php is an opinionated PHP code-quality analyzer; its mission is to govern AI-generated code so a human can verify, trust, and sign off on it (legible, secure, genuinely tested). Current invariant: keep app claims and commands grounded in real source/config files.
 
 ## Truth Order
@@ -55,7 +55,7 @@ node node_modules/@blundergoat/goat-flow/dist/cli/cli.js audit . --agent claude 
 
 ## Execution Loop: READ -> SCOPE -> ACT -> VERIFY
 
-When a goat-* skill is active, its Step 0 replaces READ and selects the skill mode/depth. Resume at ACT after Step 0 output.
+When a goat-* skill is active, its Step 0 replaces READ and selects the skill mode/depth. SCOPE still gates writes: the skill's mode or user approval must permit them. Resume at ACT after Step 0 output.
 
 ### READ
 Read relevant files before changes. For URL, local HTML, localhost, screenshot, rendered UI, or browser-visible behavior, check browser evidence first with `command -v browser-use || command -v browser-use-python`. Cross-doc: read every file describing the same concept. Use INDEX-first retrieval across `.goat-flow/learning-loop/{footguns,lessons,patterns}/INDEX.md`; include `.goat-flow/learning-loop/decisions/INDEX.md` for architecture, policy, or setup work. Open source entries only on candidate hits; grep bucket files only after the INDEX pass or on a known retrieval miss; reword once on zero hits, then record the miss instead of broad-loading a bucket. Before declaring any tool or capability unavailable, read the matching playbook in `.goat-flow/skill-docs/playbooks/` (e.g. `browser-use.md`, `page-capture.md`) and run that doc's "Availability Check" section verbatim - project-local CLI tools at `~/.local/bin/` are valid; do not conflate "no harness/MCP tool" with "no tool". Prose surfaces route the same way before writing: `CHANGELOG.md` needs `changelog.md`; release notes need `release-notes.md`; README, `docs/`, PR/issue text, and learning-loop entry bodies need `writing-style.md`.
