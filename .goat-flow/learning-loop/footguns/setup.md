@@ -1,6 +1,6 @@
 ---
 category: setup
-last_reviewed: 2026-08-07
+last_reviewed: 2026-08-12
 ---
 
 # Setup Footguns
@@ -34,6 +34,18 @@ goat-flow 1.14.0's `audit --check-content` runs `code-map-dashboard-view-drift` 
 **Evidence:** `src/Cli/Application.php` (search: `addCommands`) now uses the cross-version registration API; `tests/Console/ListRulesCliTest.php` (search: `testInstalledVendorBinProxyUsesConsumerAutoloader`) exercises a consumer install path, but local PHP 8.3 resolution alone does not prove the Symfony 8 path. GitHub Actions run `26359298476` on PR #5 showed the PHP 8.4 failure while PHP 8.3 passed the same PHPUnit test.
 
 **Prevention:** When a package constraint includes a newer framework major than the local lockfile currently installs, verify the public CLI against that major before release. For Symfony Console support, prefer APIs present across every advertised major (`addCommands` across 6.4/7.x/8.x here) and avoid deprecated 7.x APIs when `^8.0` is allowed. A consumer-install test should either run in the CI PHP version that can resolve the newest major or include an explicit platform/dependency smoke so the highest supported major is actually exercised.
+
+## Footgun: `composer update --prefer-lowest` cannot reach the advertised floor when a dev dependency requires higher
+
+**Status:** active | **Created:** 2026-08-12 | **Evidence:** ACTUAL_MEASURED
+**Decision changed:** How to prove that the version range in `composer.json` actually runs the code that depends on it.
+**Trigger phase:** VERIFY
+
+`composer.json` (search: `"nikic/php-parser"`) advertises `^5.6`. Running `composer update --prefer-lowest --prefer-stable` in this checkout resolves php-parser to **v5.7.0**, not v5.6.0, because two development dependencies hold the floor above the advertised minimum: `phpunit/php-code-coverage` requires `^5.7.0` and `infection/infection` requires `^5.6.2`. Forcing `nikic/php-parser:5.6.0` is refused outright by the resolver. A consumer installing this package has neither PHPUnit nor Infection, so a consumer can resolve v5.6.0 while this checkout never can. A `--prefer-lowest` run therefore reports green against a version no consumer floor uses, and the lowest advertised version stays untested.
+
+**Evidence:** Measured 2026-08-12 while verifying that `src/Rules/Modernisation/PublicPropertyRule.php` (search: `hasOpenWriteSide`) runs at the advertised floor. `composer why nikic/php-parser` after a `--prefer-lowest` resolution printed `phpunit/php-code-coverage 12.5.2 requires nikic/php-parser (^5.7.0)`. The real floor was proven instead by a throwaway project requiring only `php: ^8.3` and `nikic/php-parser: 5.6.0`, where `method_exists` confirmed `isReadonly`, `isPrivateSet`, and `isProtectedSet` on both `PhpParser\Node\Stmt\Property` and `PhpParser\Node\Param`.
+
+**Prevention:** Never cite a `--prefer-lowest` run inside this checkout as evidence that an advertised floor works. Prove a runtime floor in a consumer-shaped project that requires only the `require` block, never `require-dev`. Check `composer why <package>` first: when any dev dependency's constraint is tighter than the advertised one, the local resolution is measuring the dev constraint. This is the mirror image of the newer-major trap recorded above (search: `## Footgun: Consumer install tests can resolve newer dependency majors than the source checkout`); both come from the same root cause, that the source checkout's resolution is not a consumer's resolution.
 
 ## Resolved Entries
 

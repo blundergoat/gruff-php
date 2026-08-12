@@ -1,6 +1,6 @@
 ---
 category: rules
-last_reviewed: 2026-08-07
+last_reviewed: 2026-08-12
 ---
 
 # Rule Footguns
@@ -165,6 +165,18 @@ The size rules treat immutable value objects gently: `src/Rules/Size/PropertyCou
 **Evidence:** Both rules now disqualify only on the RETURN shape via `isBehaviourMethod` (search: `isBehaviourMethod`): a method is a command/behaviour when it returns `void`/`never` or is untyped (`returnType === null`), because a value object's methods always return a value. Fixtures `tests/Fixtures/Size/readonly-service-constructor.php` (a `void` command) and `tests/Fixtures/Size/readonly-carrier-with-behaviour.php` (an untyped method) lock the service shape, while `tests/Fixtures/Size/promoted-payload.php` (a pure DTO) stays exempt. The over-broad params-based check was caught by the full-project self-scan flagging the project's own DTOs, NOT by any unit test.
 
 **Prevention:** Any "is this a value object / data carrier?" heuristic must classify behaviour by what a method RETURNS (a command returns nothing or is untyped), never by whether it takes a parameter. Add a fixture for a value object with a param-taking query/wither/factory method and assert it stays exempt, plus a void/untyped-command fixture that does not. Accept the inherent limit: a service whose methods all return typed values is shape-indistinguishable from a value object and stays exempt - that is a deliberate non-guess, not a bug.
+
+## Footgun: Size rules report zero, not an error, if they run after their unit is released
+
+**Status:** active | **Created:** 2026-08-12 | **Evidence:** OBSERVED
+**Decision changed:** Whether a new caller may reuse an `AnalysisUnit` after analysis, and where a size rule may be invoked.
+**Trigger phase:** ACT
+
+`src/Engine/Parser/AnalysisUnit.php` (search: `Break ParentConnectingVisitor's back-edges`) clears `source`, `statements`, and `tokens` to cut a measured 4-5GB peak on large scans. `src/Rules/Size/SubstantiveLineCounter.php` (search: `public static function evictUnit`) drops its cached line prefix beside that release. Both release sites, `src/Rules/RuleRegistry.php` (search: `$canReleaseUnits`) and `src/Cli/Command/AnalysisPipeline.php` (search: `SubstantiveLineCounter::evictUnit`), evict then release inside the analysis loop. After that point `SubstantiveLineCounter::countAll()` recomputes from an empty source and returns `0`. It does not throw and does not signal staleness, so `size.file-length` and `size.class-length` would silently find nothing rather than fail loudly.
+
+**Evidence:** `tests/Rule/Size/SubstantiveLineCounterTest.php` (search: `testEvictsCachedPrefixBeforeUnitRelease`) pins the zero as expected behaviour: it evicts, releases, then asserts `countAll()` returns `0`. The trap is currently unreachable, and that is a property of the call sites rather than of the counter: `src/Cli/Command/BranchReviewBuilder.php` (search: `$baseRegistry->analyse`) re-analyses base units but omits `shouldReleaseUnitsAfterAnalysis`, which defaults to `false`, and also passes `$projectUnits`, which independently forces `$canReleaseUnits` to `false`. `SubstantiveLineCounter` is consumed only by `src/Rules/Size/FileLengthRule.php` and `src/Rules/Size/ClassLengthRule.php`, both per-unit rules that run before the eviction in the same iteration.
+
+**Prevention:** Before adding a caller that reuses `$sources->analysisUnits` after `RuleRegistry::analyse()`, confirm whether that call released them. Never pass units through a second size-rule pass without re-parsing. If a future caller genuinely needs post-release counting, make the counter fail loudly on a released unit rather than returning `0`; a zero here is indistinguishable from a genuinely empty file.
 
 ## Resolved Entries
 

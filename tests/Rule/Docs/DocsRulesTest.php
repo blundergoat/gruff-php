@@ -338,7 +338,7 @@ final class DocsRulesTest extends DocsRuleTestCase
      */
     public function testVoidMethodWithDocblockTriggersMissingReturnTag(): void
     {
-        // Policy lock: per .goat-flow/lessons/workflow.md "Respect explicit rule style
+        // Policy lock: per .goat-flow/learning-loop/lessons/workflow.md "Respect explicit rule style
         // even when it restates native syntax", every documented method without @return
         // must fire - including methods declared void or never. Skipping void was an
         // unintended narrowing; explicit void/never fixtures lock the broader contract

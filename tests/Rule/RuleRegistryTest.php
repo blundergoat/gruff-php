@@ -120,6 +120,12 @@ use PHPUnit\Framework\TestCase;
 final class RuleRegistryTest extends TestCase
 {
     /**
+     * Ratchet for rules that still let their name stand in for a written description. Lower it whenever
+     * the real count drops; never raise it.
+     */
+    private const MAX_RULES_WITHOUT_DESCRIPTION = 99;
+
+    /**
      * Verify default registry contains stable rule ids.
      *
      * @return void
@@ -322,6 +328,32 @@ final class RuleRegistryTest extends TestCase
     }
 
     /**
+     * Verify the count of rules with no written description never grows.
+     *
+     * @return void
+     */
+    public function testRulesFallingBackToTheirNameDoNotGrow(): void
+    {
+        // RuleDefinition::description() substitutes the name when no description is configured, so the
+        // emptiness check above passes for every rule and can never fail. This ratchet holds the real
+        // line: a new rule shipped without a description raises the count and fails here. Reading the
+        // raw property rather than the accessor is what makes the fallback visible.
+        $fallbackIds = array_values(array_map(
+                                        static fn($rule): string => $rule->definition()->id,
+                                        array_filter(
+                                            RuleRegistry::defaults()->all(),
+                                            static fn($rule): bool => trim($rule->definition()->description) === '',
+                                        ),
+                                    ));
+
+        self::assertLessThanOrEqual(
+            self::MAX_RULES_WITHOUT_DESCRIPTION,
+            count($fallbackIds),
+            'A rule shipped without a description. Add one, or lower MAX_RULES_WITHOUT_DESCRIPTION when the count drops.',
+        );
+    }
+
+    /**
      * Verify default rule definitions keep stable reporting and config metadata.
      *
      * @return void
@@ -357,7 +389,7 @@ final class RuleRegistryTest extends TestCase
 
         self::assertCount(128, $definitions);
         self::assertSame(
-            'c99cc744df7eb77554d9' . '39088124c289c6bb227f2e14fd1f1084b7aca1b4874c',
+            'efa8942d8f840536dd18' . '0e20b6576cce513620c7b6af3d28ac8f39a62b830e04',
             hash('sha256', $json),
         );
     }

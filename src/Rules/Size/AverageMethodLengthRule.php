@@ -51,6 +51,7 @@ final readonly class AverageMethodLengthRule implements RuleInterface
             tier:              RuleTier::V01,
             defaultSeverity:   Severity::Error,
             confidence:        Confidence::High,
+            description:       'Average method length (logical lines: statements only, averaged across the type\'s methods)',
             severityThreshold: new SeverityThreshold(50, Severity::Error),
         );
     }

@@ -49,6 +49,7 @@ final readonly class PublicPropertyRule implements RuleInterface
             defaultSeverity:    Severity::Warning,
             confidence:         Confidence::High,
             defaultOptions:     ['allowedClasses' => []],
+            description:        'Flags public mutable state unless its fully qualified class is an explicit lifecycle or integration contract.',
             optionDescriptions: [
                 'allowedClasses' => 'Fully qualified classes whose intentionally mutable public state is an explicit lifecycle or integration contract.',
             ],

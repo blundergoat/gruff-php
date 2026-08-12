@@ -19,6 +19,7 @@
       "Read(**/.env.test)",
       "Read(**/.envrc)",
       "Read(**/.env.*.local)",
+      "Read(**/.env*)",
       "Edit(**/.env)",
       "Edit(**/.env.local)",
       "Edit(**/.env.development)",

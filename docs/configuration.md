@@ -39,7 +39,7 @@ schemaVersion: gruff-php.config.v0.1
 
 Configs missing this key fail to load with a hint pointing at
 `gruff-php init --force`. See
-[`ADR-015`](../.goat-flow/decisions/ADR-015-per-command-minimum-severity.md)
+[`ADR-015`](../.goat-flow/learning-loop/decisions/ADR-015-per-command-minimum-severity.md)
 for the rationale.
 
 ## Extends
@@ -290,7 +290,7 @@ rules:
     excludeFromScore: true
 ```
 
-See [`ADR-016`](../.goat-flow/decisions/ADR-016-visibility-only-rule-scoring-tier.md)
+See [`ADR-016`](../.goat-flow/learning-loop/decisions/ADR-016-visibility-only-rule-scoring-tier.md)
 for the rationale and the failure-mode comparison.
 
 ## Compatibility

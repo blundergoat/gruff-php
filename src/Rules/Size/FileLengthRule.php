@@ -44,6 +44,7 @@ final readonly class FileLengthRule implements RuleInterface
             tier:              RuleTier::V01,
             defaultSeverity:   Severity::Error,
             confidence:        Confidence::High,
+            description:       'File length (substantive lines: blank and comment-only lines are free)',
             severityThreshold: new SeverityThreshold(1000, Severity::Error),
         );
     }

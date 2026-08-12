@@ -51,8 +51,8 @@ gruff is heuristic static analysis, not a proof. It does not format code, run yo
 
 ## See also
 
-- [`ADR-017`](../.goat-flow/decisions/ADR-017-mission-govern-ai-generated-code.md) — the mission decision and its calibration corollary.
-- [`ADR-010`](../.goat-flow/decisions/ADR-010-complexity-and-docs-rubric-default-recalibration.md) — complexity/docs defaults; read through the verifiability lens above.
-- [`ADR-004`](../.goat-flow/decisions/ADR-004-public-phpdoc-template.md) — the public-PHPDoc template.
+- [`ADR-017`](../.goat-flow/learning-loop/decisions/ADR-017-mission-govern-ai-generated-code.md) — the mission decision and its calibration corollary.
+- [`ADR-010`](../.goat-flow/learning-loop/decisions/ADR-010-complexity-and-docs-rubric-default-recalibration.md) — complexity/docs defaults; read through the verifiability lens above.
+- [`ADR-004`](../.goat-flow/learning-loop/decisions/ADR-004-public-phpdoc-template.md) — the public-PHPDoc template.
 - [Agent instructions](gruff-cli-agent-instructions.md) — the command quick-start for coding agents.
 - [README](../README.md) — install, commands, and configuration.

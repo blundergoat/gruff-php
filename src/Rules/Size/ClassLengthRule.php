@@ -51,6 +51,7 @@ final readonly class ClassLengthRule implements RuleInterface
             tier:              RuleTier::V01,
             defaultSeverity:   Severity::Error,
             confidence:        Confidence::High,
+            description:       'Class length (substantive lines: blank and comment-only lines are free)',
             severityThreshold: new SeverityThreshold(1000, Severity::Error),
         );
     }

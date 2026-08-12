@@ -20,7 +20,7 @@ Notable user-facing changes to `gruff-php` are listed here.
 - **SARIF size identities change** - Both size rules emit new `gruffStableIdentity` values because their messages changed.
 - **Refresh class-length hook baselines** - `size.class-length` gets a new hook identity; `size.file-length` stays matched.
 - **Public-property checks cover promotion** - Readonly classes stay quiet; public mutable promotions now report and may add baseline findings.
-- **Promoted constructor docs have one owner** - Missing tags use `docs.missing-param-tag`; duplicate property-doc findings disappear.
+- **Promoted constructor docs stop duplicating** - Missing tags use `docs.missing-param-tag`, absent docblocks `docs.missing-public-phpdoc`.
 - **Four rule options added** - Tune generic names, property line comments, dangerous functions, and intentional public-state classes.
 
 ## 0.5.1 - 2026-07-20
