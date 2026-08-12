@@ -2,26 +2,24 @@
 
 Notable user-facing changes to `gruff-php` are listed here.
 
-## Unreleased
-
-- **Procedural injection sinks are covered** - SQL and process rules resolve named arguments. SQL follows one unambiguous same-scope assignment; `proc_open()` keeps direct argument vectors safe unless they explicitly start a shell command mode.
-- **Security baselines keep existing identities** - Existing messages stay stable; new procedural findings need review or baselining.
-- **Agent-hook parsers close bypasses** - Protected paths stay blocked through curl form headers, xargs optional flags, escaped filenames, mixed-case environment assignments, and multi-batch scans.
-- **Prophecy expectations stay configured** - Native promises, predictions, and asserted `reveal()` values no longer look like bare mocks.
-- **Prophecy baselines shed false positives** - Obsolete groups disappear; remaining messages and `gruffStableIdentity` values stay stable.
-- **Empty scans are unscored** - `analyse` emits an `empty-analysis` diagnostic and omits the score when no PHP files are discovered.
-- **Empty scans preserve exit policy** - The diagnostic is non-fatal, so zero-file runs still exit 0 without changing `--fail-on` behavior.
-- **Empty-scan baselines are unchanged** - The diagnostic is not a finding, so it creates no `gruffStableIdentity` or baseline entry.
-
-## 0.5.2 - 2026-08-06
+## 0.5.2 - 2026-08-12
 
 - **File and class lengths count substantive lines** - Blank and comment-only lines are free; thresholds stay unchanged and messages name the metric.
 - **Regenerate size baselines** - Accepted size findings resurface; run `vendor/bin/gruff-php analyse --generate-baseline --fail-on none`.
 - **SARIF size identities change** - Both size rules emit new `gruffStableIdentity` values because their messages changed.
 - **Refresh class-length hook baselines** - `size.class-length` gets a new hook identity; `size.file-length` stays matched.
+- **Procedural injection sinks are covered** - SQL and process rules resolve named arguments. SQL follows one unambiguous same-scope assignment; `proc_open()` keeps direct argument vectors safe unless they explicitly start a shell command mode.
+- **Security baselines keep existing identities** - Existing messages stay stable; new procedural findings need review or baselining.
 - **Public-property checks cover promotion** - Readonly classes stay quiet; public mutable promotions now report and may add baseline findings.
+- **Prophecy expectations stay configured** - Native promises, predictions, and asserted `reveal()` values no longer look like bare mocks.
+- **Prophecy baselines shed false positives** - Obsolete groups disappear; remaining messages and `gruffStableIdentity` values stay stable.
+- **Empty scans are unscored** - `analyse` emits an `empty-analysis` diagnostic and omits the score when no PHP files are discovered.
+- **Empty scans preserve exit policy** - The diagnostic is non-fatal, so zero-file runs still exit 0 without changing `--fail-on` behavior.
+- **Empty-scan baselines are unchanged** - The diagnostic is not a finding, so it creates no `gruffStableIdentity` or baseline entry.
 - **Promoted constructor docs stop duplicating** - Missing tags use `docs.missing-param-tag`, absent docblocks `docs.missing-public-phpdoc`.
 - **Four rule options added** - Tune generic names, property line comments, dangerous functions, and intentional public-state classes.
+- **Generated config explains its rules** - `init` writes each rule's description as its comment; size rules now name substantive-line counting.
+- **Agent-hook parsers close bypasses** - Protected paths stay blocked through curl form headers, xargs optional flags, escaped filenames, mixed-case environment assignments, and multi-batch scans.
 
 ## 0.5.1 - 2026-07-20
 
