@@ -81,13 +81,13 @@ final class DebugModeEnabledRule implements RuleInterface
                 continue;
             }
 
-            $directive = SecurityNodeHelper::argumentValue($call->args, 0);
+            $directive = SecurityNodeHelper::sinkArgumentValue($call, 0);
             // Only a literal display_errors / display_startup_errors directive is in scope.
             if (!$directive instanceof Scalar\String_ || !in_array(strtolower($directive->value), self::DISPLAY_DIRECTIVES, true)) {
                 continue;
             }
 
-            $directiveValue = SecurityNodeHelper::argumentValue($call->args, 1);
+            $directiveValue = SecurityNodeHelper::sinkArgumentValue($call, 1);
             // A falsy or absent value leaves error display off, which is the safe state.
             if ($directiveValue === null || !$this->isTruthy($directiveValue)) {
                 continue;

@@ -14,6 +14,7 @@ use GruffPhp\Engine\Parser\PhpFileParser;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\RuleRegistry;
 use GruffPhp\Rules\Security\DangerousFunctionCallRule;
+use GruffPhp\Rules\Security\DebugModeEnabledRule;
 use GruffPhp\Rules\Security\DisabledSslVerificationRule;
 use GruffPhp\Rules\Security\ErrorSuppressionRule;
 use GruffPhp\Rules\Security\ExtractCompactUserInputRule;
@@ -215,6 +216,15 @@ final class SecurityRulesTest extends TestCase
             // 54/64/82: a conditional rebind never hides a real parser, including sibling-branch sinks,
             // and a conditional construction counts as possibly-XML; the rebind on the sink's own path stays silent.
             'xml loaders need xml receivers' => ['xml-receiver-gating.php', UnsafeXmlLoadingRule::ID, [22, 27, 33, 38, 54, 64, 82]],
+            // Each pair is the same sink written positionally then with named arguments only. Both lines must
+            // appear: a row that lost its second line would mean named arguments had stopped resolving again.
+            'named header arguments resolve' => ['named-argument-sinks.php', HeaderInjectionRule::ID, [7, 8]],
+            'named unserialize arguments resolve' => ['named-argument-sinks.php', UnsafeUnserializeRule::ID, [13, 14]],
+            'named extract arguments resolve' => ['named-argument-sinks.php', ExtractCompactUserInputRule::ID, [19, 20]],
+            'named ini_set arguments resolve' => ['named-argument-sinks.php', DebugModeEnabledRule::ID, [25, 26]],
+            'named curl_setopt arguments resolve' => ['named-argument-sinks.php', DisabledSslVerificationRule::ID, [31, 32]],
+            'named path arguments resolve' => ['named-argument-sinks.php', PathTraversalFileAccessRule::ID, [37, 38]],
+            'named xml arguments resolve' => ['named-argument-sinks.php', UnsafeXmlLoadingRule::ID, [43, 44]],
         ];
     }
 

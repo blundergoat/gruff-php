@@ -25,6 +25,65 @@ use PhpParser\NodeFinder;
 final class SecurityNodeHelper
 {
     /**
+     * Global sink functions mapped to the parameter names PHP declares for them, in declared order.
+     *
+     * PHP 8 accepts named arguments for internal functions, so `header(header: $target)` puts the value a
+     * rule reads in no positional slot at all. Position-only matching resolves that call to null and the
+     * sink goes unreported, which is why every function a security rule reads an argument from is listed
+     * here: `sinkArgumentValue()` asks for the slot by name first, then falls back to position. Each list
+     * carries the leading parameters the rules actually read, not every trailing option.
+     *
+     * Each slot lists every spelling that resolves it. Bundled extensions were checked against PHP's own
+     * reflected signatures; the handful that ship no reflectable declaration here (`sqlsrv_query`) list every
+     * documented spelling instead of betting on one, which costs nothing because a name that does not exist
+     * simply never matches.
+     *
+     * @var array<string, list<list<string>>>
+     */
+    private const SINK_PARAMETERS = [
+        'apache_getenv'         => [['variable']],
+        'assert'                => [['assertion']],
+        'chdir'                 => [['directory']],
+        'compact'               => [['var_name']],
+        'copy'                  => [['from'], ['to']],
+        'curl_init'             => [['url']],
+        'curl_setopt'           => [['handle'], ['option'], ['value']],
+        'curl_setopt_array'     => [['handle'], ['options']],
+        'dirname'               => [['path'], ['levels']],
+        'env'                   => [['key']],
+        'exec'                  => [['command']],
+        'extract'               => [['array']],
+        'file_get_contents'     => [['filename']],
+        'file_put_contents'     => [['filename'], ['data']],
+        'fopen'                 => [['filename']],
+        'getenv'                => [['name']],
+        'glob'                  => [['pattern']],
+        'header'                => [['header']],
+        'ini_set'               => [['option'], ['value']],
+        'mkdir'                 => [['directory']],
+        'mysql_query'           => [['query']],
+        'mysqli_query'          => [['mysql'], ['query']],
+        'oci_parse'             => [['connection'], ['sql']],
+        'passthru'              => [['command']],
+        'pg_query'              => [['connection'], ['query']],
+        'popen'                 => [['command']],
+        'proc_open'             => [['command']],
+        'readfile'              => [['filename']],
+        'realpath'              => [['path']],
+        'rename'                => [['from'], ['to']],
+        'rmdir'                 => [['directory']],
+        'scandir'               => [['directory']],
+        'shell_exec'            => [['command']],
+        'simplexml_load_file'   => [['filename']],
+        'simplexml_load_string' => [['data']],
+        // Microsoft documents `tsql`; the PHPStan stub bundled here declares `sql`. Neither is reflectable.
+        'sqlsrv_query'          => [['conn'], ['sql', 'tsql']],
+        'system'                => [['command']],
+        'unlink'                => [['filename']],
+        'unserialize'           => [['data'], ['options']],
+    ];
+
+    /**
      * Lists the PHP superglobals treated as request-controlled input.
      *
      * @return list<string> - superglobal variable names without the leading `$`, treated as tainted sources
@@ -137,6 +196,27 @@ final class SecurityNodeHelper
         }
 
         return null;
+    }
+
+    /**
+     * Returns one argument of a global function call, matching the parameter name PHP declares for that slot.
+     *
+     * Rules call this instead of `argumentValue()` whenever the callee is a global function, so a sink written
+     * with named arguments resolves to the same expression as the positional form. An unmapped function or a
+     * dynamic callee simply keeps positional matching.
+     *
+     * @param FuncCall $call - Global function call whose argument is being read.
+     * @param int      $index - Zero-based parameter position the rule wants.
+     *
+     * @return Expr|null - Argument value, or null when the call omits that parameter entirely
+     */
+    public static function sinkArgumentValue(FuncCall $call, int $index): ?Expr
+    {
+        $functionName = self::globalFunctionName($call);
+        // Without a mapped declaration there is no name to match on, so the positional path decides alone.
+        $parameterNames = $functionName === null ? [] : (self::SINK_PARAMETERS[$functionName][$index] ?? []);
+
+        return self::argumentValue($call->args, $index, $parameterNames);
     }
 
     /**
@@ -765,7 +845,7 @@ final class SecurityNodeHelper
             return false;
         }
 
-        $firstArg = self::argumentValue($call->args, 0);
+        $firstArg = self::sinkArgumentValue($call, 0);
         if ($firstArg === null) {
             // A no-argument getenv() returns the whole environment, which is treated as sensitive wholesale.
             return true;

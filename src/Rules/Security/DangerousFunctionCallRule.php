@@ -122,7 +122,7 @@ final class DangerousFunctionCallRule implements RuleInterface
                 $findings[] = $this->finding($analysisUnit, $call, $name);
             }
 
-            $firstArg = SecurityNodeHelper::argumentValue($call->args, 0);
+            $firstArg = SecurityNodeHelper::sinkArgumentValue($call, 0);
             // assert() on a string literal evaluates that string as code.
             if ($name === 'assert' && $firstArg !== null && SecurityNodeHelper::isStringLiteral($firstArg)) {
                 $findings[] = $this->finding($analysisUnit, $call, 'assert string evaluation');

@@ -223,7 +223,7 @@ final class VariableIncludeRule implements RuleInterface
         array         $dynamicConstantNames,
         bool          $canFollowAssignments,
     ): bool {
-        $path = SecurityNodeHelper::argumentValue($call->args, 0);
+        $path = SecurityNodeHelper::sinkArgumentValue($call, 0);
         $isFixedInnerPath = $path instanceof Expr && $this->isFixedIncludeExpression(
             expression:                  $path,
             analysisUnit:                $analysisUnit,
@@ -236,7 +236,7 @@ final class VariableIncludeRule implements RuleInterface
             return false;
         }
 
-        $levels = SecurityNodeHelper::argumentValue($call->args, 1);
+        $levels = SecurityNodeHelper::sinkArgumentValue($call, 1);
 
         // dirname() stays fixed only when the optional levels arg is omitted or an int literal, never a variable.
         return $levels === null || $levels instanceof Scalar\Int_;

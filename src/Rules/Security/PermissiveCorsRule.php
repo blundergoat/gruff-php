@@ -73,7 +73,7 @@ final class PermissiveCorsRule implements RuleInterface
                 continue;
             }
 
-            $firstArg = SecurityNodeHelper::argumentValue($call->args, 0);
+            $firstArg = SecurityNodeHelper::sinkArgumentValue($call, 0);
             // A non-literal header value is left to the header-injection rule.
             if (!$firstArg instanceof Scalar\String_) {
                 continue;

@@ -87,8 +87,8 @@ final class DisabledSslVerificationRule implements RuleInterface
      */
     private function isDisabledCurlSetopt(Expr\FuncCall $call): bool
     {
-        $optionArg = SecurityNodeHelper::argumentValue($call->args, 1);
-        $valueArg  = SecurityNodeHelper::argumentValue($call->args, 2);
+        $optionArg = SecurityNodeHelper::sinkArgumentValue($call, 1);
+        $valueArg  = SecurityNodeHelper::sinkArgumentValue($call, 2);
 
         if ($optionArg === null || $valueArg === null) {
             // Without both an option and a value argument the call cannot be the two-arg form this rule inspects.
@@ -119,7 +119,7 @@ final class DisabledSslVerificationRule implements RuleInterface
      */
     private function isDisabledCurlSetoptArray(Expr\FuncCall $call): bool
     {
-        $optionsArg = SecurityNodeHelper::argumentValue($call->args, 1);
+        $optionsArg = SecurityNodeHelper::sinkArgumentValue($call, 1);
         if (!$optionsArg instanceof Expr\Array_) {
             // A non-literal options argument (variable, spread) is opaque to static inspection; assume nothing is off.
             return false;

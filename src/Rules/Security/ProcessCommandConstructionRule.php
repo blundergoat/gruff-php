@@ -142,7 +142,7 @@ final class ProcessCommandConstructionRule implements RuleInterface
                 continue;
             }
 
-            $commandArgument = SecurityNodeHelper::argumentValue($functionCall->args, 0, ['command']);
+            $commandArgument = SecurityNodeHelper::sinkArgumentValue($functionCall, 0);
             // proc_open() argv arrays bypass shell parsing unless they explicitly invoke a shell command mode.
             if ($functionName === 'proc_open' && $commandArgument instanceof Expr\Array_) {
                 $commandArgument = $this->shellCommandFromArgumentVector($commandArgument);

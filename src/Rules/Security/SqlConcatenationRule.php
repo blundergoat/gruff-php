@@ -45,18 +45,20 @@ final class SqlConcatenationRule implements RuleInterface
     private const QUERY_METHODS = ['exec', 'query', 'raw', 'select'];
 
     /**
-     * Procedural SQL sinks mapped to the position and named parameter carrying the query string.
+     * Procedural SQL sinks mapped to the position carrying the query string.
      *
+     * The parameter name each position answers to lives in SecurityNodeHelper::SINK_PARAMETERS, so a named
+     * argument resolves through the same table every other security rule uses rather than a local copy.
      * pg_query() also accepts the query as its sole argument; sqlArgumentForSink() handles that overload.
      *
-     * @var array<string, array{index: int, names: list<string>}>
+     * @var array<string, int>
      */
     private const PROCEDURAL_SQL_ARGUMENTS = [
-        'mysqli_query' => ['index' => 1, 'names' => ['query']],
-        'pg_query'     => ['index' => 1, 'names' => ['query']],
-        'mysql_query'  => ['index' => 0, 'names' => ['query']],
-        'sqlsrv_query' => ['index' => 1, 'names' => ['sql']],
-        'oci_parse'    => ['index' => 1, 'names' => ['sql']],
+        'mysqli_query' => 1,
+        'pg_query'     => 1,
+        'mysql_query'  => 0,
+        'sqlsrv_query' => 1,
+        'oci_parse'    => 1,
     ];
 
     /**
@@ -163,15 +165,12 @@ final class SqlConcatenationRule implements RuleInterface
             return null;
         }
 
-        $argumentContract = self::PROCEDURAL_SQL_ARGUMENTS[$functionName];
-        $sqlArgument      = SecurityNodeHelper::argumentValue(
-            $queryCall->args,
-            $argumentContract['index'],
-            $argumentContract['names'],
-        );
-        // pg_query($query) is the one supported overload whose query occupies position zero.
+        $sqlArgument = SecurityNodeHelper::sinkArgumentValue($queryCall, self::PROCEDURAL_SQL_ARGUMENTS[$functionName]);
+        // pg_query($query) is the one supported overload whose query occupies position zero. Match it
+        // positionally only: the named form already resolved above, and asking by name here would let
+        // pg_query(connection: $handle) hand back the connection as though it were the query text.
         if ($functionName === 'pg_query' && $sqlArgument === null) {
-            return SecurityNodeHelper::argumentValue($queryCall->args, 0, $argumentContract['names']);
+            return SecurityNodeHelper::argumentValue($queryCall->args, 0);
         }
 
         return $sqlArgument;

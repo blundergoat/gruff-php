@@ -20,6 +20,11 @@ Notable user-facing changes to `gruff-php` are listed here.
 - **Four rule options added** - Tune generic names, property line comments, dangerous functions, and intentional public-state classes.
 - **Generated config explains its rules** - `init` writes each rule's description as its comment; size rules now name substantive-line counting.
 - **Agent-hook parsers close bypasses** - Protected paths stay blocked through curl form headers, xargs optional flags, escaped filenames, mixed-case environment assignments, and multi-batch scans.
+- **`summary` applies the secret allowlist** - Vetted `allowlists.secretPreviews` findings no longer inflate its counts, grade, or rule table.
+- **Named arguments resolve at global sinks** - Security rules read `header(header: $x)` like `header($x)`; method and constructor sinks stay positional.
+- **Named guards still count as guards** - `simplexml_load_string(data: $xml, options: LIBXML_NONET)` reads as protected rather than unguarded.
+- **`sqlsrv_query` accepts both parameter spellings** - Microsoft documents `tsql`, the bundled stub says `sql`; either resolves the query slot.
+- **Security baselines may gain named-argument rows** - Calls written with named arguments were previously unreported; review or baseline the new findings.
 
 ## 0.5.1 - 2026-07-20
 

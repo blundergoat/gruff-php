@@ -136,6 +136,38 @@ final class GruffCliSummaryTest extends TestCase
     }
 
     /**
+     * Verify summary applies the configured secret preview allowlist.
+     *
+     * @return void
+     * @throws JsonException
+     */
+    public function testSummaryAppliesConfiguredSecretPreviewAllowlist(): void
+    {
+        $process = new Process([
+                                   PHP_BINARY,
+                                   self::PROJECT_ROOT . '/bin/gruff-php',
+                                   'summary',
+                                   'tests/Fixtures/SensitiveData/synthetic-secrets.php',
+                                   '--config',
+                                   'tests/Fixtures/Config/allow-aws-preview.yaml',
+                                   '--format',
+                                   'json',
+                               ], self::PROJECT_ROOT);
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+
+        // The allowlist runs before scoring, so the vetted rule leaves both the digest's rule table and
+        // the grade it prints; a summary that still listed it would also still be charging for it.
+        $decoded = json_decode($process->getOutput(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertIsArray($decoded);
+        $topRules = $decoded['topRules'] ?? null;
+        self::assertIsArray($topRules);
+        self::assertNotContains('sensitive-data.aws-access-key', array_column($topRules, 'ruleId'));
+        self::assertContains('sensitive-data.api-key-pattern', array_column($topRules, 'ruleId'));
+    }
+
+    /**
      * Verify summary rejects invalid option combinations.
      *
      * @param list<string> $arguments - CLI arguments appended after the base command.
