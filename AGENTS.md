@@ -42,12 +42,13 @@ Use concise free-form subjects unless the project owner chooses a stricter conve
 
 ## Essential Commands
 
-Application commands configured by `composer.json`:
+Application commands configured by `composer.json`, plus the umbrella gate CI runs:
 
 ```bash
 git status --short --untracked-files=all
 composer check
 composer test
+bash scripts/preflight-checks.sh
 composer perf
 php bin/gruff-php --help
 php bin/gruff-php analyse
@@ -69,7 +70,7 @@ Declare files allowed to change, non-goals, and max blast radius before writes. 
 State: `[MODE]` | Goal: `[one line]` | Exit: `[condition]`. Implement narrowly and prefer existing project patterns over new abstractions.
 
 ### VERIFY
-Run relevant checks before claiming success. If no app commands exist, say that explicitly. For shell changes run `bash -n` or `shellcheck` when available. Do not claim checks passed without literal pass/fail output from this session.
+Run relevant checks before claiming success. If no app commands exist, say that explicitly. For app-code changes the gate CI enforces is `bash scripts/preflight-checks.sh`; `composer check` and `composer test` alone cover neither version consistency nor the full-project advisory gruff scan. For shell changes run `bash -n` or `shellcheck` when available. Do not claim checks passed without literal pass/fail output from this session.
 
 **Hallucination red-flags:**
 1. **Checks passed.** Do not claim tests pass or any check passed (composer check, shellcheck, audit) without showing the literal pass/fail line copied verbatim from this session's run. Paraphrase, cached output, or prior-session results do not count.

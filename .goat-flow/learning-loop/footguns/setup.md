@@ -1,6 +1,6 @@
 ---
 category: setup
-last_reviewed: 2026-08-12
+last_reviewed: 2026-08-14
 ---
 
 # Setup Footguns
@@ -46,6 +46,18 @@ goat-flow 1.14.0's `audit --check-content` runs `code-map-dashboard-view-drift` 
 **Evidence:** Measured 2026-08-12 while verifying that `src/Rules/Modernisation/PublicPropertyRule.php` (search: `hasOpenWriteSide`) runs at the advertised floor. `composer why nikic/php-parser` after a `--prefer-lowest` resolution printed `phpunit/php-code-coverage 12.5.2 requires nikic/php-parser (^5.7.0)`. The real floor was proven instead by a throwaway project requiring only `php: ^8.3` and `nikic/php-parser: 5.6.0`, where `method_exists` confirmed `isReadonly`, `isPrivateSet`, and `isProtectedSet` on both `PhpParser\Node\Stmt\Property` and `PhpParser\Node\Param`.
 
 **Prevention:** Never cite a `--prefer-lowest` run inside this checkout as evidence that an advertised floor works. Prove a runtime floor in a consumer-shaped project that requires only the `require` block, never `require-dev`. Check `composer why <package>` first: when any dev dependency's constraint is tighter than the advertised one, the local resolution is measuring the dev constraint. This is the mirror image of the newer-major trap recorded above (search: `## Footgun: Consumer install tests can resolve newer dependency majors than the source checkout`); both come from the same root cause, that the source checkout's resolution is not a consumer's resolution.
+
+## Footgun: `goat-flow hooks sync` reverts this repo's local hook fixes; the failing drift audit is not a repair prompt
+
+**Status:** active | **Created:** 2026-08-14 | **Evidence:** ACTUAL_MEASURED
+**Decision changed:** Whether to act on `goat-flow audit`'s printed repair command when the drift scope covers `.goat-flow/hooks/`.
+**Trigger phase:** ACT
+
+`goat-flow audit . --harness --agent claude` exits 1 with `hookCoverage` reporting `requiredIneffective: 3, effective: 0` and `drift` listing 8 artifacts, and every hook row prints `repairCommand: goat-flow hooks sync`. Running it would overwrite three hook scripts that carry fixes existing nowhere upstream. `.goat-flow/hooks/deny-dangerous.sh` (search: `--no-run-if-empty`) keeps `-e`, `-i`, `-l`, `--eof`, `--replace` and `--max-lines` in the no-argument xargs branch; `xargs --help` documents all six as optional-argument flags, so the shipped template consumes the following token and can walk past the real command. `.goat-flow/hooks/post-turn-safety.sh` (search: `is_normalized_credential_key`) adds the credential-label classifier, and `.goat-flow/hooks/gruff-code-quality.sh` (search: `reported span intersects`) counts findings whose whole span overlaps an edit rather than only the primary line.
+
+**Evidence:** Measured 2026-08-14. Grep counts for `is_normalized_credential_key`, `CREDENTIAL_ASSIGNMENT_RE`, the xargs no-argument branch, and `reported span intersects` are 2/3/1/1 in the installed copies and 0 in both the published `node_modules/@blundergoat/goat-flow` 1.15.1 package and the `/home/devgoat/projects/goat-flow` checkout at `v1.15.0-57-g6ba24713`, so this is divergence rather than publication version skew. All three hooks pass their self-tests (`deny-dangerous.sh --self-test` reports `executed=400, skipped=0`). Four skill and reference artifacts under `.claude/skills/` and `.goat-flow/skill-docs/playbooks/` are adapted the same way; gruff reports zero findings on both the pristine templates and the installed copies, so this project's own quality gate did not force those edits.
+
+**Prevention:** Treat a `drift` or `installation-stale` audit result whose paths include `.goat-flow/hooks/` as a report, not an instruction. Diff the installed copy against `node_modules/@blundergoat/goat-flow/workflow/hooks/<name>` before syncing, and land the local fix upstream in the goat-flow checkout first so the sync is a no-op. Re-running the self-tests after any sync is the only proof the policy corpus survived.
 
 ## Resolved Entries
 

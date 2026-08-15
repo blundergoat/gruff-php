@@ -2,14 +2,18 @@
 
 Notable user-facing changes to `gruff-php` are listed here.
 
-## 0.5.2 - 2026-08-12
+## 0.5.2 - 2026-08-16
 
 - **File and class lengths count substantive lines** - Blank and comment-only lines are free; thresholds stay unchanged and messages name the metric.
 - **Regenerate size baselines** - Accepted size findings resurface; run `vendor/bin/gruff-php analyse --generate-baseline --fail-on none`.
 - **SARIF size identities change** - Both size rules emit new `gruffStableIdentity` values because their messages changed.
 - **Refresh class-length hook baselines** - `size.class-length` gets a new hook identity; `size.file-length` stays matched.
-- **Procedural injection sinks are covered** - SQL and process rules resolve named arguments. SQL follows one unambiguous same-scope assignment; `proc_open()` keeps direct argument vectors safe unless they explicitly start a shell command mode.
-- **Security baselines keep existing identities** - Existing messages stay stable; new procedural findings need review or baselining.
+- **Named arguments resolve at global sinks** - Rules read `header(header: $x)` like `header($x)`; method and constructor sinks stay positional.
+- **Named guards still count as guards** - `simplexml_load_string(data: $xml, options: LIBXML_NONET)` reads as protected rather than unguarded.
+- **`sqlsrv_query` accepts both parameter spellings** - Microsoft documents `tsql`, the bundled stub says `sql`; either resolves the query slot.
+- **Procedural SQL sinks are covered** - Query text reaches the procedural drivers through one unambiguous same-scope assignment.
+- **`proc_open()` argv arrays stay safe** - A direct argument vector is not shell text unless its first item launches a shell with a command flag.
+- **Security baselines gain rows, not identities** - Existing messages and identities hold; review or baseline new procedural and named-argument rows.
 - **Public-property checks cover promotion** - Readonly classes stay quiet; public mutable promotions now report and may add baseline findings.
 - **Prophecy expectations stay configured** - Native promises, predictions, and asserted `reveal()` values no longer look like bare mocks.
 - **Prophecy baselines shed false positives** - Obsolete groups disappear; remaining messages and `gruffStableIdentity` values stay stable.
@@ -19,12 +23,9 @@ Notable user-facing changes to `gruff-php` are listed here.
 - **Promoted constructor docs stop duplicating** - Missing tags use `docs.missing-param-tag`, absent docblocks `docs.missing-public-phpdoc`.
 - **Four rule options added** - Tune generic names, property line comments, dangerous functions, and intentional public-state classes.
 - **Generated config explains its rules** - `init` writes each rule's description as its comment; size rules now name substantive-line counting.
-- **Agent-hook parsers close bypasses** - Protected paths stay blocked through curl form headers, xargs optional flags, escaped filenames, mixed-case environment assignments, and multi-batch scans.
+- **Agent-hook parsers close bypasses** - Curl form headers, xargs flags, escaped filenames, and mixed-case env prefixes stop hiding protected paths.
+- **Agent-hook batch scanning closes a gap** - Files past the first batch boundary are scanned, so a late protected path is not skipped.
 - **`summary` applies the secret allowlist** - Vetted `allowlists.secretPreviews` findings no longer inflate its counts, grade, or rule table.
-- **Named arguments resolve at global sinks** - Security rules read `header(header: $x)` like `header($x)`; method and constructor sinks stay positional.
-- **Named guards still count as guards** - `simplexml_load_string(data: $xml, options: LIBXML_NONET)` reads as protected rather than unguarded.
-- **`sqlsrv_query` accepts both parameter spellings** - Microsoft documents `tsql`, the bundled stub says `sql`; either resolves the query slot.
-- **Security baselines may gain named-argument rows** - Calls written with named arguments were previously unreported; review or baseline the new findings.
 
 ## 0.5.1 - 2026-07-20
 

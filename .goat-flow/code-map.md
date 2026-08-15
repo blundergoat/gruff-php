@@ -6,10 +6,18 @@ Last reviewed 2026-08-07. Captures the current source surface as wired in `compo
 
 ```text
 .
-|-- README.md                 = project entry doc; also probed by docs.missing-readme rule
+|-- README.md                 = project entry doc; also probed by docs.missing-readme rule; links the whole docs/ tree
 |-- CHANGELOG.md              = release history; the top section tracks the current `Application::VERSION`
 |-- CLAUDE.md                 = Claude Code root instruction file
 |-- AGENTS.md                 = Codex peer instruction file
+|-- CONTRIBUTING.md           = contribution guidance
+|-- SECURITY.md               = vulnerability reporting policy
+|-- SUPPORT.md                = support channels
+|-- LICENSE                   = project licence
+|-- docs/                     = user- and agent-facing documentation (configuration, rules, output formats, CI, dashboard, releasing, mission, naming, CLI agent instructions, branch review, summary) plus coding-standards/git-commit-message.md, the commit guidance the instruction-file router table points to
+|-- resources/                = shipped config presets under profiles/ (`gruff.starter`, `gruff.recommended`, `gruff.strict`), resolved by `ConfigLoader::resolveExtendsReference()` for `extends:` (ADR-021)
+|-- .gruff-php.yaml           = this project's own gruff config: schemaVersion, minimumPhpVersion, minimumSeverity, paths.ignore, allowlists, and per-rule tuning
+|-- infection.json5           = Infection mutation-testing config scoped to `src/`
 |-- composer.json             = Composer metadata, runtime deps, bin, autoload, `check`/`phpstan`/`security:scan`/`test` scripts
 |-- composer.lock             = resolved Composer dependency versions
 |-- phpstan.neon.dist         = PHPStan 2 level 10 config for `src/` and `tests/`
@@ -18,6 +26,8 @@ Last reviewed 2026-08-07. Captures the current source surface as wired in `compo
 |-- package-lock.json         = npm lockfile for harness Node tooling
 |-- node_modules/             = harness Node tooling install, gitignored; the vendored @blundergoat/goat-flow package is dist-only, so its upstream src/dashboard/views/ HTML view files (about, home, hooks, plans, projects, prompts, quality, settings, setup, skills, workspace) are not on disk here
 |-- vendor/                   = Composer install (gitignored)
+|-- baselines/                = local scratch baselines from dogfood runs (gitignored, untracked; some still carry legacy `gruff.baseline.v1`)
+|-- history.json              = local `--history-file` trend output (gitignored, untracked)
 |-- bin/                      = PHP CLI entrypoint
 |-- scripts/                  = local maintenance scripts
 |-- src/                      = gruff-php application source (PSR-4 root `GruffPhp\`)

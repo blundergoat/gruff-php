@@ -1,6 +1,6 @@
 ---
 category: rules
-last_reviewed: 2026-08-12
+last_reviewed: 2026-08-14
 ---
 
 # Rule Footguns
@@ -9,7 +9,7 @@ last_reviewed: 2026-08-12
 
 **Status:** active | **Created:** 2026-05-19 | **Evidence:** OBSERVED
 
-Five rules (`NestingDepthRule`, `NpathComplexityRule`, `CognitiveComplexityRule`, `RedundantVariableRule`, `UnreachableCodeRule`) share `src/Rules/Shared/StmtChildVisitor.php` (search: `childBlocks`) for child-block enumeration. If PHP adds a new control-flow construct (a future statement-form of `match`, an `using`-style block, etc.) and the helper is not updated, all five rules silently miss the new shape — their per-kind logic just never runs on the unknown statement type. The pre-consolidation pattern was to copy a 4-block `instanceof` chain into each rule; the helper exists precisely so that mistake can't be made one rule at a time.
+Four rules (`NestingDepthRule`, `CognitiveComplexityRule`, `RedundantVariableRule`, `UnreachableCodeRule`) share `src/Rules/Shared/StmtChildVisitor.php` (search: `childBlocks`) for child-block enumeration. If PHP adds a new control-flow construct (a future statement-form of `match`, an `using`-style block, etc.) and the helper is not updated, all four rules silently miss the new shape — their per-kind logic just never runs on the unknown statement type. The pre-consolidation pattern was to copy a 4-block `instanceof` chain into each rule; the helper exists precisely so that mistake can't be made one rule at a time.
 
 **Evidence:** `src/Rules/Shared/StmtChildVisitor.php` (search: `isControlFlowStmt`) — the supported statement-type set is fixed in one place. `tests/Rule/StmtChildVisitorTest.php` (search: `testControlFlowStatementIsRecognised`) asserts the set, so adding a new statement type without updating the helper fails the test.
 
@@ -54,14 +54,6 @@ Constructor-promoted properties are represented as `Node\Param` entries with vis
 `src/Rules/Naming/BooleanPrefixRule.php` (search: `allowedPrefixes`) checks that bool-returning methods, bool parameters, and bool properties *begin* with one of the configured prefixes (default `is`, `has`, `can`, `should`, `will`). Names that merely contain a prefix later in the identifier still fail. `ConfigLoader::projectHasConfig()` was flagged on its first cut because `has` appeared in the middle of the name; renaming to `hasProjectConfig()` cleared the rule. The same trap fires for parameters: `$shouldForce` passes, `$force` and `$forceShould` both fail.
 
 **Prevention:** When adding any bool-returning method, bool parameter, or bool property, put the prefix first. For names that read naturally with the subject before the verb (`projectHasConfig`, `userIsActive`), rephrase as prefix-first (`hasProjectConfig`, `isActiveUser`) or rename the subject out (`hasConfig` on a class already scoped to a project). The rule does not parse English — "name contains a prefix" is not enough; the leading token must be a configured prefix.
-
-## Footgun: Vendored code under `src/Vendor/` evades the vendor filter
-
-**Status:** active | **Created:** 2026-05-11 | **Evidence:** OBSERVED
-
-`design.single-implementor-interface` (and any future project rule) excludes files whose displayPath starts with `vendor/` by default, matching the Composer convention. Some projects vendor third-party libraries by copying them into `src/Vendor/...` instead of relying on Composer (observed in external dogfood: `src/Vendor/LayerShifter/...`, `src/Vendor/phpdocx/...`). Those copies live under `src/` and the rule treats them as project code, flagging genuinely external interfaces as if they were internal. Three of seven full-project findings in that target were these vendored copies (43% false-positive rate before configuration).
-
-**Prevention:** Document the rule's `additionalExcludedPaths` option (defined in `SingleImplementorInterfaceRule::definition()`'s `defaultOptions`). When dogfooding the rule in a project with vendored copies under `src/`, set `additionalExcludedPaths: ['src/Vendor/']` (or the project-specific convention) in `.gruff-php.yaml`. Do not extend the rule's hard-coded vendor list with project-specific paths; configuration is the right escape hatch. The rule surfaced the `additionalExcludedPaths` option in its remediation text so users saw the intended mitigation at the finding site. (`design.single-implementor-interface` was a built-in `ProjectRuleInterface` rule, since retired by ADR-026; the default `.gruff-php.yaml` no longer enables it. The escape-hatch lesson stands for any future project rule.)
 
 ## Footgun: Retiring a rule leaves stale count references in five doc artefacts
 
@@ -179,6 +171,17 @@ The size rules treat immutable value objects gently: `src/Rules/Size/PropertyCou
 **Prevention:** Before adding a caller that reuses `$sources->analysisUnits` after `RuleRegistry::analyse()`, confirm whether that call released them. Never pass units through a second size-rule pass without re-parsing. If a future caller genuinely needs post-release counting, make the counter fail loudly on a released unit rather than returning `0`; a zero here is indistinguishable from a genuinely empty file.
 
 ## Resolved Entries
+
+## Footgun: Vendored code under `src/Vendor/` evades the vendor filter
+
+**Status:** resolved | **Created:** 2026-05-11 | **Resolved:** 2026-06-10 | **Evidence:** OBSERVED
+
+`design.single-implementor-interface` excluded files whose displayPath started with `vendor/` by default, matching the Composer convention. Some projects vendor third-party libraries by copying them into `src/Vendor/...` instead of relying on Composer (observed in external dogfood: `src/Vendor/LayerShifter/...`, `src/Vendor/phpdocx/...`). Those copies live under `src/` and the rule treated them as project code, flagging genuinely external interfaces as if they were internal. Three of seven full-project findings in that target were these vendored copies (43% false-positive rate before configuration).
+
+**Resolution:**
+
+- [ADR-026](../decisions/ADR-026-retire-project-rules.md) retired `design.single-implementor-interface`, the only rule that could hit this. No bundled rule implements `ProjectRuleInterface` today, so the trap has no live trigger.
+- Kept as a design record: for any future `ProjectRuleInterface` rule, a hard-coded `vendor/` prefix is not a sufficient vendor filter. Give the rule an `additionalExcludedPaths` entry in its `defaultOptions` so a project can declare its own vendoring convention in `.gruff-php.yaml`, and name that option in the rule's remediation text so users see the escape hatch at the finding site. Do not extend a rule's hard-coded vendor list with project-specific paths; configuration is the right escape hatch.
 
 ## Footgun: Documentation could trip the raw `size.class-length` budget
 
