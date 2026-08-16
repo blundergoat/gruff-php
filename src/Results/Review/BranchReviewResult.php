@@ -29,7 +29,7 @@ final readonly class BranchReviewResult
      * @param list<Finding> $introduced - Findings new on this branch - the ones the review puts front and centre.
      * @param list<Finding> $removed - Findings the branch resolved: present in base, gone now.
      * @param list<Finding> $unchanged - Findings present in both base and branch, carried for context.
-     * @param float|null    $deltaScore - Score change versus the base snapshot; null when no comparable base score was available.
+     * @param float|null    $deltaScore - Score change versus the base snapshot; null when the run has no applicable score to move, so the review reports which findings changed without pricing them.
      */
     public function __construct(
         public string $base,

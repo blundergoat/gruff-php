@@ -15,11 +15,12 @@ use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Node\Expr;
+use PhpParser\NodeFinder;
 
 /**
- * Flags a mock that is set up and passed around but never given a verifying expectation - no `expects()`,
- * `shouldReceive()`, and so on - so the test never actually checks the interaction it mocked. A stub-only
- * mock (return values wired, no call asserted) downgrades to advisory. Runs over every test. Warning, medium confidence.
+ * Flags a mock that is passed around without an expectation or intentional configuration. PHPUnit/Mockery
+ * stubs remain advisory, while native Prophecy predictions and a revealed double asserted by identity count as
+ * configured. Runs over every test. Warning, medium confidence.
  */
 final readonly class MockWithoutExpectationRule implements RuleInterface
 {
@@ -37,6 +38,22 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
      * Stub-only method names that do not prove behavior was verified.
      */
     private const STUB_METHODS = ['willreturn', 'willreturnmap', 'willreturncallback', 'willreturnonconsecutivecalls', 'willreturnself', 'willthrowexception', 'andreturn'];
+
+    /**
+     * Prophecy methods that configure behaviour or register a prediction on a confirmed prophecy handle.
+     *
+     * @var list<string>
+     */
+    private const PROPHECY_CONFIGURATION_METHODS = [
+        'shouldbecalled',
+        'shouldbecalledonce',
+        'shouldbecalledtimes',
+        'shouldhavebeencalled',
+        'shouldnothavebeencalled',
+        'willreturn',
+        'willreturncallback',
+        'willthrow',
+    ];
 
     /**
      * Describes the mock-without-expectation rule for the registry and reports.
@@ -123,9 +140,9 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
      *                                                 node so {@see variableReads()} can exclude the write side and
      *                                                 keep only genuine reads.
      *
-     * @return array<string, array{line: int, name: string}> - mock variables keyed by name (sigil stripped), each
-     *                                                          holding its first assignment line so the finding points
-     *                                                          at the creation site; empty when no mocks were created
+     * @return array<string, array{line: int, name: string, isProphecy: bool}> - mock variables keyed by name (sigil
+     *                                                                          stripped), with creation evidence used
+     *                                                                          to apply framework-specific semantics
      */
     private function mockAssignments(
         TestQualityScope $scope,
@@ -152,6 +169,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
             $mockAssignments[$varName] ??= [
                 'line' => $assign->getStartLine(),
                 'name' => $varName,
+                'isProphecy' => $this->isProphecyCreationExpression($assign->expr),
             ];
         }
 
@@ -199,7 +217,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
      * @param AnalysisUnit                       $analysisUnit - Parsed unit supplying the display path for the finding.
      * @param TestQualityScope                   $scope - Test scope the mock lives in; its symbol labels findings.
      * @param string                             $varName - Mock variable name without the leading sigil.
-     * @param array{line: int, name: string}     $assignment - Creation site of the mock; its line anchors the finding.
+     * @param array{line: int, name: string, isProphecy: bool} $assignment - Creation evidence and finding location.
      * @param array<string, list<Expr\Variable>> $reads - Read occurrences per variable; a mock never read here is
      *                                                          left to the unused-mock rule and not flagged.
      *
@@ -221,6 +239,14 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
         $methodNames = $this->methodNamesCalledOnVariable($scope, $varName);
         if ($this->hasAnyIntersection($methodNames, self::VERIFICATION_METHODS)) {
             // An explicit expectation (expects/shouldReceive) proves intent, so the mock is fine.
+            return null;
+        }
+
+        // Prophecy has its own prediction vocabulary; applying it only to prophesize() avoids cross-framework guesses.
+        if ($assignment['isProphecy']
+            && ($this->hasAnyIntersection($methodNames, self::PROPHECY_CONFIGURATION_METHODS)
+                || $this->hasProphecyRevealInAssertion($scope, $varName))
+        ) {
             return null;
         }
 
@@ -287,6 +313,26 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     }
 
     /**
+     * Reports whether an expression creates a Prophecy handle directly.
+     *
+     * @param Expr $expression - Mock-creation expression whose framework vocabulary must be selected.
+     *
+     * @return bool - True only for a statically named prophesize() call.
+     */
+    private function isProphecyCreationExpression(Expr $expression): bool
+    {
+        // Framework-specific suppression is unsafe when the creation API cannot be resolved statically.
+        if (!$expression instanceof Expr\FuncCall
+            && !$expression instanceof Expr\MethodCall
+            && !$expression instanceof Expr\StaticCall
+        ) {
+            return false;
+        }
+
+        return TestQualityNodeHelper::callName($expression) === 'prophesize';
+    }
+
+    /**
      * Reports whether a method-call chain originates at a mock creator.
      *
      * @param Expr\MethodCall $call - Outermost call of a builder chain (e.g. ...->getMock()) to trace back to its root.
@@ -344,6 +390,31 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
         }
 
         return $names;
+    }
+
+    /**
+     * Reports whether an assertion directly consumes reveal() from a prophecy handle.
+     *
+     * @param TestQualityScope $scope - Test scope containing the prophecy and candidate assertion.
+     * @param string           $varName - Prophecy variable name without the sigil.
+     *
+     * @return bool - True when reveal() from this prophecy is nested inside a recognised assertion.
+     */
+    private function hasProphecyRevealInAssertion(TestQualityScope $scope, string $varName): bool
+    {
+        // Merely passing reveal() into the subject is setup; only an assertion makes the revealed identity evidence.
+        foreach (TestQualityNodeHelper::assertionCalls($scope) as $assertionCall) {
+            $nestedMethodCalls = (new NodeFinder())->findInstanceOf($assertionCall->args, Expr\MethodCall::class);
+            foreach ($nestedMethodCalls as $nestedMethodCall) {
+                if (TestQualityNodeHelper::callName($nestedMethodCall) === 'reveal'
+                    && $this->isChainRootedAtVariable($nestedMethodCall, $varName)
+                ) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

@@ -1,6 +1,6 @@
 ---
 category: performance
-last_reviewed: 2026-07-03
+last_reviewed: 2026-08-07
 ---
 
 # Performance Patterns
@@ -26,7 +26,7 @@ php /path/to/gruff-php/bin/gruff-php analyse --diff-vs=origin/deploy --changed-o
 
 **Created:** 2026-05-17
 
-**Context:** `scripts/test-performance.sh --full --corpus=all` identified repeated AST traversals as a real analyse hot path. Before the optimisation pass, the large corpus showed `design.single-implementor-interface` at about 688 ms and `complexity.maintainability-index` at about 522 ms in the per-rule top list. The relevant anchors are `src/Rules/Complexity/CyclomaticComplexityRule.php` (search: `static $cache = null`), `src/Rules/Complexity/HalsteadVolumeRule.php` (search: `validatedMetrics`), and the retired `src/Rules/Design/SingleImplementorInterfaceRule.php` (search: `collectClassTypeReferences`).
+**Context:** `scripts/test-performance.sh --full --corpus=all` identified repeated AST traversals as a real analyse hot path. Before the optimisation pass, the large corpus showed `design.single-implementor-interface` at about 688 ms and `complexity.maintainability-index` at about 522 ms in the per-rule top list. The relevant anchors are `src/Rules/Complexity/CyclomaticComplexityRule.php` (search: `static $cyclomaticCache = null`), `src/Rules/Complexity/HalsteadVolumeRule.php` (search: `validatedMetrics`), and the retired `src/Rules/Design/SingleImplementorInterfaceRule.php` (search: `collectClassTypeReferences`).
 
 **Approach:** When two rules or helper calculations need the same expensive AST metric for the same `PhpParser\Node`, cache it in a process-local `WeakMap` keyed by the node. This lets `complexity.maintainability-index` reuse cyclomatic and Halstead calculations that other complexity rules already requested, while avoiding retention of parsed ASTs after the analyse process releases them. For project rules that scan whole corpora, prefer one broad `NodeFinder::find()` pass that collects the needed class/interface nodes over multiple `findInstanceOf()` passes for each node type, then do targeted subtree scans only where the rule needs class-local references.
 

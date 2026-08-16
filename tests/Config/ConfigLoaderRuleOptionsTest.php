@@ -16,11 +16,14 @@ use GruffPhp\Results\Finding\Pillar;
 use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
+use GruffPhp\Rules\Docs\MissingPropertyPhpdocRule;
+use GruffPhp\Rules\Naming\GenericMethodNameRule;
 use GruffPhp\Rules\Naming\IdentifierQualityRule;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
 use GruffPhp\Rules\RuleRegistry;
+use GruffPhp\Rules\Security\DangerousFunctionCallRule;
 use GruffPhp\Rules\Security\SqlConcatenationRule;
 use GruffPhp\Rules\Security\VariableIncludeRule;
 use GruffPhp\Rules\TestQuality\ExtendsProductionClassRule;
@@ -105,8 +108,8 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
             $ruleRegistry,
             [
                 'rules' => [
-                    'dead-code.retired-rule'         => ['enabled' => true],
-                    FixtureDefaultDisabledRule::ID   => ['enabled' => true],
+                    'dead-code.retired-rule' => ['enabled' => true],
+                    FixtureDefaultDisabledRule::ID => ['enabled' => true],
                 ],
             ],
         );
@@ -174,6 +177,99 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     }
 
     /**
+     * Verify requested rule options load with their declared replacement, toggle, and additive shapes.
+     *
+     * @return void
+     */
+    public function testLoadsRequestedRuleOptions(): void
+    {
+        $path = $this->writeTempConfig(json_encode([
+            'rules' => [
+                GenericMethodNameRule::ID => ['options' => ['genericNames' => ['fetch']]],
+                MissingPropertyPhpdocRule::ID => ['options' => ['acceptLineComments' => true]],
+                DangerousFunctionCallRule::ID => ['options' => ['additionalFunctions' => ['custom_runner']]],
+            ],
+        ], JSON_THROW_ON_ERROR));
+
+        $config = (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
+
+        self::assertSame(
+            ['fetch'],
+            $config->ruleSettings(GenericMethodNameRule::ID)->stringListOption('genericNames'),
+        );
+        self::assertTrue(
+            $config->ruleSettings(MissingPropertyPhpdocRule::ID)->option('acceptLineComments'),
+        );
+        self::assertSame(
+            ['custom_runner'],
+            $config->ruleSettings(DangerousFunctionCallRule::ID)->stringListOption('additionalFunctions'),
+        );
+    }
+
+    /**
+     * Provide invalid values for the requested rule options.
+     *
+     * @return array<string, array{string, string, string}> - Rule id, JSON options object, and exact validation message.
+     */
+    public static function requestedRuleOptionTypeProvider(): array
+    {
+        return [
+            'generic names requires a list' => [
+                GenericMethodNameRule::ID,
+                '{"genericNames":"fetch"}',
+                'Option "rules.naming.generic-method.options.genericNames" must be a list.',
+            ],
+            'generic names requires string items' => [
+                GenericMethodNameRule::ID,
+                '{"genericNames":[1]}',
+                'Option "rules.naming.generic-method.options.genericNames.0" must be a string.',
+            ],
+            'line-comment toggle requires a boolean' => [
+                MissingPropertyPhpdocRule::ID,
+                '{"acceptLineComments":"yes"}',
+                'Option "rules.docs.missing-property-phpdoc.options.acceptLineComments" must be boolean.',
+            ],
+            'additional functions requires a list' => [
+                DangerousFunctionCallRule::ID,
+                '{"additionalFunctions":"custom_runner"}',
+                'Option "rules.security.dangerous-function-call.options.additionalFunctions" must be a list.',
+            ],
+            'additional functions requires string items' => [
+                DangerousFunctionCallRule::ID,
+                '{"additionalFunctions":[1]}',
+                'Option "rules.security.dangerous-function-call.options.additionalFunctions.0" must be a string.',
+            ],
+        ];
+    }
+
+    /**
+     * Verify requested rule options reject values outside their declared types.
+     *
+     * @param string $ruleId          - Rule whose option block is configured.
+     * @param string $optionsJson     - JSON object containing the invalid option value.
+     * @param string $expectedMessage - Exact loader rejection.
+     *
+     * @return void
+     */
+    #[DataProvider('requestedRuleOptionTypeProvider')]
+    public function testRejectsInvalidRequestedRuleOptionTypes(
+        string $ruleId,
+        string $optionsJson,
+        string $expectedMessage,
+    ): void {
+        $path = $this->writeTempConfig(sprintf(
+            '{"rules":{"%s":{"options":%s}}}',
+            $ruleId,
+            $optionsJson,
+        ));
+
+        $this->expectException(ConfigException::class);
+        $this->expectExceptionMessage($expectedMessage);
+
+        (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
+    }
+
+    /**
      * Verify rejects unknown rule option key.
      *
      * @return void
@@ -219,19 +315,19 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     public static function invalidRuleOptionTypeProvider(): array
     {
         return [
-            'float option'                   => [
+            'float option' => [
                 '{"rules":{"%s":{"options":{"ratio":"high"}}}}',
                 'Option "rules.%s.options.ratio" must be numeric.',
             ],
-            'boolean option'                 => [
+            'boolean option' => [
                 '{"rules":{"%s":{"options":{"flag":"yes"}}}}',
                 'Option "rules.%s.options.flag" must be boolean.',
             ],
-            'string option'                  => [
+            'string option' => [
                 '{"rules":{"%s":{"options":{"label":false}}}}',
                 'Option "rules.%s.options.label" must be a string.',
             ],
-            'list option'                    => [
+            'list option' => [
                 '{"rules":{"%s":{"options":{"patterns":"foo"}}}}',
                 'Option "rules.%s.options.patterns" must be a list.',
             ],
@@ -239,11 +335,11 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
                 '{"rules":{"%s":{"options":{"patterns":[123]}}}}',
                 'Option "rules.%s.options.patterns.0" must be a string.',
             ],
-            'string list item'               => [
+            'string list item' => [
                 '{"rules":{"%s":{"options":{"names":["alpha",2]}}}}',
                 'Option "rules.%s.options.names.1" must be a string.',
             ],
-            'integer list item'              => [
+            'integer list item' => [
                 '{"rules":{"%s":{"options":{"levels":[1,"two"]}}}}',
                 'Option "rules.%s.options.levels.1" must be an integer.',
             ],
@@ -253,7 +349,7 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     /**
      * Verify rejects invalid rule option type variants.
      *
-     * @param string $configTemplate - Config JSON template.
+     * @param string $configTemplate  - Config JSON template.
      * @param string $messageTemplate - Expected exception message template.
      *
      * @return void
@@ -302,7 +398,7 @@ final readonly class FixtureDefaultDisabledRule implements RuleInterface
      * Return findings produced by the fixture rule.
      *
      * @param AnalysisUnit $analysisUnit - Analysis unit.
-     * @param RuleContext  $ruleContext - Rule context for the fixture.
+     * @param RuleContext  $ruleContext  - Rule context for the fixture.
      *
      * @return list<\GruffPhp\Results\Finding\Finding> - always empty; this fixture exercises only the loader's enabled-state path and never reports
      */
@@ -336,11 +432,11 @@ final readonly class FixtureOptionsRule implements RuleInterface
             confidence:      Confidence::Low,
             defaultOptions:  [
                                  'patterns' => [],
-                                 'ratio'    => 0.5,
-                                 'flag'     => true,
-                                 'label'    => 'default',
-                                 'names'    => ['default'],
-                                 'levels'   => [1],
+                                 'ratio' => 0.5,
+                                 'flag' => true,
+                                 'label' => 'default',
+                                 'names' => ['default'],
+                                 'levels' => [1],
                              ],
         );
     }
@@ -349,7 +445,7 @@ final readonly class FixtureOptionsRule implements RuleInterface
      * Return findings produced by the fixture rule.
      *
      * @param AnalysisUnit $analysisUnit - Analysis unit.
-     * @param RuleContext  $ruleContext - Rule context for the fixture.
+     * @param RuleContext  $ruleContext  - Rule context for the fixture.
      *
      * @return list<\GruffPhp\Results\Finding\Finding> - always empty; this fixture exercises only the option-validation path and never reports
      */

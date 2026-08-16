@@ -1,4 +1,4 @@
-# CLAUDE.md - project v1.5.2 / goat-flow 1.14.0 (2026-07-20)
+# CLAUDE.md - instructions v1.5.2 / goat-flow 1.15.1 (2026-08-11)
 gruff-php is an opinionated PHP code-quality analyzer; its mission is to govern AI-generated code so a human can verify, trust, and sign off on it (legible, secure, genuinely tested). Current invariant: keep app claims and commands grounded in real source/config files.
 
 ## Truth Order
@@ -31,21 +31,22 @@ The Never tier and accepted architecture/ADR safety constraints are non-overrida
 
 - Learning loop: `.goat-flow/learning-loop/footguns/`, `.goat-flow/learning-loop/lessons/`, `.goat-flow/learning-loop/patterns/`, `.goat-flow/learning-loop/decisions/`
 - Skill reference: `.goat-flow/skill-docs/`
-- Tool playbooks: `.goat-flow/skill-docs/playbooks/README.md` is the full index (examples: `browser-use.md`, `page-capture.md`) - read BEFORE declaring a tool unavailable
+- Tool playbooks: `.goat-flow/skill-docs/playbooks/README.md` is the full index (tools such as `browser-use.md` and `page-capture.md`; disciplines such as `writing-style.md`) - read when a request names one and BEFORE declaring a tool unavailable
 - Orientation: `.goat-flow/architecture.md`, `.goat-flow/code-map.md`, `.goat-flow/glossary.md`
 
 ## Commit Messages
 
-Use concise free-form subjects unless the project owner chooses a stricter convention. Full guidance lives in `docs/coding-standards/git-commit.md`.
+Use concise free-form subjects unless the project owner chooses a stricter convention. Full guidance lives in `docs/coding-standards/git-commit-message.md`.
 
 ## Essential Commands
 
-Application commands configured by `composer.json`:
+Application commands configured by `composer.json`, plus the umbrella gate CI runs:
 
 ```bash
 git status --short --untracked-files=all
 composer check
 composer test
+bash scripts/preflight-checks.sh
 composer perf
 php bin/gruff-php --help
 php bin/gruff-php analyse
@@ -55,10 +56,10 @@ node node_modules/@blundergoat/goat-flow/dist/cli/cli.js audit . --agent claude 
 
 ## Execution Loop: READ -> SCOPE -> ACT -> VERIFY
 
-When a goat-* skill is active, its Step 0 replaces READ and selects the skill mode/depth. Resume at ACT after Step 0 output.
+When a goat-* skill is active, its Step 0 replaces READ and selects the skill mode/depth. SCOPE still gates writes: the skill's mode or user approval must permit them. Resume at ACT after Step 0 output.
 
 ### READ
-Read relevant files before changes. For URL, local HTML, localhost, screenshot, rendered UI, or browser-visible behavior, check browser evidence first with `command -v browser-use || command -v browser-use-python`. Before declaring any tool or capability unavailable, read the matching playbook in `.goat-flow/skill-docs/playbooks/` (e.g. `browser-use.md`, `page-capture.md`) and run that doc's "Availability Check" section verbatim - project-local CLI tools at `~/.local/bin/` are valid; do not conflate "no harness/MCP tool" with "no tool". Use INDEX-first retrieval across `.goat-flow/learning-loop/{footguns,lessons,patterns}/INDEX.md`; include `.goat-flow/learning-loop/decisions/INDEX.md` for architecture, policy, or setup work. Open source entries only on candidate hits; grep bucket files only after the INDEX pass or on a known retrieval miss.
+Read relevant files before changes. For URL, local HTML, localhost, screenshot, rendered UI, or browser-visible behavior, check browser evidence first with `command -v browser-use || command -v browser-use-python`. Cross-doc: read every file describing the same concept. Use INDEX-first retrieval across `.goat-flow/learning-loop/{footguns,lessons,patterns}/INDEX.md`; include `.goat-flow/learning-loop/decisions/INDEX.md` for architecture, policy, or setup work. Open source entries only on candidate hits; grep bucket files only after the INDEX pass or on a known retrieval miss; reword once on zero hits, then record the miss instead of broad-loading a bucket. Before declaring any tool or capability unavailable, read the matching playbook in `.goat-flow/skill-docs/playbooks/` (e.g. `browser-use.md`, `page-capture.md`) and run that doc's "Availability Check" section verbatim - project-local CLI tools at `~/.local/bin/` are valid; do not conflate "no harness/MCP tool" with "no tool". Prose surfaces route the same way before writing: `CHANGELOG.md` needs `changelog.md`; release notes need `release-notes.md`; README, `docs/`, PR/issue text, and learning-loop entry bodies need `writing-style.md`.
 
 ### SCOPE
 Declare files allowed to change, non-goals, and max blast radius before writes. Treat framework setup as limited to goat-flow artifacts and agent-owned config unless the user widens scope.
@@ -67,7 +68,7 @@ Declare files allowed to change, non-goals, and max blast radius before writes. 
 State: `[MODE]` | Goal: `[one line]` | Exit: `[condition]`. Implement narrowly and prefer existing project patterns over new abstractions.
 
 ### VERIFY
-Run relevant checks before claiming success. If no app commands exist, say that explicitly. For shell changes run `bash -n` or `shellcheck` when available. Do not claim checks passed without literal pass/fail output from this session.
+Run relevant checks before claiming success. If no app commands exist, say that explicitly. For app-code changes the gate CI enforces is `bash scripts/preflight-checks.sh`; `composer check` and `composer test` alone cover neither version consistency nor the full-project advisory gruff scan. For shell changes run `bash -n` or `shellcheck` when available. Do not claim checks passed without literal pass/fail output from this session.
 
 **Hallucination red-flags:**
 1. **Checks passed.** Do not claim tests pass or any check passed (composer check, shellcheck, audit) without showing the literal pass/fail line copied verbatim from this session's run. Paraphrase, cached output, or prior-session results do not count.
@@ -98,13 +99,13 @@ Footguns go in `.goat-flow/learning-loop/footguns/<category>.md`; lessons in `.g
 | Codex peer instruction file | `AGENTS.md` |
 | Learning loop | `.goat-flow/learning-loop/footguns/`, `.goat-flow/learning-loop/lessons/`, `.goat-flow/learning-loop/patterns/`, `.goat-flow/learning-loop/decisions/` |
 | Skill reference (meta) | `.goat-flow/skill-docs/` |
-| Tool playbooks (README index for CLI/MCP availability checks; examples: browser-use, page-capture) | `.goat-flow/skill-docs/playbooks/` - read BEFORE declaring a tool unavailable |
+| Tool playbooks (README index; tools e.g. browser-use, page-capture; disciplines e.g. changelog, release notes, prose style) | `.goat-flow/skill-docs/playbooks/` - read when a request names one, and BEFORE declaring a tool unavailable |
 | Skill-authoring methodology | `.goat-flow/skill-docs/skill-quality-testing/` - load the README, then the topical authoring guide |
 | Orientation | `.goat-flow/architecture.md`, `.goat-flow/code-map.md`, `.goat-flow/glossary.md` |
 | Claude skills/config | `.claude/skills/`, `.claude/settings.json` |
 | Codex skills/config | `.agents/skills/`, `.codex/config.toml`, `.codex/hooks.json` |
 | Shared hook scripts | `.goat-flow/hooks/` |
 | Local workspace notes | `.goat-flow/logs/sessions/`, `.goat-flow/plans/`, `.goat-flow/scratchpad/` |
-| Commit guidance | `docs/coding-standards/git-commit.md` |
+| Commit guidance | `docs/coding-standards/git-commit-message.md` |
 | Project entry docs | `README.md` |
 | Mission / philosophy | `docs/mission.md` (rationale); `.goat-flow/learning-loop/decisions/ADR-017-mission-govern-ai-generated-code.md` (decision) |

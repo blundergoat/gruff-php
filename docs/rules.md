@@ -148,6 +148,11 @@ call is statically the exact three-argument
 `preg_replace('/\s+/', ' ', $subject)` transformation. Larger or unrelated
 callables still need local purpose comments for their configured calls.
 
+`docs.missing-property-phpdoc` accepts a physically attached `//` or `#`
+comment in place of a docblock when `options.acceptLineComments` is true.
+The comment must carry meaning beyond what the property name already
+says. The default is false, so a docblock is required.
+
 ### `maintainability` (2)
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
@@ -235,6 +240,12 @@ incorrect. Direct `new ClassName(...)` constructor calls are outside this rule;
 functions, methods, and static calls remain eligible. Raise
 `minPositionalArguments` when a project wants a higher ambiguity floor.
 
+`modernisation.public-property` covers promoted constructor properties as
+well as declared ones, so upgrading can surface findings in constructors
+that were never edited. Readonly promotions stay quiet. Name a fully
+qualified class in `options.allowedClasses` when its mutable public state
+is a deliberate lifecycle or integration contract.
+
 ### `naming` (11)
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
@@ -303,6 +314,11 @@ array-iteration callable (`array_filter`, `array_map`, `array_walk`,
 Longer callback bodies and generic parameters on non-iteration closures
 still fire.
 
+`naming.generic-method` reads `options.genericNames` as a replacement
+list, not an addition. Setting it drops the built-in vocabulary entirely,
+so repeat any built-in name the project still wants flagged. Matching is
+case-insensitive.
+
 ### `security` (25)
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
@@ -356,6 +372,17 @@ instead - interpolating a local into the template still flags, so
 keyword (SELECT/INSERT/UPDATE/DELETE/ALTER/DROP/CREATE/SHOW/FROM/WHERE)
 must appear in the literal fragments, which keeps non-SQL `query()`
 receivers such as `DOMXPath` quiet without receiver type resolution.
+
+`security.dangerous-function-call` adds `options.additionalFunctions` to
+its built-in execution list rather than replacing it, so the built-ins
+cannot be configured away. Matching is case-insensitive.
+
+Security rules that read an argument from a global function resolve it by
+the parameter name PHP declares, so `header(header: $target)` is analysed
+exactly like `header($target)`. Sinks reached through a method or
+constructor call - `$pdo->query()`, `$zip->extractTo()`, `new Process()` -
+still match by position only, because their parameter names belong to the
+library rather than to PHP.
 
 ### `sensitive-data` (11)
 

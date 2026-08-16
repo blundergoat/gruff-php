@@ -329,6 +329,10 @@ final class SummaryCommand extends Command
                                              new RuleContext($projectRoot, $config),
             shouldReleaseUnitsAfterAnalysis: true,
         );
+        // Vetted secrets are dropped before scoring, exactly as `analyse` drops them: the allowlist decides
+        // what counts, not just what prints, so filtering later would leave the digest grading a finding the
+        // user already accepted and disagreeing with every other command over the same code.
+        $findings = (new AnalysisFindingSupport())->filterAllowedSecretPreviews($findings, $config);
         $score    = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive(), $topLimit, analysisConfig: $config);
 
         return new SummaryReportData(

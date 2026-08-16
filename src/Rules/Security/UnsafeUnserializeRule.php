@@ -68,7 +68,7 @@ final class UnsafeUnserializeRule implements RuleInterface
                 continue;
             }
 
-            $firstArg = SecurityNodeHelper::argumentValue($call->args, 0);
+            $firstArg = SecurityNodeHelper::sinkArgumentValue($call, 0);
             // A literal-string payload is fixed, not attacker-controlled.
             if ($firstArg === null || SecurityNodeHelper::isStringLiteral($firstArg)) {
                 continue;
@@ -104,7 +104,7 @@ final class UnsafeUnserializeRule implements RuleInterface
      */
     private function hasAllowedClassesFalse(Expr\FuncCall $call): bool
     {
-        $options = SecurityNodeHelper::argumentValue($call->args, 1);
+        $options = SecurityNodeHelper::sinkArgumentValue($call, 1);
         if (!$options instanceof Expr\Array_) {
             // No literal options array means we cannot prove the guardrail is set, so treat the call as unguarded.
             return false;

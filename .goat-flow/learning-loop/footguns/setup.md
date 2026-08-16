@@ -1,6 +1,6 @@
 ---
 category: setup
-last_reviewed: 2026-07-20
+last_reviewed: 2026-08-14
 ---
 
 # Setup Footguns
@@ -35,6 +35,30 @@ goat-flow 1.14.0's `audit --check-content` runs `code-map-dashboard-view-drift` 
 
 **Prevention:** When a package constraint includes a newer framework major than the local lockfile currently installs, verify the public CLI against that major before release. For Symfony Console support, prefer APIs present across every advertised major (`addCommands` across 6.4/7.x/8.x here) and avoid deprecated 7.x APIs when `^8.0` is allowed. A consumer-install test should either run in the CI PHP version that can resolve the newest major or include an explicit platform/dependency smoke so the highest supported major is actually exercised.
 
+## Footgun: `composer update --prefer-lowest` cannot reach the advertised floor when a dev dependency requires higher
+
+**Status:** active | **Created:** 2026-08-12 | **Evidence:** ACTUAL_MEASURED
+**Decision changed:** How to prove that the version range in `composer.json` actually runs the code that depends on it.
+**Trigger phase:** VERIFY
+
+`composer.json` (search: `"nikic/php-parser"`) advertises `^5.6`. Running `composer update --prefer-lowest --prefer-stable` in this checkout resolves php-parser to **v5.7.0**, not v5.6.0, because two development dependencies hold the floor above the advertised minimum: `phpunit/php-code-coverage` requires `^5.7.0` and `infection/infection` requires `^5.6.2`. Forcing `nikic/php-parser:5.6.0` is refused outright by the resolver. A consumer installing this package has neither PHPUnit nor Infection, so a consumer can resolve v5.6.0 while this checkout never can. A `--prefer-lowest` run therefore reports green against a version no consumer floor uses, and the lowest advertised version stays untested.
+
+**Evidence:** Measured 2026-08-12 while verifying that `src/Rules/Modernisation/PublicPropertyRule.php` (search: `hasOpenWriteSide`) runs at the advertised floor. `composer why nikic/php-parser` after a `--prefer-lowest` resolution printed `phpunit/php-code-coverage 12.5.2 requires nikic/php-parser (^5.7.0)`. The real floor was proven instead by a throwaway project requiring only `php: ^8.3` and `nikic/php-parser: 5.6.0`, where `method_exists` confirmed `isReadonly`, `isPrivateSet`, and `isProtectedSet` on both `PhpParser\Node\Stmt\Property` and `PhpParser\Node\Param`.
+
+**Prevention:** Never cite a `--prefer-lowest` run inside this checkout as evidence that an advertised floor works. Prove a runtime floor in a consumer-shaped project that requires only the `require` block, never `require-dev`. Check `composer why <package>` first: when any dev dependency's constraint is tighter than the advertised one, the local resolution is measuring the dev constraint. This is the mirror image of the newer-major trap recorded above (search: `## Footgun: Consumer install tests can resolve newer dependency majors than the source checkout`); both come from the same root cause, that the source checkout's resolution is not a consumer's resolution.
+
+## Footgun: `goat-flow hooks sync` reverts this repo's local hook fixes; the failing drift audit is not a repair prompt
+
+**Status:** active | **Created:** 2026-08-14 | **Evidence:** ACTUAL_MEASURED
+**Decision changed:** Whether to act on `goat-flow audit`'s printed repair command when the drift scope covers `.goat-flow/hooks/`.
+**Trigger phase:** ACT
+
+`goat-flow audit . --harness --agent claude` exits 1 with `hookCoverage` reporting `requiredIneffective: 3, effective: 0` and `drift` listing 8 artifacts, and every hook row prints `repairCommand: goat-flow hooks sync`. Running it would overwrite three hook scripts that carry fixes existing nowhere upstream. `.goat-flow/hooks/deny-dangerous.sh` (search: `--no-run-if-empty`) keeps `-e`, `-i`, `-l`, `--eof`, `--replace` and `--max-lines` in the no-argument xargs branch; `xargs --help` documents all six as optional-argument flags, so the shipped template consumes the following token and can walk past the real command. `.goat-flow/hooks/post-turn-safety.sh` (search: `is_normalized_credential_key`) adds the credential-label classifier, and `.goat-flow/hooks/gruff-code-quality.sh` (search: `reported span intersects`) counts findings whose whole span overlaps an edit rather than only the primary line.
+
+**Evidence:** Measured 2026-08-14. Grep counts for `is_normalized_credential_key`, `CREDENTIAL_ASSIGNMENT_RE`, the xargs no-argument branch, and `reported span intersects` are 2/3/1/1 in the installed copies and 0 in both the published `node_modules/@blundergoat/goat-flow` 1.15.1 package and the `/home/devgoat/projects/goat-flow` checkout at `v1.15.0-57-g6ba24713`, so this is divergence rather than publication version skew. All three hooks pass their self-tests (`deny-dangerous.sh --self-test` reports `executed=400, skipped=0`). Four skill and reference artifacts under `.claude/skills/` and `.goat-flow/skill-docs/playbooks/` are adapted the same way; gruff reports zero findings on both the pristine templates and the installed copies, so this project's own quality gate did not force those edits.
+
+**Prevention:** Treat a `drift` or `installation-stale` audit result whose paths include `.goat-flow/hooks/` as a report, not an instruction. Diff the installed copy against `node_modules/@blundergoat/goat-flow/workflow/hooks/<name>` before syncing, and land the local fix upstream in the goat-flow checkout first so the sync is a no-op. Re-running the self-tests after any sync is the only proof the policy corpus survived.
+
 ## Resolved Entries
 
 ## Footgun: classmap-authoritative hid newly added src/ classes in dev
@@ -53,6 +77,12 @@ goat-flow 1.14.0's `audit --check-content` runs `code-map-dashboard-view-drift` 
 
 `README.md` (search: `# gruff-php`) names the project, but the repository currently has no `composer.json`, `src/`, `tests/`, or PHP runtime configuration. The name makes it easy for agents to assume Composer, PHPUnit, or PHPStan commands exist. They do not exist until real app structure is added.
 
-**Resolution:** M01 added `composer.json` (search: `"bin": [`), `bin/gruff-php` (search: `new Application()`), `src/Cli/Application.php` (search: `final class Application`), `src/Cli/Command/AnalyseCommand.php` (search: `final class AnalyseCommand`), and `tests/Console/ListRulesCliTest.php` (search: `testVersionCommandRunsThroughBinary`).
+**Resolution:** M01 added the application surfaces:
+
+- `composer.json` (search: `"bin": [`) declares the package binary.
+- `bin/gruff-php` (search: `(new Application())->run()`) boots the console application.
+- `src/Cli/Application.php` (search: `final class Application`) registers the command surface.
+- `src/Cli/Command/AnalyseCommand.php` (search: `final class AnalyseCommand`) implements the analyser command.
+- `tests/Console/ListRulesCliTest.php` (search: `testVersionCommandRunsThroughBinary`) proves the binary runs.
 
 **Prevention:** Before listing app commands or describing runtime architecture, check for the actual files that define them. If a future scaffold has no app surface, say "no application command configured yet" instead of inventing PHP defaults.

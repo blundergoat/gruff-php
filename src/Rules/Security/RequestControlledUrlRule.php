@@ -164,7 +164,7 @@ final class RequestControlledUrlRule implements RuleInterface
      */
     private function hasCurlInitRequestUrl(Expr\FuncCall $call): bool
     {
-        $urlArg = SecurityNodeHelper::argumentValue($call->args, 0);
+        $urlArg = SecurityNodeHelper::sinkArgumentValue($call, 0);
 
         // Sink fires only when the URL argument is present and traces back to request input.
         return $urlArg !== null && SecurityNodeHelper::containsUserInput($urlArg);
@@ -179,8 +179,8 @@ final class RequestControlledUrlRule implements RuleInterface
      */
     private function hasCurlSetoptRequestUrl(Expr\FuncCall $call): bool
     {
-        $optionArg = SecurityNodeHelper::argumentValue($call->args, 1);
-        $valueArg  = SecurityNodeHelper::argumentValue($call->args, 2);
+        $optionArg = SecurityNodeHelper::sinkArgumentValue($call, 1);
+        $valueArg  = SecurityNodeHelper::sinkArgumentValue($call, 2);
 
         // Sink fires only for the CURLOPT_URL option when its value traces back to request input.
         return $optionArg !== null
@@ -198,7 +198,7 @@ final class RequestControlledUrlRule implements RuleInterface
      */
     private function hasCurlSetoptArrayRequestUrl(Expr\FuncCall $call): bool
     {
-        $optionsArg = SecurityNodeHelper::argumentValue($call->args, 1);
+        $optionsArg = SecurityNodeHelper::sinkArgumentValue($call, 1);
         if (!$optionsArg instanceof Expr\Array_) {
             // No literal option array to inspect, so no CURLOPT_URL entry can be proven tainted.
             return false;
@@ -230,7 +230,7 @@ final class RequestControlledUrlRule implements RuleInterface
      */
     private function hasStreamWrapperRequestUrl(Expr\FuncCall $call): bool
     {
-        $urlArg = SecurityNodeHelper::argumentValue($call->args, 0);
+        $urlArg = SecurityNodeHelper::sinkArgumentValue($call, 0);
 
         // Require a literal URL scheme plus request taint so plain local file reads do not trip this remote-fetch sink.
         return $urlArg !== null

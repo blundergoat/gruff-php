@@ -49,6 +49,7 @@ final readonly class MethodLengthRule implements RuleInterface
             tier:              RuleTier::V01,
             defaultSeverity:   Severity::Error,
             confidence:        Confidence::High,
+            description:       'Method length (logical lines: statements, not blank or comment lines)',
             severityThreshold: new SeverityThreshold(100, Severity::Error),
         );
     }

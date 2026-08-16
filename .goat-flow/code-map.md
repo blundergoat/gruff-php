@@ -1,15 +1,23 @@
 # Code Map - gruff-php
 
-Last reviewed 2026-07-04. Captures the current source surface as wired in `composer.json`, `bin/gruff-php`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
+Last reviewed 2026-08-07. Captures the current source surface as wired in `composer.json`, `bin/gruff-php`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
 
 ## Top-level layout
 
 ```text
 .
-|-- README.md                 = project entry doc; also probed by docs.missing-readme rule
+|-- README.md                 = project entry doc; also probed by docs.missing-readme rule; links the whole docs/ tree
 |-- CHANGELOG.md              = release history; the top section tracks the current `Application::VERSION`
 |-- CLAUDE.md                 = Claude Code root instruction file
 |-- AGENTS.md                 = Codex peer instruction file
+|-- CONTRIBUTING.md           = contribution guidance
+|-- SECURITY.md               = vulnerability reporting policy
+|-- SUPPORT.md                = support channels
+|-- LICENSE                   = project licence
+|-- docs/                     = user- and agent-facing documentation (configuration, rules, output formats, CI, dashboard, releasing, mission, naming, CLI agent instructions, branch review, summary) plus coding-standards/git-commit-message.md, the commit guidance the instruction-file router table points to
+|-- resources/                = shipped config presets under profiles/ (`gruff.starter`, `gruff.recommended`, `gruff.strict`), resolved by `ConfigLoader::resolveExtendsReference()` for `extends:` (ADR-021)
+|-- .gruff-php.yaml           = this project's own gruff config: schemaVersion, minimumPhpVersion, minimumSeverity, paths.ignore, allowlists, and per-rule tuning
+|-- infection.json5           = Infection mutation-testing config scoped to `src/`
 |-- composer.json             = Composer metadata, runtime deps, bin, autoload, `check`/`phpstan`/`security:scan`/`test` scripts
 |-- composer.lock             = resolved Composer dependency versions
 |-- phpstan.neon.dist         = PHPStan 2 level 10 config for `src/` and `tests/`
@@ -18,6 +26,8 @@ Last reviewed 2026-07-04. Captures the current source surface as wired in `compo
 |-- package-lock.json         = npm lockfile for harness Node tooling
 |-- node_modules/             = harness Node tooling install, gitignored; the vendored @blundergoat/goat-flow package is dist-only, so its upstream src/dashboard/views/ HTML view files (about, home, hooks, plans, projects, prompts, quality, settings, setup, skills, workspace) are not on disk here
 |-- vendor/                   = Composer install (gitignored)
+|-- baselines/                = local scratch baselines from dogfood runs (gitignored, untracked; some still carry legacy `gruff.baseline.v1`)
+|-- history.json              = local `--history-file` trend output (gitignored, untracked)
 |-- bin/                      = PHP CLI entrypoint
 |-- scripts/                  = local maintenance scripts
 |-- src/                      = gruff-php application source (PSR-4 root `GruffPhp\`)
@@ -187,7 +197,7 @@ tests/
 |-- skill-docs/
 |   |-- skill-conventions.md                  = shared full-depth skill conventions
 |   |-- skill-preamble.md                     = shared goat-* skill preamble
-|   |-- playbooks/                            = tool and discipline playbooks: browser-use.md, changelog.md, code-comments.md, gruff-code-quality.md, hook-policy-testing.md, observability.md, page-capture.md, release-notes.md, skill-playbook-authoring-sync.md, plus the README.md index
+|   |-- playbooks/                            = tool and discipline playbooks: browser-use.md, changelog.md, code-comments.md, gruff-code-quality.md, hook-policy-testing.md, observability.md, page-capture.md, release-notes.md, skill-playbook-authoring-sync.md, writing-style.md, plus the README.md index
 |   `-- skill-quality-testing/                = supporting docs for skill-quality-testing
 |-- plans/                                    = local milestone/task workspace (gitignored content under it)
 |-- scratchpad/                               = local temporary notes (gitignored content under it)
@@ -207,7 +217,7 @@ tests/
 
 .codex/
 |-- config.toml                               = Codex hooks feature config
-`-- hooks.json                                = Codex PreToolUse hook registration for the shared deny-dangerous hook; Codex post-tool/Stop hooks are unsupported in goat-flow 1.13.0
+`-- hooks.json                                = Codex hook registration for the shared hooks: PreToolUse (deny-dangerous), PostToolUse on `apply_patch` (gruff-code-quality), and Stop (post-turn-safety), all added in goat-flow 1.15.1
 
 .agents/
 `-- skills/                                   = peer-agent skills mirroring `.claude/skills/`

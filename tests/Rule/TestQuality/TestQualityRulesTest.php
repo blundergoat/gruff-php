@@ -404,7 +404,7 @@ final class TestQualityRulesTest extends TestCase
     {
         $findings = $this->analysePath('tests/Fixtures/TestQuality/mock-without-expectation.php');
 
-        self::assertRuleCount(MockWithoutExpectationRule::ID, 2, $findings);
+        self::assertRuleCount(MockWithoutExpectationRule::ID, 3, $findings);
 
         $mockFindings = array_values(array_filter(
                                          $findings,
@@ -420,7 +420,17 @@ final class TestQualityRulesTest extends TestCase
                                      ));
 
         sort($variants);
-        self::assertSame(['dead-mock', 'stub-only'], $variants);
+        self::assertSame(['dead-mock', 'dead-mock', 'stub-only'], $variants);
+        self::assertContains('bareProphecy', $variables);
+        self::assertNotContains('assertedProphecy', $variables);
+        self::assertNotContains('returningProphecy', $variables);
+        self::assertNotContains('expectedProphecy', $variables);
+        self::assertNotContains('singleCallProphecy', $variables);
+        self::assertNotContains('countedProphecy', $variables);
+        self::assertNotContains('observedProphecy', $variables);
+        self::assertNotContains('forbiddenProphecy', $variables);
+        self::assertNotContains('throwingProphecy', $variables);
+        self::assertNotContains('callbackProphecy', $variables);
         self::assertNotContains('fake', $variables);
     }
 

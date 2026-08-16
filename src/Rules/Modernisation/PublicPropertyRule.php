@@ -14,15 +14,18 @@ use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
+use PhpParser\Node;
 use PhpParser\Node\Stmt;
 
 /**
  * Flags a public mutable property that lets any caller read and overwrite object state directly, so the
  * user can move to readonly properties or accessor methods that keep the class's invariants intact.
  *
- * Runs per file over every class, skipping DTO-style data carriers where public fields are the whole
- * point. Each remaining public, non-static, non-readonly property is reported at warning - gruff-php only
- * surfaces it, it never rewrites the property for you.
+ * Runs per file over every class, skipping readonly owners and DTO-style data carriers. Readonly owners
+ * cannot expose mutable properties, while DTO public state is intentional. Each remaining declared or
+ * promoted property is reported at warning when it is public, non-static, and still writable from
+ * outside; `readonly`, `private(set)`, and `protected(set)` all close that write side. gruff-php only
+ * surfaces the property, it never rewrites it for you.
  */
 final readonly class PublicPropertyRule implements RuleInterface
 {
@@ -39,62 +42,203 @@ final readonly class PublicPropertyRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id:              self::ID,
-            name:            'Public mutable property',
-            pillar:          Pillar::Modernisation,
-            tier:            RuleTier::V01,
-            defaultSeverity: Severity::Warning,
-            confidence:      Confidence::High,
+            id:                 self::ID,
+            name:               'Public mutable property',
+            pillar:             Pillar::Modernisation,
+            tier:               RuleTier::V01,
+            defaultSeverity:    Severity::Warning,
+            confidence:         Confidence::High,
+            defaultOptions:     ['allowedClasses' => []],
+            description:        'Flags public mutable state unless its fully qualified class is an explicit lifecycle or integration contract.',
+            optionDescriptions: [
+                'allowedClasses' => 'Fully qualified classes whose intentionally mutable public state is an explicit lifecycle or integration contract.',
+            ],
+            falsePositiveShapes: [
+                [
+                    'shape' => 'Internal lifecycle containers that expose read-mostly parsed state but deliberately clear it after analysis to release memory.',
+                    'mitigation' => 'Add the exact fully qualified class to options.allowedClasses after verifying external mutation is part of the intended contract.',
+                ],
+            ],
         );
     }
 
     /**
-     * Reports each public mutable property that exposes state a caller could overwrite.
+     * Reports each public mutable declared or promoted property that exposes overwritable state.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
      *
      * @return list<Finding> - One finding per exposed public mutable property; empty when every class guards its state.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $findings = [];
+        $settings       = $ruleContext->settingsFor($this->definition());
+        $allowedClasses = $this->normalizedClassSet($settings->stringListOption('allowedClasses'));
+        $findings       = [];
 
         // Inspect every class declared in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Class_::class) as $class) {
-            // A DTO exists to carry public data, so its public fields are intentional, not a leak.
-            if (ModernisationNodeHelper::isDtoClass($class)) {
+            $className = $this->resolvedClassName($class);
+
+            // Readonly classes cannot expose mutable instance state, while DTO public fields are intentional.
+            if (
+                $class->isReadonly()
+                || ModernisationNodeHelper::isDtoClass($class)
+                || ($className !== null && isset($allowedClasses[strtolower($className)]))
+            ) {
                 continue;
             }
 
-            // Check each property the class declares.
-            foreach ($class->getProperties() as $property) {
-                // Only a plain public, non-static, non-readonly property exposes overwritable state.
-                if (!$property->isPublic() || $property->isStatic() || $property->isReadonly()) {
-                    continue;
-                }
+            array_push(
+                $findings,
+                ...$this->declaredPropertyFindings($analysisUnit, $class),
+                ...$this->promotedPropertyFindings($analysisUnit, $class),
+            );
+        }
 
-                // One declaration can name several properties, so report each name separately.
-                foreach ($property->props as $propertyProperty) {
-                    $name       = $propertyProperty->name->toString();
-                    $findings[] = new Finding(
-                        ruleId:      self::ID,
-                        message:     sprintf('Public mutable property $%s exposes state directly.', $name),
-                        filePath:    $analysisUnit->file->displayPath,
-                        line:        $propertyProperty->getStartLine(),
-                        severity:    Severity::Warning,
-                        pillar:      Pillar::Modernisation,
-                        tier:        RuleTier::V01,
-                        confidence:  Confidence::High,
-                        remediation: 'Prefer constructor-initialized readonly properties or methods that preserve invariants; DTO-style classes are exempt and gruff-php reports only.',
-                        metadata:    [
-                            'property' => $name,
-                        ],
-                    );
-                }
+        return $findings;
+    }
+
+    /**
+     * Normalizes configured class names into an exact case-insensitive lookup set.
+     *
+     * @param list<string> $classNames - Fully qualified class names supplied by rule config.
+     *
+     * @return array<string, true> - Lowercase class names without a leading namespace separator.
+     */
+    private function normalizedClassSet(array $classNames): array
+    {
+        $normalized = [];
+
+        foreach ($classNames as $className) {
+            $className = strtolower(ltrim(trim($className), '\\'));
+            if ($className !== '') {
+                $normalized[$className] = true;
+            }
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * Resolves a declaration to the exact name configured by a consumer.
+     *
+     * @param Stmt\Class_ $class - Named or anonymous class declaration.
+     *
+     * @return string|null - Fully qualified name without a leading separator, or null for anonymous classes.
+     */
+    private function resolvedClassName(Stmt\Class_ $class): ?string
+    {
+        $namespacedName = $class->namespacedName ?? null;
+        if ($namespacedName instanceof Node\Name) {
+            return ltrim($namespacedName->toString(), '\\');
+        }
+
+        return $class->name?->toString();
+    }
+
+    /**
+     * Reports mutable public properties declared with property statements.
+     *
+     * @param AnalysisUnit $analysisUnit - Parsed unit providing the reported display path.
+     * @param Stmt\Class_  $class        - Non-readonly, non-DTO class whose declarations are inspected.
+     *
+     * @return list<Finding> - One finding per public mutable declared property.
+     */
+    private function declaredPropertyFindings(AnalysisUnit $analysisUnit, Stmt\Class_ $class): array
+    {
+        $findings = [];
+
+        // Check each property the class declares.
+        foreach ($class->getProperties() as $property) {
+            // Only a plain public, non-static property with an open write side exposes overwritable state.
+            if (!$property->isPublic() || $property->isStatic() || !$this->hasOpenWriteSide($property)) {
+                continue;
+            }
+
+            // One declaration can name several properties, so report each name separately.
+            foreach ($property->props as $propertyProperty) {
+                $findings[] = $this->finding($analysisUnit, $propertyProperty, $propertyProperty->name->toString());
             }
         }
 
         return $findings;
+    }
+
+    /**
+     * Reports whether a declaration still lets an outside caller assign to the property.
+     *
+     * @param Stmt\Property|Node\Param $declaration - Property statement or promoted constructor parameter.
+     *
+     * @return bool - True when no readonly or restricted-set modifier closes the write side.
+     */
+    private function hasOpenWriteSide(Stmt\Property|Node\Param $declaration): bool
+    {
+        // PHP 8.4 asymmetric visibility keeps the read side public while closing the write side, so a
+        // `private(set)` or `protected(set)` property leaves an outside caller nothing to overwrite.
+        return !$declaration->isReadonly()
+            && !$declaration->isPrivateSet()
+            && !$declaration->isProtectedSet();
+    }
+
+    /**
+     * Reports mutable public properties promoted by a constructor.
+     *
+     * @param AnalysisUnit $analysisUnit - Parsed unit providing the reported display path.
+     * @param Stmt\Class_  $class        - Non-readonly, non-DTO class whose constructor is inspected.
+     *
+     * @return list<Finding> - One finding per public mutable promoted property.
+     */
+    private function promotedPropertyFindings(AnalysisUnit $analysisUnit, Stmt\Class_ $class): array
+    {
+        // Constructor-promoted properties are parameter nodes, not property statements.
+        $constructor = $class->getMethod('__construct');
+        if ($constructor === null) {
+            return [];
+        }
+
+        $findings = [];
+
+        foreach ($constructor->params as $parameter) {
+            // Only a public promotion with an open write side exposes writable object state.
+            if (!$parameter->isPromoted() || !$parameter->isPublic() || !$this->hasOpenWriteSide($parameter)) {
+                continue;
+            }
+
+            if (!$parameter->var instanceof Node\Expr\Variable || !is_string($parameter->var->name)) {
+                continue;
+            }
+
+            $findings[] = $this->finding($analysisUnit, $parameter, $parameter->var->name);
+        }
+
+        return $findings;
+    }
+
+    /**
+     * Builds a public-property finding for one mutable declaration or promoted parameter.
+     *
+     * @param AnalysisUnit $analysisUnit - Parsed unit providing the reported display path.
+     * @param Node         $node         - Property node whose start line anchors the finding.
+     * @param string       $name         - Property name used by the message and metadata.
+     *
+     * @return Finding - Fixed-shape warning for one exposed mutable property.
+     */
+    private function finding(AnalysisUnit $analysisUnit, Node $node, string $name): Finding
+    {
+        return new Finding(
+            ruleId:      self::ID,
+            message:     sprintf('Public mutable property $%s exposes state directly.', $name),
+            filePath:    $analysisUnit->file->displayPath,
+            line:        $node->getStartLine(),
+            severity:    Severity::Warning,
+            pillar:      Pillar::Modernisation,
+            tier:        RuleTier::V01,
+            confidence:  Confidence::High,
+            remediation: 'Prefer constructor-initialized readonly properties or methods that preserve invariants. If public mutation is an intentional lifecycle contract, add the fully qualified class to `rules.modernisation.public-property.options.allowedClasses`.',
+            metadata:    [
+                'property' => $name,
+            ],
+        );
     }
 }

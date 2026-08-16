@@ -92,7 +92,7 @@ final class PathTraversalFileAccessRule implements RuleInterface
 
             // Weigh each path argument the function takes.
             foreach (self::PATH_ARGUMENTS[$name] as $argumentIndex) {
-                $pathArg = SecurityNodeHelper::argumentValue($call->args, $argumentIndex);
+                $pathArg = SecurityNodeHelper::sinkArgumentValue($call, $argumentIndex);
                 // A URL, or a path with no request data, is not local traversal.
                 if ($pathArg === null || SecurityNodeHelper::containsUrlLiteral($pathArg) || !SecurityNodeHelper::containsUserInput($pathArg)) {
                     continue;

@@ -139,7 +139,8 @@ final class HookCliContractTest extends CliTestCase
 
             $metadata = $fileLength['metadata'] ?? null;
             self::assertIsArray($metadata);
-            $expectedMeasuredLines = 12;
+            // Substantive count: the fixture's blank and comment-only lines are free under file-length.
+            $expectedMeasuredLines = 10;
             self::assertSame($expectedMeasuredLines, $metadata['measured'] ?? null);
             self::assertSame(5, $metadata['threshold'] ?? null);
             self::assertSame('lines', $metadata['unit'] ?? null);
@@ -649,16 +650,18 @@ PHP;
      */
     private function oversizedSource(int $lines): string
     {
+        // Every generated line is substantive: file-length counts non-blank, non-comment lines only.
         $sourceLines = [
             '<?php',
-            '',
             'final class Example',
             '{',
             '}',
         ];
 
+        $fillerIndex = 1;
         while (count($sourceLines) < $lines) {
-            $sourceLines[] = '// filler';
+            $sourceLines[] = '$filler' . $fillerIndex . " = 'filler';";
+            ++$fillerIndex;
         }
 
         return implode("\n", $sourceLines) . "\n";

@@ -197,6 +197,140 @@ PHP);
     }
 
     /**
+     * Verify readonly owners stay quiet while public mutable promoted properties report once.
+     *
+     * @return void
+     */
+    public function testPublicPropertyRuleHandlesReadonlyOwnersAndPromotedProperties(): void
+    {
+        $unit = $this->inlineUnit(<<<'PHP'
+<?php
+readonly class ReadonlyOwner
+{
+    public string $declared;
+
+    public function __construct(public string $promoted)
+    {
+        $this->declared = $promoted;
+    }
+}
+final class MutableService
+{
+    public readonly string $readonlyDeclared;
+    public static string $staticDeclared;
+    public string $mutableDeclared;
+
+    public function __construct(
+        public string $publicPromoted,
+        public readonly string $readonlyPromoted,
+        protected string $protectedPromoted,
+        private string $privatePromoted,
+    ) {
+        $this->readonlyDeclared = $readonlyPromoted;
+    }
+}
+PHP);
+        $registry = RuleRegistry::defaults();
+        $config   = AnalysisConfig::fromRegistry($registry);
+        $findings = (new PublicPropertyRule())->analyse($unit, new RuleContext(self::PROJECT_ROOT, $config));
+
+        self::assertSame([], $unit->diagnostics);
+        self::assertSame(
+            ['mutableDeclared', 'publicPromoted'],
+            array_map(static fn(Finding $finding): mixed => $finding->metadata['property'] ?? null, $findings),
+        );
+        self::assertSame([15, 18], array_map(static fn(Finding $finding): ?int => $finding->line, $findings));
+        self::assertCount(2, array_unique(array_map(
+            static fn(Finding $finding): mixed => $finding->metadata['property'] ?? null,
+            $findings,
+        )));
+    }
+
+    /**
+     * Verify PHP 8.4 restricted-set properties stay quiet while an open write side still reports.
+     *
+     * @return void
+     */
+    public function testPublicPropertyRuleSkipsAsymmetricVisibilityWriteRestrictions(): void
+    {
+        $unit = $this->inlineUnit(<<<'PHP'
+<?php
+final class AsymmetricService
+{
+    public private(set) string $privateSetDeclared = '';
+    public protected(set) string $protectedSetDeclared = '';
+    public string $openDeclared = '';
+
+    public function __construct(
+        public private(set) string $privateSetPromoted,
+        public protected(set) string $protectedSetPromoted,
+        public string $openPromoted,
+    ) {
+    }
+}
+PHP);
+        $registry = RuleRegistry::defaults();
+        $config   = AnalysisConfig::fromRegistry($registry);
+        $findings = (new PublicPropertyRule())->analyse($unit, new RuleContext(self::PROJECT_ROOT, $config));
+
+        self::assertSame([], $unit->diagnostics);
+        self::assertSame(
+            ['openDeclared', 'openPromoted'],
+            array_map(static fn(Finding $finding): mixed => $finding->metadata['property'] ?? null, $findings),
+        );
+    }
+
+    /**
+     * Verify an exact configured class exemption leaves other mutable classes reportable.
+     *
+     * @return void
+     */
+    public function testPublicPropertyRuleHonoursAllowedClasses(): void
+    {
+        $unit = $this->inlineUnit(<<<'PHP'
+<?php
+namespace App\Parser;
+
+final class AllowedUnit
+{
+    public string $allowed;
+}
+
+final class ReportedUnit
+{
+    public string $reported;
+}
+PHP);
+        $registry      = RuleRegistry::defaults();
+        $defaultConfig = AnalysisConfig::fromRegistry($registry);
+        $rule          = new PublicPropertyRule();
+        $context       = new RuleContext(self::PROJECT_ROOT, $defaultConfig);
+
+        self::assertSame(
+            ['allowed', 'reported'],
+            array_map(static fn(Finding $finding): mixed => $finding->metadata['property'] ?? null, $rule->analyse($unit, $context)),
+        );
+
+        $settings      = $defaultConfig->ruleSettings(PublicPropertyRule::ID);
+        $allowedConfig = $defaultConfig->withRuleSettings(
+            PublicPropertyRule::ID,
+            new RuleSettings(
+                $settings->enabled,
+                $settings->thresholds,
+                array_merge($settings->options, ['allowedClasses' => ['App\\Parser\\AllowedUnit']]),
+                $settings->severityThreshold,
+                $settings->excludeFromScore,
+            ),
+        );
+        $findings = $rule->analyse($unit, new RuleContext(self::PROJECT_ROOT, $allowedConfig));
+
+        self::assertSame(
+            ['reported'],
+            array_map(static fn(Finding $finding): mixed => $finding->metadata['property'] ?? null, $findings),
+        );
+    }
+
+    /**
      * Verify PHP eight one candidates are detected.
      *
      * @return void

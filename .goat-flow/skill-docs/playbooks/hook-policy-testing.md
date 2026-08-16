@@ -1,5 +1,5 @@
 ---
-goat-flow-reference-version: "1.14.0"
+goat-flow-reference-version: "1.15.1"
 ---
 # Hook Policy Testing
 
@@ -16,11 +16,22 @@ test -x .goat-flow/hooks/deny-dangerous.sh &&
   bash .goat-flow/hooks/deny-dangerous.sh --self-test=smoke
 ```
 
-Availability is proven only when the command exits `0` and ends with a line like:
+Availability is proven only when the command exits `0` and ends with a `PASS`
+summary for the requested mode:
 
 ```text
-PASS: deny-dangerous self-test (mode=smoke, executed=32, skipped=0)
+PASS: deny-dangerous self-test (mode=smoke, executed=<count>, skipped=<count>)
 ```
+
+The executed count tracks the installed policy corpus, so it differs by project
+and grows as cases are added. Record this project's numbers as its baseline and
+compare later runs against that, not against any figure quoted here. An
+unfiltered run normally reports `skipped=0`. It may report one skip when the
+optional `timeout` executable is unavailable; confirm that absence with
+`command -v timeout`, record the reduced coverage, and do not claim the
+timeout-backed startup case was proved. Any other unfiltered skip is a failed
+availability check. Hook-filtered maintainer runs can skip out-of-filter cases
+by design, but they do not replace the unfiltered installed-policy check.
 
 If the installed hook is absent, stop and repair setup or select the correct
 project. Do not substitute the workflow-source hook as proof that a consumer's
@@ -135,9 +146,36 @@ Every supported agent must call the installed central dispatcher rather than a
 private copy. Confirm current configuration and manifest pointers:
 
 ```bash
-rg -n '\.goat-flow/hooks/deny-dangerous\.sh' \
-  .claude/settings.json .codex/hooks.json .github/hooks/hooks.json \
+registration_files=()
+
+# Check only registration files present in the user's selected project.
+for registration_file in \
+  .claude/settings.json \
+  .codex/hooks.json \
+  .github/hooks/hooks.json \
+  .agents/hooks.json \
   workflow/manifest.json
+do
+  # A present file can prove that the user's agent loads the central dispatcher.
+  if test -f "$registration_file"; then
+    registration_files+=("$registration_file")
+  fi
+done
+
+# No supported file means this project has no registration surface to verify.
+if test "${#registration_files[@]}" -eq 0; then
+  printf '%s\n' 'No supported agent registration files found.' >&2
+  exit 1
+fi
+
+# Ripgrep is not installed on every consumer machine; POSIX grep always is.
+if command -v rg >/dev/null 2>&1; then
+  rg -n --with-filename \
+    '\.goat-flow/hooks/deny-dangerous\.sh' "${registration_files[@]}"
+else
+  grep -nHE \
+    '\.goat-flow/hooks/deny-dangerous\.sh' "${registration_files[@]}"
+fi
 ```
 
 Then run the structural checks that detect packaging or registration drift:

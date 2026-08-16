@@ -23,6 +23,7 @@ final readonly class RunDiagnostic
      * @param string|null $filePath - Source file the diagnostic relates to; null when it is not tied to a parsed file.
      * @param int|null    $line - Source line the diagnostic relates to; null when no specific line applies.
      * @param string|null $path - Input path the diagnostic relates to when no parsed file exists; null when not applicable.
+     * @param bool        $isFatal - Whether this diagnostic makes the analysis result untrustworthy.
      */
     public function __construct(
         public string  $type,
@@ -30,6 +31,7 @@ final readonly class RunDiagnostic
         public ?string $filePath = null,
         public ?int    $line = null,
         public ?string $path = null,
+        public bool    $isFatal = true,
     ) {
     }
 
@@ -37,17 +39,24 @@ final readonly class RunDiagnostic
      * Flattens the diagnostic into the JSON shape reports emit, so an editor or CI sees the same note a
      * person reads in the terminal.
      *
-     * @return array{type: string, message: string, file: string|null, line: int|null, path: string|null} - report-ready snapshot of this diagnostic;
-     *                     the "file" key holds the source path (null when none) and "line"/"path" are null when not applicable.
+     * @return array{type: string, message: string, file: string|null, line: int|null, path: string|null, invalidatesRun?: false} - report-ready
+     *                     snapshot; invalidatesRun is emitted only for a non-fatal diagnostic because older consumers treat all existing types as fatal.
      */
     public function toArray(): array
     {
-        return [
+        $diagnostic = [
             'type'    => $this->type,
             'message' => $this->message,
             'file'    => $this->filePath,
             'line'    => $this->line,
             'path'    => $this->path,
         ];
+
+        // Existing diagnostic types remain wire-compatible; only the new non-fatal case needs an explicit marker.
+        if (!$this->isFatal) {
+            $diagnostic['invalidatesRun'] = false;
+        }
+
+        return $diagnostic;
     }
 }

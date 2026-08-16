@@ -2,7 +2,7 @@
     "schemaVersion": "gruff.analysis.v2",
     "tool": {
         "name": "gruff-php",
-        "version": "0.4.1"
+        "version": "0.5.2"
     },
     "run": {
         "format": "json",
@@ -41,7 +41,7 @@
     "findings": [
         {
             "ruleId": "size.file-length",
-            "message": "File has 27 lines, above the warning threshold of 3.",
+            "message": "File has 11 substantive lines, above the warning threshold of 3.",
             "file": "tests/Fixtures/Source/mixed/alpha.php",
             "line": 1,
             "endLine": 27,
@@ -53,10 +53,10 @@
             "tier": "v0.1",
             "confidence": "high",
             "remediation": "Split oversized files or move responsibilities into smaller units.",
-            "fingerprint": "f034a267b2fdcbc9",
-            "stableIdentity": "b7289768254b1d9c",
+            "fingerprint": "c58ffd67445ab336",
+            "stableIdentity": "26fa0bda604599a5",
             "metadata": {
-                "lines": 27,
+                "lines": 11,
                 "threshold": 3,
                 "thresholdType": "warning"
             }
@@ -253,7 +253,7 @@
                 "penalty": 48.75,
                 "maxCyclomatic": null,
                 "maxCognitive": null,
-                "maxLines": 27,
+                "maxLines": 11,
                 "mutationScore": null
             }
         ],

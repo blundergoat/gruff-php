@@ -179,7 +179,11 @@ run_once() {
         # shellcheck disable=SC2206
         cmd+=($paths)
     fi
-    cmd+=(--format=json --fail-on=none --print-runtime "--runtime-mode=${detail_mode}")
+    # --no-cache is load-bearing: without it a warm .gruff-cache from an earlier scan in the same
+    # session (composer check and scripts/preflight-checks.sh both run gruff) turns the measurement
+    # into a cache-hit benchmark. Measured 2026-08-12 on the medium corpus: 57ms/16MB warm against
+    # 2211ms/21MB cold, for identical filesParsed=275.
+    cmd+=(--no-cache --format=json --fail-on=none --print-runtime "--runtime-mode=${detail_mode}")
 
     local extra_args
     extra_args="$(corpus_extra_args "$corpus")"

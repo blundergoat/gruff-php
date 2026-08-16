@@ -1,6 +1,6 @@
 ---
 category: rules
-last_reviewed: 2026-07-20
+last_reviewed: 2026-08-14
 ---
 
 # Rule Footguns
@@ -9,7 +9,7 @@ last_reviewed: 2026-07-20
 
 **Status:** active | **Created:** 2026-05-19 | **Evidence:** OBSERVED
 
-Five rules (`NestingDepthRule`, `NpathComplexityRule`, `CognitiveComplexityRule`, `RedundantVariableRule`, `UnreachableCodeRule`) share `src/Rules/Shared/StmtChildVisitor.php` (search: `childBlocks`) for child-block enumeration. If PHP adds a new control-flow construct (a future statement-form of `match`, an `using`-style block, etc.) and the helper is not updated, all five rules silently miss the new shape — their per-kind logic just never runs on the unknown statement type. The pre-consolidation pattern was to copy a 4-block `instanceof` chain into each rule; the helper exists precisely so that mistake can't be made one rule at a time.
+Four rules (`NestingDepthRule`, `CognitiveComplexityRule`, `RedundantVariableRule`, `UnreachableCodeRule`) share `src/Rules/Shared/StmtChildVisitor.php` (search: `childBlocks`) for child-block enumeration. If PHP adds a new control-flow construct (a future statement-form of `match`, an `using`-style block, etc.) and the helper is not updated, all four rules silently miss the new shape — their per-kind logic just never runs on the unknown statement type. The pre-consolidation pattern was to copy a 4-block `instanceof` chain into each rule; the helper exists precisely so that mistake can't be made one rule at a time.
 
 **Evidence:** `src/Rules/Shared/StmtChildVisitor.php` (search: `isControlFlowStmt`) — the supported statement-type set is fixed in one place. `tests/Rule/StmtChildVisitorTest.php` (search: `testControlFlowStatementIsRecognised`) asserts the set, so adding a new statement type without updating the helper fails the test.
 
@@ -54,14 +54,6 @@ Constructor-promoted properties are represented as `Node\Param` entries with vis
 `src/Rules/Naming/BooleanPrefixRule.php` (search: `allowedPrefixes`) checks that bool-returning methods, bool parameters, and bool properties *begin* with one of the configured prefixes (default `is`, `has`, `can`, `should`, `will`). Names that merely contain a prefix later in the identifier still fail. `ConfigLoader::projectHasConfig()` was flagged on its first cut because `has` appeared in the middle of the name; renaming to `hasProjectConfig()` cleared the rule. The same trap fires for parameters: `$shouldForce` passes, `$force` and `$forceShould` both fail.
 
 **Prevention:** When adding any bool-returning method, bool parameter, or bool property, put the prefix first. For names that read naturally with the subject before the verb (`projectHasConfig`, `userIsActive`), rephrase as prefix-first (`hasProjectConfig`, `isActiveUser`) or rename the subject out (`hasConfig` on a class already scoped to a project). The rule does not parse English — "name contains a prefix" is not enough; the leading token must be a configured prefix.
-
-## Footgun: Vendored code under `src/Vendor/` evades the vendor filter
-
-**Status:** active | **Created:** 2026-05-11 | **Evidence:** OBSERVED
-
-`design.single-implementor-interface` (and any future project rule) excludes files whose displayPath starts with `vendor/` by default, matching the Composer convention. Some projects vendor third-party libraries by copying them into `src/Vendor/...` instead of relying on Composer (observed in external dogfood: `src/Vendor/LayerShifter/...`, `src/Vendor/phpdocx/...`). Those copies live under `src/` and the rule treats them as project code, flagging genuinely external interfaces as if they were internal. Three of seven full-project findings in that target were these vendored copies (43% false-positive rate before configuration).
-
-**Prevention:** Document the rule's `additionalExcludedPaths` option (defined in `SingleImplementorInterfaceRule::definition()`'s `defaultOptions`). When dogfooding the rule in a project with vendored copies under `src/`, set `additionalExcludedPaths: ['src/Vendor/']` (or the project-specific convention) in `.gruff-php.yaml`. Do not extend the rule's hard-coded vendor list with project-specific paths; configuration is the right escape hatch. The rule surfaced the `additionalExcludedPaths` option in its remediation text so users saw the intended mitigation at the finding site. (`design.single-implementor-interface` was a built-in `ProjectRuleInterface` rule, since retired by ADR-026; the default `.gruff-php.yaml` no longer enables it. The escape-hatch lesson stands for any future project rule.)
 
 ## Footgun: Retiring a rule leaves stale count references in five doc artefacts
 
@@ -166,17 +158,45 @@ The size rules treat immutable value objects gently: `src/Rules/Size/PropertyCou
 
 **Prevention:** Any "is this a value object / data carrier?" heuristic must classify behaviour by what a method RETURNS (a command returns nothing or is untyped), never by whether it takes a parameter. Add a fixture for a value object with a param-taking query/wither/factory method and assert it stays exempt, plus a void/untyped-command fixture that does not. Accept the inherent limit: a service whose methods all return typed values is shape-indistinguishable from a value object and stays exempt - that is a deliberate non-guess, not a bug.
 
-## Footgun: `size.class-length` counts comment and docblock lines, so a documentation pass can push a large class over the 800-line ERROR cap
+## Footgun: Size rules report zero, not an error, if they run after their unit is released
 
-**Status:** active | **Created:** 2026-07-04 | **Evidence:** OBSERVED
+**Status:** active | **Created:** 2026-08-12 | **Evidence:** OBSERVED
+**Decision changed:** Whether a new caller may reuse an `AnalysisUnit` after analysis, and where a size rule may be invoked.
+**Trigger phase:** ACT
 
-`size.class-length` measures RAW lines — `src/Rules/Size/ClassLengthRule.php` (search: `$endLine - $startLine + 1`) computes `endLine - startLine + 1`, which counts every comment, docblock, and blank line inside the class body, not just statements (the deliberate raw-metric choice recorded in `.goat-flow/learning-loop/decisions/ADR-012-size-rule-line-counting-metric.md`). The consequence for documentation work: adding inline comments and expanding method docblocks on a class whose body is already near the `.gruff-php.yaml` `size.class-length` threshold (800, ERROR) can trip the cap on comments alone, with zero code change. A comments-only pass over `src/Engine/Config/RuleConfigApplier.php` (727-line baseline → 811) and `src/Engine/Config/ConfigLoader.php` (764 → 819) each fired `size.class-length` ERROR mid-pass; `src/Rules/RuleRegistry.php` (class body 787) had only ~13 lines of headroom under 800 and had to be documented "lightly" to stay green.
+`src/Engine/Parser/AnalysisUnit.php` (search: `Break ParentConnectingVisitor's back-edges`) clears `source`, `statements`, and `tokens` to cut a measured 4-5GB peak on large scans. `src/Rules/Size/SubstantiveLineCounter.php` (search: `public static function evictUnit`) drops its cached line prefix beside that release. Both release sites, `src/Rules/RuleRegistry.php` (search: `$canReleaseUnits`) and `src/Cli/Command/AnalysisPipeline.php` (search: `SubstantiveLineCounter::evictUnit`), evict then release inside the analysis loop. After that point `SubstantiveLineCounter::countAll()` recomputes from an empty source and returns `0`. It does not throw and does not signal staleness, so `size.file-length` and `size.class-length` would silently find nothing rather than fail loudly.
 
-**Evidence:** `size.class-length` threshold and `error` severity live in `.gruff-php.yaml` (search: `size.class-length`); the raw metric is in `ClassLengthRule` (search: `$endLine - $startLine + 1`). Class-length = last line of the class − line of the `class`/`interface`/`trait`/`enum` keyword + 1, so a docblock ABOVE the class keyword is free (it shifts the decl line and the end line equally), but every line INSIDE the class body counts.
+**Evidence:** `tests/Rule/Size/SubstantiveLineCounterTest.php` (search: `testEvictsCachedPrefixBeforeUnitRelease`) pins the zero as expected behaviour: it evicts, releases, then asserts `countAll()` returns `0`. The trap is currently unreachable, and that is a property of the call sites rather than of the counter: `src/Cli/Command/BranchReviewBuilder.php` (search: `$baseRegistry->analyse`) re-analyses base units but omits `shouldReleaseUnitsAfterAnalysis`, which defaults to `false`, and also passes `$projectUnits`, which independently forces `$canReleaseUnits` to `false`. `SubstantiveLineCounter` is consumed only by `src/Rules/Size/FileLengthRule.php` and `src/Rules/Size/ClassLengthRule.php`, both per-unit rules that run before the eviction in the same iteration.
 
-**Prevention:** Before a comment/docblock pass on any class whose body approaches 800 lines, check the baseline class-length headroom first. Put class-level narrative in the class docblock ABOVE the class keyword (free for class-length), keep method summaries to one line, and add inline comments only on non-obvious control flow. `size.file-length` (1000, raw) has the same comment-counting property for whole files. Both are caught by `php bin/gruff-php analyse <file> --fail-on advisory`, so gate large-class edits per-file rather than discovering the cap in a full-project scan.
+**Prevention:** Before adding a caller that reuses `$sources->analysisUnits` after `RuleRegistry::analyse()`, confirm whether that call released them. Never pass units through a second size-rule pass without re-parsing. If a future caller genuinely needs post-release counting, make the counter fail loudly on a released unit rather than returning `0`; a zero here is indistinguishable from a genuinely empty file.
 
 ## Resolved Entries
+
+## Footgun: Vendored code under `src/Vendor/` evades the vendor filter
+
+**Status:** resolved | **Created:** 2026-05-11 | **Resolved:** 2026-06-10 | **Evidence:** OBSERVED
+
+`design.single-implementor-interface` excluded files whose displayPath started with `vendor/` by default, matching the Composer convention. Some projects vendor third-party libraries by copying them into `src/Vendor/...` instead of relying on Composer (observed in external dogfood: `src/Vendor/LayerShifter/...`, `src/Vendor/phpdocx/...`). Those copies live under `src/` and the rule treated them as project code, flagging genuinely external interfaces as if they were internal. Three of seven full-project findings in that target were these vendored copies (43% false-positive rate before configuration).
+
+**Resolution:**
+
+- [ADR-026](../decisions/ADR-026-retire-project-rules.md) retired `design.single-implementor-interface`, the only rule that could hit this. No bundled rule implements `ProjectRuleInterface` today, so the trap has no live trigger.
+- Kept as a design record: for any future `ProjectRuleInterface` rule, a hard-coded `vendor/` prefix is not a sufficient vendor filter. Give the rule an `additionalExcludedPaths` entry in its `defaultOptions` so a project can declare its own vendoring convention in `.gruff-php.yaml`, and name that option in the rule's remediation text so users see the escape hatch at the finding site. Do not extend a rule's hard-coded vendor list with project-specific paths; configuration is the right escape hatch.
+
+## Footgun: Documentation could trip the raw `size.class-length` budget
+
+**Status:** resolved | **Created:** 2026-07-04 | **Resolved:** 2026-08-05 | **Evidence:** OBSERVED
+
+Before the 2026-08-05 size-family ratification, `size.class-length` counted raw class-span lines. Comments, docblocks, and blank lines therefore consumed the project threshold even when executable code did not change. A comments-only pass triggered the 800-line cap in two configuration classes.
+
+**Resolution:**
+
+- `src/Rules/Size/ClassLengthRule.php` (search: `SubstantiveLineCounter::countRange`) now excludes blank and comment-only lines from class length.
+- `.goat-flow/learning-loop/decisions/ADR-012-size-rule-line-counting-metric.md` (search: `Amendment (2026-08-05, family ratification)`) records the superseding decision.
+- `.gruff-php.yaml` (search: `size.class-length`) retains the project threshold of 800 at error severity.
+
+**Prevention:** Check the live metric in `ClassLengthRule::analyse` before applying historical line-count guidance. Documentation no longer consumes the class-length budget; substantive code still does.
+
 
 ## Footgun: Project rules need full project context, not `--changed-only`
 

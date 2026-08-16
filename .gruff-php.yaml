@@ -59,7 +59,7 @@ allowlists:
     # 64-char hex hash that reads as a high-entropy secret; it is test data, not a credential. Keep this
     # preview in sync if that digest rotates (it changes whenever rules or fixtures change).
     secretPreviews:
-        - 'b2ab...beca (redacted, 64 chars)'
+        - '2a6d...9683 (redacted, 64 chars)'
 selection:
     tiers: []
     pillars: []
@@ -124,9 +124,11 @@ rules:
     # Missing @param tag
     docs.missing-param-tag:
         enabled: true
-    # Missing property PHPDoc
+    # Requires declared properties to explain their purpose with PHPDoc; an opt-in toggle also accepts meaningful attached line comments.
     docs.missing-property-phpdoc:
         enabled: true
+        options:
+            acceptLineComments: false
     # Missing method PHPDoc
     docs.missing-public-phpdoc:
         enabled: true
@@ -182,9 +184,12 @@ rules:
     # Flags PHPDoc @param/@return/@var/@property tags using mixed where a narrower type would carry more meaning. Unstructured array bags and precise array{...} envelope shapes are exempt.
     modernisation.phpdoc-mixed-overuse:
         enabled: true
-    # Public mutable property
+    # Flags public mutable state unless its fully qualified class is an explicit lifecycle or integration contract.
     modernisation.public-property:
         enabled: true
+        options:
+            allowedClasses:
+                - 'GruffPhp\Engine\Parser\AnalysisUnit'
     # Readonly property candidate
     modernisation.readonly-property-candidate:
         enabled: true
@@ -265,9 +270,21 @@ rules:
     # Confusing standalone class name
     naming.confusing-name:
         enabled: true
-    # Generic method name
+    # Flags functions and methods whose names match the configured replacement list of vague verbs.
     naming.generic-method:
         enabled: true
+        options:
+            genericNames:
+                - process
+                - handle
+                - execute
+                - run
+                - manage
+                - doIt
+                - do
+                - perform
+                - make
+                - compute
     # Flags identifiers that duplicate type information with configured prefixes such as arr, obj, str, or bool.
     naming.hungarian-notation:
         enabled: true
@@ -351,9 +368,11 @@ rules:
     # Test method naming consistency
     naming.test-naming-consistency:
         enabled: true
-    # Dangerous function calls
+    # Flags dynamic execution, built-in shell and evaluation patterns, and configured additive global function names.
     security.dangerous-function-call:
         enabled: true
+        options:
+            additionalFunctions: []
     # Forces PHP error display on via ini_set(display_errors, ...), leaking diagnostics in production.
     security.debug-mode-enabled:
         enabled: true
@@ -462,22 +481,22 @@ rules:
     # HTTP(S) URL with an inline user:password@host credential.
     sensitive-data.url-credentials:
         enabled: true
-    # Average method length
+    # Average method length (logical lines: statements only, averaged across the type's methods)
     size.average-method-length:
         enabled: true
         threshold: 50
         severity: error
-    # Class length
+    # Class length (substantive lines: blank and comment-only lines are free)
     size.class-length:
         enabled: true
         threshold: 800
         severity: error
-    # File length
+    # File length (substantive lines: blank and comment-only lines are free)
     size.file-length:
         enabled: true
         threshold: 1000
         severity: error
-    # Method length
+    # Method length (logical lines: statements, not blank or comment lines)
     size.method-length:
         enabled: true
         threshold: 70

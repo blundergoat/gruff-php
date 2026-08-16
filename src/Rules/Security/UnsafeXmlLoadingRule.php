@@ -82,7 +82,7 @@ final class UnsafeXmlLoadingRule implements RuleInterface
                 continue;
             }
 
-            $xmlArg = SecurityNodeHelper::argumentValue($call->args, 0);
+            $xmlArg = SecurityNodeHelper::sinkArgumentValue($call, 0);
             // Request-controlled XML with no LIBXML_NONET is the unsafe shape to flag.
             if ($xmlArg !== null && SecurityNodeHelper::containsUserInput($xmlArg) && !$this->hasLibxmlNonetArgument($call->args, 2)) {
                 $findings[] = $this->finding($analysisUnit, $call, $name);
@@ -566,20 +566,27 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     }
 
     /**
-     * Reports whether any positional options argument at or after the given index passes LIBXML_NONET.
+     * Reports whether any options argument at or after the given slot passes LIBXML_NONET.
      *
-     * @param array<int|string, Node\Arg|Node\VariadicPlaceholder> $args       - Call args; string-keyed named args are skipped.
+     * @param array<int|string, Node\Arg|Node\VariadicPlaceholder> $args       - Call args, positional and named.
      * @param int                                                  $startIndex - First positional index the options flags can appear at; varies by
      *                                                                         loader signature.
      *
-     * @return bool - True when an argument from the given index contains LIBXML_NONET.
+     * @return bool - True when an argument at or after that slot contains LIBXML_NONET.
      */
     private function hasLibxmlNonetArgument(array $args, int $startIndex): bool
     {
-        // Weigh each argument from the options index onward.
+        // Weigh each argument from the options slot onward.
         foreach ($args as $index => $arg) {
-            // Skip named args and positions before the options slot.
-            if (!is_int($index) || $index < $startIndex || !$arg instanceof Node\Arg) {
+            if (!$arg instanceof Node\Arg) {
+                continue;
+            }
+
+            // A named argument names the parameter it fills, so where it sits in the call says nothing about
+            // which slot it is; only an unnamed argument can be ruled out by sitting before the flags slot.
+            // Skipping named arguments here would report `simplexml_load_string(data: $xml,
+            // options: LIBXML_NONET)` as unguarded, which is a false positive on a call that set the flag.
+            if (!$arg->name instanceof Node\Identifier && is_int($index) && $index < $startIndex) {
                 continue;
             }
 
@@ -589,7 +596,7 @@ final class UnsafeXmlLoadingRule implements RuleInterface
             }
         }
 
-        // No positional flags argument referenced LIBXML_NONET, so the call is treated as network-enabled.
+        // No flags argument referenced LIBXML_NONET, so the call is treated as network-enabled.
         return false;
     }
 

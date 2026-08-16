@@ -23,9 +23,10 @@ use PhpParser\Node\Stmt\Function_;
  * Flags a documented method or function whose parameters have no matching `@param` tag, so the user keeps
  * the documented contract in step with the signature at any visibility.
  *
- * Runs per file over documented function-likes that carry real contract prose or tags (a bare skeleton is
- * left to other rules). A depth-aware parser reads the documented parameter names, tolerating multi-line
- * array shapes, and each undocumented parameter is reported. Advisory, high confidence.
+ * Runs per file over documented function-likes that carry contract prose or tags. A constructor skeleton
+ * also enforces tags for promoted parameters only, keeping property documentation under one rule without
+ * changing ordinary skeleton parameters. A depth-aware parser reads the documented parameter names,
+ * tolerating multi-line array shapes. Advisory, high confidence.
  */
 final readonly class MissingParamTagRule implements RuleInterface
 {
@@ -52,10 +53,10 @@ final readonly class MissingParamTagRule implements RuleInterface
     }
 
     /**
-     * Reports each documented function-like with undocumented parameters, at any visibility.
+     * Reports undocumented parameters for contract-bearing docblocks and promoted parameters in constructor skeletons.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
      *
      * @return list<Finding> - Findings for missing parameter tags.
      */
@@ -76,10 +77,11 @@ final readonly class MissingParamTagRule implements RuleInterface
                 continue;
             }
 
-            $docText = $docComment->getText();
+            $docText        = $docComment->getText();
+            $hasContractDoc = $this->hasContractDoc($docText);
 
-            // A skeleton docblock with no real contract is left to other rules.
-            if (!$this->hasContractDoc($docText)) {
+            // A skeleton gets narrow enforcement only when promoted parameters need a documentation owner.
+            if (!$hasContractDoc && !$this->hasPromotedConstructorParameter($node)) {
                 continue;
             }
 
@@ -88,6 +90,11 @@ final readonly class MissingParamTagRule implements RuleInterface
 
             // Check each signature parameter has a matching tag.
             foreach ($node->params as $param) {
+                // Preserve skeleton behaviour for ordinary parameters; only promoted properties gain an owner.
+                if (!$hasContractDoc && !$param->isPromoted()) {
+                    continue;
+                }
+
                 // Only a plain named parameter can be matched by name.
                 if (!$param->var instanceof Variable || !is_string($param->var->name)) {
                     continue;
@@ -172,7 +179,7 @@ final readonly class MissingParamTagRule implements RuleInterface
      * end of input.
      *
      * @param string $stripped - Docblock text with `/**`, ` * `, and `*\/` framing removed.
-     * @param int    $length - Pre-computed `strlen($stripped)` to avoid recomputation per call.
+     * @param int    $length   - Pre-computed `strlen($stripped)` to avoid recomputation per call.
      * @param int    $position - Cursor position (mutated to point past the matched variable).
      *
      * @return string|null - Variable name when found, null when the `@param` tag has no closing variable token.
@@ -234,6 +241,28 @@ final readonly class MissingParamTagRule implements RuleInterface
         $stripped = preg_replace('/\*\/\s*$/', '', $stripped) ?? '';
 
         return preg_replace('/^\s*\*\s?/m', '', $stripped) ?? '';
+    }
+
+    /**
+     * Reports whether a constructor promotes at least one parameter into a property.
+     *
+     * @param ClassMethod|Function_ $node - Documented function-like whose skeleton may need narrow enforcement.
+     *
+     * @return bool - True for a constructor with at least one promoted parameter.
+     */
+    private function hasPromotedConstructorParameter(ClassMethod|Function_ $node): bool
+    {
+        if (!$node instanceof ClassMethod || strtolower($node->name->toString()) !== '__construct') {
+            return false;
+        }
+
+        foreach ($node->params as $param) {
+            if ($param->isPromoted()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

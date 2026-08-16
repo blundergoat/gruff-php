@@ -80,7 +80,7 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
         // sit between the docblock and the property/function keyword. Walking the AST keeps
         // this distinction reliable; a token-stream walker has to skip past `T_ATTRIBUTE` tokens
         // by counting brackets, which is the "Heuristic rules overmatch nested syntax shapes"
-        // footgun documented at `.goat-flow/footguns/rules.md`.
+        // footgun documented at `.goat-flow/learning-loop/footguns/rules.md`.
         $definition = $this->definition();
         $findings   = [];
         $nodeFinder = new NodeFinder();

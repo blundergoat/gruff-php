@@ -42,7 +42,7 @@ final readonly class BranchReviewBuilder
      * @param AnalysisConfig        $config - Effective rule and path configuration.
      * @param RuleRegistry          $registry - Rule registry used to analyse the base snapshot.
      * @param list<Finding>         $currentFindings - Post-baseline findings for the current tree; empty when this branch is clean.
-     * @param float                 $currentScore - Composite score of the current findings.
+     * @param float|null            $currentScore - Composite score of the current findings; null when discovery found no files, which makes the score inapplicable.
      * @param DiffResult|null       $reviewDiff - Review diff metadata; null when the diff lookup failed, which turns review mode off.
      * @param list<RunDiagnostic>   $diagnostics - Run diagnostics collected so far; review-mode errors are appended here in place.
      *
@@ -54,7 +54,7 @@ final readonly class BranchReviewBuilder
         AnalysisConfig $config,
         RuleRegistry $registry,
         array $currentFindings,
-        float $currentScore,
+        ?float $currentScore,
         ?DiffResult $reviewDiff,
         array &$diagnostics,
     ): ?BranchReviewResult {
@@ -85,7 +85,7 @@ final readonly class BranchReviewBuilder
                 base:          [],
                 baseRef:       $options->diffVs,
                 isChangedOnly: true,
-                deltaScore:    $currentScore - $baseScore->composite->score,
+                deltaScore:    $this->deltaVersusBase($currentScore, $baseScore->composite->score),
             );
         }
 
@@ -144,7 +144,7 @@ final readonly class BranchReviewBuilder
                 base:          $baseFindings,
                 baseRef:       $options->diffVs,
                 isChangedOnly: $options->isChangedOnly,
-                deltaScore:    $currentScore - $baseScore->composite->score,
+                deltaScore:    $this->deltaVersusBase($currentScore, $baseScore->composite->score),
             );
         } catch (DiffException | RuntimeException $exception) {
             $diagnostics[] = new RunDiagnostic(
@@ -160,6 +160,22 @@ final readonly class BranchReviewBuilder
                 $gitArchiveSnapshot->remove($baseRoot);
             }
         }
+    }
+
+    /**
+     * Measures the branch's score movement against the base snapshot, and withholds the number
+     * entirely when the current side has no score to move. A run that discovered no files scores a
+     * synthetic 100 the report already refuses to publish, so subtracting the base from it would
+     * announce an improvement the same report calls inapplicable.
+     *
+     * @param float|null $currentScore - Composite score of the current findings; null when discovery found no files to score.
+     * @param float      $baseScore - Composite score calculated for the base snapshot's findings.
+     *
+     * @return float|null - Score movement from base to current, or null when the current side has no applicable score.
+     */
+    private function deltaVersusBase(?float $currentScore, float $baseScore): ?float
+    {
+        return $currentScore === null ? null : $currentScore - $baseScore;
     }
 
     /**

@@ -25,7 +25,7 @@ final readonly class BranchReviewComparator
      * @param list<Finding> $base - Findings from the base branch's run to compare against; empty means every current finding counts as introduced.
      * @param string        $baseRef - Base ref the comparison was made against (for example `origin/main`), echoed back in the review.
      * @param bool          $isChangedOnly - True when the review was restricted to changed files, recorded so the report can say the scope was narrowed.
-     * @param float|null    $deltaScore - Score change from base to current; null when no comparable base score was available to diff.
+     * @param float|null    $deltaScore - Score change from base to current; null when either side lacks an applicable score, which today means the current run discovered no files.
      *
      * @return BranchReviewResult - Findings partitioned into introduced, removed, and unchanged sets plus the score delta, ready for the caller to render the branch review.
      */

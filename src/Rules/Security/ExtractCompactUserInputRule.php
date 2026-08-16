@@ -68,7 +68,7 @@ final class ExtractCompactUserInputRule implements RuleInterface
                 continue;
             }
 
-            $firstArg = SecurityNodeHelper::argumentValue($call->args, 0);
+            $firstArg = SecurityNodeHelper::sinkArgumentValue($call, 0);
             // A call with no request-controlled input is safe, so skip it.
             if ($firstArg === null || !SecurityNodeHelper::containsUserInput($firstArg)) {
                 continue;

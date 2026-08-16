@@ -120,6 +120,12 @@ use PHPUnit\Framework\TestCase;
 final class RuleRegistryTest extends TestCase
 {
     /**
+     * Ratchet for rules that still let their name stand in for a written description. Lower it whenever
+     * the real count drops; never raise it.
+     */
+    private const MAX_RULES_WITHOUT_DESCRIPTION = 99;
+
+    /**
      * Verify default registry contains stable rule ids.
      *
      * @return void
@@ -177,7 +183,7 @@ final class RuleRegistryTest extends TestCase
             MethodLengthRule::ID, ParameterCountRule::ID,
             PropertyCountRule::ID, PublicMethodCountRule::ID,
         ];
-        $missingRuleIds  = array_values(array_filter(
+        $missingRuleIds = array_values(array_filter(
                                             $expectedRuleIds,
                                             static fn(string $ruleId): bool => !$registry->has($ruleId),
                                         ));
@@ -209,7 +215,8 @@ final class RuleRegistryTest extends TestCase
         self::assertSame(FileLengthRule::ID, $findings[0]->ruleId);
         self::assertSame(Severity::Warning, $findings[0]->severity);
         self::assertSame(Pillar::Size, $findings[0]->pillar);
-        self::assertSame(['lines' => 27, 'threshold' => 3, 'thresholdType' => 'warning'], $findings[0]->metadata);
+        // 11 substantive lines: the fixture's blank and comment-only lines are free under file-length.
+        self::assertSame(['lines' => 11, 'threshold' => 3, 'thresholdType' => 'warning'], $findings[0]->metadata);
     }
 
     /**
@@ -321,6 +328,32 @@ final class RuleRegistryTest extends TestCase
     }
 
     /**
+     * Verify the count of rules with no written description never grows.
+     *
+     * @return void
+     */
+    public function testRulesFallingBackToTheirNameDoNotGrow(): void
+    {
+        // RuleDefinition::description() substitutes the name when no description is configured, so the
+        // emptiness check above passes for every rule and can never fail. This ratchet holds the real
+        // line: a new rule shipped without a description raises the count and fails here. Reading the
+        // raw property rather than the accessor is what makes the fallback visible.
+        $fallbackIds = array_values(array_map(
+                                        static fn($rule): string => $rule->definition()->id,
+                                        array_filter(
+                                            RuleRegistry::defaults()->all(),
+                                            static fn($rule): bool => trim($rule->definition()->description) === '',
+                                        ),
+                                    ));
+
+        self::assertLessThanOrEqual(
+            self::MAX_RULES_WITHOUT_DESCRIPTION,
+            count($fallbackIds),
+            'A rule shipped without a description. Add one, or lower MAX_RULES_WITHOUT_DESCRIPTION when the count drops.',
+        );
+    }
+
+    /**
      * Verify default rule definitions keep stable reporting and config metadata.
      *
      * @return void
@@ -334,20 +367,20 @@ final class RuleRegistryTest extends TestCase
 
             // The hash asserts the listable definition surface, not object identity.
             return [
-                'id'                       => $definition->id,
-                'name'                     => $definition->name,
-                'description'              => $definition->description(),
-                'pillar'                   => $definition->pillar->value,
-                'secondaryPillars'         => array_map(static fn(Pillar $pillar): string => $pillar->value, $definition->secondaryPillars),
-                'tier'                     => $definition->tier->value,
-                'defaultSeverity'          => $definition->defaultSeverity->value,
-                'confidence'               => $definition->confidence->value,
-                'defaultThresholds'        => $definition->defaultThresholds,
+                'id' => $definition->id,
+                'name' => $definition->name,
+                'description' => $definition->description(),
+                'pillar' => $definition->pillar->value,
+                'secondaryPillars' => array_map(static fn(Pillar $pillar): string => $pillar->value, $definition->secondaryPillars),
+                'tier' => $definition->tier->value,
+                'defaultSeverity' => $definition->defaultSeverity->value,
+                'confidence' => $definition->confidence->value,
+                'defaultThresholds' => $definition->defaultThresholds,
                 'defaultSeverityThreshold' => $single === null
                     ? null
                     : ['threshold' => $single->threshold, 'severity' => $single->severity->value],
-                'defaultEnabled'           => $definition->isEnabledByDefault,
-                'defaultOptions'           => $definition->defaultOptions,
+                'defaultEnabled' => $definition->isEnabledByDefault,
+                'defaultOptions' => $definition->defaultOptions,
             ];
         }, RuleRegistry::defaults()->all());
 
@@ -356,7 +389,7 @@ final class RuleRegistryTest extends TestCase
 
         self::assertCount(128, $definitions);
         self::assertSame(
-            '728f07a0d4013c3c025b' . 'b96f275ca069f32323c163b424ae1e5624dad6917c61',
+            'efa8942d8f840536dd18' . '0e20b6576cce513620c7b6af3d28ac8f39a62b830e04',
             hash('sha256', $json),
         );
     }
@@ -372,9 +405,9 @@ final class RuleRegistryTest extends TestCase
         $countingRule    = $this->definitionCountingRule(static function () use (&$definitionCalls): void {
             $definitionCalls++;
         });
-        $registry        = new RuleRegistry([$countingRule]);
-        $config          = AnalysisConfig::fromRegistry($registry);
-        $callsBefore     = $definitionCalls;
+        $registry    = new RuleRegistry([$countingRule]);
+        $config      = AnalysisConfig::fromRegistry($registry);
+        $callsBefore = $definitionCalls;
 
         $firstResolution  = $registry->enabledRules($config);
         $secondResolution = $registry->enabledRules($config);
@@ -407,6 +440,65 @@ final class RuleRegistryTest extends TestCase
         self::assertContains(FileLengthRule::ID, $fullRuleIds);
         self::assertNotContains(FileLengthRule::ID, $narrowedIds);
         self::assertSame($fullRules, $registry->enabledRules($fullConfig), 'the narrowed config must not poison the full config cache entry');
+    }
+
+    /**
+     * Verify class-length counts substantive lines: docblock padding is free, code still fires.
+     *
+     * @return void
+     */
+    public function testClassLengthCountsSubstantiveLinesOnly(): void
+    {
+        $docHeavy = "<?php\nfinal class DocHeavy\n{\n    /**\n";
+        for ($index = 0; $index < 30; ++$index) {
+            $docHeavy .= "     * doc line {$index}\n";
+        }
+        $docHeavy .= "     */\n    public int \$value = 1;\n}\n";
+
+        $codeHeavy = "<?php\nfinal class CodeHeavy\n{\n";
+        for ($index = 0; $index < 30; ++$index) {
+            $codeHeavy .= "    public int \$value{$index} = {$index}; // trailing comment\n";
+        }
+        $codeHeavy .= "}\n";
+
+        $registry = RuleRegistry::defaults();
+        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+            ClassLengthRule::ID,
+            new RuleSettings(true, ['warning' => 20, 'error' => 999]),
+        );
+        $ruleContext = new RuleContext(__DIR__ . '/../..', $config);
+        $rule        = new ClassLengthRule();
+
+        // Thirty docblock lines are free, so the doc-heavy class stays far under the 20-line budget.
+        $docFindings = $rule->analyse($this->parseInline($docHeavy), $ruleContext);
+        self::assertSame([], $docFindings);
+
+        // Thirty property lines are substantive, so the code-heavy class still reports.
+        $codeFindings = $rule->analyse($this->parseInline($codeHeavy), $ruleContext);
+        self::assertCount(1, $codeFindings);
+        self::assertSame(33, $codeFindings[0]->metadata['lines']);
+    }
+
+    /**
+     * Parses an inline source string through the real parser via a temporary file.
+     *
+     * @param string $source - PHP source text to parse.
+     *
+     * @return AnalysisUnit - Parsed unit for direct rule invocation.
+     */
+    private function parseInline(string $source): AnalysisUnit
+    {
+        // SourceFile marks the fixture as PHP explicitly, so the allocated path needs no suffix or rename.
+        $path = tempnam(sys_get_temp_dir(), 'gruff-php-inline-');
+        self::assertNotFalse($path);
+
+        try {
+            self::assertNotFalse(file_put_contents($path, $source));
+
+            return (new PhpFileParser())->parse(new SourceFile($path, 'inline.php'));
+        } finally {
+            self::assertTrue(unlink($path));
+        }
     }
 
     /**
@@ -465,7 +557,7 @@ final class RuleRegistryTest extends TestCase
              * Return findings produced by the fixture rule.
              *
              * @param AnalysisUnit $analysisUnit - Analysis unit.
-             * @param RuleContext  $ruleContext - Rule context for the fixture.
+             * @param RuleContext  $ruleContext  - Rule context for the fixture.
              *
              * @return list<\GruffPhp\Results\Finding\Finding> - always empty; this fixture only observes definition() calls
              */
@@ -516,7 +608,7 @@ final class RuleRegistryTest extends TestCase
              * Return findings produced by the fixture rule.
              *
              * @param AnalysisUnit $analysisUnit - Analysis unit.
-             * @param RuleContext  $ruleContext - Rule context for the fixture.
+             * @param RuleContext  $ruleContext  - Rule context for the fixture.
              *
              * @return list<\GruffPhp\Results\Finding\Finding> - exactly one synthetic finding tagged with this rule's id, per unit
              */
@@ -586,7 +678,7 @@ final class RuleRegistryTest extends TestCase
              * Record one analysed unit's display path.
              *
              * @param AnalysisUnit $analysisUnit - Parsed unit to accumulate.
-             * @param RuleContext  $ruleContext - Rule context for the fixture.
+             * @param RuleContext  $ruleContext  - Rule context for the fixture.
              *
              * @return void
              */
@@ -621,7 +713,7 @@ final class RuleRegistryTest extends TestCase
             /**
              * Run the legacy whole-project pass for the fixture.
              *
-             * @param list<AnalysisUnit> $units - Parsed units available to the project-level rule.
+             * @param list<AnalysisUnit> $units       - Parsed units available to the project-level rule.
              * @param RuleContext        $ruleContext - Rule context for the fixture.
              *
              * @return list<Finding> - always empty; the registry routes this accumulator through the streaming seam instead
@@ -662,7 +754,7 @@ final class RuleRegistryTest extends TestCase
              * Return findings produced by the fixture rule.
              *
              * @param AnalysisUnit $analysisUnit - Analysis unit.
-             * @param RuleContext  $ruleContext - Rule context for the fixture.
+             * @param RuleContext  $ruleContext  - Rule context for the fixture.
              *
              * @return list<\GruffPhp\Results\Finding\Finding> - one README-scoped finding per unit, so dedup must collapse them to one
              */

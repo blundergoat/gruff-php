@@ -16,11 +16,12 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
 
 /**
- * Flags a source file whose raw line count runs past the configured budget, the simplest signal that a
- * file has taken on too much and is getting hard to navigate.
+ * Flags a source file whose substantive line count runs past the configured budget, the simplest signal
+ * that a file has taken on too much and is getting hard to navigate.
  *
- * Runs once per file, comparing its newline count against the threshold (default error above 1000).
- * File length is a container measure aligned with how reviewers navigate files. See ADR-012.
+ * Runs once per file, comparing its substantive line count - blank lines and comment-only lines are
+ * free (family ratification, 2026-08-05) - against the threshold (default error above 1000), so
+ * required documentation can never push a file over the size bar. See ADR-012.
  */
 final readonly class FileLengthRule implements RuleInterface
 {
@@ -43,15 +44,16 @@ final readonly class FileLengthRule implements RuleInterface
             tier:              RuleTier::V01,
             defaultSeverity:   Severity::Error,
             confidence:        Confidence::High,
+            description:       'File length (substantive lines: blank and comment-only lines are free)',
             severityThreshold: new SeverityThreshold(1000, Severity::Error),
         );
     }
 
     /**
-     * Reports the file when its line count runs over the configured budget.
+     * Reports the file when its substantive line count runs over the configured budget.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
      *
      * @return list<Finding> - Empty when the file is within budget; otherwise the single exceeded-length finding.
      */
@@ -59,7 +61,7 @@ final readonly class FileLengthRule implements RuleInterface
     {
         $definition     = $this->definition();
         $settings       = $ruleContext->settingsFor($definition);
-        $lineCount      = $analysisUnit->lineCount();
+        $lineCount      = SubstantiveLineCounter::countAll($analysisUnit);
         $thresholdMatch = $settings->highValueThresholdMatch($lineCount);
 
         // A file within budget produces no finding.
@@ -71,7 +73,7 @@ final readonly class FileLengthRule implements RuleInterface
             new Finding(
                 ruleId:  $definition->id,
                 message: sprintf(
-                    'File has %d lines, above the %s threshold of %s.',
+                    'File has %d substantive lines, above the %s threshold of %s.',
                     $lineCount,
                     $thresholdMatch->severity->value,
                     $this->formatNumber($thresholdMatch->threshold),
@@ -82,7 +84,7 @@ final readonly class FileLengthRule implements RuleInterface
                 pillar:           $definition->pillar,
                 tier:             $definition->tier,
                 confidence:       $definition->confidence,
-                endLine:          $lineCount,
+                endLine:          $analysisUnit->lineCount(),
                 remediation:      'Split oversized files or move responsibilities into smaller units.',
                 secondaryPillars: $definition->secondaryPillars,
                 metadata:         [

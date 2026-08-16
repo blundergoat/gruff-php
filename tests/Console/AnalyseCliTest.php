@@ -40,6 +40,51 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
+     * Verify zero-file scans are explicit and unscored in both human and machine-readable reports.
+     *
+     * @return void
+     * @throws JsonException
+     */
+    public function testAnalyseCommandReportsEmptyAnalysisAsUnscored(): void
+    {
+        $baseArguments = [
+            PHP_BINARY,
+            self::PROJECT_ROOT . '/bin/gruff-php',
+            'analyse',
+            'tests/Fixtures/Source/mixed/build',
+            '--no-config',
+            '--no-cache',
+        ];
+        $textProcess = new Process([...$baseArguments, '--format', 'text'], self::PROJECT_ROOT);
+        $textProcess->run();
+
+        self::assertSame(0, $textProcess->getExitCode(), $textProcess->getErrorOutput());
+        self::assertStringContainsString('Discovered: 0', $textProcess->getOutput());
+        self::assertStringContainsString('[EMPTY-ANALYSIS] No scannable PHP files were discovered', $textProcess->getOutput());
+        self::assertStringNotContainsString('Composite: A', $textProcess->getOutput());
+        self::assertStringNotContainsString(PHP_EOL . 'Score' . PHP_EOL, $textProcess->getOutput());
+
+        $jsonProcess = new Process([...$baseArguments, '--format', 'json'], self::PROJECT_ROOT);
+        $jsonProcess->run();
+
+        self::assertSame(0, $jsonProcess->getExitCode(), $jsonProcess->getErrorOutput());
+
+        $report      = $this->decodeJsonOutput($jsonProcess);
+        $summary     = $report['summary'] ?? null;
+        $diagnostics = $report['diagnostics'] ?? null;
+
+        self::assertIsArray($summary);
+        self::assertSame(0, $summary['filesDiscovered'] ?? null);
+        self::assertSame(0, $summary['exitCode'] ?? null);
+        self::assertArrayNotHasKey('score', $report);
+        self::assertIsArray($diagnostics);
+        $emptyAnalysisDiagnostic = $diagnostics[0] ?? null;
+        self::assertIsArray($emptyAnalysisDiagnostic);
+        self::assertSame('empty-analysis', $emptyAnalysisDiagnostic['type'] ?? null);
+        self::assertSame(false, $emptyAnalysisDiagnostic['invalidatesRun'] ?? null);
+    }
+
+    /**
      * Verify analyse command supports an explicit single-file option.
      *
      * @return void
@@ -115,6 +160,7 @@ final class AnalyseCliTest extends CliTestCase
                                    '--fail-on',
                                    'error',
                                    '--no-baseline',
+                                   '--no-cache',
                                ], __DIR__ . '/../..');
         $process->run();
 
@@ -190,6 +236,7 @@ final class AnalyseCliTest extends CliTestCase
                                    '--fail-on',
                                    'error',
                                    '--no-baseline',
+                                   '--no-cache',
                                ], __DIR__ . '/../..');
         $process->run();
 
@@ -555,6 +602,7 @@ final class AnalyseCliTest extends CliTestCase
                                    'json',
                                    '--fail-on',
                                    'none',
+                                   '--no-config',
                                ], __DIR__ . '/../..');
         $process->run();
 
@@ -589,6 +637,7 @@ final class AnalyseCliTest extends CliTestCase
                                    'html',
                                    '--fail-on',
                                    'none',
+                                   '--no-config',
                                ], __DIR__ . '/../..');
         $process->run();
 

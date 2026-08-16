@@ -36,6 +36,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
                 'none',
                 '--history-file',
                 $historyPath,
+                '--no-config',
             ], __DIR__ . '/../..');
             $process->run();
 

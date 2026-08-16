@@ -103,6 +103,7 @@ final class DashboardCliTest extends CliTestCase
             (string) $port,
             '--scan-timeout',
             '30',
+            '--no-config',
         ], self::PROJECT_ROOT);
         $process->setTimeout(null);
         $process->start();

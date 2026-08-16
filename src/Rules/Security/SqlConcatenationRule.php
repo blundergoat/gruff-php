@@ -26,7 +26,7 @@ use PhpParser\NodeFinder;
  * Flags a SQL string assembled by concatenating or interpolating dynamic data into a query - the classic
  * SQL-injection shape - so the user moves the value to a bound parameter before it reaches the database.
  *
- * Runs per file over query methods (`query`, `exec`, `raw`, `select`) whose first argument splices in a
+ * Runs per file over supported query methods and procedural database functions whose SQL argument splices in a
  * non-allowlisted dynamic part and whose literal fragments contain a SQL keyword. `prepare()` templates and
  * allowlisted identifier interpolation (`$wpdb->prefix`) are recognised. Warning, medium confidence.
  */
@@ -43,6 +43,23 @@ final class SqlConcatenationRule implements RuleInterface
      * @var list<string>
      */
     private const QUERY_METHODS = ['exec', 'query', 'raw', 'select'];
+
+    /**
+     * Procedural SQL sinks mapped to the position carrying the query string.
+     *
+     * The parameter name each position answers to lives in SecurityNodeHelper::SINK_PARAMETERS, so a named
+     * argument resolves through the same table every other security rule uses rather than a local copy.
+     * pg_query() also accepts the query as its sole argument; sqlArgumentForSink() handles that overload.
+     *
+     * @var array<string, int>
+     */
+    private const PROCEDURAL_SQL_ARGUMENTS = [
+        'mysqli_query' => 1,
+        'pg_query'     => 1,
+        'mysql_query'  => 0,
+        'sqlsrv_query' => 1,
+        'oci_parse'    => 1,
+    ];
 
     /**
      * Pattern requiring at least one word-bounded SQL keyword in the literal fragments before flagging.
@@ -90,7 +107,7 @@ final class SqlConcatenationRule implements RuleInterface
      * Reports each query call whose SQL argument splices in an unsafe dynamic part.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
      *
      * @return list<Finding> - Findings for heuristic SQL concatenation.
      */
@@ -99,22 +116,64 @@ final class SqlConcatenationRule implements RuleInterface
         $safeReceivers = $ruleContext->settingsFor($this->definition())->stringListOption('safeInterpolationReceivers');
         $findings      = [];
 
-        $calls = NodeIndex::nodesOfAny($analysisUnit, [Expr\MethodCall::class, Expr\StaticCall::class]);
-        // Check every method and static call in the file.
-        foreach ($calls as $call) {
-            /** @var Expr\MethodCall|Expr\StaticCall $call NodeIndex query restricts these classes. */
-            $firstArg = SecurityNodeHelper::argumentValue($call->args, 0);
-            // Flag a query method whose SQL argument splices in unsafe dynamic data.
-            if ($firstArg !== null
-                && $call->name instanceof Identifier
-                && in_array(strtolower($call->name->toString()), self::QUERY_METHODS, true)
-                && $this->isInjectableSqlConstruction($this->inspectionSubject($firstArg), $safeReceivers, $analysisUnit)
+        $queryCallCandidates = NodeIndex::nodesOfAny(
+            $analysisUnit,
+            [Expr\MethodCall::class, Expr\StaticCall::class, Expr\FuncCall::class],
+        );
+        // Restrict findings to APIs whose SQL-argument contract is known.
+        foreach ($queryCallCandidates as $queryCall) {
+            /** @var Expr\MethodCall|Expr\StaticCall|Expr\FuncCall $queryCall NodeIndex restricts these classes. */
+            $sqlArgument = $this->sqlArgumentForSink($queryCall);
+            // Flag a supported query sink whose SQL argument splices in unsafe dynamic data.
+            if ($sqlArgument !== null
+                && $this->isInjectableSqlConstruction(
+                    $this->sqlConstructionSubject($sqlArgument, $queryCall, $analysisUnit),
+                    $safeReceivers,
+                    $analysisUnit,
+                )
             ) {
-                $findings[] = $this->finding($analysisUnit, $call);
+                $findings[] = $this->finding($analysisUnit, $queryCall);
             }
         }
 
         return $findings;
+    }
+
+    /**
+     * Selects the SQL argument from a supported query sink.
+     *
+     * @param Expr\MethodCall|Expr\StaticCall|Expr\FuncCall $queryCall - Candidate whose API determines the SQL position.
+     *
+     * @return Expr|null - SQL argument for a supported sink, otherwise null.
+     */
+    private function sqlArgumentForSink(Expr\MethodCall|Expr\StaticCall|Expr\FuncCall $queryCall): ?Expr
+    {
+        // Method/static query APIs consistently take SQL as their first argument.
+        if ($queryCall instanceof Expr\MethodCall || $queryCall instanceof Expr\StaticCall) {
+            if (!$queryCall->name instanceof Identifier
+                || !in_array(strtolower($queryCall->name->toString()), self::QUERY_METHODS, true)
+            ) {
+                return null;
+            }
+
+            return SecurityNodeHelper::argumentValue($queryCall->args, 0);
+        }
+
+        $functionName = SecurityNodeHelper::globalFunctionName($queryCall);
+        // Unknown functions cannot safely inherit another API's argument contract.
+        if ($functionName === null || !isset(self::PROCEDURAL_SQL_ARGUMENTS[$functionName])) {
+            return null;
+        }
+
+        $sqlArgument = SecurityNodeHelper::sinkArgumentValue($queryCall, self::PROCEDURAL_SQL_ARGUMENTS[$functionName]);
+        // pg_query($query) is the one supported overload whose query occupies position zero. Match it
+        // positionally only: the named form already resolved above, and asking by name here would let
+        // pg_query(connection: $handle) hand back the connection as though it were the query text.
+        if ($functionName === 'pg_query' && $sqlArgument === null) {
+            return SecurityNodeHelper::argumentValue($queryCall->args, 0);
+        }
+
+        return $sqlArgument;
     }
 
     /**
@@ -124,24 +183,200 @@ final class SqlConcatenationRule implements RuleInterface
      * bound values, so inspection moves to the template argument - which still flags when it
      * interpolates anything beyond allowlisted parts. prepare() is never skipped wholesale.
      *
-     * @param Expr $firstArg - First argument of the query call.
+     * For a curated procedural sink, a plain local is followed through one same-scope assignment only when it
+     * is the variable's sole write before the sink. Existing method/static sinks keep their direct-argument
+     * behaviour so wrapper-specific quoting APIs are not reclassified by this procedural coverage change.
      *
-     * @return Expr - the prepare() template when the root is a prepare() call with one, otherwise the argument itself.
+     * @param Expr                                          $sqlArgument  - SQL value passed to the query API.
+     * @param Expr\MethodCall|Expr\StaticCall|Expr\FuncCall $querySink    - API call that consumes the SQL value.
+     * @param AnalysisUnit                                  $analysisUnit - Unit owning the call and candidate local assignment.
+     *
+     * @return Expr - prepare() template, shallow local value, or original argument.
      */
-    private function inspectionSubject(Expr $firstArg): Expr
+    private function sqlConstructionSubject(
+        Expr $sqlArgument,
+        Expr\MethodCall|Expr\StaticCall|Expr\FuncCall $querySink,
+        AnalysisUnit $analysisUnit,
+    ): Expr
+    {
+        $preparedSqlTemplate = $this->preparedSqlTemplate($sqlArgument);
+        // Parameter binding is safe only when the template itself does not interpolate unsafe data.
+        if ($preparedSqlTemplate !== $sqlArgument) {
+            return $preparedSqlTemplate;
+        }
+
+        // Wrapper-specific quoting semantics are unknown, so local tracking stays limited to curated functions.
+        if (!$querySink instanceof Expr\FuncCall) {
+            return $sqlArgument;
+        }
+
+        $localQueryValue = $this->soleLocalQueryValue($sqlArgument, $querySink, $analysisUnit);
+        // One unambiguous local hop exposes the query construction without approximating general data flow.
+        if ($localQueryValue instanceof Expr) {
+            return $this->preparedSqlTemplate($localQueryValue);
+        }
+
+        return $sqlArgument;
+    }
+
+    /**
+     * Selects a prepare() call's SQL template without treating parameterisation as a blanket exemption.
+     *
+     * @param Expr $subject - Direct query argument or shallow assigned value.
+     *
+     * @return Expr - prepare() template when present, otherwise the original expression.
+     */
+    private function preparedSqlTemplate(Expr $subject): Expr
     {
         // A prepare() call already binds its values, so inspect its template instead.
-        if (($firstArg instanceof Expr\MethodCall || $firstArg instanceof Expr\StaticCall)
-            && SecurityNodeHelper::methodName($firstArg) === 'prepare'
+        if (($subject instanceof Expr\MethodCall || $subject instanceof Expr\StaticCall)
+            && SecurityNodeHelper::methodName($subject) === 'prepare'
         ) {
-            $template = SecurityNodeHelper::argumentValue($firstArg->args, 0);
+            $template = SecurityNodeHelper::argumentValue($subject->args, 0);
             // Use the template when prepare() supplies one.
             if ($template instanceof Expr) {
                 return $template;
             }
         }
 
-        return $firstArg;
+        return $subject;
+    }
+
+    /**
+     * Resolves a query local through one unambiguous assignment in the sink's scope.
+     *
+     * @param Expr          $sqlArgument  - Query value, which must be a plainly named variable.
+     * @param Expr\FuncCall $querySink    - Procedural call whose source position bounds eligible writes.
+     * @param AnalysisUnit  $analysisUnit - Unit supplying file-scope statements when no function owns the sink.
+     *
+     * @return Expr|null - Sole assigned value before the sink, or null for ambiguity/reassignment/nested scope.
+     */
+    private function soleLocalQueryValue(
+        Expr $sqlArgument,
+        Expr\FuncCall $querySink,
+        AnalysisUnit $analysisUnit,
+    ): ?Expr
+    {
+        // Compound expressions and dynamic variable names already exceed this one-hop precision guard.
+        if (!$sqlArgument instanceof Expr\Variable || !is_string($sqlArgument->name)) {
+            return null;
+        }
+
+        $sinkFilePosition = $querySink->getStartFilePos();
+        // Source ordering is required to reject writes that occur after the sink.
+        if ($sinkFilePosition < 0) {
+            return null;
+        }
+
+        $sinkScope       = SecurityNodeHelper::enclosingFunctionLike($querySink);
+        $scopeStatements = $sinkScope instanceof FunctionLike ? $sinkScope->getStmts() : $analysisUnit->statements;
+        // A scope without statements cannot establish a unique preceding write.
+        if ($scopeStatements === null) {
+            return null;
+        }
+
+        $queryWrites = $this->localQueryWritesBeforeSink(
+            array_values($scopeStatements),
+            $sqlArgument->name,
+            $sinkScope,
+            $sinkFilePosition,
+        );
+
+        // More than one write is reassignment; non-plain writes are deliberately beyond this shallow tracker.
+        if (count($queryWrites) !== 1 || !$queryWrites[0] instanceof Expr\Assign) {
+            return null;
+        }
+
+        $queryAssignment = $queryWrites[0];
+        $sinkAncestorIds = SecurityNodeHelper::ancestorIdsWithin(
+            $querySink,
+            $sinkScope instanceof Node ? $sinkScope : null,
+        );
+        // Conditional or otherwise skippable writes cannot prove which value reaches the sink.
+        if (SecurityNodeHelper::isSkippableBeforeSink(
+            $queryAssignment,
+            $querySink,
+            $sinkScope instanceof Node ? $sinkScope : null,
+            $sinkAncestorIds,
+        )) {
+            return null;
+        }
+
+        return $queryAssignment->expr;
+    }
+
+    /**
+     * Collects writes to one local before a sink, excluding writes owned by nested function-like scopes.
+     *
+     * @param list<Node\Stmt>   $scopeStatements   - Statements belonging to the sink's scope.
+     * @param string            $queryVariableName - Plain local name without the leading `$`.
+     * @param FunctionLike|null $sinkScope         - Function-like owning the sink, or null for file scope.
+     * @param int               $sinkFilePosition  - Byte offset that every eligible write must precede.
+     *
+     * @return list<Expr\Assign|Expr\AssignOp|Expr\AssignRef> - Matching writes in source order.
+     */
+    private function localQueryWritesBeforeSink(
+        array $scopeStatements,
+        string $queryVariableName,
+        ?FunctionLike $sinkScope,
+        int $sinkFilePosition,
+    ): array {
+        $candidateWrites = (new NodeFinder())->find(
+            $scopeStatements,
+            static fn(Node $candidate): bool => ($candidate instanceof Expr\Assign
+                                                  || $candidate instanceof Expr\AssignOp
+                                                  || $candidate instanceof Expr\AssignRef)
+                                                 && $candidate->getStartFilePos() >= 0
+                                                 && $candidate->getStartFilePos() < $sinkFilePosition,
+        );
+
+        $queryWrites = [];
+        // Nested closures may reuse the local name without writing the value consumed by this sink.
+        foreach ($candidateWrites as $write) {
+            if (!($write instanceof Expr\Assign || $write instanceof Expr\AssignOp || $write instanceof Expr\AssignRef)) {
+                continue;
+            }
+
+            if (SecurityNodeHelper::enclosingFunctionLike($write) === $sinkScope
+                && $this->isVariableWrittenByAssignmentTarget($write->var, $queryVariableName)
+            ) {
+                $queryWrites[] = $write;
+            }
+        }
+
+        return $queryWrites;
+    }
+
+    /**
+     * Reports whether an assignment target overwrites any part of one local query value.
+     *
+     * @param Expr   $assignmentTarget - Direct, offset, or destructuring target from a preceding write.
+     * @param string $queryVariableName - Local query name without the leading `$`.
+     *
+     * @return bool - True when the write makes one-hop query provenance ambiguous at the sink.
+     */
+    private function isVariableWrittenByAssignmentTarget(Expr $assignmentTarget, string $queryVariableName): bool
+    {
+        // A direct local write replaces the value the procedural sink later consumes.
+        if ($assignmentTarget instanceof Expr\Variable) {
+            return $assignmentTarget->name === $queryVariableName;
+        }
+
+        // Mutating an offset changes the tracked value, even though the outer variable is not the assignment node.
+        if ($assignmentTarget instanceof Expr\ArrayDimFetch) {
+            return $this->isVariableWrittenByAssignmentTarget($assignmentTarget->var, $queryVariableName);
+        }
+
+        // Destructuring can rebind the query local at any nesting depth and therefore ends shallow tracking.
+        if ($assignmentTarget instanceof Expr\List_) {
+            foreach ($assignmentTarget->items as $item) {
+                if ($item !== null && $this->isVariableWrittenByAssignmentTarget($item->value, $queryVariableName)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**
