@@ -82,7 +82,7 @@ The JSON `review` object contains:
 - `counts.removed`: findings present in base but absent from current analysis.
 - `counts.unchanged`: findings present in both current and base.
 - `introduced[]`, `removed[]`, `unchanged[]`: finding payloads.
-- `deltaScore`: current score minus base score for the reviewed scope.
+- `deltaScore`: current score minus base score for the reviewed scope; `null` when the scan discovered no files and no current score applies.
 
 Line numbers are report context only. Branch review compares stable finding identity by `file + ruleId + symbol` when possible, falling back to `file + ruleId + message`.
 

@@ -4,6 +4,8 @@ Notable user-facing changes to `gruff-php` are listed here.
 
 ## 0.5.2 - 2026-08-16
 
+0.5.2 counts only substantive lines in `size.file-length` and `size.class-length`, so blank and comment-only lines stop consuming a file's or class's budget, and it teaches the security rules to read named arguments, procedural SQL drivers, and `proc_open()` argument vectors. Prophecy expectations, promoted-property docs, and `summary`'s secret allowlist shed false positives, while public mutable promotions start reporting. Empty scans carry a non-fatal `empty-analysis` diagnostic and no score instead of a full-marks grade. Four rule options ship alongside self-documenting `init` output, and the agent hooks close four parser bypasses and a batch-boundary gap. No rule IDs, severities, thresholds, scoring, `gruff.analysis.v2`, or `--fail-on` behaviour changed; both size rules emit new identities and several rules gain rows, so the baseline impact is noted below.
+
 - **File and class lengths count substantive lines** - Blank and comment-only lines are free; thresholds stay unchanged and messages name the metric.
 - **Regenerate size baselines** - Accepted size findings resurface; run `vendor/bin/gruff-php analyse --generate-baseline --fail-on none`.
 - **SARIF size identities change** - Both size rules emit new `gruffStableIdentity` values because their messages changed.
@@ -17,7 +19,7 @@ Notable user-facing changes to `gruff-php` are listed here.
 - **Public-property checks cover promotion** - Readonly classes stay quiet; public mutable promotions now report and may add baseline findings.
 - **Prophecy expectations stay configured** - Native promises, predictions, and asserted `reveal()` values no longer look like bare mocks.
 - **Prophecy baselines shed false positives** - Obsolete groups disappear; remaining messages and `gruffStableIdentity` values stay stable.
-- **Empty scans are unscored** - `analyse` emits an `empty-analysis` diagnostic and omits the score when no PHP files are discovered.
+- **Empty scans are unscored** - `analyse` emits `empty-analysis` and omits the score and branch-review delta when no PHP files are discovered.
 - **Empty scans preserve exit policy** - The diagnostic is non-fatal, so zero-file runs still exit 0 without changing `--fail-on` behavior.
 - **Empty-scan baselines are unchanged** - The diagnostic is not a finding, so it creates no `gruffStableIdentity` or baseline entry.
 - **Promoted constructor docs stop duplicating** - Missing tags use `docs.missing-param-tag`, absent docblocks `docs.missing-public-phpdoc`.

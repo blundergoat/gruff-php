@@ -435,13 +435,16 @@ final class AgentWorkflowCliTest extends TestCase
 
             self::assertSame(1, $this->intValue($counts, 'introduced'));
             self::assertContains('Example::newRisk()', $this->symbolsFromFindings($review['introduced'] ?? null));
+
+            // Discovery found a file, so this review keeps a real score to price the change against.
+            self::assertNotNull($review['deltaScore'] ?? null);
         } finally {
             $this->removeDir($repo);
         }
     }
 
     /**
-     * Verify branch review deleted file reports removed findings.
+     * Verify branch review deleted file reports removed findings without a score delta.
      *
      * @return void
      * @throws JsonException
@@ -487,6 +490,10 @@ final class AgentWorkflowCliTest extends TestCase
             self::assertGreaterThanOrEqual(1, $this->intValue($counts, 'removed'));
             self::assertContains('Example::oldRisk()', $this->symbolsFromFindings($review['removed'] ?? null));
 
+            // An empty current side scores a synthetic 100 the report withholds, so the delta drawn from it must stay null.
+            self::assertArrayHasKey('deltaScore', $review);
+            self::assertNull($review['deltaScore']);
+
             $explicitPathProcess = new Process([
                                                    PHP_BINARY,
                                                    self::PROJECT_ROOT . '/bin/gruff-php',
@@ -511,6 +518,30 @@ final class AgentWorkflowCliTest extends TestCase
 
             self::assertGreaterThanOrEqual(1, $this->intValue($explicitPathCounts, 'removed'));
             self::assertContains('Example::oldRisk()', $this->symbolsFromFindings($explicitPathReview['removed'] ?? null));
+            self::assertArrayHasKey('deltaScore', $explicitPathReview);
+            self::assertNull($explicitPathReview['deltaScore']);
+
+            $textProcess = new Process([
+                                           PHP_BINARY,
+                                           self::PROJECT_ROOT . '/bin/gruff-php',
+                                           'analyse',
+                                           'src',
+                                           '--fail-on=none',
+                                           '--no-config',
+                                           '--no-baseline',
+                                           '--diff-vs=HEAD',
+                                           '--changed-only',
+                                           '--exclude-rule=docs.return-comment',
+                                       ], $repo);
+            $textProcess->run();
+
+            self::assertSame(0, $textProcess->getExitCode(), $textProcess->getOutput() . $textProcess->getErrorOutput());
+            $textReport = $textProcess->getOutput();
+
+            // The TEXT report must not price an unscored run: the removals are reported, the score movement is not.
+            self::assertStringContainsString('the score is not applicable', $textReport);
+            self::assertMatchesRegularExpression('/Findings: 0 introduced, [1-9]\d* removed/', $textReport);
+            self::assertStringNotContainsString('Score delta', $textReport);
         } finally {
             $this->removeDir($repo);
         }

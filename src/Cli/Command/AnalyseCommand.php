@@ -238,7 +238,7 @@ final class AnalyseCommand extends Command
             config:          $config,
             registry:        $registry,
             currentFindings: $reviewFindings,
-            currentScore:    $reviewScore,
+            currentScore:    $this->reviewScoreForDiscoveredFiles($reviewScore, $filesDiscovered),
             reviewDiff:      $reviewDiff,
             diagnostics:     $diagnostics,
         );
@@ -809,6 +809,21 @@ final class AnalyseCommand extends Command
     private function scoreForDiscoveredFiles(ScoreReport $score, int $filesDiscovered): ?ScoreReport
     {
         return $filesDiscovered === 0 ? null : $score;
+    }
+
+    /**
+     * Withholds the branch review's current-side score when discovery supplied no source evidence,
+     * so the comparison reports which findings the branch removed without pricing the change against
+     * a score the rest of the report declares inapplicable.
+     *
+     * @param float $reviewScore     - Composite score calculated for the findings under review.
+     * @param int   $filesDiscovered - Number of PHP files admitted by discovery.
+     *
+     * @return float|null - Review score for a real source set, otherwise null.
+     */
+    private function reviewScoreForDiscoveredFiles(float $reviewScore, int $filesDiscovered): ?float
+    {
+        return $filesDiscovered === 0 ? null : $reviewScore;
     }
 
     /**
