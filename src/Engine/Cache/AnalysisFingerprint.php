@@ -33,8 +33,8 @@ final readonly class AnalysisFingerprint
      * Builds the run fingerprint by folding every input that affects findings - tool version, PHP floor,
      * allowlists, and the full resolved rule set - into one digest, so any change forces a fresh cache key.
      *
-     * @param RuleRegistry   $registry - Registry whose enabled-rule set is part of the key.
-     * @param AnalysisConfig $config - Resolved configuration whose settings affect findings.
+     * @param RuleRegistry   $registry    - Registry whose enabled-rule set is part of the key.
+     * @param AnalysisConfig $config      - Resolved configuration whose settings affect findings.
      * @param string         $toolVersion - gruff version string folded into the key.
      * @throws JsonException When the run payload cannot be encoded.
      *
@@ -66,6 +66,7 @@ final readonly class AnalysisFingerprint
         $payload = json_encode([
             'version' => $toolVersion,
             'minimumPhpVersion' => $config->minimumPhpVersion(),
+            'deepScanBudget' => $config->deepScanBudget(),
             'acceptedAbbreviations' => $acceptedAbbreviations,
             'allowedSecretPreviews' => $allowedSecretPreviews,
             'rules' => $rules,
@@ -83,7 +84,7 @@ final readonly class AnalysisFingerprint
      * identity, so two byte-identical files at different paths never share an entry.
      *
      * @param string $displayPath - Project-relative display path.
-     * @param string $contents - Raw file bytes.
+     * @param string $contents    - Raw file bytes.
      *
      * @return string - Hex cache key for the file's per-unit findings.
      */

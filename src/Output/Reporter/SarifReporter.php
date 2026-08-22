@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GruffPhp\Output\Reporter;
 
 use GruffPhp\Engine\Analysis\AnalysisReport;
+use GruffPhp\Engine\Analysis\RunDiagnostic;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Pillar;
 use GruffPhp\Results\Finding\Severity;
@@ -48,16 +49,16 @@ final readonly class SarifReporter
         // richer definitions from the first loop untouched, so no result points at a rule we never list.
         foreach ($report->findings as $finding) {
             $rules[$finding->ruleId] ??= [
-                'id'               => $finding->ruleId,
-                'name'             => $finding->ruleId,
+                'id' => $finding->ruleId,
+                'name' => $finding->ruleId,
                 'shortDescription' => [
                     'text' => $finding->ruleId,
                 ],
-                'properties'       => [
-                    'pillar'     => $finding->pillar->value,
-                    'severity'   => $finding->severity->value,
+                'properties' => [
+                    'pillar' => $finding->pillar->value,
+                    'severity' => $finding->severity->value,
                     'confidence' => $finding->confidence->value,
-                    'tier'       => $finding->tier->value,
+                    'tier' => $finding->tier->value,
                 ],
             ];
         }
@@ -75,20 +76,35 @@ final readonly class SarifReporter
             $properties['grade'] = $report->score->composite->letter;
         }
 
+        $run = [
+            'tool' => [
+                'driver' => [
+                    'name' => AnalysisReport::TOOL_NAME,
+                    'semanticVersion' => $report->toolVersion,
+                    'rules' => array_values($rules),
+                ],
+            ],
+            'results' => array_map(fn(Finding $finding): array => $this->result($finding, (int)$ruleIndexes[$finding->ruleId]), $report->findings),
+            'properties' => $properties,
+        ];
+        if ($report->diagnostics !== []) {
+            $run['invocations'] = [[
+                'executionSuccessful' => !array_reduce(
+                    $report->diagnostics,
+                    static fn (bool $fatal, RunDiagnostic $diagnostic): bool => $fatal || $diagnostic->isFatal,
+                    false,
+                ),
+                'toolExecutionNotifications' => array_map(
+                    fn (RunDiagnostic $diagnostic): array => $this->notification($diagnostic),
+                    $report->diagnostics,
+                ),
+            ]];
+        }
+
         $payload = [
             '$schema' => 'https://json.schemastore.org/sarif-2.1.0.json',
             'version' => '2.1.0',
-            'runs'    => [[
-                              'tool'       => [
-                                  'driver' => [
-                                      'name'            => AnalysisReport::TOOL_NAME,
-                                      'semanticVersion' => $report->toolVersion,
-                                      'rules'           => array_values($rules),
-                                  ],
-                              ],
-                              'results'    => array_map(fn(Finding $finding): array => $this->result($finding, (int)$ruleIndexes[$finding->ruleId]), $report->findings),
-                              'properties' => $properties,
-                          ]],
+            'runs' => [$run],
         ];
 
         try {
@@ -99,6 +115,30 @@ final readonly class SarifReporter
             // Encoding failure still emits parseable JSON so a SARIF consumer reports an error instead of choking.
             return sprintf('{"error":"Unable to encode SARIF: %s"}%s', addslashes($exception->getMessage()), PHP_EOL);
         }
+    }
+
+    /**
+     * Serialises one run diagnostic as a SARIF tool-execution notification.
+     *
+     * @return array<string, mixed> - SARIF notification with an optional physical location.
+     */
+    private function notification(RunDiagnostic $diagnostic): array
+    {
+        $notification = [
+            'descriptor' => ['id' => $diagnostic->type],
+            'level' => $diagnostic->isFatal ? 'error' : 'note',
+            'message' => ['text' => $diagnostic->message],
+        ];
+        $filePath = $diagnostic->filePath ?? $diagnostic->path;
+        if ($filePath !== null) {
+            $physicalLocation = ['artifactLocation' => ['uri' => str_replace('\\', '/', $filePath)]];
+            if ($diagnostic->line !== null) {
+                $physicalLocation['region'] = ['startLine' => $diagnostic->line];
+            }
+            $notification['locations'] = [['physicalLocation' => $physicalLocation]];
+        }
+
+        return $notification;
     }
 
     /**
@@ -121,11 +161,11 @@ final readonly class SarifReporter
     private function rule(RuleDefinition $definition): array
     {
         $properties = [
-            'pillar'          => $definition->pillar->value,
-            'tier'            => $definition->tier->value,
+            'pillar' => $definition->pillar->value,
+            'tier' => $definition->tier->value,
             'defaultSeverity' => $definition->defaultSeverity->value,
-            'confidence'      => $definition->confidence->value,
-            'defaultEnabled'  => $definition->isEnabledByDefault,
+            'confidence' => $definition->confidence->value,
+            'defaultEnabled' => $definition->isEnabledByDefault,
         ];
         // Some rules also feed secondary pillars; list them when present so a consumer sees every
         // quality area the rule touches. The common empty case maps to a single pillar and omits the key.
@@ -153,18 +193,18 @@ final readonly class SarifReporter
 
         // Help and full description reuse the one-line rule description; gruff has no separate long-form help text.
         return [
-            'id'               => $definition->id,
-            'name'             => $definition->name,
+            'id' => $definition->id,
+            'name' => $definition->name,
             'shortDescription' => [
                 'text' => $definition->name,
             ],
-            'fullDescription'  => [
+            'fullDescription' => [
                 'text' => $definition->description(),
             ],
-            'help'             => [
+            'help' => [
                 'text' => $definition->description(),
             ],
-            'properties'       => $properties,
+            'properties' => $properties,
         ];
     }
 
@@ -172,7 +212,7 @@ final readonly class SarifReporter
      * Turns one finding into a single SARIF result - the object that becomes an annotation on a pull
      * request line. Called once per finding while `render()` assembles the run's results list.
      *
-     * @param Finding $finding - Finding to serialize into a single SARIF result entry.
+     * @param Finding $finding   - Finding to serialize into a single SARIF result entry.
      * @param int     $ruleIndex - Zero-based offset of this finding's rule in the driver `rules` array, so the
      *                           result can reference its rule by index rather than repeating the descriptor.
      *
@@ -211,9 +251,9 @@ final readonly class SarifReporter
         }
 
         $properties = [
-            'severity'   => $finding->severity->value,
-            'pillar'     => $finding->pillar->value,
-            'tier'       => $finding->tier->value,
+            'severity' => $finding->severity->value,
+            'pillar' => $finding->pillar->value,
+            'tier' => $finding->tier->value,
             'confidence' => $finding->confidence->value,
         ];
         // Carry any extra pillars this finding touches, so a Code Scanning reader sees every quality
@@ -242,20 +282,20 @@ final readonly class SarifReporter
 
         // Two fingerprints: the precise one moves with the line, the stable one survives line drift.
         return [
-            'ruleId'              => $finding->ruleId,
-            'ruleIndex'           => $ruleIndex,
-            'level'               => $this->level($finding->severity),
-            'message'             => [
+            'ruleId' => $finding->ruleId,
+            'ruleIndex' => $ruleIndex,
+            'level' => $this->level($finding->severity),
+            'message' => [
                 'text' => $finding->message,
             ],
-            'locations'           => [[
+            'locations' => [[
                                           'physicalLocation' => $physicalLocation,
                                       ]],
             'partialFingerprints' => [
-                'gruffFingerprint'    => $finding->fingerprint(),
+                'gruffFingerprint' => $finding->fingerprint(),
                 'gruffStableIdentity' => $finding->stableIdentity(),
             ],
-            'properties'          => $properties,
+            'properties' => $properties,
         ];
     }
 

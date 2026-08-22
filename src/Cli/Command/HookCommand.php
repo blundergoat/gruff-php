@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Cli\Command;
 
+use GruffPhp\Engine\Analysis\RunDiagnostic;
 use GruffPhp\Results\Baseline\BaselineApplicationOptions;
 use GruffPhp\Engine\Config\AnalysisConfig;
 use GruffPhp\Engine\Config\ConfigException;
@@ -35,14 +36,10 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * Backs the `gruff-php hook` command - the machine-readable feedback channel an editor or coding
- * agent calls instead of the human-facing `analyse`/`report` output.
+ * Backs `gruff-php hook`, the machine-readable feedback channel editors and coding agents use instead of human reports.
  *
- * Reach for this when a tool wants structured findings scoped to just the code that changed: it
- * always speaks JSON under the stable `gruff.hook.v1` contract, and can narrow results to explicit
- * `--changed-ranges`, a git `--diff`/`--since` range, or only findings absent from a prior
- * `--baseline` report. A bare `--capabilities` probe lets a caller discover what this build supports
- * before it commits to a real run.
+ * Callers can scope JSON findings to ranges, git changes, or items absent from a baseline under the stable `gruff.hook.v1` contract.
+ * A `--capabilities` probe lets an integration discover supported behavior before requesting analysis.
  */
 final class HookCommand extends Command
 {
@@ -67,6 +64,7 @@ final class HookCommand extends Command
             ->addOption('capabilities', null, InputOption::VALUE_NONE, 'Print hook capabilities and exit.')
             ->addOption('config', null, InputOption::VALUE_REQUIRED, 'Path to a gruff YAML config file (.yaml or .yml).')
             ->addOption('no-config', null, InputOption::VALUE_NONE, 'Skip auto-applying the default .gruff-php.yaml file for this run.')
+            ->addOption('deep-scan-budget', null, InputOption::VALUE_REQUIRED, 'Bound structural analysis as <lines>:<bytes>, or disable it with off.')
             ->addOption('include-ignored', null, InputOption::VALUE_NONE, 'Scan ignored files by using filesystem traversal instead of Git/default ignores.')
             ->addOption('changed-ranges', null, InputOption::VALUE_REQUIRED, 'Explicit changed line ranges, e.g. 3-3,8-10.')
             ->addOption('changed-scope', null, InputOption::VALUE_REQUIRED, 'Changed-region scope. Hook mode supports symbol.', default: 'symbol')
@@ -122,6 +120,7 @@ final class HookCommand extends Command
         try {
             $config = $this->config($input, $projectRoot, $registry);
         } catch (ConfigException $exception) {
+            // Malformed YAML or an old non-empty secret-preview list returns its correction in-band without a stack trace.
             $this->writeJson($output, $this->emptyReport(false, $exception->getMessage()));
 
             return Command::INVALID;
@@ -137,8 +136,7 @@ final class HookCommand extends Command
                 config:               $config,
                 registry:             $registry,
             );
-            $findingSupport       = new AnalysisFindingSupport();
-            $findings             = $findingSupport->filterAllowedSecretPreviews($analysis['findings'], $config);
+            $findings             = $analysis['findings'];
             $baseStableIdentities = $this->baseStableIdentities(
                 input:                $input,
                 projectRoot:          $projectRoot,
@@ -152,9 +150,10 @@ final class HookCommand extends Command
             $this->writeJson(
                 $output,
                 $this->report(
-                    findings:        $filterResult->findings,
-                    suppressedCount: $filterResult->suppressedCount,
-                    ignoredPathRows: $analysis['sources']->discovery->ignoredPathDetails,
+                    findings:         $filterResult->findings,
+                    suppressedCount:  $filterResult->suppressedCount + $analysis['suppressedCount'],
+                    ignoredPathRows:  $analysis['sources']->discovery->ignoredPathDetails,
+                    diagnostics:      $analysis['sources']->diagnostics,
                     identities:       $filterResult->identities,
                     isConfigSchemaOk: true,
                     configError:      null,
@@ -163,6 +162,7 @@ final class HookCommand extends Command
 
             return Command::SUCCESS;
         } catch (DiffException | RuntimeException $exception) {
+            // An invalid git ref or unreadable baseline can prevent scoped analysis; integrations receive the operational error in-band.
             $this->writeJson($output, $this->emptyReport(true, $exception->getMessage()));
 
             return Command::INVALID;
@@ -191,11 +191,13 @@ final class HookCommand extends Command
                 'stableIdentity' => true,
                 'ignoreReport' => true,
                 'newOnly' => true,
+                'deepScanBudget' => true,
             ],
             'flags' => [
                 'changedRanges' => '--changed-ranges',
                 'diff' => '--diff',
                 'baseline' => '--baseline',
+                'deepScanBudget' => '--deep-scan-budget',
             ],
             'flagOrder' => 'any',
         ];
@@ -222,8 +224,23 @@ final class HookCommand extends Command
             ? AnalysisConfig::fromRegistry($registry)
             : (new ConfigLoader($projectRoot, ConfigLoader::packageRoot()))->load($configPath, $registry);
 
-        $includeRules = $this->stringListOption($input, 'include-rule');
-        $excludeRules = $this->stringListOption($input, 'exclude-rule');
+        $deepScanBudgetOverride = AnalyseCommandOptions::parseDeepScanBudgetOverride(
+            $this->stringOption($input, 'deep-scan-budget'),
+        );
+        if (is_string($deepScanBudgetOverride)) {
+            throw new ConfigException($deepScanBudgetOverride);
+        }
+        if ($deepScanBudgetOverride !== null) {
+            $config = $config->withDeepScanBudget(
+                $deepScanBudgetOverride['enabled'],
+                $deepScanBudgetOverride['maxLines'],
+                $deepScanBudgetOverride['maxBytes'],
+                'cli',
+            );
+        }
+
+        $includeRules    = $this->stringListOption($input, 'include-rule');
+        $excludeRules    = $this->stringListOption($input, 'exclude-rule');
         $ruleFilterError = $this->ruleFilterError($registry, $includeRules, $excludeRules);
         if ($ruleFilterError !== null) {
             throw new ConfigException($ruleFilterError);
@@ -236,13 +253,8 @@ final class HookCommand extends Command
     }
 
     /**
-     * Resolve the rule selection for hook --include-rule/--exclude-rule against the project config.
-     *
-     * --include-rule means "run only these ids" (per the option help), so it must narrow to exactly
-     * those rules: RuleSelection::allows() ORs tier/pillar/rule includes, so inheriting the config's
-     * tiers/pillars would widen the focused run. A bare --exclude-rule instead keeps the configured
-     * selection and only drops the named rules, so a configured selection.rules narrowing is not
-     * widened to the whole rule set (an empty include list means "all rules").
+     * Resolves hook rule filters so the integration runs exactly what the user requested on top of project config.
+     * `--include-rule` narrows to named rules, while `--exclude-rule` keeps the configured selection and removes only the named rules.
      *
      * @param RuleSelection $existing     - Selection already resolved from the project config.
      * @param list<string>  $includeRules - Hook --include-rule ids; when non-empty they focus the run.
@@ -269,7 +281,7 @@ final class HookCommand extends Command
     /**
      * Rejects any `--include-rule`/`--exclude-rule` id the registry doesn't know, so a typo fails loudly not silently.
      *
-     * @param RuleRegistry $registry - Registry whose ids define valid hook rule filters.
+     * @param RuleRegistry $registry     - Registry whose ids define valid hook rule filters.
      * @param list<string> $includeRules - Rule ids from --include-rule.
      * @param list<string> $excludeRules - Rule ids from --exclude-rule.
      *
@@ -296,7 +308,8 @@ final class HookCommand extends Command
      * @param AnalysisConfig    $config               - Effective config driving rule selection and ignores.
      * @param RuleRegistry      $registry             - Rule set executed against the discovered sources.
      *
-     * @return array{sources: AnalysisSourceSet, findings: list<Finding>} - Discovered sources and every finding before hook filtering.
+     * @return array{sources: AnalysisSourceSet, findings: list<Finding>, suppressedCount: int} - Discovered sources, every finding left after the
+     *                            configured sensitive exclusions ran, and how many those exclusions removed.
      */
     private function analyse(
         string $projectRoot,
@@ -334,14 +347,15 @@ final class HookCommand extends Command
                                       isBaselineExplicit:   false,
                                       generateBaselinePath: null,
                                   ),
-            reportEditorLink:    'none',
-            isReportInteractive: false,
-            pathsRelativeTo:     null,
-            minSeverity:         null,
-            includePillars:      [],
-            excludePillars:      [],
-            includeRules:        [],
-            excludeRules:        [],
+            reportEditorLink:       'none',
+            isReportInteractive:    false,
+            pathsRelativeTo:        null,
+            minSeverity:            null,
+            includePillars:         [],
+            excludePillars:         [],
+            includeRules:           [],
+            excludeRules:           [],
+            deepScanBudgetOverride: null,
         );
 
         $branchReviewBuilder = new BranchReviewBuilder();
@@ -357,9 +371,17 @@ final class HookCommand extends Command
             ruleRunnerObserver: null,
         );
 
+        $suppressedCount = 0;
+        // Sensitive exclusions already removed their findings inside the pipeline; total them so the hook
+        // payload still reports a suppression count rather than a silently shorter list.
+        foreach ($analysisRun['suppressions'] as $summary) {
+            $suppressedCount += $summary->suppressed;
+        }
+
         return [
             'sources' => $analysisRun['sources'],
             'findings' => $analysisRun['findings'],
+            'suppressedCount' => $suppressedCount,
         ];
     }
 
@@ -463,7 +485,7 @@ final class HookCommand extends Command
      * @param bool           $shouldIncludeIgnored - Whether ignored files should be included in the base scan.
      * @param AnalysisConfig $config               - Effective config, applied identically to the base for a fair comparison.
      *
-     * @return array<string, true>|null - Prior-finding identity set; null when no `--baseline` or diff base was given, so every finding counts as new.
+     * @return array<string, true>|null - Prior identities; null means no baseline or diff base was given, so every finding is new
      */
     private function baseStableIdentities(
         InputInterface $input,
@@ -623,12 +645,13 @@ final class HookCommand extends Command
     /**
      * Assembles the successful `gruff.hook.v1` payload the caller reads: surviving findings, suppression count, ignored paths, config status.
      *
-     * @param list<Finding>     $findings        - Findings that passed changed-region and new-only filtering.
-     * @param int               $suppressedCount - How many findings were filtered out, shown so the caller knows some were hidden.
-     * @param list<IgnoredPath>  $ignoredPathRows - Ignored path records surfaced so the caller sees what was skipped.
-     * @param array<int, string> $identities      - Pre-disambiguated identity per finding, keyed by spl_object_id($finding).
-     * @param bool               $isConfigSchemaOk - Whether the config loaded cleanly; false flags a degraded run.
-     * @param string|null        $configError     - Error message to relay, or null when the config was fine.
+     * @param list<Finding>       $findings         - Findings that passed changed-region and new-only filtering.
+     * @param int                 $suppressedCount  - How many findings were filtered out, shown so the caller knows some were hidden.
+     * @param list<IgnoredPath>   $ignoredPathRows  - Ignored path records surfaced so the caller sees what was skipped.
+     * @param list<RunDiagnostic> $diagnostics      - Analysis diagnostics, including nonfatal bounded-scan notes.
+     * @param array<int, string>  $identities       - Pre-disambiguated identity per finding, keyed by spl_object_id($finding).
+     * @param bool                $isConfigSchemaOk - Whether the config loaded cleanly; false flags a degraded run.
+     * @param string|null         $configError      - Error message to relay, or null when the config was fine.
      *
      * @return array<string, mixed> - The full JSON-ready hook report.
      */
@@ -636,6 +659,7 @@ final class HookCommand extends Command
         array $findings,
         int $suppressedCount,
         array $ignoredPathRows,
+        array $diagnostics,
         array $identities,
         bool $isConfigSchemaOk,
         ?string $configError,
@@ -645,7 +669,7 @@ final class HookCommand extends Command
         foreach ($findings as $finding) {
             $stableIdentity = $identities[spl_object_id($finding)]
                 ?? HookFindingIdentity::forFinding($finding, HookFindingScope::classify($finding));
-            $rows[]         = $presenter->toArray($finding, $stableIdentity);
+            $rows[] = $presenter->toArray($finding, $stableIdentity);
         }
 
         return [
@@ -664,6 +688,10 @@ final class HookCommand extends Command
                     $ignoredPathRows,
                 ),
             ],
+            'diagnostics' => array_map(
+                static fn(RunDiagnostic $diagnostic): array => $diagnostic->toArray(),
+                $diagnostics,
+            ),
             'config' => [
                 'schemaOk' => $isConfigSchemaOk,
                 'error' => $configError,
@@ -674,8 +702,8 @@ final class HookCommand extends Command
     /**
      * Builds the findings-free `gruff.hook.v1` payload for a run that can't proceed, so the caller still gets valid JSON.
      *
-     * @param bool        $isConfigSchemaOk - Sets the payload's `config.schemaOk`; false when the run was rejected before analysis (a bad `--format` or `--changed-scope`, or a config error), true when config parsed but the run failed later.
-     * @param string|null $configError    - The error to relay, or null when the empty report isn't about an error.
+     * @param bool        $isConfigSchemaOk - False when format, scope, or config stopped analysis; true once user config parsed successfully.
+     * @param string|null $configError      - The error to relay, or null when the empty report isn't about an error.
      *
      * @return array<string, mixed> - Empty but schema-valid hook report.
      */
@@ -694,6 +722,7 @@ final class HookCommand extends Command
             'ignored' => [
                 'paths' => [],
             ],
+            'diagnostics' => [],
             'config' => [
                 'schemaOk' => $isConfigSchemaOk,
                 'error' => $configError,

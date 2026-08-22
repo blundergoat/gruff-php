@@ -68,6 +68,7 @@ final readonly class AnalysisReport
      * @param bool                        $shouldListAbsentBaseline - Whether reporters should list resolved (absent) baseline entries.
      * @param ThresholdTrip|null          $failureReason - Gate threshold that tripped; null when the run did not fail a count threshold.
      * @param int|null                    $newFindingsCount - Size of the new-findings set; null when no new-findings gate is active.
+     * @param list<SensitiveExclusionSummary> $sensitiveExclusions - One audit row per configured sensitive-data exclusion; empty when the run configured none.
      */
     public function __construct(
         public string                  $toolVersion,
@@ -94,6 +95,7 @@ final readonly class AnalysisReport
         public bool                    $shouldListAbsentBaseline = false,
         public ?ThresholdTrip          $failureReason = null,
         public ?int                    $newFindingsCount = null,
+        public array                   $sensitiveExclusions = [],
     ) {
     }
 
@@ -221,6 +223,12 @@ final readonly class AnalysisReport
             'findings'           => array_map(
                 static fn(Finding $finding): array => $finding->toArray(),
                 $this->findings,
+            ),
+            // Every configured sensitive exclusion publishes a row here, matched or not, so a suppressed
+            // finding is accounted for rather than silently absent from the list above.
+            'suppressions'       => array_map(
+                static fn(SensitiveExclusionSummary $summary): array => $summary->toArray(),
+                $this->sensitiveExclusions,
             ),
         ];
 

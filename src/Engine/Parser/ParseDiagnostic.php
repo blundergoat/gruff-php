@@ -17,11 +17,15 @@ final readonly class ParseDiagnostic
      * Captures one parser message and the closest line it could be pinned to.
      *
      * @param string $message - Parser diagnostic message describing what went wrong.
-     * @param int    $line - Best-known source line for the diagnostic, so the user can jump to the problem.
+     * @param int    $line    - Best-known source line for the diagnostic, so the user can jump to the problem.
+     * @param string $type    - Stable diagnostic category exposed by reporters.
+     * @param bool   $isFatal - Whether the unit failed to parse and invalidates the run.
      */
     public function __construct(
         public string $message,
         public int $line,
+        public string $type = 'parse-error',
+        public bool $isFatal = true,
     ) {
     }
 }

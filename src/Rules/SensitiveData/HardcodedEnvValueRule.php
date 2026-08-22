@@ -94,15 +94,15 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
                 continue;
             }
 
-            $preview    = SecretScannerHelper::redactedKeyValue($key, $secretValue);
+            $displayMarker = SecretScannerHelper::fixedSecretMarker();
             $findings[] = SecretScannerHelper::finding(
                 analysisUnit: $analysisUnit,
                 ruleId:       self::ID,
-                message:      sprintf('Hardcoded env-style secret value detected: %s.', $preview),
+                message:      sprintf('Hardcoded env-style secret value detected: %s.', $displayMarker),
                 line:         SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
                 confidence:   Confidence::Medium,
                 detector:     'env-style-secret',
-                preview:      $preview,
+                displayMarker: $displayMarker,
                 remediation:  'Move env-style secret values out of committed source files.',
             );
         }

@@ -2,6 +2,23 @@
 
 Notable user-facing changes to `gruff-php` are listed here.
 
+## Unreleased
+
+- **BREAKING: default scans use the family fallback policy** - Non-VCS fallbacks now defer to any governing `.gitignore`, committed control metadata stays scannable, and explicit supported files bypass Git and fallback exclusions. PHP retains `.gruff-cache`, `.phpunit.cache`, and `var/cache`; eligible lockfiles are no longer dropped by filename, while VCS internals remain blocked.
+- **Bounded deep scans protect large PHP inputs** - PHP source over 20,000 lines or 2,000,000 bytes keeps file-size, sensitive-data, and config-text rules while parsing, masking, AST walking, and other structural work are dropped.
+- **Budget degradation is visible and nonfatal** - Every output surface emits `bounded-deep-scan` with the path, measured lines and bytes, both limits, and whether defaults, config, or CLI supplied them; the file still counts as analysed.
+- **Config and CLI can tune or disable the guard** - Set `deepScanBudget.enabled`, `maxLines`, and `maxBytes`, override both limits atomically with `--deep-scan-budget <lines>:<bytes>`, or use `off`; CLI wins over config and non-PHP text is never guarded.
+- **New `sensitiveExclusions:` config section** - Accept a reviewed sensitive-data finding by naming one rule id, one project-relative path, and a reason.
+- **Exclusions are authored by hand** - No command converts a reported finding, message, or preview value into an entry; `gruff-php init` seeds the section empty with guidance.
+- **An optional `symbol:` narrows an entry** - No sensitive-data rule stamps a symbol yet, so an entry carrying one matches nothing today and reports zero.
+- **Invalid entries stop the run with exit 2** - Wildcards, pillar names, unknown or non-sensitive rules, absolute/`..`/globbed paths, a missing reason, and a duplicated scope are all rejected by entry index and key.
+- **Message and value matching is rejected** - `message_contains`, `messageContains`, `value`, `preview`, and any other key fail, so a suppression can never be written against the secret itself.
+- **JSON reports gain a `suppressions` array** - One row per configured entry (`index`, `rule`, `paths`, `symbol`, `reason`, `suppressed`), present and empty when nothing is configured.
+- **Text reports state the suppression total** - A `Suppressed findings: N via ...` line names each entry and its reason, so a hidden finding is a number rather than an absence.
+- **Suppressed findings leave scoring and exit codes** - They are removed like accepted baseline debt; an entry matching nothing reports `suppressed: 0` instead of failing.
+- **`summary` applies sensitive exclusions** - The digest filters, counts, and scores the same findings `analyse` does, so its totals no longer disagree with the report it digests.
+- **`summary` text states the suppression total** - The same `Suppressed findings: N via ...` line prints below the digest, so the smaller count is accounted for. `--format json` filters without publishing a count; `gruff.summary.v2` has no field for it yet.
+
 ## 0.5.2 - 2026-08-16
 
 0.5.2 counts only substantive lines in `size.file-length` and `size.class-length`, so blank and comment-only lines stop consuming a file's or class's budget, and it teaches the security rules to read named arguments, procedural SQL drivers, and `proc_open()` argument vectors. Prophecy expectations, promoted-property docs, and `summary`'s secret allowlist shed false positives, while public mutable promotions start reporting. Empty scans carry a non-fatal `empty-analysis` diagnostic and no score instead of a full-marks grade. Four rule options ship alongside self-documenting `init` output, and the agent hooks close four parser bypasses and a batch-boundary gap. No rule IDs, severities, thresholds, scoring, `gruff.analysis.v2`, or `--fail-on` behaviour changed; both size rules emit new identities and several rules gain rows, so the baseline impact is noted below.

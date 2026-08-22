@@ -6,6 +6,7 @@ namespace GruffPhp\Output\Reporter;
 
 use GruffPhp\Engine\Analysis\AnalysisReport;
 use GruffPhp\Engine\Analysis\RunDiagnostic;
+use GruffPhp\Engine\Analysis\SensitiveExclusionSummary;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Mutation\MutationAnalysisResult;
 
@@ -70,6 +71,7 @@ final readonly class TextReporter
         $this->appendRuleDeltas($lines, $report);
         $this->appendScore($lines, $report);
         $this->appendBaseline($lines, $report);
+        $this->appendSensitiveExclusions($lines, $report);
         $this->appendMutation($lines, $report->mutation);
         $this->appendReview($lines, $report);
         $this->appendFindings($lines, $report->findings);
@@ -91,6 +93,30 @@ final readonly class TextReporter
         $this->appendOutputVolumeHint($lines, $counts['total']);
 
         return implode(PHP_EOL, $lines) . PHP_EOL;
+    }
+
+    /**
+     * Surfaces what the configured `sensitiveExclusions:` entries hid on this run, so a suppressed
+     * sensitive-data finding is a visible number with a rationale beside it rather than an absence
+     * the reader has to notice. Nothing here comes from a matched value: the rule id, the count,
+     * and the reason are all configuration.
+     *
+     * @param list<string>   $lines - Output buffer appended in place; untouched when nothing was suppressed.
+     * @param AnalysisReport $report - Report whose sensitive-exclusion audit rows are summarised.
+     *
+     * @return void
+     */
+    private function appendSensitiveExclusions(array &$lines, AnalysisReport $report): void
+    {
+        $suppressionLine = SensitiveExclusionSummary::describeTotal($report->sensitiveExclusions);
+
+        // With nothing suppressed there is no absence to explain, so the report stays as it was.
+        if ($suppressionLine === null) {
+            return;
+        }
+
+        $lines[] = '';
+        $lines[] = $suppressionLine;
     }
 
     /**

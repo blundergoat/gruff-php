@@ -41,6 +41,27 @@ final class InitCommand extends Command
                                 . "# Future analyse/report runs auto-apply gruff-baseline.json; use `gruff-php analyse --no-baseline` to audit without it.\n";
 
     /**
+     * The generated `sensitiveExclusions:` block. Rendered by hand rather than through `Yaml::dump`
+     * so the user meets the rules of the section - authored by hand, one reviewed scope per entry,
+     * a mandatory rationale - in the file itself. gruff never writes an entry for the user, and no
+     * reported preview, message, or value is ever convertible into one: an entry names a rule and a
+     * path, never anything about the matched secret.
+     */
+    private const SENSITIVE_EXCLUSIONS_SECTION = "# Sensitive-data findings are suppressed only here, and only by hand.\n"
+                                                 . "# gruff never converts a reported finding, message, or preview value into an entry for you.\n"
+                                                 . "# Each entry needs one exact sensitive-data rule id, one project-relative path, and a reason;\n"
+                                                 . "# an optional `symbol` narrows it further. Nothing else is suppressed - the same rule in another\n"
+                                                 . "# file and another rule in the same file both keep reporting.\n"
+                                                 . "# Every entry is published in the report's `suppressions` array with the count it hid, so an entry\n"
+                                                 . "# that matches nothing simply reports `suppressed: 0` instead of failing the run.\n"
+                                                 . "#\n"
+                                                 . "# sensitiveExclusions:\n"
+                                                 . "#     - rule: sensitive-data.aws-access-key\n"
+                                                 . "#       path: tests/Fixtures/SensitiveData/synthetic-secrets.php\n"
+                                                 . "#       reason: Synthetic key used by the scanner fixtures; not a live credential.\n"
+                                                 . "sensitiveExclusions: []\n";
+
+    /**
      * How deep `Yaml::dump` expands maps and lists before collapsing them to inline `{}`/`[]`.
      * Set high so every list value (e.g. `allowedLiterals`) lands on its own line, keeping the
      * generated file diffable and easy for the user to hand-edit afterwards.
@@ -62,8 +83,8 @@ final class InitCommand extends Command
      * @var array<string, string>
      */
     private const DEFAULT_MINIMUM_SEVERITY = [
-        'analyse'   => 'advisory',
-        'report'    => 'none',
+        'analyse' => 'advisory',
+        'report' => 'none',
         'dashboard' => 'none',
     ];
 
@@ -117,7 +138,7 @@ final class InitCommand extends Command
      * to clobber an existing config, then render the registry defaults to `.gruff-php.yaml` and
      * print the wrote-path plus next-steps guidance.
      *
-     * @param InputInterface  $input - Console input; only the `--project-root` and `--force` options are read.
+     * @param InputInterface  $input  - Console input; only the `--project-root` and `--force` options are read.
      * @param OutputInterface $output - Console output; carries the wrote-path notice, next-steps guidance, and any error.
      *
      * @return int - Symfony command exit code; SUCCESS after writing, FAILURE on a bad directory, existing file, or write error.
@@ -159,7 +180,7 @@ final class InitCommand extends Command
         $scaffold     = self::buildScaffoldDocument($config, $ignoredPaths, $minimumSeverity);
         $scaffoldYaml = Yaml::dump($scaffold, self::YAML_INLINE_DEPTH, self::YAML_INDENT, Yaml::DUMP_EMPTY_ARRAY_AS_SEQUENCE);
         $rulesYaml    = self::renderRulesSection($registry);
-        $contents     = self::FILE_HEADER . $scaffoldYaml . $rulesYaml;
+        $contents     = self::FILE_HEADER . $scaffoldYaml . self::SENSITIVE_EXCLUSIONS_SECTION . $rulesYaml;
 
         // The write itself failed (unwritable directory or a full disk); tell the user rather than claim success.
         if (file_put_contents($targetPath, $contents) === false) {
@@ -183,7 +204,7 @@ final class InitCommand extends Command
      * Decides where the config file lands: an explicit `--project-root` wins, otherwise the
      * directory the user launched from. Runs first so every later path is anchored to one root.
      *
-     * @param InputInterface  $input - Console input; an explicit `--project-root` wins, else the current working directory is used.
+     * @param InputInterface  $input  - Console input; an explicit `--project-root` wins, else the current working directory is used.
      * @param OutputInterface $output - Console output used to report a missing directory or an undeterminable working directory.
      *
      * @return string|null - Directory to write into; null when the directory is missing or the cwd is unreadable, which aborts init.
@@ -220,9 +241,9 @@ final class InitCommand extends Command
      * any content is generated, so the user is warned while their files are still intact.
      *
      * @param string          $projectRoot - Directory checked for a sibling legacy `.gruff.yaml` that `--force` would shadow.
-     * @param string          $targetPath - Full path of the `.gruff-php.yaml` about to be written; refused when it already exists.
+     * @param string          $targetPath  - Full path of the `.gruff-php.yaml` about to be written; refused when it already exists.
      * @param bool            $shouldForce - True bypasses both guards; the caller derives it from the `--force` option.
-     * @param OutputInterface $output - Console output used to explain why init refused.
+     * @param OutputInterface $output      - Console output used to explain why init refused.
      *
      * @return int|null - Exit code when init must refuse and stop; null when nothing is in the way and writing may proceed.
      */
@@ -264,8 +285,8 @@ final class InitCommand extends Command
      * exact order init emits them. The `rules:` block is rendered separately so each rule can carry
      * a description comment that `Yaml::dump` cannot emit.
      *
-     * @param AnalysisConfig        $analysisConfig - Config seeded from the registry defaults.
-     * @param list<string>          $ignoredPaths - Paths to omit from generated project scans; these are what the user tunes after init.
+     * @param AnalysisConfig        $analysisConfig  - Config seeded from the registry defaults.
+     * @param list<string>          $ignoredPaths    - Paths to omit from generated project scans; these are what the user tunes after init.
      * @param array<string, string> $minimumSeverity - Per-command exit-code thresholds emitted under `minimumSeverity:`.
      *
      * @return array<string, mixed> - Scaffold document keyed in the exact order init emits above the rules block, ready for `Yaml::dump`.
@@ -273,22 +294,27 @@ final class InitCommand extends Command
     private static function buildScaffoldDocument(AnalysisConfig $analysisConfig, array $ignoredPaths, array $minimumSeverity): array
     {
         return [
-            'schemaVersion'     => ConfigLoader::SCHEMA_VERSION,
+            'schemaVersion' => ConfigLoader::SCHEMA_VERSION,
             'minimumPhpVersion' => $analysisConfig->minimumPhpVersion(),
-            'minimumSeverity'   => $minimumSeverity,
-            'paths'             => [
+            'deepScanBudget' => [
+                'enabled' => $analysisConfig->deepScanBudget()['enabled'],
+                'maxLines' => $analysisConfig->deepScanBudget()['maxLines'],
+                'maxBytes' => $analysisConfig->deepScanBudget()['maxBytes'],
+            ],
+            'minimumSeverity' => $minimumSeverity,
+            'paths' => [
                 'ignore' => $ignoredPaths,
             ],
-            'allowlists'        => [
+            'allowlists' => [
                 'acceptedAbbreviations' => self::DEFAULT_ACCEPTED_ABBREVIATIONS,
-                'secretPreviews'        => [],
+                'secretPreviews' => [],
             ],
-            'selection'         => [
-                'tiers'          => [],
-                'pillars'        => [],
-                'rules'          => [],
+            'selection' => [
+                'tiers' => [],
+                'pillars' => [],
+                'rules' => [],
                 'excludePillars' => [],
-                'excludeRules'   => [],
+                'excludeRules' => [],
             ],
         ];
     }
@@ -310,10 +336,10 @@ final class InitCommand extends Command
         foreach ($ruleRegistry->all() as $rule) {
             $ruleDefinition = $rule->definition();
             // Prefer the rule's written description; fall back to its display name when it ships without one.
-            $description    = $ruleDefinition->description !== '' ? $ruleDefinition->description : $ruleDefinition->name;
-            $output         .= '    # ' . $description . "\n";
-            $ruleEntry      = self::buildRuleEntry($ruleDefinition);
-            $ruleEntryYaml  = Yaml::dump([$ruleDefinition->id => $ruleEntry], self::YAML_INLINE_DEPTH, self::YAML_INDENT, Yaml::DUMP_EMPTY_ARRAY_AS_SEQUENCE);
+            $description = $ruleDefinition->description !== '' ? $ruleDefinition->description : $ruleDefinition->name;
+            $output .= '    # ' . $description . "\n";
+            $ruleEntry     = self::buildRuleEntry($ruleDefinition);
+            $ruleEntryYaml = Yaml::dump([$ruleDefinition->id => $ruleEntry], self::YAML_INLINE_DEPTH, self::YAML_INDENT, Yaml::DUMP_EMPTY_ARRAY_AS_SEQUENCE);
             // Re-indent each dumped line by four spaces so the rule nests correctly under the `rules:` key.
             foreach (explode("\n", rtrim($ruleEntryYaml, "\n")) as $line) {
                 $output .= '    ' . $line . "\n";
@@ -435,7 +461,7 @@ final class InitCommand extends Command
      * Confirms a preserved threshold is one of the canonical `FailThreshold` values, so init never
      * carries forward a level (`advisory`, `warning`, `error`, `none`) that later gating can't read.
      *
-     * @param string $command - Owning command name, used only to point the rejection message at the offending key.
+     * @param string $command   - Owning command name, used only to point the rejection message at the offending key.
      * @param mixed  $threshold - Raw YAML value; must be a string accepted by `FailThreshold::fromInput`.
      *
      * @return string - Validated threshold string (one of `advisory`, `warning`, `error`, `none`).

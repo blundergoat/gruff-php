@@ -101,15 +101,15 @@ final readonly class JwtTokenRule implements SourceTextRuleInterface
                 continue;
             }
 
-            $preview    = SecretScannerHelper::redactedPreview($candidateSecret);
+            $displayMarker = SecretScannerHelper::fixedSecretMarker();
             $findings[] = SecretScannerHelper::finding(
                 analysisUnit: $analysisUnit,
                 ruleId:       self::ID,
-                message:      sprintf('JWT-like token literal detected: %s.', $preview),
+                message:      sprintf('JWT-like token literal detected: %s.', $displayMarker),
                 line:         SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
                 confidence:   Confidence::Medium,
                 detector:     'jwt-token',
-                preview:      $preview,
+                displayMarker: $displayMarker,
                 remediation:  'Move tokens out of source fixtures/config and generate them at runtime.',
             );
         }

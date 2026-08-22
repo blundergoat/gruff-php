@@ -37,9 +37,9 @@ final readonly class AnalyseCommandSetupBuilder
      * Entry point the `analyse` command calls first: capture the working directory the user launched
      * from, then hand off to the full validation pass. Returns a ready setup or the error they must fix.
      *
-     * @param InputInterface           $input - Symfony console input for the analyse command.
-     * @param OutputInterface          $output - Symfony console output for the optional first-run init prompt.
-     * @param SymfonyApplication|null  $symfonyApplication - Console application used to dispatch `init`; null skips the first-run config offer.
+     * @param InputInterface          $input              - Symfony console input for the analyse command.
+     * @param OutputInterface         $output             - Symfony console output for the optional first-run init prompt.
+     * @param SymfonyApplication|null $symfonyApplication - Console application used to dispatch `init`; null skips the first-run config offer.
      *
      * @return AnalyseCommandSetupResult - Ready-to-scan setup when the directory is known, otherwise a plain error result.
      */
@@ -67,10 +67,10 @@ final readonly class AnalyseCommandSetupBuilder
      * first-run config, load the project config, then fold in any CLI rule overrides. Stops at the
      * first problem with a message the user can act on rather than a half-finished report.
      *
-     * @param InputInterface          $input - Symfony console input for the analyse command.
-     * @param OutputInterface         $output - Console output used for the optional first-run init prompt.
+     * @param InputInterface          $input              - Symfony console input for the analyse command.
+     * @param OutputInterface         $output             - Console output used for the optional first-run init prompt.
      * @param SymfonyApplication|null $symfonyApplication - Console application used to dispatch `init`; null skips the first-run config offer.
-     * @param string                  $projectRoot - Working directory the run is anchored to, already known to be readable.
+     * @param string                  $projectRoot        - Working directory the run is anchored to, already known to be readable.
      *
      * @return AnalyseCommandSetupResult - Ready setup when every check passes, otherwise the first usage or config error hit.
      */
@@ -188,9 +188,9 @@ final readonly class AnalyseCommandSetupBuilder
         if ($configResult instanceof AnalysisReport) {
             return AnalyseCommandSetupResult::reportError($configResult, $formatResult);
         }
-        $failThreshold        = $this->resolveFailThresholdWithConfig($input, $configResult, $failThreshold);
-        $failThresholds       = $this->resolveFailThresholds($input, $configResult, $failThreshold);
-        $referenceError       = $this->newFindingsReferenceError($options, $failThresholds);
+        $failThreshold  = $this->resolveFailThresholdWithConfig($input, $configResult, $failThreshold);
+        $failThresholds = $this->resolveFailThresholds($input, $configResult, $failThreshold);
+        $referenceError = $this->newFindingsReferenceError($options, $failThresholds);
         // A new-findings gate is armed but nothing defines "new" yet; tell the user to add a baseline or
         // `--diff-vs <ref>` before the gate can mean anything.
         if ($referenceError !== null) {
@@ -242,7 +242,7 @@ final readonly class AnalyseCommandSetupBuilder
      * keeps the configured selection and only drops the named rules, so a
      * configured selection.rules narrowing is not widened to the whole rule set.
      *
-     * @param RuleSelection $existing - Selection already resolved from config and profile.
+     * @param RuleSelection $existing     - Selection already resolved from config and profile.
      * @param list<string>  $includeRules - CLI --include-rule ids; when non-empty they focus the run.
      * @param list<string>  $excludeRules - CLI --exclude-rule ids dropped on top of the existing selection.
      *
@@ -273,7 +273,7 @@ final readonly class AnalyseCommandSetupBuilder
      * security-only 100, which reads as a contradiction. A bare `--exclude-rule` stays a plain narrowing.
      *
      * @param RuleRegistry          $registry - Registry resolving rule ids to their definitions.
-     * @param AnalyseCommandOptions $options - Validated options carrying the profile and include filters.
+     * @param AnalyseCommandOptions $options  - Validated options carrying the profile and include filters.
      *
      * @return string|null - Usage error naming the first out-of-profile include, or null when compatible.
      */
@@ -294,10 +294,10 @@ final readonly class AnalyseCommandSetupBuilder
      * Shared with `ReportCommand` so both commands reject the same incoherent combinations with
      * identical wording, and report can do it before its own init prompt runs.
      *
-     * @param RuleRegistry         $registry - Registry resolving rule ids to their definitions; ids must already be validated.
-     * @param string               $profile - Requested profile name, echoed into the error message.
+     * @param RuleRegistry                           $registry            - Registry resolving rule ids to their definitions; ids must already be validated.
+     * @param string                                 $profile             - Requested profile name, echoed into the error message.
      * @param list<\GruffPhp\Results\Finding\Pillar> $profileScorePillars - Pillars the profile's composite counts.
-     * @param list<string>         $includeRuleIds - Requested --include-rule ids.
+     * @param list<string>                           $includeRuleIds      - Requested --include-rule ids.
      *
      * @return string|null - usage error naming the first out-of-profile include and both remedies, or null when
      *                     every include belongs to a scored pillar (including the no-includes case)
@@ -365,7 +365,7 @@ final readonly class AnalyseCommandSetupBuilder
      * Catches a mistyped `--include-rule`/`--exclude-rule` id before it silently narrows the run to no
      * rules at all, so the user hears about the typo instead of trusting an empty scan.
      *
-     * @param RuleRegistry $registry - Registry whose ids define valid CLI rule filters.
+     * @param RuleRegistry $registry     - Registry whose ids define valid CLI rule filters.
      * @param list<string> $includeRules - Rule ids from `--include-rule`; empty when the user focused nothing.
      * @param list<string> $excludeRules - Rule ids from `--exclude-rule`; empty when the user dropped nothing.
      *
@@ -411,8 +411,8 @@ final readonly class AnalyseCommandSetupBuilder
      * Settles which severity fails the run by the documented precedence: an explicit `--fail-on` the
      * user typed wins, otherwise a per-command config threshold, otherwise the built-in default.
      *
-     * @param InputInterface $input - Console input used for explicit-flag detection.
-     * @param AnalysisConfig $config - Loaded analysis config supplying per-command overrides.
+     * @param InputInterface $input             - Console input used for explicit-flag detection.
+     * @param AnalysisConfig $config            - Loaded analysis config supplying per-command overrides.
      * @param FailThreshold  $explicitOrDefault - Already-parsed CLI value; binary default when --fail-on omitted.
      *
      * @return FailThreshold - Resolved threshold honouring CLI > config > binary precedence.
@@ -441,8 +441,8 @@ final readonly class AnalyseCommandSetupBuilder
      * threshold (config minimumSeverity or the binary default) is desugared so the
      * gate stays byte-identical to today.
      *
-     * @param InputInterface $input - Console input used for explicit-flag detection.
-     * @param AnalysisConfig $config - Loaded config supplying the optional failureConditions block.
+     * @param InputInterface $input         - Console input used for explicit-flag detection.
+     * @param AnalysisConfig $config        - Loaded config supplying the optional failureConditions block.
      * @param FailThreshold  $failThreshold - Already-resolved singular threshold for the run.
      *
      * @return FailThresholds - Count-gate thresholds that decide the exit code.
@@ -484,7 +484,7 @@ final readonly class AnalyseCommandSetupBuilder
      * Guards against a new-findings gate that has nothing to compare against: returns the remediation
      * message when no baseline or `--diff-vs` defines what counts as "new", and null once one does.
      *
-     * @param AnalyseCommandOptions $options - Validated options carrying baseline and diff-vs selections.
+     * @param AnalyseCommandOptions $options        - Validated options carrying baseline and diff-vs selections.
      * @param FailThresholds        $failThresholds - Resolved gate, whose new-findings sub-gate may be set.
      *
      * @return string|null - Remediation message, or null when a reference point exists so the gate is well-formed.
@@ -545,11 +545,11 @@ final readonly class AnalyseCommandSetupBuilder
      * Loads the project's analysis configuration, or turns a broken config into a printable error report
      * so a bad `.gruff-php.yaml` fails the run cleanly instead of throwing at the user.
      *
-     * @param AnalyseCommandOptions $options - Validated options; its noConfig/configPath select the load path.
-     * @param RuleRegistry          $registry - Default rule set used to seed config when loading is disabled.
-     * @param OutputFormat          $format - Output format stamped onto the error report when loading fails.
+     * @param AnalyseCommandOptions $options       - Validated options; its noConfig/configPath select the load path.
+     * @param RuleRegistry          $registry      - Default rule set used to seed config when loading is disabled.
+     * @param OutputFormat          $format        - Output format stamped onto the error report when loading fails.
      * @param FailThreshold         $failThreshold - Threshold echoed into the error report so its failOn stays accurate.
-     * @param ConfigLoader          $configLoader - Loader that reads and validates the on-disk config file.
+     * @param ConfigLoader          $configLoader  - Loader that reads and validates the on-disk config file.
      *
      * @return AnalysisConfig|AnalysisReport - Loaded config, or a formatted config-error report when the file can't be used.
      */
@@ -563,9 +563,21 @@ final readonly class AnalyseCommandSetupBuilder
         try {
             // `--no-config` skips the YAML entirely and runs the registry defaults; otherwise load and
             // validate the project file the user relies on.
-            return $options->noConfig
+            $config = $options->noConfig
                 ? AnalysisConfig::fromRegistry($registry)
                 : $configLoader->load($options->configPath, $registry);
+
+            if ($options->deepScanBudgetOverride !== null) {
+                $budget = $options->deepScanBudgetOverride;
+                $config = $config->withDeepScanBudget(
+                    $budget['enabled'],
+                    $budget['maxLines'],
+                    $budget['maxBytes'],
+                    'cli',
+                );
+            }
+
+            return $config;
         } catch (ConfigException $exception) {
             // A broken or unreadable config is the user's to fix, so surface the reason as a report
             // rather than a stack trace.
@@ -583,7 +595,7 @@ final readonly class AnalyseCommandSetupBuilder
      * Works out which config path the report should name, so the user can see exactly which file shaped
      * the run - the one they passed, the one auto-discovery found, or none.
      *
-     * @param AnalyseCommandOptions $options - Validated options; noConfig and an explicit configPath drive the result.
+     * @param AnalyseCommandOptions $options      - Validated options; noConfig and an explicit configPath drive the result.
      * @param ConfigLoader          $configLoader - Loader used to auto-discover the path when none was given explicitly.
      *
      * @return string|null - Explicit or auto-discovered path, or null when `--no-config` ran with no file at all.
@@ -604,10 +616,10 @@ final readonly class AnalyseCommandSetupBuilder
      * same renderer and exit code as a real scan and reads consistently in every `--format`.
      *
      * @param AnalyseCommandOptions $options - Validated options supplying the requested paths and config path for context.
-     * @param OutputFormat          $format - Format the caller will render this error report in.
-     * @param string                $failOn - Fail-on value to record on the report so its threshold field stays accurate.
+     * @param OutputFormat          $format  - Format the caller will render this error report in.
+     * @param string                $failOn  - Fail-on value to record on the report so its threshold field stays accurate.
      * @param string                $message - Human-readable remediation text shown to the user as the diagnostic.
-     * @param string                $type - Diagnostic category, either 'usage-error' (default) or 'config-error'.
+     * @param string                $type    - Diagnostic category, either 'usage-error' (default) or 'config-error'.
      *
      * @return AnalysisReport - Report carrying the diagnostic and invalid exit code.
      */

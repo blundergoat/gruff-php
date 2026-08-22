@@ -1,6 +1,6 @@
 ---
 category: performance
-last_reviewed: 2026-08-07
+last_reviewed: 2026-08-22
 ---
 
 # Performance Patterns
@@ -31,3 +31,17 @@ php /path/to/gruff-php/bin/gruff-php analyse --diff-vs=origin/deploy --changed-o
 **Approach:** When two rules or helper calculations need the same expensive AST metric for the same `PhpParser\Node`, cache it in a process-local `WeakMap` keyed by the node. This lets `complexity.maintainability-index` reuse cyclomatic and Halstead calculations that other complexity rules already requested, while avoiding retention of parsed ASTs after the analyse process releases them. For project rules that scan whole corpora, prefer one broad `NodeFinder::find()` pass that collects the needed class/interface nodes over multiple `findInstanceOf()` passes for each node type, then do targeted subtree scans only where the rule needs class-local references.
 
 **Verification:** Use the performance script before and after the change, not ad hoc stopwatch timing. The 2026-05-17 optimisation pass kept focused rule tests green (`tests/Rule/Complexity/*`, `tests/Rule/Design/SingleImplementorInterfaceRuleTest.php`), `composer test` green, and `composer check` green. A follow-up `scripts/test-performance.sh --full --corpus=large` run reported `design.single-implementor-interface` at about 401 ms and `complexity.maintainability-index` at about 177 ms; rerun on the same machine/PHP build because wall time has normal local variance.
+
+## Pattern: Degrade deep source analysis and bind its performance baseline
+
+**Created:** 2026-08-22
+
+**Evidence:** ACTUAL_MEASURED
+
+**Context:** Oversized PHP source still needs raw-text security and size analysis even when materialising a PHP AST would exceed the family budget. Treating the budget as a discovery exclusion would silently remove those checks.
+
+**Approach:** Let `src/Engine/Parser/PhpFileParser.php` (search: `deepScanBudgetDiagnostic`) apply the paired line/byte limits only to `SourceFile::isPhp()` inputs. Return an `AnalysisUnit` with source text and a non-fatal `bounded-deep-scan` diagnostic but no AST; `src/Cli/Command/AnalysisPipeline.php` (search: `$phpFileParser->parse`) then keeps text rules and analysed-file accounting while AST rules naturally have no node input. Preserve the atomic config/CLI choice through `src/Engine/Config/AnalysisConfig.php` (search: `withDeepScanBudget`) and render the diagnostic on every supported surface.
+
+**Measurement integrity:** `scripts/test-performance.sh` disables the result cache, records host, PHP, Git, runtime-source, wrapper, and harness identities, and writes the tracked comparand at `scripts/performance-baselines/linux-x86_64.json`. Its runtime-source and wrapper digests match the source-bound M11 cohort run, so later comparisons can distinguish analyzer movement from host movement.
+
+**Verification:** `tests/Parser/PhpFileParserTest.php` (search: `testDeepScanBudgetProducesNonfatalRawTextUnit`) protects the parser seam, while `tests/Console/AnalyseCliTest.php` (search: `testBoundedDeepScanKeepsTextLevelSecurityFindings`) and `testBoundedDeepScanDiagnosticIsVisibleInEveryFormat` protect retained security analysis and output visibility.

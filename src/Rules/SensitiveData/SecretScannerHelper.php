@@ -12,12 +12,10 @@ use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
 
 /**
- * Shared string and finding helpers the sensitive-data scanners lean on - comment-range lookup,
- * offset-to-line conversion, value redaction, dummy/placeholder detection, path classification, Shannon
- * entropy, and a common finding builder.
+ * Shared detector utilities turn matched source into safe, consistently located sensitive findings.
  *
- * Centralising these keeps every secret scanner redacting, skipping comments, and scoring entropy the same
- * way. Pure static utility; the only state is a per-unit comment-range cache keyed by display path.
+ * Scanners use them for comment ranges, line lookup, fixed markers, placeholder checks, paths, entropy, and finding construction.
+ * The helpers are static and side-effect free except for an immutable per-file comment-range cache.
  */
 final class SecretScannerHelper
 {
@@ -108,36 +106,14 @@ final class SecretScannerHelper
     }
 
     /**
-     * Builds a redacted preview of a secret value (length only, or first 4 + last 4 chars over 8 chars).
+     * Returns the fixed zero-payload marker shown for a sensitive finding in every user-facing report.
+     * Use it after a detector confirms a match, so reports retain the finding without matched characters or length.
      *
-     * @param string $secretValue - Sensitive value to redact for reporting.
-     *
-     * @return string - redacted preview (length marker, or first/last 4 chars) safe to embed in findings and reports
+     * @return string - non-empty classification-only marker with no value-derived characters or length
      */
-    public static function redactedPreview(string $secretValue): string
+    public static function fixedSecretMarker(): string
     {
-        $length = strlen($secretValue);
-        if ($length <= 8) {
-            // Too short to show any edge without leaking most of it, so disclose only the length.
-            return sprintf('<redacted:%d chars>', $length);
-        }
-
-        // Show only the first and last 4 chars: enough to recognise the value, never enough to reconstruct it.
-        return sprintf('%s...%s (redacted, %d chars)', substr($secretValue, 0, 4), substr($secretValue, -4), $length);
-    }
-
-    /**
-     * Builds a `KEY=<redacted:N chars>` string for env-style secret findings.
-     *
-     * @param string $key - Environment-style key name.
-     * @param string $secretValue - Sensitive value associated with the key.
-     *
-     * @return string - `KEY=<redacted:N chars>` with the key kept visible and only the value's byte length disclosed
-     */
-    public static function redactedKeyValue(string $key, string $secretValue): string
-    {
-        // Keep the key visible for context but disclose only the value's length, never any of its bytes.
-        return sprintf('%s=<redacted:%d chars>', $key, strlen($secretValue));
+        return '[redacted]';
     }
 
     /**
@@ -251,7 +227,8 @@ final class SecretScannerHelper
     }
 
     /**
-     * Builds a sensitive-data finding with a redacted preview and detector metadata.
+     * Builds one sensitive-data finding with a fixed display marker and detector metadata for the user's report.
+     * Call it after detector-specific exclusions so every remaining occurrence reaches scoring and rendering.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit that owns the finding.
      * @param string       $ruleId - Sensitive-data rule identifier.
@@ -259,10 +236,10 @@ final class SecretScannerHelper
      * @param int          $line - Source line for the detected secret.
      * @param Confidence   $confidence - Confidence level assigned by the detector.
      * @param string       $detector - Detector name written to finding metadata.
-     * @param string       $preview - Redacted preview written to finding metadata.
+     * @param string       $displayMarker - Non-empty fixed marker written to finding metadata; it contains no matched value or length.
      * @param string       $remediation - Suggested remediation text for the finding.
      *
-     * @return Finding - a SensitiveData/Warning finding carrying the detector name and redacted preview in metadata
+     * @return Finding - SensitiveData/Warning finding carrying the detector name and non-empty fixed marker in metadata
      */
     public static function finding(
         AnalysisUnit $analysisUnit,
@@ -271,7 +248,7 @@ final class SecretScannerHelper
         int          $line,
         Confidence   $confidence,
         string       $detector,
-        string       $preview,
+        string       $displayMarker,
         string       $remediation,
     ): Finding {
         return new Finding(
@@ -286,7 +263,7 @@ final class SecretScannerHelper
             remediation: $remediation,
             metadata:    [
                              'detector' => $detector,
-                             'preview'  => $preview,
+                             'preview'  => $displayMarker,
                          ],
         );
     }

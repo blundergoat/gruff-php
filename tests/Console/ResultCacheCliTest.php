@@ -121,6 +121,79 @@ final class ResultCacheCliTest extends CliTestCase
         self::assertDirectoryExists($this->project . '/.gruff-cache');
     }
 
+    /** Verify warm runs replay the note and a budget change cannot reuse bounded findings. */
+    public function testDeepScanBudgetParticipatesInCacheIdentity(): void
+    {
+        $project = self::PROJECT_ROOT . '/tests/runtime-gruff-cache-' . bin2hex(random_bytes(6));
+        self::assertTrue(mkdir($project . '/src', 0777, true));
+        self::assertNotFalse(file_put_contents($project . '/README.md', "Cache budget fixture.\n"));
+        self::assertNotFalse(file_put_contents(
+            $project . '/src/Danger.php',
+            "<?php\n\$key = 'AKIAQ7R2M8N4P6T9V1X3';\neval(\$_GET['code']);\n",
+        ));
+
+        try {
+            $boundedArguments = [
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff-php',
+                'analyse',
+                '--no-config',
+                '--profile',
+                'security',
+                '--format',
+                'json',
+                '--fail-on',
+                'none',
+                '--deep-scan-budget',
+                '1:1',
+                'src/Danger.php',
+            ];
+            $cold = new Process($boundedArguments, $project);
+            $cold->run();
+            $warm = new Process($boundedArguments, $project);
+            $warm->run();
+
+            self::assertSame(0, $cold->getExitCode(), $cold->getErrorOutput());
+            self::assertSame($cold->getOutput(), $warm->getOutput());
+            $boundedReport      = $this->decodeJsonOutput($warm);
+            $boundedDiagnostics = $boundedReport['diagnostics'] ?? null;
+            self::assertIsArray($boundedDiagnostics);
+            $boundedDiagnostic = $boundedDiagnostics[0] ?? null;
+            self::assertIsArray($boundedDiagnostic);
+            self::assertSame('bounded-deep-scan', $boundedDiagnostic['type'] ?? null);
+
+            $unbounded = new Process([
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff-php',
+                'analyse',
+                '--no-config',
+                '--profile',
+                'security',
+                '--format',
+                'json',
+                '--fail-on',
+                'none',
+                '--deep-scan-budget',
+                'off',
+                'src/Danger.php',
+            ], $project);
+            $unbounded->run();
+            $unboundedReport   = $this->decodeJsonOutput($unbounded);
+            $unboundedFindings = $unboundedReport['findings'] ?? null;
+            self::assertIsArray($unboundedFindings);
+            $ruleIds = [];
+            foreach ($unboundedFindings as $finding) {
+                self::assertIsArray($finding);
+                $ruleIds[] = $finding['ruleId'] ?? null;
+            }
+
+            self::assertSame([], $unboundedReport['diagnostics'] ?? null);
+            self::assertContains('security.dangerous-function-call', $ruleIds);
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+
     /**
      * Prime the cache and replace each cache entry with an invalid finding row.
      *
@@ -217,7 +290,7 @@ final class ResultCacheCliTest extends CliTestCase
     /**
      * Write a fixture file, creating parent directories as needed.
      *
-     * @param string $path - Project-relative file path.
+     * @param string $path     - Project-relative file path.
      * @param string $contents - File contents.
      *
      * @return void

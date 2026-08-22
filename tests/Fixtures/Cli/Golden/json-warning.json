@@ -124,6 +124,7 @@
             }
         }
     ],
+    "suppressions": [],
     "score": {
         "composite": {
             "score": 96.1,

@@ -4,7 +4,7 @@ Use these docs with the top-level README for the stable user-facing surface.
 
 ## Core Docs
 
-- [Configuration](configuration.md) - config discovery, schema, allowlists, selection, and rule overrides.
+- [Configuration](configuration.md) - config discovery, schema, allowlists, selection, sensitive exclusions, and rule overrides.
 - [Rules](rules.md) - rule IDs, severities, thresholds, and remediation guidance.
 - [Output Formats](output-formats.md) - text, JSON, HTML, Markdown, GitHub annotations, hotspot, and SARIF.
 - [CI Integration](ci-integration.md) - GitHub Actions, SARIF upload, baselines, and diff scans.

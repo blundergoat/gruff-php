@@ -1,6 +1,6 @@
 ---
 category: schemas
-last_reviewed: 2026-05-30
+last_reviewed: 2026-08-22
 ---
 
 # Schema Versioning Footguns
@@ -53,3 +53,19 @@ ADR-015 introduced `schemaVersion: gruff-php.config.v0.1` as a required top-leve
 - `rg -n 'GATING_COMMANDS|gatingCommand' src/ tests/` — every validator and helper using the allowlist must reference the constant, not a copy.
 
 Adding a new gating command means adding it to `ConfigLoader::GATING_COMMANDS`, the docs lists, the `InitCommand::DEFAULT_MINIMUM_SEVERITY` map, and the precedence chain in the new command's wiring. Adding a new threshold value means extending `FailThreshold` first; the validator and init preservation iterate `FailThreshold::cases()` natively.
+
+## Footgun: A finding-suppression filter has exactly one correct seam, and it does not cover `summary`
+
+**Status:** active | **Created:** 2026-08-22 | **Evidence:** ACTUAL_MEASURED
+**Decision changed:** Where to install any config-driven filter that matches on a finding's reported path, and whether one installation covers every command that reports findings.
+**Trigger phase:** SCOPE
+
+The 0.6.0 `sensitiveExclusions:` section matches a finding by its project-relative display path. Two properties of this codebase decide where that comparison can legally happen, and both are invisible from the config layer.
+
+First, the display path is not stable for the whole run. `src/Cli/Command/AnalysisPipeline.php` (search: `private function runPipeline`) hands back findings carrying the discovery display path from `src/Engine/Source/SourceDiscovery.php` (search: `private function displayPath`), which is project-relative. `src/Cli/Command/AnalyseCommand.php` then rebases them through `src/Cli/Command/AnalysisFindingSupport.php` (search: `public function normalizeFindingPaths`) whenever the caller passed `--paths-relative-to`. A filter installed after that point compares configured paths against a caller-chosen base, so the same config would suppress different findings depending on how the command was invoked. The filter therefore has to run inside `runAnalysis`, between the pipeline and the rebase, and also before `ScoreCalculator` and the exit gate so a suppressed finding leaves scoring the way accepted baseline debt does.
+
+Second, that seam is not the only place findings are produced. Three call sites run the rules: `AnalysisPipeline` (serving `analyse` and `hook`), `src/Cli/Command/BranchReviewBuilder.php` (search: `$baseRegistry->analyse`) for the `--diff-vs` base snapshot, and `src/Cli/Command/SummaryCommand.php` (search: `private function summaryData`), which calls the registry directly and never touches the pipeline. The base-snapshot site needs the same filter for a different reason: comparing suppressed current findings against unsuppressed base findings reports an accepted credential as removed by the branch. `summary` is not covered. Measured on a four-file synthetic corpus with one exclusion configured, `analyse --format json` reported `"total": 2` with a `suppressions` row of `"suppressed": 1`, while `summary --format json` over the same tree reported `"total": 3` and carried no `suppressions` key at all. The two commands disagree by exactly the suppressed finding.
+
+**Prevention:** Before installing any config-driven finding filter, find every producer of findings, not just the one the feature was requested against. Grep case-insensitively for `->analyse(` under `src/Cli/Command/`: a case-sensitive `registry->analyse(` misses `$baseRegistry->analyse(` in `BranchReviewBuilder` and undercounts the producers by one. Then check whether the field the filter matches on is rewritten later in the run; display paths are, and a filter placed downstream of `normalizeFindingPaths` is invocation-dependent rather than wrong-looking. Finally, ask which comparisons pair filtered output with unfiltered output - a branch review pairs two independent analyses, so a filter applied to one side only turns suppression into a phantom fix.
+
+**Portability question this raises for the family, unresolved:** `../FAMILY-CONTRACT.md` (search: `**Audit counts.**`) asks every port for the suppression total on "every finding-bearing surface", but does not say which run stage owns suppression. gruff-rs suppresses once, inside `../gruff-rs/src/analysis.rs` (search: `fn partition_excluded_findings`), because one report-building path serves everything. php has two finding-producing paths and one machine-report shape, so a single seam satisfies the audit shape while leaving `summary` unsuppressed and countless. The family has to decide whether the contract means one suppression stage each port must converge on, or per-command replication with a per-command count — and whether an `analyse`/`summary` disagreement of exactly the suppressed set is conformant in the meantime. Ports whose summary-equivalent shares the analyse pipeline will not notice this question exists.

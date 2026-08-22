@@ -19,14 +19,29 @@ Supported top-level sections are:
 - `schemaVersion`
 - `extends`
 - `minimumPhpVersion`
+- `deepScanBudget`
 - `minimumSeverity`
 - `failureConditions`
 - `paths`
 - `allowlists`
 - `selection`
+- `sensitiveExclusions`
 - `rules`
 
 Unknown top-level keys are rejected so config mistakes fail early.
+
+## Bounded Deep Scans
+
+PHP files are classified before the deep-scan guard runs. By default, a PHP file over either 20,000 lines or 2,000,000 bytes keeps raw-text checks—file size, sensitive-data, and config checks—but skips token masking, PHP parsing, AST walking, and other structural analysis. The file still counts as analysed and every output format includes a nonfatal `bounded-deep-scan` diagnostic naming its path, measured lines and bytes, both limits, and the winning override source.
+
+```yaml
+deepScanBudget:
+  enabled: true
+  maxLines: 20000
+  maxBytes: 2000000
+```
+
+Use `--deep-scan-budget <lines>:<bytes>` to replace both values for one invocation, or `--deep-scan-budget off` to disable the guard. CLI values take precedence over config. Non-PHP text and config files never pass through this guard.
 
 ## Schema Version
 
@@ -202,6 +217,59 @@ selection:
   pillars: [security, complexity]
   excludeRules: [security.weak-crypto]
 ```
+
+## Sensitive Exclusions
+
+`sensitiveExclusions` is the only way to suppress a sensitive-data finding. It is deliberately
+separate from `selection` so the ban on matching reported text is structural rather than a setting
+someone can relax later:
+
+```yaml
+sensitiveExclusions:
+  - rule: sensitive-data.aws-access-key
+    path: tests/Fixtures/SensitiveExclusions/AwsSample.php
+    symbol: Fixtures::awsSample
+    reason: Synthetic key used by the scanner fixtures; not a live credential.
+```
+
+**Entries are authored by hand.** gruff never converts a reported finding, message, or preview value
+into an entry, and there is no command that writes one for you. Every finding you accept is a
+decision you record yourself, with the rationale a later reviewer will read.
+
+An entry suppresses a finding only when all of the following hold:
+
+- the finding's rule id equals `rule` exactly;
+- the finding's project-relative path equals `path` exactly;
+- `symbol` is absent, or the finding's symbol equals it exactly.
+
+Nothing else is suppressed. The same rule in another file keeps reporting, and a different rule in
+the same file keeps reporting. No sensitive-data rule stamps a symbol today, so an entry carrying
+`symbol` legitimately matches nothing - that is correct behaviour, not a bug.
+
+A suppressed finding leaves scoring and the exit code exactly as an accepted baseline finding does,
+and is never invisible: every entry publishes a row in the report's `suppressions` array, and the
+text report prints a `Suppressed findings:` total naming each entry and its reason. An entry that
+matches nothing reports `suppressed: 0` rather than failing, so fixing the underlying problem never
+breaks a build.
+
+`summary` applies the same entries, so its counts and grade agree with `analyse` over the same tree,
+and its text output prints the same `Suppressed findings:` total below the digest. Its
+`gruff.summary.v2` JSON has no suppression field yet, so `summary --format json` filters without
+publishing a count; read the total from the text output or from `analyse --format json`.
+
+These shapes are rejected at load time, each with a message naming the entry index and the offending
+key, and each exiting `2`:
+
+| Rejected | Why |
+| --- | --- |
+| `rule` missing, empty, or carrying a wildcard, glob, or regular expression | a blanket suppression hides findings nobody reviewed |
+| `rule` naming a pillar such as `sensitive-data` | a pillar selector is blanket suppression wearing a rule id |
+| `rule` naming an unknown rule id | a typo must fail loudly, not silently suppress nothing |
+| `rule` naming a rule outside the sensitive-data pillar | this section governs that pillar alone; use `selection` for the rest |
+| `path` missing, empty, absolute, containing `..`, or containing a glob | an entry names exactly one reviewed file inside the project |
+| any other key, including `message_contains`, `messageContains`, `value`, and `preview` | matching on reported text reintroduces value-based suppression |
+| `reason` missing, empty, or whitespace-only | a suppression nobody explained is a suppression nobody can review |
+| a second entry with the same `rule`, `path`, and `symbol` | two entries claiming one scope would split the audit count arbitrarily |
 
 ## Rules
 

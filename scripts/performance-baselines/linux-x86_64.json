@@ -1,0 +1,210 @@
+{
+  "schemaVersion": "gruff-perf.v1",
+  "createdAt": "2026-08-22T05:40:35Z",
+  "host": {
+    "platform": "linux-x86_64",
+    "uname": "Linux 6.6.87.2-microsoft-standard-WSL2 x86_64",
+    "cpu": "Intel(R) Core(TM) Ultra 9 275HX",
+    "php": "8.3.30"
+  },
+  "source": {
+    "gitCommit": "98a329c68e9e8f38a788d87316f8c0421d3143ef",
+    "gitDirty": true,
+    "runtimeSource": {
+      "includedPaths": [
+        "bin/gruff-php",
+        "src",
+        "composer.json",
+        "composer.lock"
+      ],
+      "fileCount": 283,
+      "digest": "sha256:9a91ac6028b33724fc23c173b165b2dbc5c307bcd1effff9e3a5141024d1fd28"
+    },
+    "artifact": {
+      "kind": "live-wrapper",
+      "sha256": "sha256:a6245a7a5f9ea30a4bc5aaff35d95f345584e840e9e262cc61a195b0c9a4ce58"
+    },
+    "harnessSha256": "sha256:17ad61bfea3f801c16dcacc8ea61e22da2b02912cec139ff0b5a3677675d879c",
+    "toolVersion": "gruff-php 0.5.2"
+  },
+  "runner": {
+    "mode": "full",
+    "cache": "disabled"
+  },
+  "corpora": {
+    "small": {
+      "wallMs": 84,
+      "peakBytes": 16777216,
+      "filesParsed": 7,
+      "rulesExecuted": 127,
+      "topRules": [
+        {
+          "ruleId": "dead-code.unused-private-method",
+          "totalNs": 2912196,
+          "invocations": 7
+        },
+        {
+          "ruleId": "naming.abbreviation-allowlist",
+          "totalNs": 2418075,
+          "invocations": 7
+        },
+        {
+          "ruleId": "complexity.cyclomatic",
+          "totalNs": 2246853,
+          "invocations": 7
+        },
+        {
+          "ruleId": "complexity.cognitive",
+          "totalNs": 2084553,
+          "invocations": 7
+        },
+        {
+          "ruleId": "naming.identifier-quality",
+          "totalNs": 1524476,
+          "invocations": 7
+        },
+        {
+          "ruleId": "waste.one-line-method",
+          "totalNs": 1387383,
+          "invocations": 7
+        },
+        {
+          "ruleId": "naming.class-file-mismatch",
+          "totalNs": 1214010,
+          "invocations": 7
+        },
+        {
+          "ruleId": "waste.unused-parameter",
+          "totalNs": 1009232,
+          "invocations": 7
+        },
+        {
+          "ruleId": "docs.missing-param-tag",
+          "totalNs": 690479,
+          "invocations": 7
+        },
+        {
+          "ruleId": "complexity.halstead-volume",
+          "totalNs": 680370,
+          "invocations": 7
+        }
+      ]
+    },
+    "medium": {
+      "wallMs": 2440,
+      "peakBytes": 23068672,
+      "filesParsed": 280,
+      "rulesExecuted": 127,
+      "topRules": [
+        {
+          "ruleId": "dead-code.unused-private-method",
+          "totalNs": 189719921,
+          "invocations": 280
+        },
+        {
+          "ruleId": "naming.abbreviation-allowlist",
+          "totalNs": 162780261,
+          "invocations": 280
+        },
+        {
+          "ruleId": "complexity.cyclomatic",
+          "totalNs": 154122748,
+          "invocations": 280
+        },
+        {
+          "ruleId": "complexity.cognitive",
+          "totalNs": 114242192,
+          "invocations": 280
+        },
+        {
+          "ruleId": "naming.class-file-mismatch",
+          "totalNs": 85925316,
+          "invocations": 280
+        },
+        {
+          "ruleId": "waste.one-line-method",
+          "totalNs": 81856800,
+          "invocations": 280
+        },
+        {
+          "ruleId": "naming.identifier-quality",
+          "totalNs": 77178714,
+          "invocations": 280
+        },
+        {
+          "ruleId": "docs.var-annotation-description",
+          "totalNs": 59469718,
+          "invocations": 280
+        },
+        {
+          "ruleId": "waste.unused-parameter",
+          "totalNs": 55392693,
+          "invocations": 280
+        },
+        {
+          "ruleId": "complexity.halstead-volume",
+          "totalNs": 46114505,
+          "invocations": 280
+        }
+      ]
+    },
+    "large": {
+      "wallMs": 4733,
+      "peakBytes": 25165824,
+      "filesParsed": 433,
+      "rulesExecuted": 127,
+      "topRules": [
+        {
+          "ruleId": "dead-code.unused-private-method",
+          "totalNs": 343596080,
+          "invocations": 393
+        },
+        {
+          "ruleId": "complexity.cyclomatic",
+          "totalNs": 303005307,
+          "invocations": 393
+        },
+        {
+          "ruleId": "naming.abbreviation-allowlist",
+          "totalNs": 296234453,
+          "invocations": 393
+        },
+        {
+          "ruleId": "complexity.cognitive",
+          "totalNs": 211016191,
+          "invocations": 393
+        },
+        {
+          "ruleId": "waste.one-line-method",
+          "totalNs": 165745812,
+          "invocations": 393
+        },
+        {
+          "ruleId": "naming.class-file-mismatch",
+          "totalNs": 165708289,
+          "invocations": 393
+        },
+        {
+          "ruleId": "naming.identifier-quality",
+          "totalNs": 144475188,
+          "invocations": 393
+        },
+        {
+          "ruleId": "complexity.halstead-volume",
+          "totalNs": 93356827,
+          "invocations": 393
+        },
+        {
+          "ruleId": "docs.var-annotation-description",
+          "totalNs": 84988712,
+          "invocations": 393
+        },
+        {
+          "ruleId": "waste.unused-parameter",
+          "totalNs": 73007534,
+          "invocations": 393
+        }
+      ]
+    }
+  }
+}

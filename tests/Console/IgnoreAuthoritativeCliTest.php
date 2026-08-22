@@ -20,7 +20,7 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
     private string $project = '';
 
     /**
-     * Build a temporary git project that ignores legacy/** via config and *.log via gitignore.
+     * Build a temporary git project with config, file, and directory ignore cases.
      *
      * @return void
      */
@@ -29,11 +29,12 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
         $this->project = $this->tempDir();
         $this->runGit(['init', '-q']);
         $this->writeProjectFile('.gruff-php.yaml', "schemaVersion: gruff-php.config.v0.1\npaths:\n    ignore:\n        - 'legacy/**'\n");
-        $this->writeProjectFile('.gitignore', "*.log\n");
+        $this->writeProjectFile('.gitignore', "*.local.json\nignored-dir/\n");
         $this->writeProjectFile('README.md', "Ignore fixture.\n");
         $this->writeProjectFile('legacy/Bad.php', "<?php\n\nnamespace Demo;\n\nclass Bad\n{\n    public function foo(\$x)\n    {\n        return \$x + 1;\n    }\n}\n");
         $this->writeProjectFile('src/Good.php', "<?php\n\nnamespace Demo;\n\nclass Good\n{\n    public function bar(\$y)\n    {\n        return \$y - 1;\n    }\n}\n");
-        $this->writeProjectFile('debug.log', "secret\n");
+        $this->writeProjectFile('secret.local.json', "{}\n");
+        $this->writeProjectFile('ignored-dir/Hidden.php', "<?php\n");
     }
 
     /**
@@ -137,14 +138,25 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
      */
     public function testCheckIgnoreReportsVerdictSourceAndPattern(): void
     {
-        $process = $this->runGruff(['check-ignore', '--format', 'json', 'legacy/Bad.php', 'src/Good.php', 'debug.log']);
+        $process = $this->runGruff([
+            'check-ignore',
+            '--format',
+            'json',
+            'legacy/Bad.php',
+            'src/Good.php',
+            'secret.local.json',
+            'ignored-dir',
+            '.git/config',
+        ]);
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         self::assertSame([
                              ['path' => 'legacy/Bad.php', 'ignored' => true, 'source' => 'config', 'pattern' => 'legacy/**'],
                              ['path' => 'src/Good.php', 'ignored' => false, 'source' => null, 'pattern' => null],
-                             ['path' => 'debug.log', 'ignored' => true, 'source' => 'gitignore', 'pattern' => '*.log'],
+                             ['path' => 'secret.local.json', 'ignored' => false, 'source' => null, 'pattern' => null],
+                             ['path' => 'ignored-dir', 'ignored' => true, 'source' => 'gitignore', 'pattern' => 'ignored-dir/'],
+                             ['path' => '.git/config', 'ignored' => true, 'source' => 'default', 'pattern' => '.git'],
                          ], $this->decodeJsonList($process));
     }
 

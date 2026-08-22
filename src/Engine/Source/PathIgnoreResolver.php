@@ -25,7 +25,7 @@ final readonly class PathIgnoreResolver
     public const SOURCE_DEFAULT = 'default';
 
     /**
-     * A path matched a built-in generated/lock filename such as composer.lock.
+     * A path matched generated-file handling outside the default directory policy.
      */
     public const SOURCE_GENERATED = 'generated';
 
@@ -35,37 +35,25 @@ final readonly class PathIgnoreResolver
     public const SOURCE_GITIGNORE = 'gitignore';
 
     /** @var list<string> */
-    private const IGNORED_DIRECTORIES = [
-        '.fleet',
+    private const VCS_DIRECTORIES = [
         '.git',
-        '.goat-flow/logs',
-        '.goat-flow/scratchpad',
-        '.goat-flow/tasks',
-        '.gruff-cache',
         '.hg',
-        '.idea',
-        '.phpunit.cache',
         '.svn',
-        '.vscode',
-        'build',
-        'cache',
-        'coverage',
-        'dist',
-        'generated',
-        'node_modules',
-        'tmp',
-        'var/cache',
-        'vendor',
     ];
 
     /** @var list<string> */
-    private const IGNORED_FILENAMES = [
-        'bun.lockb',
-        'composer.lock',
-        'npm-shrinkwrap.json',
-        'package-lock.json',
-        'pnpm-lock.yaml',
-        'yarn.lock',
+    private const FALLBACK_DIRECTORIES = [
+        '.fleet',
+        '.gruff-cache',
+        '.idea',
+        '.phpunit.cache',
+        '.vscode',
+        'build',
+        'coverage',
+        'dist',
+        'node_modules',
+        'var/cache',
+        'vendor',
     ];
 
     /**
@@ -78,17 +66,17 @@ final readonly class PathIgnoreResolver
     }
 
     /**
-     * Decides whether a path is ignored and why, applying config, built-in, and generated exclusions in
+     * Decides whether a path is ignored and why, applying config, VCS, and fallback exclusions in
      * priority order - the one place discovery and check-ignore agree on what gets skipped.
      *
-     * Configured paths.ignore is authoritative and is applied even when ignored
-     * files are otherwise included; default and generated exclusions are skipped
-     * when ignored files are requested.
+     * Configured paths.ignore and VCS internals are authoritative. Explicit files
+     * and include-ignored bypass only Git/default fallback policy.
      *
      * @param string       $displayPath - Project-relative display path used for glob and directory matching.
      * @param string       $absolutePath - Absolute path used for filename matching.
      * @param list<string> $configuredPatterns - Configured paths.ignore glob patterns.
-     * @param bool         $shouldIncludeIgnored - When true, the built-in default/generated ignores are bypassed for this run.
+     * @param bool         $shouldIncludeIgnored - When true, non-VCS fallback ignores are bypassed for this run.
+     * @param bool         $isExplicitFile - When true, the caller requested this existing file directly.
      *
      * @return IgnoreDecision - Whether the path is ignored and, if so, the source and pattern behind it.
      */
@@ -97,6 +85,7 @@ final readonly class PathIgnoreResolver
         string $absolutePath,
         array $configuredPatterns,
         bool $shouldIncludeIgnored,
+        bool $isExplicitFile = false,
     ): IgnoreDecision {
         $configuredPattern = $this->matchedConfiguredPattern($displayPath, $configuredPatterns);
         // The user's own paths.ignore wins first and always, even when they asked to include ignored files.
@@ -105,27 +94,41 @@ final readonly class PathIgnoreResolver
             return IgnoreDecision::ignored(self::SOURCE_CONFIG, $configuredPattern);
         }
 
-        // With ignored files requested, skip the built-in exclusions below (config above was already honoured).
-        if ($shouldIncludeIgnored) {
-            // Requesting ignored files bypasses only the built-in default/generated exclusions below.
+        $vcsDirectory = $this->matchedVcsDirectory($displayPath);
+        if ($vcsDirectory !== null) {
+            return IgnoreDecision::ignored(self::SOURCE_DEFAULT, $vcsDirectory);
+        }
+
+        if ($shouldIncludeIgnored || $isExplicitFile) {
             return IgnoreDecision::notIgnored();
         }
 
         $defaultDirectory = $this->matchedDefaultDirectory($displayPath);
-        // Next, a built-in tool or dependency directory like vendor or node_modules.
-        if ($defaultDirectory !== null) {
-            // A built-in tool/vendor directory match is the next exclusion source after config.
+        if ($defaultDirectory !== null && $this->fallbackAppliesAt($absolutePath)) {
             return IgnoreDecision::ignored(self::SOURCE_DEFAULT, $defaultDirectory);
         }
 
-        $generatedFilename = $this->matchedGeneratedFilename($absolutePath);
-        // Last, a known generated or lock file such as composer.lock.
-        if ($generatedFilename !== null) {
-            // A known generated/lock filename is the last built-in exclusion before falling through.
-            return IgnoreDecision::ignored(self::SOURCE_GENERATED, $generatedFilename);
+        return IgnoreDecision::notIgnored();
+    }
+
+    /**
+     * Finds an always-blocked VCS directory component in a path.
+     *
+     * @param string $displayPath - Project-relative display path being tested.
+     *
+     * @return string|null - The matching VCS token, or null when the path is outside VCS internals.
+     */
+    public function matchedVcsDirectory(string $displayPath): ?string
+    {
+        $segments = explode('/', trim(str_replace('\\', '/', $displayPath), '/'));
+
+        foreach ($segments as $segment) {
+            if (in_array($segment, self::VCS_DIRECTORIES, true)) {
+                return $segment;
+            }
         }
 
-        return IgnoreDecision::notIgnored();
+        return null;
     }
 
     /**
@@ -167,7 +170,7 @@ final readonly class PathIgnoreResolver
         $segments              = explode('/', trim($normalizedDisplayPath, '/'));
 
         // Test the path's segments against each built-in ignored directory.
-        foreach (self::IGNORED_DIRECTORIES as $ignoredDirectory) {
+        foreach (self::FALLBACK_DIRECTORIES as $ignoredDirectory) {
             $ignoredSegments = explode('/', $ignoredDirectory);
             $ignoredCount    = count($ignoredSegments);
 
@@ -184,19 +187,36 @@ final readonly class PathIgnoreResolver
     }
 
     /**
-     * Reports whether a path is a known generated or lock file (composer.lock, package-lock.json, ...)
-     * that gruff skips wherever it sits, or null when it is not one.
+     * Reports whether no `.gitignore` exists from the project root through the candidate's parent.
      *
-     * @param string $absolutePath - Absolute filesystem path being tested.
+     * @param string $absolutePath - Existing candidate path whose ancestor chain owns fallback applicability.
      *
-     * @return string|null - The matching filename; null when the path is not a known generated artifact.
+     * @return bool - True only when the family fallback should apply at this candidate.
      */
-    public function matchedGeneratedFilename(string $absolutePath): ?string
+    private function fallbackAppliesAt(string $absolutePath): bool
     {
-        $basename = basename($absolutePath);
+        $root      = rtrim(str_replace('\\', '/', realpath($this->projectRoot) ?: $this->projectRoot), '/');
+        $candidate = str_replace('\\', '/', realpath($absolutePath) ?: $absolutePath);
+        $parent    = rtrim(str_replace('\\', '/', dirname($candidate)), '/');
 
-        // Match on the bare filename only, so a generated artifact is ignored wherever it sits in the tree.
-        return in_array($basename, self::IGNORED_FILENAMES, true) ? $basename : null;
+        if ($parent !== $root && !str_starts_with($parent, $root . '/')) {
+            return true;
+        }
+
+        while (true) {
+            if (is_file($parent . '/.gitignore')) {
+                return false;
+            }
+            if ($parent === $root) {
+                return true;
+            }
+
+            $next = rtrim(str_replace('\\', '/', dirname($parent)), '/');
+            if ($next === $parent) {
+                return true;
+            }
+            $parent = $next;
+        }
     }
 
     /**

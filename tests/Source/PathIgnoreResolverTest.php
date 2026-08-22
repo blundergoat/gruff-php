@@ -10,7 +10,7 @@ use Symfony\Component\Process\Process;
 
 /**
  * Covers the shared ignore engine: configured globs stay authoritative under
- * include-ignored, built-in directory and generated-file sources, and git rules.
+ * include-ignored, VCS and fallback directories, and git rules.
  */
 final class PathIgnoreResolverTest extends TestCase
 {
@@ -40,7 +40,10 @@ final class PathIgnoreResolverTest extends TestCase
         return [
             'configured file glob' => ['legacy/Bad.php', '/project/legacy/Bad.php', ['legacy/**'], 'config', 'legacy/**'],
             'configured directory glob' => ['legacy', '/project/legacy', ['legacy/**'], 'config', 'legacy/**'],
-            'generated lockfile' => ['composer.lock', '/project/composer.lock', [], 'generated', 'composer.lock'],
+            'vcs internals' => ['nested/.git/config', '/project/nested/.git/config', [], 'default', '.git'],
+            'php cache' => ['.gruff-cache/cache.php', '/project/.gruff-cache/cache.php', [], 'default', '.gruff-cache'],
+            'phpunit cache' => ['.phpunit.cache/result.php', '/project/.phpunit.cache/result.php', [], 'default', '.phpunit.cache'],
+            'framework cache' => ['var/cache/result.php', '/project/var/cache/result.php', [], 'default', 'var/cache'],
         ];
     }
 
@@ -99,6 +102,31 @@ final class PathIgnoreResolverTest extends TestCase
 
         $included = $resolver->decide('vendor/acme/V.php', '/project/vendor/acme/V.php', [], true);
         self::assertFalse($included->ignored);
+
+        $vcs = $resolver->decide('.git/config', '/project/.git/config', [], true, true);
+        self::assertTrue($vcs->ignored);
+        self::assertSame('.git', $vcs->pattern);
+    }
+
+    /**
+     * Verify any governing .gitignore disables non-VCS fallback names for its subtree.
+     *
+     * @return void
+     */
+    public function testFallbackDefersToGitignoreInAncestorChain(): void
+    {
+        $root = $this->tempDir();
+        self::assertTrue(mkdir($root . '/packages/app/vendor', 0777, true));
+        file_put_contents($root . '/packages/app/.gitignore', "*.log\n");
+
+        $decision = (new PathIgnoreResolver($root))->decide(
+            'packages/app/vendor/acme.php',
+            $root . '/packages/app/vendor/acme.php',
+            [],
+            false,
+        );
+
+        self::assertFalse($decision->ignored);
     }
 
     /**

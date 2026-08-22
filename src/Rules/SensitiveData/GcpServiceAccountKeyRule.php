@@ -77,9 +77,7 @@ final readonly class GcpServiceAccountKeyRule implements SourceTextRuleInterface
             return [];
         }
 
-        $preview       = $privateKeyValue !== null
-            ? SecretScannerHelper::redactedPreview($privateKeyValue)
-            : '<redacted GCP service-account key>';
+        $displayMarker = SecretScannerHelper::fixedSecretMarker();
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
 
         $findings = [];
@@ -94,11 +92,11 @@ final readonly class GcpServiceAccountKeyRule implements SourceTextRuleInterface
             $findings[] = SecretScannerHelper::finding(
                 analysisUnit: $analysisUnit,
                 ruleId:       self::ID,
-                message:      sprintf('GCP service-account key detected (type: service_account with embedded private key): %s.', $preview),
+                message:      sprintf('GCP service-account key detected (type: service_account with embedded private key): %s.', $displayMarker),
                 line:         SecretScannerHelper::lineNumberForOffset($source, $offset),
                 confidence:   Confidence::High,
                 detector:     'gcp-service-account-key',
-                preview:      $preview,
+                displayMarker: $displayMarker,
                 remediation:  'Remove the service-account key from source, rotate it in Google Cloud IAM, and load credentials from a secret manager or workload identity instead.',
             );
         }
@@ -125,17 +123,13 @@ final readonly class GcpServiceAccountKeyRule implements SourceTextRuleInterface
     }
 
     /**
-     * Reports whether the embedded key is a placeholder rather than real material.
+     * Reports whether the embedded key is a short placeholder rather than material the user must remove.
+     * Armor-stripped length distinguishes marker phrases from real base64 bodies without substring false matches.
      *
-     * Real private-key bodies are long base64 blobs; placeholders are short
-     * marker phrases. A length test on the armor-stripped body separates them
-     * without the substring false-matches that a generic dummy check hits on
-     * base64.
-     *
-     * @param string|null $privateKeyValue - Extracted JSON private_key value, if any.
+     * @param string|null $privateKeyValue - Extracted JSON private_key value; null means use the PEM block from source instead.
      * @param string      $source - Raw source text (PEM fallback).
      *
-     * @return bool - True when the key body is too short to be real key material.
+     * @return bool - True for a short placeholder; false when material looks real or neither JSON nor PEM yields a body
      */
     private function looksLikePlaceholderKey(?string $privateKeyValue, string $source): bool
     {
@@ -157,7 +151,7 @@ final readonly class GcpServiceAccountKeyRule implements SourceTextRuleInterface
      *
      * @param string $source - Raw source text.
      *
-     * @return string|null - The PEM block, or null when none is present.
+     * @return string|null - PEM block used for the placeholder check; null means the user supplied no standalone PEM body
      */
     private function pemBlock(string $source): ?string
     {
@@ -176,17 +170,17 @@ final readonly class GcpServiceAccountKeyRule implements SourceTextRuleInterface
      *
      * @param string $source - Raw source text.
      *
-     * @return string|null - The (still-escaped) private_key value, or null when absent.
+     * @return string|null - Still-escaped value used only for placeholder checks; null means callers fall back to PEM evidence
      */
     private function privateKeyValue(string $source): ?string
     {
         // Capture the JSON string body without terminating on escaped quote characters.
         if (preg_match('/"private_key"\s*:\s*"((?:\\\\.|[^"\\\\])*)"/', $source, $matches) === 1) {
-            // The escaped value is enough for redacted preview and placeholder checks.
+            // The escaped value is used only for placeholder checks and never reaches the user's finding.
             return $matches[1];
         }
 
-        // PEM-only evidence has no JSON private_key field to preview.
+        // PEM-only evidence has no JSON private_key value to inspect, so the placeholder check receives null.
         return null;
     }
 }

@@ -11,8 +11,10 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers the summary CLI command: digest section output, suppression of per-finding lines, JSON-schema-conformant output, invalid-option rejection,
- * and registration in the command list.
+ * Covers the one-screen `summary` experience and the compact machine-readable result users can request.
+ *
+ * The suite protects digest sections, omitted finding detail, JSON schema, command registration, options, and config failures.
+ * Users exercise these paths when they need a quick terminal overview or a stable summary payload for automation.
  */
 final class GruffCliSummaryTest extends TestCase
 {
@@ -135,13 +137,36 @@ final class GruffCliSummaryTest extends TestCase
         self::assertLessThanOrEqual(3, count($topRules));
     }
 
+    /** Verify both compact formats retain the nonfatal budget diagnostic. */
+    public function testSummaryShowsBoundedDeepScanDiagnostic(): void
+    {
+        foreach (['text', 'json'] as $format) {
+            $process = new Process([
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff-php',
+                'summary',
+                '--no-config',
+                '--format',
+                $format,
+                '--deep-scan-budget',
+                '1:1',
+                'tests/Fixtures/Source/mixed/alpha.php',
+            ], self::PROJECT_ROOT);
+            $process->run();
+
+            self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+            self::assertStringContainsString('bounded-deep-scan', strtolower($process->getOutput()), $format);
+            self::assertStringContainsString('maxLines=1; maxBytes=1; override=cli', $process->getOutput(), $format);
+        }
+    }
+
     /**
-     * Verify summary applies the configured secret preview allowlist.
+     * Models a user running `summary` with an old non-empty secret-preview list.
+     * The command must exit 2 with the same actionable migration message as `analyse`.
      *
      * @return void
-     * @throws JsonException
      */
-    public function testSummaryAppliesConfiguredSecretPreviewAllowlist(): void
+    public function testSummaryRejectsConfiguredLegacySecretPreview(): void
     {
         $process = new Process([
                                    PHP_BINARY,
@@ -155,23 +180,18 @@ final class GruffCliSummaryTest extends TestCase
                                ], self::PROJECT_ROOT);
         $process->run();
 
-        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-
-        // The allowlist runs before scoring, so the vetted rule leaves both the digest's rule table and
-        // the grade it prints; a summary that still listed it would also still be charging for it.
-        $decoded = json_decode($process->getOutput(), true, 512, JSON_THROW_ON_ERROR);
-        self::assertIsArray($decoded);
-        $topRules = $decoded['topRules'] ?? null;
-        self::assertIsArray($topRules);
-        self::assertNotContains('sensitive-data.aws-access-key', array_column($topRules, 'ruleId'));
-        self::assertContains('sensitive-data.api-key-pattern', array_column($topRules, 'ruleId'));
+        self::assertSame(2, $process->getExitCode());
+        self::assertStringContainsString(
+            '[CONFIG-ERROR] Config key "allowlists.secretPreviews" only accepts an empty list; remove all configured entries because secret previews no longer suppress findings.',
+            $process->getOutput(),
+        );
     }
 
     /**
      * Verify summary rejects invalid option combinations.
      *
      * @param list<string> $arguments - CLI arguments appended after the base command.
-     * @param string       $message - Expected usage error excerpt.
+     * @param string       $message   - Expected usage error excerpt.
      *
      * @return void
      */

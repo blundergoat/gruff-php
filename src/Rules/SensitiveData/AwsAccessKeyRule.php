@@ -82,11 +82,11 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
             $findings[] = SecretScannerHelper::finding(
                 analysisUnit: $analysisUnit,
                 ruleId:       self::ID,
-                message:      sprintf('Potential AWS access key detected: %s.', SecretScannerHelper::redactedPreview($candidateSecret)),
+                message:      sprintf('Potential AWS access key detected: %s.', SecretScannerHelper::fixedSecretMarker()),
                 line:         SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
                 confidence:   Confidence::High,
                 detector:     'aws-access-key',
-                preview:      SecretScannerHelper::redactedPreview($candidateSecret),
+                displayMarker: SecretScannerHelper::fixedSecretMarker(),
                 remediation:  'Remove the key from source and rotate it if it was real.',
             );
         }

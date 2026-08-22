@@ -90,7 +90,7 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<\GruffPhp\Results\Finding\Finding> - one finding per realistic PII match left after allow-list and attribution filtering; empty for
+     * @return list<\GruffPhp\Results\Finding\Finding> - One finding per realistic PII match after synthetic and attribution filtering; empty for
      *                                         non-test paths or clean fixtures
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
@@ -103,9 +103,9 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
         $findings      = [];
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
         // Run each PII detector over the fixture source.
-        foreach ($this->patterns() as $definition) {
+        foreach ($this->patterns() as $piiPattern) {
             // Match every occurrence of this PII shape, capturing each offset.
-            preg_match_all($definition['pattern'], $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
+            preg_match_all($piiPattern['pattern'], $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
             // Weigh each candidate this detector found.
             foreach ($matches[0] as $match) {
@@ -116,20 +116,20 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
                 }
 
                 // Skip values the rule already treats as safely synthetic.
-                if ($this->isSuppressedMatch($definition['name'], $candidateFixture, $analysisUnit->source, $offset)) {
+                if ($this->isSuppressedMatch($piiPattern['name'], $candidateFixture, $analysisUnit->source, $offset)) {
                     continue;
                 }
 
                 $line       = SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset);
-                $preview    = SecretScannerHelper::redactedPreview($candidateFixture);
+                $displayMarker = SecretScannerHelper::fixedSecretMarker();
                 $findings[] = SecretScannerHelper::finding(
                     analysisUnit: $analysisUnit,
                     ruleId:       self::ID,
-                    message:      sprintf('Realistic-looking %s found in a test fixture: %s.', $definition['name'], $preview),
+                    message:      sprintf('Realistic-looking %s found in a test fixture: %s.', $piiPattern['name'], $displayMarker),
                     line:         $line,
                     confidence:   Confidence::Medium,
-                    detector:     $definition['name'],
-                    preview:      $preview,
+                    detector:     $piiPattern['name'],
+                    displayMarker: $displayMarker,
                     remediation:  'Use reserved example domains (.example, .test, .invalid, .local, .localhost), '
                         . 'phone numbers in the 555-010x block, and addresses with a synthetic marker word such as Test or Anytown.',
                 );

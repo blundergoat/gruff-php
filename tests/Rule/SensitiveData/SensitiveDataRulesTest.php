@@ -27,8 +27,10 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers sensitive-data detection: credentials with redacted previews, PHI/PII profiles, config-file scanning, dummy/placeholder allowlisting,
- * comment-context skipping, high-entropy false-positive avoidance, and CLI report redaction.
+ * Covers the safe sensitive-data findings users receive from source, config, fixtures, and CLI reports.
+ *
+ * Scenarios protect fixed markers, PHI/PII context, placeholders, comments, entropy exclusions, occurrence counts, and renderer containment.
+ * Users exercise these paths when source analysis or a rendered report encounters credential-like content.
  */
 final class SensitiveDataRulesTest extends TestCase
 {
@@ -36,11 +38,12 @@ final class SensitiveDataRulesTest extends TestCase
     private const PROJECT_ROOT = __DIR__ . '/../../..';
 
     /**
-     * Verify credential patterns are detected with redacted previews.
+     * Verifies every synthetic credential occurrence reaches the user with a fixed zero-payload marker.
+     * Messages and metadata must omit the matched value, its edges, and its length.
      *
      * @return void
      */
-    public function testCredentialPatternsAreDetectedWithRedactedPreviews(): void
+    public function testCredentialPatternsAreDetectedWithFixedPreviews(): void
     {
         $findings = $this->analysePath('tests/Fixtures/SensitiveData/synthetic-secrets.php');
 
@@ -62,6 +65,14 @@ final class SensitiveDataRulesTest extends TestCase
 
         self::assertSame([], $messageLeaks, 'Finding messages should not leak secret values.');
         self::assertSame([], $metadataLeaks, 'Finding metadata should not leak secret values.');
+
+        $unexpectedDisplayMarkers = array_values(array_filter(
+            $findings,
+            static fn(Finding $finding): bool => isset($finding->metadata['preview'])
+                && is_string($finding->metadata['preview'])
+                && $finding->metadata['preview'] !== '[redacted]',
+        ));
+        self::assertSame([], $unexpectedDisplayMarkers, 'Every sensitive finding must use the fixed marker without secret-derived edges or lengths.');
     }
 
     /**
@@ -162,10 +173,10 @@ final class SensitiveDataRulesTest extends TestCase
             $findings = array_values(array_filter(
                                          $this->analyseUnits([$unit]),
                                          static fn(Finding $finding): bool => $finding->ruleId === HardcodedEnvValueRule::ID,
-                                     ));
+            ));
 
             self::assertCount(1, $findings);
-            self::assertStringContainsString('API_TOKEN', $findings[0]->message);
+            self::assertSame('[redacted]', $findings[0]->metadata['preview'] ?? null);
         } finally {
             self::assertTrue(unlink($path));
         }
@@ -193,10 +204,10 @@ final class SensitiveDataRulesTest extends TestCase
             $findings = array_values(array_filter(
                                          $this->analyseUnits([$unit]),
                                          static fn(Finding $finding): bool => $finding->ruleId === HighEntropyStringRule::ID,
-                                     ));
+            ));
 
             self::assertCount(1, $findings);
-            self::assertStringContainsString('M7qP', $findings[0]->message);
+            self::assertSame('[redacted]', $findings[0]->metadata['preview'] ?? null);
         } finally {
             self::assertTrue(unlink($path));
         }
@@ -242,7 +253,7 @@ final class SensitiveDataRulesTest extends TestCase
             // (no double report); the dotted route, version, domain, and path literals all stay silent.
             self::assertCount(1, $highEntropy);
             self::assertSame(3, $highEntropy[0]->line);
-            self::assertStringContainsString('vTr4', $highEntropy[0]->message);
+            self::assertSame('[redacted]', $highEntropy[0]->metadata['preview'] ?? null);
             self::assertCount(1, $jwtFindings);
             self::assertSame(4, $jwtFindings[0]->line);
         } finally {
@@ -271,10 +282,10 @@ final class SensitiveDataRulesTest extends TestCase
             $findings = array_values(array_filter(
                                          $this->analyseUnits([$unit]),
                                          static fn(Finding $finding): bool => $finding->ruleId === HighEntropyStringRule::ID,
-                                     ));
+            ));
 
             self::assertCount(1, $findings);
-            self::assertStringContainsString('M7qP', $findings[0]->message);
+            self::assertSame('[redacted]', $findings[0]->metadata['preview'] ?? null);
         } finally {
             self::assertTrue(unlink($path));
         }
@@ -301,10 +312,10 @@ final class SensitiveDataRulesTest extends TestCase
             $findings = array_values(array_filter(
                                          $this->analyseUnits([$unit]),
                                          static fn(Finding $finding): bool => $finding->ruleId === HighEntropyStringRule::ID,
-                                     ));
+            ));
 
             self::assertCount(1, $findings);
-            self::assertStringContainsString('M7qP', $findings[0]->message);
+            self::assertSame('[redacted]', $findings[0]->metadata['preview'] ?? null);
         } finally {
             self::assertTrue(unlink($path));
         }
@@ -472,6 +483,8 @@ final class SensitiveDataRulesTest extends TestCase
     }
 
     /**
+     * Runs the CLI as a user would and returns the rendered report for leak-safety assertions.
+     *
      * @param list<string> $arguments - CLI arguments appended after the gruff binary path.
      *
      * @return string - the gruff CLI's stdout; stderr is dropped and a non-zero exit already fails the test before returning

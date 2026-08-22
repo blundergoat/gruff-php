@@ -14,9 +14,8 @@ use Symfony\Component\Yaml\Yaml;
 /**
  * Finds the right gruff YAML config for a run and folds its settings onto the rule defaults.
  *
- * It picks the file (explicit --config, project default, or packaged fallback), resolves any `extends:`
- * chain ancestor-first so a child overrides what it inherits, validates every key, and layers each
- * section onto the registry defaults - rejecting malformed or unknown config with a clear message.
+ * It selects the explicit, project, or packaged file and resolves `extends` ancestor-first.
+ * Validation stops malformed or unknown settings before analysis, while valid child values override inherited defaults.
  *
  * @phpstan-type ConfigScalar bool|float|int|object|string|null
  * @phpstan-type ConfigValue ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key,
@@ -64,10 +63,15 @@ final readonly class ConfigLoader
     private const MAX_EXTENDS_DEPTH = 5;
 
     /**
+     * Value-independent migration diagnostic for the retired secret-preview suppression list.
+     */
+    private const LEGACY_SECRET_PREVIEWS_ERROR = 'Config key "allowlists.secretPreviews" only accepts an empty list; remove all configured entries because secret previews no longer suppress findings.';
+
+    /**
      * Builds a config loader for one project root, with an optional packaged-config fallback.
      *
-     * @param string      $projectRoot - Project root used for primary config discovery.
-     * @param string|null $fallbackConfigRoot - Root used for fallback config discovery.
+     * @param string      $projectRoot        - Project root used for primary config discovery.
+     * @param string|null $fallbackConfigRoot - Packaged fallback root; null limits discovery to the user's project.
      */
     public function __construct(
         private string  $projectRoot,
@@ -87,11 +91,8 @@ final readonly class ConfigLoader
     }
 
     /**
-     * Reports whether a project root already holds a discoverable config file, without loading it.
-     *
-     * Used by callers that need a fast "is there any project config?" check
-     * without loading the file. Covers both the preferred and legacy filenames
-     * so callers do not drift from {@see resolveConfigPath()}.
+     * Reports whether the user's project already has a discoverable config without parsing it.
+     * Callers use this before analysis when they only need to choose between project settings and defaults; both supported filenames match loading.
      *
      * @param string $projectRoot - Project root used for config discovery.
      *
@@ -113,8 +114,8 @@ final readonly class ConfigLoader
     /**
      * Loads the analysis config for a run from an explicit, project, or fallback YAML file.
      *
-     * @param string|null  $configPath - Explicit config path supplied by the CLI.
-     * @param RuleRegistry $registry - Rule registry used to seed default config.
+     * @param string|null  $configPath - Explicit CLI config path; null or empty lets the loader discover project or packaged defaults.
+     * @param RuleRegistry $registry   - Rule registry used to seed default config.
      *
      * @return AnalysisConfig - Loaded config merged onto registry defaults.
      */
@@ -134,7 +135,7 @@ final readonly class ConfigLoader
     /**
      * Picks the config file this run should use: an explicit path, a project default, or the fallback.
      *
-     * @param string|null $configPath - Explicit config path supplied by the CLI.
+     * @param string|null $configPath - Explicit CLI config path; null or empty asks the loader to discover a default for the user.
      *
      * @return string|null - Absolute config path, or null when no config file is available anywhere.
      * @throws ConfigException When an explicit config path does not exist.
@@ -199,9 +200,9 @@ final readonly class ConfigLoader
     /**
      * Applies a config file - and everything it extends - onto the registry-derived defaults, in order.
      *
-     * @param AnalysisConfig $config - Starting config (registry defaults) that each chain entry layers onto.
+     * @param AnalysisConfig $config   - Starting config (registry defaults) that each chain entry layers onto.
      * @param RuleRegistry   $registry - Registry consulted when resolving rule-selection and per-rule settings.
-     * @param string         $path - Root config file whose extends chain is resolved and applied in order.
+     * @param string         $path     - Root config file whose extends chain is resolved and applied in order.
      *
      * @return AnalysisConfig - Config after file values have been applied.
      */
@@ -213,11 +214,13 @@ final readonly class ConfigLoader
             $this->assertSchemaVersion($rootConfig);
 
             $config = $this->applyMinimumPhpVersion($config, $rootConfig);
+            $config = $this->applyDeepScanBudgetConfig($config, $rootConfig);
             $config = $this->applyMinimumSeverityConfig($config, $rootConfig);
             $config = $this->applyFailureConditionsConfig($config, $rootConfig);
             $config = $this->applyPathConfig($config, $rootConfig);
             $config = $this->applyAllowlistConfig($config, $rootConfig);
             $config = $this->applySelectionConfig($config, $registry, $rootConfig);
+            $config = $this->applySensitiveExclusionsConfig($config, $registry, $rootConfig);
             $config = (new RuleConfigApplier())->apply($config, $registry, $rootConfig);
         }
 
@@ -225,16 +228,12 @@ final readonly class ConfigLoader
     }
 
     /**
-     * Resolves a config file's `extends:` chain into an ordered, ancestor-first list of configs.
+     * Resolves the user's `extends:` chain into the ancestor-first order applied before analysis.
+     * Parent settings load first so the current project can override them; a cycle or over-deep chain stops with an actionable config error.
      *
-     * The list is ancestor-first, current-file-last, so applying each in order
-     * layers child settings over inherited ones (a child block overrides the
-     * parent's for the same section - see ADR-021). A cycle or a chain deeper than
-     * the cap throws.
-     *
-     * @param string       $path - Config file to resolve.
+     * @param string       $path     - Config file to resolve.
      * @param list<string> $ancestry - Canonical paths already in the chain (cycle guard).
-     * @param int          $depth - Current resolution depth (1 at the root file).
+     * @param int          $depth    - Current resolution depth (1 at the root file).
      *
      * @return list<ConfigObject> - Configs to apply in order, ancestor first.
      * @throws ConfigException When the chain cycles, exceeds the depth cap, or a target is invalid.
@@ -273,7 +272,7 @@ final readonly class ConfigLoader
     /**
      * Resolves an `extends:` reference - a bundled `gruff.*` preset or a path - to a config file path.
      *
-     * @param string $reference - Preset name (`gruff.*`) or a relative/absolute path.
+     * @param string $reference   - Preset name (`gruff.*`) or a relative/absolute path.
      * @param string $loadingFile - Config file declaring the `extends:` (paths resolve from its directory).
      *
      * @return string - Absolute path to the referenced config file.
@@ -339,20 +338,15 @@ final readonly class ConfigLoader
     {
         foreach (array_keys($rootConfig) as $rootKey) {
             // A key outside the schema is rejected rather than silently ignored.
-            if (!in_array($rootKey, ['schemaVersion', 'extends', 'rules', 'minimumPhpVersion', 'minimumSeverity', 'failureConditions', 'paths', 'allowlists', 'selection'], true)) {
+            if (!in_array($rootKey, ['schemaVersion', 'extends', 'rules', 'minimumPhpVersion', 'deepScanBudget', 'minimumSeverity', 'failureConditions', 'paths', 'allowlists', 'selection', SensitiveExclusionConfigParser::CONFIG_KEY], true)) {
                 throw new ConfigException(sprintf('Unknown config key "%s".', $rootKey));
             }
         }
     }
 
     /**
-     * Requires the top-level `schemaVersion:` field and rejects a missing, mistyped, or unexpected value.
-     *
-     * Hard-error when the top-level `schemaVersion:` field is missing, the
-     * wrong type, or names an unexpected version. ADR-015 introduces this
-     * field in 0.2.0 as a required key with a single accepted value; the
-     * hard-error path is the intentional UX per the pre-public-adoption
-     * schema window.
+     * Requires the user's top-level `schemaVersion:` before any settings reach analysis.
+     * A missing, mistyped, or unsupported value stops the run with the migration action defined by ADR-015.
      *
      * @param ConfigObject $rootConfig - Decoded root config map that must carry the required schema version.
      *
@@ -383,13 +377,10 @@ final readonly class ConfigLoader
     }
 
     /**
-     * Validates and applies the optional `minimumSeverity:` block that sets per-command exit-code gates.
+     * Applies the user's optional `minimumSeverity:` values to the commands that can fail a run.
+     * Unsupported commands or thresholds stop config loading instead of leaving the user with a silent CI no-op; see ADR-015.
      *
-     * Rejects every non-gating command key (including summary, init, list-rules)
-     * and every non-canonical threshold value with a clear error. See ADR-015
-     * for the rejection rationale.
-     *
-     * @param AnalysisConfig $config - Config to extend; returned unchanged when no minimumSeverity block is present.
+     * @param AnalysisConfig $config     - Config to extend; returned unchanged when no minimumSeverity block is present.
      * @param ConfigObject   $rootConfig - Decoded root config map; absence of the block preserves inherited thresholds.
      *
      * @return AnalysisConfig - Config with the per-command minimumSeverity map applied.
@@ -448,7 +439,7 @@ final readonly class ConfigLoader
     /**
      * Applies the configured minimum PHP version floor when the config sets one.
      *
-     * @param AnalysisConfig $config - Config to extend; returned unchanged when no minimumPhpVersion is set.
+     * @param AnalysisConfig $config     - Config to extend; returned unchanged when no minimumPhpVersion is set.
      * @param ConfigObject   $rootConfig - Decoded root config map; absence of the key leaves the default PHP floor in place.
      *
      * @return AnalysisConfig - Config with the PHP version floor applied.
@@ -474,9 +465,55 @@ final readonly class ConfigLoader
     }
 
     /**
+     * Applies the optional budget that bounds PHP parsing and other structural work while preserving
+     * raw-text rules. Omitted fields inherit their current value across an extends chain.
+     *
+     * @param AnalysisConfig $config     - Config carrying the inherited or default budget.
+     * @param ConfigObject   $rootConfig - Decoded config map; absence preserves the current budget.
+     *
+     * @return AnalysisConfig - Config carrying the effective budget with config provenance.
+     */
+    private function applyDeepScanBudgetConfig(AnalysisConfig $config, array $rootConfig): AnalysisConfig
+    {
+        if (!array_key_exists('deepScanBudget', $rootConfig)) {
+            return $config;
+        }
+
+        $budget = $this->requireObject(
+            $rootConfig['deepScanBudget'],
+            'Config key "deepScanBudget" must be an object.',
+        );
+
+        foreach (array_keys($budget) as $key) {
+            if (!in_array($key, ['enabled', 'maxLines', 'maxBytes'], true)) {
+                throw new ConfigException(sprintf('Unknown config key "deepScanBudget.%s".', $key));
+            }
+        }
+
+        $effective = $config->deepScanBudget();
+        $enabled   = $budget['enabled'] ?? $effective['enabled'];
+        $maxLines  = $budget['maxLines'] ?? $effective['maxLines'];
+        $maxBytes  = $budget['maxBytes'] ?? $effective['maxBytes'];
+
+        if (!is_bool($enabled)) {
+            throw new ConfigException('Config key "deepScanBudget.enabled" must be a boolean.');
+        }
+
+        if (!is_int($maxLines) || $maxLines < 1) {
+            throw new ConfigException('Config key "deepScanBudget.maxLines" must be a positive integer.');
+        }
+
+        if (!is_int($maxBytes) || $maxBytes < 1) {
+            throw new ConfigException('Config key "deepScanBudget.maxBytes" must be a positive integer.');
+        }
+
+        return $config->withDeepScanBudget($enabled, $maxLines, $maxBytes, 'config');
+    }
+
+    /**
      * Applies the configured `paths:` ignore globs that shape which files discovery scans.
      *
-     * @param AnalysisConfig $config - Config to extend; returned unchanged when no paths block is present.
+     * @param AnalysisConfig $config     - Config to extend; returned unchanged when no paths block is present.
      * @param ConfigObject   $rootConfig - Decoded root config map; absence of the paths block leaves ignore patterns unchanged.
      *
      * @return AnalysisConfig - Config with ignored path patterns applied.
@@ -495,7 +532,7 @@ final readonly class ConfigLoader
     /**
      * Applies the optional `failureConditions:` count gates that fail a run on too many findings.
      *
-     * @param AnalysisConfig $config - Config to extend; returned unchanged when no failureConditions block is set.
+     * @param AnalysisConfig $config     - Config to extend; returned unchanged when no failureConditions block is set.
      * @param ConfigObject   $rootConfig - Decoded root config map; absence of the block preserves inherited failure gates.
      *
      * @return AnalysisConfig - Config with the failure-condition thresholds applied.
@@ -518,13 +555,10 @@ final readonly class ConfigLoader
     }
 
     /**
-     * Applies the configured `allowlists:`, keeping registry defaults for any sub-key the user omitted.
+     * Applies the user's `allowlists:` while retaining defaults for every omitted sub-key.
+     * The legacy `secretPreviews` key accepts only `[]` and has no effect, so migration cannot disturb naming defaults such as `id` and `url`.
      *
-     * Sub-keys that the user omitted leave the registry-seeded defaults intact;
-     * a user who configures `allowlists.secretPreviews` only must NOT lose
-     * `DEFAULT_ACCEPTED_ABBREVIATIONS` (`id`, `url`, etc.) as a side effect.
-     *
-     * @param AnalysisConfig $config - Config to extend; each allowlist sub-key the user omitted is left as-is.
+     * @param AnalysisConfig $config     - Config to extend; each allowlist sub-key the user omitted is left as-is.
      * @param ConfigObject   $rootConfig - Decoded root config map; omitted allowlist sub-keys keep registry-seeded defaults.
      *
      * @return AnalysisConfig - Config with allowlist values applied.
@@ -553,8 +587,8 @@ final readonly class ConfigLoader
     /**
      * Applies the configured `selection:` include/exclude rules that decide which rules run.
      *
-     * @param AnalysisConfig $config - Config to extend; returned unchanged when no selection block is present.
-     * @param RuleRegistry   $registry - Registry of known rule ids the parser validates include/exclude entries against.
+     * @param AnalysisConfig $config     - Config to extend; returned unchanged when no selection block is present.
+     * @param RuleRegistry   $registry   - Registry of known rule ids the parser validates include/exclude entries against.
      * @param ConfigObject   $rootConfig - Decoded root config map; absence of selection leaves the active rule set unchanged.
      *
      * @return AnalysisConfig - Config with include/exclude selection applied.
@@ -571,6 +605,35 @@ final readonly class ConfigLoader
 
         // Parser checks each id against the registry, so an unknown rule fails rather than silently no-opping.
         return $config->withRuleSelection((new SelectionConfigParser())->parse($this->configValue($rootConfig['selection']), $registry));
+    }
+
+    /**
+     * Applies the configured `sensitiveExclusions:` entries, the only channel that may hide a
+     * sensitive-data finding. Parsing validates every entry against the registry, so a wildcard, an
+     * unknown or non-sensitive rule, a globbed path, a message- or value-matching key, a missing
+     * rationale, or a duplicated scope stops the run instead of quietly hiding findings.
+     *
+     * @param AnalysisConfig $config     - Config to extend; returned unchanged when no sensitiveExclusions block is present.
+     * @param RuleRegistry   $registry   - Registry each entry's rule id is checked and classified against.
+     * @param ConfigObject   $rootConfig - Decoded root config map; absence of the block leaves inherited exclusions in place.
+     *
+     * @return AnalysisConfig - Config carrying the validated sensitive-data exclusions.
+     * @throws ConfigException When any entry in the block is invalid.
+     */
+    private function applySensitiveExclusionsConfig(
+        AnalysisConfig $config,
+        RuleRegistry   $registry,
+        array          $rootConfig,
+    ): AnalysisConfig {
+        // No sensitiveExclusions block leaves any inherited exclusions in place.
+        if (!array_key_exists(SensitiveExclusionConfigParser::CONFIG_KEY, $rootConfig)) {
+            return $config;
+        }
+
+        // Replace the inherited entries wholesale, so a child config's list is the one that applies.
+        return $config->withSensitiveExclusions(
+            (new SensitiveExclusionConfigParser())->parse($this->configValue($rootConfig[SensitiveExclusionConfigParser::CONFIG_KEY]), $registry),
+        );
     }
 
     /**
@@ -602,16 +665,13 @@ final readonly class ConfigLoader
     }
 
     /**
-     * Parses the naming and secret-preview allowlists, returning null per sub-key the user omitted.
-     *
-     * Sub-keys that the user omitted return `null` so the caller can keep the
-     * registry-seeded defaults intact rather than overriding them with an
-     * empty list.
+     * Parses the naming allowlist and retained empty secret-preview key, returning null per sub-key the user omitted.
+     * Omitted keys return null so user defaults survive; a present secretPreviews key can only return the validated empty list.
      *
      * @param mixed $decodedValue - Decoded value of the `allowlists` key; must be a mapping or the parse throws.
      *
-     * @return array{acceptedAbbreviations: list<string>|null, secretPreviews: list<string>|null} - parsed lists per
-     *   sub-key, with null for any sub-key the user omitted so the caller keeps the registry-seeded defaults.
+     * @return array{acceptedAbbreviations: list<string>|null, secretPreviews: list<string>|null} - parsed naming list and inert legacy list;
+     *   null means the user omitted that key, while secretPreviews can otherwise only be empty
      */
     private function parseAllowlistsConfig(mixed $decodedValue): array
     {
@@ -639,13 +699,12 @@ final readonly class ConfigLoader
             }
         }
 
-        $secretPreviews = array_key_exists('secretPreviews', $allowlists)
-            ? (new StringListConfigParser())->parse($this->configValue($allowlists['secretPreviews']), 'allowlists.secretPreviews', false, false)
-            : null;
+        // Missing preserves the user's inherited configuration; presence becomes [] because shape validation already rejected every other value.
+        $legacySecretPreviews = array_key_exists('secretPreviews', $allowlists) ? [] : null;
 
         return [
             'acceptedAbbreviations' => $acceptedAbbreviations,
-            'secretPreviews'        => $secretPreviews,
+            'secretPreviews' => $legacySecretPreviews,
         ];
     }
 
@@ -653,9 +712,10 @@ final readonly class ConfigLoader
      * Decodes YAML config text into a root object, rejecting a non-.yaml file or a non-mapping document.
      *
      * @param string $contents - Raw file contents to parse as YAML.
-     * @param string $path - Source path; only its extension is read here, to gate the .yaml/.yml requirement.
+     * @param string $path     - Source path; only its extension is read here, to gate the .yaml/.yml requirement.
      *
      * @return ConfigObject - the parsed YAML mapping; an empty document yields an empty array, a non-mapping throws.
+     * @throws ConfigException When extension, YAML, root shape, or a legacy preview value is invalid for the user's configuration.
      */
     private function decodeConfig(string $contents, string $path): array
     {
@@ -670,19 +730,61 @@ final readonly class ConfigLoader
         }
 
         try {
+            $shapePreservingConfig = Yaml::parse(
+                $contents,
+                Yaml::PARSE_EXCEPTION_ON_INVALID_TYPE | Yaml::PARSE_OBJECT_FOR_MAP,
+            );
             $decoded = Yaml::parse($contents, Yaml::PARSE_EXCEPTION_ON_INVALID_TYPE);
         } catch (ParseException $exception) {
+            // A user may have left an unmatched quote or invalid indentation; surface that parser detail as one config error before analysis.
             throw new ConfigException(sprintf('Invalid YAML config: %s', $exception->getMessage()), 0, $exception);
         }
 
+        $this->assertLegacySecretPreviewsAreEmpty($shapePreservingConfig);
+
         return $this->requireObject($decoded, 'Config root must be an object.');
+    }
+
+    /**
+     * Validates the retained secret-preview key before the user's analysis starts.
+     * Parsing maps as objects distinguishes `{}` from `[]`: missing and exact `[]` are inert, while every other value fails safely.
+     *
+     * @param mixed $shapePreservingConfig - Shape-preserving YAML; null, scalar, and root lists are handled by root validation.
+     *
+     * @return void - Missing `allowlists.secretPreviews` or exact `[]` leaves the user's configuration unchanged.
+     * @throws ConfigException When the key contains a scalar, null, map, blank entry, mixed list, or any non-empty list; the message never
+     *                         echoes the configured value.
+     */
+    private function assertLegacySecretPreviewsAreEmpty(mixed $shapePreservingConfig): void
+    {
+        // A non-object root cannot contain a valid allowlists mapping; general root validation gives the user its dedicated error.
+        if (!$shapePreservingConfig instanceof \stdClass) {
+            return;
+        }
+
+        $rootConfig = get_object_vars($shapePreservingConfig);
+        // Missing allowlists are inert; a malformed allowlists value is reported later by the normal section validator.
+        if (!array_key_exists('allowlists', $rootConfig) || !$rootConfig['allowlists'] instanceof \stdClass) {
+            return;
+        }
+
+        $allowlistConfig = get_object_vars($rootConfig['allowlists']);
+        // A missing legacy key means the user has no preview-based configuration to migrate.
+        if (!array_key_exists('secretPreviews', $allowlistConfig)) {
+            return;
+        }
+
+        // Only the generated empty list is inert; any other shape must stop before it could hide a finding.
+        if ($allowlistConfig['secretPreviews'] !== []) {
+            throw new ConfigException(self::LEGACY_SECRET_PREVIEWS_ERROR);
+        }
     }
 
     /**
      * Confirms a decoded config value is an object (a string-keyed map), normalising it or throwing.
      *
      * @param mixed  $decodedValue - Decoded value to check; an empty array passes, a list or scalar does not.
-     * @param string $message - Error text thrown when the value is not an object or has a non-string key.
+     * @param string $message      - Error text thrown when the value is not an object or has a non-string key.
      *
      * @return ConfigObject - the value as a string-keyed map with each entry normalised; an empty array passes through.
      */

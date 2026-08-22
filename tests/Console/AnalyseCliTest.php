@@ -9,8 +9,10 @@ use JsonException;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers the analyse CLI end-to-end: single-file mode, syntax-error handling, threshold-driven exits, JSON/HTML/SARIF/GitHub outputs, profile and
- * selection config, scoring, and editor-link options.
+ * Covers the `analyse` experience from CLI arguments through the report and exit status users receive.
+ *
+ * Scenarios include paths, syntax errors, thresholds, config, scoring, editor links, and every human- or machine-readable renderer.
+ * Users rely on these paths whenever they invoke the primary analysis command locally, in an editor, or in CI.
  */
 final class AnalyseCliTest extends CliTestCase
 {
@@ -266,6 +268,171 @@ final class AnalyseCliTest extends CliTestCase
         }
         self::assertIsArray($sizeFinding);
         self::assertSame('warning', $sizeFinding['severity'] ?? null);
+    }
+
+    /** Verify bounded PHP remains analysed and retains sensitive-data scanning. */
+    public function testBoundedDeepScanKeepsTextLevelSecurityFindings(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            self::PROJECT_ROOT . '/bin/gruff-php',
+            'analyse',
+            '--no-config',
+            '--profile',
+            'security',
+            '--format',
+            'json',
+            '--fail-on',
+            'none',
+            '--no-cache',
+            '--deep-scan-budget',
+            '1:1',
+            'tests/Fixtures/SensitiveData/synthetic-secrets.php',
+        ], self::PROJECT_ROOT);
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        $report      = $this->decodeJsonOutput($process);
+        $summary     = $report['summary'] ?? null;
+        $diagnostics = $report['diagnostics'] ?? null;
+        $findings    = $report['findings'] ?? null;
+
+        self::assertIsArray($summary);
+        self::assertSame(1, $summary['filesDiscovered'] ?? null);
+        self::assertSame(1, $summary['filesParsed'] ?? null);
+        self::assertSame(0, $summary['parseErrors'] ?? null);
+        self::assertIsArray($diagnostics);
+        self::assertCount(1, $diagnostics);
+        $diagnostic = $diagnostics[0];
+        self::assertIsArray($diagnostic);
+        self::assertSame('bounded-deep-scan', $diagnostic['type'] ?? null);
+        self::assertSame(false, $diagnostic['invalidatesRun'] ?? null);
+        $message = $diagnostic['message'] ?? null;
+        self::assertIsString($message);
+        self::assertStringContainsString('maxLines=1; maxBytes=1; override=cli', $message);
+        self::assertIsArray($findings);
+        self::assertNotSame([], $findings);
+        $firstFinding = $findings[0];
+        self::assertIsArray($firstFinding);
+        self::assertSame('sensitive-data.aws-access-key', $firstFinding['ruleId'] ?? null);
+    }
+
+    /** Verify malformed CLI budgets fail before analysis. */
+    public function testDeepScanBudgetRejectsPartialCliOverride(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            self::PROJECT_ROOT . '/bin/gruff-php',
+            'analyse',
+            '--no-config',
+            '--format',
+            'json',
+            '--deep-scan-budget',
+            '100',
+            'tests/Fixtures/Source/mixed/alpha.php',
+        ], self::PROJECT_ROOT);
+        $process->run();
+
+        self::assertSame(2, $process->getExitCode());
+        $report      = $this->decodeJsonOutput($process);
+        $diagnostics = $report['diagnostics'] ?? null;
+        self::assertIsArray($diagnostics);
+        $diagnostic = $diagnostics[0] ?? null;
+        self::assertIsArray($diagnostic);
+        $message = $diagnostic['message'] ?? null;
+        self::assertIsString($message);
+        self::assertStringContainsString(
+            '--deep-scan-budget must be <positive-lines>:<positive-bytes> or off.',
+            $message,
+        );
+    }
+
+    /** Verify an atomic CLI budget wins over the config block. */
+    public function testDeepScanBudgetCliOverrideWinsOverConfig(): void
+    {
+        $configPath = tempnam(self::PROJECT_ROOT . '/tests', 'gruff-budget-');
+        self::assertIsString($configPath);
+        $yamlPath = $configPath . '.yaml';
+        self::assertTrue(rename($configPath, $yamlPath));
+        self::assertNotFalse(file_put_contents(
+            $yamlPath,
+            "schemaVersion: gruff-php.config.v0.1\ndeepScanBudget:\n    maxLines: 1\n    maxBytes: 1\n",
+        ));
+
+        try {
+            $configBound = new Process([
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff-php',
+                'analyse',
+                '--config',
+                $yamlPath,
+                '--format',
+                'json',
+                '--fail-on',
+                'none',
+                '--no-cache',
+                'tests/Fixtures/Source/mixed/alpha.php',
+            ], self::PROJECT_ROOT);
+            $configBound->run();
+            $configReport      = $this->decodeJsonOutput($configBound);
+            $configDiagnostics = $configReport['diagnostics'] ?? null;
+            self::assertIsArray($configDiagnostics);
+            $configDiagnostic = $configDiagnostics[0] ?? null;
+            self::assertIsArray($configDiagnostic);
+            self::assertSame('bounded-deep-scan', $configDiagnostic['type'] ?? null);
+            $configMessage = $configDiagnostic['message'] ?? null;
+            self::assertIsString($configMessage);
+            self::assertStringContainsString('override=config', $configMessage);
+
+            $cliOverride = new Process([
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff-php',
+                'analyse',
+                '--config',
+                $yamlPath,
+                '--deep-scan-budget',
+                '1000:100000',
+                '--format',
+                'json',
+                '--fail-on',
+                'none',
+                '--no-cache',
+                'tests/Fixtures/Source/mixed/alpha.php',
+            ], self::PROJECT_ROOT);
+            $cliOverride->run();
+            $cliReport = $this->decodeJsonOutput($cliOverride);
+
+            self::assertSame(0, $cliOverride->getExitCode(), $cliOverride->getErrorOutput());
+            self::assertSame([], $cliReport['diagnostics'] ?? null);
+        } finally {
+            self::assertTrue(unlink($yamlPath));
+        }
+    }
+
+    /** Verify every analyse renderer exposes the bounded-scan note. */
+    public function testBoundedDeepScanDiagnosticIsVisibleInEveryFormat(): void
+    {
+        foreach (['text', 'json', 'html', 'markdown', 'github', 'hotspot', 'sarif'] as $format) {
+            $process = new Process([
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff-php',
+                'analyse',
+                '--no-config',
+                '--format',
+                $format,
+                '--fail-on',
+                'none',
+                '--no-cache',
+                '--deep-scan-budget',
+                '1:1',
+                'tests/Fixtures/Source/mixed/alpha.php',
+            ], self::PROJECT_ROOT);
+            $process->run();
+
+            self::assertSame(0, $process->getExitCode(), sprintf('%s: %s', $format, $process->getErrorOutput()));
+            self::assertStringContainsString('bounded-deep-scan', strtolower($process->getOutput()), $format);
+            self::assertStringContainsString('maxLines=1; maxBytes=1; override=cli', $process->getOutput(), $format);
+        }
     }
 
     /**
@@ -524,12 +691,13 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
-     * Verify analyse command applies configured secret preview allowlist.
+     * Models a user running `analyse` with an old non-empty secret-preview list.
+     * The command must exit 2 with one safe correction and never echo the configured value.
      *
      * @return void
-     * @throws JsonException
+     * @throws JsonException When the command unexpectedly returns malformed JSON instead of the config-error report.
      */
-    public function testAnalyseCommandAppliesConfiguredSecretPreviewAllowlist(): void
+    public function testAnalyseCommandRejectsConfiguredLegacySecretPreview(): void
     {
         $process = new Process([
                                    PHP_BINARY,
@@ -545,17 +713,19 @@ final class AnalyseCliTest extends CliTestCase
                                ], __DIR__ . '/../..');
         $process->run();
 
-        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-        $report   = $this->decodeJsonOutput($process);
-        $findings = $report['findings'] ?? null;
-        self::assertIsArray($findings);
-        $ruleIds = array_map(
-            static fn(mixed $finding): mixed => is_array($finding) ? ($finding['ruleId'] ?? null) : null,
-            $findings,
+        self::assertSame(2, $process->getExitCode());
+        $report = $this->decodeJsonOutput($process);
+        // Missing diagnostics would mean the rejected configuration never reached the report users and integrations inspect.
+        $diagnostics = $report['diagnostics'] ?? null;
+        self::assertIsArray($diagnostics);
+        // An empty diagnostics list would leave the user with exit 2 but no actionable correction.
+        $diagnostic = $diagnostics[0] ?? null;
+        self::assertIsArray($diagnostic);
+        self::assertSame(
+            'Config key "allowlists.secretPreviews" only accepts an empty list; remove all configured entries because secret previews no longer suppress findings.',
+            $diagnostic['message'] ?? null,
         );
-
-        self::assertNotContains('sensitive-data.aws-access-key', $ruleIds);
-        self::assertContains('sensitive-data.api-key-pattern', $ruleIds);
+        self::assertStringNotContainsString('T3R2', $process->getOutput());
     }
 
     /**
@@ -820,11 +990,8 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
-     * Load an expected CLI golden output fixture with its version stamps normalised.
-     *
-     * The stamped tool version inside a golden is rewritten to the live
-     * `Application::VERSION` at compare time, so version bumps never require
-     * regenerating goldens and goldens can never stamp-drift silently.
+     * Loads the expected CLI output users should see and normalises its version stamps before comparison.
+     * This keeps renderer checks focused on the UI contract when the application version changes.
      *
      * @param string $fileName - Basename under tests/Fixtures/Cli/Golden whose contents are the expected output.
      *

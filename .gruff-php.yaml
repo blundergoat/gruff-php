@@ -3,6 +3,10 @@
 # Preserve paths.ignore, allowlists, thresholds, and path-specific test-quality exceptions when regenerating.
 schemaVersion: gruff-php.config.v0.1
 minimumPhpVersion: 8.3
+deepScanBudget:
+    enabled: true
+    maxLines: 20000
+    maxBytes: 2000000
 minimumSeverity:
     analyse: advisory
     report: none
@@ -55,11 +59,7 @@ allowlists:
         - uri
         - url
         - utc
-    # The fixture-corpus snapshot digest asserted in tests/Rule/RuleRegressionSnapshotTest.php is a
-    # 64-char hex hash that reads as a high-entropy secret; it is test data, not a credential. Keep this
-    # preview in sync if that digest rotates (it changes whenever rules or fixtures change).
-    secretPreviews:
-        - '2a6d...9683 (redacted, 64 chars)'
+    secretPreviews: []
 selection:
     tiers: []
     pillars: []
@@ -71,6 +71,21 @@ selection:
     # named arguments across the existing call sites is deferred to a deliberate pass.
     excludeRules:
         - modernisation.named-argument-opportunity
+# Sensitive-data findings are suppressed only here, and only by hand.
+# gruff never converts a reported finding, message, or preview value into an entry.
+# Each entry needs one exact sensitive-data rule id, one project-relative path, and a reason;
+# an optional `symbol` narrows it further. Every entry is published in the report's
+# `suppressions` array with the count it hid, so an entry that matches nothing reports 0.
+# This repository accepts none: its synthetic credential fixtures live under tests/Fixtures/**,
+# which paths.ignore already excludes from the self-scan.
+sensitiveExclusions:
+    # The regression snapshot asserts a SHA-256 of the whole fixture report, so a 64-character hex
+    # digest is the point of the test rather than a credential. It is recorded here rather than by
+    # loosening the detector: the entropy threshold is a calibration decision owned by the precision
+    # milestone, and tuning it to make one of our own commits pass would be the wrong repair.
+    - rule: sensitive-data.high-entropy-string
+      path: tests/Rule/RuleRegressionSnapshotTest.php
+      reason: Snapshot digest of the fixture-corpus report; a hex SHA-256, not a credential.
 rules:
     # Cognitive complexity
     complexity.cognitive:
@@ -726,7 +741,6 @@ rules:
                 - ResultCache::forProject()
                 - RuleContext::settingsFor()
                 - SecretScannerHelper::lineNumberForOffset()
-                - SecretScannerHelper::redactedKeyValue()
                 - TestQualityNodeHelper::calls()
                 - ThresholdTrip::withScope()
                 - DashboardCommand::gruffBinary()

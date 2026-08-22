@@ -31,12 +31,38 @@ final class HookCliContractTest extends CliTestCase
         self::assertSame('--changed-ranges', $flags['changedRanges'] ?? null);
         self::assertSame('--diff', $flags['diff'] ?? null);
         self::assertSame('--baseline', $flags['baseline'] ?? null);
+        self::assertSame('--deep-scan-budget', $flags['deepScanBudget'] ?? null);
 
         $supports = $report['supports'] ?? null;
         self::assertIsArray($supports);
-        foreach (['changedRanges', 'diff', 'baseline', 'scopeField', 'metadata', 'stableIdentity', 'ignoreReport', 'newOnly'] as $capability) {
+        foreach (['changedRanges', 'diff', 'baseline', 'scopeField', 'metadata', 'stableIdentity', 'ignoreReport', 'newOnly', 'deepScanBudget'] as $capability) {
             self::assertTrue($supports[$capability] ?? false, $capability);
         }
+    }
+
+    /** Verify hook JSON keeps the bounded-scan diagnostic and sensitive-data findings. */
+    public function testHookReportsBoundedDeepScanWithoutInvalidatingRun(): void
+    {
+        [$process, $report] = $this->runHook(self::PROJECT_ROOT, [
+            'hook',
+            '--no-config',
+            '--deep-scan-budget',
+            '1:1',
+            '--include-rule',
+            'sensitive-data.aws-access-key',
+            '--format',
+            'json',
+            'tests/Fixtures/SensitiveData/synthetic-secrets.php',
+        ]);
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        self::assertNotNull($this->firstFindingByRule($this->findingRows($report), 'sensitive-data.aws-access-key'));
+        $diagnostics = $report['diagnostics'] ?? null;
+        self::assertIsArray($diagnostics);
+        $diagnostic = $diagnostics[0] ?? null;
+        self::assertIsArray($diagnostic);
+        self::assertSame('bounded-deep-scan', $diagnostic['type'] ?? null);
+        self::assertSame(false, $diagnostic['invalidatesRun'] ?? null);
     }
 
     /**
@@ -162,7 +188,7 @@ final class HookCliContractTest extends CliTestCase
             'hook', 'tests/Fixtures/Naming/abbreviation-allowlist.php', '--no-config',
             '--include-rule', 'naming.abbreviation-allowlist', '--format', 'json',
         ]);
-        $finding = $this->firstFindingByRule($this->findingRows($report), 'naming.abbreviation-allowlist');
+        $finding  = $this->firstFindingByRule($this->findingRows($report), 'naming.abbreviation-allowlist');
         $metadata = $finding['metadata'] ?? null;
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());

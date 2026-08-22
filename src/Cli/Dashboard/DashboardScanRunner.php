@@ -71,9 +71,9 @@ final class DashboardScanRunner
      * Wires up the collaborators every dashboard scan leans on: the gruff-php binary to run, the state
      * factory that reads the submitted form, and the renderer that turns results or failures into a page.
      *
-     * @param string                $gruffBinary - Absolute gruff-php binary path used for scan requests.
+     * @param string                $gruffBinary  - Absolute gruff-php binary path used for scan requests.
      * @param DashboardStateFactory $stateFactory - Factory used to resolve dashboard state.
-     * @param DashboardPageRenderer $renderer - Renderer used for scan output and errors.
+     * @param DashboardPageRenderer $renderer     - Renderer used for scan output and errors.
      */
     public function __construct(
         private readonly string $gruffBinary,
@@ -87,7 +87,7 @@ final class DashboardScanRunner
      * and hand back the HTML the dashboard iframe shows. Every "scan" click in the UI lands here.
      *
      * @param DashboardRequestContext $dashboardRequestContext - Per-run dashboard context: project root, launch dir, and scan timeout.
-     * @param array<string, string>   $query - Submitted form values; empty on first load, which falls back to the launch defaults.
+     * @param array<string, string>   $query                   - Submitted form values; empty on first load, which falls back to the launch defaults.
      *
      * @return string - Embeddable HTML: the rendered scan report on success, or an error panel when the root is bad or output is empty.
      */
@@ -175,16 +175,16 @@ final class DashboardScanRunner
      * Fingerprints everything a scan's result depends on, so the cache can tell an unchanged project from
      * one that needs re-analysing before it hands the user a stale report.
      *
-     * @param string                $scanRoot - Resolved project root the requested paths are taken relative to.
-     * @param list<string>          $paths - Requested scan paths; each is walked into the fingerprint.
-     * @param array<string, string> $state - Dashboard form state whose config and baseline choices also feed the fingerprint.
-     * @phpstan-param array{project: string, paths: string, scanScope: string, failOn: string, config: string, baseline: string, noBaseline: string, noConfig: string, includeIgnored: string, reportInteractive: string} $state
+     * @param         string                                                                                                                                                                                                                      $scanRoot - Resolved project root the requested paths are taken relative to.
+     * @param         list<string>                                                                                                                                                                                                                $paths    - Requested scan paths; each is walked into the fingerprint.
+     * @param         array<string, string>                                                                                                                                                                                                       $state    - Dashboard form state whose config and baseline choices also feed the fingerprint.
+     * @phpstan-param array{project: string, paths: string, scanScope: string, failOn: string, config: string, baseline: string, noBaseline: string, noConfig: string, deepScanBudget: string, includeIgnored: string, reportInteractive: string} $state
      *
      * @return string - Content hash over the scanned files plus the active config and baseline; a matching value means the cached report is safe to reuse.
      */
     private function cacheFingerprint(string $scanRoot, array $paths, array $state): string
     {
-        $parts = [$scanRoot, $state['includeIgnored']];
+        $parts = [$scanRoot, $state['includeIgnored'], $state['deepScanBudget']];
 
         // Fold every requested source path into the fingerprint so editing any scanned file busts the cache.
         foreach ($paths as $path) {
@@ -210,9 +210,9 @@ final class DashboardScanRunner
      * Records one path's contribution to the fingerprint: its file metadata, every file beneath a
      * directory, or a "missing" marker when the path is not on disk yet.
      *
-     * @param list<string> $parts - Fingerprint parts gathered so far; this call appends to it by reference.
+     * @param list<string> $parts    - Fingerprint parts gathered so far; this call appends to it by reference.
      * @param string       $scanRoot - Project root the path is resolved against before hashing.
-     * @param string       $path - Project-relative or absolute path to fingerprint; may not exist yet, which is recorded as a missing marker.
+     * @param string       $path     - Project-relative or absolute path to fingerprint; may not exist yet, which is recorded as a missing marker.
      *
      * @return void - Appends to $parts in place; there is no return value.
      */
@@ -245,8 +245,8 @@ final class DashboardScanRunner
      * Walks a directory tree and folds every readable file's metadata into the fingerprint, skipping the
      * noise directories (`vendor`, `node_modules`, build output) that never change a scan's verdict.
      *
-     * @param list<string> $parts - Fingerprint parts gathered so far; this call appends the directory's files by reference.
-     * @param string       $scanRoot - Project root used to decide which nested directories are ignored.
+     * @param list<string> $parts     - Fingerprint parts gathered so far; this call appends the directory's files by reference.
+     * @param string       $scanRoot  - Project root used to decide which nested directories are ignored.
      * @param string       $directory - Absolute directory whose files are recursively walked into the fingerprint.
      *
      * @return void - Appends to $parts in place; there is no return value.
@@ -286,8 +286,8 @@ final class DashboardScanRunner
      * Decides whether a directory should be left out of the fingerprint walk, keeping churny folders like
      * `vendor`, `node_modules`, or `var/cache` from needlessly invalidating a cached scan.
      *
-     * @param  string $scanRoot - Project root used to derive the directory's relative path for root matching.
-     * @param  string $directory - Absolute directory being considered for the recursive walk.
+     * @param string $scanRoot  - Project root used to derive the directory's relative path for root matching.
+     * @param string $directory - Absolute directory being considered for the recursive walk.
      *
      * @return bool - True to skip this directory (its edits never change the verdict); false to walk it into the fingerprint.
      */
@@ -310,7 +310,7 @@ final class DashboardScanRunner
      * Distils one file into the compact signature the cache compares against (path, mtime, size, and a
      * content hash), so any real edit to it surfaces as a different fingerprint.
      *
-     * @param  string $path - Absolute path to an existing file whose metadata identifies the cached version.
+     * @param string $path - Absolute path to an existing file whose metadata identifies the cached version.
      *
      * @return string - A `file:path:mtime:size:hash` signature; an identical string means the file is byte-for-byte unchanged.
      */
@@ -325,7 +325,7 @@ final class DashboardScanRunner
      * Keeps the in-memory result cache from growing without bound, evicting the oldest scans once it is
      * full so a long-lived dashboard session does not leak memory as the user runs scan after scan.
      *
-     * @param  string $cacheKey - Key about to be (re)written; dropped first so re-storing it counts as the newest entry.
+     * @param string $cacheKey - Key about to be (re)written; dropped first so re-storing it counts as the newest entry.
      *
      * @return void - Mutates the cache in place; there is no return value.
      */

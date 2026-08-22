@@ -55,6 +55,32 @@ configuration-only resolution. `CONFIGURE` is part of the contract but no
 present, is the full config path for an available hatch. These additive fields
 do not change `gruff.analysis.v2`, finding identities, scoring, or exit gates.
 
+Every `gruff.analysis.v2` payload carries a top-level `suppressions` array with
+one row per configured `sensitiveExclusions` entry, matched or not, so a
+suppressed sensitive-data finding is accounted for rather than merely absent:
+
+```json
+{
+  "suppressions": [
+    {
+      "index": 0,
+      "rule": "sensitive-data.aws-access-key",
+      "paths": ["tests/Fixtures/SensitiveExclusions/AwsSample.php"],
+      "symbol": null,
+      "reason": "Synthetic key used by the scanner fixtures; not a live credential.",
+      "suppressed": 1
+    }
+  ]
+}
+```
+
+`paths` is a single-element list because the shape is shared across the gruff
+family; a sensitive exclusion always names exactly one file. The array is empty
+when no exclusions are configured, and every field comes from configuration —
+no row ever carries a message excerpt, a preview, or a matched value. The text
+report prints the same information as one `Suppressed findings: N via …` line.
+See [`configuration.md`](configuration.md) for authoring rules and rejections.
+
 Baselines do not match on either hash: `gruff.baseline.v2` files store grouped
 count rows `{file, ruleId, message, count}` and matching is count arithmetic
 per `(file, ruleId, message)` group, so line numbers never affect baseline
