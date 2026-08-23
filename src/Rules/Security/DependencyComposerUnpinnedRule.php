@@ -15,11 +15,11 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\SourceTextRuleInterface;
 
 /**
- * Flags an unpinned Composer dependency constraint - `*`, a `dev-` branch, or an open `>=` with no upper
- * bound - so the user pins it before an unattended `composer update` pulls unvetted or breaking code.
+ * Flags an installable Composer dependency using `*`, a `dev-` branch, or an open `>=` with no upper bound.
  *
- * Scans `composer.json` as text over the require and require-dev sections. Warning, medium confidence - an
- * unbounded constraint is a reproducibility smell to review, not a proven risk.
+ * Users see the warning on the exact `require` or `require-dev` entry they need to bound before a future update pulls unexpected code.
+ * PHP, Composer, extension, and system-library platform requirements stay quiet because Composer does not install them as packages.
+ * Warning, medium confidence - an unbounded constraint is a reproducibility smell to review, not a proven risk.
  */
 final class DependencyComposerUnpinnedRule implements SourceTextRuleInterface
 {
@@ -59,7 +59,7 @@ final class DependencyComposerUnpinnedRule implements SourceTextRuleInterface
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> - One finding per unpinned constraint; empty when every require entry is bounded.
+     * @return list<Finding> - One finding per unpinned installable package; empty when every package is bounded or platform-provided.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -75,32 +75,48 @@ final class DependencyComposerUnpinnedRule implements SourceTextRuleInterface
         }
 
         $findings = [];
-        // Check both the require and require-dev sections.
-        foreach (self::REQUIRE_SECTIONS as $section) {
-            // Skip a section the manifest does not declare.
-            if (!isset($manifest[$section]) || !is_array($manifest[$section])) {
+        // Check both dependency sections users can edit in composer.json.
+        foreach (self::REQUIRE_SECTIONS as $dependencySectionName) {
+            // A missing or non-object section declares no package constraints for the user to review.
+            if (!isset($manifest[$dependencySectionName]) || !is_array($manifest[$dependencySectionName])) {
                 continue;
             }
 
-            // Weigh each package constraint in the section.
-            foreach ($manifest[$section] as $package => $constraint) {
-                // Only a string package with an unpinned constraint is flagged.
-                if (!is_string($package) || !is_string($constraint) || !$this->isUnpinned($constraint)) {
+            // Weigh each package constraint in the section the same way Composer presents it to the user.
+            foreach ($manifest[$dependencySectionName] as $packageName => $constraint) {
+                // Non-string entries are not usable Composer package constraints, so the rule has nothing reliable to report.
+                if (!is_string($packageName) || !is_string($constraint)) {
+                    continue;
+                }
+
+                // PHP, Composer APIs, extensions, and system libraries describe the install platform rather than downloaded packages.
+                if ($this->isComposerPlatformPackage($packageName)) {
+                    continue;
+                }
+
+                // A bounded installable package already gives the user a reproducible upgrade range.
+                if (!$this->isUnpinned($constraint)) {
                     continue;
                 }
 
                 $findings[] = new Finding(
-                    ruleId:      self::ID,
-                    message:     sprintf("Unpinned dependency constraint '%s' for %s allows non-reproducible or unexpected upgrades; pin to a bounded version range.", $constraint, $package),
+                    ruleId:  self::ID,
+                    message: sprintf(
+                        "Unpinned dependency constraint '%s' for %s allows non-reproducible or unexpected upgrades; "
+                        . 'pin to a bounded version range.',
+                        $constraint,
+                        $packageName,
+                    ),
                     filePath:    $analysisUnit->file->displayPath,
-                    line:        ComposerManifest::lineOf($analysisUnit->source, sprintf('"%s"', $package)),
+                    line:        ComposerManifest::lineOfDependencyInSection($analysisUnit->source, $dependencySectionName, $packageName),
                     severity:    Severity::Warning,
                     pillar:      Pillar::Security,
                     tier:        RuleTier::V01,
                     confidence:  Confidence::Medium,
-                    remediation: 'Constrain the dependency with a bounded operator (for example "^1.2" or ">=1.2,<2.0") and avoid "*", "dev-" branches, and open-ended ">=" requirements.',
+                    remediation: 'Constrain the dependency with a bounded operator (for example "^1.2" or ">=1.2,<2.0") '
+                        . 'and avoid "*", "dev-" branches, and open-ended ">=" requirements.',
                     metadata:    [
-                        'package'    => $package,
+                        'package'    => $packageName,
                         'constraint' => $constraint,
                     ],
                 );
@@ -108,6 +124,24 @@ final class DependencyComposerUnpinnedRule implements SourceTextRuleInterface
         }
 
         return $findings;
+    }
+
+    /**
+     * Reports whether a requirement names PHP, Composer, an extension, or a system library supplied by the user's install platform.
+     *
+     * @param string $packageName - Composer package key; an empty or ordinary vendor/package name is not treated as platform-provided.
+     *
+     * @return bool - true when Composer validates the requirement against the platform instead of downloading that named package
+     */
+    private function isComposerPlatformPackage(string $packageName): bool
+    {
+        $normalizedPackageName  = strtolower($packageName);
+        $isNamedPlatformPackage = in_array($normalizedPackageName, ['composer', 'composer-plugin-api', 'composer-runtime-api', 'php'], true);
+
+        // Prefixes such as ext-json and php-64bit describe capabilities already supplied by the user's install platform.
+        $hasPlatformPackagePrefix = preg_match('/^(?:ext-|lib-|php-)/', $normalizedPackageName) === 1;
+
+        return $isNamedPlatformPackage || $hasPlatformPackagePrefix;
     }
 
     /**
