@@ -23,10 +23,13 @@ use PhpParser\NodeFinder;
  * Flags a constructor that copies a same-named parameter straight into a property (`$this->x = $x;`),
  * where PHP 8 constructor property promotion would collapse the boilerplate, so the user can consider it.
  *
- * Runs per file on PHP 8.0+ targets, and only on self-contained classes (no parent, no traits, an explicit
- * constructor) where a single-file scan can reason safely. It reports each plain assignment whose property
- * is never written elsewhere and whose parameter is not already promoted. Advisory only - promotion
- * changes constructor shape, so gruff-php reports rather than rewrites.
+ * Runs per file on PHP 8.0+ targets, and only where a single-file scan can reason safely:
+ *
+ * - The class has no parent and no traits, so no inherited state is invisible to the scan.
+ * - The property is never written outside the constructor, so promoting it cannot drop a later mutation.
+ * - The matching parameter carries no visibility modifier, so it is not already promoted.
+ *
+ * Advisory only, because promotion changes the constructor's shape; gruff-php reports it rather than rewriting.
  */
 final readonly class ConstructorPromotionCandidateRule implements RuleInterface
 {

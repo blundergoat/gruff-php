@@ -26,15 +26,20 @@ use PhpParser\Node\Stmt\Function_;
 use PhpParser\Node\Stmt\Property;
 
 /**
- * Flags calls into PHP's execution and evaluation surface - immutable built-ins such as `exec`,
- * `shell_exec`, and `system`, project-added global functions, `eval`, `assert('...')`, and dynamic
- * `$callable()` invocations - so a reviewer can confirm each one runs trusted input rather than
- * attacker-controlled data (command injection / arbitrary code execution).
+ * Flags calls into PHP's execution and evaluation surface so a reviewer can confirm each one runs trusted input
+ * rather than attacker-controlled data, which is where command injection and arbitrary code execution begin.
  *
- * Runs per file. To keep noise down it first learns which local variables, properties, and parameters
- * are known callables (closures, arrow functions, `[obj, 'method']` arrays, or callable type hints and
- * docblocks) and trusts calls through those, flagging only unproven dynamic targets. Warning severity,
- * medium confidence - a name match is evidence for review, not a proven vulnerability.
+ * The surface is the non-removable built-ins `exec`, `shell_exec`, and `system`, any project-added global functions,
+ * `eval`, `assert('...')` on a literal, and dynamic `$callable()` invocations.
+ *
+ * Runs per file. To keep noise down it first learns which locals, properties, and parameters hold known callables:
+ *
+ * - closures and arrow functions assigned to a variable;
+ * - `[obj, 'method']` callable arrays;
+ * - parameters carrying a `callable` type hint or docblock.
+ *
+ * Calls through those are trusted, leaving only unproven dynamic targets. Warning at medium confidence, because a
+ * name match is evidence for review rather than a proven vulnerability.
  */
 final class DangerousFunctionCallRule implements RuleInterface
 {

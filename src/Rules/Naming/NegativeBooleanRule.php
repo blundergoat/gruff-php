@@ -33,11 +33,10 @@ use PhpParser\Node\UnionType;
  * Flags a typed bool property or parameter named as a negative flag - `$noCache`, `$disableLogging` - because
  * such names force the reader through a double negative at every call site (`if (!$noCache)`).
  *
- * A name can opt out by mirroring a real CLI flag through the cliMirrorAllowlist option. Advisory, medium
- * confidence. Overlap deferral order is centralised in RuleRegistry:
- * class-file-mismatch > confusing-name > negative-boolean > boolean-prefix >
- * identifier-quality > hungarian-notation > suffix-hungarian > short-variable >
- * abbreviation-allowlist.
+ * A name opts out by mirroring a real CLI flag through the cliMirrorAllowlist option. Advisory at medium confidence.
+ *
+ * Overlap deferral order is centralised in RuleRegistry: class-file-mismatch > confusing-name > negative-boolean >
+ * boolean-prefix > identifier-quality > hungarian-notation > suffix-hungarian > short-variable > abbreviation-allowlist.
  */
 final readonly class NegativeBooleanRule implements RuleInterface
 {

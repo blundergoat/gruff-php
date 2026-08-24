@@ -89,13 +89,11 @@ final readonly class BooleanPrefixRule implements RuleInterface
     /**
      * Exact boolean identifier names accepted as-is, regardless of prefix.
      *
-     * Unlike protocol acronyms there is no universal set of bare boolean names
-     * that earns its place across every codebase, so the default is empty and a
-     * project appends its own domain vocabulary (e.g. a public `valid(): bool`
-     * accessor it does not want renamed to `isValid()`). The escape hatch exists
-     * so a finding on a public, caller-visible boolean name can be cleared with
-     * config rather than a breaking rename, which is the non-breaking resolution
-     * this hatch is here to provide. Matching is whole-name and case-insensitive.
+     * No universal set of bare boolean names earns its place across every codebase, so the default is empty
+     * and a project appends its own domain vocabulary.
+     *
+     * This is the non-breaking way to clear a finding on a caller-visible name, such as a public `valid(): bool`
+     * accessor a project does not want renamed to `isValid()`. Matching is whole-name and case-insensitive.
      *
      * @var list<string>
      */
@@ -566,10 +564,9 @@ final readonly class BooleanPrefixRule implements RuleInterface
     /**
      * Reports whether a boolean identifier is on the exact accepted-name allowlist.
      *
-     * The allowlist holds whole identifier names a project has chosen to keep as
-     * they are, typically a caller-visible name a rename would break, so the
-     * comparison is whole-name and case-insensitive, never a prefix match. The
-     * caller supplies the names already lowercased.
+     * The allowlist holds whole identifier names a project has chosen to keep, typically a caller-visible name a rename
+     * would break, so the comparison is whole-name and case-insensitive rather than a prefix match.
+     * The caller supplies the names already lowercased.
      *
      * @param string       $name - Identifier name to match, compared whole and case-insensitively.
      * @param list<string> $acceptedNames - Lowercased exact names accepted as-is.

@@ -22,12 +22,11 @@ use PhpParser\Node\Scalar;
 /**
  * Flags a wildcard CORS origin combined with credentialed requests.
  *
- * `Access-Control-Allow-Origin: *` together with
- * `Access-Control-Allow-Credentials: true` is an unsafe CORS posture: it asks
- * the browser to share credentialed responses with any origin. The check is
- * pure syntax over literal `header()` calls in one file - request-controlled
- * header values are left to `security.header-injection` so evidence never
- * overlaps.
+ * `Access-Control-Allow-Origin: *` together with `Access-Control-Allow-Credentials: true` asks the browser to share
+ * credentialed responses with any origin, which is an unsafe posture.
+ *
+ * The check is pure syntax over literal `header()` calls in one file.
+ * Request-controlled header values belong to `security.header-injection`, so the two rules never report the same evidence.
  */
 final class PermissiveCorsRule implements RuleInterface
 {

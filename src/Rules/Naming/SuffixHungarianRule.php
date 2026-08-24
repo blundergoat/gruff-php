@@ -30,14 +30,12 @@ use PhpParser\Node\UnionType;
  * Flags a variable, property, or parameter whose name ends in a type suffix - `$nameString`, `$itemsArray`,
  * `$flagBoolean` - so the user drops the redundant tag when the declared or documented type already says it.
  *
- * A configured trailing token is reported when the declaration or local PHPDoc type matches the suffix, or
- * when no local type evidence contradicts it. `As<Type>` / `To<Type>` conversion idioms are exempt so a
- * transient cast such as `$nameAsString` stays readable. Advisory, medium confidence.
+ * A configured trailing token is reported when the declared or documented type matches the suffix, or when no local
+ * type evidence contradicts it. `As<Type>` and `To<Type>` conversion idioms are exempt, so a transient cast such as
+ * `$nameAsString` stays readable. Advisory at medium confidence.
  *
- * Overlap deferral order is centralised in RuleRegistry:
- * class-file-mismatch > confusing-name > negative-boolean > boolean-prefix >
- * identifier-quality > hungarian-notation > suffix-hungarian > short-variable >
- * abbreviation-allowlist.
+ * Overlap deferral order is centralised in RuleRegistry: class-file-mismatch > confusing-name > negative-boolean >
+ * boolean-prefix > identifier-quality > hungarian-notation > suffix-hungarian > short-variable > abbreviation-allowlist.
  */
 final readonly class SuffixHungarianRule implements RuleInterface
 {

@@ -84,10 +84,8 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        // Fast bail: a PHI finding requires a context keyword on the same
-        // line as the matched identifier. If the file has no PHI context
-        // keyword anywhere, none of the per-pattern matches can ever pass
-        // hasPhiContext().
+        // A PHI finding needs a health keyword on the same line as the matched identifier, so a file without one anywhere
+        // can never produce a finding; bailing here skips the expensive per-pattern scan on most files.
         if (preg_match('/\b(?:health|medicare|mrn|nhi|patient|ssn|tax_file_number|tfn)\b/i', $analysisUnit->source) !== 1) {
             // No PHI context keyword anywhere, so no per-pattern match could survive hasPhiContext().
             return [];
