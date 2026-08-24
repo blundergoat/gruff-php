@@ -60,6 +60,16 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A nine-digit number that is not an identifier at all - a timestamp, byte count, or ID - on a line that also mentions a health word.',
+                    'mitigation' => 'The TFN shape is nine digits and the gate is only a same-line keyword, so move the number away from the health-context line or mark the line as a documented example.',
+                ],
+                [
+                    'shape'      => 'A reference or error code of three letters followed by four digits, matching the NHI shape on a health-context line.',
+                    'mitigation' => 'The pattern cannot tell a domain code from a health identifier, so rename the code or keep it off lines carrying health keywords.',
+                ],
+            ],
         );
     }
 

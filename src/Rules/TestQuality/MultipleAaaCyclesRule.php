@@ -47,6 +47,12 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
             defaultThresholds:  ['minCycles' => 3],
             defaultOptions:     ['ignoredPathPatterns' => []],
             isEnabledByDefault: true,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'One workflow test that must assert between steps, such as an end-to-end journey checking state after each transition.',
+                    'mitigation' => 'Act-then-assert transitions are counted without judging whether they form one workflow, so add the suite path to options.ignoredPathPatterns or raise minCycles.',
+                ],
+            ],
         );
     }
 

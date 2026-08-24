@@ -43,6 +43,12 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A non-secret value assigned to a key whose name contains PASS, TOKEN, or SECRET, such as a cache key or a long opaque identifier of comparable shape.',
+                    'mitigation' => 'The key name plus a length-and-entropy value check is the whole test, so rename the key away from the secret vocabulary or move the value into environment configuration.',
+                ],
+            ],
         );
     }
 

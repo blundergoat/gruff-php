@@ -65,6 +65,12 @@ final readonly class JwtTokenRule implements SourceTextRuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A test fixture or documentation sample embedding a real-shaped but expired or synthetic JWT outside a comment.',
+                    'mitigation' => 'Only obvious dummy values and matches inside comments are skipped, so mint the token at runtime or move the sample into a comment.',
+                ],
+            ],
         );
     }
 

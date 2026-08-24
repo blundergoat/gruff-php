@@ -76,6 +76,16 @@ final class DangerousFunctionCallRule implements RuleInterface
             optionDescriptions: [
                 'additionalFunctions' => 'Global function names added to the non-removable built-in execution list; matching is case-insensitive.',
             ],
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A constrained internal wrapper that runs a fixed literal command through exec(), system(), or shell_exec().',
+                    'mitigation' => 'The built-in execution list matches on function name alone and never inspects the argument, and options.additionalFunctions only adds names, so review the wrapper once and accept it.',
+                ],
+                [
+                    'shape'      => 'A dynamic $callable() whose target is defined in another file, such as a container-resolved handler or an injected callable.',
+                    'mitigation' => 'Callable provenance is proven only from this file, so add a callable type hint or assign the closure locally to make the target visible.',
+                ],
+            ],
         );
     }
 

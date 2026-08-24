@@ -115,6 +115,12 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
             defaultSeverity: Severity::Advisory,
             confidence:      Confidence::Low,
             defaultOptions:  ['allowedLiterals' => self::DEFAULT_ALLOWED_LITERALS],
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A domain constant that every reader of the suite knows, such as a fixed exit code, port, or protocol version, asserted as a bare literal.',
+                    'mitigation' => 'Only HTTP status codes are allowed by default, so add the literal to options.allowedLiterals or assert against a named constant.',
+                ],
+            ],
         );
     }
 

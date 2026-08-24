@@ -59,6 +59,12 @@ final class UnsafeXmlLoadingRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A parse guarded somewhere the call cannot see, such as libxml_set_external_entity_loader(null) installed during bootstrap.',
+                    'mitigation' => 'Only an explicit LIBXML_NONET argument on the call itself counts as guarded, so pass that flag where the parse happens.',
+                ],
+            ],
         );
     }
 

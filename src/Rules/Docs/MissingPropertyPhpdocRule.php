@@ -73,6 +73,16 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
             optionDescriptions: [
                 'acceptLineComments' => 'When true, a physically attached // or # comment with meaning beyond the property name satisfies the rule.',
             ],
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A property documented by an attached // or # line comment rather than a docblock.',
+                    'mitigation' => 'The default configuration accepts only docblocks; set options.acceptLineComments to true, or convert the comment to `/** */`.',
+                ],
+                [
+                    'shape'      => 'With acceptLineComments enabled, a short comment whose words only restate the property name.',
+                    'mitigation' => 'Such a comment is treated as filler, so state what the property holds or the invariant it maintains.',
+                ],
+            ],
         );
     }
 

@@ -46,6 +46,12 @@ final readonly class EmptyClassRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A deliberate empty marker class that is not an exception, such as an attribute class, a DI tag, or an empty test double.',
+                    'mitigation' => 'Only subtypes whose parent name ends in Exception or Throwable are exempt, so accept the advisory for other marker types.',
+                ],
+            ],
         );
     }
 

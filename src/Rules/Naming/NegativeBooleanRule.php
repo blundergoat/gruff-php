@@ -68,6 +68,12 @@ final readonly class NegativeBooleanRule implements RuleInterface
             confidence:      Confidence::Medium,
             defaultOptions:  ['cliMirrorAllowlist' => []],
             description:     'Flags typed bool properties and parameters named as negative flags unless they explicitly mirror a CLI flag.',
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A Boolean that deliberately mirrors an external negative contract, such as $noCache for a --no-cache option or a wire-format noStore field.',
+                    'mitigation' => 'Renaming it positive would invert the mirrored contract, so add the finding\'s fully qualified allowlistKey to options.cliMirrorAllowlist.',
+                ],
+            ],
         );
     }
 

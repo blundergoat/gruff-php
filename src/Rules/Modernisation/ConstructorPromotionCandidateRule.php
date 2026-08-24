@@ -49,6 +49,12 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'The separately declared property carries its own docblock or attribute that promotion would move onto the constructor parameter.',
+                    'mitigation' => 'The candidate check reads the assignment shape, not the declaration\'s metadata; keep the separate declaration where that metadata matters.',
+                ],
+            ],
         );
     }
 

@@ -40,6 +40,12 @@ final readonly class MockOnlyTestRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A collaboration test whose contract genuinely is the interaction, such as proving an event was dispatched or a port was called with a mapped payload.',
+                    'mitigation' => 'The rule cannot tell an interaction contract from missing behaviour coverage, so add one assertion on a real returned value, or accept the finding.',
+                ],
+            ],
         );
     }
 

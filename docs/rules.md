@@ -14,6 +14,19 @@ Use that command for the full machine-readable metadata, including thresholds an
 
 Total rules: 128
 
+## False-positive guidance
+
+74 of the 128 rules publish `falsePositiveShapes`: a list of shapes the detector is
+known to misfire on, each paired with the mitigation that answers it. Every rule at
+`medium` or `low` confidence carries at least one, because a heuristic rule owes the
+reader the cases where its heuristic is wrong. A rule that catalogues nothing omits
+the field rather than publishing an empty list, so an absent field means "nothing
+catalogued yet", never "reviewed and found to have no false positives".
+
+The catalogue (`list-rules --format=json`) and the per-rule detail view publish the
+same guidance text. Both read it from the rule's own `RuleDefinition`, which is the
+single place this text is written.
+
 ## Remediation action metadata
 
 Selected findings carry a machine-readable `metadata.remediationAction`. The

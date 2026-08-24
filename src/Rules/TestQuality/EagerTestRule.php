@@ -98,6 +98,12 @@ final readonly class EagerTestRule implements RuleInterface
             defaultSeverity:   Severity::Advisory,
             confidence:        Confidence::Low,
             defaultThresholds: ['minAssertions' => 3],
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'One scenario that legitimately drives several calls on the same receiver, such as a builder chain or a state machine stepped through its transitions.',
+                    'mitigation' => 'Distinct calls on the busiest receiver are counted without judging whether they form one scenario, so raise this rule\'s minAssertions threshold.',
+                ],
+            ],
         );
     }
 

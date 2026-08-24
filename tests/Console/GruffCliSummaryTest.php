@@ -118,7 +118,7 @@ final class GruffCliSummaryTest extends TestCase
         self::assertSame(['tests/Fixtures/Source/mixed'], $scope['paths'] ?? null);
         self::assertArrayHasKey('configPath', $scope);
         self::assertNull($scope['configPath']);
-        self::assertSame(2, $scope['filesDiscovered'] ?? null);
+        self::assertSame(7, $scope['filesDiscovered'] ?? null);
 
         $composite = $decoded['composite'] ?? null;
         self::assertIsArray($composite);

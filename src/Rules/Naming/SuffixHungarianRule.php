@@ -74,6 +74,16 @@ final readonly class SuffixHungarianRule implements RuleInterface
             confidence:      Confidence::Medium,
             defaultOptions:  ['typeSuffixes' => self::TYPE_SUFFIXES],
             description:     'Flags identifiers that duplicate type information with trailing suffixes such as String, Map, or Boolean.',
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A domain compound whose final word coincides with a configured suffix, such as $allowList for an allowlist or $resultSet for a database result set.',
+                    'mitigation' => 'The suffix is judged as a type restatement whenever no declared type contradicts it, so rename to the closed compound or remove that suffix from options.typeSuffixes.',
+                ],
+                [
+                    'shape'      => 'An untyped local with no @var annotation whose suffixed name holds a value of some other type.',
+                    'mitigation' => 'Absent type evidence is read as agreement, so add a @var annotation naming the real type and the finding clears.',
+                ],
+            ],
         );
     }
 

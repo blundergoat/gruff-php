@@ -50,6 +50,12 @@ final class PermissiveCorsRule implements RuleInterface
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::Medium,
             description:     'Wildcard Access-Control-Allow-Origin combined with Access-Control-Allow-Credentials: true.',
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A wildcard origin and a credentialed CORS header emitted in one function on mutually exclusive branches, one for a public endpoint and one for an authenticated endpoint.',
+                    'mitigation' => 'Headers are grouped per function-like scope rather than per execution path, so move the two postures into separate functions.',
+                ],
+            ],
         );
     }
 

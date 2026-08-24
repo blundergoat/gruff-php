@@ -132,6 +132,16 @@ final readonly class BooleanPrefixRule implements RuleInterface
                 'acceptedBooleanNames' => 'Exact case-insensitive Boolean names accepted across receivers for compatibility.',
                 'includePublicApi' => 'Whether to inspect public/protected methods, properties, named functions, and their caller-visible parameters; false limits findings to private/local declarations.',
             ],
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A subject-first predicate such as projectHasConfig(), where the predicate word is not the leading token.',
+                    'mitigation' => 'Prefixes are matched only at the start of the name; rename prefix-first, or add the internal verb to options.propositionVerbAllowlist.',
+                ],
+                [
+                    'shape'      => 'An interface-mandated Boolean name such as Iterator::valid(), which a rename would break.',
+                    'mitigation' => 'State adjectives are accepted for properties and parameters only, never for method names, so add the exact name to options.acceptedBooleanNames.',
+                ],
+            ],
         );
     }
 

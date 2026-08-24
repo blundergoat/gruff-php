@@ -4,6 +4,8 @@ Notable user-facing changes to `gruff-php` are listed here.
 
 ## Unreleased
 
+- **Every heuristic rule now documents where it misfires** - All 70 `medium` and `low` confidence rules carry `falsePositiveShapes`, each shape paired with the mitigation that answers it, so a surprising finding can be judged without reading the detector.
+- **`list-rules --format=json` publishes that guidance in the catalogue** - The full-list rows carry `falsePositiveShapes` alongside the per-rule detail view, which already did. The key is present only for rules that catalogue guidance, so an absent key means none is catalogued rather than none exists.
 - **BREAKING: default scans use the family fallback policy** - Non-VCS fallbacks now defer to any governing `.gitignore`, committed control metadata stays scannable, and explicit supported files bypass Git and fallback exclusions. PHP retains `.gruff-cache`, `.phpunit.cache`, and `var/cache`; eligible lockfiles are no longer dropped by filename, while VCS internals remain blocked.
 - **Bounded deep scans protect large PHP inputs** - PHP source over 20,000 lines or 2,000,000 bytes keeps file-size, sensitive-data, and config-text rules while parsing, masking, AST walking, and other structural work are dropped.
 - **Budget degradation is visible and nonfatal** - Every output surface emits `bounded-deep-scan` with the path, measured lines and bytes, both limits, and whether defaults, config, or CLI supplied them; the file still counts as analysed.

@@ -42,6 +42,12 @@ final readonly class NoAssertionsRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Error,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A test whose checks run inside a project helper with a domain name, such as seeInDatabase() or verifyRendered(), rather than an assert-prefixed call.',
+                    'mitigation' => 'Only assert*, expect*, fail(), mock verification, and the legacy @expectedException annotation are recognised, so assert inside the test or disable this rule for custom assertion wrappers.',
+                ],
+            ],
         );
     }
 

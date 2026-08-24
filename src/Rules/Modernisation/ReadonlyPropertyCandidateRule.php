@@ -48,6 +48,16 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A property written after construction through a dynamic name ($this->$field = ...) or by reflection, as a hydrator or ORM does.',
+                    'mitigation' => 'Only statically named assignments and unsets count as late writes, so confirm no dynamic or reflective write exists before applying readonly.',
+                ],
+                [
+                    'shape'      => 'A property mutated only by being passed to a function by reference, such as sort($this->items).',
+                    'mitigation' => 'A by-reference mutation produces no assignment node and stays invisible here, so check for one before applying readonly.',
+                ],
+            ],
         );
     }
 

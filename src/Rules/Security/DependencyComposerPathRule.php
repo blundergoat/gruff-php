@@ -43,6 +43,12 @@ final class DependencyComposerPathRule implements SourceTextRuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A monorepo that develops its own first-party packages through path repositories pointing inside the same reviewed checkout.',
+                    'mitigation' => 'Every path repository is reported because the linked target is not resolved, so confirm the path is first-party and accept the finding.',
+                ],
+            ],
         );
     }
 

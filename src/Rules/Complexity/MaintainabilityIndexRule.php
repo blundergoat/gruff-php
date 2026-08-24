@@ -52,6 +52,12 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
             defaultSeverity:   Severity::Advisory,
             confidence:        Confidence::Medium,
             severityThreshold: new SeverityThreshold(35, Severity::Advisory),
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A long but linear method - wiring, data setup, or generated code - that branches very little.',
+                    'mitigation' => 'The logical-line term dominates the index, so a low score here means length rather than complexity; split the method or tune this rule\'s threshold and severity.',
+                ],
+            ],
         );
     }
 

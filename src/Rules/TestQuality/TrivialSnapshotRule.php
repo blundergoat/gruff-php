@@ -42,6 +42,12 @@ final readonly class TrivialSnapshotRule implements RuleInterface
             defaultSeverity:   Severity::Advisory,
             confidence:        Confidence::Medium,
             defaultThresholds: ['maxLiteralLength' => 5],
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A short snapshot kept deliberately so a rendered value stays reviewable in the snapshot file alongside its larger siblings.',
+                    'mitigation' => 'Only the captured literal\'s length is judged, not why it is snapshotted, so raise this rule\'s maxLiteralLength threshold.',
+                ],
+            ],
         );
     }
 

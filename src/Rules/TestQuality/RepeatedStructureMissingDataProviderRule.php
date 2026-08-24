@@ -52,6 +52,12 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
             defaultSeverity: Severity::Advisory,
             confidence:      Confidence::Low,
             defaultOptions:  ['ignoredPathPatterns' => []],
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'Three or more tests that share a call shape while testing genuinely different behaviours, where one parametrised test would hide what each case proves.',
+                    'mitigation' => 'Only the call and control-flow shape is compared, never the intent, so add the path to options.ignoredPathPatterns or keep the separate tests.',
+                ],
+            ],
         );
     }
 

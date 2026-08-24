@@ -47,6 +47,12 @@ final class UnsafeArchiveExtractionRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A domain object with its own extractTo() method, called with request-derived arguments.',
+                    'mitigation' => 'Instance calls are matched on the method name alone, while only the static path requires a ZipArchive or PharData receiver, so accept the finding or rename the local method.',
+                ],
+            ],
         );
     }
 

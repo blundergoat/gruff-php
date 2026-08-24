@@ -55,6 +55,20 @@ final class RequestControlledUrlRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'An HTTP-verb method on something that is not an HTTP client, such as a repository\'s get() or a queue\'s send(), whose argument joins a literal URL with request data.',
+                    'mitigation' => 'Client calls are matched by method name with no receiver-type check, so accept the finding or rename the local method away from the HTTP verbs.',
+                ],
+                [
+                    'shape'      => 'A fetch whose host is fixed and where request data reaches only the path or query, so the target host cannot be redirected.',
+                    'mitigation' => 'A literal URL plus reachable request data is enough to report, so confirm the host is fixed and accept the finding.',
+                ],
+                [
+                    'shape'      => 'A request-built URL constrained by an upstream host allow-list can still look controlled at the sink.',
+                    'mitigation' => 'Confirm and document the upstream host allow-list when reviewing the warning.',
+                ],
+            ],
         );
     }
 

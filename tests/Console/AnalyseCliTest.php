@@ -36,8 +36,8 @@ final class AnalyseCliTest extends CliTestCase
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         self::assertStringContainsString('gruff-php ' . Application::VERSION, $process->getOutput());
-        self::assertStringContainsString('Discovered: 2', $process->getOutput());
-        self::assertStringContainsString('Ignored: 6', $process->getOutput());
+        self::assertStringContainsString('Discovered: 7', $process->getOutput());
+        self::assertStringContainsString('Ignored: 0', $process->getOutput());
         self::assertStringContainsString('tests/Fixtures/Source/mixed/vendor/ignored.php', $process->getOutput());
     }
 
@@ -53,7 +53,7 @@ final class AnalyseCliTest extends CliTestCase
             PHP_BINARY,
             self::PROJECT_ROOT . '/bin/gruff-php',
             'analyse',
-            'tests/Fixtures/Source/mixed/build',
+            'tests/Fixtures/Source/mixed/composer.lock',
             '--no-config',
             '--no-cache',
         ];
@@ -664,8 +664,8 @@ final class AnalyseCliTest extends CliTestCase
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-        self::assertStringContainsString('Discovered: 1', $process->getOutput());
-        self::assertStringContainsString('Ignored: 7', $process->getOutput());
+        self::assertStringContainsString('Discovered: 6', $process->getOutput());
+        self::assertStringContainsString('Ignored: 1', $process->getOutput());
         self::assertStringContainsString('tests/Fixtures/Source/mixed/alpha.php', $process->getOutput());
     }
 

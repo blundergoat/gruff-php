@@ -50,6 +50,12 @@ final class DependencyComposerUnpinnedRule implements SourceTextRuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A deliberately open constraint on a first-party or internally mirrored package, such as a dev- branch for a monorepo sibling, whose installed version composer.lock already pins.',
+                    'mitigation' => 'Only PHP, Composer, ext-, lib-, and php- platform requirements are exempt and the lock file is not read, so bound the constraint or accept the finding.',
+                ],
+            ],
         );
     }
 

@@ -61,6 +61,16 @@ final class SensitiveDataLoggingRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A log message whose static text merely names a credential, such as \'Authorization failed for user \' concatenated with an identifier.',
+                    'mitigation' => 'A string literal containing a credential word is itself read as sensitive context, so reword the message or pass the identifier through the context array.',
+                ],
+                [
+                    'shape'      => 'A non-logger method sharing a PSR-3 name, such as a response builder\'s error() or a metrics client\'s info(), called with a dynamic argument.',
+                    'mitigation' => 'Logger calls are matched by method name with no receiver-type check, so accept the finding or rename the local method.',
+                ],
+            ],
         );
     }
 
