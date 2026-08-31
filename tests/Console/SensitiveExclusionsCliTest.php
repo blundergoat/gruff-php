@@ -142,13 +142,13 @@ final class SensitiveExclusionsCliTest extends CliTestCase
     {
         return [
             'file carrying no finding' => [[
-                'rule'   => self::AWS_RULE,
-                'path'   => 'corpus/Clean.php',
+                'rule' => self::AWS_RULE,
+                'path' => 'corpus/Clean.php',
                 'reason' => 'Retained while the fixture is being removed.',
             ]],
             'symbol narrows to nothing' => [[
-                'rule'   => self::AWS_RULE,
-                'path'   => 'corpus/AwsSample.php',
+                'rule' => self::AWS_RULE,
+                'path' => 'corpus/AwsSample.php',
                 'symbol' => 'SyntheticFixtureSymbol',
                 'reason' => 'Narrowed to one symbol while the fixture is refactored.',
             ]],
@@ -173,11 +173,10 @@ final class SensitiveExclusionsCliTest extends CliTestCase
 
             self::assertSame(
                 [[
-                    'index'      => 0,
-                    'rule'       => self::AWS_RULE,
-                    'paths'      => ['corpus/AwsSample.php'],
-                    'symbol'     => null,
-                    'reason'     => $reason,
+                    'index' => 0,
+                    'rule' => self::AWS_RULE,
+                    'paths' => ['corpus/AwsSample.php'],
+                    'reason' => $reason,
                     'suppressed' => 1,
                 ]],
                 $report['suppressions'],
@@ -393,7 +392,7 @@ final class SensitiveExclusionsCliTest extends CliTestCase
      * saw files - without that check, two runs that each scanned nothing compare equal.
      *
      * @param string $project - Project root to scan.
-     * @param string $format - Output format requested from the CLI.
+     * @param string $format  - Output format requested from the CLI.
      *
      * @return Process - the finished process, whose stdout carries the report.
      */
@@ -449,7 +448,7 @@ final class SensitiveExclusionsCliTest extends CliTestCase
      * Names the findings the configured run removed relative to the baseline run, which is what a
      * sibling suppression would show up in.
      *
-     * @param array<string, mixed> $baseline - Report from the same corpus with no exclusions configured.
+     * @param array<string, mixed> $baseline   - Report from the same corpus with no exclusions configured.
      * @param array<string, mixed> $configured - Report from the same corpus under the case configuration.
      *
      * @return list<array{string, string}> - rule-and-file pairs present in the baseline but absent from the configured run.

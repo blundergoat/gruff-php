@@ -76,9 +76,11 @@ final class AnalyseCliTest extends CliTestCase
         $diagnostics = $report['diagnostics'] ?? null;
 
         self::assertIsArray($summary);
-        self::assertSame(0, $summary['filesDiscovered'] ?? null);
+        self::assertSame(0, $summary['discoveredFiles'] ?? null);
         self::assertSame(0, $summary['exitCode'] ?? null);
-        self::assertArrayNotHasKey('score', $report);
+        $score = $report['score'] ?? null;
+        self::assertIsArray($score);
+        self::assertSame(['grade' => 'N/A', 'score' => 0], $score['composite'] ?? null);
         self::assertIsArray($diagnostics);
         $emptyAnalysisDiagnostic = $diagnostics[0] ?? null;
         self::assertIsArray($emptyAnalysisDiagnostic);
@@ -116,9 +118,9 @@ final class AnalyseCliTest extends CliTestCase
 
         self::assertIsArray($runMetadata);
         self::assertIsArray($summary);
-        self::assertSame(['tests/Fixtures/Source/mixed/alpha.php'], $runMetadata['paths'] ?? null);
-        self::assertSame(1, $summary['filesDiscovered'] ?? null);
-        self::assertSame(1, $summary['filesParsed'] ?? null);
+        self::assertSame(['tests/Fixtures/Source/mixed/alpha.php'], $runMetadata['inputs'] ?? null);
+        self::assertSame(1, $summary['discoveredFiles'] ?? null);
+        self::assertSame(1, $summary['parsedFiles'] ?? null);
         self::assertSame(0, $summary['exitCode'] ?? null);
     }
 
@@ -252,9 +254,9 @@ final class AnalyseCliTest extends CliTestCase
         $summary  = $report['summary'] ?? null;
         $findings = $report['findings'] ?? null;
 
-        self::assertSame('gruff.analysis.v2', $report['schemaVersion'] ?? null);
+        self::assertSame('gruff.analysis.v3', $report['schemaVersion'] ?? null);
         self::assertIsArray($summary);
-        self::assertSame(1, $summary['filesDiscovered'] ?? null);
+        self::assertSame(1, $summary['discoveredFiles'] ?? null);
         self::assertSame(0, $summary['exitCode'] ?? null);
         self::assertIsArray($findings);
         self::assertCount(4, $findings);
@@ -298,8 +300,8 @@ final class AnalyseCliTest extends CliTestCase
         $findings    = $report['findings'] ?? null;
 
         self::assertIsArray($summary);
-        self::assertSame(1, $summary['filesDiscovered'] ?? null);
-        self::assertSame(1, $summary['filesParsed'] ?? null);
+        self::assertSame(1, $summary['discoveredFiles'] ?? null);
+        self::assertSame(1, $summary['parsedFiles'] ?? null);
         self::assertSame(0, $summary['parseErrors'] ?? null);
         self::assertIsArray($diagnostics);
         self::assertCount(1, $diagnostics);
@@ -783,12 +785,12 @@ final class AnalyseCliTest extends CliTestCase
         $diff   = $report['diff'] ?? null;
 
         self::assertIsArray($score);
-        self::assertIsArray($diff);
+        self::assertNull($diff);
         $composite = $score['composite'] ?? null;
         self::assertIsArray($composite);
         self::assertSame('A', $composite['grade'] ?? null);
         self::assertSame('full-project', $score['scope'] ?? null);
-        self::assertSame(false, $diff['active'] ?? null);
+        self::assertArrayNotHasKey('diff', $report);
     }
 
     /**

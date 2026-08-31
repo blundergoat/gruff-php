@@ -4,6 +4,7 @@ Notable user-facing changes to `gruff-php` are listed here.
 
 ## Unreleased
 
+- **BREAKING: machine JSON adopts the family v3 envelopes** - Update analysis consumers to accept `gruff.analysis.v3`, use one `findings[].file` path, read `score.composite.{score,grade}`, move ignore evidence under `paths`, read changed-region counts from `summary.suppressedFindings` and `diff.filteredFindings`, and read PHP-only trend, mutation, and review data from `extensions.php.topLevel`. `summary --format json` now emits `gruff.summary.v3`, the analysis document with only top-level `findings` removed. Finding identities, score values, baseline matching, action metadata, and exit decisions are unchanged. This coordinated pre-1.0 family break has no v2 writer or deprecation window so every port releases one machine contract.
 - **Every heuristic rule now documents where it misfires** - All 70 `medium` and `low` confidence rules carry `falsePositiveShapes`, each shape paired with the mitigation that answers it, so a surprising finding can be judged without reading the detector.
 - **`list-rules --format=json` publishes that guidance in the catalogue** - The full-list rows carry `falsePositiveShapes` alongside the per-rule detail view, which already did. The key is present only for rules that catalogue guidance, so an absent key means none is catalogued rather than none exists.
 - **BREAKING: default scans use the family fallback policy** - Non-VCS fallbacks now defer to any governing `.gitignore`, committed control metadata stays scannable, and explicit supported files bypass Git and fallback exclusions. PHP retains `.gruff-cache`, `.phpunit.cache`, and `var/cache`; eligible lockfiles are no longer dropped by filename, while VCS internals remain blocked.
@@ -15,11 +16,11 @@ Notable user-facing changes to `gruff-php` are listed here.
 - **An optional `symbol:` narrows an entry** - No sensitive-data rule stamps a symbol yet, so an entry carrying one matches nothing today and reports zero.
 - **Invalid entries stop the run with exit 2** - Wildcards, pillar names, unknown or non-sensitive rules, absolute/`..`/globbed paths, a missing reason, and a duplicated scope are all rejected by entry index and key.
 - **Message and value matching is rejected** - `message_contains`, `messageContains`, `value`, `preview`, and any other key fail, so a suppression can never be written against the secret itself.
-- **JSON reports gain a `suppressions` array** - One row per configured entry (`index`, `rule`, `paths`, `symbol`, `reason`, `suppressed`), present and empty when nothing is configured.
+- **JSON reports publish every suppression** - Analysis and summary v3 include one `{index, rule, paths, symbol?, reason, suppressed}` row per configured entry, present and empty when nothing is configured.
 - **Text reports state the suppression total** - A `Suppressed findings: N via ...` line names each entry and its reason, so a hidden finding is a number rather than an absence.
 - **Suppressed findings leave scoring and exit codes** - They are removed like accepted baseline debt; an entry matching nothing reports `suppressed: 0` instead of failing.
 - **`summary` applies sensitive exclusions** - The digest filters, counts, and scores the same findings `analyse` does, so its totals no longer disagree with the report it digests.
-- **`summary` text states the suppression total** - The same `Suppressed findings: N via ...` line prints below the digest, so the smaller count is accounted for. `--format json` filters without publishing a count; `gruff.summary.v2` has no field for it yet.
+- **`summary` publishes the full suppression audit** - Text prints the same `Suppressed findings: N via ...` line as `analyse`. JSON emits `gruff.summary.v3` with the same `suppressions` rows and `summary.suppressedFindings` count as the corresponding analysis run.
 
 ## 0.5.2 - 2026-08-16
 

@@ -6,7 +6,7 @@ namespace GruffPhp\Cli\Command;
 
 use GruffPhp\Engine\Analysis\SensitiveExclusionFilter;
 use GruffPhp\Engine\Analysis\SensitiveExclusionSummary;
-use GruffPhp\Engine\Analysis\RunDiagnostic;
+use GruffPhp\Engine\Analysis\AnalysisReport;
 use GruffPhp\Engine\Config\AnalysisConfig;
 use GruffPhp\Engine\Config\ConfigException;
 use GruffPhp\Engine\Config\ConfigLoader;
@@ -34,7 +34,7 @@ final class SummaryCommand extends Command
     /**
      * Schema identifier stamped on JSON output so tools can tell which summary shape they received.
      */
-    public const SCHEMA_VERSION = 'gruff.summary.v2';
+    public const SCHEMA_VERSION = AnalysisReport::SUMMARY_SCHEMA_VERSION;
 
     /**
      * Default number of top rules and offenders shown when the user does not pass `--top`.
@@ -143,6 +143,7 @@ final class SummaryCommand extends Command
                                    paths:                $this->paths($input),
                                    shouldIncludeIgnored: (bool)$input->getOption('include-ignored'),
                                    effectiveConfigPath:  $noConfig ? null : ($configPath ?? $configLoader->resolveConfigPath(null)),
+                                   format:               $format,
                                    config:               $config,
                                    registry:             $registry,
                                    topLimit:             $topLimit,
@@ -334,6 +335,7 @@ final class SummaryCommand extends Command
      * @param list<string>   $paths                - Project-relative paths requested by the summary command.
      * @param bool           $shouldIncludeIgnored - When true, scan ignored files via filesystem traversal instead of Git/default ignores.
      * @param string|null    $effectiveConfigPath  - Config path to echo in the report, or null when running without config.
+     * @param string         $format               - Output format recorded in canonical run metadata.
      * @param AnalysisConfig $config               - Resolved configuration driving rule selection and ignore patterns.
      * @param RuleRegistry   $registry             - Rule set executed against the discovered sources.
      * @param int            $topLimit             - Maximum rows kept for the top-rules and top-offenders lists.
@@ -345,6 +347,7 @@ final class SummaryCommand extends Command
         array          $paths,
         bool           $shouldIncludeIgnored,
         ?string        $effectiveConfigPath,
+        string         $format,
         AnalysisConfig $config,
         RuleRegistry   $registry,
         int            $topLimit,
@@ -368,12 +371,36 @@ final class SummaryCommand extends Command
         $exclusionResult = (new SensitiveExclusionFilter())->apply($findings, $config->sensitiveExclusions());
         $findings        = $exclusionResult->findings;
 
-        $score = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive(), $topLimit, analysisConfig: $config);
+        $score           = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive(), $topLimit, analysisConfig: $config);
+        $filesDiscovered = count($sources->discovery->files);
+        $analysisReport  = new AnalysisReport(
+            toolVersion:      Application::VERSION,
+            requestedPaths:   $paths,
+            format:           $format,
+            failOn:           'none',
+            filesDiscovered:  $filesDiscovered,
+            filesParsed:      $sources->parsedFileCount(),
+            ignoredPaths:     $sources->discovery->ignoredPaths,
+            missingPaths:     $sources->discovery->missingPaths,
+            diagnostics:      $sources->diagnostics,
+            findings:         $findings,
+            exitCode:         $this->summaryExitCode($sources->diagnostics),
+            configPath:       $effectiveConfigPath,
+            score:            $filesDiscovered === 0 ? null : $score,
+            sensitiveExclusions: $exclusionResult->summaries,
+            machineContext:    [
+                'ignoredPathDetails' => $sources->discovery->ignoredPathDetails,
+                'shouldIncludeIgnored' => $shouldIncludeIgnored,
+                'projectRoot' => $projectRoot,
+                'unfilteredFindings' => null,
+            ],
+        );
 
         return new SummaryReportData(
             paths:               $paths,
             configPath:          $effectiveConfigPath,
-            sourcesDiscovered:   count($sources->discovery->files),
+            analysisReport:      $analysisReport,
+            sourcesDiscovered:   $filesDiscovered,
             sourcesParsed:       $sources->parsedFileCount(),
             ignoredPaths:        count($sources->discovery->ignoredPaths),
             missingPaths:        count($sources->discovery->missingPaths),
@@ -411,7 +438,7 @@ final class SummaryCommand extends Command
                 return Command::FAILURE;
             }
 
-            return Command::SUCCESS;
+            return $summaryReportData->analysisReport->exitCode;
         }
 
         $output->write($this->renderText($summaryReportData));
@@ -525,6 +552,24 @@ final class SummaryCommand extends Command
         }
 
         return $count;
+    }
+
+    /**
+     * Derives the machine report's process status from diagnostics without applying a finding gate.
+     *
+     * @param list<\GruffPhp\Engine\Analysis\RunDiagnostic> $diagnostics - Run diagnostics whose fatal entries invalidate the summary.
+     *
+     * @return int - Invalid-command status for a fatal diagnostic, otherwise success.
+     */
+    private function summaryExitCode(array $diagnostics): int
+    {
+        foreach ($diagnostics as $diagnostic) {
+            if ($diagnostic->isFatal) {
+                return Command::INVALID;
+            }
+        }
+
+        return Command::SUCCESS;
     }
 
     /**
@@ -670,32 +715,11 @@ final class SummaryCommand extends Command
      */
     private function renderJson(SummaryReportData $summaryReportData): string
     {
-        $payload = [
-            'schemaVersion' => self::SCHEMA_VERSION,
-            'tool' => ['name' => Application::NAME, 'version' => Application::VERSION],
-            'scope' => [
-                'paths' => $summaryReportData->paths,
-                'configPath' => $summaryReportData->configPath,
-                'filesDiscovered' => $summaryReportData->sourcesDiscovered,
-                'filesParsed' => $summaryReportData->sourcesParsed,
-                'ignoredPaths' => $summaryReportData->ignoredPaths,
-                'missingPaths' => $summaryReportData->missingPaths,
-                'parseErrors' => $summaryReportData->parseErrors,
-                'scope' => $summaryReportData->score->scope,
-            ],
-            'composite' => $summaryReportData->score->composite->toArray(),
-            'findings' => $summaryReportData->totals,
-            'diagnostics' => array_map(
-                static fn (RunDiagnostic $diagnostic): array => $diagnostic->toArray(),
-                $summaryReportData->diagnostics,
-            ),
-            'pillars' => array_map(static fn($pillar): array => $pillar->toArray(), $summaryReportData->score->pillars),
-            'topRules' => $summaryReportData->topRules,
-            'topOffenders' => array_map(static fn($file): array => $file->toArray(), $summaryReportData->topOffenders),
-        ];
-
         // Invalid source bytes become U+FFFD so `summary --format json` always hands the user parseable JSON.
-        return json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR);
+        return json_encode(
+            $summaryReportData->analysisReport->toSummaryArray(),
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR,
+        );
     }
 
     /**

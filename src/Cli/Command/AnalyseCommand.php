@@ -261,7 +261,6 @@ final class AnalyseCommand extends Command
             filesDiscovered:          $filesDiscovered,
             filesParsed:              $sources->parsedFileCount(),
             ignoredPaths:             $sources->discovery->ignoredPaths,
-            ignoredPathDetails:       $sources->discovery->ignoredPathDetails,
             missingPaths:             $sources->discovery->missingPaths,
             diagnostics:              $diagnostics,
             findings:                 $displayFindings,
@@ -279,6 +278,12 @@ final class AnalyseCommand extends Command
             failureReason:            $failureReason,
             newFindingsCount:         $newFindingsCount,
             sensitiveExclusions:      $analysisRun['suppressions'],
+            machineContext:           [
+                'ignoredPathDetails' => $sources->discovery->ignoredPathDetails,
+                'shouldIncludeIgnored' => $options->shouldIncludeIgnored,
+                'projectRoot' => $projectRoot,
+                'unfilteredFindings' => $findings,
+            ],
         );
 
         $reportStart = hrtime(true);

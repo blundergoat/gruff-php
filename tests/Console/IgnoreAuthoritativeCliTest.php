@@ -61,12 +61,13 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         $report   = $this->decodeJsonOutput($process);
         $findings = $report['findings'];
+        $paths    = $this->decodedJsonObjectAt($report, 'paths');
         self::assertIsArray($findings);
         self::assertCount(0, $findings);
-        self::assertSame(['legacy/Bad.php'], $report['ignoredPaths']);
+        self::assertSame(['legacy/Bad.php'], $paths['ignoredPaths']);
         self::assertSame(
-            [['path' => 'legacy/Bad.php', 'source' => 'config', 'pattern' => 'legacy/**']],
-            $report['ignoredPathDetails'],
+            [['path' => 'legacy/Bad.php', 'reason' => 'config-ignore', 'source' => 'config', 'pattern' => 'legacy/**']],
+            $paths['details'],
         );
     }
 
@@ -84,9 +85,10 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         $report   = $this->decodeJsonOutput($process);
         $findings = $report['findings'];
+        $paths    = $this->decodedJsonObjectAt($report, 'paths');
         self::assertIsArray($findings);
         self::assertGreaterThan(0, count($findings));
-        self::assertSame([], $report['ignoredPathDetails']);
+        self::assertSame([], $paths['details']);
     }
 
     /**
@@ -103,9 +105,10 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         $report   = $this->decodeJsonOutput($process);
         $findings = $report['findings'];
+        $paths    = $this->decodedJsonObjectAt($report, 'paths');
         self::assertIsArray($findings);
         self::assertCount(0, $findings);
-        self::assertSame(['legacy/Bad.php'], $report['ignoredPaths']);
+        self::assertSame(['legacy/Bad.php'], $paths['ignoredPaths']);
     }
 
     /**
@@ -122,11 +125,12 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         $report   = $this->decodeJsonOutput($process);
         $findings = $report['findings'];
+        $paths    = $this->decodedJsonObjectAt($report, 'paths');
         self::assertIsArray($findings);
         self::assertCount(0, $findings);
         self::assertSame(
-            [['path' => 'legacy/Bad.php', 'source' => 'config', 'pattern' => 'legacy/**']],
-            $report['ignoredPathDetails'],
+            [['path' => 'legacy/Bad.php', 'reason' => 'config-ignore', 'source' => 'config', 'pattern' => 'legacy/**']],
+            $paths['details'],
         );
     }
 
@@ -170,9 +174,11 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
     {
         $analyse = $this->runGruff(['analyse', 'legacy/Bad.php', '--format', 'json', '--no-baseline', '--fail-on', 'none']);
         $analyse->run();
+        $analyseReport = $this->decodeJsonOutput($analyse);
+        $analysePaths  = $this->decodedJsonObjectAt($analyseReport, 'paths');
         self::assertSame(
-            [['path' => 'legacy/Bad.php', 'source' => 'config', 'pattern' => 'legacy/**']],
-            $this->decodeJsonOutput($analyse)['ignoredPathDetails'],
+            [['path' => 'legacy/Bad.php', 'reason' => 'config-ignore', 'source' => 'config', 'pattern' => 'legacy/**']],
+            $analysePaths['details'],
         );
 
         $checkIgnore = $this->runGruff(['check-ignore', '--format', 'json', 'legacy/Bad.php']);
@@ -250,7 +256,7 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
     /**
      * Write a fixture file, creating parent directories as needed.
      *
-     * @param string $path - Project-relative file path.
+     * @param string $path     - Project-relative file path.
      * @param string $contents - File contents.
      *
      * @return void

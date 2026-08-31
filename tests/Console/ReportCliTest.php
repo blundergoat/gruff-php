@@ -103,7 +103,7 @@ final class ReportCliTest extends CliTestCase
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
 
         $report = $this->decodeJsonOutput($process);
-        self::assertSame('gruff.analysis.v2', $report['schemaVersion'] ?? null);
+        self::assertSame('gruff.analysis.v3', $report['schemaVersion'] ?? null);
     }
 
     /** Verify report forwards the CLI budget and preserves its diagnostic. */
@@ -169,11 +169,11 @@ final class ReportCliTest extends CliTestCase
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput() . $process->getOutput());
 
         $report = $this->decodeJsonOutput($process);
-        self::assertSame('gruff.analysis.v2', $report['schemaVersion'] ?? null);
+        self::assertSame('gruff.analysis.v3', $report['schemaVersion'] ?? null);
         // --since forwarded: the child records an active diff block for the changed-region scan.
         $diff = $report['diff'] ?? null;
         self::assertIsArray($diff);
-        self::assertTrue($diff['active'] ?? null);
+        self::assertTrue($diff['enabled'] ?? null);
     }
 
     /**

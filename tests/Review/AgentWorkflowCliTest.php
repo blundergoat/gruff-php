@@ -73,10 +73,14 @@ final class AgentWorkflowCliTest extends TestCase
         $findings    = $this->arrayValue($summary, 'findings');
         $runMetadata = $this->arrayValue($report, 'run');
         $filters     = $this->arrayValue($runMetadata, 'filters');
+        $display     = $this->arrayValue($report, 'displayFilter');
         $score       = $this->arrayValue($report, 'score');
         $composite   = $this->arrayValue($score, 'composite');
+        $total       = $this->intValue($findings, 'total');
 
-        self::assertSame(0, $this->intValue($findings, 'total'));
+        self::assertSame([], $this->listValue($report, 'findings'));
+        self::assertGreaterThan(0, $total);
+        self::assertSame($total, $this->intValue($display, 'hiddenFindings'));
         self::assertTrue($filters['active'] ?? null);
         self::assertSame('warning', $this->stringValue($filters, 'minSeverity'));
         self::assertSame(['naming.identifier-quality'], $this->listValue($filters, 'includeRules'));
@@ -138,7 +142,7 @@ final class AgentWorkflowCliTest extends TestCase
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         $report = $this->decodeJson($process);
 
-        $files           = array_map(
+        $files = array_map(
             fn(mixed $findingValue): string => $this->stringValue($this->stringKeyedArray($findingValue), 'file'),
             $this->listValue($report, 'findings'),
         );
@@ -189,7 +193,7 @@ final class AgentWorkflowCliTest extends TestCase
 
             self::assertSame(0, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
             $report = $this->decodeJson($process);
-            $review = $this->arrayValue($report, 'review');
+            $review = $this->phpTopLevelExtension($report, 'review');
             $counts = $this->arrayValue($review, 'counts');
 
             self::assertSame('HEAD', $this->stringValue($review, 'base'));
@@ -272,7 +276,7 @@ final class AgentWorkflowCliTest extends TestCase
 
             self::assertSame(0, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
             $report = $this->decodeJson($process);
-            $review = $this->arrayValue($report, 'review');
+            $review = $this->phpTopLevelExtension($report, 'review');
             $counts = $this->arrayValue($review, 'counts');
 
             self::assertSame(0, $this->intValue($counts, 'introduced'));
@@ -322,7 +326,7 @@ final class AgentWorkflowCliTest extends TestCase
 
             self::assertSame(0, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
             $report = $this->decodeJson($process);
-            $review = $this->arrayValue($report, 'review');
+            $review = $this->phpTopLevelExtension($report, 'review');
             $counts = $this->arrayValue($review, 'counts');
 
             self::assertSame(0, $this->intValue($counts, 'introduced'));
@@ -376,7 +380,7 @@ final class AgentWorkflowCliTest extends TestCase
             $report = $this->decodeJson($process);
             self::assertSame([], $this->diagnosticTypes($report));
 
-            $review = $this->arrayValue($report, 'review');
+            $review = $this->phpTopLevelExtension($report, 'review');
             $counts = $this->arrayValue($review, 'counts');
 
             self::assertGreaterThanOrEqual(1, $this->intValue($counts, 'introduced'));
@@ -428,9 +432,9 @@ final class AgentWorkflowCliTest extends TestCase
             self::assertSame([], $this->diagnosticTypes($report));
 
             $summary = $this->arrayValue($report, 'summary');
-            self::assertSame(1, $this->intValue($summary, 'filesDiscovered'));
+            self::assertSame(1, $this->intValue($summary, 'discoveredFiles'));
 
-            $review = $this->arrayValue($report, 'review');
+            $review = $this->phpTopLevelExtension($report, 'review');
             $counts = $this->arrayValue($review, 'counts');
 
             self::assertSame(1, $this->intValue($counts, 'introduced'));
@@ -484,7 +488,7 @@ final class AgentWorkflowCliTest extends TestCase
             $report = $this->decodeJson($process);
             self::assertSame(['empty-analysis'], $this->diagnosticTypes($report));
 
-            $review = $this->arrayValue($report, 'review');
+            $review = $this->phpTopLevelExtension($report, 'review');
             $counts = $this->arrayValue($review, 'counts');
 
             self::assertGreaterThanOrEqual(1, $this->intValue($counts, 'removed'));
@@ -513,7 +517,7 @@ final class AgentWorkflowCliTest extends TestCase
             $explicitPathReport = $this->decodeJson($explicitPathProcess);
             self::assertSame(['empty-analysis'], $this->diagnosticTypes($explicitPathReport));
 
-            $explicitPathReview = $this->arrayValue($explicitPathReport, 'review');
+            $explicitPathReview = $this->phpTopLevelExtension($explicitPathReport, 'review');
             $explicitPathCounts = $this->arrayValue($explicitPathReview, 'counts');
 
             self::assertGreaterThanOrEqual(1, $this->intValue($explicitPathCounts, 'removed'));
@@ -603,7 +607,7 @@ final class AgentWorkflowCliTest extends TestCase
      * Read an associative array from decoded JSON output.
      *
      * @param array<string, mixed> $payload - Decoded JSON object containing the nested key under test.
-     * @param string               $key - key whose value must itself be a string-keyed array; missing key asserts.
+     * @param string               $key     - key whose value must itself be a string-keyed array; missing key asserts.
      *
      * @return array<string, mixed> - the nested JSON object at that key, ready for further key reads
      */
@@ -613,8 +617,25 @@ final class AgentWorkflowCliTest extends TestCase
     }
 
     /**
+     * Read a PHP-owned v3 top-level extension from decoded analysis output.
+     *
+     * @param array<string, mixed> $payload - Decoded v3 analysis document.
+     * @param string               $key     - PHP extension key to read.
+     *
+     * @return array<string, mixed> - Validated PHP extension object.
+     */
+    private function phpTopLevelExtension(array $payload, string $key): array
+    {
+        $extensions    = $this->arrayValue($payload, 'extensions');
+        $phpExtensions = $this->arrayValue($extensions, 'php');
+        $topLevel      = $this->arrayValue($phpExtensions, 'topLevel');
+
+        return $this->arrayValue($topLevel, $key);
+    }
+
+    /**
      * @param array<string, mixed> $payload - Decoded JSON object containing the integer key under test.
-     * @param string               $key - key whose value must be an int; a non-int (or missing) value fails the test.
+     * @param string               $key     - key whose value must be an int; a non-int (or missing) value fails the test.
      *
      * @return int - the value at that key, asserted to be an int so callers can use it without re-checking
      */
@@ -630,7 +651,7 @@ final class AgentWorkflowCliTest extends TestCase
      * Read a list from decoded JSON output.
      *
      * @param array<string, mixed> $payload - Decoded JSON object containing the list key under test.
-     * @param string               $key - key whose value must be a list; missing key resolves to null and asserts.
+     * @param string               $key     - key whose value must be a list; missing key resolves to null and asserts.
      *
      * @return list<mixed> - the JSON array at that key, reindexed to 0-based order
      */
@@ -641,7 +662,7 @@ final class AgentWorkflowCliTest extends TestCase
 
     /**
      * @param array<string, mixed> $payload - Decoded JSON object containing the string key under test.
-     * @param string               $key - key whose value must be a string; a non-string (or missing) value fails.
+     * @param string               $key     - key whose value must be a string; a non-string (or missing) value fails.
      *
      * @return string - the value at that key, asserted to be a string so callers can use it without re-checking
      */
@@ -743,7 +764,7 @@ final class AgentWorkflowCliTest extends TestCase
     /**
      * Run a Git command in a fixture repository.
      *
-     * @param string $cwd - Working directory.
+     * @param string $cwd  - Working directory.
      * @param string $args - Command arguments.
      *
      * @return void
