@@ -21,15 +21,18 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * Turns everything typed after `gruff-php analyse` into one validated setup object, or the first
- * usage or config error the invocation tripped.
+ * Turns everything typed after `gruff-php analyse` into one validated setup object, or the first usage or config error the
+ * invocation tripped.
  *
- * Every `analyse` run passes through here before a single file is scanned: it parses and
- * range-checks the flags (`--format`, `--fail-on`, `--mutation-budget`, `--include-rule`), rejects
- * contradictory pairs with a one-line message, offers to write a starter config on a first run,
- * then loads the project config and folds any CLI overrides into the final rule selection. A ready
- * result lets the command scan at once; an error result stops it and shows the user how to fix the
- * command instead of emitting a misleading report.
+ * Every `analyse` run passes through here before a single file is scanned:
+ *
+ * - parses and range-checks the flags (`--format`, `--fail-on`, `--mutation-budget`, `--include-rule`);
+ * - rejects contradictory pairs such as `--no-config` with `--config` in a one-line message;
+ * - offers to write a starter config the first time someone runs it in a project without one;
+ * - loads the project config and folds any CLI overrides into the final rule selection.
+ *
+ * A ready result lets the command scan at once. An error result stops it and shows how to fix the command rather than
+ * emitting a misleading report.
  */
 final readonly class AnalyseCommandSetupBuilder
 {
@@ -48,18 +51,122 @@ final readonly class AnalyseCommandSetupBuilder
         OutputInterface $output,
         ?SymfonyApplication $symfonyApplication,
     ): AnalyseCommandSetupResult {
-        $projectRoot = getcwd();
+        $launchDirectory = getcwd();
 
-        // Every scanned and reported path is resolved against the launch directory; if the shell can't
-        // name it (say it was deleted mid-session), stop rather than scan an unknown location.
-        if ($projectRoot === false) {
+        // The shell cannot name the current directory, which happens when it was deleted mid-session; stop rather than
+        // scan an unknown location.
+        if ($launchDirectory === false) {
             return AnalyseCommandSetupResult::plainError(
                 '<error>Unable to determine current working directory.</error>',
                 Command::FAILURE,
             );
         }
 
+        /** @var list<string> $requestedPaths */
+        $requestedPaths = (array) $input->getArgument('paths');
+        $projectRoot = self::projectRootFromTargets($launchDirectory, $requestedPaths);
+
+        // The caller named targets in unrelated projects, so there is no single root to report paths against.
+        if ($projectRoot === null) {
+            return AnalyseCommandSetupResult::plainError(
+                '<error>scan targets do not share a filesystem root</error>',
+                Command::INVALID,
+            );
+        }
+
         return $this->buildSetup($input, $output, $symfonyApplication, $projectRoot);
+    }
+
+    /**
+     * Pick the directory that every reported path is written relative to.
+     *
+     * Run `gruff-php analyse .` inside a project and the answer is that directory. Run `gruff-php analyse /srv/checkout`
+     * from a home directory, as CI and scripted scans do, and the answer is /srv/checkout, so findings still read
+     * `src/Controller/Api.php` rather than an absolute path.
+     *
+     * @param string       $launchDirectory - Working directory the command was started from.
+     * @param list<string> $paths           - Scan targets as typed on the command line; empty means no target was named, so the
+     *                                        launch directory is the project.
+     *
+     * @return string|null - Directory to treat as the project root; null when targets sit under different filesystem roots, such
+     *                       as `analyse /srv/api /opt/tools`, leaving no single project to report against.
+     */
+    private static function projectRootFromTargets(string $launchDirectory, array $paths): ?string
+    {
+        // No target was named, so the directory the command ran from is the project.
+        if ($paths === []) {
+            return $launchDirectory;
+        }
+
+        $common = null;
+        // Each target narrows the answer: the root must be a directory that contains all of them.
+        foreach ($paths as $path) {
+            $absolute = self::isAbsolutePath($path) ? $path : $launchDirectory . DIRECTORY_SEPARATOR . $path;
+            $resolved = realpath($absolute);
+            // The caller named a path that does not exist, such as a typo; discovery reports it as missing instead.
+            if ($resolved === false) {
+                continue;
+            }
+
+            // Naming one file means the project is the folder holding it, not the file itself.
+            $directory = is_dir($resolved) ? $resolved : dirname($resolved);
+
+            // The first target sets the starting answer; later ones can only widen it.
+            if ($common === null) {
+                $common = $directory;
+                continue;
+            }
+
+            while (!self::isSameOrDescendant($directory, $common)) {
+                $parent = dirname($common);
+                // Walking up hit the filesystem root, so these targets live in unrelated projects.
+                if ($parent === $common) {
+                    return null;
+                }
+                $common = $parent;
+            }
+        }
+
+        // Targets sit inside the launch directory, so it stays the root. Moving the root down to a target's own folder
+        // would re-anchor config discovery, ignore patterns, and baseline paths.
+        if ($common === null || self::isSameOrDescendant($common, $launchDirectory)) {
+            return $launchDirectory;
+        }
+
+        return $common;
+    }
+
+    /**
+     * Report whether a path already names a location on its own, so it needs no launch-directory prefix.
+     *
+     * @param string $path - Path as typed on the command line; empty is treated as relative.
+     *
+     * @return bool - True for a POSIX path such as /srv/app or a Windows path such as C:\app.
+     */
+    private static function isAbsolutePath(string $path): bool
+    {
+        return $path !== '' && ($path[0] === '/' || preg_match('#^[A-Za-z]:[\\\\/]#', $path) === 1);
+    }
+
+    /**
+     * Report whether one directory is another or sits inside it.
+     *
+     * Comparison is by whole path segment, so a sibling folder such as /work/apidocs is never mistaken for something
+     * inside /work/api.
+     *
+     * @param string $candidate - Directory being tested.
+     * @param string $ancestor  - Directory that may contain it.
+     *
+     * @return bool - True when candidate is the ancestor or sits inside it.
+     */
+    private static function isSameOrDescendant(string $candidate, string $ancestor): bool
+    {
+        // Identical paths need no segment work, and this is the common case for a single scan target.
+        if ($candidate === $ancestor) {
+            return true;
+        }
+
+        return str_starts_with($candidate, rtrim($ancestor, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR);
     }
 
     /**
@@ -235,12 +342,12 @@ final readonly class AnalyseCommandSetupBuilder
      * Works out the final rule set once `--include-rule`/`--exclude-rule` are in play, so the run
      * honours exactly what the user chose to focus on or drop.
      *
-     * Mirrors the hook command's selection refinement: --include-rule means "run
-     * only these ids", so it must narrow to exactly those rules because
-     * RuleSelection::allows() ORs tier/pillar/rule includes and inheriting the
-     * config's tiers/pillars would widen the focused run. A bare --exclude-rule
-     * keeps the configured selection and only drops the named rules, so a
-     * configured selection.rules narrowing is not widened to the whole rule set.
+     * Mirrors the hook command's selection refinement, and the two flags behave differently on purpose:
+     *
+     * - `--include-rule` means "run only these ids", so it narrows to exactly those rules. `RuleSelection::allows()` ORs
+     *   tier, pillar, and rule includes, so inheriting the config's tiers and pillars would widen the focused run.
+     * - A bare `--exclude-rule` keeps the configured selection and only drops the named rules, so a config that already
+     *   narrowed `selection.rules` is not widened back to the whole rule set.
      *
      * @param RuleSelection $existing     - Selection already resolved from config and profile.
      * @param list<string>  $includeRules - CLI --include-rule ids; when non-empty they focus the run.
@@ -294,7 +401,7 @@ final readonly class AnalyseCommandSetupBuilder
      * Shared with `ReportCommand` so both commands reject the same incoherent combinations with
      * identical wording, and report can do it before its own init prompt runs.
      *
-     * @param RuleRegistry                           $registry            - Registry resolving rule ids to their definitions; ids must already be validated.
+     * @param RuleRegistry                           $registry            - Resolves rule ids to definitions; ids must already be validated.
      * @param string                                 $profile             - Requested profile name, echoed into the error message.
      * @param list<\GruffPhp\Results\Finding\Pillar> $profileScorePillars - Pillars the profile's composite counts.
      * @param list<string>                           $includeRuleIds      - Requested --include-rule ids.
@@ -436,10 +543,12 @@ final readonly class AnalyseCommandSetupBuilder
      * Resolves the richer count-gate that decides the exit code, in precedence order the user controls:
      * an explicit CLI flag, then a `failureConditions:` config block, then the single resolved threshold.
      *
-     * An explicit `--fail-on` always wins (back-compat); otherwise an explicit
-     * `failureConditions:` block is used; otherwise the already-resolved singular
-     * threshold (config minimumSeverity or the binary default) is desugared so the
-     * gate stays byte-identical to today.
+     * Precedence, highest first:
+     *
+     * - an explicit `--fail-on` on the command line always wins, for backward compatibility;
+     * - otherwise an explicit `failureConditions:` block in the project config;
+     * - otherwise the already-resolved single threshold, from config `minimumSeverity` or the binary default, desugared
+     *   so the gate stays byte-identical to today.
      *
      * @param InputInterface $input         - Console input used for explicit-flag detection.
      * @param AnalysisConfig $config        - Loaded config supplying the optional failureConditions block.
