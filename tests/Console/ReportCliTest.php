@@ -106,7 +106,11 @@ final class ReportCliTest extends CliTestCase
         self::assertSame('gruff.analysis.v3', $report['schemaVersion'] ?? null);
     }
 
-    /** Verify report forwards the CLI budget and preserves its diagnostic. */
+    /**
+     * Verify report forwards the CLI budget and preserves its diagnostic.
+     *
+     * @return void
+     */
     public function testReportCommandForwardsDeepScanBudget(): void
     {
         $process = new Process([

@@ -128,7 +128,11 @@ final readonly class PhpFileParser
     /**
      * Describes a PHP file whose raw source crosses either structural-analysis bound.
      *
-     * @param array{enabled: bool, maxLines: int, maxBytes: int, override: string}|null $deepScanBudget
+     * @param SourceFile $file - Discovered file under consideration; a non-PHP source is never bounded.
+     * @param string $source - Raw contents, measured in lines and bytes against the budget.
+     * @param array{enabled: bool, maxLines: int, maxBytes: int, override: string}|null $deepScanBudget - Bounds in force, or null when the guard is off.
+     *
+     * @return ParseDiagnostic|null - Nonfatal note naming both counts and both limits; null while the file stays inside the budget.
      */
     public static function deepScanBudgetDiagnostic(
         SourceFile $file,

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace GruffPhp\Cli\Command;
 
+use GruffPhp\Results\Diff\ChangeScopeOptions;
+
 use GruffPhp\Results\Baseline\BaselineApplicationOptions;
 use GruffPhp\Results\Baseline\BaselineStore;
 use GruffPhp\Engine\Config\RuleSelection;
@@ -48,12 +50,7 @@ final readonly class AnalyseCommandOptions
      * @param bool                                                    $noCache                - Set by `--no-cache`; when true, the run ignores the on-disk cache and re-analyses every file.
      * @param string                                                  $profile                - The `--profile` value ('default' or 'security') deciding which rules run.
      * @param MutationAnalysisOptions                                 $mutation               - Parsed `--infection-*` and `--mutation-*` options driving mutation analysis.
-     * @param string|null                                             $diffMode               - Requested `--diff` mode, or null when `--diff` was not supplied so the full tree is analysed.
-     * @param string|null                                             $since                  - Git base ref from `--since`, or null when the user did not scope the run to changes since a ref.
-     * @param string|null                                             $changedRanges          - Explicit line ranges from `--changed-ranges`, or null when the user named none.
-     * @param string                                                  $changedScope           - How ranges expand to findings via `--changed-scope`: symbol, hunk, or file.
-     * @param string|null                                             $diffVs                 - Comparison ref from `--diff-vs`, or null when the user is not comparing against another ref.
-     * @param bool                                                    $isChangedOnly          - Set by `--changed-only`; when true, only files that changed versus `--diff-vs` are reported.
+     * @param ChangeScopeOptions                                      $changeScope            - The `--diff`, `--since`, `--changed-ranges`, `--changed-scope`, `--diff-vs`, and `--changed-only` choices that narrow the run.
      * @param string|null                                             $historyFile            - Trend-history file from `--history-file`, or null when the user is not recording a trend.
      * @param bool                                                    $noBaseline             - Set by `--no-baseline`; when true, no baseline loads so previously accepted debt surfaces again.
      * @param BaselineApplicationOptions                              $baseline               - Parsed `--baseline` and `--generate-baseline` options.
@@ -76,12 +73,7 @@ final readonly class AnalyseCommandOptions
         public bool                       $noCache,
         public string                     $profile,
         public MutationAnalysisOptions    $mutation,
-        public ?string                    $diffMode,
-        public ?string                    $since,
-        public ?string                    $changedRanges,
-        public string                     $changedScope,
-        public ?string                    $diffVs,
-        public bool                       $isChangedOnly,
+        public ChangeScopeOptions         $changeScope,
         public ?string                    $historyFile,
         public bool                       $noBaseline,
         public BaselineApplicationOptions $baseline,
@@ -173,12 +165,14 @@ final readonly class AnalyseCommandOptions
                                       mutationBaselinePath:          self::optionalStringOption($input, 'mutation-baseline'),
                                       mutationBudget:                null,
                                   ),
-            diffMode:      $diffMode,
-            since:         self::optionalStringOption($input, 'since'),
-            changedRanges: self::optionalStringOption($input, 'changed-ranges'),
-            changedScope:  self::optionalStringOption($input, 'changed-scope') ?? 'symbol',
-            diffVs:        self::optionalStringOption($input, 'diff-vs'),
-            isChangedOnly: (bool)$input->getOption('changed-only'),
+            changeScope:   new ChangeScopeOptions(
+                                      diffMode:      $diffMode,
+                                      since:         self::optionalStringOption($input, 'since'),
+                                      changedRanges: self::optionalStringOption($input, 'changed-ranges'),
+                                      changedScope:  self::optionalStringOption($input, 'changed-scope') ?? 'symbol',
+                                      diffVs:        self::optionalStringOption($input, 'diff-vs'),
+                                      isChangedOnly: (bool)$input->getOption('changed-only'),
+                                  ),
             historyFile:   self::optionalStringOption($input, 'history-file'),
             noBaseline:    (bool)$input->getOption('no-baseline'),
             baseline:      new BaselineApplicationOptions(
@@ -229,12 +223,7 @@ final readonly class AnalyseCommandOptions
                                       mutationBaselinePath:          $this->mutation->mutationBaselinePath,
                                       mutationBudget:                $mutationBudget,
                                   ),
-            diffMode:               $this->diffMode,
-            since:                  $this->since,
-            changedRanges:          $this->changedRanges,
-            changedScope:           $this->changedScope,
-            diffVs:                 $this->diffVs,
-            isChangedOnly:          $this->isChangedOnly,
+            changeScope:            $this->changeScope,
             historyFile:            $this->historyFile,
             noBaseline:             $this->noBaseline,
             baseline:               $this->baseline,
@@ -280,12 +269,7 @@ final readonly class AnalyseCommandOptions
             noCache:              $this->noCache,
             profile:              $this->profile,
             mutation:             $this->mutation,
-            diffMode:             $this->diffMode,
-            since:                $this->since,
-            changedRanges:        $this->changedRanges,
-            changedScope:         $this->changedScope,
-            diffVs:               $this->diffVs,
-            isChangedOnly:        $this->isChangedOnly,
+            changeScope:          $this->changeScope,
             historyFile:          $this->historyFile,
             noBaseline:           $this->noBaseline,
             baseline:             new BaselineApplicationOptions(
@@ -310,15 +294,17 @@ final readonly class AnalyseCommandOptions
      * Parses the family CLI shape: `off` disables the guard, otherwise `<lines>:<bytes>` replaces
      * both bounds atomically.
      *
+     * @param string|null $budgetOverride - Raw `--deep-scan-budget` text as typed; null when the flag was absent.
+     *
      * @return array{enabled: bool, maxLines: int, maxBytes: int}|string|null - Parsed override, usage error, or null when absent.
      */
-    public static function parseDeepScanBudgetOverride(?string $value): array|string|null
+    public static function parseDeepScanBudgetOverride(?string $budgetOverride): array|string|null
     {
-        if ($value === null) {
+        if ($budgetOverride === null) {
             return null;
         }
 
-        if ($value === 'off') {
+        if ($budgetOverride === 'off') {
             return [
                 'enabled' => false,
                 'maxLines' => 1,
@@ -326,7 +312,8 @@ final readonly class AnalyseCommandOptions
             ];
         }
 
-        if (preg_match('/^([1-9][0-9]*):([1-9][0-9]*)$/', $value, $matches) !== 1) {
+        // Both bounds must be positive integers joined by a colon; a partial or zero override is a usage error.
+        if (preg_match('/^([1-9][0-9]*):([1-9][0-9]*)$/', $budgetOverride, $matches) !== 1) {
             return '--deep-scan-budget must be <positive-lines>:<positive-bytes> or off.';
         }
 
@@ -456,9 +443,9 @@ final readonly class AnalyseCommandOptions
      */
     public function hasChangedRegionMode(): bool
     {
-        return $this->diffMode !== null
-               || $this->since !== null
-               || $this->changedRanges !== null;
+        return $this->changeScope->diffMode !== null
+               || $this->changeScope->since !== null
+               || $this->changeScope->changedRanges !== null;
     }
 
     /**
@@ -469,7 +456,7 @@ final readonly class AnalyseCommandOptions
      */
     public function usesChangedFilesForDiscovery(): bool
     {
-        return $this->diffMode !== null || $this->since !== null;
+        return $this->changeScope->diffMode !== null || $this->changeScope->since !== null;
     }
 
     /**
@@ -673,9 +660,9 @@ final readonly class AnalyseCommandOptions
     private function diffUsageError(): ?string
     {
         $changedModes = array_filter([
-                                         $this->diffMode,
-                                         $this->since,
-                                         $this->changedRanges,
+                                         $this->changeScope->diffMode,
+                                         $this->changeScope->since,
+                                         $this->changeScope->changedRanges,
                                      ], static fn(?string $mode): bool => $mode !== null);
 
         // Stacking two changed-region flags (say `--diff` and `--since`) is ambiguous, since each derives the region differently.
@@ -684,17 +671,17 @@ final readonly class AnalyseCommandOptions
         }
 
         // `--diff-vs` is its own comparison mode and cannot sit on top of a changed-region flag.
-        if ($this->diffVs !== null && $changedModes !== []) {
+        if ($this->changeScope->diffVs !== null && $changedModes !== []) {
             return '--diff, --since, --changed-ranges, and --diff-vs are mutually exclusive.';
         }
 
         // An unknown `--changed-scope` (e.g. `--changed-scope=line`) would silently mis-map ranges to findings, so refuse it.
-        if (!in_array($this->changedScope, ['symbol', 'hunk', 'file'], true)) {
+        if (!in_array($this->changeScope->changedScope, ['symbol', 'hunk', 'file'], true)) {
             return '--changed-scope must be one of: symbol, hunk, file.';
         }
 
         // `--changed-ranges` gives line spans, which mean nothing unless the user also names the file they belong to.
-        if ($this->changedRanges !== null && $this->paths === []) {
+        if ($this->changeScope->changedRanges !== null && $this->paths === []) {
             return '--changed-ranges requires at least one file path.';
         }
 
@@ -710,7 +697,7 @@ final readonly class AnalyseCommandOptions
     private function changedOnlyUsageError(): ?string
     {
         // Either the user didn't ask for changed-only, or they already supplied `--diff-vs`, so nothing is missing.
-        if (!$this->isChangedOnly || $this->diffVs !== null) {
+        if (!$this->changeScope->isChangedOnly || $this->changeScope->diffVs !== null) {
             return null;
         }
 

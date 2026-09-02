@@ -44,6 +44,9 @@ final readonly class MarkdownReporter
      * Adds every run diagnostic to the shareable document, including nonfatal bounded-scan notes.
      *
      * @param list<string> $lines - Markdown lines being built.
+     * @param AnalysisReport $report - Completed report whose run diagnostics are appended.
+     *
+     * @return void
      */
     private function appendDiagnostics(array &$lines, AnalysisReport $report): void
     {

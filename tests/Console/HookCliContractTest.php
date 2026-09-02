@@ -40,7 +40,11 @@ final class HookCliContractTest extends CliTestCase
         }
     }
 
-    /** Verify hook JSON keeps the bounded-scan diagnostic and sensitive-data findings. */
+    /**
+     * Verify hook JSON keeps the bounded-scan diagnostic and sensitive-data findings.
+     *
+     * @return void
+     */
     public function testHookReportsBoundedDeepScanWithoutInvalidatingRun(): void
     {
         [$process, $report] = $this->runHook(self::PROJECT_ROOT, [

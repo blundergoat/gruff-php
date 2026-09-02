@@ -46,7 +46,11 @@ final class PhpFileParserTest extends TestCase
         self::assertNotSame('', $unit->diagnostics[0]->message);
     }
 
-    /** Verify either bound degrades PHP to raw text without marking it unanalysed. */
+    /**
+     * Verify either bound degrades PHP to raw text without marking it unanalysed.
+     *
+     * @return void
+     */
     public function testDeepScanBudgetProducesNonfatalRawTextUnit(): void
     {
         $path = $this->fixturePath('mixed/alpha.php');
@@ -67,7 +71,11 @@ final class PhpFileParserTest extends TestCase
         self::assertStringContainsString('maxLines=1; maxBytes=1; override=cli', $unit->diagnostics[0]->message);
     }
 
-    /** Verify the guard is never applied to non-code text, even above both limits. */
+    /**
+     * Verify the guard is never applied to non-code text, even above both limits.
+     *
+     * @return void
+     */
     public function testDeepScanBudgetDoesNotApplyToTextSources(): void
     {
         $path = $this->fixturePath('mixed/alpha.php');

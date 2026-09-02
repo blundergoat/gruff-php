@@ -87,25 +87,42 @@ final class PathIgnoreResolverTest extends TestCase
     }
 
     /**
-     * Verify a built-in directory is reported as the default source and is bypassed by include-ignored.
+     * Verify a built-in directory is reported as ignored by the default source, naming the matched entry.
      *
      * @return void
      */
-    public function testDefaultDirectorySourceAndIncludeIgnoredBypass(): void
+    public function testDefaultDirectoryIsReportedAsTheDefaultSource(): void
     {
-        $resolver = new PathIgnoreResolver('/project');
+        $decision = (new PathIgnoreResolver('/project'))->decide('vendor/acme/V.php', '/project/vendor/acme/V.php', [], false);
 
-        $ignored = $resolver->decide('vendor/acme/V.php', '/project/vendor/acme/V.php', [], false);
-        self::assertTrue($ignored->ignored);
-        self::assertSame('default', $ignored->source);
-        self::assertSame('vendor', $ignored->pattern);
+        self::assertTrue($decision->ignored);
+        self::assertSame('default', $decision->source);
+        self::assertSame('vendor', $decision->pattern);
+    }
 
-        $included = $resolver->decide('vendor/acme/V.php', '/project/vendor/acme/V.php', [], true);
-        self::assertFalse($included->ignored);
+    /**
+     * Verify include-ignored scans a built-in directory that would otherwise be skipped.
+     *
+     * @return void
+     */
+    public function testIncludeIgnoredBypassesADefaultDirectory(): void
+    {
+        $decision = (new PathIgnoreResolver('/project'))->decide('vendor/acme/V.php', '/project/vendor/acme/V.php', [], true);
 
-        $vcs = $resolver->decide('.git/config', '/project/.git/config', [], true, true);
-        self::assertTrue($vcs->ignored);
-        self::assertSame('.git', $vcs->pattern);
+        self::assertFalse($decision->ignored);
+    }
+
+    /**
+     * Verify VCS internals stay blocked even under include-ignored, which never reaches them.
+     *
+     * @return void
+     */
+    public function testVcsInternalsStayBlockedUnderIncludeIgnored(): void
+    {
+        $decision = (new PathIgnoreResolver('/project'))->decide('.git/config', '/project/.git/config', [], true, true);
+
+        self::assertTrue($decision->ignored);
+        self::assertSame('.git', $decision->pattern);
     }
 
     /**

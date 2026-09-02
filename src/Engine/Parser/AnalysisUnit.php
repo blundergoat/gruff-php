@@ -55,6 +55,8 @@ final class AnalysisUnit
 
     /**
      * Reports whether structural work was bounded while raw-text analysis remained available.
+     *
+     * @return bool - True once a bounded-deep-scan diagnostic was recorded against this unit.
      */
     public function isDeepScanBounded(): bool
     {

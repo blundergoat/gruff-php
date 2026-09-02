@@ -62,7 +62,7 @@ final readonly class AnalyseCommandSetupBuilder
             );
         }
 
-        /** @var list<string> $requestedPaths */
+        /** @var list<string> $requestedPaths - Path operands exactly as typed, before any root resolution. */
         $requestedPaths = (array) $input->getArgument('paths');
         $projectRoot = self::projectRootFromTargets($launchDirectory, $requestedPaths);
 
@@ -145,6 +145,7 @@ final readonly class AnalyseCommandSetupBuilder
      */
     private static function isAbsolutePath(string $path): bool
     {
+        // A Windows absolute path is a drive letter, a colon, then either slash: C:\app or C:/app.
         return $path !== '' && ($path[0] === '/' || preg_match('#^[A-Za-z]:[\\\\/]#', $path) === 1);
     }
 
@@ -608,7 +609,7 @@ final readonly class AnalyseCommandSetupBuilder
         $baselineWillApply = $options->baseline->baselinePath !== null && $options->baseline->generateBaselinePath === null;
         // A baseline will apply, or `--diff-vs` names a ref to compare against, so "new" has a concrete
         // meaning and the gate is well-formed.
-        if ($baselineWillApply || $options->diffVs !== null) {
+        if ($baselineWillApply || $options->changeScope->diffVs !== null) {
             return null;
         }
 

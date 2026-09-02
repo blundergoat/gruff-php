@@ -90,7 +90,7 @@ final class SummaryCommand extends Command
             return Command::INVALID;
         }
 
-        $configPath = $this->configPath($input);
+        $configPath = $this->configPathOption($input, 'config');
         $noConfig   = (bool)$input->getOption('no-config');
         // The user both named a config and asked to skip config; obeying one would silently ignore the other.
         if ($this->hasConfigConflict($noConfig, $configPath, $output)) {
@@ -220,19 +220,13 @@ final class SummaryCommand extends Command
     }
 
     /**
-     * Resolves the user's `--config` flag to a concrete path or "none given", which decides whether
-     * the default config is auto-discovered later.
+     * Reads one non-empty string option without coercing other input shapes.
      *
-     * @param InputInterface $input - Console input carrying the optional --config value.
+     * @param InputInterface $input - Parsed console input for this run.
+     * @param string $name - Option name to read, such as `config`.
      *
-     * @return string|null - Explicit config path; null when no `--config` was given, so the default `.gruff-php.yaml` is used.
+     * @return string|null - The option's text; null when it was omitted or left blank.
      */
-    private function configPath(InputInterface $input): ?string
-    {
-        return $this->configPathOption($input, 'config');
-    }
-
-    /** Reads one non-empty string option without coercing other input shapes. */
     private function configPathOption(InputInterface $input, string $name): ?string
     {
         $configPath = $input->getOption($name);
@@ -608,81 +602,12 @@ final class SummaryCommand extends Command
         $lines[] = sprintf('Scope     %s', $summaryReportData->score->scope);
         $lines[] = sprintf('Score note %s', $summaryReportData->score->explanation);
 
-        if ($summaryReportData->diagnostics !== []) {
-            $lines[] = '';
-            $lines[] = 'Diagnostics';
-            foreach ($summaryReportData->diagnostics as $diagnostic) {
-                $location = $diagnostic->filePath ?? $diagnostic->path;
-                if ($location !== null && $diagnostic->filePath !== null && $diagnostic->line !== null) {
-                    $location .= ':' . $diagnostic->line;
-                }
-                $lines[] = $location === null
-                    ? sprintf('  [%s] %s', strtoupper($diagnostic->type), $diagnostic->message)
-                    : sprintf('  [%s] %s %s', strtoupper($diagnostic->type), $location, $diagnostic->message);
-            }
-        }
+        array_push($lines, ...$this->diagnosticLines($summaryReportData));
         $lines[] = '';
         $lines[] = 'Pillars';
-
-        $sortedPillars = $summaryReportData->score->pillars;
-        usort($sortedPillars, static function ($left, $right): int {
-            return $right->findings <=> $left->findings;
-        });
-
-        $pillarWidth = $this->columnWidth(array_map(static fn($pillar): string => $pillar->pillar, $sortedPillars), 14);
-        // One aligned row per pillar (naming, complexity, security, …) - the grades users scan first.
-        foreach ($sortedPillars as $pillar) {
-            $grade = $pillar->grade === null ? 'n/a' : $pillar->grade->letter;
-            // A pillar with no applicable rules has no grade, so show "n/a" rather than a misleading zero.
-            $scoreText = $pillar->grade === null ? '  n/a ' : sprintf('%6.2f', $pillar->grade->score);
-            $lines[]   = sprintf(
-                '  %-' . $pillarWidth . 's %s %s findings=%-5d advisory=%-5d warning=%-5d error=%-5d',
-                $pillar->pillar,
-                $grade,
-                $scoreText,
-                $pillar->findings,
-                $pillar->advisory,
-                $pillar->warning,
-                $pillar->error,
-            );
-        }
-
-        // Print the "top rules" block only when something actually fired; on clean code it would just be clutter.
-        if ($summaryReportData->topRules !== []) {
-            $lines[] = '';
-            $lines[] = sprintf('Top %d rules by finding count', count($summaryReportData->topRules));
-            $idWidth = $this->columnWidth(array_map(static fn(array $ruleSummary): string => $ruleSummary['ruleId'], $summaryReportData->topRules), 30);
-            foreach ($summaryReportData->topRules as $ruleSummary) {
-                $lines[] = sprintf(
-                    '  %5d  %-' . $idWidth . 's  %s  a=%d w=%d e=%d',
-                    $ruleSummary['count'],
-                    $ruleSummary['ruleId'],
-                    $ruleSummary['pillar'],
-                    $ruleSummary['advisory'],
-                    $ruleSummary['warning'],
-                    $ruleSummary['error'],
-                );
-            }
-        }
-
-        // Likewise, rank the worst files only when there are findings to rank; no findings means no offenders.
-        if ($summaryReportData->topOffenders !== []) {
-            $lines[]   = '';
-            $lines[]   = sprintf('Top %d file offenders', count($summaryReportData->topOffenders));
-            $fileWidth = $this->columnWidth(array_map(static fn($file): string => $file->filePath, $summaryReportData->topOffenders), 30);
-            foreach ($summaryReportData->topOffenders as $file) {
-                $lines[] = sprintf(
-                    '  %s  %6.2f  %-' . $fileWidth . 's  findings=%-4d a=%d w=%d e=%d',
-                    $file->grade->letter,
-                    $file->grade->score,
-                    $file->filePath,
-                    $file->findings,
-                    $file->advisory,
-                    $file->warning,
-                    $file->error,
-                );
-            }
-        }
+        array_push($lines, ...$this->pillarLines($summaryReportData));
+        array_push($lines, ...$this->topRuleLines($summaryReportData));
+        array_push($lines, ...$this->topOffenderLines($summaryReportData));
 
         // With findings on the board, point the user at the baseline workflow for accepting known debt.
         if ($summaryReportData->totals['total'] > 0) {
@@ -702,6 +627,130 @@ final class SummaryCommand extends Command
         }
 
         return implode(PHP_EOL, $lines) . PHP_EOL;
+    }
+
+    /**
+     * Renders the run-diagnostic block, which reports notes such as a bounded deep scan or a parse failure.
+     *
+     * @param SummaryReportData $summaryReportData - Aggregated run data carrying the diagnostics to print.
+     *
+     * @return list<string> - Heading and one indented row per diagnostic; empty when the run raised none.
+     */
+    private function diagnosticLines(SummaryReportData $summaryReportData): array
+    {
+        if ($summaryReportData->diagnostics === []) {
+            return [];
+        }
+
+        $lines = ['', 'Diagnostics'];
+        foreach ($summaryReportData->diagnostics as $diagnostic) {
+            $location = $diagnostic->filePath ?? $diagnostic->path;
+            if ($location !== null && $diagnostic->filePath !== null && $diagnostic->line !== null) {
+                $location .= ':' . $diagnostic->line;
+            }
+            $lines[] = $location === null
+                ? sprintf('  [%s] %s', strtoupper($diagnostic->type), $diagnostic->message)
+                : sprintf('  [%s] %s %s', strtoupper($diagnostic->type), $location, $diagnostic->message);
+        }
+
+        return $lines;
+    }
+
+    /**
+     * Renders one aligned row per pillar, worst first, which is the block users scan before anything else.
+     *
+     * @param SummaryReportData $summaryReportData - Aggregated run data carrying the scored pillars.
+     *
+     * @return list<string> - One row per pillar, ordered by finding count.
+     */
+    private function pillarLines(SummaryReportData $summaryReportData): array
+    {
+        $sortedPillars = $summaryReportData->score->pillars;
+        usort($sortedPillars, static function ($left, $right): int {
+            return $right->findings <=> $left->findings;
+        });
+
+        $pillarWidth = $this->columnWidth(array_map(static fn($pillar): string => $pillar->pillar, $sortedPillars), 14);
+        $lines       = [];
+        // One aligned row per pillar (naming, complexity, security, …) - the grades users scan first.
+        foreach ($sortedPillars as $pillar) {
+            $grade = $pillar->grade === null ? 'n/a' : $pillar->grade->letter;
+            // A pillar with no applicable rules has no grade, so show "n/a" rather than a misleading zero.
+            $scoreText = $pillar->grade === null ? '  n/a ' : sprintf('%6.2f', $pillar->grade->score);
+            $lines[]   = sprintf(
+                '  %-' . $pillarWidth . 's %s %s findings=%-5d advisory=%-5d warning=%-5d error=%-5d',
+                $pillar->pillar,
+                $grade,
+                $scoreText,
+                $pillar->findings,
+                $pillar->advisory,
+                $pillar->warning,
+                $pillar->error,
+            );
+        }
+
+        return $lines;
+    }
+
+    /**
+     * Renders the highest-volume rules, so a user can see which single rule accounts for most of the run.
+     *
+     * @param SummaryReportData $summaryReportData - Aggregated run data carrying the ranked rules.
+     *
+     * @return list<string> - Heading and one row per ranked rule; empty on clean code, where the block would be clutter.
+     */
+    private function topRuleLines(SummaryReportData $summaryReportData): array
+    {
+        if ($summaryReportData->topRules === []) {
+            return [];
+        }
+
+        $lines   = ['', sprintf('Top %d rules by finding count', count($summaryReportData->topRules))];
+        $idWidth = $this->columnWidth(array_map(static fn(array $ruleSummary): string => $ruleSummary['ruleId'], $summaryReportData->topRules), 30);
+        foreach ($summaryReportData->topRules as $ruleSummary) {
+            $lines[] = sprintf(
+                '  %5d  %-' . $idWidth . 's  %s  a=%d w=%d e=%d',
+                $ruleSummary['count'],
+                $ruleSummary['ruleId'],
+                $ruleSummary['pillar'],
+                $ruleSummary['advisory'],
+                $ruleSummary['warning'],
+                $ruleSummary['error'],
+            );
+        }
+
+        return $lines;
+    }
+
+    /**
+     * Renders the lowest-scoring files, so a user knows where to start reading.
+     *
+     * @param SummaryReportData $summaryReportData - Aggregated run data carrying the ranked files.
+     *
+     * @return list<string> - Heading and one row per ranked file; empty when no findings means no offenders.
+     */
+    private function topOffenderLines(SummaryReportData $summaryReportData): array
+    {
+        if ($summaryReportData->topOffenders === []) {
+            return [];
+        }
+
+        $lines     = ['', sprintf('Top %d file offenders', count($summaryReportData->topOffenders))];
+        $fileWidth = $this->columnWidth(array_map(static fn($file): string => $file->filePath, $summaryReportData->topOffenders), 30);
+        foreach ($summaryReportData->topOffenders as $file) {
+            $lines[] = sprintf(
+                '  %s  %6.2f  %-' . $fileWidth . 's  findings=%-4d a=%d w=%d e=%d',
+                $file->grade->letter,
+                $file->grade->score,
+                $file->filePath,
+                $file->findings,
+                $file->advisory,
+                $file->warning,
+                $file->error,
+            );
+        }
+
+        return $lines;
     }
 
     /**

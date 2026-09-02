@@ -161,7 +161,7 @@ final class AnalyseCommand extends Command
         $config        = $setup->config;
         $registry      = $setup->registry;
         $diagnostics   = [];
-        $reviewDiff    = $this->buildDiffResult($projectRoot, $options->diffVs, $diagnostics);
+        $reviewDiff    = $this->buildDiffResult($projectRoot, $options->changeScope->diffVs, $diagnostics);
         $diff          = $this->buildChangedDiffResult($projectRoot, $options, $diagnostics);
         $analysisPaths = $this->currentAnalysisPaths($projectRoot, $options, $reviewDiff, $diff);
         $discoverStart = hrtime(true);
@@ -203,7 +203,7 @@ final class AnalyseCommand extends Command
         // A changed-region scope is active, so keep only findings inside the user's changed lines.
         // The suppressed count explains how many otherwise-visible findings were outside that scope.
         if ($diff instanceof DiffResult && $diff->active) {
-            $diffFilterResult = (new DiffFindingFilter())->apply($findings, $diff, $sources->analysisUnits, $options->changedScope);
+            $diffFilterResult = (new DiffFindingFilter())->apply($findings, $diff, $sources->analysisUnits, $options->changeScope->changedScope);
             $findings         = $diffFilterResult->findings;
             $suppressedCount  = $diffFilterResult->suppressedCount;
             $diff             = $diff->withSuppressedCount($suppressedCount);
@@ -215,7 +215,7 @@ final class AnalyseCommand extends Command
             findings:        $findings,
             diff:            $diff,
             diagnostics:     $diagnostics,
-            hasPartialScope: $options->diffVs !== null && $options->isChangedOnly,
+            hasPartialScope: $options->changeScope->diffVs !== null && $options->changeScope->isChangedOnly,
         );
         $findings = $findingSupport->normalizeFindingPaths($findings, $options->pathsRelativeTo);
 
@@ -224,11 +224,11 @@ final class AnalyseCommand extends Command
         $scoreNs    = hrtime(true) - $scoreStart;
         // Without `--diff-vs`, review covers the whole run.
         // With a base ref, mutation findings are excluded so the branch verdict reflects only comparable rules.
-        $reviewFindings = $options->diffVs === null ? $findings : array_values(array_filter(
+        $reviewFindings = $options->changeScope->diffVs === null ? $findings : array_values(array_filter(
                                                                                    $findings,
                                                                                    static fn(Finding $finding): bool => $finding->pillar !== Pillar::Mutation,
                                                                                ));
-        $reviewScore = $options->diffVs === null
+        $reviewScore = $options->changeScope->diffVs === null
             ? $score->composite->score
             : (new ScoreCalculator())->calculate($reviewFindings, null, null, scorePillars: $options->profileScorePillars(), analysisConfig: $config)->composite->score;
         $review = $branchReviewBuilder->build(
@@ -455,17 +455,17 @@ final class AnalyseCommand extends Command
     private function buildChangedDiffResult(string $projectRoot, AnalyseCommandOptions $options, array &$diagnostics): ?DiffResult
     {
         // `--changed-ranges` takes precedence: the user spelled out exact line ranges, so trust those rather than asking Git.
-        if ($options->changedRanges !== null) {
+        if ($options->changeScope->changedRanges !== null) {
             return $this->buildExplicitRangesDiffResult($projectRoot, $options, $diagnostics);
         }
 
         // `--since=<ref>` scopes the run to whatever changed against that base ref, for example `--since=main`.
-        if ($options->since !== null) {
-            return $this->buildDiffResult($projectRoot, $options->since, $diagnostics);
+        if ($options->changeScope->since !== null) {
+            return $this->buildDiffResult($projectRoot, $options->changeScope->since, $diagnostics);
         }
 
         // `--diff=-` reads a unified patch from stdin, as in `git diff | gruff-php analyse --diff=-`.
-        if ($options->diffMode === '-') {
+        if ($options->changeScope->diffMode === '-') {
             $patch = stream_get_contents(STDIN);
             // `false` means the piped patch could not be read, so no diff scope exists.
             // An empty or closed pipe returns `''` and correctly parses as an empty patch.
@@ -491,7 +491,7 @@ final class AnalyseCommand extends Command
         }
 
         // A bare or ref-valued `--diff` falls through to Git for the selected staged, unstaged, working-tree, or base-ref comparison.
-        return $this->buildDiffResult($projectRoot, $options->diffMode, $diagnostics);
+        return $this->buildDiffResult($projectRoot, $options->changeScope->diffMode, $diagnostics);
     }
 
     /**
@@ -519,7 +519,7 @@ final class AnalyseCommand extends Command
         }
 
         try {
-            $ranges = $this->parseChangedRanges($options->changedRanges ?? '');
+            $ranges = $this->parseChangedRanges($options->changeScope->changedRanges ?? '');
         } catch (DiffException $exception) {
             // A user may type an inverted or malformed range such as `8-3`; report the option error instead of scanning an unintended scope.
             $diagnostics[] = new RunDiagnostic(
@@ -612,7 +612,7 @@ final class AnalyseCommand extends Command
     ): ?array {
         // A changed-only review with no resolved base diff has no file list.
         // Return "scan nothing" instead of surprising the user with a whole-project scan.
-        if ($options->isChangedOnly && $options->paths === [] && $reviewDiff === null) {
+        if ($options->changeScope->isChangedOnly && $options->paths === [] && $reviewDiff === null) {
             return null;
         }
 
@@ -645,7 +645,7 @@ final class AnalyseCommand extends Command
 
         // Outside changed-only review, scan exactly the paths the user named.
         // An empty path list means the user requested the whole project.
-        if (!$options->isChangedOnly || $options->paths !== []) {
+        if (!$options->changeScope->isChangedOnly || $options->paths !== []) {
             return $options->paths;
         }
 
@@ -678,7 +678,7 @@ final class AnalyseCommand extends Command
         ?DiffResult           $reviewDiff,
     ): array {
         // Outside a changed-only review there is no narrower scope to apply, so hand back every diagnostic untouched.
-        if (!$options->isChangedOnly || !$reviewDiff instanceof DiffResult || $reviewDiff->changedFiles === []) {
+        if (!$options->changeScope->isChangedOnly || !$reviewDiff instanceof DiffResult || $reviewDiff->changedFiles === []) {
             return $diagnostics;
         }
 
@@ -797,7 +797,7 @@ final class AnalyseCommand extends Command
         ?DiffResult $reviewDiff,
         AnalysisFindingSupport $findingSupport,
     ): array {
-        if ($options->diffVs === null || !$options->isChangedOnly || !$reviewDiff instanceof DiffResult) {
+        if ($options->changeScope->diffVs === null || !$options->changeScope->isChangedOnly || !$reviewDiff instanceof DiffResult) {
             return $findings;
         }
 

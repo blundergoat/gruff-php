@@ -86,6 +86,18 @@ sensitiveExclusions:
     - rule: sensitive-data.high-entropy-string
       path: tests/Rule/RuleRegressionSnapshotTest.php
       reason: Snapshot digest of the fixture-corpus report; a hex SHA-256, not a credential.
+    # npm records one integrity digest per resolved package. They are base64 SHA-512 checksums of
+    # published tarballs, high-entropy by construction and carrying no secret. The lockfile is excluded
+    # here rather than by lowering the entropy threshold, which would weaken the detector for real
+    # source. A rule-level lockfile guard is a family question and stays in backlog.md.
+    - rule: sensitive-data.high-entropy-string
+      path: package-lock.json
+      reason: npm integrity digests over published tarballs; checksums, not credentials.
+    # The literal is a synthetic AWS-shaped identifier asserting that a warm cache entry is not reused
+    # when the deep-scan budget changes. It has never been a live credential and is not derived from one.
+    - rule: sensitive-data.aws-access-key
+      path: tests/Console/ResultCacheCliTest.php
+      reason: Synthetic AWS-shaped fixture pinning cache identity across a budget change; not a live credential.
 rules:
     # Cognitive complexity
     complexity.cognitive:

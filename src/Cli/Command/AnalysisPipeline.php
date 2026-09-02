@@ -14,7 +14,9 @@ use GruffPhp\Cli\Application;
 use GruffPhp\Results\Diff\DiffResult;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Engine\Parser\AnalysisUnit;
+use GruffPhp\Engine\Parser\ParseDiagnostic;
 use GruffPhp\Engine\Parser\PhpFileParser;
+use GruffPhp\Engine\Source\SourceFile;
 use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Size\SubstantiveLineCounter;
 use GruffPhp\Rules\Contracts\RuleContext;
@@ -219,7 +221,7 @@ final class AnalysisPipeline
         return ($reviewDiff === null || !$reviewDiff->active)
                && !$options->hasChangedRegionMode()
                && !$hasNarrowProjectRuleContext
-               && $options->diffVs === null
+               && $options->changeScope->diffVs === null
                && $this->registry->supportsStreaming($ruleContext);
     }
 
@@ -285,39 +287,19 @@ final class AnalysisPipeline
         // Walk the discovered files one at a time; this loop is where each file the user asked to scan is
         // parsed, checked, and then dropped so memory never holds more than the file in hand.
         foreach ($discoveryResult->files as $file) {
-            $cacheKey               = null;
-            $cachedBudgetDiagnostic = null;
             // With the cache live and the file readable, try to reuse a previous run's findings for it instead
             // of parsing again - this is what makes a warm re-scan of unchanged code feel instant.
-            if ($cache instanceof ResultCache && $fingerprint instanceof AnalysisFingerprint && is_readable($file->absolutePath)) {
-                $contents = file_get_contents($file->absolutePath);
-                // Only a successful read gives us bytes to fingerprint; a file that could not be read falls
-                // through to a normal parse below rather than a cache lookup.
-                if (is_string($contents)) {
-                    $cachedBudgetDiagnostic = PhpFileParser::deepScanBudgetDiagnostic(
-                        $file,
-                        $contents,
-                        $config->deepScanBudget(),
-                    );
-                    $cacheKey       = $fingerprint->forFile($file->displayPath, $contents);
-                    $cachedFindings = $cache->get($cacheKey);
-                    // A stored entry means this exact file content was scanned before, so replay its findings,
-                    // count it as parsed, and skip straight to the next file without re-running any rule.
-                    if ($cachedFindings !== null) {
-                        array_push($findings, ...$cachedFindings);
-                        if ($cachedBudgetDiagnostic !== null) {
-                            $sourceDiagnostics[] = new RunDiagnostic(
-                                type:     $cachedBudgetDiagnostic->type,
-                                message:  $cachedBudgetDiagnostic->message,
-                                filePath: $file->displayPath,
-                                line:     $cachedBudgetDiagnostic->line,
-                                isFatal:  $cachedBudgetDiagnostic->isFatal,
-                            );
-                        }
-                        $parsedCount++;
-                        continue;
-                    }
+            $cached = self::lookUpCachedFile($file, $cache, $fingerprint, $config);
+
+            // A stored entry means this exact file content was scanned before, so replay its findings,
+            // count it as parsed, and skip straight to the next file without re-running any rule.
+            if ($cached['findings'] !== null) {
+                array_push($findings, ...$cached['findings']);
+                if ($cached['budgetDiagnostic'] !== null) {
+                    $sourceDiagnostics[] = self::runDiagnosticFor($cached['budgetDiagnostic'], $file);
                 }
+                $parsedCount++;
+                continue;
             }
 
             $unit = $phpFileParser->parse($file, $config->deepScanBudget());
@@ -329,21 +311,15 @@ final class AnalysisPipeline
             // Turn each parser complaint into a run diagnostic so a syntactically broken file surfaces to the
             // user as a reported parse error instead of silently vanishing from the results.
             foreach ($unit->diagnostics as $diagnostic) {
-                $sourceDiagnostics[] = new RunDiagnostic(
-                    type:     $diagnostic->type,
-                    message:  $diagnostic->message,
-                    filePath: $file->displayPath,
-                    line:     $diagnostic->line,
-                    isFatal:  $diagnostic->isFatal,
-                );
+                $sourceDiagnostics[] = self::runDiagnosticFor($diagnostic, $file);
             }
 
             $unitFindings = $this->registry->analyseUnit($unit, $ruleContext, $ruleRunnerObserver);
             array_push($findings, ...$unitFindings);
             // Store the freshly computed findings only for a clean parse, so the next run over unchanged code
             // can reuse them; a broken file's partial results are never cached.
-            if ($cache instanceof ResultCache && $cacheKey !== null && !$unit->hasParseErrors()) {
-                $cache->put($cacheKey, $unitFindings);
+            if ($cache instanceof ResultCache && $cached['key'] !== null && !$unit->hasParseErrors()) {
+                $cache->put($cached['key'], $unitFindings);
             }
             NodeIndex::evictUnit($unit);
             SubstantiveLineCounter::evictUnit($unit);
@@ -366,6 +342,69 @@ final class AnalysisPipeline
             'analyseNs' => $analyseNs,
             'projectContextUnits' => [],
         ];
+    }
+
+    /**
+     * Looks one discovered file up in the per-run result cache before it is parsed.
+     *
+     * The key is returned on a miss as well as a hit, because the caller needs it again to store the findings
+     * it is about to compute. A file that cannot be read, or a run with the cache off, simply reports a miss and
+     * falls through to a normal parse.
+     *
+     * @param SourceFile               $file        - Discovered file about to be analysed.
+     * @param ResultCache|null         $cache       - Live store for this run; null when the run is uncacheable.
+     * @param AnalysisFingerprint|null $fingerprint - Run identity the file key is derived from; null with no cache.
+     * @param AnalysisConfig           $config      - Effective config supplying the deep-scan budget.
+     *
+     * @return array{key: string|null, findings: list<Finding>|null, budgetDiagnostic: ParseDiagnostic|null} - Cache
+     *     key when one could be computed, stored findings on a hit and null on a miss, and any bounded-deep-scan
+     *     note the replayed file would have reported.
+     */
+    private static function lookUpCachedFile(
+        SourceFile           $file,
+        ?ResultCache         $cache,
+        ?AnalysisFingerprint $fingerprint,
+        AnalysisConfig       $config,
+    ): array {
+        $miss = ['key' => null, 'findings' => null, 'budgetDiagnostic' => null];
+
+        if (!$cache instanceof ResultCache || !$fingerprint instanceof AnalysisFingerprint || !is_readable($file->absolutePath)) {
+            return $miss;
+        }
+
+        $contents = file_get_contents($file->absolutePath);
+        // Only a successful read gives us bytes to fingerprint; a file that could not be read falls
+        // through to a normal parse rather than a cache lookup.
+        if (!is_string($contents)) {
+            return $miss;
+        }
+
+        $cacheKey = $fingerprint->forFile($file->displayPath, $contents);
+
+        return [
+            'key' => $cacheKey,
+            'findings' => $cache->get($cacheKey),
+            'budgetDiagnostic' => PhpFileParser::deepScanBudgetDiagnostic($file, $contents, $config->deepScanBudget()),
+        ];
+    }
+
+    /**
+     * Lifts a parse-time diagnostic onto the run, so a bounded or broken file stays visible in the report.
+     *
+     * @param ParseDiagnostic $diagnostic - Diagnostic raised while parsing, or replayed from the cache.
+     * @param SourceFile      $file       - File the diagnostic belongs to; supplies the reported path.
+     *
+     * @return RunDiagnostic - The same note carrying the file's display path.
+     */
+    private static function runDiagnosticFor(ParseDiagnostic $diagnostic, SourceFile $file): RunDiagnostic
+    {
+        return new RunDiagnostic(
+            type:     $diagnostic->type,
+            message:  $diagnostic->message,
+            filePath: $file->displayPath,
+            line:     $diagnostic->line,
+            isFatal:  $diagnostic->isFatal,
+        );
     }
 
     /**

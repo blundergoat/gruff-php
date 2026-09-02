@@ -57,7 +57,7 @@ final readonly class BranchReviewBuilder
         array &$diagnostics,
     ): ?BranchReviewResult {
         // Without a `--diff-vs` ref or a usable diff, there is no base to compare against, so review mode stays off.
-        if ($options->diffVs === null || $reviewDiff === null) {
+        if ($options->changeScope->diffVs === null || $reviewDiff === null) {
             return null;
         }
 
@@ -74,14 +74,14 @@ final readonly class BranchReviewBuilder
         $baseAnalysisPaths = $this->baseAnalysisPaths($projectRoot, $options, $reviewDiff);
 
         // Changed-only mode with no project context and nothing to pull from the base ref means the base side is empty.
-        if ($options->isChangedOnly && !$shouldLoadProjectContext && $baseSnapshotPaths === []) {
+        if ($options->changeScope->isChangedOnly && !$shouldLoadProjectContext && $baseSnapshotPaths === []) {
             $baseScore = (new ScoreCalculator())->calculate([], null, null, scorePillars: $options->profileScorePillars(), analysisConfig: $config);
 
             // Compare against an empty base so every current finding is reported as introduced by this branch.
             return (new BranchReviewComparator())->compare(
                 current:       $currentFindings,
                 base:          [],
-                baseRef:       $options->diffVs,
+                baseRef:       $options->changeScope->diffVs,
                 isChangedOnly: true,
                 deltaScore:    $this->deltaVersusBase($currentScore, $baseScore->composite->score),
             );
@@ -90,7 +90,7 @@ final readonly class BranchReviewBuilder
         // Build and analyze the base-ref snapshot for the user's comparison.
         // Snapshot or diff failures become diagnostics rather than aborting the ordinary scan.
         try {
-            $baseRoot     = $gitArchiveSnapshot->create($projectRoot, $options->diffVs, $baseSnapshotPaths);
+            $baseRoot     = $gitArchiveSnapshot->create($projectRoot, $options->changeScope->diffVs, $baseSnapshotPaths);
             $basePaths    = (new AnalysisFindingSupport())->existingSnapshotPaths($baseRoot, $baseAnalysisPaths);
             $baseFindings = [];
 
@@ -120,7 +120,7 @@ final readonly class BranchReviewBuilder
             $baseFindings = (new SensitiveExclusionFilter())->apply($baseFindings, $config->sensitiveExclusions())->findings;
 
             // In changed-only mode the user only cares about files this branch touched, so trim the base findings to those same files.
-            if ($options->isChangedOnly) {
+            if ($options->changeScope->isChangedOnly) {
                 $baseFindings = (new AnalysisFindingSupport())->filterFindingsToChangedFiles($baseFindings, $reviewDiff->changedFiles);
             }
 
@@ -145,8 +145,8 @@ final readonly class BranchReviewBuilder
             return (new BranchReviewComparator())->compare(
                 current:       $currentFindings,
                 base:          $baseFindings,
-                baseRef:       $options->diffVs,
-                isChangedOnly: $options->isChangedOnly,
+                baseRef:       $options->changeScope->diffVs,
+                isChangedOnly: $options->changeScope->isChangedOnly,
                 deltaScore:    $this->deltaVersusBase($currentScore, $baseScore->composite->score),
             );
         } catch (DiffException | RuntimeException $exception) {
@@ -249,7 +249,7 @@ final readonly class BranchReviewBuilder
         }
 
         // A normal (not changed-only) run compares the exact paths the user asked to analyse.
-        if (!$options->isChangedOnly) {
+        if (!$options->changeScope->isChangedOnly) {
             return $support->normaliseRequestedPaths($projectRoot, $options->paths);
         }
 
@@ -292,7 +292,7 @@ final readonly class BranchReviewBuilder
     private function baseAnalysisPaths(string $projectRoot, AnalyseCommandOptions $options, DiffResult $reviewDiff): array
     {
         // Changed-only with no explicit paths: analyse exactly the files the diff says this branch touched.
-        if ($options->isChangedOnly && $options->paths === []) {
+        if ($options->changeScope->isChangedOnly && $options->paths === []) {
             return $reviewDiff->changedFiles;
         }
 
@@ -368,7 +368,7 @@ final readonly class BranchReviewBuilder
         }
 
         // For a whole-project request, only changed-only mode with real changes still needs extra context for project rules.
-        return $options->isChangedOnly
+        return $options->changeScope->isChangedOnly
             && $reviewDiff instanceof DiffResult
             && $reviewDiff->changedFiles !== [];
     }

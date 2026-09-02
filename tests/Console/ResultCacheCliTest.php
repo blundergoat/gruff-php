@@ -121,7 +121,11 @@ final class ResultCacheCliTest extends CliTestCase
         self::assertDirectoryExists($this->project . '/.gruff-cache');
     }
 
-    /** Verify warm runs replay the note and a budget change cannot reuse bounded findings. */
+    /**
+     * Verify warm runs replay the note and a budget change cannot reuse bounded findings.
+     *
+     * @return void
+     */
     public function testDeepScanBudgetParticipatesInCacheIdentity(): void
     {
         $project = self::PROJECT_ROOT . '/tests/runtime-gruff-cache-' . bin2hex(random_bytes(6));
@@ -182,8 +186,8 @@ final class ResultCacheCliTest extends CliTestCase
             $unboundedFindings = $unboundedReport['findings'] ?? null;
             self::assertIsArray($unboundedFindings);
             $ruleIds = [];
-            foreach ($unboundedFindings as $finding) {
-                self::assertIsArray($finding);
+            foreach ($unboundedFindings as $index => $finding) {
+                self::assertIsArray($finding, sprintf('unbounded finding %s is not an array', (string)$index));
                 $ruleIds[] = $finding['ruleId'] ?? null;
             }
 

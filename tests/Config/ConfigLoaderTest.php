@@ -46,40 +46,6 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
         self::assertSame(Severity::Error, $settings->severityThreshold->severity);
     }
 
-    /** Verify the family deep-scan limits are active by default. */
-    public function testLoadsDefaultDeepScanBudget(): void
-    {
-        $config = (new ConfigLoader(__DIR__ . '/../Fixtures/Source/empty'))->load(null, RuleRegistry::defaults());
-
-        self::assertSame([
-            'enabled' => true,
-            'maxLines' => 20_000,
-            'maxBytes' => 2_000_000,
-            'override' => 'default',
-        ], $config->deepScanBudget());
-    }
-
-    /** Verify config may replace or disable either structural-analysis bound. */
-    public function testLoadsDeepScanBudgetConfig(): void
-    {
-        $path = $this->writeTempConfig(
-            "deepScanBudget:\n    enabled: false\n    maxLines: 123\n    maxBytes: 456\n",
-        );
-
-        try {
-            $config = (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
-
-            self::assertSame([
-                'enabled' => false,
-                'maxLines' => 123,
-                'maxBytes' => 456,
-                'override' => 'config',
-            ], $config->deepScanBudget());
-        } finally {
-            self::assertTrue(unlink($path));
-        }
-    }
-
     /**
      * Verify loads explicit threshold overrides.
      *

@@ -74,7 +74,11 @@ final class DashboardScanCommandBuilderTest extends TestCase
         self::assertContains('--', $command);
     }
 
-    /** Verify dashboard scans forward the atomic deep-scan override before path operands. */
+    /**
+     * Verify dashboard scans forward the atomic deep-scan override before path operands.
+     *
+     * @return void
+     */
     public function testAnalyseCommandForwardsDeepScanBudget(): void
     {
         $state                   = $this->state();

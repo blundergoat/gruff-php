@@ -76,7 +76,7 @@ final readonly class SarifReporter
             $properties['grade'] = $report->score->composite->letter;
         }
 
-        $run = [
+        $sarifRun = [
             'tool' => [
                 'driver' => [
                     'name' => AnalysisReport::TOOL_NAME,
@@ -88,10 +88,10 @@ final readonly class SarifReporter
             'properties' => $properties,
         ];
         if ($report->diagnostics !== []) {
-            $run['invocations'] = [[
+            $sarifRun['invocations'] = [[
                 'executionSuccessful' => !array_reduce(
                     $report->diagnostics,
-                    static fn (bool $fatal, RunDiagnostic $diagnostic): bool => $fatal || $diagnostic->isFatal,
+                    static fn (bool $isFatalSoFar, RunDiagnostic $diagnostic): bool => $isFatalSoFar || $diagnostic->isFatal,
                     false,
                 ),
                 'toolExecutionNotifications' => array_map(
@@ -104,7 +104,7 @@ final readonly class SarifReporter
         $payload = [
             '$schema' => 'https://json.schemastore.org/sarif-2.1.0.json',
             'version' => '2.1.0',
-            'runs' => [$run],
+            'runs' => [$sarifRun],
         ];
 
         try {
@@ -119,6 +119,8 @@ final readonly class SarifReporter
 
     /**
      * Serialises one run diagnostic as a SARIF tool-execution notification.
+     *
+     * @param RunDiagnostic $diagnostic - Run-level note to serialise; a fatal one raises the notification level.
      *
      * @return array<string, mixed> - SARIF notification with an optional physical location.
      */

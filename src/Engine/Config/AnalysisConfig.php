@@ -441,7 +441,7 @@ final readonly class AnalysisConfig
     /**
      * Reads the effective structural-analysis budget and whether defaults, config, or CLI supplied it.
      *
-     * @return array{enabled: bool, maxLines: int, maxBytes: int, override: 'default'|'config'|'cli'}
+     * @return array{enabled: bool, maxLines: int, maxBytes: int, override: 'default'|'config'|'cli'} - Bounds in force for this run and which layer supplied them.
      */
     public function deepScanBudget(): array
     {
@@ -451,7 +451,14 @@ final readonly class AnalysisConfig
     /**
      * Returns a copy carrying a validated structural-analysis budget.
      *
+     * @param bool $enabled - Whether the guard runs at all; false leaves every PHP file fully parsed.
+     * @param int $maxLines - Line count above which deep script analysis is skipped; must be positive.
+     * @param int $maxBytes - Byte count above which deep script analysis is skipped; must be positive.
      * @param string $override - Source that supplied the effective value; must be default, config, or cli.
+     *
+     * @return self - A copy carrying the budget; the receiver is left unchanged.
+     *
+     * @throws InvalidArgumentException - When either bound is below 1, or the override names a layer other than default, config, or cli.
      */
     public function withDeepScanBudget(bool $enabled, int $maxLines, int $maxBytes, string $override): self
     {

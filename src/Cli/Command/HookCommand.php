@@ -13,6 +13,7 @@ use GruffPhp\Engine\Config\RuleSelection;
 use GruffPhp\Cli\Application as GruffApplication;
 use GruffPhp\Results\Diff\ChangedLineRange;
 use GruffPhp\Results\Diff\DiffException;
+use GruffPhp\Results\Diff\ChangeScopeOptions;
 use GruffPhp\Results\Diff\DiffResult;
 use GruffPhp\Results\Diff\GitDiffProvider;
 use GruffPhp\Results\Diff\UnifiedDiffParser;
@@ -334,12 +335,14 @@ final class HookCommand extends Command
                                       mutationBaselinePath:          null,
                                       mutationBudget:                null,
                                   ),
-            diffMode:             null,
-            since:                null,
-            changedRanges:        null,
-            changedScope:         'symbol',
-            diffVs:               null,
-            isChangedOnly:        false,
+            changeScope:          new ChangeScopeOptions(
+                                      diffMode:      null,
+                                      since:         null,
+                                      changedRanges: null,
+                                      changedScope:  'symbol',
+                                      diffVs:        null,
+                                      isChangedOnly: false,
+                                  ),
             historyFile:          null,
             noBaseline:           true,
             baseline:             new BaselineApplicationOptions(

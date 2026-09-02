@@ -45,7 +45,13 @@ final readonly class GithubAnnotationsReporter
         return implode(PHP_EOL, $lines) . ($lines === [] ? '' : PHP_EOL);
     }
 
-    /** Encodes a run diagnostic as a workflow annotation so non-finding scan notes remain visible. */
+    /**
+     * Encodes a run diagnostic as a workflow annotation so non-finding scan notes remain visible.
+     *
+     * @param RunDiagnostic $diagnostic - Run-level note to encode; a fatal one raises the annotation level.
+     *
+     * @return string - One `::error` or `::notice` workflow command carrying the diagnostic's file, line, and message.
+     */
     private function diagnosticAnnotation(RunDiagnostic $diagnostic): string
     {
         $properties = ['title=' . $this->escapeProperty($diagnostic->type)];

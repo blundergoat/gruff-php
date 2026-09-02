@@ -104,7 +104,7 @@ final readonly class PathIgnoreResolver
         }
 
         $defaultDirectory = $this->matchedDefaultDirectory($displayPath);
-        if ($defaultDirectory !== null && $this->fallbackAppliesAt($absolutePath)) {
+        if ($defaultDirectory !== null && $this->shouldApplyFallbackAt($absolutePath)) {
             return IgnoreDecision::ignored(self::SOURCE_DEFAULT, $defaultDirectory);
         }
 
@@ -193,7 +193,7 @@ final readonly class PathIgnoreResolver
      *
      * @return bool - True only when the family fallback should apply at this candidate.
      */
-    private function fallbackAppliesAt(string $absolutePath): bool
+    private function shouldApplyFallbackAt(string $absolutePath): bool
     {
         $root      = rtrim(str_replace('\\', '/', realpath($this->projectRoot) ?: $this->projectRoot), '/');
         $candidate = str_replace('\\', '/', realpath($absolutePath) ?: $absolutePath);
