@@ -372,6 +372,10 @@ final class TrendRecorderTest extends TestCase
     private function score(float $score, string $scope = 'full-project'): ScoreReport
     {
         return new ScoreReport(
+            clusters:               [],
+            ruleAttribution:        [],
+            evaluatedFiles:         10,
+            scoredPillars:          [],
             composite:              Grade::fromScore($score),
             pillars:                [],
             topOffenders:           [],

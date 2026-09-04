@@ -43,6 +43,20 @@ final readonly class ScoreCalculator
     ];
 
     /**
+     * Lowest score the ratified curve can reach, so one saturated pillar can drag the composite by
+     * at most (100 - floor) / N points. Part of the family-ratified parameter set: the shape
+     * `bounded-normalized-density-floored` was ratified 2026-09-01 and these values 2026-09-03, and
+     * all five ports carry the same numbers. Changing either is a family decision, not a gruff-php one.
+     */
+    private const SCORE_FLOOR = 50.0;
+
+    /**
+     * Finding density, per evaluated file, at which a pillar sits half way between the floor and 100.
+     * Ratified alongside SCORE_FLOOR and identical in every port.
+     */
+    private const DENSITY_SCALE = 0.1;
+
+    /**
      * Size and complexity rules that describe one over-large method as separate
      * symptoms of a single root cause (P5 / ADR-024).
      *
@@ -66,6 +80,8 @@ final readonly class ScoreCalculator
      * averages them into the composite, and ranks the worst files - the numbers every reporter shows.
      *
      * @param list<Finding>               $findings - Findings included in the score calculation.
+     * @param int                         $evaluatedFiles - Ratified scoring denominator: PHP files that survived discovery and
+     *                                                    parsed. Zero means nothing was evaluated, so every score is null rather than perfect.
      * @param MutationAnalysisResult|null $mutationAnalysisResult - Mutation result folded in as the Mutation pillar; null when mutation analysis was not run.
      * @param DiffResult|null             $diffResult - Diff result that sets the scope label; null or inactive means a full-project score.
      * @param int                         $fileScoreLimit - Maximum worst-file rows to keep in the report.
@@ -77,6 +93,7 @@ final readonly class ScoreCalculator
      */
     public function calculate(
         array                   $findings,
+        int                     $evaluatedFiles,
         ?MutationAnalysisResult $mutationAnalysisResult,
         ?DiffResult             $diffResult,
         int                     $fileScoreLimit = 10,
@@ -85,7 +102,7 @@ final readonly class ScoreCalculator
     ): ScoreReport {
         $findings   = $this->scoredFindings($findings, $analysisConfig);
         $penalties  = $this->findingPenalties($findings);
-        $pillars    = $this->pillarScores($findings, $penalties, $mutationAnalysisResult, $scorePillars);
+        $pillars    = $this->pillarScores($findings, $penalties, $mutationAnalysisResult, $scorePillars, $evaluatedFiles);
         $scoreTotal = 0.0;
         $scoreCount = 0;
 
@@ -100,15 +117,21 @@ final readonly class ScoreCalculator
             $scoreCount++;
         }
 
-        $averageScore = $scoreCount === 0 ? 100.0 : $scoreTotal / $scoreCount;
+        // Nothing applicable was evaluated, so there is no health to report. Scoring 100 here is what
+        // let an empty directory, or one whose every PHP file failed to parse, grade A before this break.
+        $composite = $scoreCount === 0 ? null : Grade::fromScore($scoreTotal / $scoreCount);
 
         $scope = $diffResult instanceof DiffResult && $diffResult->active ? 'diff' : 'full-project';
 
-        // Composite is the mean of applicable pillars only; an all-inapplicable run scored 100 above keeps a clean grade.
+        // Composite is the mean of applicable pillars only, and null when no pillar had an opinion.
         return new ScoreReport(
-            composite:              Grade::fromScore($averageScore),
+            composite:              $composite,
+            clusters:               $this->correlatedClusters($findings, $penalties),
+            ruleAttribution:        $this->ruleAttribution($findings, $penalties),
+            evaluatedFiles:         $evaluatedFiles,
+            scoredPillars:          array_map(static fn(PillarScore $pillar): string => $pillar->pillar, $pillars),
             pillars:                $pillars,
-            topOffenders:           $this->fileScores($findings, $penalties, $mutationAnalysisResult, $fileScoreLimit),
+            topOffenders:           $this->fileScores($findings, $penalties, $mutationAnalysisResult, $fileScoreLimit, $evaluatedFiles),
             complexityDistribution: $this->complexityDistribution($findings),
             scope:                  $scope,
             explanation:            $this->scoreExplanation($mutationAnalysisResult),
@@ -167,7 +190,7 @@ final readonly class ScoreCalculator
      */
     private function scoreExplanation(?MutationAnalysisResult $mutationAnalysisResult): string
     {
-        $base = 'Per-pillar scores start at 100 and subtract weighted finding penalties; correlated size and complexity findings on one symbol share a single penalty; the composite is the average of applicable pillar scores.';
+        $base = 'Each pillar scores on the density of its weighted findings per evaluated file, on a curve from 50 to 100, so a larger project is not penalised for its size; correlated size and complexity findings on one symbol share a single weight; the composite is the average of applicable pillar scores.';
 
         // When a mutation report was supplied, the note explains the Mutation pillar is graded from its MSI.
         if ($mutationAnalysisResult instanceof MutationAnalysisResult) {
@@ -182,6 +205,8 @@ final readonly class ScoreCalculator
      * Mutation pillar (when present) is graded straight from its MSI.
      *
      * @param list<Finding>               $findings - Scored findings bucketed into per-pillar penalties.
+     * @param int                         $evaluatedFiles - Ratified scoring denominator: PHP files that survived discovery and
+     *                                                    parsed. Zero means nothing was evaluated, so every score is null rather than perfect.
      * @param array<int, float>           $penalties - Clustered penalty per finding keyed by spl_object_id() (see findingPenalties()).
      * @param MutationAnalysisResult|null $mutationAnalysisResult - Mutation report that adds the Mutation pillar graded from its MSI; null omits that
      *                                                            pillar.
@@ -189,7 +214,7 @@ final readonly class ScoreCalculator
      *
      * @return list<PillarScore> - One score per resolved pillar in pillar-name order; inapplicable pillars are present but ungraded.
      */
-    private function pillarScores(array $findings, array $penalties, ?MutationAnalysisResult $mutationAnalysisResult, ?array $scorePillars): array
+    private function pillarScores(array $findings, array $penalties, ?MutationAnalysisResult $mutationAnalysisResult, ?array $scorePillars, int $evaluatedFiles): array
     {
         // Start from the caller's explicit pillar set, or the built-in static-analysis pillars when none was given.
         $pillarNames = $scorePillars === null
@@ -251,22 +276,46 @@ final readonly class ScoreCalculator
                                                $findings,
                                                static fn(Finding $finding): bool => $finding->pillar->value === $pillarName,
                                            ));
-            $penalty        = $this->sumPenalties($pillarFindings, $penalties) * 4.0;
+            $weight         = $this->sumPenalties($pillarFindings, $penalties);
             $counts         = $this->severityCounts($pillarFindings);
 
             $scores[] = new PillarScore(
                 pillar:     $pillarName,
                 applicable: true,
-                grade:      Grade::fromScore(100.0 - $penalty),
+                grade:      $this->curveGrade($weight, $evaluatedFiles),
                 findings:   count($pillarFindings),
                 advisory:   $counts['advisory'],
                 warning:    $counts['warning'],
                 error:      $counts['error'],
-                penalty:    $penalty,
+                penalty:    $weight,
             );
         }
 
         return $scores;
+    }
+
+    /**
+     * Applies the ratified pillar curve to one summed weight, or reports no grade when nothing was evaluated.
+     *
+     * The curve is `floor + (100 - floor) / (1 + density / densityScale)`, where density is the weight
+     * divided by the evaluated-file count. Dividing before transforming is what makes a duplicated
+     * project score the same as the original: twice the findings over twice the code is one ratio.
+     *
+     * @param float $weight         - Summed severity-by-confidence weight for one pillar or file; zero means reachable and clean.
+     * @param int   $evaluatedFiles - Ratified denominator; zero or less means nothing was evaluated and there is nothing to grade.
+     *
+     * @return Grade|null - The graded score between the ratified floor and 100, or null when nothing was evaluated.
+     */
+    private function curveGrade(float $weight, int $evaluatedFiles): ?Grade
+    {
+        // Nothing was evaluated, so this pillar has no opinion and inventing one would be the defect C3 forbids.
+        if ($evaluatedFiles <= 0) {
+            return null;
+        }
+
+        $density = $weight / $evaluatedFiles;
+
+        return Grade::fromScore(self::SCORE_FLOOR + (100.0 - self::SCORE_FLOOR) / (1.0 + $density / self::DENSITY_SCALE));
     }
 
     /**
@@ -278,10 +327,12 @@ final readonly class ScoreCalculator
      * @param MutationAnalysisResult|null $mutationAnalysisResult - Mutation report whose per-file MSI summaries enrich each file score; null leaves
      *                                                            mutationScore unset.
      * @param int                         $limit - Maximum number of worst-scoring file scores to return.
+     * @param int                         $evaluatedFiles - Ratified scoring denominator: PHP files that survived discovery and
+     *                                                    parsed. Zero means nothing was evaluated, so every score is null rather than perfect.
      *
      * @return list<FileScore> - The worst-grade files first (ties broken by finding count, then path), capped at $limit.
      */
-    private function fileScores(array $findings, array $penalties, ?MutationAnalysisResult $mutationAnalysisResult, int $limit): array
+    private function fileScores(array $findings, array $penalties, ?MutationAnalysisResult $mutationAnalysisResult, int $limit, int $evaluatedFiles): array
     {
         /** @var array<string, list<Finding>> $byFile Accumulator shape is built incrementally from finding file paths. */
         $byFile = [];
@@ -307,18 +358,21 @@ final readonly class ScoreCalculator
         // Turn each file's findings into a graded score row.
         foreach ($byFile as $filePath => $fileFindings) {
             $counts          = $this->severityCounts($fileFindings);
-            $penalty         = $this->sumPenalties($fileFindings, $penalties) * 5.0;
+            // A file's density is its own weighted findings, so file and project scores share one curve
+            // and a top-offender list can no longer rank code by a rule the project grade never used.
+            $weight          = $this->sumPenalties($fileFindings, $penalties);
+            $fileGrade       = $evaluatedFiles <= 0 ? null : $this->curveGrade($weight, 1);
             // Attach the file's mutation score when Infection measured it.
             $mutationSummary = $mutationByFile[$filePath] ?? null;
 
             $scores[] = new FileScore(
                 filePath:      $filePath,
-                grade:         Grade::fromScore(100.0 - $penalty),
+                grade:         $fileGrade,
                 findings:      count($fileFindings),
                 advisory:      $counts['advisory'],
                 warning:       $counts['warning'],
                 error:         $counts['error'],
-                penalty:       $penalty,
+                penalty:       $weight,
                 maxCyclomatic: $this->maxMetadataInt($fileFindings, 'complexity.cyclomatic', 'complexity'),
                 maxCognitive:  $this->maxMetadataInt($fileFindings, 'complexity.cognitive', 'complexity'),
                 maxLines:      $this->maxLineMetric($fileFindings),
@@ -327,7 +381,8 @@ final readonly class ScoreCalculator
         }
 
         usort($scores, static function (FileScore $leftFileScore, FileScore $rightFileScore): int {
-            return $leftFileScore->grade->score <=> $rightFileScore->grade->score
+            // An ungraded file sorts as if perfect, so a run that evaluated nothing ranks by findings alone.
+            return ($leftFileScore->grade->score ?? 100.0) <=> ($rightFileScore->grade->score ?? 100.0)
                 ?: $rightFileScore->findings <=> $leftFileScore->findings
                     ?: strcmp($leftFileScore->filePath, $rightFileScore->filePath);
         });
@@ -449,7 +504,10 @@ final readonly class ScoreCalculator
                 continue;
             }
 
-            $key              = $finding->filePath . "\0" . $finding->symbol . "\0" . $finding->line;
+            // The ratified contract keys clustering on file and qualified symbol without line
+            // identity: correlated rules disagree about which line to report, and a line in the key
+            // splits one root cause into two. gruff-php emits a qualified symbol, so the key is exact.
+            $key              = $finding->filePath . "\0" . $finding->symbol;
             $clusters[$key][] = $finding;
         }
 
@@ -468,6 +526,86 @@ final readonly class ScoreCalculator
         }
 
         return $penalties;
+    }
+
+    /**
+     * Lists every correlated concept that billed one shared weight, so a reader can see which
+     * findings the grade counted once rather than inferring it from a lower total.
+     *
+     * Sorted by file then symbol, so two runs over unchanged input publish the same bytes.
+     *
+     * @param list<Finding>     $findings - Scored findings for the run.
+     * @param array<int, float> $penalties - Clustered weight per finding keyed by spl_object_id().
+     *
+     * @return list<array{file: string, symbol: string, ruleIds: list<string>, findings: int, weight: float}> - One row per cluster of two or more.
+     */
+    private function correlatedClusters(array $findings, array $penalties): array
+    {
+        /** @var array<string, list<Finding>> $groups Correlated findings grouped by the ratified file|symbol key. */
+        $groups = [];
+
+        foreach ($findings as $finding) {
+            if (!in_array($finding->ruleId, self::CORRELATED_COMPLEXITY_RULES, true) || $finding->symbol === null) {
+                continue;
+            }
+
+            $groups[$finding->filePath . "\0" . $finding->symbol][] = $finding;
+        }
+
+        $clusters = [];
+
+        foreach ($groups as $group) {
+            // A lone correlated finding billed its own full weight, so it is not a cluster to report.
+            if (count($group) < 2) {
+                continue;
+            }
+
+            $ruleIds = array_map(static fn(Finding $finding): string => $finding->ruleId, $group);
+            sort($ruleIds);
+            $first      = $group[0];
+            $clusters[] = [
+                'file'     => $first->filePath,
+                'symbol'   => (string)$first->symbol,
+                'ruleIds'  => $ruleIds,
+                'findings' => count($group),
+                'weight'   => round($this->sumPenalties($group, $penalties), 2),
+            ];
+        }
+
+        usort($clusters, static fn(array $left, array $right): int => [$left['file'], $left['symbol']] <=> [$right['file'], $right['symbol']]);
+
+        return $clusters;
+    }
+
+    /**
+     * Reports how much weight each native rule removed from the score.
+     *
+     * The key is the native ruleId: a conceptId may group reporting, but the ratified contract never
+     * makes it the attribution key. Sorted by rule identifier for deterministic output.
+     *
+     * @param list<Finding>     $findings - Scored findings for the run.
+     * @param array<int, float> $penalties - Clustered weight per finding keyed by spl_object_id().
+     *
+     * @return list<array{ruleId: string, findings: int, weight: float}> - One row per native rule that carried weight.
+     */
+    private function ruleAttribution(array $findings, array $penalties): array
+    {
+        $counts  = [];
+        $weights = [];
+
+        foreach ($findings as $finding) {
+            $counts[$finding->ruleId]  = ($counts[$finding->ruleId] ?? 0) + 1;
+            $weights[$finding->ruleId] = ($weights[$finding->ruleId] ?? 0.0) + ($penalties[spl_object_id($finding)] ?? $this->penaltyFor($finding));
+        }
+
+        ksort($counts);
+        $attribution = [];
+
+        foreach ($counts as $ruleId => $count) {
+            $attribution[] = ['ruleId' => (string)$ruleId, 'findings' => $count, 'weight' => round($weights[$ruleId], 2)];
+        }
+
+        return $attribution;
     }
 
     /**

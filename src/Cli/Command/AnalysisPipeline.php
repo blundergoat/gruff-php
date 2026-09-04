@@ -226,6 +226,21 @@ final class AnalysisPipeline
     }
 
     /**
+     * Reports whether one successfully parsed file belongs in the ratified scoring denominator.
+     *
+     * Only PHP files carry code to score. A README is scanned by the raw-text rules and counted as
+     * parsed, but including it would divide real findings by files no PHP rule ever evaluated.
+     *
+     * @param SourceFile $file - File that parsed without error.
+     *
+     * @return int - 1 when the file enters the scoring denominator, 0 otherwise.
+     */
+    private static function evaluatedIncrement(SourceFile $file): int
+    {
+        return $file->isPhp() ? 1 : 0;
+    }
+
+    /**
      * Streaming pipeline: parse a file, analyse it, then free its AST before the next one, so a large
      * repository scans with peak memory near a single file instead of the whole tree at once.
      *
@@ -281,8 +296,9 @@ final class AnalysisPipeline
 
         $this->registry->beginStreaming($ruleContext);
         $findings     = [];
-        $parsedCount  = 0;
-        $analyseStart = hrtime(true);
+        $parsedCount    = 0;
+        $evaluatedCount = 0;
+        $analyseStart   = hrtime(true);
 
         // Walk the discovered files one at a time; this loop is where each file the user asked to scan is
         // parsed, checked, and then dropped so memory never holds more than the file in hand.
@@ -299,6 +315,8 @@ final class AnalysisPipeline
                     $sourceDiagnostics[] = self::runDiagnosticFor($cached['budgetDiagnostic'], $file);
                 }
                 $parsedCount++;
+                // A cached hit was evaluated exactly as a fresh parse would have been.
+                $evaluatedCount += self::evaluatedIncrement($file);
                 continue;
             }
 
@@ -307,6 +325,7 @@ final class AnalysisPipeline
             // still has its problems reported but is not counted as successfully scanned.
             if (!$unit->hasParseErrors()) {
                 $parsedCount++;
+                $evaluatedCount += self::evaluatedIncrement($file);
             }
             // Turn each parser complaint into a run diagnostic so a syntactically broken file surfaces to the
             // user as a reported parse error instead of silently vanishing from the results.
@@ -336,7 +355,7 @@ final class AnalysisPipeline
 
         // Streaming never retains parsed units, so report no project-context units alongside the finalised findings.
         return [
-            'sources' => new AnalysisSourceSet($discoveryResult, [], $sourceDiagnostics, $parsedCount),
+            'sources' => new AnalysisSourceSet($discoveryResult, [], $sourceDiagnostics, $parsedCount, $evaluatedCount),
             'findings' => $findings,
             'discoverParseNs' => $discoverParseNs,
             'analyseNs' => $analyseNs,

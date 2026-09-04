@@ -50,7 +50,7 @@ final class GruffCliSummaryTest extends TestCase
             '/^Findings: \d+ total · \d+ error · \d+ warning · \d+ advisory$/m',
             $output,
         );
-        self::assertStringContainsString('Score note Per-pillar scores start at 100', $output);
+        self::assertStringContainsString('Score note Each pillar scores on the density of its weighted findings per evaluated file', $output);
         self::assertStringContainsString('Pillars', $output);
         self::assertStringContainsString('Top', $output);
         self::assertStringContainsString('gruff-php analyse --generate-baseline', $output);

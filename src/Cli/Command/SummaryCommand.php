@@ -365,7 +365,7 @@ final class SummaryCommand extends Command
         $exclusionResult = (new SensitiveExclusionFilter())->apply($findings, $config->sensitiveExclusions());
         $findings        = $exclusionResult->findings;
 
-        $score           = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive(), $topLimit, analysisConfig: $config);
+        $score           = (new ScoreCalculator())->calculate($findings, $sources->evaluatedFileCount(), null, DiffResult::inactive(), $topLimit, analysisConfig: $config);
         $filesDiscovered = count($sources->discovery->files);
         $analysisReport  = new AnalysisReport(
             toolVersion:      Application::VERSION,
@@ -576,8 +576,23 @@ final class SummaryCommand extends Command
      */
     private function renderText(SummaryReportData $summaryReportData): string
     {
+        // FAMILY-CONTRACT section 1: the masthead and the two-line composite block are the first
+        // three lines, and every gruff-php line sits below them. The scan card used to sit between
+        // the two, which put the number a reader came for six lines down and out of line with what
+        // `analyse` prints one command away.
         $lines   = [];
         $lines[] = sprintf('%s %s summary', Application::NAME, Application::VERSION);
+        // A run that evaluated nothing has no composite, and printing 100.00 would call it perfect.
+        $lines[] = $summaryReportData->score->composite === null
+            ? 'Composite: n/a (nothing evaluated)'
+            : sprintf('Composite: %s (%.2f / 100)', $summaryReportData->score->composite->letter, $summaryReportData->score->composite->score);
+        $lines[] = sprintf(
+            'Findings: %d total · %d error · %d warning · %d advisory',
+            $summaryReportData->totals['total'],
+            $summaryReportData->totals['error'],
+            $summaryReportData->totals['warning'],
+            $summaryReportData->totals['advisory'],
+        );
         $lines[] = '';
         // Show the paths the user scanned, or "(none)" to signal the default whole-project run.
         $lines[] = sprintf('Paths     %s', $summaryReportData->paths === [] ? '(none)' : implode(', ', $summaryReportData->paths));
@@ -589,15 +604,6 @@ final class SummaryCommand extends Command
             $summaryReportData->ignoredPaths,
             $summaryReportData->missingPaths,
             $summaryReportData->parseErrors
-        );
-        $lines[] = '';
-        $lines[] = sprintf('Composite: %s (%.2f / 100)', $summaryReportData->score->composite->letter, $summaryReportData->score->composite->score);
-        $lines[] = sprintf(
-            'Findings: %d total · %d error · %d warning · %d advisory',
-            $summaryReportData->totals['total'],
-            $summaryReportData->totals['error'],
-            $summaryReportData->totals['warning'],
-            $summaryReportData->totals['advisory'],
         );
         $lines[] = sprintf('Scope     %s', $summaryReportData->score->scope);
         $lines[] = sprintf('Score note %s', $summaryReportData->score->explanation);
@@ -740,8 +746,8 @@ final class SummaryCommand extends Command
         foreach ($summaryReportData->topOffenders as $file) {
             $lines[] = sprintf(
                 '  %s  %6.2f  %-' . $fileWidth . 's  findings=%-4d a=%d w=%d e=%d',
-                $file->grade->letter,
-                $file->grade->score,
+                $file->grade->letter ?? 'n/a',
+                $file->grade->score ?? 0.0,
                 $file->filePath,
                 $file->findings,
                 $file->advisory,

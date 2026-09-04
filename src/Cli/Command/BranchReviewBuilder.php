@@ -40,7 +40,7 @@ final readonly class BranchReviewBuilder
      * @param AnalysisConfig        $config          - Effective rule and path configuration.
      * @param RuleRegistry          $registry        - Rule registry used to analyse the base snapshot.
      * @param list<Finding>         $currentFindings - Post-baseline findings for the current tree; empty when this branch is clean.
-     * @param float|null            $currentScore    - Current composite score; null means discovery found no files and scoring is inapplicable.
+     * @param ReviewScoreContext    $scoreContext    - Current composite score and the evaluated-file denominator it came from, so the base side is scored the same way.
      * @param DiffResult|null       $reviewDiff      - Review diff metadata; null when the diff lookup failed, which turns review mode off.
      * @param list<RunDiagnostic>   $diagnostics     - Run diagnostics collected so far; review-mode errors are appended here in place.
      *
@@ -52,7 +52,7 @@ final readonly class BranchReviewBuilder
         AnalysisConfig $config,
         RuleRegistry $registry,
         array $currentFindings,
-        ?float $currentScore,
+        ReviewScoreContext $scoreContext,
         ?DiffResult $reviewDiff,
         array &$diagnostics,
     ): ?BranchReviewResult {
@@ -75,7 +75,9 @@ final readonly class BranchReviewBuilder
 
         // Changed-only mode with no project context and nothing to pull from the base ref means the base side is empty.
         if ($options->changeScope->isChangedOnly && !$shouldLoadProjectContext && $baseSnapshotPaths === []) {
-            $baseScore = (new ScoreCalculator())->calculate([], null, null, scorePillars: $options->profileScorePillars(), analysisConfig: $config);
+            // The base is scored on the current run's denominator, so the delta measures the branch's
+            // findings rather than the difference between two project sizes.
+            $baseScore = (new ScoreCalculator())->calculate([], $scoreContext->evaluatedFiles, null, null, scorePillars: $options->profileScorePillars(), analysisConfig: $config);
 
             // Compare against an empty base so every current finding is reported as introduced by this branch.
             return (new BranchReviewComparator())->compare(
@@ -83,7 +85,7 @@ final readonly class BranchReviewBuilder
                 base:          [],
                 baseRef:       $options->changeScope->diffVs,
                 isChangedOnly: true,
-                deltaScore:    $this->deltaVersusBase($currentScore, $baseScore->composite->score),
+                deltaScore:    $this->deltaVersusBase($scoreContext->currentScore, $baseScore->composite?->score),
             );
         }
 
@@ -139,7 +141,7 @@ final readonly class BranchReviewBuilder
             }
 
             $baseFindings = (new AnalysisFindingSupport())->normalizeFindingPaths($baseFindings, $options->pathsRelativeTo);
-            $baseScore    = (new ScoreCalculator())->calculate($baseFindings, null, null, scorePillars: $options->profileScorePillars(), analysisConfig: $config);
+            $baseScore    = (new ScoreCalculator())->calculate($baseFindings, $scoreContext->evaluatedFiles, null, null, scorePillars: $options->profileScorePillars(), analysisConfig: $config);
 
             // Compare current and base findings so the report identifies what this branch introduced or removed.
             return (new BranchReviewComparator())->compare(
@@ -147,7 +149,7 @@ final readonly class BranchReviewBuilder
                 base:          $baseFindings,
                 baseRef:       $options->changeScope->diffVs,
                 isChangedOnly: $options->changeScope->isChangedOnly,
-                deltaScore:    $this->deltaVersusBase($currentScore, $baseScore->composite->score),
+                deltaScore:    $this->deltaVersusBase($scoreContext->currentScore, $baseScore->composite?->score),
             );
         } catch (DiffException | RuntimeException $exception) {
             // A missing base ref or unreadable git archive can block comparison; keep the ordinary scan and report review mode as unavailable.
@@ -175,9 +177,10 @@ final readonly class BranchReviewBuilder
      *
      * @return float|null - Score movement from base to current, or null when the current side has no applicable score.
      */
-    private function deltaVersusBase(?float $currentScore, float $baseScore): ?float
+    private function deltaVersusBase(?float $currentScore, ?float $baseScore): ?float
     {
-        return $currentScore === null ? null : $currentScore - $baseScore;
+        // A base that evaluated nothing has no score to subtract, so no delta can be claimed against it.
+        return $currentScore === null || $baseScore === null ? null : $currentScore - $baseScore;
     }
 
     /**

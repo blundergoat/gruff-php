@@ -119,7 +119,7 @@ final class AnalyseCliRuleSelectionTest extends CliTestCase
         $composite = $score['composite'] ?? null;
         self::assertIsArray($composite);
         self::assertNotCount(0, $findings);
-        self::assertSame('F', $composite['grade'] ?? null);
+        self::assertSame('C', $composite['grade'] ?? null);
 
         foreach ($findings as $index => $finding) {
             self::assertIsArray($finding, sprintf('Finding %d should be an array.', $index));

@@ -42,7 +42,7 @@ final class AnalyseMinimumSeverityPrecedenceTest extends TestCase
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-        self::assertStringContainsString('[warning] size.file-length', $process->getOutput());
+        self::assertStringContainsString('[warning] tests/Fixtures/Source/mixed/alpha.php:1 size.file-length', $process->getOutput());
     }
 
     /**
@@ -69,7 +69,7 @@ final class AnalyseMinimumSeverityPrecedenceTest extends TestCase
         $process->run();
 
         self::assertSame(1, $process->getExitCode());
-        self::assertStringContainsString('[warning] size.file-length', $process->getOutput());
+        self::assertStringContainsString('[warning] tests/Fixtures/Source/mixed/alpha.php:1 size.file-length', $process->getOutput());
     }
 
     /**

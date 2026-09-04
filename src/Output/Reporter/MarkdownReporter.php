@@ -89,7 +89,7 @@ final readonly class MarkdownReporter
             $lines,
             '# gruff-php report',
             '',
-            sprintf('**Grade:** %s (%s/100)', $score === null ? 'n/a' : $score->composite->letter, $score === null ? 'n/a' : sprintf('%.2f', $score->composite->score)),
+            sprintf('**Grade:** %s (%s/100)', $score?->composite->letter ?? 'n/a', $score?->composite === null ? 'n/a' : sprintf('%.2f', $score->composite->score)),
             sprintf('**Scope:** %s', $score === null ? 'full-project' : $score->scope),
             sprintf('**Findings:** %d total, %d error, %d warning, %d advisory', $counts['total'], $counts['error'], $counts['warning'], $counts['advisory']),
         );

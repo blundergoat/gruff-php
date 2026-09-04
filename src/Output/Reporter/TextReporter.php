@@ -45,7 +45,11 @@ final readonly class TextReporter
 
         // Lead with the composite grade, but only when scoring ran; a metadata-only run has none to show.
         if ($report->score !== null) {
-            $lines[] = sprintf('Composite: %s (%.2f / 100)', $report->score->composite->letter, $report->score->composite->score);
+            // A run that evaluated nothing has no composite: printing 100.00 is what let an empty
+            // directory read as perfect before the M06 break.
+            $lines[] = $report->score->composite === null
+                ? 'Composite: n/a (nothing evaluated)'
+                : sprintf('Composite: %s (%.2f / 100)', $report->score->composite->letter, $report->score->composite->score);
         }
 
         $lines[] = sprintf(
@@ -607,9 +611,11 @@ final readonly class TextReporter
                 $location .= sprintf(':%d', $finding->line);
             }
 
-            $lines[] = sprintf('  [%s] %s', $finding->severity->value, $finding->ruleId);
-            $lines[] = sprintf('    %s', $location);
-            $lines[] = sprintf('    %s', $finding->message);
+            // FAMILY-CONTRACT section 1 made the rs/ts dash-line the family canon at this break:
+            // `- [severity] file:line ruleId - message`. gruff-php emitted a three-line block, so the
+            // same finding took three lines here and one line in two sibling ports, and no editor
+            // jump-to-location convention matched.
+            $lines[] = sprintf('- [%s] %s %s - %s', $finding->severity->value, $location, $finding->ruleId, $finding->message);
         }
     }
 }

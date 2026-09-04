@@ -71,7 +71,7 @@ final readonly class SarifReporter
         ];
         // Publish the composite score and grade only when the run produced them; a null score means
         // scoring was skipped, so we omit the fields rather than show a misleading zero.
-        if ($report->score !== null) {
+        if ($report->score?->composite !== null) {
             $properties['score'] = $report->score->composite->score;
             $properties['grade'] = $report->score->composite->letter;
         }

@@ -220,7 +220,8 @@ final class AnalyseCommand extends Command
         $findings = $findingSupport->normalizeFindingPaths($findings, $options->pathsRelativeTo);
 
         $scoreStart = hrtime(true);
-        $score      = (new ScoreCalculator())->calculate($findings, $mutationAnalysis, $diff, scorePillars: $options->profileScorePillars(), analysisConfig: $config);
+        $evaluatedFiles = $sources->evaluatedFileCount();
+        $score      = (new ScoreCalculator())->calculate($findings, $evaluatedFiles, $mutationAnalysis, $diff, scorePillars: $options->profileScorePillars(), analysisConfig: $config);
         $scoreNs    = hrtime(true) - $scoreStart;
         // Without `--diff-vs`, review covers the whole run.
         // With a base ref, mutation findings are excluded so the branch verdict reflects only comparable rules.
@@ -229,15 +230,15 @@ final class AnalyseCommand extends Command
                                                                                    static fn(Finding $finding): bool => $finding->pillar !== Pillar::Mutation,
                                                                                ));
         $reviewScore = $options->changeScope->diffVs === null
-            ? $score->composite->score
-            : (new ScoreCalculator())->calculate($reviewFindings, null, null, scorePillars: $options->profileScorePillars(), analysisConfig: $config)->composite->score;
+            ? $score->composite?->score
+            : (new ScoreCalculator())->calculate($reviewFindings, $evaluatedFiles, null, null, scorePillars: $options->profileScorePillars(), analysisConfig: $config)->composite?->score;
         $review = $branchReviewBuilder->build(
             projectRoot:     $projectRoot,
             options:         $options,
             config:          $config,
             registry:        $registry,
             currentFindings: $reviewFindings,
-            currentScore:    $this->reviewScoreForDiscoveredFiles($reviewScore, $filesDiscovered),
+            scoreContext:    new ReviewScoreContext($this->reviewScoreForDiscoveredFiles($reviewScore, $filesDiscovered), $evaluatedFiles),
             reviewDiff:      $reviewDiff,
             diagnostics:     $diagnostics,
         );
@@ -828,7 +829,7 @@ final class AnalyseCommand extends Command
      *
      * @return float|null - Review score for a real source set, otherwise null.
      */
-    private function reviewScoreForDiscoveredFiles(float $reviewScore, int $filesDiscovered): ?float
+    private function reviewScoreForDiscoveredFiles(?float $reviewScore, int $filesDiscovered): ?float
     {
         return $filesDiscovered === 0 ? null : $reviewScore;
     }
@@ -918,6 +919,12 @@ final class AnalyseCommand extends Command
     ): ?TrendReport {
         // No `--history-file` was given, so the user opted out of trend tracking and there is nothing to record.
         if ($options->historyFile === null) {
+            return null;
+        }
+
+        // A run that evaluated nothing has no score, so it contributes no trend point. Writing one
+        // would put a scoreless row in the history that every later delta would have to subtract from.
+        if ($score->composite === null) {
             return null;
         }
 

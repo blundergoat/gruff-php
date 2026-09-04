@@ -69,7 +69,7 @@ final class SarifReporterTest extends TestCase
             ),
         );
         $findings = [$finding];
-        $score    = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive());
+        $score    = (new ScoreCalculator())->calculate($findings, 10, null, DiffResult::inactive());
         $report   = $this->report($findings, $score);
 
         $payload  = $this->decode((new SarifReporter())->render($report));
@@ -132,6 +132,7 @@ final class SarifReporterTest extends TestCase
         self::assertSame('allowlists.acceptedAbbreviations', $resultMetadata['configurationKey'] ?? null);
         $runProperties = $this->stringKeyedArray($sarifRun, 'properties');
         self::assertSame('gruff.analysis.v3', $this->stringValue($runProperties, 'gruffSchemaVersion'));
+        self::assertNotNull($score->composite, 'the fixture evaluated files, so it must carry a composite');
         self::assertSame($score->composite->score, $runProperties['score'] ?? null);
         self::assertSame($score->composite->letter, $runProperties['grade'] ?? null);
         $jsonPayload = $this->decode((new JsonReporter())->render($report));

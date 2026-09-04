@@ -517,7 +517,10 @@ final readonly class AnalysisReport
     {
         if (!$this->score instanceof ScoreReport) {
             return [
-                'composite' => ['grade' => 'N/A', 'score' => 0.0],
+                // No scoring ran, so there is no number to report; a 0.0 here would read as a failing grade.
+                'composite' => ['grade' => null, 'score' => null],
+                'clusters' => [],
+                'ruleAttribution' => [],
                 'pillars' => [],
                 'topOffenders' => [],
                 'coverage' => [
@@ -657,13 +660,23 @@ final readonly class AnalysisReport
     /**
      * Removes unavailable optional values from one native score row before serialization.
      *
+     * `score` and `grade` are kept even when null. Under the ratified scoring contract a null there
+     * is a statement - nothing applicable was evaluated - and omitting the key would leave a consumer
+     * unable to tell that apart from a port that never published the field at all.
+     *
      * @param array<string, ReportValue> $values - Native row whose null entries mean the field is unavailable.
      *
-     * @return array<string, ReportValue> - The same row with null-valued optional fields omitted.
+     * @return array<string, ReportValue> - The same row with null-valued optional fields omitted, except the two ratified score fields.
      */
     private static function withoutNullValues(array $values): array
     {
-        return array_filter($values, static fn(mixed $value): bool => $value !== null);
+        $ratifiedNullableKeys = ['score', 'grade'];
+
+        return array_filter(
+            $values,
+            static fn(mixed $fieldValue, string $fieldName): bool => $fieldValue !== null || in_array($fieldName, $ratifiedNullableKeys, true),
+            ARRAY_FILTER_USE_BOTH,
+        );
     }
 
     /**

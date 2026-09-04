@@ -80,7 +80,9 @@ final class AnalyseCliTest extends CliTestCase
         self::assertSame(0, $summary['exitCode'] ?? null);
         $score = $report['score'] ?? null;
         self::assertIsArray($score);
-        self::assertSame(['grade' => 'N/A', 'score' => 0], $score['composite'] ?? null);
+        // A run that scored nothing publishes nulls: 'N/A' with a 0 read as a failing grade to any
+        // consumer comparing numbers, which is the confusion the ratified applicability contract removes.
+        self::assertSame(['grade' => null, 'score' => null], $score['composite'] ?? null);
         self::assertIsArray($diagnostics);
         $emptyAnalysisDiagnostic = $diagnostics[0] ?? null;
         self::assertIsArray($emptyAnalysisDiagnostic);
@@ -192,7 +194,9 @@ final class AnalyseCliTest extends CliTestCase
         $process->run();
 
         self::assertSame(1, $process->getExitCode());
-        self::assertStringContainsString('[error] size.file-length', $process->getOutput());
+        // FAMILY-CONTRACT section 1: one dash-line per finding, with the location between the
+        // severity and the rule id, so the rule no longer follows the bracket directly.
+        self::assertStringContainsString('[error] tests/Fixtures/Source/mixed/alpha.php:1 size.file-length', $process->getOutput());
         self::assertStringContainsString('Exit code: 1', $process->getOutput());
     }
 
