@@ -6,6 +6,7 @@ namespace GruffPhp\Output\Reporter;
 
 use GruffPhp\Engine\Analysis\AnalysisReport;
 use GruffPhp\Engine\Analysis\RunDiagnostic;
+use GruffPhp\Results\Finding\BaselineIdentity;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Pillar;
 use GruffPhp\Results\Finding\Severity;
@@ -282,7 +283,6 @@ final readonly class SarifReporter
             $properties['metadata'] = $finding->metadata;
         }
 
-        // Two fingerprints: the precise one moves with the line, the stable one survives line drift.
         return [
             'ruleId' => $finding->ruleId,
             'ruleIndex' => $ruleIndex,
@@ -293,12 +293,33 @@ final readonly class SarifReporter
             'locations' => [[
                                           'physicalLocation' => $physicalLocation,
                                       ]],
-            'partialFingerprints' => [
-                'gruffFingerprint' => $finding->fingerprint(),
-                'gruffStableIdentity' => $finding->stableIdentity(),
-            ],
             'properties' => $properties,
-        ];
+        ] + $this->partialFingerprints($finding);
+    }
+
+    /**
+     * Projects one finding into the fingerprints GitHub code scanning groups its alerts by.
+     *
+     * `gruffFingerprint` is the ratified durable identity and nothing else, so an alert survives a line move while a
+     * second declaration of one name opens its own alert. A sensitive finding has no identity at all and therefore
+     * carries no `partialFingerprints` key: publishing one would give a secret a stable name in a system gruff does
+     * not control.
+     *
+     * @param Finding $finding - Finding being rendered as a SARIF result.
+     *
+     * @return array{partialFingerprints?: array{gruffFingerprint: string}} - The key to merge into the result, or an
+     *                                                                       empty array for a sensitive finding.
+     */
+    private function partialFingerprints(Finding $finding): array
+    {
+        // A secret is never given a durable name, in this port or in the external system reading its report.
+        if (!BaselineIdentity::isEligible($finding)) {
+            return [];
+        }
+
+        $ordinals = BaselineIdentity::assignOrdinals([$finding]);
+
+        return ['partialFingerprints' => ['gruffFingerprint' => BaselineIdentity::identityOf($finding, $ordinals[spl_object_id($finding)] ?? 1)]];
     }
 
     /**

@@ -17,6 +17,7 @@ use GruffPhp\Rules\Shared\PhysicalCommentAttachment;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
+use GruffPhp\Support\DeclarationLine;
 use PhpParser\Comment;
 use PhpParser\Comment\Doc;
 use PhpParser\Modifiers;
@@ -307,7 +308,7 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
             $findings[] = $this->classConstantFinding(
                 $const->name->toString(),
                 $className,
-                $statement->getStartLine(),
+                DeclarationLine::of($statement),
                 $definition,
                 $analysisUnit,
                 [
@@ -496,7 +497,7 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
             $findings[] = $this->enumCaseFinding(
                 caseName:       $statement->name->toString(),
                 className:      $className,
-                line:           $statement->getStartLine(),
+                line:           DeclarationLine::of($statement),
                 definition:     $definition,
                 analysisUnit:   $analysisUnit,
                 commentKind:    $this->localCommentKind($statement, meaningfulOnly: true, source: $analysisUnit->source),

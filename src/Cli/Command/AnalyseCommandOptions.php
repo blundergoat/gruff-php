@@ -183,6 +183,8 @@ final readonly class AnalyseCommandOptions
                                       generateBaselinePath: $generateFlagPresent
                                                                 ? (self::optionalStringOption($input, 'generate-baseline') ?? BaselineStore::DEFAULT_FILENAME)
                                                                 : null,
+                                      migrateBaselinePath:  self::optionalStringOption($input, 'migrate-baseline'),
+                                      shouldForceBaselineOverwrite: (bool)$input->getOption('force'),
                                   ),
             reportEditorLink:       $reportEditorLink,
             isReportInteractive:    $isReportInteractive,
@@ -641,6 +643,11 @@ final readonly class AnalyseCommandOptions
      */
     private function baselineUsageError(): ?string
     {
+        // A migration has nowhere to write without a new path, and writing over the input would destroy the user's retreat copy.
+        if ($this->baseline->migrateBaselinePath !== null && $this->baseline->generateBaselinePath === null) {
+            return '--migrate-baseline requires --generate-baseline <new path>; the migrated file is written there and the original is left untouched.';
+        }
+
         // With at most one of `--baseline` / `--generate-baseline` set there is no clash, so allow the run.
         if ($this->baseline->baselinePath === null || $this->baseline->generateBaselinePath === null) {
             return null;

@@ -81,7 +81,7 @@ final readonly class MockOnlyTestRule implements RuleInterface
                 ruleId:      self::ID,
                 message:     sprintf('%s verifies mock interactions without a real assertion.', $scope->symbol),
                 filePath:    $analysisUnit->file->displayPath,
-                line:        $scope->line,
+                line:        $scope->anchorLine(),
                 severity:    Severity::Warning,
                 pillar:      Pillar::TestQuality,
                 tier:        RuleTier::V01,

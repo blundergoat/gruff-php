@@ -76,6 +76,19 @@ final class AnalyseCommand extends Command
             ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Output format: text, json, html, markdown, github, hotspot, or sarif.', default: OutputFormat::Text->value)
             ->addOption('fail-on', null, InputOption::VALUE_REQUIRED, 'Finding severity that fails the run: advisory, warning, error, or none.', default: FailThreshold::Advisory->value)
             ->addOption('fail-on-new', null, InputOption::VALUE_NONE, 'Fail only on findings introduced by the change (requires --baseline or --diff-vs). Shorthand for failureConditions.newFindings.severityThresholds.error: 0.')
+            ->addOption(
+                'force',
+                null,
+                InputOption::VALUE_NONE,
+                'Overwrite a 0.5 baseline at the default path; without it a generate that would destroy the retreat path is refused.',
+            )
+            ->addOption(
+                'force',
+                null,
+                InputOption::VALUE_NONE,
+                'Overwrite a 0.5 baseline at the default path; without it a generate that would destroy the retreat path is refused.',
+            )
+            ->addOption('migrate-baseline', null, InputOption::VALUE_REQUIRED, 'Path of a 0.5 baseline whose reviewed findings are carried into --generate-baseline; the original file is left untouched.')
             ->addOption('report-editor-link', null, InputOption::VALUE_REQUIRED, 'Editor link style for HTML file:line references: vscode, phpstorm, or none.', default: 'none')
             ->addOption('report-interactive', null, InputOption::VALUE_OPTIONAL, 'Render opt-in interactive HTML finding filters. Accepts true or false.', default: null)
             ->addOption('include-ignored', null, InputOption::VALUE_NONE, 'Scan ignored files by using filesystem traversal instead of Git/default ignores.')

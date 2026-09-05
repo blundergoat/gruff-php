@@ -15,6 +15,7 @@ use GruffPhp\Rules\Shared\PhysicalCommentAttachment;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
+use GruffPhp\Support\DeclarationLine;
 use PhpParser\Comment;
 use PhpParser\Comment\Doc;
 use PhpParser\Node\Stmt\Class_;
@@ -178,7 +179,7 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
                 $findings[] = $this->declaredPropertyFinding(
                     propertyName: $propertyProperty->name->toString(),
                     className:    $className,
-                    line:         $property->getStartLine(),
+                    line:         DeclarationLine::of($property),
                     definition:   $definition,
                     analysisUnit: $analysisUnit,
                 );

@@ -92,7 +92,7 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
                                  $threshold,
                              ),
                 filePath:    $analysisUnit->file->displayPath,
-                line:        $scope->line,
+                line:        $scope->anchorLine(),
                 severity:    Severity::Advisory,
                 pillar:      Pillar::TestQuality,
                 tier:        RuleTier::V01,

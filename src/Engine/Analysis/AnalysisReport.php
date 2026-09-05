@@ -559,14 +559,20 @@ final readonly class AnalysisReport
         }
 
         $legacy  = $baseline->toArray();
+        // The nine keys every port publishes, so one consumer reads five ports without a per-port branch.
+        // A generate or migrate run compared against nothing, so its movement counts are zero rather than absent.
         $payload = [
+            'applied' => !$baseline->generated,
             'entries' => $baseline->totalEntries,
             'generated' => $baseline->generated,
+            'newFindings' => $this->newFindingsCount ?? ($baseline->newCount + $baseline->collisionCount + $baseline->notEligibleCount),
+            'resolvedFindings' => $baseline->absentCount,
             'source' => $baseline->source,
             'stale' => $legacy['stale'],
             'staleEntries' => count($baseline->staleEntries),
             'staleEvaluation' => $baseline->staleEvaluation,
             'suppressedFindings' => $baseline->suppressedFindings,
+            'unchangedFindings' => $baseline->unchangedCount,
             'extensions' => [
                 'php' => ['baseline' => ['buckets' => $legacy['buckets']]],
             ],
@@ -574,10 +580,6 @@ final readonly class AnalysisReport
         $baselinePath = $this->machineRelativePath($baseline->path);
         if ($baselinePath !== null) {
             $payload['path'] = $baselinePath;
-        }
-
-        if ($this->newFindingsCount !== null) {
-            $payload['newFindings'] = $this->newFindingsCount;
         }
 
         return $payload;

@@ -93,7 +93,7 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
                     $cycles,
                 ),
                 filePath:    $analysisUnit->file->displayPath,
-                line:        $scope->line,
+                line:        $scope->anchorLine(),
                 severity:    Severity::Advisory,
                 pillar:      Pillar::TestQuality,
                 tier:        RuleTier::V01,

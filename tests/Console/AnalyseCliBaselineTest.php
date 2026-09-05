@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Console;
 
+use GruffPhp\Results\Finding\BaselineIdentity;
 use JsonException;
 use Symfony\Component\Process\Process;
 
@@ -180,7 +181,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
 
             self::assertSame(2, $process->getExitCode());
             self::assertStringContainsString('[BASELINE-ERROR]', $process->getOutput());
-            self::assertStringContainsString('Baseline schemaVersion must be "gruff.baseline.v2".', $process->getOutput());
+            self::assertStringContainsString('Baseline schemaVersion must be "gruff.baseline.v3".', $process->getOutput());
         } finally {
             $this->removeDir($tempDir);
         }
@@ -694,19 +695,23 @@ final class AnalyseCliBaselineTest extends CliTestCase
     }
 
     /**
-     * Write a one-group v2 baseline accepting the anonymous-class handler findings.
+     * Write a one-row v3 baseline reviewing the anonymous-class handler findings, which share one identity because both methods
+     * carry the symbol `class@anonymous::handle()`.
      *
      * @param string $project       - Fixture project root the baseline is written into.
-     * @param int    $acceptedCount - Accepted instance count for the handler group.
+     * @param int    $acceptedCount - Reviewed occurrence count for the shared identity.
      *
      * @return void
      */
     private function writeHandlerGroupBaseline(string $project, int $acceptedCount): void
     {
+        $identity = BaselineIdentity::computeFor('php', 'docs.missing-public-phpdoc', 'src/Handlers.php', 'class@anonymous::handle()#1');
+
         file_put_contents(
             $project . '/gruff-baseline.json',
             sprintf(
-                '{"schemaVersion":"gruff.baseline.v2","groups":[{"file":"src/Handlers.php","ruleId":"docs.missing-public-phpdoc","message":"Method class@anonymous::handle() needs a brief intent description above its declaration (one plain-English line; not a restatement of the method signature).","count":%d}]}',
+                '{"schemaVersion":"gruff.baseline.v3","toolLanguage":"php","generatedAt":"2026-09-05T00:00:00+00:00","occurrences":[{"identity":"%s","count":%d}],"sensitive":{"eligible":false,"reason":"r","counts":{"total":0,"byRule":{}}}}',
+                $identity,
                 $acceptedCount,
             ),
         );

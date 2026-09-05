@@ -50,10 +50,13 @@ final class RuleRegressionSnapshotTest extends TestCase
     {
         [$units, $findings, $json] = $this->analysePaths(['tests/Fixtures']);
 
-        self::assertCount(182, $units);
+        // M07 added tests/Fixtures/Baseline/gruff-baseline-v3.json to the corpus.
+        self::assertCount(183, $units);
         self::assertCount(2677, $findings);
+        // M07 moved 21 anchors off PHP 8 attribute groups onto the declarations they decorate. The finding
+        // count, the rule set, and every line-free identity are unchanged; only those 21 lines moved.
         self::assertSame(
-            'ec3a52081f8ea2a94f2502d7f318bb7c9ca45a90b4f45713698fad0fd3c9025a',
+            '86903a099ea044803950bb3b55bc93a50c906b6170d5adde64ab309524c5a5af',
             hash('sha256', $json),
         );
     }

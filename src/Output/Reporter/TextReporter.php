@@ -374,9 +374,9 @@ final readonly class TextReporter
                 $lines[] = sprintf(
                     '    %s %s (resolved %d): %s',
                     $resolvedEntry->ruleId,
-                    $resolvedEntry->filePath,
+                    $resolvedEntry->path,
                     $resolvedEntry->count,
-                    $resolvedEntry->message,
+                    $resolvedEntry->subject,
                 );
             }
         }

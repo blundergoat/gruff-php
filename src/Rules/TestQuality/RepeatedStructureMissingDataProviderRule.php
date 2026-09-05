@@ -14,6 +14,7 @@ use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
+use GruffPhp\Support\DeclarationLine;
 use PhpParser\Node;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Name;
@@ -134,7 +135,7 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
                         implode(', ', $names),
                     ),
                     filePath:    $analysisUnit->file->displayPath,
-                    line:        $first->getStartLine(),
+                    line:        DeclarationLine::of($first),
                     severity:    Severity::Advisory,
                     pillar:      Pillar::TestQuality,
                     tier:        RuleTier::V01,

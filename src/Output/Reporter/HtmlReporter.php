@@ -505,9 +505,9 @@ final readonly class HtmlReporter
                     $items[] = sprintf(
                         'Resolved: %s %s (resolved %d): %s',
                         $resolvedEntry->ruleId,
-                        $resolvedEntry->filePath,
+                        $resolvedEntry->path,
                         $resolvedEntry->count,
-                        $resolvedEntry->message,
+                        $resolvedEntry->subject,
                     );
                 }
             }

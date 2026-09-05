@@ -180,7 +180,7 @@ final readonly class SutNotCalledRule implements RuleInterface
                 ruleId:      self::ID,
                 message:     sprintf('%s name implies a SUT behavior, but no matching method call was detected.', $scope->symbol),
                 filePath:    $analysisUnit->file->displayPath,
-                line:        $scope->line,
+                line:        $scope->anchorLine(),
                 severity:    Severity::Error,
                 pillar:      Pillar::TestQuality,
                 tier:        RuleTier::V01,

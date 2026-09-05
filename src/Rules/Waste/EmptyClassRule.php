@@ -14,6 +14,7 @@ use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
+use GruffPhp\Support\DeclarationLine;
 use PhpParser\Node\Stmt\Class_;
 
 /**
@@ -93,7 +94,7 @@ final readonly class EmptyClassRule implements RuleInterface
                 ruleId:      $definition->id,
                 message:     sprintf('%s is an empty class with no members.', $symbol),
                 filePath:    $analysisUnit->file->displayPath,
-                line:        $class->getStartLine(),
+                line:        DeclarationLine::of($class),
                 severity:    $definition->defaultSeverity,
                 pillar:      $definition->pillar,
                 tier:        $definition->tier,
