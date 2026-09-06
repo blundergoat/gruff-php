@@ -389,7 +389,7 @@ final class AnalyseCliTest extends CliTestCase
         $diagnostic = $diagnostics[0] ?? null;
         self::assertIsArray($diagnostic);
         self::assertSame(
-            'Config key "allowlists.secretPreviews" only accepts an empty list; remove all configured entries because secret previews no longer suppress findings.',
+            'Config key "allowlists.secretPreviews" is removed in 0.6.0: FAMILY-CONTRACT.md section 5 makes category markers unconditional, so the key authorises nothing; delete it from the configuration.',
             $diagnostic['message'] ?? null,
         );
         self::assertStringNotContainsString('T3R2', $process->getOutput());

@@ -15,7 +15,7 @@ use Symfony\Component\Console\Input\InputOption;
 
 /**
  * Covers dashboard state construction: console input merging, fallback conventions, bare-flag preservation, checkbox unchecking, project-root
- * resolution, string-option validation, and the ADR-015 precedence chain (CLI > config.minimumSeverity.dashboard > binary default) through to the
+ * resolution, string-option validation, and the ADR-015 precedence chain (CLI > config.failOn.dashboard > binary default) through to the
  * scan command builder.
  */
 final class DashboardStateFactoryTest extends TestCase
@@ -196,7 +196,7 @@ final class DashboardStateFactoryTest extends TestCase
     /**
      * Verify the ADR-015 precedence chain resolves the dashboard initial-state threshold correctly.
      *
-     * Each row writes a `.gruff-php.yaml` carrying `minimumSeverity.dashboard:
+     * Each row writes a `.gruff-php.yaml` carrying `failOn.dashboard:
      * error`, then invokes `defaultQuery` with the parameters under test. The
      * expected value reflects which level of the chain wins: CLI flag (when
      * set explicitly), config (when no flag), or binary default (when
@@ -318,7 +318,7 @@ final class DashboardStateFactoryTest extends TestCase
     /**
      * Build a temporary project containing a .gruff-php.yaml with a dashboard threshold.
      *
-     * @param string $threshold - Threshold value to set under `minimumSeverity.dashboard`.
+     * @param string $threshold - Threshold value to set under `failOn.dashboard`.
      *
      * @return string - absolute root of the temp project whose `.gruff-php.yaml` now carries the threshold
      */
@@ -327,7 +327,7 @@ final class DashboardStateFactoryTest extends TestCase
         $project = $this->createProjectDir();
         file_put_contents(
             $project . '/.gruff-php.yaml',
-            "schemaVersion: gruff-php.config.v0.1\nminimumSeverity:\n    dashboard: " . $threshold . "\n",
+            "schemaVersion: gruff-php.config.v0.1\nfailOn:\n    dashboard: " . $threshold . "\n",
         );
 
         return $project;

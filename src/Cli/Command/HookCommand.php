@@ -5,6 +5,12 @@ declare(strict_types=1);
 namespace GruffPhp\Cli\Command;
 
 use GruffPhp\Engine\Analysis\RunDiagnostic;
+use GruffPhp\Engine\Analysis\SensitiveExclusionSummary;
+use GruffPhp\Results\Baseline\BaselineException;
+use GruffPhp\Results\Baseline\BaselineFilter;
+use GruffPhp\Results\Baseline\BaselineStore;
+use GruffPhp\Results\Finding\Confidence;
+use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Results\Baseline\BaselineApplicationOptions;
 use GruffPhp\Engine\Config\AnalysisConfig;
 use GruffPhp\Engine\Config\ConfigException;
@@ -21,7 +27,8 @@ use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Output\Hook\HookFindingFilter;
 use GruffPhp\Output\Hook\HookFindingIdentity;
 use GruffPhp\Output\Hook\HookFindingPresenter;
-use GruffPhp\Output\Hook\HookFindingScope;
+use GruffPhp\Output\Hook\HookRunAudit;
+use GruffPhp\Results\Finding\BaselineIdentity;
 use GruffPhp\Results\Mutation\MutationAnalysisOptions;
 use GruffPhp\Results\Review\GitArchiveSnapshot;
 use GruffPhp\Rules\Contracts\RuleContext;
@@ -34,12 +41,13 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Console\Output\ConsoleOutputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
  * Backs `gruff-php hook`, the machine-readable feedback channel editors and coding agents use instead of human reports.
  *
- * Callers can scope JSON findings to ranges, git changes, or items absent from a baseline under the stable `gruff.hook.v1` contract.
+ * Callers can scope JSON findings to ranges, git changes, or items absent from a baseline under the stable `gruff.hook.v2` contract.
  * A `--capabilities` probe lets an integration discover supported behavior before requesting analysis.
  */
 final class HookCommand extends Command
@@ -47,7 +55,22 @@ final class HookCommand extends Command
     /**
      * Contract version advertised in every hook payload and capability probe.
      */
-    private const CONTRACT_VERSION = 'gruff.hook.v1';
+    private const CONTRACT_VERSION = 'gruff.hook.v2';
+
+    /**
+     * Baseline schema this hook accepts; anything else is refused rather than read under the wrong matching rules.
+     */
+    private const BASELINE_SCHEMA_VERSION = 'gruff.baseline.v3';
+
+    /**
+     * Severity order the exit gate compares against; a severity nobody ranked sinks below every floor.
+     */
+    private const SEVERITY_RANK = ['advisory' => 0, 'warning' => 1, 'error' => 2];
+
+    /**
+     * Confidence order the exit gate compares against; an unrated finding ranks highest so it cannot slip under a gate.
+     */
+    private const CONFIDENCE_RANK = ['low' => 0, 'medium' => 1, 'high' => 2];
 
     /**
      * Registers the `hook` command's paths argument and every flag a caller types after `gruff-php hook`.
@@ -73,7 +96,11 @@ final class HookCommand extends Command
             ->addOption('since', null, InputOption::VALUE_REQUIRED, 'Use a git base ref for changed regions and new-only filtering.')
             ->addOption('baseline', null, InputOption::VALUE_REQUIRED, 'Path to a prior gruff.hook.v1 JSON report for new-only filtering.')
             ->addOption('include-rule', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Run only the named rule id. Can be repeated or comma-separated.')
-            ->addOption('exclude-rule', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Skip the named rule id. Can be repeated or comma-separated.');
+            ->addOption('exclude-rule', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Skip the named rule id. Can be repeated or comma-separated.')
+            ->addOption('fail-on', null, InputOption::VALUE_REQUIRED, 'Lowest severity that exits 1. The hook default of none keeps findings advisory.', default: 'none')
+            ->addOption('min-confidence', null, InputOption::VALUE_REQUIRED, 'Lowest confidence that reaches the exit gate: low, medium or high.')
+            ->addOption('fail-on-new', null, InputOption::VALUE_NONE, 'Exit 1 when any published finding is new against the applied baseline.')
+            ->addOption('fail-on-diagnostics', null, InputOption::VALUE_NONE, 'Exit 1 when the run reports any diagnostic, however minor.');
     }
 
     /**
@@ -127,6 +154,14 @@ final class HookCommand extends Command
             return Command::INVALID;
         }
 
+        $gate = $this->exitGate($input);
+        // A gate the user mistyped is worse than a command that refused, because the run would report a verdict nobody asked for.
+        if (is_string($gate)) {
+            $this->writeJson($output, $this->emptyReport(true, $gate));
+
+            return Command::INVALID;
+        }
+
         try {
             $diff          = $this->changedRegion($input, $projectRoot, $paths);
             $analysisPaths = $this->analysisPaths($projectRoot, $paths, $diff);
@@ -147,27 +182,196 @@ final class HookCommand extends Command
             );
             $hasNewOnlySource = $baseStableIdentities !== null;
             $filterResult     = (new HookFindingFilter())->apply($findings, $diff, $baseStableIdentities ?? [], $hasNewOnlySource);
+            $baselineResult   = $this->applyBaseline($input, $projectRoot, $filterResult->findings);
 
-            $this->writeJson(
-                $output,
-                $this->report(
-                    findings:         $filterResult->findings,
-                    suppressedCount:  $filterResult->suppressedCount + $analysis['suppressedCount'],
-                    ignoredPathRows:  $analysis['sources']->discovery->ignoredPathDetails,
-                    diagnostics:      $analysis['sources']->diagnostics,
-                    identities:       $filterResult->identities,
-                    isConfigSchemaOk: true,
-                    configError:      null,
-                ),
+            $payload = $this->report(
+                findings:         $baselineResult['findings'],
+                suppressedCount:  $filterResult->suppressedCount,
+                ignoredPathRows:  $analysis['sources']->discovery->ignoredPathDetails,
+                diagnostics:      $analysis['sources']->diagnostics,
+                runAudit:         new HookRunAudit(
+                                      mode:              $this->runMode($input),
+                                      scope:             $this->runScope($input),
+                                      paths:             $paths,
+                                      analysedFiles:     count($analysis['sources']->discovery->files),
+                                      isBaselineApplied: $baselineResult['path'] !== null,
+                                      baselinePath:      $baselineResult['path'],
+                                  ),
+                exclusions:       $analysis['suppressions'],
+                baselineStatuses: $baselineResult['statuses'],
             );
+            $this->writeJson($output, $payload);
 
-            return Command::SUCCESS;
+            return $this->exitCode($payload, $gate);
+        } catch (BaselineException $exception) {
+            // A baseline this port cannot read would otherwise suppress findings under rules nobody ratified. The
+            // reason goes to stderr as well as the payload, because a shell user reads one and an agent reads the other.
+            $this->writeJson($output, $this->emptyReport(true, $exception->getMessage(), 'baseline'));
+            $this->writeError($output, $exception->getMessage());
+
+            return Command::INVALID;
         } catch (DiffException | RuntimeException $exception) {
-            // An invalid git ref or unreadable baseline can prevent scoped analysis; integrations receive the operational error in-band.
+            // An invalid git ref or unreadable input can prevent scoped analysis; integrations receive the error in-band.
             $this->writeJson($output, $this->emptyReport(true, $exception->getMessage()));
 
             return Command::INVALID;
         }
+    }
+
+    /**
+     * Reads the four exit-gate flags, refusing a value outside the ratified vocabularies.
+     *
+     * @param InputInterface $input - Flags carrying `--fail-on`, `--min-confidence`, `--fail-on-new` and `--fail-on-diagnostics`.
+     *
+     * @return array{failOn: string, minConfidence: string, failOnNew: bool, failOnDiagnostics: bool}|string - The resolved gate, or the message explaining a rejected value.
+     */
+    private function exitGate(InputInterface $input): array|string
+    {
+        $failOn = strtolower(trim($this->stringOption($input, 'fail-on') ?? 'none'));
+
+        // `none` is the hook's default and keeps every finding advisory, which is why it is not a Severity case.
+        if ($failOn !== 'none' && Severity::tryFrom($failOn) === null) {
+            return sprintf('Unknown severity "%s" for --fail-on: want advisory, warning, error or none.', $failOn);
+        }
+
+        $minConfidence = strtolower(trim($this->stringOption($input, 'min-confidence') ?? Confidence::Low->value));
+
+        if (Confidence::tryFrom($minConfidence) === null) {
+            return sprintf('Unknown confidence "%s" for --min-confidence: want low, medium or high.', $minConfidence);
+        }
+
+        return [
+            'failOn' => $failOn,
+            'minConfidence' => $minConfidence,
+            'failOnNew' => (bool)$input->getOption('fail-on-new'),
+            'failOnDiagnostics' => (bool)$input->getOption('fail-on-diagnostics'),
+        ];
+    }
+
+    /**
+     * Decides what the hook tells the calling agent, reading the payload it just published rather than the raw scan.
+     *
+     * What blocks an edit is exactly what the agent was shown: a finding the changed-region filter or the baseline
+     * removed is not in the payload and does not block.
+     *
+     * @param array<string, mixed>                                                                  $payload - The published hook report.
+     * @param array{failOn: string, minConfidence: string, failOnNew: bool, failOnDiagnostics: bool} $gate    - The resolved exit gate.
+     *
+     * @return int - 0 when nothing reached the gate, 1 when something did.
+     */
+    private function exitCode(array $payload, array $gate): int
+    {
+        // A consumer may ask for any caveat to stop the edit, which is the only way a warning becomes blocking.
+        if ($gate['failOnDiagnostics'] && is_array($payload['diagnostics'] ?? null) && $payload['diagnostics'] !== []) {
+            return 1;
+        }
+
+        /** @var list<array<string, mixed>> $rows Findings this run published, each a decoded JSON object. */
+        $rows = is_array($payload['findings'] ?? null) ? $payload['findings'] : [];
+
+        foreach ($rows as $publishedFinding) {
+            if ($this->isGateReached($publishedFinding, $gate)) {
+                return 1;
+            }
+        }
+
+        return 0;
+    }
+
+    /**
+     * Reports whether one published finding reaches the gate the caller set.
+     *
+     * Severity and confidence are independent floors, so a finding blocks only by clearing both. The baseline
+     * dimension sits beside them: an unreviewed finding blocks whatever its severity, because it is what the edit added.
+     *
+     * @param array<string, mixed>                                                                  $publishedFinding - One finding from the payload.
+     * @param array{failOn: string, minConfidence: string, failOnNew: bool, failOnDiagnostics: bool} $gate             - The resolved exit gate.
+     *
+     * @return bool - True when this finding alone is enough to exit 1.
+     */
+    private function isGateReached(array $publishedFinding, array $gate): bool
+    {
+        if ($gate['failOnNew'] && ($publishedFinding['baselineStatus'] ?? null) === 'new') {
+            return true;
+        }
+
+        $severityFloor = self::SEVERITY_RANK[$gate['failOn']] ?? null;
+
+        // A `none` threshold names no floor at all, so no severity reaches it and only --fail-on-new can block.
+        if ($severityFloor === null) {
+            return false;
+        }
+
+        $severity   = self::SEVERITY_RANK[is_string($publishedFinding['severity'] ?? null) ? $publishedFinding['severity'] : ''] ?? 0;
+        $confidence = self::CONFIDENCE_RANK[is_string($publishedFinding['confidence'] ?? null) ? $publishedFinding['confidence'] : ''] ?? 2;
+
+        return $severity >= $severityFloor && $confidence >= (self::CONFIDENCE_RANK[$gate['minConfidence']] ?? 0);
+    }
+
+    /**
+     * Names which region selector chose the work, so a consumer can tell a targeted run from a whole-tree one.
+     *
+     * @param InputInterface $input - Flags carrying the region selectors.
+     *
+     * @return string - One of `changed-ranges`, `diff`, `since` or `full`.
+     */
+    private function runMode(InputInterface $input): string
+    {
+        // Explicit ranges are the narrowest selector and win when more than one is given.
+        if ($this->stringOption($input, 'changed-ranges') !== null) {
+            return 'changed-ranges';
+        }
+
+        if ($input->getOption('diff') !== null && $input->getOption('diff') !== false) {
+            return 'diff';
+        }
+
+        return $this->stringOption($input, 'since') !== null ? 'since' : 'full';
+    }
+
+    /**
+     * Names how wide each changed line was taken to be, which decides what a clean result actually proves.
+     *
+     * @param InputInterface $input - Flags carrying the region selectors.
+     *
+     * @return string - `symbol` when a region selector narrowed the run, `file` when nothing did.
+     */
+    private function runScope(InputInterface $input): string
+    {
+        // A region selector widens each changed line to its enclosing declaration; without one, the whole file was judged.
+        if ($this->runMode($input) === 'full') {
+            return 'file';
+        }
+
+        return 'symbol';
+    }
+
+    /**
+     * Applies a `--baseline` file, classifying every finding it covers and leaving the rest to be reported.
+     *
+     * The hook reads the same ratified baseline v3 file `analyse --generate-baseline` writes, so one review carries
+     * across both surfaces. A file in any other schema is refused rather than read under the wrong matching rules.
+     *
+     * @param InputInterface $input       - Flags carrying `--baseline`.
+     * @param string         $projectRoot - Project root the baseline path resolves against.
+     * @param list<Finding>  $findings    - Findings the changed-region filter left; the returned set is what the baseline gates.
+     *
+     * @return array{findings: list<Finding>, statuses: array<int, string>, path: string|null} - Gated findings, the status per finding, and the applied baseline path.
+     * @throws BaselineException When the named file is missing, malformed, in another schema, or written by another port.
+     */
+    private function applyBaseline(InputInterface $input, string $projectRoot, array $findings): array
+    {
+        $baselinePath = $this->stringOption($input, 'baseline');
+
+        // With no baseline named, every finding stands and none carries a status a consumer could misread as reviewed.
+        if ($baselinePath === null) {
+            return ['findings' => $findings, 'statuses' => [], 'path' => null];
+        }
+
+        $baseline = (new BaselineStore($projectRoot))->read($baselinePath);
+        $applied  = (new BaselineFilter())->apply($baseline, $findings, false);
+
+        return ['findings' => $applied['findings'], 'statuses' => $applied['statuses'], 'path' => $baselinePath];
     }
 
     /**
@@ -184,21 +388,26 @@ final class HookCommand extends Command
                 'version' => GruffApplication::VERSION,
             ],
             'supports' => [
-                'changedRanges' => true,
-                'diff' => true,
                 'baseline' => true,
-                'scopeField' => true,
-                'metadata' => true,
-                'stableIdentity' => true,
-                'ignoreReport' => true,
-                'newOnly' => true,
+                'baselineV3' => true,
+                'changedRanges' => true,
+                'confidenceGate' => true,
                 'deepScanBudget' => true,
+                'diagnostics' => true,
+                'diff' => true,
+                'ignoreReport' => true,
+                'metadata' => true,
+                'newOnly' => true,
+                'scopeField' => true,
+                'stableIdentity' => true,
             ],
             'flags' => [
-                'changedRanges' => '--changed-ranges',
-                'diff' => '--diff',
                 'baseline' => '--baseline',
+                'changedRanges' => '--changed-ranges',
                 'deepScanBudget' => '--deep-scan-budget',
+                'diff' => '--diff',
+                'failOnDiagnostics' => '--fail-on-diagnostics',
+                'minConfidence' => '--min-confidence',
             ],
             'flagOrder' => 'any',
         ];
@@ -309,8 +518,8 @@ final class HookCommand extends Command
      * @param AnalysisConfig    $config               - Effective config driving rule selection and ignores.
      * @param RuleRegistry      $registry             - Rule set executed against the discovered sources.
      *
-     * @return array{sources: AnalysisSourceSet, findings: list<Finding>, suppressedCount: int} - Discovered sources, every finding left after the
-     *                            configured sensitive exclusions ran, and how many those exclusions removed.
+     * @return array{sources: AnalysisSourceSet, findings: list<Finding>, suppressions: list<SensitiveExclusionSummary>} - Discovered sources, every
+     *                            finding left after the configured sensitive exclusions ran, and one audit row per configured exclusion.
      */
     private function analyse(
         string $projectRoot,
@@ -358,6 +567,8 @@ final class HookCommand extends Command
             excludePillars:         [],
             includeRules:           [],
             excludeRules:           [],
+            presentation:           new PresentationSelectors(),
+            minConfidence:          null,
             deepScanBudgetOverride: null,
         );
 
@@ -374,17 +585,11 @@ final class HookCommand extends Command
             ruleRunnerObserver: null,
         );
 
-        $suppressedCount = 0;
-        // Sensitive exclusions already removed their findings inside the pipeline; total them so the hook
-        // payload still reports a suppression count rather than a silently shorter list.
-        foreach ($analysisRun['suppressions'] as $summary) {
-            $suppressedCount += $summary->suppressed;
-        }
-
         return [
             'sources' => $analysisRun['sources'],
             'findings' => $analysisRun['findings'],
-            'suppressedCount' => $suppressedCount,
+            // The exclusion audit travels whole: section 13a requires the rows, not just a total.
+            'suppressions' => $analysisRun['suppressions'],
         ];
     }
 
@@ -652,9 +857,9 @@ final class HookCommand extends Command
      * @param int                 $suppressedCount  - How many findings were filtered out, shown so the caller knows some were hidden.
      * @param list<IgnoredPath>   $ignoredPathRows  - Ignored path records surfaced so the caller sees what was skipped.
      * @param list<RunDiagnostic> $diagnostics      - Analysis diagnostics, including nonfatal bounded-scan notes.
-     * @param array<int, string>  $identities       - Pre-disambiguated identity per finding, keyed by spl_object_id($finding).
-     * @param bool                $isConfigSchemaOk - Whether the config loaded cleanly; false flags a degraded run.
-     * @param string|null         $configError      - Error message to relay, or null when the config was fine.
+     * @param HookRunAudit                    $runAudit         - What this run did: mode, scope, operands, file count and baseline.
+     * @param list<SensitiveExclusionSummary> $exclusions       - One section 13a audit row per configured exclusion, zero matches included.
+     * @param array<int, string>              $baselineStatuses - Baseline status per finding, keyed by spl_object_id($finding); empty when none applied.
      *
      * @return array<string, mixed> - The full JSON-ready hook report.
      */
@@ -663,16 +868,21 @@ final class HookCommand extends Command
         int $suppressedCount,
         array $ignoredPathRows,
         array $diagnostics,
-        array $identities,
-        bool $isConfigSchemaOk,
-        ?string $configError,
+        HookRunAudit $runAudit,
+        array $exclusions,
+        array $baselineStatuses,
     ): array {
         $presenter = new HookFindingPresenter();
-        $rows      = [];
+        $ordinals  = BaselineIdentity::assignOrdinals($findings);
+        $presented = [];
         foreach ($findings as $finding) {
-            $stableIdentity = $identities[spl_object_id($finding)]
-                ?? HookFindingIdentity::forFinding($finding, HookFindingScope::classify($finding));
-            $rows[] = $presenter->toArray($finding, $stableIdentity);
+            $ordinal     = $ordinals[spl_object_id($finding)] ?? 0;
+            $presented[] = $presenter->toArray(
+                $finding,
+                $this->ratifiedIdentity($finding, $ordinal),
+                $ordinal,
+                $baselineStatuses[spl_object_id($finding)] ?? null,
+            );
         }
 
         return [
@@ -681,25 +891,82 @@ final class HookCommand extends Command
                 'name' => 'gruff-php',
                 'version' => GruffApplication::VERSION,
             ],
-            'findings' => $presenter->sort($rows),
+            'run' => $runAudit->toArray(self::BASELINE_SCHEMA_VERSION),
+            'findings' => $presenter->sort($presented),
             'suppressed' => [
                 'count' => $suppressedCount,
             ],
+            'suppressions' => array_map(
+                static fn(SensitiveExclusionSummary $exclusion): array => [
+                    'rule'       => $exclusion->rule,
+                    'path'       => $exclusion->path,
+                    'symbol'     => $exclusion->symbol,
+                    'reason'     => $exclusion->reason,
+                    'suppressed' => $exclusion->suppressed,
+                ],
+                $exclusions,
+            ),
             'ignored' => [
                 'paths' => array_map(
                     static fn(IgnoredPath $ignoredPath): array => $ignoredPath->toArray(),
                     $ignoredPathRows,
                 ),
             ],
-            'diagnostics' => array_map(
-                static fn(RunDiagnostic $diagnostic): array => $diagnostic->toArray(),
-                $diagnostics,
-            ),
+            'diagnostics' => $this->diagnosticRows($diagnostics),
             'config' => [
-                'schemaOk' => $isConfigSchemaOk,
-                'error' => $configError,
+                'schemaOk' => true,
+                'error' => null,
             ],
         ];
+    }
+
+    /**
+     * Names one finding with the ratified family identity, or with nothing where the family refuses to name it.
+     *
+     * A sensitive-data finding is deliberately unidentifiable: a durable identity is exactly what would let a stored
+     * review hide a secret. A finding this port cannot name is reported without one rather than with a guessed one.
+     *
+     * @param Finding $finding - The finding being named.
+     * @param int     $ordinal - Declaration ordinal ranked across the whole run; 0 when the finding names no symbol.
+     *
+     * @return string|null - The sixteen-character family identity, or null for a sensitive or unnameable finding.
+     */
+    private function ratifiedIdentity(Finding $finding, int $ordinal): ?string
+    {
+        // The family gives a sensitive finding no identity at all, so there is nothing to compute here.
+        if (!BaselineIdentity::isEligible($finding)) {
+            return null;
+        }
+
+        try {
+            return BaselineIdentity::identityOf($finding, $ordinal);
+        } catch (BaselineException) {
+            // A symbol carrying the ordinal separator lands here; a partial identity would collide two declarations.
+            return null;
+        }
+    }
+
+    /**
+     * Projects run diagnostics into the v2 shape, where every entry says what it means for the run.
+     *
+     * v1 left a consumer to infer severity from the diagnostic type, so a budget note and a run that could not happen
+     * looked alike. A diagnostic that invalidates the run is fatal; anything else is a warning read in-band.
+     *
+     * @param list<RunDiagnostic> $diagnostics - Diagnostics this run produced, in the order the engine emitted them.
+     *
+     * @return list<array<string, mixed>> - One JSON row per diagnostic, each carrying an explicit severity.
+     */
+    private function diagnosticRows(array $diagnostics): array
+    {
+        return array_map(
+            static function (RunDiagnostic $diagnostic): array {
+                $diagnosticRow = $diagnostic->toArray();
+                $diagnosticRow['severity'] = $diagnostic->isFatal ? 'fatal' : 'warning';
+
+                return $diagnosticRow;
+            },
+            $diagnostics,
+        );
     }
 
     /**
@@ -707,10 +974,11 @@ final class HookCommand extends Command
      *
      * @param bool        $isConfigSchemaOk - False when format, scope, or config stopped analysis; true once user config parsed successfully.
      * @param string|null $configError      - The error to relay, or null when the empty report isn't about an error.
+     * @param string      $diagnosticType   - Stable machine-readable kind for the fatal diagnostic, such as config or baseline.
      *
      * @return array<string, mixed> - Empty but schema-valid hook report.
      */
-    private function emptyReport(bool $isConfigSchemaOk, ?string $configError): array
+    private function emptyReport(bool $isConfigSchemaOk, ?string $configError, string $diagnosticType = 'usage-error'): array
     {
         return [
             'contractVersion' => self::CONTRACT_VERSION,
@@ -718,19 +986,47 @@ final class HookCommand extends Command
                 'name' => 'gruff-php',
                 'version' => GruffApplication::VERSION,
             ],
+            'run' => (new HookRunAudit(mode: 'full', scope: 'file', paths: [], analysedFiles: 0))->toArray(self::BASELINE_SCHEMA_VERSION),
             'findings' => [],
             'suppressed' => [
                 'count' => 0,
             ],
+            'suppressions' => [],
             'ignored' => [
                 'paths' => [],
             ],
-            'diagnostics' => [],
+            // Nothing was analysed, so this is fatal rather than a caveat attached to a result the consumer could use.
+            'diagnostics' => $configError === null ? [] : [[
+                'type'     => $diagnosticType,
+                'severity' => 'fatal',
+                'message'  => $configError,
+                'file'     => null,
+                'line'     => null,
+                'path'     => null,
+            ]],
             'config' => [
                 'schemaOk' => $isConfigSchemaOk,
-                'error' => $configError,
+                // A configuration a consumer cannot fix is a dead end, so the error carries its remediation.
+                'error' => $configError === null ? null : [
+                    'message'     => $configError,
+                    'remediation' => 'Fix the reported problem in .gruff-php.yaml, or pass --no-config to run without project configuration.',
+                ],
             ],
         ];
+    }
+
+    /**
+     * Writes one error line to stderr, so a shell user sees the reason without parsing the JSON payload.
+     *
+     * @param OutputInterface $output  - The command's output; its error stream is used when one exists.
+     * @param string          $message - The reason the run could not proceed.
+     *
+     * @return void
+     */
+    private function writeError(OutputInterface $output, string $message): void
+    {
+        $errorOutput = $output instanceof ConsoleOutputInterface ? $output->getErrorOutput() : $output;
+        $errorOutput->writeln($message);
     }
 
     /**

@@ -57,6 +57,11 @@ use Symfony\Component\Console\Output\OutputInterface;
 final class AnalyseCommand extends Command
 {
     /**
+     * Superseded flag spellings and the family names that replace them, each behaving identically.
+     */
+    private const SUPERSEDED_SPELLINGS = ['diff-vs' => '--diff-base'];
+
+    /**
      * Declares every argument, flag, and `--help` line the user can type after `gruff-php analyse` -
      * the paths to scan plus the long list of scope, baseline, mutation, diff, and output options.
      *
@@ -107,6 +112,13 @@ final class AnalyseCommand extends Command
             ->addOption('changed-only', null, InputOption::VALUE_NONE, 'With --diff-vs, compare only files changed from the base ref.')
             ->addOption('paths-relative-to', null, InputOption::VALUE_REQUIRED, 'Normalize absolute finding paths relative to this directory for reports.')
             ->addOption('min-severity', null, InputOption::VALUE_REQUIRED, 'Display only findings at or above advisory, warning, or error.')
+            ->addOption('min-confidence', null, InputOption::VALUE_REQUIRED, 'Lowest confidence that reaches the exit gate: low, medium, or high. Never filters the report.')
+            ->addOption('show-rule', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Display only these comma-separated rule IDs. Never changes execution or the score.')
+            ->addOption('hide-rule', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Hide these comma-separated rule IDs from the report.')
+            ->addOption('show-pillar', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Display only these comma-separated pillars.')
+            ->addOption('hide-pillar', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Hide these comma-separated pillars from the report.')
+            ->addOption('scan-timeout', null, InputOption::VALUE_REQUIRED, 'Parsed and accepted for cross-port compatibility; gruff-php enforces no scan deadline on analyse.')
+            ->addOption('diff-base', null, InputOption::VALUE_REQUIRED, 'The ref a diff is taken against. Canonical spelling of --diff-vs.')
             ->addOption('include-pillar', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Display only these comma-separated pillars or repeated values.')
             ->addOption('exclude-pillar', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Hide these comma-separated pillars or repeated values.')
             ->addOption('include-rule', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Run only these comma-separated rule IDs or repeated values.')
@@ -148,6 +160,43 @@ final class AnalyseCommand extends Command
      *
      * @return int - Symfony exit code: SUCCESS when clean, FAILURE when a fail-on gate trips, INVALID on a run diagnostic.
      */
+    /**
+     * Prints one line per superseded flag spelling the user typed, naming the family name that replaces it.
+     *
+     * The run continues: behaviour is identical under the family spelling, so refusing would break a working command
+     * line for a rename. The warning is what tells the user the old name is going away.
+     *
+     * @param InputInterface  $input  - The parsed command line.
+     * @param OutputInterface $output - Destination whose error stream carries the notice, so stdout stays parseable.
+     *
+     * @return void
+     */
+    private function warnSupersededSpellings(InputInterface $input, OutputInterface $output): void
+    {
+        $errorOutput = $output instanceof ConsoleOutputInterface ? $output->getErrorOutput() : $output;
+
+        foreach (self::SUPERSEDED_SPELLINGS as $superseded => $replacement) {
+            // A flag the user did not type needs no notice, and a null value means exactly that.
+            if ($input->getOption($superseded) === null) {
+                continue;
+            }
+
+            $errorOutput->writeln(sprintf(
+                '--%s is superseded by %s and behaves identically; the old spelling is going away.',
+                $superseded,
+                $replacement,
+            ));
+        }
+    }
+
+    /**
+     * Runs one `gruff-php analyse` call end to end: validate the flags, scan, score, then render the chosen format.
+     *
+     * @param InputInterface  $input  - Parsed flags and paths for this run.
+     * @param OutputInterface $output - Destination for the rendered report.
+     *
+     * @return int - 0 when nothing reached the exit gate, 1 when a finding did, 2 when the run could not happen.
+     */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $runtimeStart             = hrtime(true);
@@ -158,6 +207,8 @@ final class AnalyseCommand extends Command
         $shouldListAbsentBaseline = (bool)$input->getOption('baseline-include-absent');
         $findingSupport           = new AnalysisFindingSupport();
         $branchReviewBuilder      = new BranchReviewBuilder();
+
+        $this->warnSupersededSpellings($input, $output);
 
         $setupResult = (new AnalyseCommandSetupBuilder())->build($input, $output, $this->getApplication());
 
@@ -264,7 +315,7 @@ final class AnalyseCommand extends Command
         $exitCode         = $gate['exitCode'];
         $failureReason    = $gate['trip'];
         $newFindingsCount = $setup->failThresholds->newFindingsGate instanceof FailThresholds ? count($newFindings) : null;
-        $displayFilter    = $options->displayFilter();
+        $displayFilter    = $options->displayFilter()->withConfiguredFloor($config->displayFloor());
         $displayFindings  = $displayFilter->apply($findings);
         $displayReview    = $review?->filtered(fn(array $reviewFindings): array => $displayFilter->apply($reviewFindings));
         $analysisReport   = new AnalysisReport(
@@ -419,9 +470,30 @@ final class AnalyseCommand extends Command
         // Setup produced a partial report, so render the failure through the same `--format` the user chose (JSON, SARIF, and so on).
         if ($result->report instanceof AnalysisReport && $result->format instanceof OutputFormat) {
             $this->renderReport($result->report, $result->format, $output);
+            $this->writeSetupDiagnosticsToError($result->report, $output);
         }
 
         return $result->exitCode;
+    }
+
+    /**
+     * Repeats a failed run's diagnostics on stderr, so a shell user reads the reason without parsing the report.
+     *
+     * The report on stdout is the artifact a machine consumer parses, and in a chosen format it may be JSON or SARIF.
+     * A configuration the loader refused is not part of that artifact: it is why there is no artifact worth reading.
+     *
+     * @param AnalysisReport  $report - The partial report setup produced, whose diagnostics carry the reason.
+     * @param OutputInterface $output - The command's output; its error stream is used when one exists.
+     *
+     * @return void
+     */
+    private function writeSetupDiagnosticsToError(AnalysisReport $report, OutputInterface $output): void
+    {
+        $errorOutput = $output instanceof ConsoleOutputInterface ? $output->getErrorOutput() : $output;
+
+        foreach ($report->diagnostics as $diagnostic) {
+            $errorOutput->writeln($diagnostic->message);
+        }
     }
 
     /**

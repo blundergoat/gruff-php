@@ -8,7 +8,7 @@ use JsonException;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers the gruff.hook.v1 agent-hook CLI contract.
+ * Covers the gruff.hook.v2 agent-hook CLI contract.
  */
 final class HookCliContractTest extends CliTestCase
 {
@@ -23,7 +23,7 @@ final class HookCliContractTest extends CliTestCase
         [$process, $report] = $this->runHook(self::PROJECT_ROOT, ['hook', '--capabilities', '--format', 'json']);
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-        self::assertSame('gruff.hook.v1', $report['contractVersion'] ?? null);
+        self::assertSame('gruff.hook.v2', $report['contractVersion'] ?? null);
         self::assertSame('any', $report['flagOrder'] ?? null);
 
         $flags = $report['flags'] ?? null;
@@ -35,7 +35,11 @@ final class HookCliContractTest extends CliTestCase
 
         $supports = $report['supports'] ?? null;
         self::assertIsArray($supports);
-        foreach (['changedRanges', 'diff', 'baseline', 'scopeField', 'metadata', 'stableIdentity', 'ignoreReport', 'newOnly', 'deepScanBudget'] as $capability) {
+        // v2 adds four advertisements, and each must be true of this port rather than merely present.
+        foreach ([
+            'baseline', 'baselineV3', 'changedRanges', 'confidenceGate', 'deepScanBudget', 'diagnostics',
+            'diff', 'ignoreReport', 'metadata', 'newOnly', 'scopeField', 'stableIdentity',
+        ] as $capability) {
             self::assertTrue($supports[$capability] ?? false, $capability);
         }
     }
@@ -154,7 +158,7 @@ final class HookCliContractTest extends CliTestCase
                 'Example.php',
             ]);
 
-            self::assertSame('gruff.hook.v1', $report['contractVersion'] ?? null);
+            self::assertSame('gruff.hook.v2', $report['contractVersion'] ?? null);
             self::assertSame(0, $this->suppressedCount($report));
 
             $fileLength = $this->firstFindingByRule($this->findingRows($report), 'size.file-length');
@@ -216,7 +220,7 @@ final class HookCliContractTest extends CliTestCase
             file_put_contents($tempDir . '/gruff-test.yaml', $this->focusedConfig(5, false));
             file_put_contents($tempDir . '/Example.php', $this->oversizedSource(7));
 
-            [$baselineProcess, $baselineReport] = $this->runHook($tempDir, [
+            [, $baselineReport] = $this->runHook($tempDir, [
                 'hook',
                 'Example.php',
                 '--config',
@@ -224,7 +228,7 @@ final class HookCliContractTest extends CliTestCase
                 '--format',
                 'json',
             ]);
-            file_put_contents($tempDir . '/baseline.json', $baselineProcess->getOutput());
+            $this->generateBaseline($tempDir, 'gruff-test.yaml', 'baseline.json');
 
             $baselineFinding = $this->firstFindingByRule($this->findingRows($baselineReport), 'size.file-length');
             self::assertNotNull($baselineFinding);
@@ -255,19 +259,14 @@ final class HookCliContractTest extends CliTestCase
                 'json',
             ]);
             self::assertSame([], $this->findingRows($filteredReport));
-            self::assertSame(1, $this->suppressedCount($filteredReport));
+            // v2 reports the applied baseline in the run block; suppressed.count stays the changed-region filter's own count.
+            $runBaselineBlock = $this->runBaselineBlock($filteredReport);
+            self::assertTrue($runBaselineBlock['applied'] ?? false);
+            self::assertSame('gruff.baseline.v3', $runBaselineBlock['schemaVersion'] ?? null);
 
             file_put_contents($tempDir . '/gruff-new.yaml', $this->focusedConfig(7, false));
             file_put_contents($tempDir . '/New.php', $this->oversizedSource(5));
-            [$cleanBaselineProcess] = $this->runHook($tempDir, [
-                'hook',
-                'New.php',
-                '--config',
-                'gruff-new.yaml',
-                '--format',
-                'json',
-            ]);
-            file_put_contents($tempDir . '/clean-baseline.json', $cleanBaselineProcess->getOutput());
+            $this->generateBaseline($tempDir, 'gruff-new.yaml', 'clean-baseline.json');
             file_put_contents($tempDir . '/New.php', $this->oversizedSource(9));
 
             [, $newFindingReport] = $this->runHook($tempDir, [
@@ -300,7 +299,7 @@ final class HookCliContractTest extends CliTestCase
             file_put_contents($tempDir . '/gruff-test.yaml', $this->symbolOnlyConfig());
             file_put_contents($tempDir . '/Example.php', $this->singleEmptyMethodSource());
 
-            [$baselineProcess, $baselineReport] = $this->runHook($tempDir, [
+            [, $baselineReport] = $this->runHook($tempDir, [
                 'hook',
                 'Example.php',
                 '--config',
@@ -308,7 +307,7 @@ final class HookCliContractTest extends CliTestCase
                 '--format',
                 'json',
             ]);
-            file_put_contents($tempDir . '/baseline.json', $baselineProcess->getOutput());
+            $this->generateBaseline($tempDir, 'gruff-test.yaml', 'baseline.json');
             $baselineFinding = $this->firstFindingByRule($this->findingRows($baselineReport), 'waste.empty-method');
             self::assertNotNull($baselineFinding);
 
@@ -338,7 +337,8 @@ final class HookCliContractTest extends CliTestCase
                 'json',
             ]);
             self::assertSame([], $this->findingRows($filteredReport));
-            self::assertSame(1, $this->suppressedCount($filteredReport));
+            // A baseline match is reviewed debt, not a changed-region drop, so the run block is what records it.
+            self::assertTrue($this->runBaselineBlock($filteredReport)['applied'] ?? false);
         } finally {
             $this->removeDir($tempDir);
         }
@@ -442,8 +442,12 @@ YAML);
             $config = $badReport['config'] ?? null;
             self::assertIsArray($config);
             self::assertFalse($config['schemaOk'] ?? true);
-            self::assertIsString($config['error'] ?? null);
-            self::assertStringContainsString('schemaVersion', $config['error']);
+            // v2 carries the error as an object, because a configuration a consumer cannot fix is a dead end.
+            self::assertIsArray($config['error'] ?? null);
+            $configError = $config['error'];
+            self::assertIsString($configError['message'] ?? null);
+            self::assertStringContainsString('schemaVersion', $configError['message']);
+            self::assertNotSame('', $config['error']['remediation'] ?? '');
         } finally {
             $this->removeDir($tempDir);
         }
@@ -525,11 +529,13 @@ YAML);
             ]);
 
             self::assertSame(2, $process->getExitCode());
-            self::assertSame('gruff.hook.v1', $report['contractVersion'] ?? null);
+            self::assertSame('gruff.hook.v2', $report['contractVersion'] ?? null);
             $config = $report['config'] ?? null;
             self::assertIsArray($config);
-            self::assertIsString($config['error'] ?? null);
-            self::assertStringContainsString('baseline', $config['error']);
+            self::assertIsArray($config['error'] ?? null);
+            $configError = $config['error'];
+            self::assertIsString($configError['message'] ?? null);
+            self::assertStringContainsString('baseline', $configError['message']);
         } finally {
             $this->removeDir($tempDir);
         }
@@ -569,6 +575,51 @@ YAML);
         } finally {
             $this->removeDir($tempDir);
         }
+    }
+
+    /**
+     * Write a ratified baseline v3 file the hook can apply, the same file `analyse --generate-baseline` gives a user.
+     *
+     * @param string $cwd          - Project directory the baseline is generated in.
+     * @param string $configFile   - Config the generating scan runs under, so the baseline covers the same rules.
+     * @param string $baselineFile - Project-relative destination for the generated baseline.
+     *
+     * @return void
+     */
+    private function generateBaseline(string $cwd, string $configFile, string $baselineFile): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            self::PROJECT_ROOT . '/bin/gruff-php',
+            'analyse',
+            '.',
+            '--config',
+            $configFile,
+            '--generate-baseline',
+            $baselineFile,
+        ], $cwd);
+        $process->run();
+
+        // A generating scan still reports its findings, so its exit code says nothing about whether the file was written.
+        self::assertFileExists($cwd . '/' . $baselineFile, $process->getErrorOutput());
+    }
+
+    /**
+     * Read the applied-baseline block a v2 hook payload reports, so a test can assert what classified the run.
+     *
+     * @param array<string, mixed> $report - Decoded hook report.
+     *
+     * @return array<string, mixed> - The run block's baseline map: applied, schemaVersion, and path.
+     */
+    private function runBaselineBlock(array $report): array
+    {
+        $runAudit = $report['run'] ?? null;
+        self::assertIsArray($runAudit);
+        $baseline = $runAudit['baseline'] ?? null;
+        self::assertIsArray($baseline);
+
+        /** @var array<string, mixed> $baseline Decoded JSON object, asserted as an array above. */
+        return $baseline;
     }
 
     /**

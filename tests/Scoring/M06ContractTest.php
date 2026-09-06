@@ -68,31 +68,49 @@ final class M06ContractTest extends TestCase
      * This is the property the ratified shape exists to deliver: duplication doubles the findings and
      * the evaluated files together, so the density they make is unchanged. The retired absolute-sum
      * shape failed it - a 4x duplication of identical code cost gruff-php nearly ten composite points.
+     *
+     * @return void
      */
     public function testScaleIsNotAnAutomaticPenalty(): void
     {
         $single     = [$this->finding('naming.one', Pillar::Naming, Severity::Warning, filePath: 'src/A.php')];
-        $doubled    = [...$single, $this->finding('naming.one', Pillar::Naming, Severity::Warning, filePath: 'src/B.php')];
         $quadrupled = [
-            ...$doubled,
+            ...$single,
+            $this->finding('naming.one', Pillar::Naming, Severity::Warning, filePath: 'src/B.php'),
             $this->finding('naming.one', Pillar::Naming, Severity::Warning, filePath: 'src/C.php'),
             $this->finding('naming.one', Pillar::Naming, Severity::Warning, filePath: 'src/D.php'),
         ];
 
         $base = (new ScoreCalculator())->calculate($single, self::EVALUATED_FILES, null, DiffResult::inactive());
-        self::assertNotNull($base->composite);
-
-        $scaled = (new ScoreCalculator())->calculate($doubled, self::EVALUATED_FILES * 2, null, DiffResult::inactive());
-        self::assertNotNull($scaled->composite);
-        self::assertSame($base->composite->score, $scaled->composite->score);
-
         $wide = (new ScoreCalculator())->calculate($quadrupled, self::EVALUATED_FILES * 4, null, DiffResult::inactive());
+
+        self::assertNotNull($base->composite);
         self::assertNotNull($wide->composite);
         self::assertSame($base->composite->score, $wide->composite->score);
     }
 
     /**
+     * Doubling a project must not move its grade either, which is the same property at the smaller factor.
+     *
+     * @return void
+     */
+    public function testScaleIsNotAnAutomaticPenaltyWhenDoubled(): void
+    {
+        $single  = [$this->finding('naming.one', Pillar::Naming, Severity::Warning, filePath: 'src/A.php')];
+        $doubled = [...$single, $this->finding('naming.one', Pillar::Naming, Severity::Warning, filePath: 'src/B.php')];
+
+        $base   = (new ScoreCalculator())->calculate($single, self::EVALUATED_FILES, null, DiffResult::inactive());
+        $scaled = (new ScoreCalculator())->calculate($doubled, self::EVALUATED_FILES * 2, null, DiffResult::inactive());
+
+        self::assertNotNull($base->composite);
+        self::assertNotNull($scaled->composite);
+        self::assertSame($base->composite->score, $scaled->composite->score);
+    }
+
+    /**
      * Adding a finding without adding a file can only worsen its own pillar.
+     *
+     * @return void
      */
     public function testMonotonicityAtAFixedDenominator(): void
     {
@@ -133,17 +151,18 @@ final class M06ContractTest extends TestCase
 
     /**
      * A reachable clean pillar scores 100; a run that evaluated nothing scores nothing at all.
+     *
+     * @return void
      */
     public function testApplicabilityKeepsNullApartFromPerfect(): void
     {
         $clean = (new ScoreCalculator())->calculate([], self::EVALUATED_FILES, null, DiffResult::inactive());
 
-        foreach ($clean->pillars as $pillar) {
-            // The mutation pillar is graded from an Infection report, which this run has none of.
-            if (!$pillar->applicable) {
-                continue;
-            }
+        // The mutation pillar is graded from an Infection report, which this run has none of, so it is not reachable here.
+        $reachable = array_filter($clean->pillars, static fn(PillarScore $pillar): bool => $pillar->applicable);
+        self::assertNotSame([], $reachable);
 
+        foreach ($reachable as $pillar) {
             self::assertNotNull($pillar->grade, sprintf('pillar %s has no grade', $pillar->pillar));
             self::assertSame(100.0, $pillar->grade->score, sprintf('reachable clean pillar %s', $pillar->pillar));
         }
@@ -159,6 +178,8 @@ final class M06ContractTest extends TestCase
 
     /**
      * Ties round away from zero, matching the four sibling ports.
+     *
+     * @return void
      */
     public function testSerializationRoundsToTwoDecimalsAwayFromZero(): void
     {
@@ -172,6 +193,8 @@ final class M06ContractTest extends TestCase
      *
      * Correlated rules disagree about which line to report, so a line in the cluster key would split
      * one root cause into two and bill it twice.
+     *
+     * @return void
      */
     public function testClusteringKeysOnSymbolWithoutLineIdentity(): void
     {
@@ -210,6 +233,8 @@ final class M06ContractTest extends TestCase
 
     /**
      * Every rule that produced a finding owes exactly one row, sorted by its native identifier.
+     *
+     * @return void
      */
     public function testRuleAttributionIsKeyedByNativeRuleId(): void
     {
@@ -234,6 +259,8 @@ final class M06ContractTest extends TestCase
 
     /**
      * The composite a person reads and the one a script reads come from one calculation.
+     *
+     * @return void
      */
     public function testMachineViewPublishesTheScoredComposite(): void
     {

@@ -213,7 +213,7 @@ final class GruffCliSummaryTest extends TestCase
 
         self::assertSame(2, $process->getExitCode());
         self::assertStringContainsString(
-            '[CONFIG-ERROR] Config key "allowlists.secretPreviews" only accepts an empty list; remove all configured entries because secret previews no longer suppress findings.',
+            '[CONFIG-ERROR] Config key "allowlists.secretPreviews" is removed in 0.6.0: FAMILY-CONTRACT.md section 5 makes category markers unconditional, so the key authorises nothing; delete it from the configuration.',
             $process->getOutput(),
         );
     }

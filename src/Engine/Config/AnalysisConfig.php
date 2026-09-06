@@ -6,6 +6,7 @@ namespace GruffPhp\Engine\Config;
 
 use GruffPhp\Output\Reporter\FailThreshold;
 use GruffPhp\Output\Reporter\FailThresholds;
+use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Rules\RuleRegistry;
 use InvalidArgumentException;
 
@@ -37,7 +38,7 @@ final readonly class AnalysisConfig
      * @var list<string>
      */
     public const DEFAULT_ACCEPTED_ABBREVIATIONS = [
-        'age', 'app', 'db', 'dto', 'fs', 'id', 'io', 'key', 'log', 'max', 'min', 'now', 'raw', 'rx', 'tx', 'ui', 'url', 'utc',
+        'age', 'app', 'db', 'fs', 'id', 'io', 'key', 'log', 'max', 'min', 'now', 'raw', 'rx', 'tx', 'ui', 'url',
     ];
 
     /**
@@ -54,6 +55,7 @@ final readonly class AnalysisConfig
      * @param FailThresholds|null                                                                    $failureConditions     - Severity count gate; null means the user configured no failureConditions block.
      * @param list<SensitiveExclusion>                                                               $sensitiveExclusions   - Reviewed sensitive-data exclusions in configuration order; empty means nothing is suppressed.
      * @param array{enabled: bool, maxLines: int, maxBytes: int, override: 'default'|'config'|'cli'} $deepScanBudget        - Effective structural-analysis budget and its winning source.
+     * @param Severity|null                                                                          $displayFloor          - Lowest severity a report shows; null means it shows everything it found.
      *
      * @throws InvalidArgumentException When the PHP version floor is below 7.4.
      */
@@ -73,6 +75,7 @@ final readonly class AnalysisConfig
             'maxBytes' => self::DEFAULT_DEEP_SCAN_MAX_BYTES,
             'override' => 'default',
         ],
+        private ?Severity       $displayFloor = null,
     ) {
         // gruff cannot reason about PHP older than 7.4, so a lower floor is rejected outright.
         if ($this->minimumPhpVersion < 7.4) {
@@ -367,7 +370,42 @@ final readonly class AnalysisConfig
             $this->failureConditions,
             $this->sensitiveExclusions,
             $this->deepScanBudget,
+            $this->displayFloor,
         );
+    }
+
+    /**
+     * Returns a copy carrying the report's display floor, the configuration form of the family's `--min-severity`.
+     *
+     * @param Severity $displayFloor - Lowest severity a report shows; it never changes an exit code, a score, or a baseline.
+     *
+     * @return self - Config carrying the display floor the reporter applies.
+     */
+    public function withDisplayFloor(Severity $displayFloor): self
+    {
+        return new self(
+            $this->rules,
+            $this->minimumPhpVersion,
+            $this->ruleSelection,
+            $this->ignoredPathPatterns,
+            $this->acceptedAbbreviations,
+            $this->allowedSecretPreviews,
+            $this->minimumSeverity,
+            $this->failureConditions,
+            $this->sensitiveExclusions,
+            $this->deepScanBudget,
+            $displayFloor,
+        );
+    }
+
+    /**
+     * Reads the configured display floor, so a report can hide what the project asked it to hide.
+     *
+     * @return Severity|null - The floor the project configured, or null when it set none and every severity shows.
+     */
+    public function displayFloor(): ?Severity
+    {
+        return $this->displayFloor;
     }
 
     /**

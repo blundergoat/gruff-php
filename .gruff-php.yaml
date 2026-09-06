@@ -7,7 +7,7 @@ deepScanBudget:
     enabled: true
     maxLines: 20000
     maxBytes: 2000000
-minimumSeverity:
+failOn:
     analyse: advisory
     report: none
     dashboard: none
@@ -59,7 +59,6 @@ allowlists:
         - uri
         - url
         - utc
-    secretPreviews: []
 selection:
     tiers: []
     pillars: []

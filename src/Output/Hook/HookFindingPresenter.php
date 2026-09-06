@@ -8,7 +8,7 @@ use GruffPhp\Results\Finding\Finding;
 use JsonException;
 
 /**
- * Shapes internal `Finding` objects into the `gruff.hook.v1` finding entries the `hook` command
+ * Shapes internal `Finding` objects into the `gruff.hook.v2` finding entries the `hook` command
  * emits to an editor or coding agent.
  *
  * This is the last pass before a finding leaves the tool: it copies the reportable fields, fills in
@@ -21,28 +21,33 @@ final readonly class HookFindingPresenter
 {
     /**
      * Builds the single JSON finding entry the `hook` command emits for one result, copying the
-     * reportable fields and attaching the caller's stable identity plus a freshly recomputed fingerprint.
+     * reportable fields and attaching the ratified family identity plus a freshly recomputed fingerprint.
      *
-     * @param Finding $finding        - The internal finding to reshape for the hook contract.
-     * @param string  $stableIdentity - Disambiguated hook identity for this finding, resolved across the full result set so no two entries collide.
+     * @param Finding     $finding        - The internal finding to reshape for the hook contract.
+     * @param string|null $stableIdentity - The ratified family identity, or null for a sensitive finding, which the family never names.
+     * @param int         $symbolOrdinal  - 1-based declaration ordinal of the finding's symbol in its file; 0 when it names no symbol.
+     * @param string|null $baselineStatus - What an applied baseline made of this finding; null when no baseline was applied.
      *
      * @return array<string, mixed> - JSON-ready hook finding entry with `metadata` always an object, never an empty list.
      * @throws JsonException When the fingerprint cannot be encoded.
      */
-    public function toArray(Finding $finding, string $stableIdentity): array
+    public function toArray(Finding $finding, ?string $stableIdentity, int $symbolOrdinal = 0, ?string $baselineStatus = null): array
     {
         $scope   = HookFindingScope::classify($finding);
         $payload = [
             'ruleId'         => $finding->ruleId,
             'pillar'         => $finding->pillar->value,
             'severity'       => $finding->severity->value,
+            'confidence'     => $finding->confidence->value,
             'scope'          => $scope,
             'file'           => $finding->filePath,
             'line'           => $finding->line,
-            'endLine'        => $finding->endLine,
+            'endLine'        => $this->endLine($finding),
             'symbol'         => $finding->symbol,
+            'symbolOrdinal'  => $symbolOrdinal,
             'message'        => $finding->message,
             'remediation'    => $finding->remediation ?? sprintf('Address the %s finding or configure the rule if this is intentional.', $finding->ruleId),
+            'baselineStatus' => $baselineStatus,
             'metadata'       => $this->metadata($finding),
             'stableIdentity' => $stableIdentity,
             'fingerprint'    => $finding->fingerprint(),
@@ -54,6 +59,27 @@ final readonly class HookFindingPresenter
         }
 
         return $payload;
+    }
+
+    /**
+     * Returns the span end every v2 finding carries, repeating the start line when the rule reported no span.
+     *
+     * A consumer locating a finding cannot treat an absent end as a single line by guessing, so the contract makes the
+     * field required and the single-line case explicit.
+     *
+     * @param Finding $finding - The finding whose span end is being reported.
+     *
+     * @return int|null - The last line the finding covers; null only when the finding names no line at all.
+     */
+    private function endLine(Finding $finding): ?int
+    {
+        // Without a start line there is no span to state, and `line` is null for the same reason.
+        if ($finding->line === null) {
+            return null;
+        }
+
+        // An unset or reversed end means the finding occupies its start line alone, which the contract says to spell out.
+        return $finding->endLine !== null && $finding->endLine >= $finding->line ? $finding->endLine : $finding->line;
     }
 
     /**

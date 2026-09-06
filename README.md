@@ -93,8 +93,10 @@ vendor/bin/gruff-php dashboard
 | `analyse [paths...]` | Run the analyzer and print findings. |
 | `summary [paths...]` | Print compact score, pillar, rule, and file summaries. |
 | `report [paths...]` | Render an HTML or JSON report to stdout or `--output`. |
+| `hook [paths...]` | Run gruff-php using the cross-analyzer agent-hook contract; emits `gruff.hook.v2` JSON. |
 | `dashboard` | Serve the local browser dashboard. |
 | `init` | Write a default `.gruff-php.yaml` populated with registry defaults. |
+| `migrate-config` | Rewrite a 0.5 config for the current schema, writing the result to a different file. |
 | `check-ignore <paths...>` | Report whether gruff would ignore each path, with the matching source and pattern. |
 | `list-rules [rule-id]` | Print rule metadata as a table or JSON, or show one rule's detail view. |
 | `list`, `help`, `completion` | Symfony Console command catalogue, help, and shell completion support. |

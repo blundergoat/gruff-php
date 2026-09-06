@@ -116,15 +116,24 @@ PHP, AbbreviationAllowlistRule::ID);
     }
 
     /**
-     * Verify universal DTO and UTC vocabulary stays quiet while domain and out-of-band names retain their contracts.
+     * Verify the shipped seed is exactly the ratified sixteen, so domain vocabulary stays a project decision.
+     *
+     * `dto` and `utc` were seeded here until 2026-09-06. FAMILY-CONTRACT.md section 8 ratifies sixteen entries and
+     * replace-not-merge loading, so two extra defaults meant a gruff-php project silently accepted two names no
+     * other port did, and a user who listed their own vocabulary lost them without being told.
      *
      * @return void
      */
-    public function testAbbreviationAllowlistShipsUniversalDtoAndUtcDefaults(): void
+    public function testAbbreviationAllowlistSeedsExactlyTheRatifiedSixteen(): void
     {
+        self::assertSame(
+            ['age', 'app', 'db', 'fs', 'id', 'io', 'key', 'log', 'max', 'min', 'now', 'raw', 'rx', 'tx', 'ui', 'url'],
+            AnalysisConfig::DEFAULT_ACCEPTED_ABBREVIATIONS,
+        );
+
         $findings = $this->analyseSourceRule(<<<'PHP'
 <?php
-function mapDomainValues(string $dto, string $utc, string $dob, string $uuid): void
+function mapDomainValues(string $dto, string $utc, string $dob, string $id): void
 {
 }
 PHP, AbbreviationAllowlistRule::ID);
@@ -134,7 +143,8 @@ PHP, AbbreviationAllowlistRule::ID);
         );
         sort($names);
 
-        self::assertSame(['dob'], $names);
+        // `id` is one of the sixteen and stays quiet; the three that are not are reported until a project lists them.
+        self::assertSame(['dob', 'dto', 'utc'], $names);
     }
 
     /**

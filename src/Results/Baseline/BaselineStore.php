@@ -91,11 +91,13 @@ final readonly class BaselineStore
             ));
         }
 
-        // The retired 0.4 layout has no migration path, so the user regenerates from a reviewed scan.
+        // The retired layout stores no identity this port can translate, so the user is pointed at the same route as
+        // any other pre-0.6 file: --migrate-baseline is the one command that turns an old baseline into a v3 one.
         if ($schemaVersion === self::RETIRED_SCHEMA_VERSION) {
             throw new BaselineException(sprintf(
-                'Baseline schema "%s" is no longer supported: baselines now store one line-free identity per reviewed finding. Regenerate with `gruff-php analyse --generate-baseline %s`.',
+                'Baseline schema "%s" is no longer supported: baselines now store one line-free identity per reviewed finding. Carry its reviews forward with `gruff-php analyse --migrate-baseline %s --generate-baseline <new path>`, or regenerate from a reviewed scan with `gruff-php analyse --generate-baseline %s`.',
                 self::RETIRED_SCHEMA_VERSION,
+                $path,
                 $path,
             ));
         }

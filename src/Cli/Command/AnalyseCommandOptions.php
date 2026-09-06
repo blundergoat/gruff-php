@@ -62,6 +62,8 @@ final readonly class AnalyseCommandOptions
      * @param list<string>                                            $excludePillars         - Pillars from `--exclude-pillar`; empty means nothing is filtered out of the report.
      * @param list<string>                                            $includeRules           - Rule IDs from `--include-rule` the run executes exclusively; empty means every configured rule runs. Enforced at execution level, like the hook command.
      * @param list<string>                                            $excludeRules           - Rule IDs from `--exclude-rule` that do not run at all; empty means nothing is excluded.
+     * @param PresentationSelectors                                   $presentation           - The four family flags that decide what the report shows and nothing else.
+     * @param string|null                                             $minConfidence          - Confidence floor from `--min-confidence`; null means every confidence reaches the exit gate.
      * @param array{enabled: bool, maxLines: int, maxBytes: int}|null $deepScanBudgetOverride - Parsed CLI budget override, or null when config/defaults govern.
      * @param string|null                                             $optionError            - A usage error found while parsing (the last failing check wins), or null when every flag was accepted.
      */
@@ -89,6 +91,8 @@ final readonly class AnalyseCommandOptions
         public array                      $includeRules,
         /** @var list<string> */
         public array                      $excludeRules,
+        public PresentationSelectors      $presentation,
+        public ?string                    $minConfidence,
         /** @var array{enabled: bool, maxLines: int, maxBytes: int}|null */
         public ?array                     $deepScanBudgetOverride = null,
         private ?string                   $optionError = null,
@@ -170,7 +174,7 @@ final readonly class AnalyseCommandOptions
                                       since:         self::optionalStringOption($input, 'since'),
                                       changedRanges: self::optionalStringOption($input, 'changed-ranges'),
                                       changedScope:  self::optionalStringOption($input, 'changed-scope') ?? 'symbol',
-                                      diffVs:        self::optionalStringOption($input, 'diff-vs'),
+                                      diffVs:        self::optionalStringOption($input, 'diff-base') ?? self::optionalStringOption($input, 'diff-vs'),
                                       isChangedOnly: (bool)$input->getOption('changed-only'),
                                   ),
             historyFile:   self::optionalStringOption($input, 'history-file'),
@@ -194,6 +198,13 @@ final readonly class AnalyseCommandOptions
             excludePillars:         self::stringListOption($input, 'exclude-pillar'),
             includeRules:           self::stringListOption($input, 'include-rule'),
             excludeRules:           self::stringListOption($input, 'exclude-rule'),
+            presentation:           new PresentationSelectors(
+                                        showRules:   self::stringListOption($input, 'show-rule'),
+                                        hideRules:   self::stringListOption($input, 'hide-rule'),
+                                        showPillars: self::stringListOption($input, 'show-pillar'),
+                                        hidePillars: self::stringListOption($input, 'hide-pillar'),
+                                    ),
+            minConfidence:          self::optionalStringOption($input, 'min-confidence'),
             deepScanBudgetOverride: $deepScanBudget,
             optionError:            $optionError,
         );
@@ -237,6 +248,8 @@ final readonly class AnalyseCommandOptions
             excludePillars:         $this->excludePillars,
             includeRules:           $this->includeRules,
             excludeRules:           $this->excludeRules,
+            presentation:           $this->presentation,
+            minConfidence:          $this->minConfidence,
             deepScanBudgetOverride: $this->deepScanBudgetOverride,
             optionError:            $this->optionError,
         );
@@ -287,6 +300,8 @@ final readonly class AnalyseCommandOptions
             excludePillars:         $this->excludePillars,
             includeRules:           $this->includeRules,
             excludeRules:           $this->excludeRules,
+            presentation:           $this->presentation,
+            minConfidence:          $this->minConfidence,
             deepScanBudgetOverride: $this->deepScanBudgetOverride,
             optionError:            $this->optionError,
         );
@@ -355,12 +370,16 @@ final readonly class AnalyseCommandOptions
      */
     public function displayFilter(): FindingDisplayFilter
     {
+        // The family spellings and this port's older ones feed one filter, because they describe the same view.
+        $shownPillars  = [...$this->includePillars, ...$this->presentation->showPillars];
+        $hiddenPillars = [...$this->excludePillars, ...$this->presentation->hidePillars];
+
         return new FindingDisplayFilter(
             minSeverity:    $this->minSeverity === null ? null : Severity::from($this->minSeverity),
-            includePillars: array_map(static fn(string $optionValue): Pillar => Pillar::from($optionValue), $this->includePillars),
-            excludePillars: array_map(static fn(string $optionValue): Pillar => Pillar::from($optionValue), $this->excludePillars),
-            includeRules:   $this->includeRules,
-            excludeRules:   $this->excludeRules,
+            includePillars: array_map(static fn(string $optionValue): Pillar => Pillar::from($optionValue), $shownPillars),
+            excludePillars: array_map(static fn(string $optionValue): Pillar => Pillar::from($optionValue), $hiddenPillars),
+            includeRules:   [...$this->includeRules, ...$this->presentation->showRules],
+            excludeRules:   [...$this->excludeRules, ...$this->presentation->hideRules],
         );
     }
 

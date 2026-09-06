@@ -142,7 +142,7 @@ view.
 
 `gruff-php hook --format json` carries the same `remediation` string and
 `metadata.remediationAction` / `metadata.configurationKey` fields in each
-`gruff.hook.v1` finding. The hook presenter passes non-threshold metadata
+`gruff.hook.v2` finding. The hook presenter passes non-threshold metadata
 through unchanged; its existing threshold normalisation preserves the action
 keys alongside measured values. Hook new-only fingerprints deliberately omit
 both action keys, so a finding accepted before action metadata was introduced

@@ -6,6 +6,7 @@ namespace GruffPhp\Engine\Config;
 
 use GruffPhp\Output\Reporter\FailThreshold;
 use GruffPhp\Output\Reporter\FailThresholds;
+use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Rules\RuleRegistry;
 use GruffPhp\Support\PathHelper;
 use Symfony\Component\Yaml\Exception\ParseException;
@@ -65,7 +66,7 @@ final readonly class ConfigLoader
     /**
      * Value-independent migration diagnostic for the retired secret-preview suppression list.
      */
-    private const LEGACY_SECRET_PREVIEWS_ERROR = 'Config key "allowlists.secretPreviews" only accepts an empty list; remove all configured entries because secret previews no longer suppress findings.';
+    private const LEGACY_SECRET_PREVIEWS_ERROR = 'Config key "allowlists.secretPreviews" is removed in 0.6.0: FAMILY-CONTRACT.md section 5 makes category markers unconditional, so the key authorises nothing; delete it from the configuration.';
 
     /**
      * Builds a config loader for one project root, with an optional packaged-config fallback.
@@ -338,7 +339,7 @@ final readonly class ConfigLoader
     {
         foreach (array_keys($rootConfig) as $rootKey) {
             // A key outside the schema is rejected rather than silently ignored.
-            if (!in_array($rootKey, ['schemaVersion', 'extends', 'rules', 'minimumPhpVersion', 'deepScanBudget', 'minimumSeverity', 'failureConditions', 'paths', 'allowlists', 'selection', SensitiveExclusionConfigParser::CONFIG_KEY], true)) {
+            if (!in_array($rootKey, ['schemaVersion', 'extends', 'rules', 'minimumPhpVersion', 'deepScanBudget', 'minimumSeverity', 'failOn', 'failureConditions', 'paths', 'allowlists', 'selection', SensitiveExclusionConfigParser::CONFIG_KEY], true)) {
                 throw new ConfigException(sprintf('Unknown config key "%s".', $rootKey));
             }
         }
@@ -387,26 +388,29 @@ final readonly class ConfigLoader
      */
     private function applyMinimumSeverityConfig(AnalysisConfig $config, array $rootConfig): AnalysisConfig
     {
-        // No minimumSeverity block leaves inherited thresholds in place.
-        if (!array_key_exists('minimumSeverity', $rootConfig)) {
+        $config = $this->applyReportDisplayFloor($config, $rootConfig);
+
+
+        // No failOn block leaves inherited thresholds in place.
+        if (!array_key_exists('failOn', $rootConfig)) {
             return $config;
         }
 
-        $entries = $rootConfig['minimumSeverity'];
+        $entries = $rootConfig['failOn'];
         if (!is_array($entries) || ($entries !== [] && array_is_list($entries))) {
-            throw new ConfigException('Config key "minimumSeverity" must be a map of command name to threshold.');
+            throw new ConfigException('Config key "failOn" must be a map of command name to threshold.');
         }
 
         $resolved = [];
         foreach ($entries as $command => $rawValue) {
             if (!is_string($command)) {
-                throw new ConfigException('Config key "minimumSeverity" keys must be strings.');
+                throw new ConfigException('Config key "failOn" keys must be strings.');
             }
 
             // Only a gating command may set a threshold; others would silently never fail CI.
             if (!in_array($command, self::GATING_COMMANDS, true)) {
                 throw new ConfigException(sprintf(
-                                              'Config key "minimumSeverity.%s" is not a valid gating command. Valid keys are: %s.',
+                                              'Config key "failOn.%s" is not a valid gating command. Valid keys are: %s.',
                                               $command,
                                               implode(', ', self::GATING_COMMANDS),
                                           ));
@@ -414,7 +418,7 @@ final readonly class ConfigLoader
 
             if (!is_string($rawValue)) {
                 throw new ConfigException(sprintf(
-                                              'Config key "minimumSeverity.%s" must be a string. Got %s.',
+                                              'Config key "failOn.%s" must be a string. Got %s.',
                                               $command,
                                               get_debug_type($rawValue),
                                           ));
@@ -423,7 +427,7 @@ final readonly class ConfigLoader
             $threshold = FailThreshold::fromInput($rawValue);
             if ($threshold === null) {
                 throw new ConfigException(sprintf(
-                                              'Config key "minimumSeverity.%s" value "%s" is not a valid threshold. Accepted: %s.',
+                                              'Config key "failOn.%s" value "%s" is not a valid threshold. Accepted: %s.',
                                               $command,
                                               $rawValue,
                                               implode(', ', array_map(static fn(FailThreshold $case): string => $case->value, FailThreshold::cases())),
@@ -700,7 +704,12 @@ final readonly class ConfigLoader
         }
 
         // Missing preserves the user's inherited configuration; presence becomes [] because shape validation already rejected every other value.
-        $legacySecretPreviews = array_key_exists('secretPreviews', $allowlists) ? [] : null;
+        // Presence is the test, not content: an empty list reads as configured redaction just as a populated one does.
+        if (array_key_exists('secretPreviews', $allowlists)) {
+            throw new ConfigException(self::LEGACY_SECRET_PREVIEWS_ERROR);
+        }
+
+        $legacySecretPreviews = null;
 
         return [
             'acceptedAbbreviations' => $acceptedAbbreviations,
@@ -919,5 +928,45 @@ final readonly class ConfigLoader
         }
 
         return $normalizedConfigValues;
+    }
+
+    /**
+     * Reads the display floor from a scalar `minimumSeverity:`, and refuses the per-command map that used to gate.
+     *
+     * Before 0.6.0 this key set the exit gate. Reading the old map as a display floor would change what a committed
+     * configuration does without changing what it says, so the map is refused and pointed at `failOn:` instead.
+     *
+     * @param AnalysisConfig $config     - Config to extend; returned unchanged when the key is absent.
+     * @param ConfigObject   $rootConfig - Decoded root config map.
+     *
+     * @return AnalysisConfig - Config carrying the display floor the report will apply.
+     * @throws ConfigException When the key carries the pre-0.6.0 map, or a severity outside the ratified three.
+     */
+    private function applyReportDisplayFloor(AnalysisConfig $config, array $rootConfig): AnalysisConfig
+    {
+        // An absent key is not a floor of advisory; it means the report shows every finding it made.
+        if (!array_key_exists('minimumSeverity', $rootConfig)) {
+            return $config;
+        }
+
+        $configuredFloor = $rootConfig['minimumSeverity'];
+
+        if (is_array($configuredFloor)) {
+            throw new ConfigException(
+                'Config key "minimumSeverity" is the display floor in 0.6.0 and takes one severity, not a per-command map; '
+                . 'move the per-command exit gate to "failOn", which is the key that gates the exit code.',
+            );
+        }
+
+        $severity = is_string($configuredFloor) ? Severity::tryFrom($configuredFloor) : null;
+
+        if ($severity === null) {
+            throw new ConfigException(sprintf(
+                'Config key "minimumSeverity" value "%s" is not a severity: want advisory, warning or error.',
+                is_string($configuredFloor) ? $configuredFloor : get_debug_type($configuredFloor),
+            ));
+        }
+
+        return $config->withDisplayFloor($severity);
     }
 }

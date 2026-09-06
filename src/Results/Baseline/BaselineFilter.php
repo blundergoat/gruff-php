@@ -32,7 +32,7 @@ final readonly class BaselineFilter
      * @param list<Finding> $findings - This run's live findings; empty means nothing to match, so every reviewed row resolves on a full scan.
      * @param bool          $hasDiffScope - True when the scan covered only changed files, which turns off resolved-debt detection because unscanned files would look falsely resolved.
      *
-     * @return array{findings: list<Finding>, new: list<Finding>, unchanged: list<Finding>, collisions: list<Collision>, report: BaselineReport} - "findings" is the gated set
+     * @return array{findings: list<Finding>, new: list<Finding>, unchanged: list<Finding>, statuses: array<int, string>, collisions: list<Collision>, report: BaselineReport} - "findings" is the gated set
      *                         the user must still act on (new, collision, and not-eligible findings in scan order), "unchanged" the hidden ones, and "report" the movement summary.
      * @throws BaselineException When the baseline was written by another port, or a finding cannot be identified.
      */
@@ -56,6 +56,8 @@ final readonly class BaselineFilter
             'findings'   => $partition['gated'],
             'new'        => $partition['new'],
             'unchanged'  => $partition['unchanged'],
+            // The status per finding travels out too, so a surface can report what the baseline made of each one.
+            'statuses'   => $classification['statuses'],
             'collisions' => $classification['collisions'],
             'report'     => new BaselineReport(
                 path:               $baseline->path,
