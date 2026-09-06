@@ -15,6 +15,7 @@ use GruffPhp\Rules\Shared\PhysicalCommentAttachment;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
+use GruffPhp\Support\DeclarationLine;
 use PhpParser\Comment;
 use PhpParser\Comment\Doc;
 use PhpParser\Node\Stmt\Class_;
@@ -72,6 +73,16 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
             description:        'Requires declared properties to explain their purpose with PHPDoc; an opt-in toggle also accepts meaningful attached line comments.',
             optionDescriptions: [
                 'acceptLineComments' => 'When true, a physically attached // or # comment with meaning beyond the property name satisfies the rule.',
+            ],
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A property documented by an attached // or # line comment rather than a docblock.',
+                    'mitigation' => 'The default configuration accepts only docblocks; set options.acceptLineComments to true, or convert the comment to `/** */`.',
+                ],
+                [
+                    'shape'      => 'With acceptLineComments enabled, a short comment whose words only restate the property name.',
+                    'mitigation' => 'Such a comment is treated as filler, so state what the property holds or the invariant it maintains.',
+                ],
             ],
         );
     }
@@ -168,7 +179,7 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
                 $findings[] = $this->declaredPropertyFinding(
                     propertyName: $propertyProperty->name->toString(),
                     className:    $className,
-                    line:         $property->getStartLine(),
+                    line:         DeclarationLine::of($property),
                     definition:   $definition,
                     analysisUnit: $analysisUnit,
                 );

@@ -56,6 +56,12 @@ final readonly class HungarianNotationRule implements RuleInterface
             confidence:      Confidence::Medium,
             defaultOptions:  ['typePrefixes' => self::PREFIXES],
             description:     'Flags identifiers that duplicate type information with configured prefixes such as arr, obj, str, or bool.',
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A domain word that happens to start with a configured prefix followed by an uppercase letter, such as $boolQuery for a search-engine bool query.',
+                    'mitigation' => 'Matching is prefix plus word boundary, with no domain vocabulary, so remove that prefix from options.typePrefixes.',
+                ],
+            ],
         );
     }
 

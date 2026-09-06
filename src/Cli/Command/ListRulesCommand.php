@@ -82,7 +82,7 @@ final class ListRulesCommand extends Command
             );
         }
 
-        /** @var list<array{id: string, name: string, pillar: string, tier: string, defaultSeverity: string, confidence: string, defaultEnabled: bool, thresholds: array<string, int|float>|\stdClass, options: array<string, int|float|bool|string|array<array-key, int|float|bool|string>>|\stdClass, description: string}> $rows Accumulator shape is built from rule definitions for table rendering. */
+        /** @var list<array{id: string, name: string, pillar: string, tier: string, defaultSeverity: string, confidence: string, defaultEnabled: bool, thresholds: array<string, int|float>|\stdClass, options: array<string, int|float|bool|string|array<array-key, int|float|bool|string>>|\stdClass, description: string}> $rows Accumulator shape is built from rule definitions for table rendering; a row may also carry falsePositiveShapes. */
         $rows = [];
 
         // No id given: build one catalogue row per registered rule, tagging each with whether this
@@ -430,10 +430,23 @@ final class ListRulesCommand extends Command
      * @param RuleDefinition $definition - Rule whose metadata, thresholds, and options populate the catalogue row.
      * @param bool           $enabled - Effective project enabled state; emitted as the `defaultEnabled` field.
      *
-     * @return array{id: string, name: string, pillar: string, tier: string, defaultSeverity: string, confidence: string, defaultEnabled: bool,
-     *                   thresholds: array<string, int|float|string>|\stdClass, options: array<string, int|float|bool|string|array<array-key,
-     *                   int|float|bool|string>>|\stdClass, description: string} - one catalogue row of rule metadata for table or JSON output; empty
-     *                   option/threshold maps are stdClass so they encode as `{}` rather than `[]`
+     * @return array - one catalogue row of rule metadata for table or JSON output; empty option/threshold
+     *                   maps are stdClass so they encode as `{}` rather than `[]`, and `falsePositiveShapes`
+     *                   is present only for rules that catalogue guidance
+     *
+     * @phpstan-return array{
+     *     id: string,
+     *     name: string,
+     *     pillar: string,
+     *     tier: string,
+     *     defaultSeverity: string,
+     *     confidence: string,
+     *     defaultEnabled: bool,
+     *     thresholds: array<string, int|float|string>|\stdClass,
+     *     options: array<string, int|float|bool|string|array<array-key, int|float|bool|string>>|\stdClass,
+     *     description: string,
+     *     falsePositiveShapes?: list<array{shape: string, mitigation: string}>
+     * }
      */
     private function ruleMetadataRow(RuleDefinition $definition, bool $enabled): array
     {
@@ -443,7 +456,7 @@ final class ListRulesCommand extends Command
             : ($definition->defaultThresholds === [] ? (object)[] : $definition->defaultThresholds);
 
         // Coerce an empty thresholds map to stdClass so this row's `thresholds` stays object-typed across every rule listed.
-        return [
+        $ruleMetadata = [
             'id'              => $definition->id,
             'name'            => $definition->name,
             'pillar'          => $definition->pillar->value,
@@ -455,5 +468,13 @@ final class ListRulesCommand extends Command
             'options'         => $definition->defaultOptions === [] ? (object)[] : $definition->defaultOptions,
             'description'     => $definition->description(),
         ];
+
+        // Catalogued guidance rides along only where a rule has some; an absent key means none is
+        // catalogued, which reads differently from a rule that documents an empty list.
+        if ($definition->falsePositiveShapes !== []) {
+            $ruleMetadata['falsePositiveShapes'] = $definition->falsePositiveShapes;
+        }
+
+        return $ruleMetadata;
     }
 }

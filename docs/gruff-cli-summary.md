@@ -68,6 +68,14 @@ Baseline  After review, `gruff-php analyse --generate-baseline` records current 
 
 Pillars are ordered by finding count (loudest first). Pillars with zero findings still appear so it's obvious which are clean.
 
+`summary` applies any configured [`sensitiveExclusions`](configuration.md#sensitive-exclusions), so its counts and grade match `analyse` over the same tree. When a run suppressed something, a final line states the total in the same words `analyse` uses:
+
+```
+Suppressed findings: 1 via sensitiveExclusions[0] sensitive-data.aws-access-key: 1 (Synthetic key used by the scanner fixtures; not a live credential.)
+```
+
+`gruff.summary.v2` has no suppression field yet, so `summary --format json` filters without publishing a count - read the total from the text output or from `analyse --format json`.
+
 ## Example - JSON format
 
 ```bash

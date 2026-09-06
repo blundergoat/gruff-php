@@ -54,6 +54,12 @@ final readonly class GlobalStateMutationRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A test that restores the mutated value inline at the end of its own body, in a class that declares no tearDown or #[After] hook.',
+                    'mitigation' => 'Only a cleanup hook on the class or its visible parents clears the finding, so move the restore into tearDown or an #[After] method.',
+                ],
+            ],
         );
     }
 

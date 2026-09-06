@@ -40,6 +40,12 @@ final readonly class MockOnlyTestRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A collaboration test whose contract genuinely is the interaction, such as proving an event was dispatched or a port was called with a mapped payload.',
+                    'mitigation' => 'The rule cannot tell an interaction contract from missing behaviour coverage, so add one assertion on a real returned value, or accept the finding.',
+                ],
+            ],
         );
     }
 
@@ -75,7 +81,7 @@ final readonly class MockOnlyTestRule implements RuleInterface
                 ruleId:      self::ID,
                 message:     sprintf('%s verifies mock interactions without a real assertion.', $scope->symbol),
                 filePath:    $analysisUnit->file->displayPath,
-                line:        $scope->line,
+                line:        $scope->anchorLine(),
                 severity:    Severity::Warning,
                 pillar:      Pillar::TestQuality,
                 tier:        RuleTier::V01,

@@ -42,6 +42,12 @@ final readonly class NoAssertionsRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Error,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A test whose checks run inside a project helper with a domain name, such as seeInDatabase() or verifyRendered(), rather than an assert-prefixed call.',
+                    'mitigation' => 'Only assert*, expect*, fail(), mock verification, and the legacy @expectedException annotation are recognised, so assert inside the test or disable this rule for custom assertion wrappers.',
+                ],
+            ],
         );
     }
 
@@ -68,7 +74,7 @@ final readonly class NoAssertionsRule implements RuleInterface
                 ruleId:      self::ID,
                 message:     sprintf('%s has no detected PHPUnit or Pest assertions.', $scope->symbol),
                 filePath:    $analysisUnit->file->displayPath,
-                line:        $scope->line,
+                line:        $scope->anchorLine(),
                 severity:    Severity::Error,
                 pillar:      Pillar::TestQuality,
                 tier:        RuleTier::V01,

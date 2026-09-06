@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Console;
 
+use GruffPhp\Results\Finding\BaselineIdentity;
 use JsonException;
 use Symfony\Component\Process\Process;
 
@@ -44,7 +45,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
             self::assertFileExists($historyPath);
 
             $report = $this->decodeJsonOutput($process);
-            self::assertIsArray($report['trend'] ?? null);
+            $this->decodedJsonObjectAt($report, 'extensions', 'php', 'topLevel', 'trend');
 
             $decodedHistory = json_decode((string) file_get_contents($historyPath), true, 512, JSON_THROW_ON_ERROR);
 
@@ -67,14 +68,14 @@ final class AnalyseCliBaselineTest extends CliTestCase
         $project = $this->createBaselineProject();
 
         try {
-            $fullRun   = $this->runInProject($project, ['analyse', 'src', '--format', 'json', '--fail-on', 'none', '--no-baseline', '--history-file', 'gruff-history.json']);
-            $fullTrend = $this->decodeJsonOutput($fullRun)['trend'] ?? null;
-            self::assertIsArray($fullTrend);
+            $fullRun    = $this->runInProject($project, ['analyse', 'src', '--format', 'json', '--fail-on', 'none', '--no-baseline', '--history-file', 'gruff-history.json']);
+            $fullReport = $this->decodeJsonOutput($fullRun);
+            $fullTrend  = $this->decodedJsonObjectAt($fullReport, 'extensions', 'php', 'topLevel', 'trend');
             self::assertSame('full-project', $fullTrend['scope'] ?? null);
 
-            $diffRun   = $this->runInProject($project, ['analyse', '--changed-ranges', '1-5', 'src/OrderCalculator.php', '--format', 'json', '--fail-on', 'none', '--no-baseline', '--history-file', 'gruff-history.json']);
-            $diffTrend = $this->decodeJsonOutput($diffRun)['trend'] ?? null;
-            self::assertIsArray($diffTrend);
+            $diffRun    = $this->runInProject($project, ['analyse', '--changed-ranges', '1-5', 'src/OrderCalculator.php', '--format', 'json', '--fail-on', 'none', '--no-baseline', '--history-file', 'gruff-history.json']);
+            $diffReport = $this->decodeJsonOutput($diffRun);
+            $diffTrend  = $this->decodedJsonObjectAt($diffReport, 'extensions', 'php', 'topLevel', 'trend');
             // The diff-scoped score joins its own series: no delta against the full-project entry.
             self::assertSame('diff', $diffTrend['scope'] ?? null);
             self::assertArrayHasKey('previousScore', $diffTrend);
@@ -121,7 +122,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
             $generatedBaseline = $generatedReport['baseline'] ?? null;
             self::assertIsArray($generatedBaseline);
             self::assertSame(true, $generatedBaseline['generated'] ?? null);
-            self::assertSame(1, $generatedBaseline['totalEntries'] ?? null);
+            self::assertSame(1, $generatedBaseline['entries'] ?? null);
 
             $applyProcess = new Process([
                 PHP_BINARY,
@@ -180,7 +181,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
 
             self::assertSame(2, $process->getExitCode());
             self::assertStringContainsString('[BASELINE-ERROR]', $process->getOutput());
-            self::assertStringContainsString('Baseline schemaVersion must be "gruff.baseline.v2".', $process->getOutput());
+            self::assertStringContainsString('Baseline schemaVersion must be "gruff.baseline.v3".', $process->getOutput());
         } finally {
             $this->removeDir($tempDir);
         }
@@ -256,7 +257,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
             self::assertIsArray($generatedBaseline);
             self::assertSame('gruff-baseline.json', $generatedBaseline['path'] ?? null);
             self::assertSame(true, $generatedBaseline['generated'] ?? null);
-            self::assertSame(1, $generatedBaseline['totalEntries'] ?? null);
+            self::assertSame(1, $generatedBaseline['entries'] ?? null);
             self::assertSame('default', $generatedBaseline['source'] ?? null);
 
             $autoApplyProcess = new Process([
@@ -575,10 +576,9 @@ final class AnalyseCliBaselineTest extends CliTestCase
             );
 
             $jsonRun  = $this->runInProject($project, ['analyse', 'src', '--format', 'json', '--fail-on', 'none']);
-            $baseline = $this->decodeJsonOutput($jsonRun)['baseline'] ?? null;
-            self::assertIsArray($baseline);
-            $buckets = $baseline['buckets'] ?? null;
-            self::assertIsArray($buckets);
+            $report   = $this->decodeJsonOutput($jsonRun);
+            $baseline = $this->decodedJsonObjectAt($report, 'baseline');
+            $buckets  = $this->decodedJsonObjectAt($baseline, 'extensions', 'php', 'baseline', 'buckets');
             self::assertSame(1, $buckets['unchanged'] ?? null);
             self::assertSame(0, $buckets['absent'] ?? null);
             self::assertGreaterThanOrEqual(1, $buckets['new'] ?? 0);
@@ -614,10 +614,8 @@ final class AnalyseCliBaselineTest extends CliTestCase
 
             $rerun    = $this->runInProject($project, ['analyse', 'src', '--format', 'json', '--fail-on', 'none']);
             $report   = $this->decodeJsonOutput($rerun);
-            $baseline = $report['baseline'] ?? null;
-            self::assertIsArray($baseline);
-            $buckets = $baseline['buckets'] ?? null;
-            self::assertIsArray($buckets);
+            $baseline = $this->decodedJsonObjectAt($report, 'baseline');
+            $buckets  = $this->decodedJsonObjectAt($baseline, 'extensions', 'php', 'baseline', 'buckets');
             self::assertSame(0, $buckets['new'] ?? null);
             self::assertSame(1, $buckets['unchanged'] ?? null);
             self::assertSame(0, $buckets['absent'] ?? null);
@@ -669,8 +667,9 @@ final class AnalyseCliBaselineTest extends CliTestCase
             $overflowRun->run();
 
             self::assertSame(1, $overflowRun->getExitCode(), $overflowRun->getErrorOutput());
-            $overflowReport = $this->decodeJsonOutput($overflowRun);
-            self::assertSame(1, $overflowReport['newFindingsCount'] ?? null);
+            $overflowReport   = $this->decodeJsonOutput($overflowRun);
+            $overflowBaseline = $this->decodedJsonObjectAt($overflowReport, 'baseline');
+            self::assertSame(1, $overflowBaseline['newFindings'] ?? null);
 
             // Accepting both instances in the group must clear the gate.
             $this->writeHandlerGroupBaseline($project, 2);
@@ -687,27 +686,32 @@ final class AnalyseCliBaselineTest extends CliTestCase
                 '--include-rule',
                 'docs.missing-public-phpdoc',
             ]);
-            $withinBudgetReport = $this->decodeJsonOutput($withinBudgetRun);
-            self::assertSame(0, $withinBudgetReport['newFindingsCount'] ?? null);
+            $withinBudgetReport   = $this->decodeJsonOutput($withinBudgetRun);
+            $withinBudgetBaseline = $this->decodedJsonObjectAt($withinBudgetReport, 'baseline');
+            self::assertSame(0, $withinBudgetBaseline['newFindings'] ?? null);
         } finally {
             $this->removeDir($project);
         }
     }
 
     /**
-     * Write a one-group v2 baseline accepting the anonymous-class handler findings.
+     * Write a one-row v3 baseline reviewing the anonymous-class handler findings, which share one identity because both methods
+     * carry the symbol `class@anonymous::handle()`.
      *
-     * @param string $project - Fixture project root the baseline is written into.
-     * @param int    $acceptedCount - Accepted instance count for the handler group.
+     * @param string $project       - Fixture project root the baseline is written into.
+     * @param int    $acceptedCount - Reviewed occurrence count for the shared identity.
      *
      * @return void
      */
     private function writeHandlerGroupBaseline(string $project, int $acceptedCount): void
     {
+        $identity = BaselineIdentity::computeFor('php', 'docs.missing-public-phpdoc', 'src/Handlers.php', 'class@anonymous::handle()#1');
+
         file_put_contents(
             $project . '/gruff-baseline.json',
             sprintf(
-                '{"schemaVersion":"gruff.baseline.v2","groups":[{"file":"src/Handlers.php","ruleId":"docs.missing-public-phpdoc","message":"Method class@anonymous::handle() needs a brief intent description above its declaration (one plain-English line; not a restatement of the method signature).","count":%d}]}',
+                '{"schemaVersion":"gruff.baseline.v3","toolLanguage":"php","generatedAt":"2026-09-05T00:00:00+00:00","occurrences":[{"identity":"%s","count":%d}],"sensitive":{"eligible":false,"reason":"r","counts":{"total":0,"byRule":{}}}}',
+                $identity,
                 $acceptedCount,
             ),
         );
@@ -740,11 +744,10 @@ final class AnalyseCliBaselineTest extends CliTestCase
             );
 
             $jsonRun  = $this->runInProject($project, ['analyse', 'src', '--format', 'json', '--fail-on', 'none', '--diff-vs', 'HEAD', '--changed-only']);
-            $baseline = $this->decodeJsonOutput($jsonRun)['baseline'] ?? null;
-            self::assertIsArray($baseline);
+            $report   = $this->decodeJsonOutput($jsonRun);
+            $baseline = $this->decodedJsonObjectAt($report, 'baseline');
             self::assertSame('not-evaluated-diff-scope', $baseline['staleEvaluation'] ?? null);
-            $buckets = $baseline['buckets'] ?? null;
-            self::assertIsArray($buckets);
+            $buckets = $this->decodedJsonObjectAt($baseline, 'extensions', 'php', 'baseline', 'buckets');
             self::assertSame(0, $buckets['absent'] ?? null);
             self::assertGreaterThanOrEqual(1, $buckets['new'] ?? 0);
         } finally {
@@ -756,7 +759,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
      * Run the analyse CLI inside a project directory and return the finished process.
      *
      * @param string       $project - Working directory the binary runs in, so relative paths resolve against it.
-     * @param list<string> $args - CLI arguments passed after the binary.
+     * @param list<string> $args    - CLI arguments passed after the binary.
      *
      * @return Process - Completed analyse process.
      */
@@ -773,7 +776,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
      * Run git inside a fixture project.
      *
      * @param string       $project - Fixture repository root.
-     * @param list<string> $args - Git arguments.
+     * @param list<string> $args    - Git arguments.
      *
      * @return void
      */

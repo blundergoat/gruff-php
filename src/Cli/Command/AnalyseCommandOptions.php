@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace GruffPhp\Cli\Command;
 
+use GruffPhp\Results\Diff\ChangeScopeOptions;
+
 use GruffPhp\Results\Baseline\BaselineApplicationOptions;
 use GruffPhp\Results\Baseline\BaselineStore;
 use GruffPhp\Engine\Config\RuleSelection;
@@ -41,31 +43,29 @@ final readonly class AnalyseCommandOptions
      * Holds the fully parsed, validated option set; callers build it through `fromInput()` rather
      * than by hand so the usage-error capture and flag normalisation all live in one place.
      *
-     * @param list<string>               $paths - Files or directories the user named; empty means none were given, so the whole project is scanned.
-     * @param bool                       $shouldIncludeIgnored - Set by `--include-ignored`; when true, files the ignore rules would skip are scanned anyway.
-     * @param string|null                $configPath - Explicit `--config` path, or null when none was given so the default `.gruff-php.yaml` is discovered.
-     * @param bool                       $noConfig - Set by `--no-config`; when true, no YAML config is loaded and registry defaults run instead.
-     * @param bool                       $noCache - Set by `--no-cache`; when true, the run ignores the on-disk cache and re-analyses every file.
-     * @param string                     $profile - The `--profile` value ('default' or 'security') deciding which rules run.
-     * @param MutationAnalysisOptions    $mutation - Parsed `--infection-*` and `--mutation-*` options driving mutation analysis.
-     * @param string|null                $diffMode - Requested `--diff` mode, or null when `--diff` was not supplied so the full tree is analysed.
-     * @param string|null                $since - Git base ref from `--since`, or null when the user did not scope the run to changes since a ref.
-     * @param string|null                $changedRanges - Explicit line ranges from `--changed-ranges`, or null when the user named none.
-     * @param string                     $changedScope - How ranges expand to findings via `--changed-scope`: symbol, hunk, or file.
-     * @param string|null                $diffVs - Comparison ref from `--diff-vs`, or null when the user is not comparing against another ref.
-     * @param bool                       $isChangedOnly - Set by `--changed-only`; when true, only files that changed versus `--diff-vs` are reported.
-     * @param string|null                $historyFile - Trend-history file from `--history-file`, or null when the user is not recording a trend.
-     * @param bool                       $noBaseline - Set by `--no-baseline`; when true, no baseline loads so previously accepted debt surfaces again.
-     * @param BaselineApplicationOptions $baseline - Parsed `--baseline` and `--generate-baseline` options.
-     * @param string                     $reportEditorLink - Editor-link style from `--report-editor-link`: none, vscode, or phpstorm.
-     * @param bool                       $isReportInteractive - Set by `--report-interactive`; when true, the report offers interactive prompts.
-     * @param string|null                $pathsRelativeTo - Base path from `--paths-relative-to` for display, or null when paths are shown as discovered.
-     * @param string|null                $minSeverity - Severity floor from `--min-severity`, or null when every severity is shown.
-     * @param list<string>               $includePillars - Pillars from `--include-pillar`; empty means no include filter, so every pillar shows.
-     * @param list<string>               $excludePillars - Pillars from `--exclude-pillar`; empty means nothing is filtered out of the report.
-     * @param list<string>               $includeRules - Rule IDs from `--include-rule` the run executes exclusively; empty means every configured rule runs. Enforced at execution level, like the hook command.
-     * @param list<string>               $excludeRules - Rule IDs from `--exclude-rule` that do not run at all; empty means nothing is excluded.
-     * @param string|null                $optionError - A usage error found while parsing (the last failing check wins), or null when every flag was accepted.
+     * @param list<string>                                            $paths                  - Files or directories the user named; empty means none were given, so the whole project is scanned.
+     * @param bool                                                    $shouldIncludeIgnored   - Set by `--include-ignored`; when true, files the ignore rules would skip are scanned anyway.
+     * @param string|null                                             $configPath             - Explicit `--config` path, or null when none was given so the default `.gruff-php.yaml` is discovered.
+     * @param bool                                                    $noConfig               - Set by `--no-config`; when true, no YAML config is loaded and registry defaults run instead.
+     * @param bool                                                    $noCache                - Set by `--no-cache`; when true, the run ignores the on-disk cache and re-analyses every file.
+     * @param string                                                  $profile                - The `--profile` value ('default' or 'security') deciding which rules run.
+     * @param MutationAnalysisOptions                                 $mutation               - Parsed `--infection-*` and `--mutation-*` options driving mutation analysis.
+     * @param ChangeScopeOptions                                      $changeScope            - The `--diff`, `--since`, `--changed-ranges`, `--changed-scope`, `--diff-vs`, and `--changed-only` choices that narrow the run.
+     * @param string|null                                             $historyFile            - Trend-history file from `--history-file`, or null when the user is not recording a trend.
+     * @param bool                                                    $noBaseline             - Set by `--no-baseline`; when true, no baseline loads so previously accepted debt surfaces again.
+     * @param BaselineApplicationOptions                              $baseline               - Parsed `--baseline` and `--generate-baseline` options.
+     * @param string                                                  $reportEditorLink       - Editor-link style from `--report-editor-link`: none, vscode, or phpstorm.
+     * @param bool                                                    $isReportInteractive    - Set by `--report-interactive`; when true, the report offers interactive prompts.
+     * @param string|null                                             $pathsRelativeTo        - Base path from `--paths-relative-to` for display, or null when paths are shown as discovered.
+     * @param string|null                                             $minSeverity            - Severity floor from `--min-severity`, or null when every severity is shown.
+     * @param list<string>                                            $includePillars         - Pillars from `--include-pillar`; empty means no include filter, so every pillar shows.
+     * @param list<string>                                            $excludePillars         - Pillars from `--exclude-pillar`; empty means nothing is filtered out of the report.
+     * @param list<string>                                            $includeRules           - Rule IDs from `--include-rule` the run executes exclusively; empty means every configured rule runs. Enforced at execution level, like the hook command.
+     * @param list<string>                                            $excludeRules           - Rule IDs from `--exclude-rule` that do not run at all; empty means nothing is excluded.
+     * @param PresentationSelectors                                   $presentation           - The four family flags that decide what the report shows and nothing else.
+     * @param string|null                                             $minConfidence          - Confidence floor from `--min-confidence`; null means every confidence reaches the exit gate.
+     * @param array{enabled: bool, maxLines: int, maxBytes: int}|null $deepScanBudgetOverride - Parsed CLI budget override, or null when config/defaults govern.
+     * @param string|null                                             $optionError            - A usage error found while parsing (the last failing check wins), or null when every flag was accepted.
      */
     public function __construct(
         public array                      $paths,
@@ -75,12 +75,7 @@ final readonly class AnalyseCommandOptions
         public bool                       $noCache,
         public string                     $profile,
         public MutationAnalysisOptions    $mutation,
-        public ?string                    $diffMode,
-        public ?string                    $since,
-        public ?string                    $changedRanges,
-        public string                     $changedScope,
-        public ?string                    $diffVs,
-        public bool                       $isChangedOnly,
+        public ChangeScopeOptions         $changeScope,
         public ?string                    $historyFile,
         public bool                       $noBaseline,
         public BaselineApplicationOptions $baseline,
@@ -96,6 +91,10 @@ final readonly class AnalyseCommandOptions
         public array                      $includeRules,
         /** @var list<string> */
         public array                      $excludeRules,
+        public PresentationSelectors      $presentation,
+        public ?string                    $minConfidence,
+        /** @var array{enabled: bool, maxLines: int, maxBytes: int}|null */
+        public ?array                     $deepScanBudgetOverride = null,
         private ?string                   $optionError = null,
     ) {
     }
@@ -119,7 +118,13 @@ final readonly class AnalyseCommandOptions
         $generateFlagPresent = $input->hasParameterOption('--generate-baseline', true);
         $reportEditorLink    = self::optionalStringOption($input, 'report-editor-link') ?? 'none';
         $isReportInteractive = self::reportInteractive($input);
+        $deepScanBudget      = self::parseDeepScanBudgetOverride(self::optionalStringOption($input, 'deep-scan-budget'));
         $optionError         = null;
+
+        if (is_string($deepScanBudget)) {
+            $optionError    = $deepScanBudget;
+            $deepScanBudget = null;
+        }
 
         // A string back from the `--file` parser means one occurrence was blank (`--file=`); hold that error and drop the unusable list.
         if (is_string($filePaths)) {
@@ -149,13 +154,13 @@ final readonly class AnalyseCommandOptions
         }
 
         return new self(
-            paths:                $paths,
-            shouldIncludeIgnored: (bool)$input->getOption('include-ignored'),
-            configPath:           is_string($configPath) && $configPath !== '' ? $configPath : null,
-            noConfig:             (bool)$input->getOption('no-config'),
-            noCache:              (bool)$input->getOption('no-cache'),
-            profile:              self::optionalStringOption($input, 'profile') ?? self::PROFILE_DEFAULT,
-            mutation:             new MutationAnalysisOptions(
+            paths:                         $paths,
+            shouldIncludeIgnored:          (bool)$input->getOption('include-ignored'),
+            configPath:                    is_string($configPath) && $configPath !== '' ? $configPath : null,
+            noConfig:                      (bool)$input->getOption('no-config'),
+            noCache:                       (bool)$input->getOption('no-cache'),
+            profile:                       self::optionalStringOption($input, 'profile') ?? self::PROFILE_DEFAULT,
+            mutation:                      new MutationAnalysisOptions(
                                       infectionReportPath:           self::optionalStringOption($input, 'infection-report'),
                                       shouldRunInfection:            (bool)$input->getOption('infection-run'),
                                       infectionBin:                  self::optionalStringOption($input, 'infection-bin') ?? 'infection',
@@ -164,32 +169,44 @@ final readonly class AnalyseCommandOptions
                                       mutationBaselinePath:          self::optionalStringOption($input, 'mutation-baseline'),
                                       mutationBudget:                null,
                                   ),
-            diffMode:             $diffMode,
-            since:                self::optionalStringOption($input, 'since'),
-            changedRanges:        self::optionalStringOption($input, 'changed-ranges'),
-            changedScope:         self::optionalStringOption($input, 'changed-scope') ?? 'symbol',
-            diffVs:               self::optionalStringOption($input, 'diff-vs'),
-            isChangedOnly:        (bool)$input->getOption('changed-only'),
-            historyFile:          self::optionalStringOption($input, 'history-file'),
-            noBaseline:           (bool)$input->getOption('no-baseline'),
-            baseline:             new BaselineApplicationOptions(
-                                      baselinePath:         $baselineFlagPresent
+            changeScope:   new ChangeScopeOptions(
+                                      diffMode:      $diffMode,
+                                      since:         self::optionalStringOption($input, 'since'),
+                                      changedRanges: self::optionalStringOption($input, 'changed-ranges'),
+                                      changedScope:  self::optionalStringOption($input, 'changed-scope') ?? 'symbol',
+                                      diffVs:        self::optionalStringOption($input, 'diff-base') ?? self::optionalStringOption($input, 'diff-vs'),
+                                      isChangedOnly: (bool)$input->getOption('changed-only'),
+                                  ),
+            historyFile:   self::optionalStringOption($input, 'history-file'),
+            noBaseline:    (bool)$input->getOption('no-baseline'),
+            baseline:      new BaselineApplicationOptions(
+                                      baselinePath:  $baselineFlagPresent
                                                                 ? (self::optionalStringOption($input, 'baseline') ?? BaselineStore::DEFAULT_FILENAME)
                                                                 : null,
                                       isBaselineExplicit:   $baselineFlagPresent,
                                       generateBaselinePath: $generateFlagPresent
                                                                 ? (self::optionalStringOption($input, 'generate-baseline') ?? BaselineStore::DEFAULT_FILENAME)
                                                                 : null,
+                                      migrateBaselinePath:  self::optionalStringOption($input, 'migrate-baseline'),
+                                      shouldForceBaselineOverwrite: (bool)$input->getOption('force'),
                                   ),
-            reportEditorLink:     $reportEditorLink,
-            isReportInteractive:  $isReportInteractive,
-            pathsRelativeTo:      self::optionalStringOption($input, 'paths-relative-to'),
-            minSeverity:          self::optionalStringOption($input, 'min-severity'),
-            includePillars:       self::stringListOption($input, 'include-pillar'),
-            excludePillars:       self::stringListOption($input, 'exclude-pillar'),
-            includeRules:         self::stringListOption($input, 'include-rule'),
-            excludeRules:         self::stringListOption($input, 'exclude-rule'),
-            optionError:          $optionError,
+            reportEditorLink:       $reportEditorLink,
+            isReportInteractive:    $isReportInteractive,
+            pathsRelativeTo:        self::optionalStringOption($input, 'paths-relative-to'),
+            minSeverity:            self::optionalStringOption($input, 'min-severity'),
+            includePillars:         self::stringListOption($input, 'include-pillar'),
+            excludePillars:         self::stringListOption($input, 'exclude-pillar'),
+            includeRules:           self::stringListOption($input, 'include-rule'),
+            excludeRules:           self::stringListOption($input, 'exclude-rule'),
+            presentation:           new PresentationSelectors(
+                                        showRules:   self::stringListOption($input, 'show-rule'),
+                                        hideRules:   self::stringListOption($input, 'hide-rule'),
+                                        showPillars: self::stringListOption($input, 'show-pillar'),
+                                        hidePillars: self::stringListOption($input, 'hide-pillar'),
+                                    ),
+            minConfidence:          self::optionalStringOption($input, 'min-confidence'),
+            deepScanBudgetOverride: $deepScanBudget,
+            optionError:            $optionError,
         );
     }
 
@@ -204,13 +221,13 @@ final readonly class AnalyseCommandOptions
     public function withMutationBudget(?int $mutationBudget): self
     {
         return new self(
-            paths:                $this->paths,
-            shouldIncludeIgnored: $this->shouldIncludeIgnored,
-            configPath:           $this->configPath,
-            noConfig:             $this->noConfig,
-            noCache:              $this->noCache,
-            profile:              $this->profile,
-            mutation:             new MutationAnalysisOptions(
+            paths:                         $this->paths,
+            shouldIncludeIgnored:          $this->shouldIncludeIgnored,
+            configPath:                    $this->configPath,
+            noConfig:                      $this->noConfig,
+            noCache:                       $this->noCache,
+            profile:                       $this->profile,
+            mutation:                      new MutationAnalysisOptions(
                                       infectionReportPath:           $this->mutation->infectionReportPath,
                                       shouldRunInfection:            $this->mutation->shouldRunInfection,
                                       infectionBin:                  $this->mutation->infectionBin,
@@ -219,24 +236,22 @@ final readonly class AnalyseCommandOptions
                                       mutationBaselinePath:          $this->mutation->mutationBaselinePath,
                                       mutationBudget:                $mutationBudget,
                                   ),
-            diffMode:             $this->diffMode,
-            since:                $this->since,
-            changedRanges:        $this->changedRanges,
-            changedScope:         $this->changedScope,
-            diffVs:               $this->diffVs,
-            isChangedOnly:        $this->isChangedOnly,
-            historyFile:          $this->historyFile,
-            noBaseline:           $this->noBaseline,
-            baseline:             $this->baseline,
-            reportEditorLink:     $this->reportEditorLink,
-            isReportInteractive:  $this->isReportInteractive,
-            pathsRelativeTo:      $this->pathsRelativeTo,
-            minSeverity:          $this->minSeverity,
-            includePillars:       $this->includePillars,
-            excludePillars:       $this->excludePillars,
-            includeRules:         $this->includeRules,
-            excludeRules:         $this->excludeRules,
-            optionError:          $this->optionError,
+            changeScope:            $this->changeScope,
+            historyFile:            $this->historyFile,
+            noBaseline:             $this->noBaseline,
+            baseline:               $this->baseline,
+            reportEditorLink:       $this->reportEditorLink,
+            isReportInteractive:    $this->isReportInteractive,
+            pathsRelativeTo:        $this->pathsRelativeTo,
+            minSeverity:            $this->minSeverity,
+            includePillars:         $this->includePillars,
+            excludePillars:         $this->excludePillars,
+            includeRules:           $this->includeRules,
+            excludeRules:           $this->excludeRules,
+            presentation:           $this->presentation,
+            minConfidence:          $this->minConfidence,
+            deepScanBudgetOverride: $this->deepScanBudgetOverride,
+            optionError:            $this->optionError,
         );
     }
 
@@ -269,12 +284,7 @@ final readonly class AnalyseCommandOptions
             noCache:              $this->noCache,
             profile:              $this->profile,
             mutation:             $this->mutation,
-            diffMode:             $this->diffMode,
-            since:                $this->since,
-            changedRanges:        $this->changedRanges,
-            changedScope:         $this->changedScope,
-            diffVs:               $this->diffVs,
-            isChangedOnly:        $this->isChangedOnly,
+            changeScope:          $this->changeScope,
             historyFile:          $this->historyFile,
             noBaseline:           $this->noBaseline,
             baseline:             new BaselineApplicationOptions(
@@ -282,16 +292,53 @@ final readonly class AnalyseCommandOptions
                                       isBaselineExplicit:   false,
                                       generateBaselinePath: null,
                                   ),
-            reportEditorLink:     $this->reportEditorLink,
-            isReportInteractive:  $this->isReportInteractive,
-            pathsRelativeTo:      $this->pathsRelativeTo,
-            minSeverity:          $this->minSeverity,
-            includePillars:       $this->includePillars,
-            excludePillars:       $this->excludePillars,
-            includeRules:         $this->includeRules,
-            excludeRules:         $this->excludeRules,
-            optionError:          $this->optionError,
+            reportEditorLink:       $this->reportEditorLink,
+            isReportInteractive:    $this->isReportInteractive,
+            pathsRelativeTo:        $this->pathsRelativeTo,
+            minSeverity:            $this->minSeverity,
+            includePillars:         $this->includePillars,
+            excludePillars:         $this->excludePillars,
+            includeRules:           $this->includeRules,
+            excludeRules:           $this->excludeRules,
+            presentation:           $this->presentation,
+            minConfidence:          $this->minConfidence,
+            deepScanBudgetOverride: $this->deepScanBudgetOverride,
+            optionError:            $this->optionError,
         );
+    }
+
+    /**
+     * Parses the family CLI shape: `off` disables the guard, otherwise `<lines>:<bytes>` replaces
+     * both bounds atomically.
+     *
+     * @param string|null $budgetOverride - Raw `--deep-scan-budget` text as typed; null when the flag was absent.
+     *
+     * @return array{enabled: bool, maxLines: int, maxBytes: int}|string|null - Parsed override, usage error, or null when absent.
+     */
+    public static function parseDeepScanBudgetOverride(?string $budgetOverride): array|string|null
+    {
+        if ($budgetOverride === null) {
+            return null;
+        }
+
+        if ($budgetOverride === 'off') {
+            return [
+                'enabled' => false,
+                'maxLines' => 1,
+                'maxBytes' => 1,
+            ];
+        }
+
+        // Both bounds must be positive integers joined by a colon; a partial or zero override is a usage error.
+        if (preg_match('/^([1-9][0-9]*):([1-9][0-9]*)$/', $budgetOverride, $matches) !== 1) {
+            return '--deep-scan-budget must be <positive-lines>:<positive-bytes> or off.';
+        }
+
+        return [
+            'enabled' => true,
+            'maxLines' => (int)$matches[1],
+            'maxBytes' => (int)$matches[2],
+        ];
     }
 
     /**
@@ -323,12 +370,16 @@ final readonly class AnalyseCommandOptions
      */
     public function displayFilter(): FindingDisplayFilter
     {
+        // The family spellings and this port's older ones feed one filter, because they describe the same view.
+        $shownPillars  = [...$this->includePillars, ...$this->presentation->showPillars];
+        $hiddenPillars = [...$this->excludePillars, ...$this->presentation->hidePillars];
+
         return new FindingDisplayFilter(
             minSeverity:    $this->minSeverity === null ? null : Severity::from($this->minSeverity),
-            includePillars: array_map(static fn(string $optionValue): Pillar => Pillar::from($optionValue), $this->includePillars),
-            excludePillars: array_map(static fn(string $optionValue): Pillar => Pillar::from($optionValue), $this->excludePillars),
-            includeRules:   $this->includeRules,
-            excludeRules:   $this->excludeRules,
+            includePillars: array_map(static fn(string $optionValue): Pillar => Pillar::from($optionValue), $shownPillars),
+            excludePillars: array_map(static fn(string $optionValue): Pillar => Pillar::from($optionValue), $hiddenPillars),
+            includeRules:   [...$this->includeRules, ...$this->presentation->showRules],
+            excludeRules:   [...$this->excludeRules, ...$this->presentation->hideRules],
         );
     }
 
@@ -413,9 +464,9 @@ final readonly class AnalyseCommandOptions
      */
     public function hasChangedRegionMode(): bool
     {
-        return $this->diffMode !== null
-               || $this->since !== null
-               || $this->changedRanges !== null;
+        return $this->changeScope->diffMode !== null
+               || $this->changeScope->since !== null
+               || $this->changeScope->changedRanges !== null;
     }
 
     /**
@@ -426,7 +477,7 @@ final readonly class AnalyseCommandOptions
      */
     public function usesChangedFilesForDiscovery(): bool
     {
-        return $this->diffMode !== null || $this->since !== null;
+        return $this->changeScope->diffMode !== null || $this->changeScope->since !== null;
     }
 
     /**
@@ -475,7 +526,7 @@ final readonly class AnalyseCommandOptions
      * can replace with its own default.
      *
      * @param InputInterface $input - Console input the option is read from.
-     * @param string         $name - Option name without the leading dashes.
+     * @param string         $name  - Option name without the leading dashes.
      *
      * @return string|null - the option value when a non-empty string, or null so callers can apply a null-coalescing default for absent or empty
      *                     input.
@@ -492,7 +543,7 @@ final readonly class AnalyseCommandOptions
      * as typed with no comma-splitting, and rejecting the whole run if any occurrence was left blank.
      *
      * @param InputInterface $input - Console input the repeated option is read from.
-     * @param string         $name - Option name without the leading dashes; named in the error on a blank entry.
+     * @param string         $name  - Option name without the leading dashes; named in the error on a blank entry.
      *
      * @return list<string>|string - the verbatim occurrence values (no comma splitting), or a usage-error message string when any occurrence is
      *                             blank.
@@ -527,7 +578,7 @@ final readonly class AnalyseCommandOptions
      * --include-rule=c` - and still get back a de-duplicated, trimmed list.
      *
      * @param InputInterface $input - Console input the repeated option is read from.
-     * @param string         $name - Option name without the leading dashes; each occurrence is comma-split and trimmed.
+     * @param string         $name  - Option name without the leading dashes; each occurrence is comma-split and trimmed.
      *
      * @return list<string> - the comma-expanded, trimmed values from every occurrence, de-duplicated and re-keyed into a clean list.
      */
@@ -611,6 +662,11 @@ final readonly class AnalyseCommandOptions
      */
     private function baselineUsageError(): ?string
     {
+        // A migration has nowhere to write without a new path, and writing over the input would destroy the user's retreat copy.
+        if ($this->baseline->migrateBaselinePath !== null && $this->baseline->generateBaselinePath === null) {
+            return '--migrate-baseline requires --generate-baseline <new path>; the migrated file is written there and the original is left untouched.';
+        }
+
         // With at most one of `--baseline` / `--generate-baseline` set there is no clash, so allow the run.
         if ($this->baseline->baselinePath === null || $this->baseline->generateBaselinePath === null) {
             return null;
@@ -630,9 +686,9 @@ final readonly class AnalyseCommandOptions
     private function diffUsageError(): ?string
     {
         $changedModes = array_filter([
-                                         $this->diffMode,
-                                         $this->since,
-                                         $this->changedRanges,
+                                         $this->changeScope->diffMode,
+                                         $this->changeScope->since,
+                                         $this->changeScope->changedRanges,
                                      ], static fn(?string $mode): bool => $mode !== null);
 
         // Stacking two changed-region flags (say `--diff` and `--since`) is ambiguous, since each derives the region differently.
@@ -641,17 +697,17 @@ final readonly class AnalyseCommandOptions
         }
 
         // `--diff-vs` is its own comparison mode and cannot sit on top of a changed-region flag.
-        if ($this->diffVs !== null && $changedModes !== []) {
+        if ($this->changeScope->diffVs !== null && $changedModes !== []) {
             return '--diff, --since, --changed-ranges, and --diff-vs are mutually exclusive.';
         }
 
         // An unknown `--changed-scope` (e.g. `--changed-scope=line`) would silently mis-map ranges to findings, so refuse it.
-        if (!in_array($this->changedScope, ['symbol', 'hunk', 'file'], true)) {
+        if (!in_array($this->changeScope->changedScope, ['symbol', 'hunk', 'file'], true)) {
             return '--changed-scope must be one of: symbol, hunk, file.';
         }
 
         // `--changed-ranges` gives line spans, which mean nothing unless the user also names the file they belong to.
-        if ($this->changedRanges !== null && $this->paths === []) {
+        if ($this->changeScope->changedRanges !== null && $this->paths === []) {
             return '--changed-ranges requires at least one file path.';
         }
 
@@ -667,7 +723,7 @@ final readonly class AnalyseCommandOptions
     private function changedOnlyUsageError(): ?string
     {
         // Either the user didn't ask for changed-only, or they already supplied `--diff-vs`, so nothing is missing.
-        if (!$this->isChangedOnly || $this->diffVs !== null) {
+        if (!$this->changeScope->isChangedOnly || $this->changeScope->diffVs !== null) {
             return null;
         }
 

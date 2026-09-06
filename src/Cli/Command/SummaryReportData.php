@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace GruffPhp\Cli\Command;
 
+use GruffPhp\Engine\Analysis\AnalysisReport;
+use GruffPhp\Engine\Analysis\SensitiveExclusionSummary;
+use GruffPhp\Engine\Analysis\RunDiagnostic;
 use GruffPhp\Results\Scoring\FileScore;
 use GruffPhp\Results\Scoring\ScoreReport;
 
@@ -19,21 +22,25 @@ final readonly class SummaryReportData
     /**
      * Capture source, score, and aggregate finding data for one summary render.
      *
-     * @param list<string>                                                                                     $paths             - Paths the user named; empty means none were given, so the whole project was scanned.
-     * @param string|null                                                                                      $configPath        - Effective config path for the run; null when no config file was used.
-     * @param int                                                                                              $sourcesDiscovered - Number of files discovered before parsing.
-     * @param int                                                                                              $sourcesParsed     - Number of files parsed without parse errors.
-     * @param int                                                                                              $ignoredPaths      - Number of ignored paths reported by discovery.
-     * @param int                                                                                              $missingPaths      - Number of missing input paths.
-     * @param int                                                                                              $parseErrors       - Number of parse-error diagnostics.
-     * @param ScoreReport                                                                                      $score             - Composite score report for the run.
-     * @param array{advisory: int, warning: int, error: int, total: int}                                       $totals            - Finding totals by severity.
-     * @param list<array{ruleId: string, count: int, advisory: int, warning: int, error: int, pillar: string}> $topRules          - Highest-volume rules; empty when the run had no findings.
-     * @param list<FileScore>                                                                                  $topOffenders      - Lowest-scoring files; empty when nothing scored below the pass mark.
+     * @param list<string>                                                                                     $paths               - Paths the user named; empty means none were given, so the whole project was scanned.
+     * @param string|null                                                                                      $configPath          - Effective config path for the run; null when no config file was used.
+     * @param AnalysisReport                                                                                   $analysisReport      - Canonical model projected by the JSON renderer.
+     * @param int                                                                                              $sourcesDiscovered   - Number of files discovered before parsing.
+     * @param int                                                                                              $sourcesParsed       - Number of files parsed without parse errors.
+     * @param int                                                                                              $ignoredPaths        - Number of ignored paths reported by discovery.
+     * @param int                                                                                              $missingPaths        - Number of missing input paths.
+     * @param int                                                                                              $parseErrors         - Number of parse-error diagnostics.
+     * @param ScoreReport                                                                                      $score               - Composite score report for the run.
+     * @param array{advisory: int, warning: int, error: int, total: int}                                       $totals              - Finding totals by severity.
+     * @param list<array{ruleId: string, count: int, advisory: int, warning: int, error: int, pillar: string}> $topRules            - Highest-volume rules; empty when the run had no findings.
+     * @param list<FileScore>                                                                                  $topOffenders        - Lowest-scoring files; empty when nothing scored below the pass mark.
+     * @param list<SensitiveExclusionSummary>                                                                  $sensitiveExclusions - One audit row per configured sensitive-data exclusion, so the digest can state what its own filtering removed; empty when the run configured none.
+     * @param list<RunDiagnostic>                                                                              $diagnostics         - Run diagnostics shown in both summary formats.
      */
     public function __construct(
         public array $paths,
         public ?string $configPath,
+        public AnalysisReport $analysisReport,
         public int $sourcesDiscovered,
         public int $sourcesParsed,
         public int $ignoredPaths,
@@ -43,6 +50,8 @@ final readonly class SummaryReportData
         public array $totals,
         public array $topRules,
         public array $topOffenders,
+        public array $sensitiveExclusions = [],
+        public array $diagnostics = [],
     ) {
     }
 }

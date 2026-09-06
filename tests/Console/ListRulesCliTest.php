@@ -116,6 +116,102 @@ final class ListRulesCliTest extends CliTestCase
     }
 
     /**
+     * Verify the catalogue publishes false-positive guidance for every medium and low confidence rule.
+     *
+     * One method covers the whole guarantee - population, per-rule guidance, and the deliberate
+     * absence of the key - because each assertion reads the same catalogue payload.
+     *
+     * @return void
+     */
+    public function testCatalogueJsonPublishesGuidanceForEveryMediumAndLowConfidenceRule(): void
+    {
+        $process = new Process([PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'list-rules', '--format', 'json']);
+        $process->run();
+        $exitCode = $process->getExitCode();
+        $payload  = json_decode($process->getOutput(), associative: true, flags: JSON_THROW_ON_ERROR);
+        /** @var list<array{id: string, confidence: string, falsePositiveShapes?: list<array{shape: string, mitigation: string}>}> $rules Catalogue rows as published by the JSON renderer. */
+        $rules = (array)(is_array($payload) ? ($payload['rules'] ?? []) : []);
+
+        $mediumOrLowRules = array_values(array_filter(
+            $rules,
+            static fn(array $rule): bool => in_array($rule['confidence'], ['medium', 'low'], true),
+        ));
+        $withoutGuidance = array_values(array_map(
+            static fn(array $rule): string => $rule['id'],
+            array_filter(
+                $mediumOrLowRules,
+                static fn(array $rule): bool => ($rule['falsePositiveShapes'] ?? []) === [],
+            ),
+        ));
+        // Name every rule with a blank half so one failure lists them all rather than only the first.
+        $blankGuidance = array_values(array_map(
+            static fn(array $rule): string => $rule['id'],
+            array_filter($mediumOrLowRules, static fn(array $rule): bool => array_filter(
+                $rule['falsePositiveShapes'] ?? [],
+                static fn(array $entry): bool => trim($entry['shape']) === '' || trim($entry['mitigation']) === '',
+            ) !== []),
+        ));
+
+        // A rule that catalogues nothing omits the key rather than publishing an empty list, so an
+        // absent key never reads as "reviewed and found to have no false positives".
+        $shapelessRules       = array_values(array_filter(
+            $rules,
+            static fn(array $rule): bool => !array_key_exists('falsePositiveShapes', $rule),
+        ));
+        $shapelessConfidences = array_values(array_unique(array_map(
+            static fn(array $rule): string => (string)$rule['confidence'],
+            $shapelessRules,
+        )));
+
+        self::assertSame(0, $exitCode, $process->getErrorOutput());
+        self::assertCount(128, $rules);
+        self::assertCount(70, $mediumOrLowRules);
+        self::assertSame([], $withoutGuidance);
+        self::assertSame([], $blankGuidance);
+        self::assertNotEmpty($shapelessRules);
+        self::assertSame(['high'], $shapelessConfidences);
+    }
+
+    /**
+     * Verify guidance catalogued before this batch is still published by both catalogue surfaces.
+     *
+     * @return void
+     */
+    public function testPreExistingGuidanceStaysPublishedInCatalogueAndDetailViews(): void
+    {
+        $listProcess = new Process([PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'list-rules', '--format', 'json']);
+        $listProcess->run();
+        $detailProcess = new Process([
+            PHP_BINARY,
+            self::PROJECT_ROOT . '/bin/gruff-php',
+            'list-rules',
+            'waste.one-line-method',
+            '--format',
+            'json',
+        ]);
+        $detailProcess->run();
+
+        $listPayload   = json_decode($listProcess->getOutput(), associative: true, flags: JSON_THROW_ON_ERROR);
+        $detailPayload = json_decode($detailProcess->getOutput(), associative: true, flags: JSON_THROW_ON_ERROR);
+        /** @var list<array{id: string, falsePositiveShapes?: list<array{shape: string, mitigation: string}>}> $catalogueRules Catalogue rows as published by the JSON renderer. */
+        $catalogueRules  = (array)(is_array($listPayload) ? ($listPayload['rules'] ?? []) : []);
+        $catalogueShapes = array_merge(...array_map(
+            static fn(array $rule): array => $rule['falsePositiveShapes'] ?? [],
+            array_values(array_filter(
+                $catalogueRules,
+                static fn(array $rule): bool => $rule['id'] === 'waste.one-line-method',
+            )),
+        ));
+        $detailShapes = (array)(is_array($detailPayload) ? ($detailPayload['falsePositiveShapes'] ?? []) : []);
+
+        self::assertSame(0, $listProcess->getExitCode(), $listProcess->getErrorOutput());
+        self::assertSame(0, $detailProcess->getExitCode(), $detailProcess->getErrorOutput());
+        self::assertNotEmpty($catalogueShapes);
+        // The catalogue row and the detail card publish one text, so a reader comparing them agrees.
+        self::assertSame($detailShapes, $catalogueShapes);
+    }
+
+    /**
      * Verify Boolean detail JSON preserves the documented option semantics added for configuration users.
      *
      * @return void

@@ -15,6 +15,7 @@ use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
+use GruffPhp\Support\DeclarationLine;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 
@@ -94,7 +95,7 @@ final readonly class MissingReturnTagRule implements RuleInterface
                 ruleId:      $definition->id,
                 message:     sprintf('%s has a docblock but needs an @return tag with a brief description (one plain-English clause; not a restatement of the type signature).', $symbol),
                 filePath:    $analysisUnit->file->displayPath,
-                line:        $node->getStartLine(),
+                line:        DeclarationLine::of($node),
                 severity:    $definition->defaultSeverity,
                 pillar:      $definition->pillar,
                 tier:        $definition->tier,

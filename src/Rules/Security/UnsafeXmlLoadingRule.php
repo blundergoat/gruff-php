@@ -23,10 +23,12 @@ use PhpParser\NodeFinder;
  * that parses request-controlled data without `LIBXML_NONET`, the shape that lets a crafted document pull
  * in external entities and reach internal hosts (XXE / SSRF). A reviewer sees each unguarded parse.
  *
- * Runs per file. Generic loader method names (`load`, `open`, `xml`) are only flagged when the receiver is
- * provably a real XML parser class, traced through variables, `$this` properties, and constructor writes,
- * so archives and ORMs that share those names stay quiet. A call passing `LIBXML_NONET` is treated as
- * guarded. Warning severity, medium confidence - taint tracking is heuristic and the flag may be set out of view.
+ * Runs per file. The generic loader names `load`, `open`, and `xml` are flagged only when the receiver is provably a real
+ * XML parser class, traced through variables, `$this` properties, and constructor writes, so archives and ORMs that
+ * share those names stay quiet.
+ *
+ * A call passing `LIBXML_NONET` counts as guarded. Warning at medium confidence, because taint tracking is heuristic and
+ * the flag may be set somewhere this scan cannot see.
  */
 final class UnsafeXmlLoadingRule implements RuleInterface
 {
@@ -59,6 +61,12 @@ final class UnsafeXmlLoadingRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A parse guarded somewhere the call cannot see, such as libxml_set_external_entity_loader(null) installed during bootstrap.',
+                    'mitigation' => 'Only an explicit LIBXML_NONET argument on the call itself counts as guarded, so pass that flag where the parse happens.',
+                ],
+            ],
         );
     }
 
@@ -185,10 +193,11 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     /**
      * Reports whether a receiver variable can hold an XML parser at the loader call.
      *
-     * Same-scope writes are replayed in source order. A write the runtime could skip
-     * on the sink's path (it sits in a branch the sink does not share) can add XML
-     * evidence but never erase it, so one conditional rebind cannot hide a real
-     * parser from the user; an unskippable write fully rebinds the receiver.
+     * Same-scope writes are replayed in source order.
+     *
+     * A write the runtime could skip on the sink's path, because it sits in a branch the sink does not share, can add
+     * XML evidence but never erase it, so one conditional rebind cannot hide a real parser. An unskippable write does
+     * fully rebind the receiver.
      *
      * @param AnalysisUnit    $analysisUnit - Parsed unit supplying top-level statements when the call has no enclosing function.
      * @param string          $variableName - Receiver variable name at the loader call.
@@ -582,10 +591,10 @@ final class UnsafeXmlLoadingRule implements RuleInterface
                 continue;
             }
 
-            // A named argument names the parameter it fills, so where it sits in the call says nothing about
-            // which slot it is; only an unnamed argument can be ruled out by sitting before the flags slot.
-            // Skipping named arguments here would report `simplexml_load_string(data: $xml,
-            // options: LIBXML_NONET)` as unguarded, which is a false positive on a call that set the flag.
+            // A named argument names the parameter it fills, so its position says nothing about which slot it is.
+            //
+            // Only an unnamed argument can be ruled out by sitting before the flags slot. Skipping named arguments here
+            // would report `simplexml_load_string(data: $xml, options: LIBXML_NONET)` as unguarded, a false positive.
             if (!$arg->name instanceof Node\Identifier && is_int($index) && $index < $startIndex) {
                 continue;
             }

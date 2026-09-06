@@ -28,7 +28,10 @@ use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers cross-rule regression behaviour over the fixture corpus.
+ * Covers cross-rule report stability over the full fixture corpus users depend on for release confidence.
+ *
+ * Snapshot hashes and catalogue coverage expose any change to finding counts, content, identity, or calibration signal.
+ * Maintainers use this suite before release so users do not receive unexplained report or scoring drift.
  *
  * @phpstan-import-type FindingArray from Finding
  * @phpstan-import-type FindingMetadata from Finding
@@ -47,10 +50,14 @@ final class RuleRegressionSnapshotTest extends TestCase
     {
         [$units, $findings, $json] = $this->analysePaths(['tests/Fixtures']);
 
-        self::assertCount(178, $units);
-        self::assertCount(2670, $findings);
+        // M07 added tests/Fixtures/Baseline/gruff-baseline-v3.json to the corpus.
+        self::assertCount(183, $units);
+        self::assertCount(2677, $findings);
+        // M08 made sensitive-data markers carry the class the detector already knew: a classified finding now reads
+        // `[redacted:aws-access-key]` where it read `[redacted]`. The finding count, the rule set, and every
+        // line-free identity are unchanged; only the marker text inside those findings moved.
         self::assertSame(
-            '2a6dcb6385de754dc238058357640680a337af3ab5138855e0b54671b40a9683',
+            '9a0a42d1cdbf29a212b1dd070ebcbce6529abf8e9f24eb777d8fbc4a2903392e',
             hash('sha256', $json),
         );
     }
@@ -266,6 +273,8 @@ final class RuleRegressionSnapshotTest extends TestCase
     }
 
     /**
+     * Sorts nested finding metadata so the user-visible regression snapshot stays stable across equivalent map ordering.
+     *
      * @param FindingMetadata $metadata - Finding metadata payload.
      *
      * @return FindingMetadata - the metadata with both nested maps and the top level key-sorted for a stable snapshot hash

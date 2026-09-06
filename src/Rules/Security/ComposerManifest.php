@@ -88,4 +88,60 @@ final class ComposerManifest
         // Count newlines before the match and add 1 to convert the 0-based offset into a 1-based line number.
         return substr_count($source, "\n", 0, $position) + 1;
     }
+
+    /**
+     * Resolves a package's 1-based line inside one dependency section, so the warning points to the manifest entry the user needs to edit.
+     *
+     * @param string $source      - Raw manifest contents; empty text cannot contain a dependency and falls back to line 1.
+     * @param string $sectionName - Dependency section name such as `require`; an empty or absent section falls back to line 1.
+     * @param string $packageName - Decoded package key to locate; an empty or absent key in that section falls back to line 1.
+     *
+     * @return int - exact 1-based package-key line, or 1 when the section or key cannot be located reliably
+     */
+    public static function lineOfDependencyInSection(string $source, string $sectionName, string $packageName): int
+    {
+        // Missing names cannot identify the dependency entry a user needs to edit, so keep the existing top-of-file fallback.
+        if ($sectionName === '' || $packageName === '') {
+            return 1;
+        }
+
+        $sectionPattern = sprintf('/"%s"\s*:\s*\{/', preg_quote($sectionName, '/'));
+
+        // If the requested dependency section is absent, there is no reliable package location to show the user.
+        if (preg_match($sectionPattern, $source, $sectionMatch, PREG_OFFSET_CAPTURE) !== 1) {
+            return 1;
+        }
+
+        [$sectionHeader, $sectionHeaderPosition] = $sectionMatch[0];
+        $sectionBodyPosition                     = $sectionHeaderPosition + strlen($sectionHeader);
+        $sectionEndPosition                      = strpos($source, '}', $sectionBodyPosition);
+
+        // Composer dependency sections are flat objects; without their closing brace, the package search cannot stay inside the chosen section.
+        if ($sectionEndPosition === false) {
+            return 1;
+        }
+
+        $packagePattern = sprintf('/"%s"\s*:/', preg_quote($packageName, '/'));
+
+        // A package not found at or after this section's opening brace cannot anchor a warning in the requested section.
+        if (preg_match(
+            pattern: $packagePattern,
+            subject: $source,
+            matches: $packageMatch,
+            flags:   PREG_OFFSET_CAPTURE,
+            offset:  $sectionBodyPosition,
+        ) !== 1) {
+            return 1;
+        }
+
+        $packagePosition = $packageMatch[0][1];
+
+        // A same-named key after this section belongs elsewhere, so line 1 is safer than pointing the user at the wrong manifest entry.
+        if ($packagePosition >= $sectionEndPosition) {
+            return 1;
+        }
+
+        // Convert the package key's byte offset into the exact 1-based line shown in CLI and JSON findings.
+        return substr_count($source, "\n", 0, $packagePosition) + 1;
+    }
 }

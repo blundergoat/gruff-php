@@ -69,6 +69,12 @@ final readonly class MysteryGuestRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A test reading a fixture the suite prepared elsewhere, for example in setUp() or a shared trait rather than in the test body.',
+                    'mitigation' => 'Only paths the test itself prepared are exempt, so create the file inside the test body or accept the advisory.',
+                ],
+            ],
         );
     }
 

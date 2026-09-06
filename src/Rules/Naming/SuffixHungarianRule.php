@@ -30,14 +30,12 @@ use PhpParser\Node\UnionType;
  * Flags a variable, property, or parameter whose name ends in a type suffix - `$nameString`, `$itemsArray`,
  * `$flagBoolean` - so the user drops the redundant tag when the declared or documented type already says it.
  *
- * A configured trailing token is reported when the declaration or local PHPDoc type matches the suffix, or
- * when no local type evidence contradicts it. `As<Type>` / `To<Type>` conversion idioms are exempt so a
- * transient cast such as `$nameAsString` stays readable. Advisory, medium confidence.
+ * A configured trailing token is reported when the declared or documented type matches the suffix, or when no local
+ * type evidence contradicts it. `As<Type>` and `To<Type>` conversion idioms are exempt, so a transient cast such as
+ * `$nameAsString` stays readable. Advisory at medium confidence.
  *
- * Overlap deferral order is centralised in RuleRegistry:
- * class-file-mismatch > confusing-name > negative-boolean > boolean-prefix >
- * identifier-quality > hungarian-notation > suffix-hungarian > short-variable >
- * abbreviation-allowlist.
+ * Overlap deferral order is centralised in RuleRegistry: class-file-mismatch > confusing-name > negative-boolean >
+ * boolean-prefix > identifier-quality > hungarian-notation > suffix-hungarian > short-variable > abbreviation-allowlist.
  */
 final readonly class SuffixHungarianRule implements RuleInterface
 {
@@ -74,6 +72,16 @@ final readonly class SuffixHungarianRule implements RuleInterface
             confidence:      Confidence::Medium,
             defaultOptions:  ['typeSuffixes' => self::TYPE_SUFFIXES],
             description:     'Flags identifiers that duplicate type information with trailing suffixes such as String, Map, or Boolean.',
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A domain compound whose final word coincides with a configured suffix, such as $allowList for an allowlist or $resultSet for a database result set.',
+                    'mitigation' => 'The suffix is judged as a type restatement whenever no declared type contradicts it, so rename to the closed compound or remove that suffix from options.typeSuffixes.',
+                ],
+                [
+                    'shape'      => 'An untyped local with no @var annotation whose suffixed name holds a value of some other type.',
+                    'mitigation' => 'Absent type evidence is read as agreement, so add a @var annotation naming the real type and the finding clears.',
+                ],
+            ],
         );
     }
 

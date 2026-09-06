@@ -47,6 +47,12 @@ final class UnsafeArchiveExtractionRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A domain object with its own extractTo() method, called with request-derived arguments.',
+                    'mitigation' => 'Instance calls are matched on the method name alone, while only the static path requires a ZipArchive or PharData receiver, so accept the finding or rename the local method.',
+                ],
+            ],
         );
     }
 
@@ -127,12 +133,12 @@ final class UnsafeArchiveExtractionRule implements RuleInterface
     /**
      * Reports whether the extraction receiver can hold a request-controlled archive.
      *
-     * Tracks the receiver variable within its own function-like scope only: an open
-     * call with request-tainted input or a `new PharData($request-tainted)` assignment
-     * marks it. An event the runtime could skip on the sink's path (it sits in a branch
-     * the sink does not share) can add upload evidence but never clear it, so one
-     * conditional clean re-open cannot hide an uploaded archive; an unskippable clean
-     * re-open or reassignment still clears the taint.
+     * Tracks the receiver variable within its own function-like scope only, marking it on an open call with
+     * request-tainted input or a `new PharData($requestTainted)` assignment.
+     *
+     * An event the runtime could skip on the sink's path, because it sits in a branch the sink does not share, can add
+     * upload evidence but never clear it, so one conditional clean re-open cannot hide an uploaded archive.
+     * An unskippable clean re-open or reassignment still clears the taint.
      *
      * @param AnalysisUnit    $analysisUnit - Parsed unit supplying top-level statements when the call has no enclosing function.
      * @param Expr\MethodCall $call - extractTo() call whose receiver variable is being traced.

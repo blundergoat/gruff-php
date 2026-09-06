@@ -133,6 +133,16 @@ final readonly class SutNotCalledRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Error,
             confidence:      Confidence::Low,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A test that does exercise the named behaviour but reaches it through a differently named entry point, such as __invoke() or a facade that forwards to the method.',
+                    'mitigation' => 'The inferred method name must appear as a literal call name, so call the named method directly or rename the test after the entry point it uses.',
+                ],
+                [
+                    'shape'      => 'A test whose name begins with a recognised verb that is prose rather than a method, so an unrelated word is inferred as the system under test.',
+                    'mitigation' => 'Candidates are derived from camelCase tokens before the first outcome marker, so rename the test so its verb phrase matches the method it calls.',
+                ],
+            ],
         );
     }
 
@@ -170,7 +180,7 @@ final readonly class SutNotCalledRule implements RuleInterface
                 ruleId:      self::ID,
                 message:     sprintf('%s name implies a SUT behavior, but no matching method call was detected.', $scope->symbol),
                 filePath:    $analysisUnit->file->displayPath,
-                line:        $scope->line,
+                line:        $scope->anchorLine(),
                 severity:    Severity::Error,
                 pillar:      Pillar::TestQuality,
                 tier:        RuleTier::V01,

@@ -52,6 +52,12 @@ final readonly class ForbiddenGlobalAccessRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'Request-handling boundary code that does not follow the controller naming convention: a front controller, middleware, or session bootstrap.',
+                    'mitigation' => 'Only a /Controller/ or /Controllers/ directory, or a *Controller.php filename, is exempt, so move the read behind that boundary or accept the finding.',
+                ],
+            ],
         );
     }
 

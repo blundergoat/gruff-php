@@ -40,6 +40,32 @@ final readonly class FindingDisplayFilter
     }
 
     /**
+     * Returns a copy carrying the project's configured display floor, unless the user already named one on the command line.
+     *
+     * The flag wins because it is the more specific instruction: a project floor is a default, and typing
+     * `--min-severity` is the user overriding that default for one run.
+     *
+     * @param Severity|null $configuredFloor - Floor from the project's `minimumSeverity:` key; null when it set none.
+     *
+     * @return self - This filter when a flag already set the floor, otherwise a copy carrying the configured one.
+     */
+    public function withConfiguredFloor(?Severity $configuredFloor): self
+    {
+        // A floor the user typed, or no configured floor at all, leaves this filter exactly as it is.
+        if ($this->minSeverity !== null || $configuredFloor === null) {
+            return $this;
+        }
+
+        return new self(
+            minSeverity:    $configuredFloor,
+            includePillars: $this->includePillars,
+            excludePillars: $this->excludePillars,
+            includeRules:   $this->includeRules,
+            excludeRules:   $this->excludeRules,
+        );
+    }
+
+    /**
      * Winnows the full finding list down to just what the active filters allow - `analyse` applies this
      * before it builds the report, so the user sees only the findings their flags asked for.
      *

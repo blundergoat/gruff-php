@@ -79,6 +79,10 @@ final class MarkdownReporterTest extends TestCase
     public function testMarkdownReporterSortsPillarsByFindingsDescThenNameAsc(): void
     {
         $scoreReport = new ScoreReport(
+            clusters:               [],
+            ruleAttribution:        [],
+            evaluatedFiles:         10,
+            scoredPillars:          [],
             composite:              new Grade(70.0, 'C'),
             pillars:                [
                                         new PillarScore('size', true, new Grade(90.5, 'A'), 2, 1, 1, 0, 9.5),
@@ -118,6 +122,10 @@ final class MarkdownReporterTest extends TestCase
     public function testMarkdownReporterOmitsNonApplicablePillars(): void
     {
         $scoreReport = new ScoreReport(
+            clusters:               [],
+            ruleAttribution:        [],
+            evaluatedFiles:         10,
+            scoredPillars:          [],
             composite:              new Grade(82.0, 'B'),
             pillars:                [
                                         new PillarScore('mutation', false, null, 0, 0, 0, 0, 0.0),
@@ -145,6 +153,10 @@ final class MarkdownReporterTest extends TestCase
     public function testMarkdownReporterRendersPlaceholderRowWhenNoApplicablePillars(): void
     {
         $scoreReport = new ScoreReport(
+            clusters:               [],
+            ruleAttribution:        [],
+            evaluatedFiles:         10,
+            scoredPillars:          [],
             composite:              new Grade(100.0, 'A'),
             pillars:                [
                                         new PillarScore('mutation', false, null, 0, 0, 0, 0, 0.0),
@@ -170,6 +182,10 @@ final class MarkdownReporterTest extends TestCase
     public function testMarkdownReporterReusesPillarScoreSeverityCounts(): void
     {
         $scoreReport = new ScoreReport(
+            clusters:               [],
+            ruleAttribution:        [],
+            evaluatedFiles:         10,
+            scoredPillars:          [],
             composite:              new Grade(50.0, 'F'),
             pillars:                [
                                         new PillarScore('documentation', true, new Grade(0.0, 'F'), 12, 9, 2, 1, 100.0),
@@ -194,6 +210,10 @@ final class MarkdownReporterTest extends TestCase
     public function testMarkdownReporterRendersNotApplicableGradeWhenGradeMissing(): void
     {
         $scoreReport = new ScoreReport(
+            clusters:               [],
+            ruleAttribution:        [],
+            evaluatedFiles:         10,
+            scoredPillars:          [],
             composite:              new Grade(100.0, 'A'),
             pillars:                [
                                         new PillarScore('documentation', true, null, 0, 0, 0, 0, 0.0),
@@ -218,6 +238,10 @@ final class MarkdownReporterTest extends TestCase
     public function testMarkdownReporterEscapesPipeCharactersInPillarCells(): void
     {
         $scoreReport = new ScoreReport(
+            clusters:               [],
+            ruleAttribution:        [],
+            evaluatedFiles:         10,
+            scoredPillars:          [],
             composite:              new Grade(90.0, 'A'),
             pillars:                [
                                         new PillarScore('a|b', true, new Grade(0.0, 'F'), 1, 0, 0, 1, 100.0),
@@ -274,7 +298,7 @@ final class MarkdownReporterTest extends TestCase
      */
     private function report(array $findings, ?ScoreReport $score = null): AnalysisReport
     {
-        $score ??= (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive());
+        $score ??= (new ScoreCalculator())->calculate($findings, 10, null, DiffResult::inactive());
 
         return new AnalysisReport(
             toolVersion:     '0.1.0-test',

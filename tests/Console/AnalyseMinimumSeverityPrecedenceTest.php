@@ -10,7 +10,7 @@ use Symfony\Component\Process\Process;
 /**
  * Verifies the ADR-015 precedence chain for the analyse command's --fail-on resolution.
  *
- * CLI flag > config.minimumSeverity.analyse > binary default (advisory).
+ * CLI flag > config.failOn.analyse > binary default (advisory).
  */
 final class AnalyseMinimumSeverityPrecedenceTest extends TestCase
 {
@@ -20,9 +20,9 @@ final class AnalyseMinimumSeverityPrecedenceTest extends TestCase
     private const PROJECT_ROOT = __DIR__ . '/../..';
 
     /**
-     * Verify config minimumSeverity.analyse > binary default when --fail-on is omitted.
+     * Verify config failOn.analyse > binary default when --fail-on is omitted.
      *
-     * The fixture sets `minimumSeverity.analyse: error` and configures the
+     * The fixture sets `failOn.analyse: error` and configures the
      * size.file-length rule to emit warning findings. Without --fail-on, the
      * config-supplied error threshold wins and warning findings do not trigger
      * exit 1.
@@ -42,7 +42,7 @@ final class AnalyseMinimumSeverityPrecedenceTest extends TestCase
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-        self::assertStringContainsString('[warning] size.file-length', $process->getOutput());
+        self::assertStringContainsString('[warning] tests/Fixtures/Source/mixed/alpha.php:1 size.file-length', $process->getOutput());
     }
 
     /**
@@ -69,7 +69,7 @@ final class AnalyseMinimumSeverityPrecedenceTest extends TestCase
         $process->run();
 
         self::assertSame(1, $process->getExitCode());
-        self::assertStringContainsString('[warning] size.file-length', $process->getOutput());
+        self::assertStringContainsString('[warning] tests/Fixtures/Source/mixed/alpha.php:1 size.file-length', $process->getOutput());
     }
 
     /**

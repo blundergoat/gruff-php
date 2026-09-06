@@ -47,7 +47,8 @@ final readonly class PrivateKeyRule implements SourceTextRuleInterface
     }
 
     /**
-     * Reports each PEM private-key header found in the raw source, with the key body redacted.
+     * Reports each PEM private-key header so users can remove and rotate committed key material.
+     * The finding stores only the fixed marker; neither the header nor body reaches report metadata.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -67,15 +68,15 @@ final readonly class PrivateKeyRule implements SourceTextRuleInterface
         $findings = [];
         // Report each private-key header the scan turned up.
         foreach ($matches[0] as $match) {
-            [$header, $offset] = $match;
-            $findings[]        = SecretScannerHelper::finding(
+            [, $offset] = $match;
+            $findings[] = SecretScannerHelper::finding(
                 analysisUnit: $analysisUnit,
                 ruleId:       self::ID,
                 message:      'Private key block header detected; key body is redacted.',
                 line:         SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
                 confidence:   Confidence::High,
                 detector:     'private-key-header',
-                preview:      $header,
+                displayMarker: SecretScannerHelper::categoryMarker('private-key'),
                 remediation:  'Remove private keys from source and rotate the key if it was real.',
             );
         }

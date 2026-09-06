@@ -115,7 +115,6 @@ selection:
     excludeRules: ["security.weak-crypto"]
 allowlists:
     acceptedAbbreviations: ["id", "db"]
-    secretPreviews: ["AKIA...T3R2 (redacted, 20 chars)"]
 rules:
     complexity.cognitive:
         enabled: true

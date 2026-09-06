@@ -59,6 +59,16 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A first-party action deliberately tracked at a branch-shaped ref such as @main, inside a repository that controls that action.',
+                    'mitigation' => 'A ref named dev, head, latest, main, master, or trunk is treated as floating regardless of ownership, so pin to a commit SHA or a version tag.',
+                ],
+                [
+                    'shape'      => 'A run: step that interpolates github.event data inside an already-quoted assignment, where the value cannot break out of the shell word.',
+                    'mitigation' => 'The workflow is scanned line by line as text with no shell-quoting model, so pass the value through env: and reference the variable instead.',
+                ],
+            ],
         );
     }
 

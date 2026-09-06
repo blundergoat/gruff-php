@@ -60,6 +60,16 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A nine-digit number that is not an identifier at all - a timestamp, byte count, or ID - on a line that also mentions a health word.',
+                    'mitigation' => 'The TFN shape is nine digits and the gate is only a same-line keyword, so move the number away from the health-context line or mark the line as a documented example.',
+                ],
+                [
+                    'shape'      => 'A reference or error code of three letters followed by four digits, matching the NHI shape on a health-context line.',
+                    'mitigation' => 'The pattern cannot tell a domain code from a health identifier, so rename the code or keep it off lines carrying health keywords.',
+                ],
+            ],
         );
     }
 
@@ -69,15 +79,13 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<\GruffPhp\Results\Finding\Finding> - one finding per non-comment, non-placeholder pattern hit that had PHI context on its line; empty
+     * @return list<\GruffPhp\Results\Finding\Finding> - One finding per contextual non-placeholder PHI hit outside comments; empty
      *                                         when none qualify
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        // Fast bail: a PHI finding requires a context keyword on the same
-        // line as the matched identifier. If the file has no PHI context
-        // keyword anywhere, none of the per-pattern matches can ever pass
-        // hasPhiContext().
+        // A PHI finding needs a health keyword on the same line as the matched identifier, so a file without one anywhere
+        // can never produce a finding; bailing here skips the expensive per-pattern scan on most files.
         if (preg_match('/\b(?:health|medicare|mrn|nhi|patient|ssn|tax_file_number|tfn)\b/i', $analysisUnit->source) !== 1) {
             // No PHI context keyword anywhere, so no per-pattern match could survive hasPhiContext().
             return [];
@@ -87,9 +95,9 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
 
         // Run each PHI identifier pattern over the source.
-        foreach ($this->patterns() as $definition) {
+        foreach ($this->patterns() as $phiPattern) {
             // Match every occurrence of this identifier shape, capturing each offset.
-            preg_match_all($definition['pattern'], $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
+            preg_match_all($phiPattern['pattern'], $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
             // Weigh each candidate this pattern found.
             foreach ($matches[0] as $match) {
@@ -102,7 +110,7 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
                 $lineNumber = SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset);
                 $line       = $this->lineText($analysisUnit->source, $lineNumber);
                 // Without a health keyword on the same line, the number is probably not PHI.
-                if (!$this->hasPhiContext($line, $definition['name'])) {
+                if (!$this->hasPhiContext($line, $phiPattern['name'])) {
                     continue;
                 }
 
@@ -111,15 +119,15 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
                     continue;
                 }
 
-                $preview    = SecretScannerHelper::redactedPreview($candidateSecret);
+                $displayMarker = SecretScannerHelper::categoryMarker($phiPattern['name']);
                 $findings[] = SecretScannerHelper::finding(
                     analysisUnit: $analysisUnit,
                     ruleId:       self::ID,
-                    message:      sprintf('Potential %s identifier detected: %s.', strtoupper($definition['name']), $preview),
+                    message:      sprintf('Potential %s identifier detected: %s.', strtoupper($phiPattern['name']), $displayMarker),
                     line:         $lineNumber,
                     confidence:   Confidence::Medium,
-                    detector:     $definition['name'],
-                    preview:      $preview,
+                    detector:     $phiPattern['name'],
+                    displayMarker: $displayMarker,
                     remediation:  'Use synthetic health identifiers in fixtures and keep real PHI out of source.',
                 );
             }

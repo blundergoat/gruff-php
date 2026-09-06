@@ -45,7 +45,7 @@ final class HtmlReporterTest extends TestCase
                 confidence: Confidence::High,
             ),
         ];
-        $score          = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive());
+        $score          = (new ScoreCalculator())->calculate($findings, 10, null, DiffResult::inactive());
         $analysisReport = new AnalysisReport(
             toolVersion:     '0.1.0-test',
             requestedPaths:  ['src/<bad>.php'],
@@ -86,7 +86,7 @@ final class HtmlReporterTest extends TestCase
      */
     public function testHtmlReporterOmitsMutationVisualization(): void
     {
-        $score          = (new ScoreCalculator())->calculate([], null, DiffResult::inactive());
+        $score          = (new ScoreCalculator())->calculate([], 10, null, DiffResult::inactive());
         $analysisReport = new AnalysisReport(
             toolVersion:     '0.1.0-test',
             requestedPaths:  ['src'],
@@ -375,6 +375,10 @@ final class HtmlReporterTest extends TestCase
     public function testHtmlReporterRendersCustomScoreReportEdgeCases(): void
     {
         $scoreReport = new ScoreReport(
+            clusters:               [],
+            ruleAttribution:        [],
+            evaluatedFiles:         10,
+            scoredPillars:          [],
             composite:              new Grade(88.25, 'B'),
             pillars:                [
                                         new PillarScore('Mutation', true, new Grade(99.0, 'A'), 1, 0, 0, 1, 1.0),
@@ -406,6 +410,10 @@ final class HtmlReporterTest extends TestCase
     public function testHtmlReporterRendersOffenderMetricColumnsInOrder(): void
     {
         $scoreReport = new ScoreReport(
+            clusters:               [],
+            ruleAttribution:        [],
+            evaluatedFiles:         10,
+            scoredPillars:          [],
             composite:              new Grade(72.0, 'C'),
             pillars:                [],
             topOffenders:           [
@@ -512,7 +520,7 @@ final class HtmlReporterTest extends TestCase
      */
     private function report(array $findings, array $diagnostics = [], ?ScoreReport $score = null): AnalysisReport
     {
-        $score ??= (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive());
+        $score ??= (new ScoreCalculator())->calculate($findings, 10, null, DiffResult::inactive());
 
         return new AnalysisReport(
             toolVersion:     '0.1.0-test',

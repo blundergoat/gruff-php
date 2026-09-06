@@ -12,12 +12,10 @@ use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
 
 /**
- * Shared string and finding helpers the sensitive-data scanners lean on - comment-range lookup,
- * offset-to-line conversion, value redaction, dummy/placeholder detection, path classification, Shannon
- * entropy, and a common finding builder.
+ * Shared detector utilities turn matched source into safe, consistently located sensitive findings.
  *
- * Centralising these keeps every secret scanner redacting, skipping comments, and scoring entropy the same
- * way. Pure static utility; the only state is a per-unit comment-range cache keyed by display path.
+ * Scanners use them for comment ranges, line lookup, fixed markers, placeholder checks, paths, entropy, and finding construction.
+ * The helpers are static and side-effect free except for an immutable per-file comment-range cache.
  */
 final class SecretScannerHelper
 {
@@ -108,36 +106,63 @@ final class SecretScannerHelper
     }
 
     /**
-     * Builds a redacted preview of a secret value (length only, or first 4 + last 4 chars over 8 chars).
+     * The seventeen marker categories FAMILY-CONTRACT.md section 5 ratifies. Nothing outside this list can reach a
+     * marker, so a detector name the family never ratified degrades to the bare marker instead of inventing one.
      *
-     * @param string $secretValue - Sensitive value to redact for reporting.
-     *
-     * @return string - redacted preview (length marker, or first/last 4 chars) safe to embed in findings and reports
+     * @var list<string>
      */
-    public static function redactedPreview(string $secretValue): string
-    {
-        $length = strlen($secretValue);
-        if ($length <= 8) {
-            // Too short to show any edge without leaking most of it, so disclose only the length.
-            return sprintf('<redacted:%d chars>', $length);
-        }
+    private const RATIFIED_MARKER_CATEGORIES = [
+        'private-key', 'jwt', 'aws-access-key', 'github-token', 'slack-token', 'stripe-live-key', 'google-api-key',
+        'anthropic-api-key', 'npm-token', 'gitlab-token', 'gcp-service-account', 'email', 'phone', 'payment-card',
+        'ssn', 'medicare', 'mrn',
+    ];
 
-        // Show only the first and last 4 chars: enough to recognise the value, never enough to reconstruct it.
-        return sprintf('%s...%s (redacted, %d chars)', substr($secretValue, 0, 4), substr($secretValue, -4), $length);
+    /**
+     * Returns the bare zero-payload marker, shown when a detector classified nothing more specific.
+     * Generic-assignment and entropy matches always use this: they name no class the user can act on.
+     *
+     * @return string - non-empty classification-only marker with no value-derived characters or length
+     */
+    public static function fixedSecretMarker(): string
+    {
+        return '[redacted]';
     }
 
     /**
-     * Builds a `KEY=<redacted:N chars>` string for env-style secret findings.
+     * Returns the most specific marker for a classified match, unconditionally.
+     * Section 5 removed the configuration that once gated this, because every marker is zero-payload by construction.
      *
-     * @param string $key - Environment-style key name.
-     * @param string $secretValue - Sensitive value associated with the key.
+     * @param string|null $category - Ratified category the detector classified; null or an unratified name yields the bare marker.
      *
-     * @return string - `KEY=<redacted:N chars>` with the key kept visible and only the value's byte length disclosed
+     * @return string - `[redacted:<category>]` for a ratified category, `[redacted]` otherwise
      */
-    public static function redactedKeyValue(string $key, string $secretValue): string
+    public static function categoryMarker(?string $category): string
     {
-        // Keep the key visible for context but disclose only the value's length, never any of its bytes.
-        return sprintf('%s=<redacted:%d chars>', $key, strlen($secretValue));
+        // An unratified name would put this port outside the closed family grammar, so it degrades rather than invents.
+        if ($category === null || !in_array($category, self::RATIFIED_MARKER_CATEGORIES, true)) {
+            return self::fixedSecretMarker();
+        }
+
+        return sprintf('[redacted:%s]', $category);
+    }
+
+    /**
+     * Returns the connection marker naming only the scheme, which the URL already published in plain text.
+     *
+     * @param string $scheme - Scheme captured by the detector's own pattern; case-insensitive, never user-supplied text.
+     *
+     * @return string - `[redacted:connection-string:<scheme>]`, or the bare marker when the scheme is malformed
+     */
+    public static function connectionStringMarker(string $scheme): string
+    {
+        $normalised = strtolower($scheme);
+
+        // A scheme outside the shape the grammar allows would leak whatever the pattern happened to capture.
+        if (preg_match('/^[a-z][a-z0-9+.-]*$/', $normalised) !== 1) {
+            return self::fixedSecretMarker();
+        }
+
+        return sprintf('[redacted:connection-string:%s]', $normalised);
     }
 
     /**
@@ -251,7 +276,8 @@ final class SecretScannerHelper
     }
 
     /**
-     * Builds a sensitive-data finding with a redacted preview and detector metadata.
+     * Builds one sensitive-data finding with a fixed display marker and detector metadata for the user's report.
+     * Call it after detector-specific exclusions so every remaining occurrence reaches scoring and rendering.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit that owns the finding.
      * @param string       $ruleId - Sensitive-data rule identifier.
@@ -259,10 +285,10 @@ final class SecretScannerHelper
      * @param int          $line - Source line for the detected secret.
      * @param Confidence   $confidence - Confidence level assigned by the detector.
      * @param string       $detector - Detector name written to finding metadata.
-     * @param string       $preview - Redacted preview written to finding metadata.
+     * @param string       $displayMarker - Non-empty fixed marker written to finding metadata; it contains no matched value or length.
      * @param string       $remediation - Suggested remediation text for the finding.
      *
-     * @return Finding - a SensitiveData/Warning finding carrying the detector name and redacted preview in metadata
+     * @return Finding - SensitiveData/Warning finding carrying the detector name and non-empty fixed marker in metadata
      */
     public static function finding(
         AnalysisUnit $analysisUnit,
@@ -271,7 +297,7 @@ final class SecretScannerHelper
         int          $line,
         Confidence   $confidence,
         string       $detector,
-        string       $preview,
+        string       $displayMarker,
         string       $remediation,
     ): Finding {
         return new Finding(
@@ -286,7 +312,7 @@ final class SecretScannerHelper
             remediation: $remediation,
             metadata:    [
                              'detector' => $detector,
-                             'preview'  => $preview,
+                             'preview'  => $displayMarker,
                          ],
         );
     }

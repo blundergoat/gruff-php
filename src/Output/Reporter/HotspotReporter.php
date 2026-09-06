@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GruffPhp\Output\Reporter;
 
 use GruffPhp\Engine\Analysis\AnalysisReport;
+use GruffPhp\Engine\Analysis\RunDiagnostic;
 use GruffPhp\Results\Scoring\FileScore;
 
 /**
@@ -35,6 +36,10 @@ final readonly class HotspotReporter
             'limitations' => 'v0.1 hotspot ranking uses finding density and available metrics; git churn weighting is not available unless a later history layer provides it.',
             // A scored run names its own scope; a report with no `$score` has nothing to read, so the feed falls back to the generic `full-project` label.
             'scope' => $score === null ? 'full-project' : $score->scope,
+            'diagnostics' => array_map(
+                static fn (RunDiagnostic $diagnostic): array => $diagnostic->toArray(),
+                $report->diagnostics,
+            ),
             'hotspots' => array_map(
                 static fn (FileScore $file): array => $file->toArray(),
                 // With a score in hand, serialise its already-ranked top offenders as hotspots; an unscored run has none, so the list comes back empty.
