@@ -560,7 +560,6 @@ final readonly class ConfigLoader
 
     /**
      * Applies the user's `allowlists:` while retaining defaults for every omitted sub-key.
-     * The legacy `secretPreviews` key accepts only `[]` and has no effect, so migration cannot disturb naming defaults such as `id` and `url`.
      *
      * @param AnalysisConfig $config     - Config to extend; each allowlist sub-key the user omitted is left as-is.
      * @param ConfigObject   $rootConfig - Decoded root config map; omitted allowlist sub-keys keep registry-seeded defaults.
@@ -574,15 +573,11 @@ final readonly class ConfigLoader
             return $config;
         }
 
-        $allowlists = $this->parseAllowlistsConfig($rootConfig['allowlists']);
+        $acceptedAbbreviations = $this->parseAllowlistsConfig($rootConfig['allowlists']);
 
         // Apply the naming allowlist only when the user actually set it.
-        if ($allowlists['acceptedAbbreviations'] !== null) {
-            $config = $config->withAcceptedAbbreviations($allowlists['acceptedAbbreviations']);
-        }
-
-        if ($allowlists['secretPreviews'] !== null) {
-            $config = $config->withAllowedSecretPreviews($allowlists['secretPreviews']);
+        if ($acceptedAbbreviations !== null) {
+            $config = $config->withAcceptedAbbreviations($acceptedAbbreviations);
         }
 
         return $config;
@@ -669,21 +664,27 @@ final readonly class ConfigLoader
     }
 
     /**
-     * Parses the naming allowlist and retained empty secret-preview key, returning null per sub-key the user omitted.
-     * Omitted keys return null so user defaults survive; a present secretPreviews key can only return the validated empty list.
+     * Parses the naming allowlist, returning null when the user omitted it so the seeded default survives.
+     *
+     * The removed `secretPreviews` key is recognised only to be refused by name: a user upgrading from 0.5 reads the
+     * section 5 explanation instead of an unknown-key error that looks like a typo.
      *
      * @param mixed $decodedValue - Decoded value of the `allowlists` key; must be a mapping or the parse throws.
      *
-     * @return array{acceptedAbbreviations: list<string>|null, secretPreviews: list<string>|null} - parsed naming list and inert legacy list;
-     *   null means the user omitted that key, while secretPreviews can otherwise only be empty
+     * @return list<string>|null - the parsed naming list, or null when the user omitted `acceptedAbbreviations`
      */
-    private function parseAllowlistsConfig(mixed $decodedValue): array
+    private function parseAllowlistsConfig(mixed $decodedValue): ?array
     {
         $allowlists = $this->requireObject($decodedValue, 'Config key "allowlists" must be an object.');
 
-        // Only the two known allowlist sub-keys are supported.
+        // Presence is the test, not content: an empty list reads as configured redaction just as a populated one does.
+        if (array_key_exists('secretPreviews', $allowlists)) {
+            throw new ConfigException(self::LEGACY_SECRET_PREVIEWS_ERROR);
+        }
+
+        // Only the naming allowlist remains under this key.
         foreach (array_keys($allowlists) as $key) {
-            if (!in_array($key, ['acceptedAbbreviations', 'secretPreviews'], true)) {
+            if ($key !== 'acceptedAbbreviations') {
                 throw new ConfigException(sprintf('Unknown config key "allowlists.%s".', $key));
             }
         }
@@ -703,18 +704,7 @@ final readonly class ConfigLoader
             }
         }
 
-        // Missing preserves the user's inherited configuration; presence becomes [] because shape validation already rejected every other value.
-        // Presence is the test, not content: an empty list reads as configured redaction just as a populated one does.
-        if (array_key_exists('secretPreviews', $allowlists)) {
-            throw new ConfigException(self::LEGACY_SECRET_PREVIEWS_ERROR);
-        }
-
-        $legacySecretPreviews = null;
-
-        return [
-            'acceptedAbbreviations' => $acceptedAbbreviations,
-            'secretPreviews' => $legacySecretPreviews,
-        ];
+        return $acceptedAbbreviations;
     }
 
     /**
@@ -724,7 +714,7 @@ final readonly class ConfigLoader
      * @param string $path     - Source path; only its extension is read here, to gate the .yaml/.yml requirement.
      *
      * @return ConfigObject - the parsed YAML mapping; an empty document yields an empty array, a non-mapping throws.
-     * @throws ConfigException When extension, YAML, root shape, or a legacy preview value is invalid for the user's configuration.
+     * @throws ConfigException When the extension, the YAML, or the root shape is invalid for the user's configuration.
      */
     private function decodeConfig(string $contents, string $path): array
     {
@@ -739,54 +729,13 @@ final readonly class ConfigLoader
         }
 
         try {
-            $shapePreservingConfig = Yaml::parse(
-                $contents,
-                Yaml::PARSE_EXCEPTION_ON_INVALID_TYPE | Yaml::PARSE_OBJECT_FOR_MAP,
-            );
             $decoded = Yaml::parse($contents, Yaml::PARSE_EXCEPTION_ON_INVALID_TYPE);
         } catch (ParseException $exception) {
             // A user may have left an unmatched quote or invalid indentation; surface that parser detail as one config error before analysis.
             throw new ConfigException(sprintf('Invalid YAML config: %s', $exception->getMessage()), 0, $exception);
         }
 
-        $this->assertLegacySecretPreviewsAreEmpty($shapePreservingConfig);
-
         return $this->requireObject($decoded, 'Config root must be an object.');
-    }
-
-    /**
-     * Validates the retained secret-preview key before the user's analysis starts.
-     * Parsing maps as objects distinguishes `{}` from `[]`: missing and exact `[]` are inert, while every other value fails safely.
-     *
-     * @param mixed $shapePreservingConfig - Shape-preserving YAML; null, scalar, and root lists are handled by root validation.
-     *
-     * @return void - Missing `allowlists.secretPreviews` or exact `[]` leaves the user's configuration unchanged.
-     * @throws ConfigException When the key contains a scalar, null, map, blank entry, mixed list, or any non-empty list; the message never
-     *                         echoes the configured value.
-     */
-    private function assertLegacySecretPreviewsAreEmpty(mixed $shapePreservingConfig): void
-    {
-        // A non-object root cannot contain a valid allowlists mapping; general root validation gives the user its dedicated error.
-        if (!$shapePreservingConfig instanceof \stdClass) {
-            return;
-        }
-
-        $rootConfig = get_object_vars($shapePreservingConfig);
-        // Missing allowlists are inert; a malformed allowlists value is reported later by the normal section validator.
-        if (!array_key_exists('allowlists', $rootConfig) || !$rootConfig['allowlists'] instanceof \stdClass) {
-            return;
-        }
-
-        $allowlistConfig = get_object_vars($rootConfig['allowlists']);
-        // A missing legacy key means the user has no preview-based configuration to migrate.
-        if (!array_key_exists('secretPreviews', $allowlistConfig)) {
-            return;
-        }
-
-        // Only the generated empty list is inert; any other shape must stop before it could hide a finding.
-        if ($allowlistConfig['secretPreviews'] !== []) {
-            throw new ConfigException(self::LEGACY_SECRET_PREVIEWS_ERROR);
-        }
     }
 
     /**

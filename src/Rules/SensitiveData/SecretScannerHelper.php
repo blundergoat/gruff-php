@@ -106,14 +106,63 @@ final class SecretScannerHelper
     }
 
     /**
-     * Returns the fixed zero-payload marker shown for a sensitive finding in every user-facing report.
-     * Use it after a detector confirms a match, so reports retain the finding without matched characters or length.
+     * The seventeen marker categories FAMILY-CONTRACT.md section 5 ratifies. Nothing outside this list can reach a
+     * marker, so a detector name the family never ratified degrades to the bare marker instead of inventing one.
+     *
+     * @var list<string>
+     */
+    private const RATIFIED_MARKER_CATEGORIES = [
+        'private-key', 'jwt', 'aws-access-key', 'github-token', 'slack-token', 'stripe-live-key', 'google-api-key',
+        'anthropic-api-key', 'npm-token', 'gitlab-token', 'gcp-service-account', 'email', 'phone', 'payment-card',
+        'ssn', 'medicare', 'mrn',
+    ];
+
+    /**
+     * Returns the bare zero-payload marker, shown when a detector classified nothing more specific.
+     * Generic-assignment and entropy matches always use this: they name no class the user can act on.
      *
      * @return string - non-empty classification-only marker with no value-derived characters or length
      */
     public static function fixedSecretMarker(): string
     {
         return '[redacted]';
+    }
+
+    /**
+     * Returns the most specific marker for a classified match, unconditionally.
+     * Section 5 removed the configuration that once gated this, because every marker is zero-payload by construction.
+     *
+     * @param string|null $category - Ratified category the detector classified; null or an unratified name yields the bare marker.
+     *
+     * @return string - `[redacted:<category>]` for a ratified category, `[redacted]` otherwise
+     */
+    public static function categoryMarker(?string $category): string
+    {
+        // An unratified name would put this port outside the closed family grammar, so it degrades rather than invents.
+        if ($category === null || !in_array($category, self::RATIFIED_MARKER_CATEGORIES, true)) {
+            return self::fixedSecretMarker();
+        }
+
+        return sprintf('[redacted:%s]', $category);
+    }
+
+    /**
+     * Returns the connection marker naming only the scheme, which the URL already published in plain text.
+     *
+     * @param string $scheme - Scheme captured by the detector's own pattern; case-insensitive, never user-supplied text.
+     *
+     * @return string - `[redacted:connection-string:<scheme>]`, or the bare marker when the scheme is malformed
+     */
+    public static function connectionStringMarker(string $scheme): string
+    {
+        $normalised = strtolower($scheme);
+
+        // A scheme outside the shape the grammar allows would leak whatever the pattern happened to capture.
+        if (preg_match('/^[a-z][a-z0-9+.-]*$/', $normalised) !== 1) {
+            return self::fixedSecretMarker();
+        }
+
+        return sprintf('[redacted:connection-string:%s]', $normalised);
     }
 
     /**

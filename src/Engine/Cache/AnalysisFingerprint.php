@@ -60,15 +60,12 @@ final readonly class AnalysisFingerprint
 
         $acceptedAbbreviations = $config->acceptedAbbreviations();
         sort($acceptedAbbreviations);
-        $allowedSecretPreviews = $config->allowedSecretPreviews();
-        sort($allowedSecretPreviews);
 
         $payload = json_encode([
             'version' => $toolVersion,
             'minimumPhpVersion' => $config->minimumPhpVersion(),
             'deepScanBudget' => $config->deepScanBudget(),
             'acceptedAbbreviations' => $acceptedAbbreviations,
-            'allowedSecretPreviews' => $allowedSecretPreviews,
             'rules' => $rules,
         ], JSON_THROW_ON_ERROR);
 

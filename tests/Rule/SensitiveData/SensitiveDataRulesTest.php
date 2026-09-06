@@ -66,13 +66,29 @@ final class SensitiveDataRulesTest extends TestCase
         self::assertSame([], $messageLeaks, 'Finding messages should not leak secret values.');
         self::assertSame([], $metadataLeaks, 'Finding metadata should not leak secret values.');
 
-        $unexpectedDisplayMarkers = array_values(array_filter(
-            $findings,
-            static fn(Finding $finding): bool => isset($finding->metadata['preview'])
-                && is_string($finding->metadata['preview'])
-                && $finding->metadata['preview'] !== '[redacted]',
-        ));
-        self::assertSame([], $unexpectedDisplayMarkers, 'Every sensitive finding must use the fixed marker without secret-derived edges or lengths.');
+        $unexpectedDisplayMarkers = array_values(array_filter($findings, self::isMarkerOutsideGrammar(...)));
+        self::assertSame([], $unexpectedDisplayMarkers, 'Every sensitive marker must stay inside the ratified grammar, with no secret-derived edges or lengths.');
+    }
+
+    /**
+     * Reports whether one finding's marker falls outside the closed grammar FAMILY-CONTRACT.md section 5 ratifies.
+     *
+     * The grammar admits the bare `[redacted]`, one of the seventeen ratified categories, and a connection marker
+     * naming only its already-public scheme. Anything else means a detector put matched text into a marker.
+     *
+     * @param Finding $finding - Sensitive-data finding whose `metadata.preview` marker is judged.
+     *
+     * @return bool - true when the marker is outside the grammar; a finding with no string marker is never outside it
+     */
+    private static function isMarkerOutsideGrammar(Finding $finding): bool
+    {
+        $marker = $finding->metadata['preview'] ?? null;
+        $grammar = '/^\[redacted(?::(?:private-key|jwt|aws-access-key|github-token|slack-token|stripe-live-key'
+                   . '|google-api-key|anthropic-api-key|npm-token|gitlab-token|gcp-service-account|email|phone'
+                   . '|payment-card|ssn|medicare|mrn|connection-string:[a-z][a-z0-9+.-]*))?\]$/';
+
+        // A finding carrying no string marker has nothing to judge, so the grammar cannot reject it.
+        return is_string($marker) && preg_match($grammar, $marker) !== 1;
     }
 
     /**

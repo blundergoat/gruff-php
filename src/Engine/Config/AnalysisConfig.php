@@ -50,7 +50,6 @@ final readonly class AnalysisConfig
      * @param RuleSelection                                                                          $ruleSelection         - Include/exclude rule selection for the run.
      * @param list<string>                                                                           $ignoredPathPatterns   - Path patterns skipped during discovery.
      * @param list<string>                                                                           $acceptedAbbreviations - Abbreviations accepted by naming rules.
-     * @param list<string>                                                                           $allowedSecretPreviews - Legacy field; empty means no migration value, and entries have no analysis effect.
      * @param array<string, FailThreshold>                                                           $minimumSeverity       - Per-command exit-code thresholds, keyed by command name.
      * @param FailThresholds|null                                                                    $failureConditions     - Severity count gate; null means the user configured no failureConditions block.
      * @param list<SensitiveExclusion>                                                               $sensitiveExclusions   - Reviewed sensitive-data exclusions in configuration order; empty means nothing is suppressed.
@@ -65,7 +64,6 @@ final readonly class AnalysisConfig
         private RuleSelection   $ruleSelection = new RuleSelection(),
         private array           $ignoredPathPatterns = [],
         private array           $acceptedAbbreviations = [],
-        private array           $allowedSecretPreviews = [],
         private array           $minimumSeverity = [],
         private ?FailThresholds $failureConditions = null,
         private array           $sensitiveExclusions = [],
@@ -150,7 +148,6 @@ final readonly class AnalysisConfig
             $this->ruleSelection,
             $this->ignoredPathPatterns,
             $this->acceptedAbbreviations,
-            $this->allowedSecretPreviews,
             $this->minimumSeverity,
             $this->failureConditions,
             $this->sensitiveExclusions,
@@ -183,7 +180,6 @@ final readonly class AnalysisConfig
             $this->ruleSelection,
             $this->ignoredPathPatterns,
             $this->acceptedAbbreviations,
-            $this->allowedSecretPreviews,
             $this->minimumSeverity,
             $this->failureConditions,
             $this->sensitiveExclusions,
@@ -226,7 +222,6 @@ final readonly class AnalysisConfig
             $ruleSelection,
             $this->ignoredPathPatterns,
             $this->acceptedAbbreviations,
-            $this->allowedSecretPreviews,
             $this->minimumSeverity,
             $this->failureConditions,
             $this->sensitiveExclusions,
@@ -259,7 +254,6 @@ final readonly class AnalysisConfig
             $this->ruleSelection,
             $ignoredPathPatterns,
             $this->acceptedAbbreviations,
-            $this->allowedSecretPreviews,
             $this->minimumSeverity,
             $this->failureConditions,
             $this->sensitiveExclusions,
@@ -294,42 +288,6 @@ final readonly class AnalysisConfig
             $this->ruleSelection,
             $this->ignoredPathPatterns,
             $acceptedAbbreviations,
-            $this->allowedSecretPreviews,
-            $this->minimumSeverity,
-            $this->failureConditions,
-            $this->sensitiveExclusions,
-            $this->deepScanBudget,
-        );
-    }
-
-    /**
-     * Reads the retained legacy secret-preview list for migration and configuration identity only.
-     * Users receive an empty list from every accepted file config; analysis never uses it to hide findings.
-     *
-     * @return list<string> - retained migration field; empty for every accepted file configuration, never null
-     */
-    public function allowedSecretPreviews(): array
-    {
-        return $this->allowedSecretPreviews;
-    }
-
-    /**
-     * Returns a copy with a different retained legacy secret-preview list for internal migration flows.
-     * Empty means no legacy value; non-empty programmatic input remains inert and cannot change the user's findings.
-     *
-     * @param list<string> $allowedSecretPreviews - Retained migration value; empty or populated, it has no analysis effect and is never null.
-     *
-     * @return self - Config carrying the supplied migration list; findings remain unchanged when the list is empty or populated
-     */
-    public function withAllowedSecretPreviews(array $allowedSecretPreviews): self
-    {
-        return new self(
-            $this->rules,
-            $this->minimumPhpVersion,
-            $this->ruleSelection,
-            $this->ignoredPathPatterns,
-            $this->acceptedAbbreviations,
-            $allowedSecretPreviews,
             $this->minimumSeverity,
             $this->failureConditions,
             $this->sensitiveExclusions,
@@ -365,7 +323,6 @@ final readonly class AnalysisConfig
             $this->ruleSelection,
             $this->ignoredPathPatterns,
             $this->acceptedAbbreviations,
-            $this->allowedSecretPreviews,
             $minimumSeverity,
             $this->failureConditions,
             $this->sensitiveExclusions,
@@ -389,7 +346,6 @@ final readonly class AnalysisConfig
             $this->ruleSelection,
             $this->ignoredPathPatterns,
             $this->acceptedAbbreviations,
-            $this->allowedSecretPreviews,
             $this->minimumSeverity,
             $this->failureConditions,
             $this->sensitiveExclusions,
@@ -433,7 +389,6 @@ final readonly class AnalysisConfig
             $this->ruleSelection,
             $this->ignoredPathPatterns,
             $this->acceptedAbbreviations,
-            $this->allowedSecretPreviews,
             $this->minimumSeverity,
             $failureConditions,
             $this->sensitiveExclusions,
@@ -468,7 +423,6 @@ final readonly class AnalysisConfig
             $this->ruleSelection,
             $this->ignoredPathPatterns,
             $this->acceptedAbbreviations,
-            $this->allowedSecretPreviews,
             $this->minimumSeverity,
             $this->failureConditions,
             $sensitiveExclusions,
@@ -514,7 +468,6 @@ final readonly class AnalysisConfig
             $this->ruleSelection,
             $this->ignoredPathPatterns,
             $this->acceptedAbbreviations,
-            $this->allowedSecretPreviews,
             $this->minimumSeverity,
             $this->failureConditions,
             $this->sensitiveExclusions,

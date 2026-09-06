@@ -196,7 +196,6 @@ allowlists:
     - ui
     - url
     - utc
-  secretPreviews: []
 ```
 
 `allowlists.acceptedAbbreviations` is matched case-insensitively by

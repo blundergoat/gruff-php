@@ -679,7 +679,6 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
 
         self::assertSame(['legacy/**', 'generated'], $config->ignoredPathPatterns());
         self::assertSame(['q', 'id'], $config->acceptedAbbreviations());
-        self::assertSame([], $config->allowedSecretPreviews());
         self::assertTrue($config->ruleSelection()->allows(RuleRegistry::defaults()->get(FileLengthRule::ID)->definition()));
 
         $weakCrypto = RuleRegistry::defaults()->get('security.weak-crypto')->definition();

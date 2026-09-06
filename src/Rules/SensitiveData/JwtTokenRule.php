@@ -107,7 +107,7 @@ final readonly class JwtTokenRule implements SourceTextRuleInterface
                 continue;
             }
 
-            $displayMarker = SecretScannerHelper::fixedSecretMarker();
+            $displayMarker = SecretScannerHelper::categoryMarker('jwt');
             $findings[] = SecretScannerHelper::finding(
                 analysisUnit: $analysisUnit,
                 ruleId:       self::ID,

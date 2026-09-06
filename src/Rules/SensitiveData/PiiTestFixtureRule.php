@@ -121,7 +121,7 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
                 }
 
                 $line       = SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset);
-                $displayMarker = SecretScannerHelper::fixedSecretMarker();
+                $displayMarker = SecretScannerHelper::categoryMarker($piiPattern['name']);
                 $findings[] = SecretScannerHelper::finding(
                     analysisUnit: $analysisUnit,
                     ruleId:       self::ID,

@@ -76,7 +76,7 @@ final readonly class PrivateKeyRule implements SourceTextRuleInterface
                 line:         SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
                 confidence:   Confidence::High,
                 detector:     'private-key-header',
-                displayMarker: SecretScannerHelper::fixedSecretMarker(),
+                displayMarker: SecretScannerHelper::categoryMarker('private-key'),
                 remediation:  'Remove private keys from source and rotate the key if it was real.',
             );
         }

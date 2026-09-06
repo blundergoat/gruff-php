@@ -77,7 +77,7 @@ final readonly class GcpServiceAccountKeyRule implements SourceTextRuleInterface
             return [];
         }
 
-        $displayMarker = SecretScannerHelper::fixedSecretMarker();
+        $displayMarker = SecretScannerHelper::categoryMarker('gcp-service-account');
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
 
         $findings = [];

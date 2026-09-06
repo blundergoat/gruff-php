@@ -86,7 +86,8 @@ final readonly class UrlEmbeddedCredentialsRule implements SourceTextRuleInterfa
                 continue;
             }
 
-            $displayMarker = SecretScannerHelper::fixedSecretMarker();
+            // The pattern only matches http and https, and the matched text starts with whichever one it was.
+            $displayMarker = SecretScannerHelper::connectionStringMarker(str_starts_with(strtolower($match[0]), 'https://') ? 'https' : 'http');
 
             $findings[] = SecretScannerHelper::finding(
                 analysisUnit: $analysisUnit,

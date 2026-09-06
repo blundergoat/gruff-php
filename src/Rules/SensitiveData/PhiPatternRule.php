@@ -119,7 +119,7 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
                     continue;
                 }
 
-                $displayMarker = SecretScannerHelper::fixedSecretMarker();
+                $displayMarker = SecretScannerHelper::categoryMarker($phiPattern['name']);
                 $findings[] = SecretScannerHelper::finding(
                     analysisUnit: $analysisUnit,
                     ruleId:       self::ID,

@@ -182,7 +182,6 @@ selection:
 
 allowlists:
   acceptedAbbreviations: [id, db]
-  secretPreviews: []
 
 rules:
   size.method-length:

@@ -90,7 +90,8 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
                 continue;
             }
 
-            $displayMarker = SecretScannerHelper::fixedSecretMarker();
+            // The scheme is the one part of a connection string the URL already publishes in plain text.
+            $displayMarker = SecretScannerHelper::connectionStringMarker($matches['scheme'][$index][0]);
 
             $findings[] = SecretScannerHelper::finding(
                 analysisUnit: $analysisUnit,

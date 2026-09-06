@@ -113,7 +113,7 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
                     continue;
                 }
 
-                $displayMarker = SecretScannerHelper::fixedSecretMarker();
+                $displayMarker = SecretScannerHelper::categoryMarker(self::markerCategory($providerPattern['name']));
                 $findings[] = SecretScannerHelper::finding(
                     analysisUnit: $analysisUnit,
                     ruleId:       self::ID,
@@ -128,5 +128,27 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
         }
 
         return $findings;
+    }
+
+    /**
+     * Maps one provider pattern name to the marker category section 5 ratifies for it.
+     * A provider the family never ratified returns null, so its finding carries the bare marker rather than a new one.
+     *
+     * @param string $providerName - Name of the pattern that matched, as `patterns()` declares it.
+     *
+     * @return string|null - the ratified category, or null when this provider has none
+     */
+    private static function markerCategory(string $providerName): ?string
+    {
+        return match ($providerName) {
+            'stripe' => 'stripe-live-key',
+            'github', 'github-fine-grained', 'github-oauth' => 'github-token',
+            'anthropic' => 'anthropic-api-key',
+            'slack', 'slack-webhook' => 'slack-token',
+            'npm' => 'npm-token',
+            'google-api-key' => 'google-api-key',
+            'gitlab' => 'gitlab-token',
+            default => null,
+        };
     }
 }
