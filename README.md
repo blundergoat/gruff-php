@@ -16,7 +16,7 @@ gruff-php exists to make AI-generated code safe for a human to sign off on. When
 - **Secure where the eye fails.** Security and sensitive-data rules catch the classes of mistake a human reviewer skims past.
 - **Tested for real, not padded.** Test-quality rules reward genuine assertions and flag low-signal ceremony, so a green suite means the behaviour is actually exercised rather than mocked into a tautology.
 
-Wired into a coding agent's loop — as a pre-commit hook, a CI gate (`--fail-on`), or the agent's own verification step — gruff pushes the agent to keep producing code a human can confidently approve, not just code that compiles and passes. See [`docs/mission.md`](docs/mission.md) for the full rationale.
+Wired into a coding agent's loop — as a pre-commit hook, a CI gate (`--fail-on`), or the agent's own verification step — gruff pushes the agent to keep producing code a human can confidently approve, not just code that compiles and passes. See [`docs/mission.md`](https://github.com/blundergoat/gruff-php/blob/main/docs/mission.md) for the full rationale.
 
 ## Status At A Glance
 
@@ -306,15 +306,15 @@ Performance checks are available with `composer perf`; mutation workflows live i
 
 ## Documentation
 
-- [Mission](docs/mission.md)
+- [Mission](https://github.com/blundergoat/gruff-php/blob/main/docs/mission.md)
 - [Changelog](CHANGELOG.md)
-- [Contributing](CONTRIBUTING.md)
+- [Contributing](https://github.com/blundergoat/gruff-php/blob/main/CONTRIBUTING.md)
 - [Security](SECURITY.md)
 - [Support](SUPPORT.md)
-- [Summary command](docs/gruff-cli-summary.md)
-- [Agent instructions](docs/gruff-cli-agent-instructions.md)
-- [Branch review](docs/gruff-cli-branch-review.md)
-- [Naming conventions](docs/naming-conventions.md)
+- [Summary command](https://github.com/blundergoat/gruff-php/blob/main/docs/gruff-cli-summary.md)
+- [Agent instructions](https://github.com/blundergoat/gruff-php/blob/main/docs/gruff-cli-agent-instructions.md)
+- [Branch review](https://github.com/blundergoat/gruff-php/blob/main/docs/gruff-cli-branch-review.md)
+- [Naming conventions](https://github.com/blundergoat/gruff-php/blob/main/docs/naming-conventions.md)
 
 ## Author
 
