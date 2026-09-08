@@ -164,7 +164,7 @@ profile's rule set freely.
 
 ## Configuration
 
-Place `.gruff-php.yaml` in the project root. `analyse`, `report`, and `dashboard` auto-load it unless `--config <path>` or `--no-config` is supplied. Legacy `.gruff.yaml` files are still auto-loaded when `.gruff-php.yaml` is absent. Unknown keys and unsupported rule options fail closed.
+Place `.gruff-php.yaml` in the project root. `analyse`, `report`, `dashboard`, `summary`, `hook`, and `check-ignore` auto-load it unless `--config <path>` or `--no-config` is supplied. Legacy `.gruff.yaml` files are still auto-loaded when `.gruff-php.yaml` is absent. Unknown keys and unsupported rule options fail closed.
 
 ```yaml
 schemaVersion: gruff-php.config.v0.1
@@ -262,7 +262,7 @@ Bare `--diff` compares the working tree to `HEAD`. `--changed-scope=symbol` is t
 Branch review compares against a base ref:
 
 ```bash
-vendor/bin/gruff-php analyse --diff-vs=origin/main --changed-only --fail-on none
+vendor/bin/gruff-php analyse --diff-base=origin/main --changed-only --fail-on none
 ```
 
 Display filters such as `--min-severity`, `--include-pillar`, and `--exclude-pillar` reduce rendered output without changing which rules execute. The rule-id flags `--include-rule` and `--exclude-rule` instead select rule execution, matching the hook command: an excluded rule does not run, and the exit code reflects the narrowed run.

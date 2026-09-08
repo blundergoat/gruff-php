@@ -116,7 +116,7 @@ Use branch-review mode when you need the answer to "what did this branch make wo
 Quick JSON command from the target project root:
 
 ```bash
-php /path/to/gruff-php/bin/gruff-php analyse --diff-vs=<base-ref> --changed-only --no-config --no-baseline --format=json --fail-on=none > /tmp/gruff-review.json
+php /path/to/gruff-php/bin/gruff-php analyse --diff-base=<base-ref> --changed-only --no-config --no-baseline --format=json --fail-on=none > /tmp/gruff-review.json
 ```
 
 With `--changed-only` and no explicit paths, gruff derives changed files from Git internally. Do not wrap the command in a separate `git diff | mapfile` step unless intentionally forcing a custom path list. Replace `<base-ref>` with the branch or ref you review against.
@@ -151,7 +151,7 @@ When in doubt, run both:
 ```bash
 php bin/gruff-php analyse src --format json --fail-on none > /tmp/gruff-full.json
 php bin/gruff-php analyse src --diff --format json --fail-on none > /tmp/gruff-diff.json
-php bin/gruff-php analyse --diff-vs=<base-ref> --changed-only --no-config --no-baseline --format json --fail-on none > /tmp/gruff-review.json
+php bin/gruff-php analyse --diff-base=<base-ref> --changed-only --no-config --no-baseline --format json --fail-on none > /tmp/gruff-review.json
 ```
 
 ## Config
@@ -284,7 +284,7 @@ Important JSON fields:
 - `diff`
 - `baseline`
 - `score`
-- `extensions.php.topLevel.review` when `--diff-vs` is used
+- `extensions.php.topLevel.review` when `--diff-base` is used
 - `run.filters` when display filters are used
 
 Use Markdown when posting a short human report:
@@ -373,14 +373,14 @@ failureConditions:
 
 ## New-findings-only gate (`--fail-on-new`)
 
-The highest-value hook policy: fail only on the debt a change *introduces*, leaving pre-existing findings visible but non-blocking. Provide a reference point — a committed baseline or a `--diff-vs` ref — and enable the gate:
+The highest-value hook policy: fail only on the debt a change *introduces*, leaving pre-existing findings visible but non-blocking. Provide a reference point — a committed baseline or a `--diff-base` ref — and enable the gate:
 
 ```bash
 # Against a committed baseline (existing debt frozen in gruff-baseline.json):
 php bin/gruff-php analyse src --baseline --fail-on-new
 
 # Against a base ref, no baseline file (PR-check style):
-php bin/gruff-php analyse src --diff-vs origin/main --fail-on-new
+php bin/gruff-php analyse src --diff-base origin/main --fail-on-new
 ```
 
 `--fail-on-new` is shorthand for `failureConditions.newFindings.severityThresholds.error: 0`; the YAML form takes the same `severityThresholds`/`total` shape as the total gate:
@@ -392,7 +392,7 @@ failureConditions:
     severityThresholds: { error: 0 }   # new-findings gate
 ```
 
-"New" is `baselineNew ∩ branchIntroduced`: the post-baseline set with `--baseline`, the branch-introduced set with `--diff-vs`, their intersection with both — never "all findings". The total gate and the new-findings gate are independent (either can fail the run); the new-findings reason wins when both trip and renders as `Failed: N new <severity> finding(s)…` with JSON `extensions.php.topLevel.failureReason.scope: "new"` and the count at `baseline.newFindings`. Enabling the gate with no reference point (no baseline and no `--diff-vs`) errors at setup rather than treating every finding as new.
+"New" is `baselineNew ∩ branchIntroduced`: the post-baseline set with `--baseline`, the branch-introduced set with `--diff-base`, their intersection with both — never "all findings". The total gate and the new-findings gate are independent (either can fail the run); the new-findings reason wins when both trip and renders as `Failed: N new <severity> finding(s)…` with JSON `extensions.php.topLevel.failureReason.scope: "new"` and the count at `baseline.newFindings`. Enabling the gate with no reference point (no baseline and no `--diff-base`) errors at setup rather than treating every finding as new.
 
 ## Config presets (`extends:`)
 

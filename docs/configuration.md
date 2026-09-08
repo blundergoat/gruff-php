@@ -136,7 +136,7 @@ failureConditions:
 Any configured cap that is exceeded fails the run. An explicit CLI `--fail-on`
 flag overrides `failureConditions`. To gate only change-introduced findings,
 configure `newFindings` and provide a reference point with `--baseline` or
-`--diff-vs`:
+`--diff-base`:
 
 ```yaml
 failureConditions:
@@ -169,7 +169,7 @@ paths:
 `paths.ignore` is authoritative in every invocation mode: a matching path is
 excluded from analysis and produces no findings however it was supplied — a
 directory walk, an explicit file operand, or any diff/changed-region scan
-(`--diff`, `--diff -`, `--changed-ranges`, `--since`, `--diff-vs`).
+(`--diff`, `--diff -`, `--changed-ranges`, `--since`, `--diff-base`).
 `--include-ignored` opts back into Git/default-ignored paths only; it never
 overrides `paths.ignore`.
 
@@ -358,7 +358,7 @@ metadata keys:
   hatch, for example `allowlists.acceptedAbbreviations` or
   `rules.naming.boolean-prefix.options.acceptedBooleanNames`.
 
-`CONFIGURE` is not emitted unconditionally by any 0.5.1 rule. Abbreviation,
+`CONFIGURE` is not emitted unconditionally by any 0.5.2 rule. Abbreviation,
 every Boolean parameter, and other caller-visible Boolean findings use
 `CONSIDER` because configuration or a compatibility-sensitive rename can both
 be valid. Only private property and private callable names use `APPLY`.

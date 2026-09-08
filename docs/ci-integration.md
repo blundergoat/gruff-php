@@ -72,7 +72,7 @@ PHP supports changed-code workflows:
 
 ```sh
 vendor/bin/gruff-php analyse src --diff=staged --format github --fail-on warning
-vendor/bin/gruff-php analyse src --diff-vs=origin/main --changed-only --fail-on none
+vendor/bin/gruff-php analyse src --diff-base=origin/main --changed-only --fail-on none
 ```
 
 Document project-specific diff policy in the repository that runs the job.

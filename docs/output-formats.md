@@ -11,7 +11,7 @@ Use `text` for local terminal scans:
 vendor/bin/gruff-php analyse src --format text --fail-on warning
 ```
 
-Text keeps the established finding block in 0.5.1. Machine-readable
+Text keeps the established finding block in 0.5.2. Machine-readable
 `remediationAction` and `configurationKey` metadata is not added to this
 presentation.
 
@@ -25,11 +25,13 @@ vendor/bin/gruff-php analyse src --format json --fail-on none > gruff-php.json
 
 Version 3 is the coordinated family machine contract. Paths are
 project-relative POSIX paths, `run.projectRoot` is `.`, and unavailable
-optional fields are omitted rather than emitted as `null`. The shared
-top-level sections are `schemaVersion`, `tool`, `run`, `summary`,
-`score`, `diagnostics`, `findings`, `paths`, and `suppressions`.
-`baseline`, `diff`, `displayFilter`, and `extensions` appear only when
-their features are active.
+optional fields are omitted rather than emitted as `null`. The one
+exception is the composite: a run that evaluated nothing emits
+`score.composite.score` and `score.composite.grade` as `null` rather
+than omitting them. The shared top-level sections are `schemaVersion`,
+`tool`, `run`, `summary`, `score`, `diagnostics`, `findings`, `paths`,
+and `suppressions`. `baseline`, `diff`, `displayFilter`, and
+`extensions` appear only when their features are active.
 
 ### Migrating v2 consumers
 
@@ -87,9 +89,10 @@ Classified findings retain top-level `remediation` and action data inside
 }
 ```
 
-`remediationAction` is `APPLY` for a direct source fix, `CONSIDER` for optional
-or compatibility-sensitive advice, or `CONFIGURE` for a
-configuration-only resolution. `configurationKey` is optional.
+`remediationAction` is `APPLY` for a direct source fix or `CONSIDER` for
+optional or compatibility-sensitive advice. `CONFIGURE`, for a
+configuration-only resolution, is reserved and emitted by no current rule.
+`configurationKey` is optional.
 
 ### Paths and suppressions
 
@@ -179,7 +182,7 @@ and `--file` (pass paths positionally instead).
 
 Use `markdown` for pull request comments and release notes.
 
-Markdown keeps its established finding rows in 0.5.1 and does not render the
+Markdown keeps its established finding rows in 0.5.2 and does not render the
 new action metadata. Use JSON, hook, or SARIF when a consumer needs the
 machine-readable action distinction.
 

@@ -37,7 +37,7 @@ behaviour:
 - `CONSIDER` marks optional or compatibility-sensitive advice that needs human
   judgement.
 - `CONFIGURE` is reserved for a deterministic configuration-only resolution;
-  no rule emits it unconditionally in 0.5.1.
+  no current rule emits it.
 
 When a deliberate configuration hatch exists, `metadata.configurationKey`
 contains its full path. Regex comments, missing constant documentation, and
@@ -48,7 +48,7 @@ emits `CONSIDER`. PHP named arguments make parameter-only renames
 compatibility-sensitive even for private methods, promoted private state,
 closures, and arrow functions.
 JSON, hook, and SARIF transport these fields. Text and Markdown keep their
-existing finding presentation in 0.5.1.
+existing finding presentation in 0.5.2.
 
 ## Summary By Pillar
 

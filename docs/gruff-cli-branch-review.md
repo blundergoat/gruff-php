@@ -5,7 +5,7 @@ Use branch-review mode when you need the answer to "what did this branch make wo
 Branch review is different from `--diff=<base>`:
 
 - `--diff=<base>` filters current findings to changed lines/files.
-- `--diff-vs=<base>` compares current findings with a base-ref snapshot and reports `introduced`, `removed`, and `unchanged` findings.
+- `--diff-base=<base>` compares current findings with a base-ref snapshot and reports `introduced`, `removed`, and `unchanged` findings.
 
 ## Recommended Command
 
@@ -13,7 +13,7 @@ Run from the target project root:
 
 ```bash
 php /path/to/gruff-php/bin/gruff-php analyse \
-  --diff-vs=<base-ref> \
+  --diff-base=<base-ref> \
   --changed-only \
   --no-config \
   --no-baseline \
@@ -26,7 +26,7 @@ When running inside this checkout against this checkout, use:
 
 ```bash
 php bin/gruff-php analyse \
-  --diff-vs=<base-ref> \
+  --diff-base=<base-ref> \
   --changed-only \
   --no-config \
   --no-baseline \
@@ -35,7 +35,7 @@ php bin/gruff-php analyse \
   > /tmp/gruff-branch-review.json
 ```
 
-`--diff-vs=<base-ref> --changed-only` is the key combination. Replace `<base-ref>` with the branch or ref you review against. With no explicit paths, gruff derives changed files from Git internally and scopes both current-tree analysis and base snapshot comparison to those changed files. Agents should not wrap this in a separate `git diff | mapfile` command unless they intentionally need a custom path list.
+`--diff-base=<base-ref> --changed-only` is the key combination. Replace `<base-ref>` with the branch or ref you review against. With no explicit paths, gruff derives changed files from Git internally and scopes both current-tree analysis and base snapshot comparison to those changed files. Agents should not wrap this in a separate `git diff | mapfile` command unless they intentionally need a custom path list.
 
 Project-level rules need full project context. No bundled rule currently implements `ProjectRuleInterface` (the project rules were retired), but a zero count for any future `ProjectRuleInterface` rule under `--changed-only` is not proof that the branch is clean for that rule. When those rules matter, run a full-project scan and intersect relevant findings with changed files or review relevance after the fact.
 
@@ -46,7 +46,7 @@ Pass paths only when the review should be narrower than the branch diff:
 ```bash
 php /path/to/gruff-php/bin/gruff-php analyse \
   src/Foo.php src/Bar \
-  --diff-vs=<base-ref> \
+  --diff-base=<base-ref> \
   --changed-only \
   --no-config \
   --no-baseline \
@@ -93,7 +93,7 @@ For performance smoke testing:
 ```bash
 /usr/bin/time -f 'elapsed=%E cpu=%P maxrss_kb=%M' \
 php /path/to/gruff-php/bin/gruff-php analyse \
-  --diff-vs=<base-ref> \
+  --diff-base=<base-ref> \
   --changed-only \
   --no-config \
   --no-baseline \
