@@ -9,7 +9,11 @@ Use these docs with the top-level README for the stable user-facing surface.
 - [Output Formats](output-formats.md) - text, JSON, HTML, Markdown, GitHub annotations, hotspot, and SARIF.
 - [CI Integration](ci-integration.md) - GitHub Actions, SARIF upload, baselines, and diff scans.
 - [Dashboard](dashboard.md) - local dashboard flags and safety model.
-- [Releasing](releasing.md) - release checks and packaging notes.
+- [Upgrading](../UPGRADING.md) - what each release line breaks and how to go back.
+
+## Maintainer Docs
+
+- [Releasing](releasing.md) - maintainer-only: release checks and packaging notes.
 
 ## Extra Docs
 

@@ -48,7 +48,10 @@ Version 3 is a hard break with no v2 writer or compatibility flag:
 | independent compact summary fields | the `gruff.summary.v3` analysis projection |
 
 The adapter preserves native fingerprint and `stableIdentity` values, every
-score and grade, baseline matching, action metadata, and exit-code decisions.
+score and grade, baseline matching, action metadata, and exit-code decisions:
+the envelope projects what the analyser computed and does not recompute it.
+What each of those values *is* did change in this release - see
+[`CHANGELOG.md`](../CHANGELOG.md) and [`UPGRADING.md`](../UPGRADING.md).
 
 ### Findings and identities
 
@@ -58,15 +61,17 @@ present only when known. `metadata.locationPrecision` is
 
 Each finding carries two identifiers:
 
-- `fingerprint` — the existing 16-character, line-sensitive SHA-256 prefix
-  mirrored into SARIF as `gruffFingerprint`.
-- `stableIdentity` — the existing 16-character, line-insensitive identity for
-  matching the same logical finding across unrelated line shifts.
+- `fingerprint` — the 16-character, line-sensitive SHA-256 prefix. It is a
+  JSON-only field: SARIF does not carry it.
+- `stableIdentity` — the 16-character, line-insensitive identity for matching
+  the same logical finding across unrelated line shifts.
 
 Two findings for the same rule, symbol, and message can share a
 `stableIdentity` while retaining distinct `fingerprint` values. PHP baseline
-matching remains count arithmetic over its grouped v2 baseline rows; the
-analysis-envelope upgrade does not change it.
+matching is count arithmetic over the line-free `identity` digest in each
+`gruff.baseline.v3` `occurrences` row, which is neither of these two fields;
+see [Baseline, trend, and changed-region data](#baseline-trend-and-changed-region-data).
+SARIF publishes that same baseline identity under `gruffFingerprint`.
 
 Classified findings retain top-level `remediation` and action data inside
 `metadata`:
@@ -101,12 +106,16 @@ preview, or matched value. See
 
 ### Baseline, trend, and changed-region data
 
-When a PHP grouped baseline is generated or applied, the canonical `baseline`
+When a PHP baseline is generated or applied, the canonical `baseline`
 object contains its entries, path, generation and staleness data, and
-`suppressedFindings`. The native `new`, `unchanged`, and `absent` bucket
-tallies live at `baseline.extensions.php.baseline.buckets`. Baseline files
-remain `gruff.baseline.v2`; regenerate only when baseline behavior itself
-requires it, not for the analysis-envelope upgrade.
+`suppressedFindings`. The native `new`, `unchanged`, `absent`, `collision`,
+`notEligible`, and `sensitiveCounted` bucket tallies live at
+`baseline.extensions.php.baseline.buckets`. Baseline files
+are `gruff.baseline.v3`: a top-level `occurrences` array of
+`{identity, count, ruleId, path, subject}` rows beside `toolLanguage`,
+`generatedAt`, and a `sensitive` object recording that sensitive findings are
+never eligible. A `gruff.baseline.v1` or `gruff.baseline.v2` file fails closed
+with exit `2` and names `--migrate-baseline`.
 
 Trend history remains scope-aware. Its machine representation moves to
 `extensions.php.topLevel.trend`: full-project scores compare only with earlier
@@ -191,15 +200,20 @@ Use `sarif` for GitHub code scanning or other SARIF consumers:
 vendor/bin/gruff-php analyse src --format sarif --fail-on none > gruff-php.sarif
 ```
 
-Each SARIF result carries two `partialFingerprints` keys that map onto the
-JSON finding identity fields:
+A SARIF result for an ordinary finding carries one `partialFingerprints` key:
 
-- `gruffFingerprint` — the precise, line-sensitive `fingerprint`. Byte-compatible
-  with earlier releases; changes whenever the finding's location changes.
-- `gruffStableIdentity` — the line-insensitive `stableIdentity`. Survives
-  unrelated edits that shift line numbers, so SARIF consumers (for example
-  GitHub Code Scanning) can keep an alert open across line drift instead of
-  closing and reopening it.
+- `gruffFingerprint` — the ratified family identity, the same durable value
+  baseline matching reads. It is line-free, so SARIF consumers (for example
+  GitHub Code Scanning) keep an alert open across unrelated edits that shift
+  line numbers instead of closing and reopening it.
+
+A sensitive-data result carries no `partialFingerprints` object at all, so a
+secret is never given a durable name in a system gruff does not control; its
+alerts close at this break and later occurrences arrive ungrouped.
+
+The php-only `gruffStableIdentity` key is gone; the JSON finding object still
+publishes `stableIdentity`, documented under
+[Findings and identities](#findings-and-identities).
 
 When a finding is classified, SARIF carries the human remediation at
 `result.properties.remediation` and the action fields at

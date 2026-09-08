@@ -21,6 +21,7 @@ Supported top-level sections are:
 - `minimumPhpVersion`
 - `deepScanBudget`
 - `minimumSeverity`
+- `failOn`
 - `failureConditions`
 - `paths`
 - `allowlists`
@@ -74,12 +75,27 @@ names fail fast.
 
 ## Minimum Severity
 
-`minimumSeverity` sets the exit-code threshold per gating command. Keys are
+`minimumSeverity` is the report's display floor. It takes one severity —
+`advisory`, `warning`, or `error` — and hides every finding below it from
+the report:
+
+```yaml
+minimumSeverity: warning
+```
+
+The floor changes what a report shows, never what it decides: a finding it
+hides still counts toward the exit code and the score. `none` is not a floor
+value, and a per-command map is rejected with an error pointing at `failOn`,
+which is the key that gates the exit code.
+
+## Fail On
+
+`failOn` sets the exit-code threshold per gating command. Keys are
 `analyse`, `report`, and `dashboard`; values are `advisory`, `warning`,
 `error`, or `none`:
 
 ```yaml
-minimumSeverity:
+failOn:
   analyse: advisory
   report: none
   dashboard: none
@@ -94,14 +110,14 @@ accepted values.
 Precedence when resolving the effective threshold:
 
 1. CLI `--fail-on` flag (when set explicitly)
-2. `minimumSeverity.<command>` from `.gruff-php.yaml`
+2. `failOn.<command>` from `.gruff-php.yaml`
 3. Binary default — `advisory` for `analyse`, `none` for `report` and
    `dashboard`
 
 `analyse`'s binary default lowered from `error` to `advisory` in 0.2.0 so
 that every finding visible in the report can fail CI by default. Pass
-`--fail-on error` or set `minimumSeverity.analyse: error` to restore the
-older behaviour.
+`--fail-on error` or set `failOn.analyse: error` to restore the older
+behaviour.
 
 ## Failure Conditions
 
@@ -129,11 +145,14 @@ failureConditions:
       error: 0
 ```
 
-With a baseline reference point, "new" derives from `gruff.baseline.v2` group
-matching: a finding counts as new when its `(file, ruleId, message)` group has
-more live instances than the baseline accepted, so unrelated line shifts never
-re-trigger the gate. Legacy `gruff.baseline.v1` files fail closed — regenerate
-them once with `analyse --generate-baseline`.
+With a baseline reference point, "new" derives from `gruff.baseline.v3`
+identity matching: a finding counts as new when its line-free identity has more
+live instances than the baseline accepted, so unrelated line shifts never
+re-trigger the gate. Legacy files fail closed: carry a `gruff.baseline.v2`
+file's reviews forward once with
+`analyse --migrate-baseline <old> --generate-baseline <new>`, and regenerate a
+`gruff.baseline.v1` file with `analyse --generate-baseline`, which
+`--migrate-baseline` refuses because it reads only v2.
 
 ## Paths
 
@@ -154,15 +173,18 @@ directory walk, an explicit file operand, or any diff/changed-region scan
 `--include-ignored` opts back into Git/default-ignored paths only; it never
 overrides `paths.ignore`.
 
-Each excluded path is reported in the JSON report's additive `ignoredPathDetails`
-array (alongside the compatibility `ignoredPaths` string list) with the `source`
-that excluded it (`config`, `default`, `generated`, or `gitignore`) and the
-matching `pattern`:
+Each excluded path is reported in the JSON report's `paths.details` array with a
+canonical `reason`, the `source` that excluded it (`config`, `default`,
+`generated`, or `gitignore`), and the matching `pattern` when that source has
+one. `paths.ignoredPaths` is the ordered path projection of the same rows:
 
 ```json
-"ignoredPathDetails": [
-  { "path": "legacy/Report.php", "source": "config", "pattern": "legacy/**" }
-]
+"paths": {
+  "details": [
+    { "path": "legacy/Report.php", "reason": "config-ignore", "source": "config", "pattern": "legacy/**" }
+  ],
+  "ignoredPaths": ["legacy/Report.php"]
+}
 ```
 
 Use `gruff-php check-ignore <path>...` to ask whether gruff would ignore a path,
@@ -200,8 +222,8 @@ allowlists:
 
 `allowlists.acceptedAbbreviations` is matched case-insensitively by
 `naming.abbreviation-allowlist`. Gruff seeds the universal programming terms
-`age`, `app`, `db`, `dto`, `fs`, `id`, `io`, `key`, `log`, `max`, `min`, `now`,
-`raw`, `rx`, `tx`, `ui`, `url`, and `utc` when this key is absent. Supplying the key replaces
+`age`, `app`, `db`, `fs`, `id`, `io`, `key`, `log`, `max`, `min`, `now`, `raw`,
+`rx`, `tx`, `ui`, and `url` when this key is absent. Supplying the key replaces
 that seeded list, so include every universal term the project still accepts as
 well as domain vocabulary such as `dob`. An unaccepted short name remains an
 advisory `CONSIDER` finding; the allowlist is a deliberate project decision,
@@ -253,8 +275,9 @@ breaks a build.
 
 `summary` applies the same entries, so its counts and grade agree with `analyse` over the same tree,
 and its text output prints the same `Suppressed findings:` total below the digest. Its
-`gruff.summary.v2` JSON has no suppression field yet, so `summary --format json` filters without
-publishing a count; read the total from the text output or from `analyse --format json`.
+`gruff.summary.v3` JSON publishes the same `suppressions` array as `analyse`, one
+`{index, rule, paths, symbol?, reason, suppressed}` row per configured entry, so the count is
+readable from `summary --format json` directly.
 
 These shapes are rejected at load time, each with a message naming the entry index and the offending
 key, and each exiting `2`:
