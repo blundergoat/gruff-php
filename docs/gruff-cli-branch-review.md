@@ -60,22 +60,23 @@ Explicit directories include changed files below that directory. Explicit files 
 ## Inspect The Result
 
 ```bash
-php -r '$j=json_decode(file_get_contents("/tmp/gruff-branch-review.json"), true); echo "diagnostics=".json_encode($j["diagnostics"] ?? null)."\n"; echo "review_counts=".json_encode($j["review"]["counts"] ?? null)."\n";'
+php -r '$j=json_decode(file_get_contents("/tmp/gruff-branch-review.json"), true); echo "diagnostics=".json_encode($j["diagnostics"] ?? null)."\n"; echo "php_review_counts=".json_encode($j["extensions"]["php"]["topLevel"]["review"]["counts"] ?? null)."\n";'
 ```
 
 Expected successful shape:
 
 ```text
 diagnostics=[]
-review_counts={"introduced":...,"removed":...,"unchanged":...}
+php_review_counts={"introduced":...,"removed":...,"unchanged":...}
 ```
 
-If `review_counts` is `null`, branch-review comparison did not complete. Check `diagnostics` first.
+If `php_review_counts` is `null`, the run published no `review` object and the branch-review comparison did not complete. Check `diagnostics` for a `diff-mode-error` first.
 
 ## Output Fields Agents Should Use
 
-The JSON `review` object contains:
+The `extensions.php.topLevel.review` object contains:
 
+- `active`: always `true`; the object is absent altogether when no branch review ran.
 - `base`: the base ref used for comparison.
 - `changedOnly`: whether changed-file scoping was enabled.
 - `counts.introduced`: findings present in current analysis but absent from base.
@@ -83,6 +84,7 @@ The JSON `review` object contains:
 - `counts.unchanged`: findings present in both current and base.
 - `introduced[]`, `removed[]`, `unchanged[]`: finding payloads.
 - `deltaScore`: current score minus base score for the reviewed scope; `null` when the scan discovered no files and no current score applies.
+- `perRuleDelta[]`: one row per rule whose count moved, as `{ruleId, introduced, removed, net}`, ascending by net so the largest reductions come first. A rule that introduced and removed the same number is omitted.
 
 Line numbers are report context only. Branch review compares stable finding identity by `file + ruleId + symbol` when possible, falling back to `file + ruleId + message`.
 
