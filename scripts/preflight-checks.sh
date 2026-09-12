@@ -417,12 +417,46 @@ sort($ids);
 $pillars = array_values(array_unique(array_map(static fn(array $rule): string => (string)$rule['pillar'], $rules)));
 sort($pillars);
 $shapes = count(array_filter($rules, static fn(array $rule): bool => ($rule['falsePositiveShapes'] ?? []) !== []));
+$pillarCounts = array_map(
+    static fn(string $pillar): string => $pillar . ':' . count(array_filter($rules, static fn(array $rule): bool => $rule['pillar'] === $pillar)),
+    $pillars,
+);
 echo 'count=' . count($rules) . "\n";
 echo 'pillars=' . count($pillars) . "\n";
 echo 'shapes=' . $shapes . "\n";
 echo 'pillarNames=' . implode('|', $pillars) . "\n";
+echo 'pillarCounts=' . implode('|', $pillarCounts) . "\n";
 echo 'ids=' . implode(' ', $ids) . "\n";
 PHP
+}
+
+# Compare every per-pillar table row in the README with the live catalogue. A row that names a count
+# the catalogue does not have, or a table shorter than the catalogue's pillar list, is a stale claim.
+docs_drift_pillar_table() {
+    local readme=$1 facts=$2
+    local backtick='`'
+    local pillar_counts row_pillar row_count live_count table_rows=0 pillars
+    pillars=$(docs_fact "$facts" pillars)
+    pillar_counts="|$(docs_fact "$facts" pillarCounts)|"
+
+    while IFS='|' read -r row_pillar row_count; do
+        table_rows=$((table_rows + 1))
+        live_count=$(sed -n "s/.*|${row_pillar}:\([0-9]*\)|.*/\1/p" <<<"$pillar_counts")
+        if [[ "$live_count" != "$row_count" ]]; then
+            printf 'docs drift: source-revision: README.md pillar table says %s has %s rules but list-rules has %s\n' \
+                "$row_pillar" "$row_count" "${live_count:-no such pillar}"
+            return 1
+        fi
+    done < <(grep -oE "^\| *${backtick}[a-z-]+${backtick} *\| *[0-9]+ *\|$" "$readme" \
+        | sed -E "s/^\| *${backtick}([a-z-]+)${backtick} *\| *([0-9]+) *\|$/\1|\2/")
+
+    if ((table_rows > 0 && table_rows != pillars)); then
+        printf 'docs drift: source-revision: README.md pillar table has %s rows but list-rules has %s pillars\n' \
+            "$table_rows" "$pillars"
+        return 1
+    fi
+
+    printf '%s' "$table_rows"
 }
 
 # Read one fact from the extracted facts block.
@@ -484,8 +518,29 @@ docs_drift_check_root() {
             return 1
         fi
     done < <(grep -oE '[0-9]+ of the [0-9]+ rules publish' "$rules_doc")
+    while IFS= read -r claim; do
+        claims=$((claims + 1))
+        if [[ "$claim" != "$count rules across $pillars pillars" ]]; then
+            printf 'docs drift: source-revision: README.md says "%s" but list-rules has %s rules across %s pillars\n' \
+                "$claim" "$count" "$pillars"
+            return 1
+        fi
+    done < <(grep -oE '[0-9]+ rules across [0-9]+ pillars' "$readme")
+    while IFS= read -r claim; do
+        claims=$((claims + 1))
+        if [[ "$claim" != "contains $count registry rules" ]]; then
+            printf 'docs drift: source-revision: README.md says "%s" but list-rules has %s rules\n' "$claim" "$count"
+            return 1
+        fi
+    done < <(grep -oE 'contains [0-9]+ registry rules' "$readme")
+    local table_rows
+    table_rows=$(docs_drift_pillar_table "$readme" "$facts") || {
+        printf '%s\n' "$table_rows"
+        return 1
+    }
+    claims=$((claims + table_rows))
     if ((claims == 0)); then
-        printf 'docs drift: false-empty: docs/rules.md states no catalogue size\n'
+        printf 'docs drift: false-empty: README.md and docs/rules.md state no catalogue size\n'
         return 1
     fi
 
@@ -618,8 +673,13 @@ docs_drift_fixture_check() {
     printf '\n[Missing page](docs/missing-page.md)\n' >>"$root/README.md"
     expect_docs_drift_rejection dead-link 'entry-page link' "$root" "$facts" || { rm -rf -- "$harness"; return 1; }
 
+    root="$harness/stale-pillar-table"
+    cp -R "$valid" "$root"
+    sed -i -E "0,/^(\| *${backtick}[a-z-]+${backtick} *\| *)[0-9]+( *\|)$/s//\1999\2/" "$root/README.md"
+    expect_docs_drift_rejection stale-pillar-table 'pillar table' "$root" "$facts" || { rm -rf -- "$harness"; return 1; }
+
     rm -rf -- "$harness"
-    printf '5 mutations rejected'
+    printf '6 mutations rejected'
 }
 
 summary() {
