@@ -29,6 +29,8 @@ time, so a project using more than one of them moves once. This port's recorded 
 
 11. **the agent-hook contract moves from `gruff.hook.v1` to `gruff.hook.v2`** — The payload's `contractVersion` changes and the envelope gains two required keys, `run` and `suppressions`. `run` carries the audit data a consumer needs to trust the verdict — mode, scope, the operands as given, `analysedFiles`, and the applied baseline — and `suppressions` carries one row per configured sensitive exclusion the run applied, `[]` when none are configured. The exits are ratified as three and no others: `0` when nothing reached the gate, `1` when something did under an explicit consumer request (`--fail-on`, `--fail-on-new`, or `--fail-on-diagnostics`), and `2` when the run could not happen. Update any consumer that validates the payload's key set; one that reads only the keys it needs is unaffected. The contract is `gruff-spec/contracts/core/hook.v2.json`, ratified 2026-09-06.
 
+12. **`list-rules --format json` publishes thresholds as a named knob map** — A tunable rule's `thresholds` is `{"maxLines": 100}` or `{"threshold": 10}`, never the `{"threshold": N, "severity": S}` pair, and a rule with no threshold omits the key instead of publishing `{}`. Update any consumer that read `thresholds.threshold` or `thresholds.severity`: the number sits under its knob name, the severity is the row's `defaultSeverity`, and `list-rules <ruleId> --format json` changes the same way. `.gruff-php.yaml` keys are unchanged.
+
 ## Upgrade workflow (`0.5.x` → `0.6.0`)
 
 1. Read the list above and decide which breaks touch your project. A project with no committed

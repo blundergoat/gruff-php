@@ -449,4 +449,65 @@ final class ListRulesCliTest extends CliTestCase
             $this->removeDir($tempDir);
         }
     }
+
+    /**
+     * Verify both JSON surfaces publish thresholds in the family shape: a named knob map on a
+     * tunable rule, and no key at all on a rule without one.
+     *
+     * The catalogue row and the detail card are read together because they must agree, and the
+     * three threshold kinds - a borrowed gruff-go knob name, the one-key `threshold` map, and a
+     * rule's own named defaults - are asserted on real rules so the projector cannot regress one
+     * kind while the others stay green.
+     *
+     * @return void
+     */
+    public function testCatalogueAndDetailPublishThresholdsAsNamedKnobMaps(): void
+    {
+        $listProcess = new Process([PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'list-rules', '--format', 'json']);
+        $listProcess->run();
+        $detailProcess = new Process([
+            PHP_BINARY,
+            self::PROJECT_ROOT . '/bin/gruff-php',
+            'list-rules',
+            'size.method-length',
+            '--format',
+            'json',
+        ]);
+        $detailProcess->run();
+
+        $listPayload   = json_decode($listProcess->getOutput(), associative: true, flags: JSON_THROW_ON_ERROR);
+        $detailPayload = json_decode($detailProcess->getOutput(), associative: true, flags: JSON_THROW_ON_ERROR);
+        /** @var list<array{id: string, thresholds?: array<string, int|float>}> $rules Catalogue rows as published by the JSON renderer. */
+        $rules = (array)(is_array($listPayload) ? ($listPayload['rules'] ?? []) : []);
+        /** @var array{thresholds?: array<string, int|float>} $detail Detail card as published by the JSON renderer. */
+        $detail = is_array($detailPayload) ? $detailPayload : [];
+        $rulesById = array_combine(
+            array_map(static fn(array $rule): string => $rule['id'], $rules),
+            $rules,
+        );
+        $pairShaped = array_keys(array_filter(
+            $rulesById,
+            static fn(array $rule): bool => array_key_exists('severity', $rule['thresholds'] ?? []),
+        ));
+        $emptyMaps = array_keys(array_filter(
+            $rulesById,
+            static fn(array $rule): bool => array_key_exists('thresholds', $rule) && $rule['thresholds'] === [],
+        ));
+
+        self::assertSame(0, $listProcess->getExitCode(), $listProcess->getErrorOutput());
+        self::assertSame(0, $detailProcess->getExitCode(), $detailProcess->getErrorOutput());
+        // A rubric whose rule id has a gruff-go knob name borrows it.
+        self::assertSame(['maxComplexity' => 20], $rulesById['complexity.cognitive']['thresholds'] ?? null);
+        self::assertSame(['maxLines' => 100], $rulesById['size.method-length']['thresholds'] ?? null);
+        // A rubric with no knob name anywhere in the family publishes the one-key map.
+        self::assertSame(['threshold' => 10], $rulesById['docs.todo-density']['thresholds'] ?? null);
+        // A rule with its own named defaults publishes them unchanged.
+        self::assertSame(['minLength' => 32, 'entropy' => 4.2], $rulesById['sensitive-data.high-entropy-string']['thresholds'] ?? null);
+        // A rule with no threshold omits the key rather than publishing `{}`.
+        self::assertArrayNotHasKey('thresholds', $rulesById['security.header-injection'] ?? []);
+        self::assertSame([], $pairShaped);
+        self::assertSame([], $emptyMaps);
+        // The detail card publishes the same map as the catalogue row.
+        self::assertSame(['maxLines' => 100], $detail['thresholds'] ?? null);
+    }
 }
