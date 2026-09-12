@@ -90,6 +90,12 @@ which is the key that gates the exit code.
 
 ## Fail On
 
+Across the Gruff family only `analyse` and `report` are accepted by every port, so a
+polyglot repository that shares one `failOn` block should write only those two keys.
+`dashboard` is accepted by gruff-go, gruff-php and gruff-py, and `summary` by gruff-go
+and gruff-ts; each other port refuses the key with exit 2 rather than ignoring it,
+because it ships no gate for that command.
+
 `failOn` sets the exit-code threshold per gating command. Keys are
 `analyse`, `report`, and `dashboard`; values are `advisory`, `warning`,
 `error`, or `none`:
