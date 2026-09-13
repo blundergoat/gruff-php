@@ -14,7 +14,10 @@ use GruffPhp\Output\Reporter\ThresholdTrip;
 use GruffPhp\Results\Review\BranchReviewResult;
 use GruffPhp\Results\Scoring\ScoreReport;
 use GruffPhp\Engine\Source\IgnoredPath;
+use GruffPhp\Engine\Source\PathIgnoreResolver;
+use GruffPhp\Support\PathHelper;
 use GruffPhp\Results\Trend\TrendReport;
+use LogicException;
 
 /**
  * The complete result of one analysis run - everything every reporter format needs to render, in one place.
@@ -25,9 +28,14 @@ use GruffPhp\Results\Trend\TrendReport;
  * SARIF, HTML - the reporter reads from this one object, so the text they read and the JSON their CI
  * parses always describe the same run.
  *
- * @phpstan-type ReportScalar bool|float|int|object|string|null
- * @phpstan-type ReportValue ReportScalar|array<array-key, ReportScalar|array<array-key, ReportScalar|array<array-key, ReportScalar|array<array-key,
- *               ReportScalar|array<array-key, ReportScalar>>>>>
+ * @phpstan-type ReportValue bool|float|int|object|string|null|array<array-key, mixed>
+ * @phpstan-type MachinePathDetail array{path: string, reason: string, source: string, pattern?: string}
+ * @phpstan-type MachineReportContext array{
+ *     ignoredPathDetails: list<IgnoredPath>,
+ *     shouldIncludeIgnored: bool,
+ *     projectRoot: string,
+ *     unfilteredFindings: list<Finding>|null
+ * }
  */
 final readonly class AnalysisReport
 {
@@ -39,7 +47,12 @@ final readonly class AnalysisReport
     /**
      * Stable schema identifier emitted in machine-readable reports.
      */
-    public const SCHEMA_VERSION = 'gruff.analysis.v2';
+    public const SCHEMA_VERSION = 'gruff.analysis.v3';
+
+    /**
+     * Stable schema identifier for the findings-free projection of an analysis report.
+     */
+    public const SUMMARY_SCHEMA_VERSION = 'gruff.summary.v3';
 
     /**
      * Gathers everything one analysis run produced into the single object every reporter renders from.
@@ -64,10 +77,11 @@ final readonly class AnalysisReport
      * @param BranchReviewResult|null     $review - Branch review result; null when the run was not a --diff-vs review.
      * @param FindingDisplayFilter|null   $filters - Display filters applied to the output; null when none were active.
      * @param int|null                    $suppressedCount - Findings hidden by changed-region filtering; null when no such filtering ran.
-     * @param list<IgnoredPath>           $ignoredPathDetails - Ignored paths enriched with source and matching pattern.
      * @param bool                        $shouldListAbsentBaseline - Whether reporters should list resolved (absent) baseline entries.
      * @param ThresholdTrip|null          $failureReason - Gate threshold that tripped; null when the run did not fail a count threshold.
      * @param int|null                    $newFindingsCount - Size of the new-findings set; null when no new-findings gate is active.
+     * @param list<SensitiveExclusionSummary> $sensitiveExclusions - One audit row per configured sensitive-data exclusion; empty when the run configured none.
+     * @param MachineReportContext        $machineContext - Serializer-only paths, run flags, root, and pre-display finding data.
      */
     public function __construct(
         public string                  $toolVersion,
@@ -90,10 +104,16 @@ final readonly class AnalysisReport
         public ?BranchReviewResult     $review = null,
         public ?FindingDisplayFilter   $filters = null,
         public ?int                    $suppressedCount = null,
-        public array                   $ignoredPathDetails = [],
         public bool                    $shouldListAbsentBaseline = false,
         public ?ThresholdTrip          $failureReason = null,
         public ?int                    $newFindingsCount = null,
+        public array                   $sensitiveExclusions = [],
+        private array                  $machineContext = [
+            'ignoredPathDetails' => [],
+            'shouldIncludeIgnored' => false,
+            'projectRoot' => '.',
+            'unfilteredFindings' => null,
+        ],
     ) {
     }
 
@@ -178,98 +198,533 @@ final readonly class AnalysisReport
     }
 
     /**
-     * Flattens the whole report into the reporter wire shape, so JSON, SARIF, and HTML all serialise the
-     * same run - with each optional section present only when the run actually produced it.
+     * Projects the in-memory PHP report into the strict family analysis envelope.
      *
-     * @return array<string, ReportValue> - the report serialized to the reporter wire shape; optional sections (mutation, score, diff, etc.) are
-     *                       present only when populated.
+     * @return array<string, ReportValue> - Canonical v3 analysis document with optional data omitted when absent.
      */
     public function toArray(): array
     {
+        $details         = array_map(fn(IgnoredPath $ignoredPath): array => $this->machinePathDetail($ignoredPath), $this->machineContext['ignoredPathDetails']);
+        $ignoredPaths    = array_map(static fn(array $detail): string => $detail['path'], $details);
+        $summaryFindings = $this->machineContext['unfilteredFindings'] ?? $this->findings;
+        $runMetadata     = [
+            'failOn' => $this->failOn,
+            'format' => $this->format,
+            'inputs' => $this->machinePaths($this->requestedPaths),
+            'projectRoot' => '.',
+        ];
+
+        if ($this->configPath !== null) {
+            $configPath = $this->machineRelativePath($this->configPath);
+            if ($configPath !== null) {
+                $runMetadata['config'] = $configPath;
+            }
+        }
+
+        if ($this->filters instanceof FindingDisplayFilter && $this->filters->isActive()) {
+            $runMetadata['filters'] = $this->machineRunFilters($this->filters);
+        }
+
+        if ($this->machineContext['shouldIncludeIgnored']) {
+            $runMetadata['includeIgnored'] = true;
+        }
+
         $report = [
-            'schemaVersion'      => self::SCHEMA_VERSION,
-            'tool'               => [
-                'name'    => self::TOOL_NAME,
+            'schemaVersion' => self::SCHEMA_VERSION,
+            'tool' => [
+                'name' => self::TOOL_NAME,
                 'version' => $this->toolVersion,
             ],
-            'run'                => [
-                'format'  => $this->format,
-                'failOn'  => $this->failOn,
-                'config'  => $this->configPath,
-                'paths'   => $this->requestedPaths,
-                'filters' => $this->filters?->toArray(),
+            'run' => $runMetadata,
+            'summary' => [
+                'analysedFiles' => $this->filesParsed,
+                'diagnostics' => count($this->diagnostics),
+                'discoveredFiles' => $this->filesDiscovered,
+                'exitCode' => $this->exitCode,
+                'findings' => self::findingCountsFor($summaryFindings),
+                'findingsByPillar' => self::findingCountsByPillarFor($summaryFindings),
+                'ignoredPaths' => count($ignoredPaths),
+                'missingPaths' => count($this->missingPaths),
+                'parseErrors' => $this->parseErrorCount(),
+                'parsedFiles' => $this->filesParsed,
+                'skippedFiles' => count($details),
             ],
-            'summary'            => [
-                'filesDiscovered' => $this->filesDiscovered,
-                'filesParsed'     => $this->filesParsed,
-                'ignoredPaths'    => count($this->ignoredPaths),
-                'missingPaths'    => count($this->missingPaths),
-                'parseErrors'     => $this->parseErrorCount(),
-                'findings'        => $this->findingCounts(),
-                'exitCode'        => $this->exitCode,
+            'score' => $this->machineScore(),
+            'diagnostics' => array_map(fn(RunDiagnostic $diagnostic): array => $this->machineDiagnostic($diagnostic), $this->diagnostics),
+            'findings' => array_map(fn(Finding $finding): array => $this->machineFinding($finding), $this->findings),
+            'paths' => [
+                'analysedFiles' => $this->filesParsed,
+                'details' => $details,
+                'ignoredPaths' => $ignoredPaths,
+                'missingPaths' => $this->machinePaths($this->missingPaths),
             ],
-            'ignoredPaths'       => $this->ignoredPaths,
-            'ignoredPathDetails' => array_map(
-                static fn(IgnoredPath $ignoredPath): array => $ignoredPath->toArray(),
-                $this->ignoredPathDetails,
-            ),
-            'missingPaths'       => $this->missingPaths,
-            'diagnostics'        => array_map(
-                static fn(RunDiagnostic $diagnostic): array => $diagnostic->toArray(),
-                $this->diagnostics,
-            ),
-            'findings'           => array_map(
-                static fn(Finding $finding): array => $finding->toArray(),
-                $this->findings,
+            'suppressions' => array_map(
+                fn(SensitiveExclusionSummary $summary): array => $this->machineSuppression($summary),
+                $this->sensitiveExclusions,
             ),
         ];
 
-        // Include the suppressed count only when changed-region filtering actually hid some findings.
         if ($this->suppressedCount !== null) {
-            $report['suppressedCount'] = $this->suppressedCount;
+            $report['summary']['suppressedFindings'] = $this->suppressedCount;
         }
 
-        // Include the failure reason only when the run tripped a count threshold.
-        if ($this->failureReason instanceof ThresholdTrip) {
-            $report['failureReason'] = $this->failureReason->toArray();
+        if ($this->baseline instanceof BaselineReport || $this->newFindingsCount !== null) {
+            $report['baseline'] = $this->machineBaseline($this->baseline);
         }
 
-        // Include the new-findings count only when a new-findings gate was active.
-        if ($this->newFindingsCount !== null) {
-            $report['newFindingsCount'] = $this->newFindingsCount;
+        if ($this->diff instanceof DiffResult && $this->diff->active) {
+            $report['diff'] = $this->machineDiff($this->diff);
         }
 
-        // Attach the mutation section only when mutation analysis ran.
-        if ($this->mutation instanceof MutationAnalysisResult) {
-            $report['mutation'] = $this->mutation->toArray();
+        if ($this->filters instanceof FindingDisplayFilter && $this->filters->isActive()) {
+            $report['displayFilter'] = $this->machineDisplayFilter($this->filters, count($summaryFindings) - count($this->findings));
         }
 
-        // Attach the score section only when scoring was produced.
-        if ($this->score instanceof ScoreReport) {
-            $report['score'] = $this->score->toArray();
-        }
-
-        // Attach the diff section only on a changed-region run.
-        if ($this->diff instanceof DiffResult) {
-            $report['diff'] = $this->diff->toArray();
-        }
-
-        // Attach the trend section only when trend history was recorded.
-        if ($this->trend instanceof TrendReport) {
-            $report['trend'] = $this->trend->toArray();
-        }
-
-        // Attach the baseline section only when a baseline was applied.
-        if ($this->baseline instanceof BaselineReport) {
-            $report['baseline'] = $this->baseline->toArray();
-        }
-
-        // Attach the branch-review section only on a --diff-vs review run.
-        if ($this->review instanceof BranchReviewResult) {
-            $report['review'] = $this->review->toArray();
+        $extensions = $this->machineExtensions();
+        if ($extensions !== []) {
+            $report['extensions'] = $extensions;
         }
 
         return $report;
+    }
+
+    /**
+     * Produces the only supported compact machine payload from the canonical analysis document.
+     *
+     * @return array<string, ReportValue> - Analysis v3 with only findings removed and the schema identifier changed.
+     */
+    public function toSummaryArray(): array
+    {
+        $summary                  = $this->toArray();
+        $summary['schemaVersion'] = self::SUMMARY_SCHEMA_VERSION;
+        unset($summary['findings']);
+
+        return $summary;
+    }
+
+    /**
+     * Counts a complete finding collection by canonical severity without changing its order or identity.
+     *
+     * @param list<Finding> $findings - Findings whose severities contribute to the machine summary.
+     *
+     * @return array{advisory: int, warning: int, error: int, total: int} - Canonical severity totals, including zero-valued buckets.
+     */
+    private static function findingCountsFor(array $findings): array
+    {
+        $counts = ['advisory' => 0, 'warning' => 0, 'error' => 0, 'total' => count($findings)];
+
+        foreach ($findings as $finding) {
+            $counts[$finding->severity->value]++;
+        }
+
+        return $counts;
+    }
+
+    /**
+     * Counts a complete finding collection by its primary pillar for the machine summary.
+     *
+     * @param list<Finding> $findings - Findings whose primary pillars contribute to the summary.
+     *
+     * @return array<string, int>|object - Sorted pillar totals, or an empty JSON object when there are no findings.
+     */
+    private static function findingCountsByPillarFor(array $findings): array|object
+    {
+        $counts = [];
+
+        foreach ($findings as $finding) {
+            $counts[$finding->pillar->value] = ($counts[$finding->pillar->value] ?? 0) + 1;
+        }
+
+        ksort($counts);
+
+        return $counts === [] ? (object)[] : $counts;
+    }
+
+    /**
+     * Adapts PHP display-filter settings to the canonical run metadata shape.
+     *
+     * @param FindingDisplayFilter $filters - Active filter settings recorded for this run.
+     *
+     * @return array<string, bool|string|list<string>> - Filter metadata with an absent minimum severity omitted.
+     */
+    private function machineRunFilters(FindingDisplayFilter $filters): array
+    {
+        $payload = $filters->toArray();
+        if ($payload['minSeverity'] === null) {
+            unset($payload['minSeverity']);
+        }
+
+        return $payload;
+    }
+
+    /**
+     * Maps one native finding to the v3 wire shape while preserving both identity values.
+     *
+     * @param Finding $finding - Native finding to serialize without changing its identity inputs.
+     *
+     * @return array<string, ReportValue> - Canonical finding fields with unavailable optional locations omitted.
+     */
+    private function machineFinding(Finding $finding): array
+    {
+        $metadata                      = $finding->metadata;
+        $metadata['locationPrecision'] = $finding->column === null ? 'line-only' : 'scanner-pinpointed';
+        $payload                       = [
+            'ruleId' => $finding->ruleId,
+            'message' => $finding->message,
+            'file' => $this->machinePath($finding->filePath),
+            'line' => max(1, $finding->line ?? 1),
+            'severity' => $finding->severity->value,
+            'pillar' => $finding->pillar->value,
+            'secondaryPillars' => array_map(static fn($pillar): string => $pillar->value, $finding->secondaryPillars),
+            'tier' => $finding->tier->value,
+            'confidence' => $finding->confidence->value,
+            'remediation' => $finding->remediation ?? '',
+            'fingerprint' => $finding->fingerprint(),
+            'stableIdentity' => $finding->stableIdentity(),
+            'metadata' => $metadata,
+        ];
+
+        if ($finding->endLine !== null) {
+            $payload['endLine'] = max(1, $finding->endLine);
+        }
+
+        if ($finding->column !== null) {
+            $payload['column'] = max(1, $finding->column);
+        }
+
+        if ($finding->symbol !== null && $finding->symbol !== '') {
+            $payload['symbol'] = $finding->symbol;
+        }
+
+        return $payload;
+    }
+
+    /**
+     * Maps one run diagnostic to the canonical v3 diagnostic shape.
+     *
+     * @param RunDiagnostic $diagnostic - Native diagnostic emitted while loading or parsing the run.
+     *
+     * @return array<string, ReportValue> - Canonical diagnostic with optional file and line data omitted when absent.
+     */
+    private function machineDiagnostic(RunDiagnostic $diagnostic): array
+    {
+        $payload = [
+            'type' => $diagnostic->type,
+            'message' => $diagnostic->message,
+            'invalidatesRun' => $diagnostic->isFatal,
+        ];
+        $filePath = $diagnostic->filePath ?? $diagnostic->path;
+
+        if ($filePath !== null && $filePath !== '') {
+            $payload['file'] = $this->machinePath($filePath);
+        }
+
+        if ($diagnostic->line !== null && $diagnostic->line > 0) {
+            $payload['line'] = $diagnostic->line;
+        }
+
+        return $payload;
+    }
+
+    /**
+     * Projects one ignored path into the auditable M15 detail shape.
+     *
+     * @param IgnoredPath $ignoredPath - Native ignored-path record carrying its source and optional pattern.
+     *
+     * @return MachinePathDetail - Project-relative path detail with a canonical skip reason.
+     */
+    private function machinePathDetail(IgnoredPath $ignoredPath): array
+    {
+        $payload = [
+            'path' => $this->machinePath($ignoredPath->path),
+            'reason' => self::skipReason($ignoredPath),
+            'source' => $ignoredPath->source,
+        ];
+
+        if ($ignoredPath->pattern !== null && $ignoredPath->pattern !== '') {
+            $payload['pattern'] = $ignoredPath->pattern;
+        }
+
+        return $payload;
+    }
+
+    /**
+     * Translates a native ignore source and pattern into the closed family reason vocabulary.
+     *
+     * @param IgnoredPath $ignoredPath - Native ignored-path record to classify.
+     *
+     * @return string - Canonical M15 reason associated with the observed source and pattern.
+     * @throws LogicException When the source or default pattern has no canonical reason.
+     */
+    private static function skipReason(IgnoredPath $ignoredPath): string
+    {
+        if ($ignoredPath->source === PathIgnoreResolver::SOURCE_CONFIG) {
+            return 'config-ignore';
+        }
+
+        if ($ignoredPath->source === PathIgnoreResolver::SOURCE_GITIGNORE) {
+            return 'gitignored';
+        }
+
+        if ($ignoredPath->source === PathIgnoreResolver::SOURCE_GENERATED) {
+            return 'generated';
+        }
+
+        if ($ignoredPath->source !== PathIgnoreResolver::SOURCE_DEFAULT) {
+            throw new LogicException(sprintf('Unknown ignored-path source "%s".', $ignoredPath->source));
+        }
+
+        return match ($ignoredPath->pattern) {
+            '.git', '.hg', '.svn' => 'vcs',
+            'node_modules', 'vendor' => 'dependency',
+            'build', 'coverage', 'dist' => 'build-output',
+            '.fleet', '.idea', '.vscode' => 'local-tooling',
+            '.gruff-cache', '.phpunit.cache', 'var/cache' => 'tool-cache',
+            default => throw new LogicException(sprintf('Unknown default ignored-path pattern "%s".', $ignoredPath->pattern ?? '')),
+        };
+    }
+
+    /**
+     * Projects one configured sensitive exclusion into its non-secret audit record.
+     *
+     * @param SensitiveExclusionSummary $summary - Exclusion result containing only approved audit fields.
+     *
+     * @return array<string, ReportValue> - Canonical suppression record with an optional symbol.
+     */
+    private function machineSuppression(SensitiveExclusionSummary $summary): array
+    {
+        $payload = [
+            'index' => $summary->index,
+            'rule' => $summary->rule,
+            'paths' => $this->machinePaths([$summary->path]),
+            'reason' => $summary->reason,
+            'suppressed' => $summary->suppressed,
+        ];
+
+        if ($summary->symbol !== null && $summary->symbol !== '') {
+            $payload['symbol'] = $summary->symbol;
+        }
+
+        return $payload;
+    }
+
+    /**
+     * Adapts the native score container without recalculating any M06-owned score value.
+     *
+     * @return array<string, ReportValue> - Canonical score data, or the structural unscored representation.
+     */
+    private function machineScore(): array
+    {
+        if (!$this->score instanceof ScoreReport) {
+            return [
+                // No scoring ran, so there is no number to report; a 0.0 here would read as a failing grade.
+                'composite' => ['grade' => null, 'score' => null],
+                'clusters' => [],
+                'ruleAttribution' => [],
+                'pillars' => [],
+                'topOffenders' => [],
+                'coverage' => [
+                    'contributingPillars' => [],
+                    'caveat' => 'No score was produced for this run.',
+                ],
+            ];
+        }
+
+        $payload                 = $this->score->toArray();
+        $payload['pillars']      = array_map(self::withoutNullValues(...), $payload['pillars']);
+        $payload['topOffenders'] = array_map(function (array $offender): array {
+            $offender['file'] = $this->machinePath($offender['file']);
+
+            return self::withoutNullValues($offender);
+        }, $payload['topOffenders']);
+
+        if ($payload['complexityDistribution'] === []) {
+            $payload['complexityDistribution'] = (object)[];
+        }
+
+        return $payload;
+    }
+
+    /**
+     * Adapts baseline structure while leaving M07-owned matching semantics unchanged.
+     *
+     * @param BaselineReport|null $baseline - Applied native baseline result, or null for a gate-only count.
+     *
+     * @return array<string, ReportValue> - Canonical baseline fields plus PHP-owned bucket extensions.
+     */
+    private function machineBaseline(?BaselineReport $baseline): array
+    {
+        if (!$baseline instanceof BaselineReport) {
+            return ['newFindings' => $this->newFindingsCount ?? 0];
+        }
+
+        $legacy  = $baseline->toArray();
+        // The nine keys every port publishes, so one consumer reads five ports without a per-port branch.
+        // A generate or migrate run compared against nothing, so its movement counts are zero rather than absent.
+        $payload = [
+            'applied' => !$baseline->generated,
+            'entries' => $baseline->totalEntries,
+            'generated' => $baseline->generated,
+            'newFindings' => $this->newFindingsCount ?? ($baseline->newCount + $baseline->collisionCount + $baseline->notEligibleCount),
+            'resolvedFindings' => $baseline->absentCount,
+            'source' => $baseline->source,
+            'stale' => $legacy['stale'],
+            'staleEntries' => count($baseline->staleEntries),
+            'staleEvaluation' => $baseline->staleEvaluation,
+            'suppressedFindings' => $baseline->suppressedFindings,
+            'unchangedFindings' => $baseline->unchangedCount,
+            'extensions' => [
+                'php' => ['baseline' => ['buckets' => $legacy['buckets']]],
+            ],
+        ];
+        $baselinePath = $this->machineRelativePath($baseline->path);
+        if ($baselinePath !== null) {
+            $payload['path'] = $baselinePath;
+        }
+
+        return $payload;
+    }
+
+    /**
+     * Projects active changed-region context into the canonical diff container.
+     *
+     * @param DiffResult $diff - Active native diff result whose paths are made project-relative.
+     *
+     * @return array<string, ReportValue> - Canonical diff fields with absent optional values omitted.
+     */
+    private function machineDiff(DiffResult $diff): array
+    {
+        $payload = [
+            'changedFileCount' => count($diff->changedFiles),
+            'changedFiles' => $this->machinePaths($diff->changedFiles),
+            'enabled' => true,
+            'message' => $diff->message,
+            'mode' => $diff->mode,
+        ];
+
+        if ($diff->base !== null && $diff->base !== '') {
+            $payload['base'] = $diff->base;
+        }
+
+        if ($diff->suppressedCount !== null) {
+            $payload['filteredFindings'] = $diff->suppressedCount;
+        }
+
+        return $payload;
+    }
+
+    /**
+     * Records how an active display filter changed only the rendered finding list.
+     *
+     * @param FindingDisplayFilter $filters        - Active filter settings applied to rendered findings.
+     * @param int                  $hiddenFindings - Number of full-run findings omitted from the rendered list.
+     *
+     * @return array<string, ReportValue> - Canonical display-filter metadata and hidden count.
+     */
+    private function machineDisplayFilter(FindingDisplayFilter $filters, int $hiddenFindings): array
+    {
+        $payload                   = $this->machineRunFilters($filters);
+        $payload['applied']        = true;
+        $payload['hiddenFindings'] = max(0, $hiddenFindings);
+        unset($payload['active'], $payload['minSeverity']);
+
+        return $payload;
+    }
+
+    /**
+     * Isolates native top-level features under PHP's named extension namespace.
+     *
+     * @return array<string, ReportValue> - PHP extension data, or an empty array when no native feature is active.
+     */
+    private function machineExtensions(): array
+    {
+        $topLevel = [];
+
+        if ($this->failureReason instanceof ThresholdTrip) {
+            $topLevel['failureReason'] = $this->failureReason->toArray();
+        }
+
+        if ($this->mutation instanceof MutationAnalysisResult) {
+            $topLevel['mutation'] = $this->mutation->toArray();
+        }
+
+        if ($this->review instanceof BranchReviewResult) {
+            $topLevel['review'] = $this->review->toArray();
+        }
+
+        if ($this->trend instanceof TrendReport) {
+            $topLevel['trend'] = $this->trend->toArray();
+        }
+
+        return $topLevel === [] ? [] : ['php' => ['topLevel' => $topLevel]];
+    }
+
+    /**
+     * Removes unavailable optional values from one native score row before serialization.
+     *
+     * `score` and `grade` are kept even when null. Under the ratified scoring contract a null there
+     * is a statement - nothing applicable was evaluated - and omitting the key would leave a consumer
+     * unable to tell that apart from a port that never published the field at all.
+     *
+     * @param array<string, ReportValue> $values - Native row whose null entries mean the field is unavailable.
+     *
+     * @return array<string, ReportValue> - The same row with null-valued optional fields omitted, except the two ratified score fields.
+     */
+    private static function withoutNullValues(array $values): array
+    {
+        $ratifiedNullableKeys = ['score', 'grade'];
+
+        return array_filter(
+            $values,
+            static fn(mixed $fieldValue, string $fieldName): bool => $fieldValue !== null || in_array($fieldName, $ratifiedNullableKeys, true),
+            ARRAY_FILTER_USE_BOTH,
+        );
+    }
+
+    /**
+     * Normalizes and deduplicates a path list for deterministic machine output.
+     *
+     * @param list<string> $paths - Native paths to express relative to the run root.
+     *
+     * @return list<string> - Unique project-relative POSIX paths in first-seen order.
+     */
+    private function machinePaths(array $paths): array
+    {
+        return array_values(array_unique(array_map(fn(string $path): string => $this->machinePath($path), $paths)));
+    }
+
+    /**
+     * Requires one native path to resolve inside the run root before serialization.
+     *
+     * @param string $path - Native path that must belong to the analysed project.
+     *
+     * @return string - Project-relative POSIX path accepted by the v3 schema.
+     * @throws LogicException When the path cannot be represented beneath the project root.
+     */
+    private function machinePath(string $path): string
+    {
+        $normalized = $this->machineRelativePath($path);
+
+        if ($normalized === null || $normalized === '') {
+            throw new LogicException(sprintf('Machine path "%s" is outside the project root.', $path));
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * Attempts to express one native path relative to the canonical run root.
+     *
+     * @param string $path - Native absolute or root-relative path to normalize.
+     *
+     * @return string|null - Project-relative POSIX path, or null when the path lies outside the root.
+     */
+    private function machineRelativePath(string $path): ?string
+    {
+        $root     = PathHelper::canonical($this->machineContext['projectRoot']);
+        $absolute = PathHelper::resolveAgainst($root, $path);
+
+        return PathHelper::relativeToRoot($absolute, $root);
     }
 
     /**

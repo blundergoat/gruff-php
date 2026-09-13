@@ -162,14 +162,14 @@ final class RuleRegistry
      * Lower numbers win. The order encodes the documented deferral contract for overlapping naming rules.
      */
     private const NAMING_RULE_PRIORITY = [
-        'naming.class-file-mismatch'    => 0,
-        'naming.confusing-name'         => 1,
-        'naming.negative-boolean'       => 2,
-        'naming.boolean-prefix'         => 3,
-        'naming.identifier-quality'     => 4,
-        'naming.hungarian-notation'     => 5,
-        'naming.suffix-hungarian'       => 6,
-        'naming.short-variable'         => 7,
+        'naming.class-file-mismatch' => 0,
+        'naming.confusing-name' => 1,
+        'naming.negative-boolean' => 2,
+        'naming.boolean-prefix' => 3,
+        'naming.identifier-quality' => 4,
+        'naming.hungarian-notation' => 5,
+        'naming.suffix-hungarian' => 6,
+        'naming.short-variable' => 7,
         'naming.abbreviation-allowlist' => 8,
     ];
 
@@ -542,8 +542,8 @@ final class RuleRegistry
      * parse → analyse → release pipeline that keeps peak memory close to
      * one unit's worth on large codebases.
      *
-     * @param AnalysisUnit            $analysisUnit - Parsed unit to analyse.
-     * @param RuleContext             $ruleContext - Rule execution context.
+     * @param AnalysisUnit            $analysisUnit       - Parsed unit to analyse.
+     * @param RuleContext             $ruleContext        - Rule execution context.
      * @param RuleRunnerObserver|null $ruleRunnerObserver - Optional per-rule timing hook.
      *
      * @return list<Finding> - file-scoped findings for this unit only; accumulator output is deferred to endStreaming()
@@ -562,8 +562,8 @@ final class RuleRegistry
     /**
      * Runs only the per-unit (file-scoped) rules against a single unit.
      *
-     * @param AnalysisUnit            $analysisUnit - Parsed unit to analyse.
-     * @param RuleContext             $ruleContext - Rule execution context.
+     * @param AnalysisUnit            $analysisUnit       - Parsed unit to analyse.
+     * @param RuleContext             $ruleContext        - Rule execution context.
      * @param RuleRunnerObserver|null $ruleRunnerObserver - Optional per-rule timing hook.
      *
      * @return list<Finding> - findings from per-unit rules in rule-execution order, not yet deduped or final-sorted
@@ -589,6 +589,12 @@ final class RuleRegistry
             if (!$isPhp && !$rule instanceof SourceTextRuleInterface) {
                 continue;
             }
+            if ($analysisUnit->isDeepScanBounded()
+                && !$rule instanceof SourceTextRuleInterface
+                && !$rule instanceof FileLengthRule
+            ) {
+                continue;
+            }
 
             if ($ruleRunnerObserver === null) {
                 array_push($findings, ...$rule->analyse($analysisUnit, $ruleContext));
@@ -608,8 +614,8 @@ final class RuleRegistry
     /**
      * Pushes one unit through every enabled streaming project rule.
      *
-     * @param AnalysisUnit            $analysisUnit - Parsed unit to accumulate.
-     * @param RuleContext             $ruleContext - Rule execution context.
+     * @param AnalysisUnit            $analysisUnit       - Parsed unit to accumulate.
+     * @param RuleContext             $ruleContext        - Rule execution context.
      * @param RuleRunnerObserver|null $ruleRunnerObserver - Optional per-rule timing hook.
      *
      * @return void
@@ -633,6 +639,9 @@ final class RuleRegistry
             if (!$isPhp && !$rule instanceof ProjectSourceTextRuleAccumulator) {
                 continue;
             }
+            if ($analysisUnit->isDeepScanBounded() && !$rule instanceof ProjectSourceTextRuleAccumulator) {
+                continue;
+            }
 
             if ($ruleRunnerObserver === null) {
                 $rule->accumulate($analysisUnit, $ruleContext);
@@ -649,7 +658,7 @@ final class RuleRegistry
     /**
      * Finalises the project-rule accumulators and returns their findings after streaming completes.
      *
-     * @param RuleContext             $ruleContext - Rule execution context.
+     * @param RuleContext             $ruleContext        - Rule execution context.
      * @param RuleRunnerObserver|null $ruleRunnerObserver - Optional per-rule timing hook.
      *
      * @return list<Finding> - project-level findings flushed from accumulator state; empty when no accumulators ran or matched
@@ -716,10 +725,10 @@ final class RuleRegistry
     /**
      * Runs all enabled file and project rules against parsed units.
      *
-     * @param list<AnalysisUnit>      $units - Parsed units to analyse with file-scoped rules.
-     * @param RuleContext             $ruleContext - Rule execution context.
-     * @param list<AnalysisUnit>|null $projectUnits - Parsed units available to project-level rules.
-     * @param RuleRunnerObserver|null $ruleRunnerObserver - Optional per-rule timing hook; default analyse runs leave this null.
+     * @param list<AnalysisUnit>      $units                           - Parsed units to analyse with file-scoped rules.
+     * @param RuleContext             $ruleContext                     - Rule execution context.
+     * @param list<AnalysisUnit>|null $projectUnits                    - Parsed units available to project-level rules.
+     * @param RuleRunnerObserver|null $ruleRunnerObserver              - Optional per-rule timing hook; default analyse runs leave this null.
      * @param bool                    $shouldReleaseUnitsAfterAnalysis - Whether units can release AST contents after analysis.
      *
      * @return list<Finding> - all per-unit, accumulator, and legacy project findings, deduped and in canonical report order
@@ -795,9 +804,9 @@ final class RuleRegistry
     /**
      * Runs the project-level rules that need the full analysis context.
      *
-     * @param list<ProjectRuleInterface> $rules - Project rules to run.
-     * @param list<AnalysisUnit>         $contextUnits - Candidate units available to project rules.
-     * @param RuleContext                $ruleContext - Rule execution context.
+     * @param list<ProjectRuleInterface> $rules              - Project rules to run.
+     * @param list<AnalysisUnit>         $contextUnits       - Candidate units available to project rules.
+     * @param RuleContext                $ruleContext        - Rule execution context.
      * @param RuleRunnerObserver|null    $ruleRunnerObserver - Optional per-rule timing hook.
      *
      * @return list<Finding> - findings from the supplied legacy project rules; empty when no parse-clean PHP units remain to analyse
@@ -810,7 +819,9 @@ final class RuleRegistry
     ): array {
         $analyseableUnits = array_values(array_filter(
                                              $contextUnits,
-                                             static fn(AnalysisUnit $analysisUnit): bool => !$analysisUnit->hasParseErrors() && $analysisUnit->file->isPhp(),
+                                             static fn(AnalysisUnit $analysisUnit): bool => !$analysisUnit->hasParseErrors()
+                                                 && !$analysisUnit->isDeepScanBounded()
+                                                 && $analysisUnit->file->isPhp(),
                                          ));
 
         // No parse-clean PHP units means the project rules have nothing to inspect.

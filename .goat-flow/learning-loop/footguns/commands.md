@@ -1,6 +1,6 @@
 ---
 category: commands
-last_reviewed: 2026-08-16
+last_reviewed: 2026-08-22
 ---
 
 # CLI Command Footguns
@@ -38,11 +38,18 @@ last_reviewed: 2026-08-16
 **Status:** active | **Created:** 2026-06-14 | **Evidence:** ACTUAL_MEASURED
 **Decision changed:** Inspect `ignoredPathDetails.source` and prove `summary.filesParsed > 0` before trusting a scan; choose the remedy for the reported ignore layer.
 **Trigger phase:** VERIFY
-**Incident count:** 2 | **Latest occurrence:** 2026-08-09
+**Incident count:** 3 | **Latest occurrence:** 2026-08-22
 
 `src/Engine/Source/PathIgnoreResolver.php` (search: `Configured paths.ignore wins first and unconditionally`) applies configured `paths.ignore` patterns before it considers `--include-ignored`. The flag bypasses built-in default and generated exclusions only. A scan excluded by project config therefore still exits zero with the flag.
 
 The default-ignore variant affects corpora under `.goat-flow/scratchpad`: scanning the bundled Shopware source parsed 0 files until `--include-ignored` was added, after which it parsed 7,147. The configured-ignore variant recurred during the 0.5.2 substantive-line proof. `.gruff-php.yaml` (search: `'tests/Fixtures/**'`) excluded `tests/Fixtures/Source/mixed/alpha.php`; scans both with and without `--include-ignored` reported `filesParsed: 0`. Passing the existing narrow config `tests/Fixtures/Config/file-length-warning.yaml` parsed one file and reported 11 substantive lines.
+
+The third incident was the M11 scan-cost calibration. `src/Engine/Source/PathIgnoreResolver.php`
+(search: `IGNORED_DIRECTORIES`) ignores any path segment named `tmp`, as well as `cache`, `build`,
+`dist`, `generated`, `coverage`, `vendor`, and `node_modules`. A synthetic `.php` probe below
+`/tmp` therefore returned `empty-analysis`, `ignoredPaths: 1`, and pattern `tmp`; the plausible
+elapsed time was pure startup cost. Moving the probe to a non-ignored external scratch root and
+asserting that the report actually analysed a file produced the valid cost series.
 
 **Prevention:** Read `ignoredPathDetails.source` before changing flags. Use `--include-ignored` for `default` or `generated` exclusions. For a `config` exclusion, pass an explicit config that admits the target, or use `--no-config` only when the run is deliberately calibrating registry defaults. Treat an exit-zero scan as unproven until `summary.filesParsed > 0`; target a corpus source subtree so its dependency directories stay out.
 

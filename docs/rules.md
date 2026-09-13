@@ -14,6 +14,19 @@ Use that command for the full machine-readable metadata, including thresholds an
 
 Total rules: 128
 
+## False-positive guidance
+
+74 of the 128 rules publish `falsePositiveShapes`: a list of shapes the detector is
+known to misfire on, each paired with the mitigation that answers it. Every rule at
+`medium` or `low` confidence carries at least one, because a heuristic rule owes the
+reader the cases where its heuristic is wrong. A rule that catalogues nothing omits
+the field rather than publishing an empty list, so an absent field means "nothing
+catalogued yet", never "reviewed and found to have no false positives".
+
+The catalogue (`list-rules --format=json`) and the per-rule detail view publish the
+same guidance text. Both read it from the rule's own `RuleDefinition`, which is the
+single place this text is written.
+
 ## Remediation action metadata
 
 Selected findings carry a machine-readable `metadata.remediationAction`. The
@@ -24,7 +37,7 @@ behaviour:
 - `CONSIDER` marks optional or compatibility-sensitive advice that needs human
   judgement.
 - `CONFIGURE` is reserved for a deterministic configuration-only resolution;
-  no rule emits it unconditionally in 0.5.1.
+  no current rule emits it.
 
 When a deliberate configuration hatch exists, `metadata.configurationKey`
 contains its full path. Regex comments, missing constant documentation, and
@@ -35,7 +48,7 @@ emits `CONSIDER`. PHP named arguments make parameter-only renames
 compatibility-sensitive even for private methods, promoted private state,
 closures, and arrow functions.
 JSON, hook, and SARIF transport these fields. Text and Markdown keep their
-existing finding presentation in 0.5.1.
+existing finding presentation in 0.5.2.
 
 ## Summary By Pillar
 

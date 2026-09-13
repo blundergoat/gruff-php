@@ -103,7 +103,42 @@ final class ReportCliTest extends CliTestCase
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
 
         $report = $this->decodeJsonOutput($process);
-        self::assertSame('gruff.analysis.v2', $report['schemaVersion'] ?? null);
+        self::assertSame('gruff.analysis.v3', $report['schemaVersion'] ?? null);
+    }
+
+    /**
+     * Verify report forwards the CLI budget and preserves its diagnostic.
+     *
+     * @return void
+     */
+    public function testReportCommandForwardsDeepScanBudget(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            self::PROJECT_ROOT . '/bin/gruff-php',
+            'report',
+            '--format',
+            'json',
+            '--fail-on',
+            'none',
+            '--no-config',
+            '--no-cache',
+            '--deep-scan-budget',
+            '1:1',
+            'tests/Fixtures/Source/mixed/alpha.php',
+        ], self::PROJECT_ROOT);
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        $report      = $this->decodeJsonOutput($process);
+        $diagnostics = $report['diagnostics'] ?? null;
+        self::assertIsArray($diagnostics);
+        $diagnostic = $diagnostics[0] ?? null;
+        self::assertIsArray($diagnostic);
+        self::assertSame('bounded-deep-scan', $diagnostic['type'] ?? null);
+        $message = $diagnostic['message'] ?? null;
+        self::assertIsString($message);
+        self::assertStringContainsString('override=cli', $message);
     }
 
     /**
@@ -138,11 +173,11 @@ final class ReportCliTest extends CliTestCase
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput() . $process->getOutput());
 
         $report = $this->decodeJsonOutput($process);
-        self::assertSame('gruff.analysis.v2', $report['schemaVersion'] ?? null);
+        self::assertSame('gruff.analysis.v3', $report['schemaVersion'] ?? null);
         // --since forwarded: the child records an active diff block for the changed-region scan.
         $diff = $report['diff'] ?? null;
         self::assertIsArray($diff);
-        self::assertTrue($diff['active'] ?? null);
+        self::assertTrue($diff['enabled'] ?? null);
     }
 
     /**
@@ -265,7 +300,7 @@ final class ReportCliTest extends CliTestCase
     /**
      * Run git inside a fixture repository.
      *
-     * @param string $repo - Fixture repository root.
+     * @param string $repo         - Fixture repository root.
      * @param string ...$arguments - Git arguments.
      *
      * @return void

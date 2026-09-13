@@ -49,6 +49,12 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A docblock that exists only to carry precise @param/@return types a static analyser requires, with no prose anywhere.',
+                    'mitigation' => 'The types stay as they are; add a one-line summary, or describe a single tag, so the block also states intent.',
+                ],
+            ],
         );
     }
 

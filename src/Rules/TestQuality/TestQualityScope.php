@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Rules\TestQuality;
 
+use GruffPhp\Support\DeclarationLine;
 use PhpParser\Node;
 use PhpParser\Node\Stmt;
 
@@ -34,6 +35,22 @@ final readonly class TestQualityScope
         public bool $isPest,
         public ?string $className = null,
     ) {
+    }
+
+    /**
+     * Returns the line a finding on this scope should report.
+     *
+     * `$line` is where the scope's span starts, attribute groups included, because the span is what the length
+     * and range rules measure. A PHP 8 attribute is a sub-node of the method it decorates, so reporting that
+     * span start points the reader at `#[DataProvider(...)]` instead of at the test. The declaration itself is
+     * what a finding names.
+     *
+     * @return int - 1-based source line of the declaration, never the line of one of its attributes.
+     */
+    public function anchorLine(): int
+    {
+        // Only a method scope can carry attributes; a Pest closure's span already starts at its test() call.
+        return $this->node instanceof Stmt\ClassMethod ? DeclarationLine::of($this->node) : $this->line;
     }
 
     /**

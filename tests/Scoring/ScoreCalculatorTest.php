@@ -17,6 +17,7 @@ use GruffPhp\Results\Mutation\MutationAnalysisResult;
 use GruffPhp\Rules\RuleRegistry;
 use GruffPhp\Rules\Size\FileLengthRule;
 use GruffPhp\Results\Scoring\Grade;
+use GruffPhp\Results\Scoring\ScoreReport;
 use GruffPhp\Results\Scoring\ScoreCalculator;
 use PHPUnit\Framework\TestCase;
 
@@ -50,12 +51,12 @@ final class ScoreCalculatorTest extends TestCase
         $score = (new ScoreCalculator())->calculate([
                                                         $this->finding('docs.missing-public-phpdoc', Pillar::Documentation, Severity::Advisory),
                                                         $this->finding('security.dangerous-function-call', Pillar::Security, Severity::Error),
-                                                    ], null, DiffResult::inactive());
+                                                    ], 10, null, DiffResult::inactive());
 
-        self::assertLessThan(100.0, $score->composite->score);
+        self::assertLessThan(100.0, $this->composite($score)->score);
         self::assertSame('full-project', $score->scope);
         self::assertSame(
-            'Per-pillar scores start at 100 and subtract weighted finding penalties; correlated size and complexity findings on one symbol share a single penalty; the composite is the average of applicable pillar scores. '
+            'Each pillar scores on the density of its weighted findings per evaluated file, on a curve from 50 to 100, so a larger project is not penalised for its size; correlated size and complexity findings on one symbol share a single weight; the composite is the average of applicable pillar scores. '
             . 'Mutation is omitted when no Infection report is supplied.',
             $score->explanation,
         );
@@ -81,14 +82,14 @@ final class ScoreCalculatorTest extends TestCase
             $this->finding('complexity.cyclomatic', Pillar::Complexity, Severity::Warning, filePath: 'src/Other.php', line: 9, symbol: 'Other::run()'),
         ];
 
-        $score = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive());
+        $score = (new ScoreCalculator())->calculate($findings, 10, null, DiffResult::inactive());
 
         self::assertSame(['size.method-length', 'complexity.cognitive', 'complexity.cyclomatic'], array_map(
             static fn(Finding $finding): string => $finding->ruleId,
             $findings,
         ));
         self::assertArrayNotHasKey('design', $this->pillarMap($score->pillars));
-        self::assertLessThan(100.0, $score->composite->score);
+        self::assertLessThan(100.0, $this->composite($score)->score);
     }
 
     /**
@@ -107,15 +108,15 @@ final class ScoreCalculatorTest extends TestCase
                                                             $this->finding('size.method-length', Pillar::Size, Severity::Warning, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
                                                             $this->finding('complexity.cognitive', Pillar::Complexity, Severity::Warning, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
                                                             $this->finding('complexity.cyclomatic', Pillar::Complexity, Severity::Warning, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
-                                                        ], null, DiffResult::inactive());
+                                                        ], 10, null, DiffResult::inactive());
 
         $spread = (new ScoreCalculator())->calculate([
                                                          $this->finding('size.method-length', Pillar::Size, Severity::Warning, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
                                                          $this->finding('complexity.cognitive', Pillar::Complexity, Severity::Warning, filePath: 'src/Big.php', line: 40, symbol: 'Big::other()'),
                                                          $this->finding('complexity.cyclomatic', Pillar::Complexity, Severity::Warning, filePath: 'src/Big.php', line: 70, symbol: 'Big::third()'),
-                                                     ], null, DiffResult::inactive());
+                                                     ], 10, null, DiffResult::inactive());
 
-        self::assertGreaterThan($spread->composite->score, $clustered->composite->score);
+        self::assertGreaterThan($this->composite($spread)->score, $this->composite($clustered)->score);
 
         $pillars = $this->pillarMap($clustered->pillars);
         self::assertSame(2, $pillars['complexity']->findings);
@@ -138,10 +139,10 @@ final class ScoreCalculatorTest extends TestCase
                                                         $this->finding('complexity.cyclomatic', Pillar::Complexity, Severity::Error, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
                                                         $this->finding('complexity.cognitive', Pillar::Complexity, Severity::Warning, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
                                                         $this->finding('complexity.nesting-depth', Pillar::Complexity, Severity::Advisory, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
-                                                    ], null, DiffResult::inactive());
+                                                    ], 10, null, DiffResult::inactive());
 
         $complexity = $this->pillarMap($score->pillars)['complexity'];
-        self::assertEqualsWithDelta(48.0, $complexity->penalty, 0.0001);
+        self::assertEqualsWithDelta(12.0, $complexity->penalty, 0.0001);
         self::assertSame(3, $complexity->findings);
     }
 
@@ -159,11 +160,11 @@ final class ScoreCalculatorTest extends TestCase
         $score = (new ScoreCalculator())->calculate([
                                                         $this->finding('complexity.cyclomatic', Pillar::Complexity, Severity::Warning, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
                                                         $this->finding('naming.generic-method-name', Pillar::Naming, Severity::Warning, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
-                                                    ], null, DiffResult::inactive());
+                                                    ], 10, null, DiffResult::inactive());
 
         $pillars = $this->pillarMap($score->pillars);
-        self::assertEqualsWithDelta(16.0, $pillars['complexity']->penalty, 0.0001);
-        self::assertEqualsWithDelta(16.0, $pillars['naming']->penalty, 0.0001);
+        self::assertEqualsWithDelta(4.0, $pillars['complexity']->penalty, 0.0001);
+        self::assertEqualsWithDelta(4.0, $pillars['naming']->penalty, 0.0001);
     }
 
     /**
@@ -196,7 +197,7 @@ final class ScoreCalculatorTest extends TestCase
                                                                              ],
                                                              ));
 
-        $score   = (new ScoreCalculator())->calculate($findings, $mutationAnalysisResult, new DiffResult(
+        $score   = (new ScoreCalculator())->calculate($findings, 10, $mutationAnalysisResult, new DiffResult(
             active:       true,
             mode:         'unstaged',
             base:         null,
@@ -210,7 +211,7 @@ final class ScoreCalculatorTest extends TestCase
         self::assertSame(['1-5' => 1, '6-10' => 1, '11-15' => 0, '16-20' => 0, '21+' => 0], $score->complexityDistribution);
         self::assertSame('diff', $payload['scope']);
         self::assertSame(
-            'Per-pillar scores start at 100 and subtract weighted finding penalties; correlated size and complexity findings on one symbol share a single penalty; the composite is the average of applicable pillar scores. '
+            'Each pillar scores on the density of its weighted findings per evaluated file, on a curve from 50 to 100, so a larger project is not penalised for its size; correlated size and complexity findings on one symbol share a single weight; the composite is the average of applicable pillar scores. '
             . 'Mutation uses the supplied Infection MSI as the mutation pillar score.',
             $payload['explanation'],
         );
@@ -259,6 +260,7 @@ final class ScoreCalculatorTest extends TestCase
                               $this->finding('security.dangerous-function-call', Pillar::Security, Severity::Error),
                               $this->finding('security.unsafe-unserialize', Pillar::Security, Severity::Error),
                           ],
+                          10,
                           null,
                           DiffResult::inactive(),
             scorePillars: [Pillar::Security, Pillar::SensitiveData],
@@ -267,7 +269,7 @@ final class ScoreCalculatorTest extends TestCase
         $pillars = array_map(static fn($pillar): string => $pillar->pillar, $score->pillars);
 
         self::assertSame(['security', 'sensitive-data'], $pillars);
-        self::assertSame('F', $score->composite->letter);
+        self::assertSame('C', $this->composite($score)->letter);
     }
 
     /**
@@ -282,11 +284,11 @@ final class ScoreCalculatorTest extends TestCase
             $this->finding(FileLengthRule::ID, Pillar::Size, Severity::Error),
         ];
 
-        $scoredWithRule    = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive());
-        $scoredWithoutRule = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive(), analysisConfig: $this->configWithExcludedRule($registry, FileLengthRule::ID));
+        $scoredWithRule    = (new ScoreCalculator())->calculate($findings, 10, null, DiffResult::inactive());
+        $scoredWithoutRule = (new ScoreCalculator())->calculate($findings, 10, null, DiffResult::inactive(), analysisConfig: $this->configWithExcludedRule($registry, FileLengthRule::ID));
 
-        self::assertLessThan(100.0, $scoredWithRule->composite->score);
-        self::assertSame(100.0, $scoredWithoutRule->composite->score);
+        self::assertLessThan(100.0, $this->composite($scoredWithRule)->score);
+        self::assertSame(100.0, $this->composite($scoredWithoutRule)->score);
     }
 
     /**
@@ -300,9 +302,9 @@ final class ScoreCalculatorTest extends TestCase
             $this->finding(FileLengthRule::ID, Pillar::Size, Severity::Error),
         ];
 
-        $score = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive(), analysisConfig: null);
+        $score = (new ScoreCalculator())->calculate($findings, 10, null, DiffResult::inactive(), analysisConfig: null);
 
-        self::assertLessThan(100.0, $score->composite->score);
+        self::assertLessThan(100.0, $this->composite($score)->score);
     }
 
     /**
@@ -384,4 +386,22 @@ final class ScoreCalculatorTest extends TestCase
             metadata:   $metadata,
         );
     }
+
+    /**
+     * Reads the composite a fixture expects to exist, failing the test rather than dereferencing null.
+     *
+     * The ratified contract lets a composite be null when a run evaluated nothing; every fixture here
+     * supplies a positive denominator, so a null composite is a regression, not an expected shape.
+     *
+     * @param ScoreReport $score - Report whose composite the assertion is about to read.
+     *
+     * @return Grade - The composite grade, once its presence has been asserted.
+     */
+    private function composite(ScoreReport $score): Grade
+    {
+        self::assertNotNull($score->composite, 'the fixture evaluated files, so it must carry a composite');
+
+        return $score->composite;
+    }
+
 }

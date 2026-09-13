@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GruffPhp\Output\Reporter;
 
 use GruffPhp\Engine\Analysis\AnalysisReport;
+use GruffPhp\Engine\Analysis\RunDiagnostic;
 use GruffPhp\Results\Finding\Finding;
 
 /**
@@ -36,8 +37,38 @@ final readonly class GithubAnnotationsReporter
             $lines[] = $this->annotation($finding);
         }
 
+        foreach ($report->diagnostics as $diagnostic) {
+            $lines[] = $this->diagnosticAnnotation($diagnostic);
+        }
+
         // Append the trailing newline only when there is output, so a clean report emits nothing, not a blank line.
         return implode(PHP_EOL, $lines) . ($lines === [] ? '' : PHP_EOL);
+    }
+
+    /**
+     * Encodes a run diagnostic as a workflow annotation so non-finding scan notes remain visible.
+     *
+     * @param RunDiagnostic $diagnostic - Run-level note to encode; a fatal one raises the annotation level.
+     *
+     * @return string - One `::error` or `::notice` workflow command carrying the diagnostic's file, line, and message.
+     */
+    private function diagnosticAnnotation(RunDiagnostic $diagnostic): string
+    {
+        $properties = ['title=' . $this->escapeProperty($diagnostic->type)];
+        $filePath   = $diagnostic->filePath ?? $diagnostic->path;
+        if ($filePath !== null) {
+            $properties[] = 'file=' . $this->escapeProperty($filePath);
+        }
+        if ($diagnostic->line !== null) {
+            $properties[] = 'line=' . $diagnostic->line;
+        }
+
+        return sprintf(
+            '::%s %s::%s',
+            $diagnostic->isFatal ? 'error' : 'notice',
+            implode(',', $properties),
+            $this->escapeData($diagnostic->message),
+        );
     }
 
     /**

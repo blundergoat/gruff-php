@@ -161,15 +161,15 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
                 continue;
             }
 
-            $preview    = SecretScannerHelper::redactedPreview($candidateSecret);
+            $displayMarker = SecretScannerHelper::fixedSecretMarker();
             $findings[] = SecretScannerHelper::finding(
                 analysisUnit: $analysisUnit,
                 ruleId:       self::ID,
-                message:      sprintf('High-entropy string literal detected: %s.', $preview),
+                message:      sprintf('High-entropy string literal detected: %s.', $displayMarker),
                 line:         SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
                 confidence:   Confidence::Medium,
                 detector:     'high-entropy-string',
-                preview:      $preview,
+                displayMarker: $displayMarker,
                 remediation:  'Confirm this is not a credential; move real secrets out of source. '
                     . 'Word-shaped identifiers and slugs are exempt automatically.',
             );
@@ -341,13 +341,8 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     }
 
     /**
-     * Requires the word-segment decomposition that separates identifiers from encoded credentials.
-     *
-     * Split on `[/._-]`, every segment alphanumeric, no non-word segment long enough to be a random
-     * credential tail, and a character-weighted strict majority of alpha-word characters. A segment-count
-     * census would let two short dictionary words outvote one long random run (`config_prod_<32-char
-     * tail>`), so the census weighs characters, not segments, and a single long non-word segment refuses
-     * the exemption outright.
+     * Distinguishes readable identifiers from encoded credentials before a sensitive-data finding reaches the user.
+     * It weighs alpha-word characters across segments; one long random-looking segment keeps the value eligible for scanning.
      *
      * @param string $candidateSecret - Literal already matching an identifier/slug shape.
      *

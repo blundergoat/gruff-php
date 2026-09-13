@@ -1,0 +1,31 @@
+{
+    "schemaVersion": "gruff.baseline.v3",
+    "toolLanguage": "php",
+    "generatedAt": "2026-09-05T00:00:00+00:00",
+    "occurrences": [
+        {
+            "identity": "3b0c1f2e4d5a6978",
+            "count": 2,
+            "ruleId": "docs.missing-public-phpdoc",
+            "path": "src/Example.php",
+            "subject": "Example::calculateTotal()#1"
+        },
+        {
+            "identity": "c8d9e0f1a2b3c4d5",
+            "count": 1,
+            "ruleId": "security.dangerous-function-call",
+            "path": "src/Other.php",
+            "subject": "Dangerous PHP execution pattern detected: eval."
+        }
+    ],
+    "sensitive": {
+        "eligible": false,
+        "reason": "Sensitive findings are never baseline-eligible; a stored identity would be a durable suppression of a secret.",
+        "counts": {
+            "total": 1,
+            "byRule": {
+                "sensitive-data.aws-access-key": 1
+            }
+        }
+    }
+}

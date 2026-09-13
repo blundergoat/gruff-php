@@ -21,10 +21,11 @@ final readonly class AnalysisSourceLoader
     /**
      * Discovers and parses every requested file in one pass - the simple path for smaller scans.
      *
-     * @param string       $projectRoot          - Root used for source discovery and parsing.
-     * @param list<string> $paths                - Project-relative paths requested by the CLI.
-     * @param bool         $shouldIncludeIgnored - Whether files matching default ignore patterns are included.
-     * @param list<string> $ignoredPathPatterns  - Configured path patterns to skip unless ignored files are included.
+     * @param string                                                                    $projectRoot          - Root used for source discovery and parsing.
+     * @param list<string>                                                              $paths                - Project-relative paths requested by the CLI.
+     * @param bool                                                                      $shouldIncludeIgnored - Whether files matching default ignore patterns are included.
+     * @param list<string>                                                              $ignoredPathPatterns  - Configured path patterns to skip unless ignored files are included.
+     * @param array{enabled: bool, maxLines: int, maxBytes: int, override: string}|null $deepScanBudget       - Effective structural-analysis budget.
      *
      * @return AnalysisSourceSet - discovered files, their parsed units, and missing-path plus parse-error diagnostics
      */
@@ -33,6 +34,7 @@ final readonly class AnalysisSourceLoader
         array  $paths,
         bool   $shouldIncludeIgnored,
         array  $ignoredPathPatterns,
+        ?array $deepScanBudget = null,
     ): AnalysisSourceSet {
         $discoveryResult = (new SourceDiscovery($projectRoot))->discover($paths, $shouldIncludeIgnored, $ignoredPathPatterns);
         $phpFileParser   = new PhpFileParser();
@@ -41,16 +43,17 @@ final readonly class AnalysisSourceLoader
 
         // Parse each discovered file into an analysis unit the rules can inspect.
         foreach ($discoveryResult->files as $file) {
-            $unit            = $phpFileParser->parse($file);
+            $unit            = $phpFileParser->parse($file, $deepScanBudget);
             $analysisUnits[] = $unit;
 
             // Surface any parse errors as diagnostics, so the user learns a file was skipped rather than clean.
             foreach ($unit->diagnostics as $diagnostic) {
                 $diagnostics[] = new RunDiagnostic(
-                    type:     'parse-error',
+                    type:     $diagnostic->type,
                     message:  $diagnostic->message,
                     filePath: $file->displayPath,
                     line:     $diagnostic->line,
+                    isFatal:  $diagnostic->isFatal,
                 );
             }
         }
@@ -81,7 +84,7 @@ final readonly class AnalysisSourceLoader
         $discoveryResult = (new SourceDiscovery($projectRoot))->discover($paths, $shouldIncludeIgnored, $ignoredPathPatterns);
 
         return [
-            'discovery'   => $discoveryResult,
+            'discovery' => $discoveryResult,
             'diagnostics' => $this->missingPathDiagnostics($discoveryResult),
         ];
     }

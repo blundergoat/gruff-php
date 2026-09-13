@@ -42,8 +42,10 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers the security rule pack: dangerous execution and deserialisation, dynamic-call discrimination, sensitive-logger handling, request-data
- * heuristics, workflow risks, and config-driven disables.
+ * Covers the security findings users see for dangerous execution, deserialisation, logger data, request input, workflows, and disabled rules.
+ *
+ * Focused cases keep safe application code quiet while exact finding lines show which risky call a user needs to review.
+ * Registry-wide cases ensure those precision fixes still work as part of a normal Gruff PHP scan.
  */
 final class SecurityRulesTest extends TestCase
 {
@@ -183,6 +185,18 @@ final class SecurityRulesTest extends TestCase
     }
 
     /**
+     * Verify LLM usage counters stay loggable while credential-shaped and singular token values still produce warnings.
+     *
+     * @return void
+     */
+    public function testTokenUsageMetricsAreNotTreatedAsCredentials(): void
+    {
+        $findings = $this->findingsForRule($this->tokenContextLoggerUnit(), SensitiveDataLoggingRule::ID);
+
+        self::assertSame([15, 16, 17], self::findingLines($findings));
+    }
+
+    /**
      * Verify request data security heuristics detected.
      *
      * @return void
@@ -211,8 +225,12 @@ final class SecurityRulesTest extends TestCase
         return [
             'variable include attack shapes' => ['variable-include-precision.php', VariableIncludeRule::ID, [9, 10, 13, 17, 19, 20, 32]],
             'sql concatenation attack shapes' => ['sql-concatenation-precision.php', SqlConcatenationRule::ID, [7, 8, 9, 10, 25]],
-            'procedural sql sinks follow one unambiguous local assignment' => ['procedural-sink-precision.php', SqlConcatenationRule::ID, [8, 21, 22, 23, 24, 59, 60]],
-            'procedural command sinks flag dynamic command strings' => ['procedural-sink-precision.php', ProcessCommandConstructionRule::ID, [13, 61, 75, 76]],
+            'procedural sql sinks follow one unambiguous local assignment' => [
+                'procedural-sink-precision.php', SqlConcatenationRule::ID, [8, 21, 22, 23, 24, 59, 60],
+            ],
+            'procedural command sinks flag dynamic command strings' => [
+                'procedural-sink-precision.php', ProcessCommandConstructionRule::ID, [13, 61, 75, 76],
+            ],
             // 54/64/82: a conditional rebind never hides a real parser, including sibling-branch sinks,
             // and a conditional construction counts as possibly-XML; the rebind on the sink's own path stays silent.
             'xml loaders need xml receivers' => ['xml-receiver-gating.php', UnsafeXmlLoadingRule::ID, [22, 27, 33, 38, 54, 64, 82]],
@@ -763,6 +781,40 @@ final class RuntimeLoggerValueFixture
 }
 PHP,
             'tests/Fixtures/Security/inline-runtime-logger-value.php',
+        );
+    }
+
+    /**
+     * Parse logs containing safe LLM counters and real credential tokens, matching what an API client may record after a request.
+     *
+     * @return AnalysisUnit - log calls whose usage and first-token timing metrics stay quiet while credential contexts flag on lines 15 to 17
+     */
+    private function tokenContextLoggerUnit(): AnalysisUnit
+    {
+        // An API client may log provider usage after a response, but logging credential or ambiguous singular token values must still warn the user.
+        return $this->parseSource(
+            <<<'PHP'
+<?php
+
+final class TokenContextLoggerFixture
+{
+    public function record(object $logger, array $usage): void
+    {
+        $inputTokens       = $usage['input'];
+        $outputTokens      = $usage['output'];
+        $totalTokens       = $usage['total'];
+        $cachedInputTokens = $usage['cached'];
+
+        $logger->info('usage', [$inputTokens, $outputTokens, $totalTokens, $cachedInputTokens]);
+        $logger->info('usage', ['gen_ai.usage.input_tokens' => $usage['input']]);
+        $logger->info('timing', ['ttft_ms' => $usage['timeToFirstTextTokenMs']]);
+        $logger->warning('credential', ['access_token' => $usage['access']]);
+        $logger->warning('credential', ['refresh_token' => $usage['refresh']]);
+        $logger->warning('credential', ['input_token' => $usage['inputToken']]);
+    }
+}
+PHP,
+            'tests/Fixtures/Security/inline-token-context-logger.php',
         );
     }
 

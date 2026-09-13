@@ -35,6 +35,7 @@ final class ReportCommand extends Command
      */
     private const STRING_OPTIONS = [
         'config',
+        'deep-scan-budget',
         'profile',
         'infection-report',
         'infection-bin',
@@ -97,6 +98,7 @@ final class ReportCommand extends Command
             ->addOption('output', null, InputOption::VALUE_REQUIRED, 'Write the report to this file.')
             ->addOption('config', null, InputOption::VALUE_REQUIRED, 'Path to a gruff YAML config file (.yaml or .yml).')
             ->addOption('no-config', null, InputOption::VALUE_NONE, 'Skip auto-applying the default .gruff-php.yaml file for this run.')
+            ->addOption('deep-scan-budget', null, InputOption::VALUE_REQUIRED, 'Bound structural analysis as <lines>:<bytes>, or disable it with off.')
             ->addOption('profile', null, InputOption::VALUE_REQUIRED, 'Rule execution profile: default or security.')
             ->addOption('fail-on', null, InputOption::VALUE_REQUIRED, 'Finding severity that fails the scan: advisory, warning, error, or none.', default: 'none')
             ->addOption('fail-on-new', null, InputOption::VALUE_NONE, 'Fail only on findings introduced by the change (requires --baseline or --diff-vs). The report artifact is still written when analysis completes.')
@@ -141,7 +143,7 @@ final class ReportCommand extends Command
      * work, then stream its rendered report to the terminal or save it with `--output`. Its error early
      * returns stop with a clear message rather than a broken report; the config-offer passthrough instead forwards init's own exit code.
      *
-     * @param InputInterface  $input - Console input carrying report paths, format, and forwarded analyse options.
+     * @param InputInterface  $input  - Console input carrying report paths, format, and forwarded analyse options.
      * @param OutputInterface $output - Destination for the rendered report, status lines, and forwarded child stderr.
      *
      * @return int - Symfony exit code; it mirrors the analyse subprocess, so a fail-on threshold hit still fails the report.
@@ -280,7 +282,7 @@ final class ReportCommand extends Command
      * with a dash is still treated as a path and never mistaken for an option.
      *
      * @param list<string>   $command - Analyse command arguments built so far.
-     * @param InputInterface $input - Supplies the variadic paths argument appended after the `--` separator.
+     * @param InputInterface $input   - Supplies the variadic paths argument appended after the `--` separator.
      *
      * @return void - Nothing is returned; user paths are appended to `$command` in place.
      */
@@ -303,7 +305,7 @@ final class ReportCommand extends Command
      * scan, quietly dropping the ones they left unset so no empty flags reach analyse.
      *
      * @param list<string>   $command - Analyse command arguments built so far.
-     * @param InputInterface $input - Source of the STRING_OPTIONS values; empty or unset options are skipped.
+     * @param InputInterface $input   - Source of the STRING_OPTIONS values; empty or unset options are skipped.
      *
      * @return void - Nothing is returned; matching flag pairs are appended to `$command` in place.
      */
@@ -328,7 +330,7 @@ final class ReportCommand extends Command
      * references become clickable, but drops the default `none` since it needs no flag.
      *
      * @param list<string>   $command - Analyse command arguments built so far.
-     * @param InputInterface $input - Source of report-editor-link; the default "none" is treated as unset and dropped.
+     * @param InputInterface $input   - Source of report-editor-link; the default "none" is treated as unset and dropped.
      *
      * @return void - Nothing is returned; the editor-link flag is appended to `$command` when it applies.
      */
@@ -348,7 +350,7 @@ final class ReportCommand extends Command
      * they did not.
      *
      * @param list<string>   $command - Analyse command arguments built so far.
-     * @param InputInterface $input - Source of --baseline; the flag is forwarded only when the user passed it.
+     * @param InputInterface $input   - Source of --baseline; the flag is forwarded only when the user passed it.
      *
      * @return void - Nothing is returned; the baseline flag (and any path) is appended to `$command` in place.
      */
@@ -371,7 +373,7 @@ final class ReportCommand extends Command
      * leaving any they didn't set off in the child run.
      *
      * @param list<string>   $command - Analyse command arguments built so far.
-     * @param InputInterface $input - Source of the BOOLEAN_OPTIONS flags; only flags resolving to true are forwarded.
+     * @param InputInterface $input   - Source of the BOOLEAN_OPTIONS flags; only flags resolving to true are forwarded.
      *
      * @return void - Nothing is returned; each enabled flag is appended to `$command` in place.
      */
@@ -391,7 +393,7 @@ final class ReportCommand extends Command
      * `--exclude-pillar`), emitting one flag pair per value so every repeat reaches the child scan.
      *
      * @param list<string>   $command - Analyse command arguments built so far.
-     * @param InputInterface $input - Source of the REPEATED_OPTIONS arrays; each non-empty value yields one flag pair.
+     * @param InputInterface $input   - Source of the REPEATED_OPTIONS arrays; each non-empty value yields one flag pair.
      *
      * @return void - Nothing is returned; one flag pair per value is appended to `$command` in place.
      */
@@ -422,7 +424,7 @@ final class ReportCommand extends Command
      * client-side finding filters, passing their exact true/false value or the bare flag.
      *
      * @param list<string>   $command - Analyse command arguments built so far.
-     * @param InputInterface $input - Source of --report-interactive; a string value is passed as `=value`, else bare.
+     * @param InputInterface $input   - Source of --report-interactive; a string value is passed as `=value`, else bare.
      *
      * @return void - Nothing is returned; the interactive flag is appended to `$command` when the user opted in.
      */
@@ -447,7 +449,7 @@ final class ReportCommand extends Command
      * (working-tree, staged, unstaged, or a base ref) or the bare flag for the default.
      *
      * @param list<string>   $command - Analyse command arguments built so far.
-     * @param InputInterface $input - Source of --diff; forwarded only when present, with its mode value when non-empty.
+     * @param InputInterface $input   - Source of --diff; forwarded only when present, with its mode value when non-empty.
      *
      * @return void - Nothing is returned; the diff flag (and any mode) is appended to `$command` in place.
      */
@@ -532,7 +534,7 @@ final class ReportCommand extends Command
      * non-string option the same way instead of guarding each one.
      *
      * @param InputInterface $input - Console input to read the option from.
-     * @param string         $name - Option name to read, without the leading dashes.
+     * @param string         $name  - Option name to read, without the leading dashes.
      *
      * @return string|null - The option's non-empty string value; null when the user omitted the flag or left it blank.
      */
@@ -600,7 +602,7 @@ final class ReportCommand extends Command
      * how analyse parses the same flags so validation here agrees with what the child run would accept.
      *
      * @param InputInterface $input - Console input for the report command.
-     * @param string         $name - Repeatable option name to read.
+     * @param string         $name  - Repeatable option name to read.
      *
      * @return list<string> - Unique, non-empty rule ids in the order given; empty when the flag was unused or held only blanks.
      */

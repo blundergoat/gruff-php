@@ -127,7 +127,7 @@ final class InvalidUtf8ReporterTest extends TestCase
             diagnostics:     [],
             findings:        $findings,
             exitCode:        0,
-            score:           (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive()),
+            score:           (new ScoreCalculator())->calculate($findings, 10, null, DiffResult::inactive()),
             diff:            DiffResult::inactive(),
         );
     }

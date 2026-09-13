@@ -5,27 +5,29 @@ declare(strict_types=1);
 namespace GruffPhp\Results\Baseline;
 
 /**
- * Immutable bundle of the three baseline decisions for a single `gruff-php analyse` run: whether
- * to apply an existing baseline, whether that baseline was named by the user or picked up as the
- * project default, and whether to write a fresh baseline instead. The command layer fills this in
- * from the user's `--baseline`, `--generate-baseline`, and `--no-baseline` flags, then hands it to
- * `BaselineApplication`. That reader decides whether the run suppresses already-accepted findings,
- * records the current findings as accepted debt, or shows every finding untouched.
+ * The baseline decisions for one `gruff-php analyse` run, frozen while the command line is parsed.
+ *
+ * The command layer fills this in from `--baseline`, `--generate-baseline`, `--migrate-baseline`, and `--no-baseline`, then hands it to
+ * `BaselineApplication`, which decides whether the run hides reviewed findings, records the current findings, or shows everything.
  */
 final readonly class BaselineApplicationOptions
 {
     /**
-     * Freezes the baseline choices for one analyse run, built while parsing the user's command-line
-     * flags and read later when the run decides how to treat findings it has seen before.
+     * Freezes the baseline choices for one analyse run.
      *
-     * @param string|null $baselinePath - Path of the baseline file whose recorded findings this run suppresses; null when no baseline applies (a plain run or `--no-baseline`), so every finding is shown.
-     * @param bool        $isBaselineExplicit - True when the user typed `--baseline` themselves, false when the path is the auto-adopted project default; only decides whether the baseline report is labelled explicit or default.
-     * @param string|null $generateBaselinePath - Path to write a fresh baseline to, recording the current findings as accepted debt; null on a normal run that writes nothing, and any path here takes precedence over applying a baseline.
+     * @param string|null $baselinePath - Baseline whose reviewed findings this run hides; null when none applies, so every finding is shown.
+     * @param bool        $isBaselineExplicit - True when the user typed `--baseline`; false when the path is the discovered project default.
+     * @param string|null $generateBaselinePath - Path to write a fresh baseline to; null on a normal run. Any path here wins over applying one.
+     * @param string|null $migrateBaselinePath - 0.5 baseline whose reviewed findings are carried into $generateBaselinePath; null when generating from the scan alone.
+     * @param bool        $shouldForceBaselineOverwrite - True when the user passed --force and means to overwrite a 0.5
+     *                                                    baseline at the default path; false keeps their retreat copy.
      */
     public function __construct(
         public ?string $baselinePath,
         public bool $isBaselineExplicit,
         public ?string $generateBaselinePath,
+        public ?string $migrateBaselinePath = null,
+        public bool $shouldForceBaselineOverwrite = false,
     ) {
     }
 }

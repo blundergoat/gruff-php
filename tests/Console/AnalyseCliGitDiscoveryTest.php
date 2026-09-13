@@ -12,6 +12,9 @@ use Symfony\Component\Process\Process;
  */
 final class AnalyseCliGitDiscoveryTest extends CliTestCase
 {
+    /** Number of tracked files arranged in the Git discovery fixture. */
+    private const TRACKED_FIXTURE_FILES = 5;
+
     /**
      * Verify analyse command uses Git-visible files for default discovery.
      *
@@ -58,7 +61,7 @@ final class AnalyseCliGitDiscoveryTest extends CliTestCase
             $report  = $this->decodeJsonOutput($process);
             $summary = $report['summary'] ?? null;
             self::assertIsArray($summary);
-            self::assertSame(5, $summary['filesDiscovered'] ?? null);
+            self::assertSame(self::TRACKED_FIXTURE_FILES, $summary['discoveredFiles'] ?? null);
             $findings = $report['findings'] ?? null;
             self::assertIsArray($findings);
             foreach ($findings as $index => $finding) {
@@ -93,7 +96,7 @@ final class AnalyseCliGitDiscoveryTest extends CliTestCase
      * Run a git command in a temporary project.
      *
      * @param string       $project - Project root.
-     * @param list<string> $args - Git arguments.
+     * @param list<string> $args    - Git arguments.
      *
      * @return void
      */
@@ -108,8 +111,8 @@ final class AnalyseCliGitDiscoveryTest extends CliTestCase
     /**
      * Write a temporary project file, creating parent directories as needed.
      *
-     * @param string $project - Project root.
-     * @param string $path - Project-relative path.
+     * @param string $project  - Project root.
+     * @param string $path     - Project-relative path.
      * @param string $contents - File contents.
      *
      * @return void

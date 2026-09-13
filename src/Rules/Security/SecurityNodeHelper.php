@@ -856,14 +856,74 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Reports whether text contains a secret-like word (identifier or string key).
+     * Reports whether an identifier or string key names a credential rather than a known non-secret token usage counter.
      *
-     * @param string $contextText - Identifier or string-key text to scan; the value itself, never a read secret.
+     * @param string $contextText - Identifier or string-key text to scan; an empty string carries no sensitive context.
      *
-     * @return bool - true when the text matches the secret-name pattern (api key, token, password, secret, etc.)
+     * @return bool - true when the text names likely secret data; false for empty text and recognised usage metrics such as `input_tokens`
      */
     private static function hasSensitiveContext(string $contextText): bool
     {
-        return preg_match('/(?:api[_-]?key|auth(?:orization)?|cookie|pass(?:word|wd)?|private[_-]?key|secret|token)/i', $contextText) === 1;
+        // Credential words remain sensitive even when a longer identifier also resembles a usage metric, such as input_tokens_secret.
+        if (preg_match('/(?:api[_-]?key|auth(?:orization)?|cookie|pass(?:word|wd)?|private[_-]?key|secret)/i', $contextText) === 1) {
+            return true;
+        }
+
+        // Text without "token" cannot be one of the token credentials or usage counters this final check distinguishes.
+        if (stripos($contextText, 'token') === false) {
+            return false;
+        }
+
+        // Known provider usage counters are operational metrics; every other token-shaped context remains sensitive by default.
+        return !self::isKnownNonSecretTokenMetric($contextText);
+    }
+
+    /**
+     * Reports whether token-shaped text is recognised LLM usage or first-token timing telemetry that users can safely include in logs.
+     *
+     * @param string $contextText - Token-shaped identifier or key; empty or unrecognised text is not accepted as safe telemetry.
+     *
+     * @return bool - true only for known usage counters or first-token timing names composed entirely from telemetry words
+     */
+    private static function isKnownNonSecretTokenMetric(string $contextText): bool
+    {
+        // Split camelCase and acronym boundaries so user-facing metric names can be compared as plain words.
+        $wordSeparatedContext = preg_replace(
+            '/(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])/',
+            '_',
+            $contextText,
+        );
+
+        // An unreadable identifier cannot be verified as safe, so the logging rule keeps warning about it.
+        if ($wordSeparatedContext === null) {
+            return false;
+        }
+
+        // Split snake_case, dotted telemetry keys, and other separators into the words users see in their code.
+        $contextWords = preg_split('/[^a-z0-9]+/', strtolower($wordSeparatedContext), -1, PREG_SPLIT_NO_EMPTY);
+
+        // Empty or unsplittable text provides no evidence that the token value is only an operational counter.
+        if ($contextWords === false || $contextWords === []) {
+            return false;
+        }
+
+        $knownMetricWords = [
+            'ai', 'cache', 'cached', 'count', 'counter', 'counters', 'counts', 'creation', 'first', 'gen', 'input', 'llm', 'ms', 'output', 'read',
+            'text', 'time', 'to', 'token', 'tokens', 'total', 'usage', 'used', 'write',
+        ];
+
+        // Extra words such as access, refresh, session, or api keep the context classified as a credential.
+        if (array_diff($contextWords, $knownMetricWords) !== []) {
+            return false;
+        }
+
+        $hasTokenWord   = array_intersect($contextWords, ['token', 'tokens']) !== [];
+        $hasUsageScope  = array_intersect($contextWords, ['cache', 'cached', 'input', 'output', 'total']) !== [];
+        $hasCounterForm = in_array('tokens', $contextWords, true)
+            || array_intersect($contextWords, ['count', 'counter', 'counters', 'counts']) !== [];
+        $hasUsageCounter   = $hasUsageScope && $hasCounterForm;
+        $hasFirstTokenTime = in_array('first', $contextWords, true) && in_array('time', $contextWords, true);
+
+        return $hasTokenWord && ($hasUsageCounter || $hasFirstTokenTime);
     }
 }

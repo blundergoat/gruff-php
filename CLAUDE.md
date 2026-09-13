@@ -22,7 +22,8 @@ The Never tier and accepted architecture/ADR safety constraints are non-overrida
 ## Hard Rules
 
 - If a file exists, modify it in place; do not create backup or `_new` variants.
-- Keep app claims grounded in existing files. Current app/quality surface: `composer.json`, `composer.lock`, `bin/gruff-php`, `src/`, `tests/`, `phpunit.xml.dist`, `phpstan.neon.dist`, `.gruff-php.yaml`, `scripts/`, `package.json`, `package-lock.json`, and `.github/workflows/`.
+- Keep app claims grounded in existing files. Contracted output shapes: `gruff.analysis.v3`, `gruff.summary.v3`, `gruff.baseline.v3` and `gruff.hook.v2` are owned by `FAMILY-CONTRACT.md`; changing what this port emits under any of them is a family break, not a php decision.
+Current app/quality surface: `composer.json`, `composer.lock`, `bin/gruff-php`, `src/`, `tests/`, `phpunit.xml.dist`, `phpstan.neon.dist`, `.gruff-php.yaml`, `scripts/`, `package.json`, `package-lock.json`, and `.github/workflows/`.
 - Route durable project knowledge to `.goat-flow/`; keep this hot-path file behavioral and concise.
 - Preserve cross-agent consistency between `CLAUDE.md` and `AGENTS.md` for shared goat-flow rules.
 - Keep the controlling goat-flow workspace distinct from this selected target project when tools or prompts originate outside this checkout.

@@ -79,7 +79,7 @@ final class AnalyseCliDiffTest extends CliTestCase
 
             self::assertIsArray($findings);
             /** @var list<array{symbol?: string|null}> $findings decoded finding rows used for symbol extraction */
-            self::assertGreaterThanOrEqual(1, $report['suppressedCount'] ?? null);
+            self::assertGreaterThanOrEqual(1, $this->suppressedCount($report));
             self::assertContains('Example::changed()', $this->symbolsFromJsonFindings($findings));
             self::assertNotContains('Example::unchanged()', $this->symbolsFromJsonFindings($findings));
         } finally {
@@ -130,7 +130,7 @@ PATCH
 
             self::assertIsArray($diff);
             self::assertSame('stdin', $diff['mode'] ?? null);
-            self::assertGreaterThanOrEqual(1, $report['suppressedCount'] ?? null);
+            self::assertGreaterThanOrEqual(1, $this->suppressedCount($report));
         } finally {
             $this->removeDir($tempDir);
         }
@@ -415,15 +415,18 @@ PATCH
     }
 
     /**
-     * Return the top-level changed-region suppression count from a decoded report.
+     * Return the canonical summary changed-region suppression count from a decoded report.
      *
      * @param array<string, mixed> $report - Decoded JSON report.
      *
-     * @return int - Top-level suppressedCount value.
+     * @return int - summary.suppressedFindings value.
      */
     private function suppressedCount(array $report): int
     {
-        $suppressedCount = $report['suppressedCount'] ?? null;
+        $summary = $report['summary'] ?? null;
+        self::assertIsArray($summary);
+
+        $suppressedCount = $summary['suppressedFindings'] ?? null;
         self::assertIsInt($suppressedCount);
 
         return $suppressedCount;
@@ -434,14 +437,14 @@ PATCH
      *
      * @param array<string, mixed> $report - Decoded JSON report.
      *
-     * @return int - diff.suppressedCount value.
+     * @return int - diff.filteredFindings value.
      */
     private function diffSuppressedCount(array $report): int
     {
         $diff = $report['diff'] ?? null;
         self::assertIsArray($diff);
 
-        $suppressedCount = $diff['suppressedCount'] ?? null;
+        $suppressedCount = $diff['filteredFindings'] ?? null;
         self::assertIsInt($suppressedCount);
 
         return $suppressedCount;
@@ -451,7 +454,7 @@ PATCH
      * Run gruff in a fixture project and decode its JSON report.
      *
      * @param string       $workingDirectory - Project root to run the command in.
-     * @param list<string> $arguments - CLI arguments after the PHP binary and bin path.
+     * @param list<string> $arguments        - CLI arguments after the PHP binary and bin path.
      *
      * @return array<string, mixed> - Decoded JSON report.
      * @throws JsonException
@@ -544,25 +547,25 @@ selection:
 rules:
     size.file-length:
         threshold: 5
-        severity: warning
+        severity:  warning
     size.method-length:
         threshold: 3
-        severity: warning
+        severity:  warning
     size.class-length:
         threshold: 5
-        severity: warning
+        severity:  warning
     size.parameter-count:
         threshold: 2
-        severity: warning
+        severity:  warning
     size.public-method-count:
         threshold: 3
-        severity: warning
+        severity:  warning
     size.property-count:
         threshold: 3
-        severity: warning
+        severity:  warning
     size.average-method-length:
         threshold: 2
-        severity: warning
+        severity:  warning
 YAML);
     }
 
@@ -587,7 +590,7 @@ selection:
 rules:
     size.file-length:
         threshold: 5
-        severity: warning
+        severity:  warning
 YAML);
     }
 

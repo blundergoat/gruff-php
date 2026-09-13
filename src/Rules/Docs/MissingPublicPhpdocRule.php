@@ -15,6 +15,7 @@ use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
+use GruffPhp\Support\DeclarationLine;
 use PhpParser\Node\Stmt\ClassMethod;
 
 /**
@@ -93,7 +94,7 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
             ruleId:      $definition->id,
             message:     sprintf('Method %s needs a brief intent description above its declaration (one plain-English line; not a restatement of the method signature).', $symbol),
             filePath:    $analysisUnit->file->displayPath,
-            line:        $classMethod->getStartLine(),
+            line:        DeclarationLine::of($classMethod),
             severity:    $definition->defaultSeverity,
             pillar:      $definition->pillar,
             tier:        $definition->tier,
