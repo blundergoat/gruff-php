@@ -95,7 +95,8 @@ final readonly class BaselineFilter
         }
 
         foreach ($findings as $finding) {
-            if (!BaselineIdentity::isEligible($finding)) {
+            // A sensitive finding, or one whose symbol carries the ordinal separator, has no identity to match.
+            if (!BaselineIdentity::hasIdentity($finding)) {
                 $statuses[spl_object_id($finding)] = 'notEligible';
             }
         }
@@ -141,7 +142,7 @@ final readonly class BaselineFilter
         $groups   = [];
 
         foreach ($findings as $finding) {
-            if (!BaselineIdentity::isEligible($finding)) {
+            if (!BaselineIdentity::hasIdentity($finding)) {
                 continue;
             }
 

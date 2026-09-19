@@ -241,8 +241,8 @@ precomputed line-free `identity` digest with the `count` they accept, so
 accepted debt keeps matching after unrelated line shifts. Legacy files fail
 closed (exit code `2`): migrate a `gruff.baseline.v2` file with
 `--migrate-baseline <old> --generate-baseline <new>`, and regenerate a
-`gruff.baseline.v1` file with `--generate-baseline`, because
-`--migrate-baseline` reads only v2. A symbol-bearing
+`gruff.baseline.v1` file with `--generate-baseline`, adding `--force` at the
+default `gruff-baseline.json`, because `--migrate-baseline` reads only v2. A symbol-bearing
 finding's subject is its symbol rather than its message, so rewording a rule
 message no longer requires a regenerate.
 

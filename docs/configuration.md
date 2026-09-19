@@ -157,8 +157,9 @@ live instances than the baseline accepted, so unrelated line shifts never
 re-trigger the gate. Legacy files fail closed: carry a `gruff.baseline.v2`
 file's reviews forward once with
 `analyse --migrate-baseline <old> --generate-baseline <new>`, and regenerate a
-`gruff.baseline.v1` file with `analyse --generate-baseline`, which
-`--migrate-baseline` refuses because it reads only v2.
+`gruff.baseline.v1` file with `analyse --generate-baseline`, adding `--force` at
+the default `gruff-baseline.json`, which `--migrate-baseline` refuses because it
+reads only v2.
 
 ## Paths
 

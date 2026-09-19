@@ -24,6 +24,8 @@ paths:
         - 'src/Vendor/**'
         - 'tests/Fixtures/**'
 allowlists:
+    # Reason (2026-09-19, measured at the rule defaults with `analyse src tests --no-config`, fixtures excluded): the abbreviations this
+    # codebase uses on purpose. Without them naming.abbreviation-allowlist reports 43 identifiers (32 in src, 11 in tests).
     acceptedAbbreviations:
         - age
         - app
@@ -168,6 +170,8 @@ rules:
     docs.missing-throws-tag:
         enabled: true
     # Requires an explanatory comment immediately above configured PCRE calls or their nearest statement owner. String-labelled match arms and narrow, call-specific callable contracts can provide equivalent context.
+    # Reason (2026-09-19, measured at the rule defaults with `analyse src tests --no-config`, fixtures excluded): narrowed from the five
+    # default PCRE functions to preg_match. The other four report 42 calls (35 in src/Rules). Accepted debt, not a design choice.
     docs.regex-comment:
         enabled: true
         options:
@@ -211,6 +215,8 @@ rules:
     modernisation.phpdoc-mixed-overuse:
         enabled: true
     # Flags public mutable state unless its fully qualified class is an explicit lifecycle or integration contract.
+    # Reason (2026-09-19, measured at the rule defaults with `analyse src tests --no-config`, fixtures excluded): AnalysisUnit's public state is
+    # the parse result every rule reads and release() clears, the lifecycle contract this rule exempts. It silences 3 findings in src/Engine.
     modernisation.public-property:
         enabled: true
         options:
@@ -228,6 +234,8 @@ rules:
             minLength: 2
             maxLength: 3
     # Boolean method prefix
+    # Reason (2026-09-19, measured at the rule defaults with `analyse src tests --no-config`, fixtures excluded): the listed state adjectives
+    # name configuration keys and ignore states this codebase exposes. Without them 4 findings report (3 in src/Engine, 1 in src/Rules).
     naming.boolean-prefix:
         enabled: true
         options:
@@ -363,6 +371,8 @@ rules:
             minScopeReferences: 1
             loopBodyThreshold: 4
     # Flags typed bool properties and parameters named as negative flags unless they explicitly mirror a CLI flag.
+    # Reason (2026-09-19, measured at the rule defaults with `analyse src tests --no-config`, fixtures excluded): every listed name mirrors the
+    # --no-config, --no-baseline or --no-cache CLI flag, which this rule exempts by design. It silences 6 findings in src/Cli.
     naming.negative-boolean:
         enabled: true
         options:
@@ -536,6 +546,8 @@ rules:
             promotedConstructorMaxParameters: 25
             constructorMaxParameters: 0
     # Property count
+    # Reason (2026-09-19, measured at the rule defaults with `analyse src tests --no-config`, fixtures excluded): raised from 15 to 25. At 15
+    # two classes report, one in src/Cli and one in src/Engine. Accepted debt.
     size.property-count:
         enabled: true
         threshold: 25
@@ -546,6 +558,8 @@ rules:
         threshold: 25
         severity: error
     # Conditional test logic
+    # Reason (2026-09-19, measured at the rule defaults with `analyse src tests --no-config`, fixtures excluded): exempts four test files. At the
+    # defaults 14 findings report there (10 in tests/Rule, 3 in tests/Review, 1 in tests/Console). Accepted debt.
     test-quality.conditional-logic:
         enabled: true
         options:
@@ -558,6 +572,8 @@ rules:
     test-quality.data-provider-annotation:
         enabled: true
     # Eager test
+    # Reason (2026-09-19, measured at the rule defaults with `analyse src tests --no-config`, fixtures excluded): raised from 3 to 25 assertions.
+    # At 3, 17 tests report across tests/Console, tests/Review, tests/Rule, tests/Baseline and tests/Command. Accepted debt.
     test-quality.eager-test:
         enabled: true
         thresholds:
@@ -622,6 +638,8 @@ rules:
         options:
             domainNamespaces: []
     # Multiple arrange-act-assert cycles
+    # Reason (2026-09-19, measured at the rule defaults with `analyse src tests --no-config`, fixtures excluded): exempts four test files. At the
+    # defaults 15 findings report (10 in tests/Rule). Accepted debt.
     test-quality.multiple-aaa-cycles:
         enabled: true
         thresholds:
@@ -662,6 +680,8 @@ rules:
     test-quality.private-reflection:
         enabled: true
     # Repeated test structure missing data provider
+    # Reason (2026-09-19, measured at the rule defaults with `analyse src tests --no-config`, fixtures excluded): exempts six
+    # test files. At the defaults 9 findings report (8 in tests/Rule). Accepted debt.
     test-quality.repeated-structure-missing-data-provider:
         enabled: true
         options:
@@ -693,11 +713,15 @@ rules:
     test-quality.tautological-type-assertion:
         enabled: true
     # Test longer than apparent SUT
+    # Reason (2026-09-19, measured at the rule defaults with `analyse src tests --no-config`, fixtures excluded): raised from 12 to 80
+    # lines. At 12, 17 tests report (14 in tests/Rule). Accepted debt.
     test-quality.test-longer-than-sut:
         enabled: true
         thresholds:
             minTestLines: 80
     # Test method too long
+    # Reason (2026-09-19, measured at the rule defaults with `analyse src tests --no-config`, fixtures excluded): raised from 25 to 160
+    # meaningful lines. At 25, 108 tests report (52 in tests/Console, 30 in tests/Rule). Accepted debt, the largest in this file.
     test-quality.test-method-too-long:
         enabled: true
         thresholds:
@@ -734,6 +758,9 @@ rules:
     waste.empty-method:
         enabled: true
     # Flags trivial methods that only wrap a one-line call expression.
+    # Reason (2026-09-19, measured at the rule defaults with `analyse src tests --no-config`, fixtures excluded): each allowed symbol is a
+    # deliberate one-call API or helper. Re-measured after the M19 repair: without the list 4 still report (two gruffBinary()
+    # CLI helpers, lineNumberForOffset() and calls()), so the list stays.
     waste.one-line-method:
         enabled: true
         options:

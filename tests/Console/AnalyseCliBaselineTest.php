@@ -225,6 +225,60 @@ final class AnalyseCliBaselineTest extends CliTestCase
     }
 
     /**
+     * Verify every command a v1-baseline refusal prints actually works against a v1 file at the default filename, so
+     * no refusal sends the user to another refusal.
+     *
+     * @return void
+     */
+    public function testEveryCommandAV1RefusalPrintsWorks(): void
+    {
+        $project = $this->tempDir();
+
+        try {
+            mkdir($project . '/src');
+            file_put_contents($project . '/src/Example.php', "<?php\n\ndeclare(strict_types=1);\n\necho 'example';\n");
+            $v1Baseline = '{"schemaVersion":"gruff.baseline.v1","findings":[]}';
+            file_put_contents($project . '/gruff-baseline.json', $v1Baseline);
+
+            // Each route a user can take with a v1 file, and the refusal it meets first.
+            $refusals = [
+                ['analyse', 'src', '--baseline', 'gruff-baseline.json'],
+                ['analyse', 'src', '--migrate-baseline', 'gruff-baseline.json', '--generate-baseline', 'migrated.json'],
+                ['analyse', 'src', '--generate-baseline', 'gruff-baseline.json'],
+            ];
+            $advisedCommands = [];
+
+            foreach ($refusals as $refusalArgs) {
+                $refusal = new Process(array_merge([PHP_BINARY, __DIR__ . '/../../bin/gruff-php'], $refusalArgs), $project);
+                $refusal->run();
+                $refusalText = $refusal->getOutput() . $refusal->getErrorOutput();
+
+                self::assertSame(2, $refusal->getExitCode(), $refusalText);
+                self::assertStringNotContainsString('--migrate-baseline gruff-baseline.json', $refusalText, 'A v1 file cannot be migrated.');
+
+                // Every backticked gruff-php command the refusal prints is advice the user will follow.
+                preg_match_all('/`gruff-php ([^`]+)`/', $refusalText, $matches);
+                $advisedCommands = [...$advisedCommands, ...$matches[1]];
+            }
+
+            self::assertNotSame([], $advisedCommands);
+            // The regenerate-in-place route must be printed as a command too, or this test would never run it.
+            self::assertNotSame([], array_filter($advisedCommands, static fn(string $command): bool => str_contains($command, '--force')));
+
+            foreach (array_unique($advisedCommands) as $advisedCommand) {
+                file_put_contents($project . '/gruff-baseline.json', $v1Baseline);
+                $arguments = explode(' ', str_replace('<new path>', 'regenerated.json', $advisedCommand));
+                $followed  = new Process(array_merge([PHP_BINARY, __DIR__ . '/../../bin/gruff-php'], $arguments, ['--fail-on', 'none']), $project);
+                $followed->run();
+
+                self::assertSame(0, $followed->getExitCode(), $advisedCommand . "\n" . $followed->getOutput() . $followed->getErrorOutput());
+            }
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+
+    /**
      * Verify analyse command writes and auto applies default baseline file.
      *
      * @throws JsonException

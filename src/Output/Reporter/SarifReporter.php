@@ -313,7 +313,8 @@ final readonly class SarifReporter
     private function partialFingerprints(Finding $finding): array
     {
         // A secret is never given a durable name, in this port or in the external system reading its report.
-        if (!BaselineIdentity::isEligible($finding)) {
+        // A symbol carrying the ordinal separator has no identity either, so it publishes no fingerprint.
+        if (!BaselineIdentity::hasIdentity($finding)) {
             return [];
         }
 

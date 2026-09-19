@@ -85,13 +85,7 @@ final class AnalyseCommand extends Command
                 'force',
                 null,
                 InputOption::VALUE_NONE,
-                'Overwrite a 0.5 baseline at the default path; without it a generate that would destroy the retreat path is refused.',
-            )
-            ->addOption(
-                'force',
-                null,
-                InputOption::VALUE_NONE,
-                'Overwrite a 0.5 baseline at the default path; without it a generate that would destroy the retreat path is refused.',
+                'Overwrite an older baseline (0.5, v1, or an unknown schema) at the default path; without it a generate that would destroy that file is refused.',
             )
             ->addOption('migrate-baseline', null, InputOption::VALUE_REQUIRED, 'Path of a 0.5 baseline whose reviewed findings are carried into --generate-baseline; the original file is left untouched.')
             ->addOption('report-editor-link', null, InputOption::VALUE_REQUIRED, 'Editor link style for HTML file:line references: vscode, phpstorm, or none.', default: 'none')

@@ -54,6 +54,11 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     private const WORD_CHARACTER_MAJORITY_RATIO = 0.5;
 
     /**
+     * PCRE's largest `{n,}` repeat count; a longer configured minimum is still enforced by the length check.
+     */
+    private const MAX_SCAN_LENGTH = 65535;
+
+    /**
      * Ordered alphabets used by parsers/generators; these are keyspaces, not secret material.
      *
      * @var array<string, true>
@@ -110,16 +115,23 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $settings         = $ruleContext->settingsFor($this->definition());
-        $minLength        = (int) $settings->numericThreshold('minLength');
+        // A length below one would make every quoted character a candidate, so the floor never drops under it.
+        $minLength        = max(1, (int) $settings->numericThreshold('minLength'));
         $entropyThreshold = (float) $settings->numericThreshold('entropy');
 
-        // Match every long quoted literal in the source, capturing its value and offset.
-        preg_match_all('/["\'](?<value>[A-Za-z0-9_+\/=.-]{32,})["\']/', $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
+        // A literal shorter than 2^entropy cannot reach that entropy, so the scan starts there even when minLength is
+        // lower; that also keeps a short run such as the `'.'` between two concatenated literals from pairing with a
+        // secret's opening quote.
+        $entropyFloor = (int) min(self::MAX_SCAN_LENGTH, ceil(2 ** max(0.0, $entropyThreshold)));
+        $scanLength   = min(self::MAX_SCAN_LENGTH, max($minLength, $entropyFloor));
+
+        // Match every quoted literal at least the scan length long, so lowering minLength widens the scan.
+        preg_match_all('/["\'](?<value>[A-Za-z0-9_+\/=.-]{' . $scanLength . ',})["\']/', $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
         $findings      = [];
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
         // Weigh each candidate literal the scan found.
-        foreach ($matches['value'] as $match) {
+        foreach ($matches['value'] ?? [] as $match) {
             [$candidateSecret, $offset] = $match;
             // A literal inside a comment is documentation, not a live value.
             if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
@@ -155,9 +167,15 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
                 continue;
             }
 
-            $entropy = SecretScannerHelper::entropy($candidateSecret);
-            // Below the entropy bar (and not a long hex digest) the literal reads as ordinary text.
-            if ($entropy < $entropyThreshold && !(strlen($candidateSecret) >= 64 && ctype_xdigit($candidateSecret))) {
+            // A pure-hex literal is a checksum or id, never a secret this rule can tell apart. Sixteen symbols cap at
+            // 4.0 bits, under the 4.2 default, but gruff-go skips hex explicitly so that a lowered entropy bar still
+            // cannot turn a digest into a finding, and this port does the same.
+            if (ctype_xdigit($candidateSecret)) {
+                continue;
+            }
+
+            // Below the configured entropy bar the literal reads as ordinary text; the bar is the only entropy gate.
+            if (SecretScannerHelper::entropy($candidateSecret) < $entropyThreshold) {
                 continue;
             }
 
@@ -354,7 +372,7 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
         $segments = preg_split('#[/._-]+#', $candidateSecret, -1, PREG_SPLIT_NO_EMPTY);
         if (!is_array($segments) || count($segments) < self::IDENTIFIER_MIN_SEGMENTS) {
             // A regex engine error or an unbroken token (no separators) is not an identifier compound; fail
-            // closed so single-run secrets such as 64-char hex digests stay eligible for entropy scanning.
+            // closed so single-run secrets such as unbroken base64 keys stay eligible for entropy scanning.
             return false;
         }
 

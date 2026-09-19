@@ -242,7 +242,8 @@ Legacy files fail closed with exit `2`, and the two recover differently. A
 file and preserves the original. A `gruff.baseline.v1` file cannot be migrated -
 `--migrate-baseline` refuses it with "is not a `gruff.baseline.v2` file, so there
 is nothing to migrate" - so regenerate it from a reviewed scan with
-`analyse --generate-baseline` and re-review what it accepts.
+`analyse --generate-baseline <new path>`, or in place with `--force` when it is the
+default `gruff-baseline.json`, and re-review what it accepts.
 
 Known blind spot: a reviewed row accepts a `count`, so fixing one instance while
 adding another under the same identity keeps the row within budget and reports

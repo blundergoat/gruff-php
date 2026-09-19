@@ -267,6 +267,28 @@ final class BaselineFilterTest extends TestCase
     }
 
     /**
+     * Verify a finding whose symbol carries the ordinal separator is reported with no identity instead of failing the
+     * run, as the operator decided on 2026-09-19, while an ordinary reviewed finding is still hidden.
+     *
+     * @return void
+     */
+    public function testSeparatorBearingSymbolIsReportedWithoutAnIdentity(): void
+    {
+        $reviewed  = $this->finding();
+        $separated = $this->finding(symbol: 'App::process()#2');
+
+        self::assertTrue(BaselineIdentity::hasIdentity($reviewed));
+        self::assertFalse(BaselineIdentity::hasIdentity($separated));
+        // It is still an ordinary finding, never counted as a secret.
+        self::assertTrue(BaselineIdentity::isEligible($separated));
+
+        $application = (new BaselineFilter())->apply($this->baseline([$reviewed]), [$reviewed, $separated], false);
+
+        self::assertSame([$separated], $application['findings']);
+        self::assertSame(1, $application['report']->notEligibleCount);
+    }
+
+    /**
      * Build a baseline from reviewed findings and classify a run against it.
      *
      * @param list<Finding> $reviewed - Findings the user reviewed.

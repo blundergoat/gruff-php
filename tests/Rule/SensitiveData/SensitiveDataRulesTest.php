@@ -6,7 +6,9 @@ namespace GruffPhp\Tests\Rule\SensitiveData;
 
 use GruffPhp\Engine\Config\AnalysisConfig;
 use GruffPhp\Engine\Config\ConfigLoader;
+use GruffPhp\Results\Finding\Confidence;
 use GruffPhp\Results\Finding\Finding;
+use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Engine\Parser\PhpFileParser;
 use GruffPhp\Rules\Contracts\RuleContext;
@@ -20,9 +22,11 @@ use GruffPhp\Rules\SensitiveData\JwtTokenRule;
 use GruffPhp\Rules\SensitiveData\PhiPatternRule;
 use GruffPhp\Rules\SensitiveData\PiiTestFixtureRule;
 use GruffPhp\Rules\SensitiveData\PrivateKeyRule;
+use GruffPhp\Rules\SensitiveData\SecretScannerHelper;
 use GruffPhp\Engine\Source\SourceDiscovery;
 use GruffPhp\Engine\Source\SourceFile;
 use JsonException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
@@ -52,7 +56,8 @@ final class SensitiveDataRulesTest extends TestCase
         self::assertRuleCount(JwtTokenRule::ID, 1, $findings);
         self::assertRuleCount(DatabaseUrlPasswordRule::ID, 1, $findings);
         self::assertRuleCount(HardcodedEnvValueRule::ID, 1, $findings);
-        self::assertRuleCount(HighEntropyStringRule::ID, 3, $findings);
+        // Two, not three: the fixture's pure-hex digest is a checksum, skipped at any entropy bar since 2026-09-19.
+        self::assertRuleCount(HighEntropyStringRule::ID, 2, $findings);
         self::assertRuleCount(PrivateKeyRule::ID, 1, $findings);
 
         $messages      = implode("\n", array_map(static fn(Finding $finding): string => $finding->message, $findings));
@@ -140,8 +145,11 @@ final class SensitiveDataRulesTest extends TestCase
                                      $this->analysePath('tests/Fixtures/SensitiveData/safe-dummy-values.php'),
                                      static fn(Finding $finding): bool => str_starts_with($finding->ruleId, 'sensitive-data.'),
                                  ));
+        $reported = array_map(static fn(Finding $finding): string => $finding->ruleId . ':' . $finding->line, $findings);
 
-        self::assertSame([], $findings);
+        // Line 11 is AWS's documented example key. An AWS key is one alphanumeric run, so since 2026-09-19 no
+        // placeholder word can hide it and it reports, as it does in gruff-go. Every other placeholder stays quiet.
+        self::assertSame(['sensitive-data.aws-access-key:11'], $reported);
     }
 
     /**
@@ -369,6 +377,105 @@ final class SensitiveDataRulesTest extends TestCase
         } finally {
             self::assertTrue(unlink($path));
         }
+    }
+
+    /**
+     * Threshold configurations and the entropy-rule lines each must report.
+     *
+     * @return array<string, array{0: string|null, 1: list<int>}> - config fixture path, or null for defaults, and the exact lines
+     */
+    public static function highEntropyThresholdCases(): array
+    {
+        return [
+            // Defaults: 32 characters and 4.2 bits. Line 3 carries 4.0 bits, line 5 is 24 characters, line 6 is hex,
+            // and line 7 concatenates a 34-character literal onto a short one.
+            'defaults report only the long, high-entropy literals' => [null, [4, 7]],
+            // A lowered bar admits line 3's 4.0 bits, and a pure-hex digest still stays silent.
+            'entropy 3.5 admits the 4.0-bit literal, never the digest' => ['tests/Fixtures/Config/high-entropy-entropy-3-5.yaml', [3, 4, 7]],
+            'minLength 48 excludes the 34-character literals' => ['tests/Fixtures/Config/high-entropy-min-length-48.yaml', []],
+            // Below 32 the candidate pattern itself must widen, or a lowered minLength would do nothing.
+            'minLength 20 admits the 24-character literal' => ['tests/Fixtures/Config/high-entropy-min-length-20.yaml', [4, 5, 7]],
+            // The widened pattern must not pair the `'.'` between line 7's literals and swallow the secret's quote.
+            'minLength 1 keeps each literal whole' => ['tests/Fixtures/Config/high-entropy-min-length-1.yaml', [4, 5, 7]],
+            // Past PCRE's repeat limit the pattern must still compile, or the rule would warn and report nothing.
+            'minLength 70000 compiles and reports nothing' => ['tests/Fixtures/Config/high-entropy-min-length-70000.yaml', []],
+        ];
+    }
+
+    /**
+     * Verify both configured thresholds are load-bearing in both directions, read through project configuration the
+     * way a user's `.gruff-php.yaml` reaches the rule, and that the rule keeps the decided family contract.
+     *
+     * @param string|null $configPath    - Project-relative config fixture, or null for registry defaults.
+     * @param list<int>   $expectedLines - Exact lines of `entropy-thresholds.php` the rule must report.
+     *
+     * @return void
+     */
+    #[DataProvider('highEntropyThresholdCases')]
+    public function testHighEntropyThresholdsAreLoadBearing(?string $configPath, array $expectedLines): void
+    {
+        $registry = RuleRegistry::defaults();
+        $config   = $configPath === null ? null : (new ConfigLoader(self::PROJECT_ROOT))->load($configPath, $registry);
+        $findings = $this->analyseUnits([$this->unitForPath('tests/Fixtures/SensitiveData/entropy-thresholds.php')], $config);
+        $lines    = array_values(array_map(
+            static fn(Finding $finding): ?int => $finding->line,
+            array_filter($findings, static fn(Finding $finding): bool => $finding->ruleId === HighEntropyStringRule::ID),
+        ));
+
+        self::assertSame($expectedLines, $lines);
+
+        // The family contract decided on 2026-09-02: warning, medium confidence, on by default, 32 and 4.2.
+        $definition = (new HighEntropyStringRule())->definition();
+        self::assertSame(Severity::Warning, $definition->defaultSeverity);
+        self::assertSame(Confidence::Medium, $definition->confidence);
+        self::assertTrue($definition->isEnabledByDefault);
+        self::assertEquals(['minLength' => 32, 'entropy' => 4.2], $definition->defaultThresholds);
+    }
+
+    /**
+     * Placeholder words must begin a token, never sit inside one, in both directions.
+     *
+     * @return array<string, array{0: string, 1: bool, 2: bool}> - value, whether identifier words split tokens, expected
+     */
+    public static function placeholderValueCases(): array
+    {
+        return [
+            // A word that merely contains a placeholder word is a real value and must stay reportable.
+            'latest is not test'         => ['latestReleaseCredentialZq7Xw2Lp9', true, false],
+            'contest is not test'        => ['contest', true, false],
+            'attestation is not test'    => ['attestation', true, false],
+            // Glued, camelCase, snake_case, and separated placeholders stay suppressed.
+            'digit-suffixed changeme'    => ['changeme123', true, true],
+            'camelCase fake'             => ['fakeToken', true, true],
+            'PascalCase changeme'        => ['ChangeMe', true, true],
+            'separated example'          => ['example-password', true, true],
+            'snake_case test'            => ['my_test_secret', true, true],
+            'low-cardinality filler'     => ['xxxxxxxx', true, true],
+            'empty literal'              => ['', true, true],
+            // A token that begins with a placeholder word is a glued dummy, as the operator decided on 2026-09-19.
+            'unbroken testkey'           => ['TESTKEY', true, true],
+            'glued testpass'             => ['testpass99', true, true],
+            'glued example placeholder'  => ['sk_live_exampleplaceholder', true, true],
+            // AWS's documented example key, assembled so this file never holds it: identifier words split it, whole
+            // alphanumeric runs do not.
+            'aws example key, words'     => ['AKIA' . 'IOSFODNN7' . 'EXAMPLE', true, true],
+            'aws example key, whole run' => ['AKIA' . 'IOSFODNN7' . 'EXAMPLE', false, false],
+        ];
+    }
+
+    /**
+     * Verify the placeholder filter matches words that begin a token rather than any substring.
+     *
+     * @param string $candidateValue             - Candidate value handed to the filter.
+     * @param bool   $shouldSplitIdentifierWords - Whether identifier word boundaries also split tokens.
+     * @param bool   $isPlaceholder              - Whether the filter must suppress the value.
+     *
+     * @return void
+     */
+    #[DataProvider('placeholderValueCases')]
+    public function testPlaceholderWordsMustBeginAToken(string $candidateValue, bool $shouldSplitIdentifierWords, bool $isPlaceholder): void
+    {
+        self::assertSame($isPlaceholder, SecretScannerHelper::isLikelyDummyValue($candidateValue, $shouldSplitIdentifierWords));
     }
 
     /**

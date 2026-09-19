@@ -26,7 +26,8 @@ use PhpParser\Node\Stmt\Function_;
  *
  * Runs per file on PHP 8.0+ targets. It fires when a call has at least the configured number of positional
  * arguments, or slightly fewer when adjacent same-type values or bare boolean/null flags make a mix-up
- * easy. Calls to same-file variadic callables are skipped, since naming there misleads. Low confidence and
+ * easy. Calls to same-file variadic callables, to PHP's own variadic built-ins, and to callees it cannot
+ * resolve are skipped, since naming there misleads or breaks the call. Low confidence and
  * advisory - names are only worth adding for stable APIs, so gruff-php reports only.
  */
 final readonly class NamedArgumentOpportunityRule implements RuleInterface
@@ -35,6 +36,37 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
      * Stable rule identifier for named argument opportunity findings.
      */
     public const ID = 'modernisation.named-argument-opportunity';
+
+    /**
+     * PHP internal functions whose trailing parameter is variadic, so their extra positional arguments have no name.
+     *
+     * Naming them breaks the call: `sprintf(format: ..., values: ...)` throws ArgumentCountError on PHP 8.3, and
+     * `compact()` takes variable names rather than parameters. Lowercase, because PHP matches function names that way.
+     *
+     * @var list<string>
+     */
+    private const INTERNAL_VARIADIC_FUNCTIONS = [
+        'array_diff',
+        'array_diff_key',
+        'array_intersect',
+        'array_intersect_key',
+        'array_map',
+        'array_merge',
+        'array_merge_recursive',
+        'array_push',
+        'array_replace',
+        'array_replace_recursive',
+        'array_unshift',
+        'call_user_func',
+        'compact',
+        'fprintf',
+        'max',
+        'min',
+        'pack',
+        'printf',
+        'sprintf',
+        'sscanf',
+    ];
 
     /**
      * Describes the named-argument-opportunity rule for the registry and reports.
@@ -56,6 +88,10 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
                 [
                     'shape' => 'The target API is unstable or its parameter names are not a compatibility promise.',
                     'mitigation' => 'Keep positional arguments; named arguments are optional advice only for stable APIs whose parameter names are intended contracts.',
+                ],
+                [
+                    'shape' => 'A call to a userland variadic function or method declared in another file, whose trailing arguments have no names.',
+                    'mitigation' => 'PHP\'s own variadic built-ins and same-file variadic declarations are skipped automatically; keep positional arguments for a variadic target declared elsewhere.',
                 ],
             ],
         );
@@ -252,23 +288,36 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
     }
 
     /**
-     * Reports whether a call targets a same-file variadic callable, where named arguments would mislead.
+     * Reports whether a call may target a variadic callable, where named arguments would mislead or break the call.
      *
-     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Call whose callee name is matched against the variadic set.
-     * @param array<string, true> $variadicNames - Lowercase callable names declared with variadic params.
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Call whose callee name is matched against the variadic sets.
+     * @param array<string, true> $variadicNames - Lowercase callable names declared with variadic params in this file.
      *
-     * @return bool - True when the call target is variadic, false otherwise.
+     * @return bool - True for a PHP internal variadic function, a same-file variadic declaration, or a dynamic callee
+     *   whose declaration cannot be seen; false only for a named callee known not to be variadic here.
      */
     private function isVariadicCall(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call, array $variadicNames): bool
     {
         $name = $this->callableSimpleName($call);
         if ($name === null) {
-            // A dynamic or expression callee cannot be resolved to a declaration, so it cannot be matched as variadic.
-            return false;
+            // A dynamic callee has no declaration to read, so it may be variadic and the suggestion cannot be trusted.
+            return true;
         }
 
-        // True only when this exact callable name was recorded as variadic earlier in the same file.
-        return isset($variadicNames[strtolower($name)]);
+        $lowerName = strtolower($name);
+        // A global function call may reach one of PHP's own variadic built-ins, which no file declares; a namespaced
+        // name such as `\App\sprintf` is a user function of the same short name, not the built-in.
+        if (
+            $call instanceof Expr\FuncCall
+            && $call->name instanceof Node\Name
+            && !str_contains($call->name->toString(), '\\')
+            && in_array($lowerName, self::INTERNAL_VARIADIC_FUNCTIONS, true)
+        ) {
+            return true;
+        }
+
+        // Otherwise only a callable recorded as variadic earlier in the same file qualifies.
+        return isset($variadicNames[$lowerName]);
     }
 
     /**

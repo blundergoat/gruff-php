@@ -28,6 +28,38 @@ use PHPUnit\Framework\TestCase;
 final class ScoreCalculatorTest extends TestCase
 {
     /**
+     * Guard: a rule may not introduce a pillar STATIC_PILLARS does not name.
+     *
+     * An unnamed pillar joins the composite only on runs where it has findings, so the divisor moves between runs and
+     * fixing the last finding in that pillar can lower the composite. Mirrors gruff-py's
+     * `test_static_pillars_covers_every_catalog_pillar`.
+     *
+     * @return void
+     */
+    public function testStaticPillarsCoverEveryCataloguePillar(): void
+    {
+        $staticPillars   = (new \ReflectionClassConstant(ScoreCalculator::class, 'STATIC_PILLARS'))->getValue();
+        $cataloguePillars = [];
+
+        // Collect every primary and secondary pillar any registered rule declares.
+        foreach (RuleRegistry::defaults()->all() as $rule) {
+            $definition = $rule->definition();
+            $cataloguePillars[$definition->pillar->value] = true;
+
+            foreach ($definition->secondaryPillars as $secondaryPillar) {
+                $cataloguePillars[$secondaryPillar->value] = true;
+            }
+        }
+
+        self::assertIsArray($staticPillars);
+        $unnamedPillars = array_filter(
+            array_keys($cataloguePillars),
+            static fn(string $pillar): bool => !in_array($pillar, $staticPillars, true),
+        );
+        self::assertSame([], array_values($unnamedPillars));
+    }
+
+    /**
      * Verify grade boundaries use simple af scale.
      *
      * @return void

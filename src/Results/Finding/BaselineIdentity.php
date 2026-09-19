@@ -54,6 +54,22 @@ final readonly class BaselineIdentity
     }
 
     /**
+     * Tells whether a finding can be given an identity at all.
+     *
+     * A sensitive finding cannot, and neither can an ordinary finding whose symbol already contains the ordinal
+     * separator: its subject could pose as another symbol's ordinal, so it is reported and never baselined, the way a
+     * sensitive finding already is. The operator chose that reading over a symbol-less fallback on 2026-09-19.
+     *
+     * @param Finding $finding - Any finding from the current scan.
+     *
+     * @return bool - True when `identityOf()` can name the finding; false for a sensitive finding or a separator-bearing symbol.
+     */
+    public static function hasIdentity(Finding $finding): bool
+    {
+        return self::isEligible($finding) && !str_contains($finding->symbol ?? '', self::ORDINAL_SEPARATOR);
+    }
+
+    /**
      * Replaces every measured value in a message with `#`, per the identity amendment of 2026-09-05.
      *
      * "File has 1010 lines (limit 1000)" becomes "File has # lines (limit #)", so a file that grows keeps the identity the user reviewed.

@@ -243,6 +243,10 @@ final class SecurityRulesTest extends TestCase
             'named curl_setopt arguments resolve' => ['named-argument-sinks.php', DisabledSslVerificationRule::ID, [31, 32]],
             'named path arguments resolve' => ['named-argument-sinks.php', PathTraversalFileAccessRule::ID, [37, 38]],
             'named xml arguments resolve' => ['named-argument-sinks.php', UnsafeXmlLoadingRule::ID, [43, 44]],
+            // 104: a callable parameter in a sibling function no longer proves this one's variable. 111, 112, 114:
+            // request-chosen targets, including through Closure::fromCallable and a first-class `$x(...)` reference.
+            // 124: an early-return guard is a known residual the rule does not read. Every other call is a proven shape.
+            'dynamic calls prove callability the way PHP does' => ['dynamic-call-precision.php', DangerousFunctionCallRule::ID, [104, 111, 112, 114, 124, 132, 137, 140, 141, 144, 146, 154, 161, 167, 177, 196, 199]],
         ];
     }
 

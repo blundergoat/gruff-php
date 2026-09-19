@@ -50,14 +50,22 @@ final class RuleRegressionSnapshotTest extends TestCase
     {
         [$units, $findings, $json] = $this->analysePaths(['tests/Fixtures']);
 
-        // M07 added tests/Fixtures/Baseline/gruff-baseline-v3.json to the corpus.
-        self::assertCount(183, $units);
-        self::assertCount(2677, $findings);
+        // M07 added tests/Fixtures/Baseline/gruff-baseline-v3.json to the corpus, and M19 ten precision fixtures.
+        self::assertCount(193, $units);
+        // M19 (2026-09-19) removed confirmed false positives and nothing else: an immediately invoked closure, a
+        // statically written first-class callable, `#[\Override]` and `{@inheritdoc}` methods, and pure-hex digests.
+        // AWS's documented example key now reports, as the operator decided, and so does one sibling-scope `$x()`.
+        // Its review fixes then added 38 findings, every one on a new fixture line: ten laundering and shadowing
+        // `$x()` shapes, two one-line wrappers, a namespaced `sprintf()`, a concatenated secret, and 24 findings
+        // other rules raise on that new fixture code. The operator-requested double-check added 39 more: 3 on the
+        // dynamic-call fixture's two new pins, 33 on the two inherited-contract fixtures (21 docs tags the narrowed
+        // exemption owes, 12 from other rules), and 3 docs tags on older fixtures that exemption no longer hides.
+        self::assertCount(2792, $findings);
         // M08 made sensitive-data markers carry the class the detector already knew: a classified finding now reads
         // `[redacted:aws-access-key]` where it read `[redacted]`. The finding count, the rule set, and every
         // line-free identity are unchanged; only the marker text inside those findings moved.
         self::assertSame(
-            '9a0a42d1cdbf29a212b1dd070ebcbce6529abf8e9f24eb777d8fbc4a2903392e',
+            'd7dd1f9fa86e81626c4353f49c3e1256cfbd3966c4b7ca119a4811e6f53738a0',
             hash('sha256', $json),
         );
     }

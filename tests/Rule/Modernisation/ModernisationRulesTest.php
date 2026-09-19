@@ -83,6 +83,25 @@ final class ModernisationRulesTest extends TestCase
     }
 
     /**
+     * Verify PHP's variadic built-ins and dynamic callees are never told to use named arguments, while a userland call
+     * with five positional arguments still is.
+     *
+     * @return void
+     */
+    public function testNamedArgumentOpportunitySkipsVariadicAndUnresolvedCallees(): void
+    {
+        $findings = $this->analysePath('tests/Fixtures/Modernisation/named-argument-variadics.php');
+        $lines    = array_values(array_map(
+            static fn(Finding $finding): ?int => $finding->line,
+            array_filter($findings, static fn(Finding $finding): bool => $finding->ruleId === NamedArgumentOpportunityRule::ID),
+        ));
+
+        // 18 and 20: the only calls whose parameters have names a caller could use; 20 is a namespaced function
+        // that merely shares `sprintf`'s short name.
+        self::assertSame([18, 20], $lines);
+    }
+
+    /**
      * Verify PHP eight candidates are detected.
      *
      * @return void

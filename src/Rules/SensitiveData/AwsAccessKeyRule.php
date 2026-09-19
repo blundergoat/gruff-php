@@ -75,7 +75,7 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
             }
 
             // An obvious placeholder or dummy value is not a real credential.
-            if (SecretScannerHelper::isLikelyDummyValue($candidateSecret)) {
+            if (SecretScannerHelper::isLikelyDummyValue($candidateSecret, shouldSplitIdentifierWords: false)) {
                 continue;
             }
 

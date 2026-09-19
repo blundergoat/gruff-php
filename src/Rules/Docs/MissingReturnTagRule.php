@@ -16,16 +16,20 @@ use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
 use GruffPhp\Support\DeclarationLine;
+use PhpParser\Node;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
+use PhpParser\NodeFinder;
 
 /**
  * Flags a documented method or function that omits an explicit `@return` tag, so the user gets a complete
  * contract - every documented callable states what it hands back, even when that is void or never.
  *
  * Runs per file over documented function-likes, skipping constructors and destructors (which have no
- * meaningful return). Advisory, high confidence. The companion return-comment rule then checks the tag
- * actually describes the value rather than restating the type.
+ * meaningful return) and an override whose inherited contract already declares the return: the same-file method
+ * it overrides carries `@return`, or `{@inheritdoc}` or `#[\Override]` points at a contract in another file.
+ * Advisory, high confidence. The companion return-comment rule then checks the tag actually describes the value
+ * rather than restating the type.
  */
 final readonly class MissingReturnTagRule implements RuleInterface
 {
@@ -64,6 +68,8 @@ final readonly class MissingReturnTagRule implements RuleInterface
     {
         $definition = $this->definition();
         $nodes      = NodeIndex::nodesOfAny($analysisUnit, [ClassMethod::class, Function_::class]);
+        $nodeFinder = new NodeFinder();
+        $inheritanceHelper = new DocsInheritanceHelper();
 
         $findings = [];
 
@@ -89,11 +95,16 @@ final readonly class MissingReturnTagRule implements RuleInterface
                 continue;
             }
 
+            // An inherited contract that already declares the return owes no second tag here.
+            if ($node instanceof ClassMethod && $this->isReturnInherited($node, $analysisUnit->statements, $nodeFinder, $inheritanceHelper)) {
+                continue;
+            }
+
             $symbol = CyclomaticComplexityRule::resolveSymbol($node);
 
             $findings[] = new Finding(
                 ruleId:      $definition->id,
-                message:     sprintf('%s has a docblock but needs an @return tag with a brief description (one plain-English clause; not a restatement of the type signature).', $symbol),
+                message:     sprintf('%s has a docblock but no @return tag declaring its return contract.', $symbol),
                 filePath:    $analysisUnit->file->displayPath,
                 line:        DeclarationLine::of($node),
                 severity:    $definition->defaultSeverity,
@@ -101,11 +112,39 @@ final readonly class MissingReturnTagRule implements RuleInterface
                 tier:        $definition->tier,
                 confidence:  $definition->confidence,
                 symbol:      $symbol,
-                remediation: 'Add an `@return SomeType Description.` tag. This rule wants content, not boilerplate - the description should answer "what does the returned value represent at the edge cases."',
+                remediation: 'Add an `@return SomeType` tag. Whether it needs a description is docs.return-comment\'s check, not this one.',
             );
         }
 
         return $findings;
     }
 
+    /**
+     * Reports whether an inherited contract already declares a method's return.
+     *
+     * @param ClassMethod           $classMethod       - Documented method without its own `@return` tag.
+     * @param list<Node\Stmt>       $statements        - The unit's statements, searched for the overridden method.
+     * @param NodeFinder            $nodeFinder        - Shared finder reused across nodes.
+     * @param DocsInheritanceHelper $inheritanceHelper - Resolves same-file ancestors and inheritance markers.
+     *
+     * @return bool - true when the same-file method it overrides declares `@return`, or, with no such method in this
+     *   file, when `{@inheritdoc}` or `#[\Override]` points at a contract declared elsewhere; false otherwise, so a
+     *   visible ancestor without the tag, or a marker in a class with nothing to inherit, still reports
+     */
+    private function isReturnInherited(
+        ClassMethod $classMethod,
+        array $statements,
+        NodeFinder $nodeFinder,
+        DocsInheritanceHelper $inheritanceHelper,
+    ): bool {
+        $ancestorMethod = $inheritanceHelper->sameFileAncestorMethod($classMethod, $statements, $nodeFinder);
+        if ($ancestorMethod instanceof ClassMethod) {
+            // A visible ancestor stands in only when it declares the return, or inherits it in turn through its own
+            // marker; one hop, so a malformed cyclic `extends` cannot recurse.
+            return str_contains($ancestorMethod->getDocComment()?->getText() ?? '', '@return')
+                || $inheritanceHelper->hasInheritanceMarker($ancestorMethod);
+        }
+
+        return $inheritanceHelper->hasInheritanceMarker($classMethod);
+    }
 }

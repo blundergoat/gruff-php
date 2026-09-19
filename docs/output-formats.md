@@ -117,8 +117,9 @@ object contains its entries, path, generation and staleness data, and
 are `gruff.baseline.v3`: a top-level `occurrences` array of
 `{identity, count, ruleId, path, subject}` rows beside `toolLanguage`,
 `generatedAt`, and a `sensitive` object recording that sensitive findings are
-never eligible. A `gruff.baseline.v1` or `gruff.baseline.v2` file fails closed
-with exit `2` and names `--migrate-baseline`.
+never eligible. A `gruff.baseline.v2` file fails closed with exit `2` and names
+`--migrate-baseline`. A `gruff.baseline.v1` file fails closed and names
+`--generate-baseline`, because its reviews cannot be carried forward.
 
 Trend history remains scope-aware. Its machine representation moves to
 `extensions.php.topLevel.trend`: full-project scores compare only with earlier

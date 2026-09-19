@@ -10,6 +10,7 @@ use GruffPhp\Results\Finding\Pillar;
 use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
+use GruffPhp\Rules\Naming\IdentifierTokenizer;
 
 /**
  * Shared detector utilities turn matched source into safe, consistently located sensitive findings.
@@ -106,6 +107,13 @@ final class SecretScannerHelper
     }
 
     /**
+     * Words that mark a value as a documented placeholder when one stands as its own token.
+     *
+     * @var list<string>
+     */
+    private const PLACEHOLDER_WORDS = ['changeme', 'dummy', 'example', 'fake', 'placeholder', 'redacted', 'sample', 'test'];
+
+    /**
      * The seventeen marker categories FAMILY-CONTRACT.md section 5 ratifies. Nothing outside this list can reach a
      * marker, so a detector name the family never ratified degrades to the bare marker instead of inventing one.
      *
@@ -168,23 +176,38 @@ final class SecretScannerHelper
     /**
      * Reports whether a value looks like a placeholder rather than a real secret (changeme / dummy / etc.).
      *
-     * @param string $secretValue - Candidate sensitive value.
+     * A placeholder word must begin a token, never sit inside one, so `latest`, `contest`, and `attestation` stay
+     * eligible while glued dummies such as `testpass99` and `exampleplaceholder` stay suppressed. By default a token is
+     * a run of letters and digits, or one identifier word, so `example-password`, `ChangeMe`, `changeme123`, and
+     * `fakeToken` stay suppressed too. A caller whose candidate is a fixed-shape key passes
+     * `$shouldSplitIdentifierWords: false`, so only whole alphanumeric runs count and AWS's documented example key reports.
+     *
+     * @param string $secretValue          - Candidate sensitive value.
+     * @param bool   $shouldSplitIdentifierWords - Whether camelCase, digit-run, and underscore boundaries also split tokens.
      *
      * @return bool - true when the value is empty, low-cardinality, or a placeholder, so the caller suppresses it
      */
-    public static function isLikelyDummyValue(string $secretValue): bool
+    public static function isLikelyDummyValue(string $secretValue, bool $shouldSplitIdentifierWords = true): bool
     {
-        $normalized = strtolower(trim($secretValue, "\"' \t\r\n"));
+        $trimmed    = trim($secretValue, "\"' \t\r\n");
+        $normalized = strtolower($trimmed);
         if ($normalized === '') {
             // An empty or quote-only literal carries no secret, so treat it as a placeholder and suppress.
             return true;
         }
 
-        // Check the value for any known placeholder word.
-        foreach (['changeme', 'dummy', 'example', 'fake', 'placeholder', 'redacted', 'sample', 'test'] as $marker) {
-            if (str_contains($normalized, $marker)) {
-                // A known placeholder word anywhere in the value marks it as documentation, not a live credential.
-                return true;
+        // Runs of letters and digits, split on every other character.
+        $tokens = preg_split('/[^a-z0-9]+/', $normalized, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        if ($shouldSplitIdentifierWords) {
+            $tokens = [...$tokens, ...(new IdentifierTokenizer())->tokenize($trimmed)];
+        }
+
+        // A token that is, or begins with, a placeholder word marks the value as documentation, not a live credential.
+        foreach ($tokens as $token) {
+            foreach (self::PLACEHOLDER_WORDS as $word) {
+                if (str_starts_with($token, $word)) {
+                    return true;
+                }
             }
         }
 

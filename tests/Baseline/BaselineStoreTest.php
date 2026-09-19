@@ -127,6 +127,29 @@ final class BaselineStoreTest extends TestCase
     }
 
     /**
+     * Verify a finding whose symbol carries the ordinal separator stays out of a written baseline, is not counted as a
+     * secret, and no longer aborts the whole generation.
+     *
+     * @return void
+     */
+    public function testWriteLeavesOutASeparatorBearingSymbol(): void
+    {
+        $root = $this->tempDir();
+
+        try {
+            $baselineData = (new BaselineStore($root))->write('gruff-baseline.json', [
+                $this->finding(),
+                $this->finding(symbol: 'Example::process()#2'),
+            ]);
+
+            self::assertCount(1, $baselineData->entries);
+            self::assertSame([], $baselineData->sensitiveByRule);
+        } finally {
+            $this->removeDir($root);
+        }
+    }
+
+    /**
      * Verify a 0.5 baseline fails closed with the migration command rather than being misread.
      *
      * @return void

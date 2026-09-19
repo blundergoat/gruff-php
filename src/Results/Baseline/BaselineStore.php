@@ -91,13 +91,12 @@ final readonly class BaselineStore
             ));
         }
 
-        // The retired layout stores no identity this port can translate, so the user is pointed at the same route as
-        // any other pre-0.6 file: --migrate-baseline is the one command that turns an old baseline into a v3 one.
+        // The retired layout stores no identity this port can translate, and --migrate-baseline reads only v2, so the
+        // only route that works is a fresh baseline; the advice names --force because the default filename needs it.
         if ($schemaVersion === self::RETIRED_SCHEMA_VERSION) {
             throw new BaselineException(sprintf(
-                'Baseline schema "%s" is no longer supported: baselines now store one line-free identity per reviewed finding. Carry its reviews forward with `gruff-php analyse --migrate-baseline %s --generate-baseline <new path>`, or regenerate from a reviewed scan with `gruff-php analyse --generate-baseline %s`.',
+                'Baseline schema "%s" is no longer supported: baselines now store one line-free identity per reviewed finding, and a v1 file\'s reviews cannot be carried forward. Regenerate it from a reviewed scan with `gruff-php analyse --generate-baseline <new path>`, or in place with `gruff-php analyse --generate-baseline %s --force`.',
                 self::RETIRED_SCHEMA_VERSION,
-                $path,
                 $path,
             ));
         }
@@ -143,7 +142,12 @@ final readonly class BaselineStore
 
         // Only the 0.5 layout is migratable; a v3 file needs no migration and a retired one has no rows to carry.
         if (($decoded['schemaVersion'] ?? null) !== self::LEGACY_SCHEMA_VERSION) {
-            throw new BaselineException(sprintf('Baseline %s is not a "%s" file, so there is nothing to migrate.', $path, self::LEGACY_SCHEMA_VERSION));
+            // A retired v1 file gets the one route that works for it, so the refusal never ends the user's search.
+            $retiredAdvice = ($decoded['schemaVersion'] ?? null) === self::RETIRED_SCHEMA_VERSION
+                ? ' A "' . self::RETIRED_SCHEMA_VERSION . '" file\'s reviews cannot be carried forward; regenerate it with `gruff-php analyse --generate-baseline <new path>`.'
+                : '';
+
+            throw new BaselineException(sprintf('Baseline %s is not a "%s" file, so there is nothing to migrate.%s', $path, self::LEGACY_SCHEMA_VERSION, $retiredAdvice));
         }
 
         $this->requireOneRowContainer($decoded, $path);
@@ -216,13 +220,17 @@ final readonly class BaselineStore
             return;
         }
 
+        // Only a v2 file can be migrated; advising --migrate-baseline for any other schema sends the user to a refusal.
+        $advice = $schema === self::LEGACY_SCHEMA_VERSION
+            ? sprintf('Migrate it with `gruff-php analyse --migrate-baseline %s --generate-baseline <new path>`, or pass --force to overwrite it.', $outputPath)
+            : sprintf('Its reviews cannot be carried forward, so regenerate it in place with `gruff-php analyse --generate-baseline %s --force`, or generate to a new path.', $outputPath);
+
         throw new BaselineException(sprintf(
-            '%s is a "%s" baseline, not "%s"; generating over it would destroy the retreat path. Migrate it with '
-            . '`gruff-php analyse --migrate-baseline %s --generate-baseline <new path>`, or pass --force to overwrite it.',
+            '%s is a "%s" baseline, not "%s"; generating over it would destroy the retreat path. %s',
             $outputPath,
             $schema,
             self::SCHEMA_VERSION,
-            $outputPath,
+            $advice,
         ));
     }
 
@@ -484,6 +492,12 @@ final readonly class BaselineStore
             // A sensitive finding contributes a count and nothing that could name it.
             if (!BaselineIdentity::isEligible($finding)) {
                 $sensitiveByRule[$finding->ruleId] = ($sensitiveByRule[$finding->ruleId] ?? 0) + 1;
+                continue;
+            }
+
+            // A symbol carrying the ordinal separator cannot be named, so the finding stays out of the baseline
+            // and keeps reporting, instead of aborting the whole generation.
+            if (!BaselineIdentity::hasIdentity($finding)) {
                 continue;
             }
 
