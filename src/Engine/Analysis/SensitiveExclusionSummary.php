@@ -14,7 +14,7 @@ namespace GruffPhp\Engine\Analysis;
  * never breaks a build. Nothing here is derived from a matched value - the rule id, path, symbol,
  * and reason all come from configuration.
  *
- * @phpstan-type SensitiveExclusionSummaryArray array{index: int, rule: string, paths: list<string>, symbol: string|null, reason: string,
+ * @phpstan-type SensitiveExclusionSummaryArray array{index: int, rule: string, paths: list<string>, symbol: string|null, source?: string, reason: string,
  *               suppressed: int}
  */
 final readonly class SensitiveExclusionSummary
@@ -28,6 +28,7 @@ final readonly class SensitiveExclusionSummary
      * @param string|null $symbol - Symbol narrowing the scope; null when the entry covers the whole file.
      * @param string      $reason - Rationale supplied by whoever accepted the finding.
      * @param int         $suppressed - Findings this entry removed from the run; zero is a valid, non-failing result.
+     * @param string|null $source - `built-in` on a row the family's lockfile skip produced; null on a configured entry's row.
      */
     public function __construct(
         public int     $index,
@@ -36,6 +37,7 @@ final readonly class SensitiveExclusionSummary
         public ?string $symbol,
         public string  $reason,
         public int     $suppressed,
+        public ?string $source = null,
     ) {
     }
 
@@ -48,7 +50,7 @@ final readonly class SensitiveExclusionSummary
      */
     public function toArray(): array
     {
-        return [
+        $auditRow = [
             'index'      => $this->index,
             'rule'       => $this->rule,
             'paths'      => [$this->path],
@@ -56,6 +58,13 @@ final readonly class SensitiveExclusionSummary
             'reason'     => $this->reason,
             'suppressed' => $this->suppressed,
         ];
+
+        // Only a built-in row names its source; a configured row is recognised by carrying none.
+        if ($this->source !== null) {
+            $auditRow['source'] = $this->source;
+        }
+
+        return $auditRow;
     }
 
     /**
@@ -66,6 +75,11 @@ final readonly class SensitiveExclusionSummary
      */
     public function describe(): string
     {
+        // A built-in row names the lockfile it skipped, because it has no configured entry to point at.
+        if ($this->source !== null) {
+            return sprintf('builtInLockfile[%s] %s: %d (%s)', $this->path, $this->rule, $this->suppressed, $this->reason);
+        }
+
         return sprintf('sensitiveExclusions[%d] %s: %d (%s)', $this->index, $this->rule, $this->suppressed, $this->reason);
     }
 

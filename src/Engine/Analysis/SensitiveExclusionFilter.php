@@ -20,6 +20,33 @@ use GruffPhp\Results\Finding\Finding;
 final readonly class SensitiveExclusionFilter
 {
     /**
+     * The one rule the family's built-in lockfile skip covers; every other sensitive-data rule still reads a lockfile.
+     */
+    private const BUILT_IN_LOCKFILE_RULE = 'sensitive-data.high-entropy-string';
+
+    /**
+     * The rationale every port publishes on a built-in lockfile audit row.
+     */
+    private const BUILT_IN_LOCKFILE_REASON = 'Lockfile digests are published integrity hashes, so the entropy rule skips package-manager lockfiles by name.';
+
+    /**
+     * The ratified package-manager lockfile names, matched by exact base name at any depth.
+     *
+     * @var list<string>
+     */
+    private const BUILT_IN_LOCKFILE_NAMES = [
+        'package-lock.json',
+        'npm-shrinkwrap.json',
+        'yarn.lock',
+        'pnpm-lock.yaml',
+        'composer.lock',
+        'Cargo.lock',
+        'go.sum',
+        'uv.lock',
+        'poetry.lock',
+    ];
+
+    /**
      * Partitions findings into those no entry claimed and one audit row per configured entry.
      *
      * @param list<Finding>            $findings - Findings produced by the run, in report order.
@@ -30,11 +57,6 @@ final readonly class SensitiveExclusionFilter
      */
     public function apply(array $findings, array $exclusions): SensitiveExclusionResult
     {
-        // Nothing configured means nothing to hide and nothing to audit, so hand the findings straight back.
-        if ($exclusions === []) {
-            return new SensitiveExclusionResult($findings, []);
-        }
-
         $counts    = array_fill(0, count($exclusions), 0);
         $survivors = [];
 
@@ -51,7 +73,70 @@ final readonly class SensitiveExclusionFilter
             $counts[$matchedIndex]++;
         }
 
-        return new SensitiveExclusionResult($survivors, $this->summaries($exclusions, $counts));
+        // A configured entry claims its findings first, so its count stays what the user wrote it for.
+        return $this->applyBuiltInLockfileSkip($survivors, $this->summaries($exclusions, $counts));
+    }
+
+    /**
+     * Removes the entropy rule's findings from package-manager lockfiles and appends one audit row per lockfile
+     * that had any, after the configured rows.
+     *
+     * A lockfile digest is a published integrity hash and a real project carries thousands of them, so the family
+     * skips that one rule by file name. It is counted on every surface rather than applied in silence, and a
+     * lockfile with nothing to skip publishes no row (FAMILY-CONTRACT.md section 13a). Every other sensitive-data
+     * rule still reads the lockfile, because a credential pasted into one is as live as anywhere else.
+     *
+     * @param list<Finding>                    $findings - Findings that survived the configured entries.
+     * @param list<SensitiveExclusionSummary>  $summaries - The configured entries' audit rows, which built-in rows follow.
+     *
+     * @return SensitiveExclusionResult - Survivors, then the configured rows followed by one row per lockfile.
+     */
+    private function applyBuiltInLockfileSkip(array $findings, array $summaries): SensitiveExclusionResult
+    {
+        $skipped   = [];
+        $survivors = [];
+
+        foreach ($findings as $finding) {
+            if ($finding->ruleId === self::BUILT_IN_LOCKFILE_RULE && $this->isBuiltInLockfile($finding->filePath)) {
+                $skipped[$finding->filePath] = ($skipped[$finding->filePath] ?? 0) + 1;
+                continue;
+            }
+
+            $survivors[] = $finding;
+        }
+
+        ksort($skipped);
+        // Built-in rows are numbered among themselves, so the index means the same thing in every port however
+        // many entries the user configured. `source` is what tells a consumer which channel a row came from.
+        $builtInIndex = 0;
+        foreach ($skipped as $lockfile => $count) {
+            $summaries[] = new SensitiveExclusionSummary(
+                index: $builtInIndex++,
+                rule: self::BUILT_IN_LOCKFILE_RULE,
+                path: (string)$lockfile,
+                symbol: null,
+                reason: self::BUILT_IN_LOCKFILE_REASON,
+                suppressed: $count,
+                source: 'built-in',
+            );
+        }
+
+        return new SensitiveExclusionResult($survivors, $summaries);
+    }
+
+    /**
+     * Reports whether a path's base name is one of the ratified package-manager lockfiles.
+     *
+     * @param string $filePath - Project-relative display path of the finding's file.
+     *
+     * @return bool - true when the entropy rule's findings in this file are skipped and counted
+     */
+    private function isBuiltInLockfile(string $filePath): bool
+    {
+        $normalized = str_replace('\\', '/', $filePath);
+        $fileName   = substr((string)strrchr('/' . $normalized, '/'), 1);
+
+        return in_array($fileName, self::BUILT_IN_LOCKFILE_NAMES, true);
     }
 
     /**

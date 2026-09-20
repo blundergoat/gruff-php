@@ -505,6 +505,11 @@ final readonly class AnalysisReport
             $payload['symbol'] = $summary->symbol;
         }
 
+        // Only a built-in row names its source; a configured row is recognised by carrying none.
+        if ($summary->source !== null) {
+            $payload['source'] = $summary->source;
+        }
+
         return $payload;
     }
 

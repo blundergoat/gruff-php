@@ -903,6 +903,8 @@ final class HookCommand extends Command
                     'symbol'     => $exclusion->symbol,
                     'reason'     => $exclusion->reason,
                     'suppressed' => $exclusion->suppressed,
+                    // Only a built-in row names its source; a configured row is recognised by carrying none.
+                    ...($exclusion->source === null ? [] : ['source' => $exclusion->source]),
                 ],
                 $exclusions,
             ),

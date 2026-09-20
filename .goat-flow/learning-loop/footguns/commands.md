@@ -27,7 +27,9 @@ last_reviewed: 2026-08-22
 
 ## Footgun: The result cache keys on tool version + config + rule set, not rule source, so a rule-LOGIC change does not invalidate cached findings
 
-**Status:** active | **Created:** 2026-06-14 | **Evidence:** OBSERVED
+**Status:** resolved | **Created:** 2026-06-14 | **Evidence:** OBSERVED
+
+**Resolved 2026-09-20 for rule source:** `src/Engine/Cache/AnalysisFingerprint.php` (search: `implementationDigest`) now folds a digest of every PHP file under the analyser's own `src/` into the run key, so an edited rule misses the cache under an unchanged version. The vendored parser and non-PHP data files stay outside the key, so a `composer update` under one version can still serve cached findings. The trap below was live until then and produced a real disagreement: on gruff-php's own tree a cached `analyse` reported 3,255 findings where `summary` and `analyse --no-cache` reported 3,203. `--no-cache` is no longer needed to validate a rule change; the preflight keeps passing it, which costs nothing. See ADR-020's 2026-09-20 addendum.
 
 `src/Engine/Cache/AnalysisFingerprint.php` (search: `forRun`) builds the per-file cache key from the resolved config, the enabled rule ids, and the gruff version (search: `toolVersion`, which writes `'version' => $toolVersion`) — never the rule classes' source. This is correct for end users because every release bumps `Application::VERSION`, which invalidates all entries. But while iterating on a rule's logic *within one version* (the common dev/validation loop), re-running `analyse` against a path that already has a warm `.gruff-cache` returns the OLD findings: same file content + same version + same enabled rules hashes to the same key, so the changed rule logic never re-runs. Observed while validating the guard-clause classifier change (later committed as `84d196d`) — a re-scan of a previously-scanned fixture reported the stale `severity: advisory` / `complexityShape: flat-guard-clauses`, while `--no-cache` on the same path reported the corrected `warning` / `branching`. (ADR-020 documents the cache.)
 
