@@ -210,8 +210,14 @@ final class HookCommand extends Command
             $this->writeError($output, $exception->getMessage());
 
             return Command::INVALID;
-        } catch (DiffException | RuntimeException $exception) {
-            // An invalid git ref or unreadable input can prevent scoped analysis; integrations receive the error in-band.
+        } catch (DiffException $exception) {
+            // A scope the run could not read carries one family type on every surface, so an agent reading the hook
+            // and a reader of the analyse envelope see the same name for the same failure.
+            $this->writeJson($output, $this->emptyReport(true, $exception->getMessage(), RunDiagnostic::CHANGED_REGION_TYPE));
+
+            return Command::INVALID;
+        } catch (RuntimeException $exception) {
+            // Anything else that stopped the run before it could scan is a usage problem; integrations receive it in-band.
             $this->writeJson($output, $this->emptyReport(true, $exception->getMessage()));
 
             return Command::INVALID;

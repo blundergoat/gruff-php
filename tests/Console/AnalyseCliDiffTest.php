@@ -37,8 +37,91 @@ final class AnalyseCliDiffTest extends CliTestCase
             $process->run();
 
             self::assertSame(2, $process->getExitCode());
-            self::assertStringContainsString('[DIFF-MODE-ERROR]', $process->getOutput());
+            // One family type names every scope the run could not read, and a run that could not apply its
+            // scope publishes no findings beside the failure.
+            self::assertStringContainsString('[CHANGED-REGION]', $process->getOutput());
             self::assertStringContainsString('Diff mode requires a git working tree.', $process->getOutput());
+            self::assertStringContainsString('Findings: 0 total', $process->getOutput());
+        } finally {
+            $this->removeDir($tempDir);
+        }
+    }
+
+    /**
+     * Verify the hook names an unreadable changed-region scope with the same family type analyse uses.
+     *
+     * The hook called it `usage-error` until M46 while analyse called it `changed-region`, so one failure had two
+     * names depending on which surface saw it and a consumer matching the family type missed half of them.
+     *
+     * @return void
+     */
+    public function testHookNamesAnUnreadableChangedRangeWithTheFamilyType(): void
+    {
+        $tempDir = $this->tempDir();
+
+        try {
+            file_put_contents($tempDir . '/Example.php', "<?php\n\nfinal class Example\n{\n    public function run(): void {}\n}\n");
+
+            $process = new Process([
+                                       PHP_BINARY,
+                                       self::PROJECT_ROOT . '/bin/gruff-php',
+                                       'hook',
+                                       'Example.php',
+                                       '--no-config',
+                                       '--changed-ranges',
+                                       '=abc',
+                                   ], $tempDir);
+            $process->run();
+
+            self::assertSame(2, $process->getExitCode(), $process->getErrorOutput());
+            $payload = $this->decodeJsonOutput($process);
+            self::assertIsArray($payload['diagnostics']);
+            self::assertSame(['changed-region'], array_column($payload['diagnostics'], 'type'));
+            self::assertSame(['fatal'], array_column($payload['diagnostics'], 'severity'));
+            self::assertSame([], $payload['findings']);
+        } finally {
+            $this->removeDir($tempDir);
+        }
+    }
+
+    /**
+     * Verify a `--changed-ranges` value the run cannot scope to ends the run instead of widening it.
+     *
+     * An empty value is malformed for the same reason a garbled one is: the caller asked for a scoped run and
+     * named no range, and reading that as "no filter" scans the whole tree without saying so.
+     *
+     * @return void
+     */
+    public function testAnalyseCommandRefusesChangedRangesItCannotScope(): void
+    {
+        $tempDir = $this->tempDir();
+
+        try {
+            file_put_contents($tempDir . '/Example.php', "<?php\n\nfinal class Example\n{\n    public function run(): void {}\n}\n");
+
+            foreach (['=abc', ''] as $ranges) {
+                $process = new Process([
+                                           PHP_BINARY,
+                                           self::PROJECT_ROOT . '/bin/gruff-php',
+                                           'analyse',
+                                           'Example.php',
+                                           '--no-config',
+                                           '--no-baseline',
+                                           '--changed-ranges',
+                                           $ranges,
+                                           '--format',
+                                           'json',
+                                           '--fail-on',
+                                           'none',
+                                       ], $tempDir);
+                $process->run();
+
+                self::assertSame(2, $process->getExitCode(), $process->getErrorOutput());
+                $report = $this->decodeJsonOutput($process);
+                self::assertIsArray($report['diagnostics']);
+                self::assertSame(['changed-region'], array_column($report['diagnostics'], 'type'), $ranges);
+                self::assertSame([], $report['findings'], $ranges);
+            }
         } finally {
             $this->removeDir($tempDir);
         }

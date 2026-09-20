@@ -172,7 +172,7 @@ final readonly class AnalyseCommandOptions
             changeScope:   new ChangeScopeOptions(
                                       diffMode:      $diffMode,
                                       since:         self::optionalStringOption($input, 'since'),
-                                      changedRanges: self::optionalStringOption($input, 'changed-ranges'),
+                                      changedRanges: self::providedStringOption($input, 'changed-ranges'),
                                       changedScope:  self::optionalStringOption($input, 'changed-scope') ?? 'symbol',
                                       diffVs:        self::optionalStringOption($input, 'diff-base') ?? self::optionalStringOption($input, 'diff-vs'),
                                       isChangedOnly: (bool)$input->getOption('changed-only'),
@@ -536,6 +536,25 @@ final readonly class AnalyseCommandOptions
         $optionValue = $input->getOption($name);
 
         return is_string($optionValue) && $optionValue !== '' ? $optionValue : null;
+    }
+
+    /**
+     * Reads a string option that must tell "the user never gave it" apart from "the user gave it empty".
+     *
+     * `optionalStringOption()` folds an empty value into null, which suits an option whose empty form means unset.
+     * `--changed-ranges=` instead asks to scope the run and names no range, which the range parser refuses; folding
+     * it into null would run the whole tree without saying so.
+     *
+     * @param InputInterface $input - Console input to read the option from.
+     * @param string         $name  - Option name to look up.
+     *
+     * @return string|null - The value exactly as typed, including an empty string; null only when the option is absent.
+     */
+    private static function providedStringOption(InputInterface $input, string $name): ?string
+    {
+        $optionValue = $input->getOption($name);
+
+        return is_string($optionValue) ? $optionValue : null;
     }
 
     /**

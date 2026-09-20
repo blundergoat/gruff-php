@@ -62,6 +62,12 @@ final class AnalyseCommand extends Command
     private const SUPERSEDED_SPELLINGS = ['diff-vs' => '--diff-base'];
 
     /**
+     * The one type every port publishes when it cannot read the changed-region scope it was asked to analyse,
+     * whether that scope came from --changed-ranges, --diff or --since, so a consumer reading a scoped run's
+     * failure need not know which analyser produced it (FAMILY-CONTRACT.md section 6).
+     */
+
+    /**
      * Declares every argument, flag, and `--help` line the user can type after `gruff-php analyse` -
      * the paths to scan plus the long list of scope, baseline, mutation, diff, and output options.
      *
@@ -256,6 +262,8 @@ final class AnalyseCommand extends Command
         $findings = $this->withMutationFindings($findings, $mutationAnalysis);
 
         $findings = $this->findingsForChangedReview($findings, $options, $reviewDiff, $findingSupport);
+
+        $findings = $this->findingsWithinReadableScope($findings, $diagnostics);
 
         $suppressedCount = null;
         // A changed-region scope is active, so keep only findings inside the user's changed lines.
@@ -513,7 +521,7 @@ final class AnalyseCommand extends Command
         } catch (DiffException $exception) {
             // A user may name an unknown git ref or run outside a repository; report the scope error and keep the command failure actionable.
             $diagnostics[] = new RunDiagnostic(
-                type:    'diff-mode-error',
+                type:    RunDiagnostic::CHANGED_REGION_TYPE,
                 message: $exception->getMessage(),
             );
 
@@ -521,6 +529,27 @@ final class AnalyseCommand extends Command
         }
     }
 
+    /**
+     * Drops every finding when the run could not read the changed-region scope it was asked to analyse.
+     *
+     * A scope the run could not apply leaves nothing scoped to report, and publishing the unscoped findings beside
+     * the diagnostic would read as a successful narrow scan at a scope the run never applied.
+     *
+     * @param list<Finding>       $findings    - Findings the run produced before the scope was considered.
+     * @param list<RunDiagnostic> $diagnostics - Run diagnostics collected so far.
+     *
+     * @return list<Finding> - the findings unchanged, or none when a changed-region scope failure was recorded
+     */
+    private function findingsWithinReadableScope(array $findings, array $diagnostics): array
+    {
+        foreach ($diagnostics as $diagnostic) {
+            if ($diagnostic->type === RunDiagnostic::CHANGED_REGION_TYPE) {
+                return [];
+            }
+        }
+
+        return $findings;
+    }
     /**
      * Picks where the "changed region" for `--diff`, `--since`, or `--changed-ranges` comes from and
      * builds the diff that later narrows findings to just the lines the user touched.
@@ -591,7 +620,7 @@ final class AnalyseCommand extends Command
         // Line ranges mean nothing without a file to apply them to, so reject `--changed-ranges` when the user named no path.
         if ($changedFiles === []) {
             $diagnostics[] = new RunDiagnostic(
-                type:    'diff-mode-error',
+                type:    RunDiagnostic::CHANGED_REGION_TYPE,
                 message: '--changed-ranges requires at least one file path.',
             );
 
@@ -603,7 +632,7 @@ final class AnalyseCommand extends Command
         } catch (DiffException $exception) {
             // A user may type an inverted or malformed range such as `8-3`; report the option error instead of scanning an unintended scope.
             $diagnostics[] = new RunDiagnostic(
-                type:    'diff-mode-error',
+                type:    RunDiagnostic::CHANGED_REGION_TYPE,
                 message: $exception->getMessage(),
             );
 

@@ -581,7 +581,8 @@ final class AgentWorkflowCliTest extends TestCase
             self::assertSame(2, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
             $report = $this->decodeJson($process);
 
-            self::assertContains('diff-mode-error', $this->diagnosticTypes($report));
+            // One family type names every scope the run could not read, whichever flag asked for it.
+            self::assertContains('changed-region', $this->diagnosticTypes($report));
         } finally {
             $this->removeDir($repo);
         }
