@@ -153,6 +153,26 @@ final class SensitiveDataRulesTest extends TestCase
     }
 
     /**
+     * Models a config that shows where an AWS key goes with a run of X instead of the key.
+     * FAMILY-CONTRACT.md section 5 reads a body that is entirely X as naming no credential, while a real key that
+     * merely contains a run of X still reports, because hiding it would hide a live credential.
+     *
+     * @return void
+     */
+    public function testAwsKeyWhoseWholeBodyIsXIsReadAsMasked(): void
+    {
+        $masked   = str_repeat('X', 16);
+        $source   = "aws_access_key_id = AKIA{$masked}\n"
+            . "aws_session_key_id = ASIA{$masked}\n"
+            . 'aws_partly_masked_id = AKIA' . 'IOSFODNN' . str_repeat('X', 8) . "\n";
+        $unit     = new AnalysisUnit(new SourceFile(__FILE__, 'config.env', SourceFile::TYPE_TEXT), $source, [], [], []);
+        $context  = new RuleContext(self::PROJECT_ROOT, AnalysisConfig::fromRegistry(RuleRegistry::defaults()));
+        $findings = (new AwsAccessKeyRule())->analyse($unit, $context);
+
+        self::assertSame([3], array_map(static fn(Finding $finding): ?int => $finding->line, $findings));
+    }
+
+    /**
      * Verify matches inside PHP comments are skipped for opt-in pattern rules but private-key still fires.
      *
      * @return void

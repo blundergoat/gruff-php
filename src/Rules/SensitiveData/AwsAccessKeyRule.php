@@ -79,6 +79,11 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
                 continue;
             }
 
+            // A body that is entirely X shows where a key goes and names no credential (FAMILY-CONTRACT.md section 5).
+            if (self::isMaskedKey($candidateSecret)) {
+                continue;
+            }
+
             $findings[] = SecretScannerHelper::finding(
                 analysisUnit: $analysisUnit,
                 ruleId:       self::ID,
@@ -92,5 +97,19 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
         }
 
         return $findings;
+    }
+
+    /**
+     * Reports whether a key-shaped match is a masked value: the prefix followed by a body that is entirely X.
+     *
+     * Only the whole body counts, because a real key may contain a run of X and hiding it would hide a live credential.
+     *
+     * @param string $candidateSecret - The matched key-shaped literal.
+     *
+     * @return bool - true when the sixteen-character body is all X
+     */
+    private static function isMaskedKey(string $candidateSecret): bool
+    {
+        return preg_match('/^(?:AKIA|ASIA)X{16}$/', $candidateSecret) === 1;
     }
 }

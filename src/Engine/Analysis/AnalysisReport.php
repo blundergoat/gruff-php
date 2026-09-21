@@ -210,7 +210,7 @@ final readonly class AnalysisReport
         $runMetadata     = [
             'failOn' => $this->failOn,
             'format' => $this->format,
-            'inputs' => $this->machinePaths($this->requestedPaths),
+            'inputs' => $this->machineInputs($this->requestedPaths),
             'projectRoot' => '.',
         ];
 
@@ -696,6 +696,32 @@ final readonly class AnalysisReport
     private function machinePaths(array $paths): array
     {
         return array_values(array_unique(array_map(fn(string $path): string => $this->machinePath($path), $paths)));
+    }
+
+    /**
+     * Publishes the requested inputs that have a project-relative form and leaves out the rest.
+     *
+     * A run that could not start never resolved a project root, so its envelope is rooted at the launch directory, and
+     * a target named from a sibling directory, such as `analyse ../proj`, has no form under it. A host path may not be
+     * published, so the input is left out the way the config path beside it already is, instead of throwing away the
+     * one envelope that says why the run could not start.
+     *
+     * @param list<string> $paths - Requested paths as the caller passed them.
+     *
+     * @return list<string> - Unique project-relative POSIX paths in first-seen order, without any that lie outside the root.
+     */
+    private function machineInputs(array $paths): array
+    {
+        $inputs = [];
+        foreach ($paths as $path) {
+            $normalized = $this->machineRelativePath($path);
+            // An input with no project-relative form is left out rather than published as a host path.
+            if ($normalized !== null && $normalized !== '') {
+                $inputs[] = $normalized;
+            }
+        }
+
+        return array_values(array_unique($inputs));
     }
 
     /**

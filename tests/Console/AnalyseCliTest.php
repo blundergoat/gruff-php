@@ -657,6 +657,50 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
+     * Models a user in a sibling directory running `analyse ../proj` with a config that cannot load.
+     * The run never resolves a project root, so its envelope is rooted at the launch directory, where the target has
+     * no project-relative form; the command must still publish the config-error envelope and leave that input out.
+     *
+     * @return void
+     * @throws JsonException When the command prints no JSON envelope for the run that could not start.
+     */
+    public function testAnalyseCommandPublishesTheConfigErrorEnvelopeForATargetNamedFromASiblingDirectory(): void
+    {
+        $workspace = $this->tempDir();
+        self::assertTrue(mkdir($workspace . '/proj'));
+        self::assertTrue(mkdir($workspace . '/sib'));
+        self::assertNotFalse(file_put_contents($workspace . '/proj/a.php', "<?php\necho 1;\n"));
+
+        try {
+            $process = new Process([
+                                       PHP_BINARY,
+                                       self::PROJECT_ROOT . '/bin/gruff-php',
+                                       'analyse',
+                                       '../proj',
+                                       '--config',
+                                       '../missing.yaml',
+                                       '--format',
+                                       'json',
+                                       '--no-cache',
+                                   ], $workspace . '/sib');
+            $process->run();
+
+            self::assertSame(2, $process->getExitCode(), $process->getErrorOutput());
+            $report = $this->decodeJsonOutput($process);
+            $run    = $this->decodedJsonObjectAt($report, 'run');
+            self::assertSame([], $run['inputs'] ?? null);
+            self::assertArrayNotHasKey('config', $run);
+            $diagnostics = $report['diagnostics'] ?? null;
+            self::assertIsArray($diagnostics);
+            $diagnostic = $this->decodedJsonObject($diagnostics[0] ?? null);
+            self::assertSame('config-error', $diagnostic['type'] ?? null);
+            self::assertTrue($diagnostic['invalidatesRun'] ?? null);
+        } finally {
+            $this->removeDir($workspace);
+        }
+    }
+
+    /**
      * Loads the expected CLI output users should see and normalises its version stamps before comparison.
      * This keeps renderer checks focused on the UI contract when the application version changes.
      *
