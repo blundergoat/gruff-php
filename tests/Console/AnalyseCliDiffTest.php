@@ -62,23 +62,27 @@ final class AnalyseCliDiffTest extends CliTestCase
         try {
             file_put_contents($tempDir . '/Example.php', "<?php\n\nfinal class Example\n{\n    public function run(): void {}\n}\n");
 
-            $process = new Process([
-                                       PHP_BINARY,
-                                       self::PROJECT_ROOT . '/bin/gruff-php',
-                                       'hook',
-                                       'Example.php',
-                                       '--no-config',
-                                       '--changed-ranges',
-                                       '=abc',
-                                   ], $tempDir);
-            $process->run();
+            // An empty value is unreadable for the same reason a garbled one is: the caller asked for a scoped
+            // run and named no range, so reading it as "no filter" would widen the hook to the whole tree.
+            foreach (['=abc', ''] as $ranges) {
+                $process = new Process([
+                                           PHP_BINARY,
+                                           self::PROJECT_ROOT . '/bin/gruff-php',
+                                           'hook',
+                                           'Example.php',
+                                           '--no-config',
+                                           '--changed-ranges',
+                                           $ranges,
+                                       ], $tempDir);
+                $process->run();
 
-            self::assertSame(2, $process->getExitCode(), $process->getErrorOutput());
-            $payload = $this->decodeJsonOutput($process);
-            self::assertIsArray($payload['diagnostics']);
-            self::assertSame(['changed-region'], array_column($payload['diagnostics'], 'type'));
-            self::assertSame(['fatal'], array_column($payload['diagnostics'], 'severity'));
-            self::assertSame([], $payload['findings']);
+                self::assertSame(2, $process->getExitCode(), $process->getErrorOutput());
+                $payload = $this->decodeJsonOutput($process);
+                self::assertIsArray($payload['diagnostics']);
+                self::assertSame(['changed-region'], array_column($payload['diagnostics'], 'type'));
+                self::assertSame(['fatal'], array_column($payload['diagnostics'], 'severity'));
+                self::assertSame([], $payload['findings']);
+            }
         } finally {
             $this->removeDir($tempDir);
         }

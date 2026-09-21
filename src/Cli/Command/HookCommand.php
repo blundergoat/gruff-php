@@ -324,7 +324,7 @@ final class HookCommand extends Command
     private function runMode(InputInterface $input): string
     {
         // Explicit ranges are the narrowest selector and win when more than one is given.
-        if ($this->stringOption($input, 'changed-ranges') !== null) {
+        if ($this->providedStringOption($input, 'changed-ranges') !== null) {
             return 'changed-ranges';
         }
 
@@ -610,7 +610,7 @@ final class HookCommand extends Command
      */
     private function changedRegion(InputInterface $input, string $projectRoot, array $paths): ?DiffResult
     {
-        $changedRanges = $this->stringOption($input, 'changed-ranges');
+        $changedRanges = $this->providedStringOption($input, 'changed-ranges');
         // Explicit `--changed-ranges` is the most direct source: the caller hands us the exact lines it touched.
         if ($changedRanges !== null) {
             $changedFiles = (new AnalysisFindingSupport())->normaliseRequestedPaths($projectRoot, $paths);
@@ -1141,6 +1141,25 @@ final class HookCommand extends Command
         $rawOption = $input->getOption($name);
 
         return is_string($rawOption) && $rawOption !== '' ? $rawOption : null;
+    }
+
+    /**
+     * Reads an option the caller may legitimately pass empty, keeping `''` distinct from absence.
+     *
+     * `stringOption()` folds an empty value into null, which is right for every option where blank means
+     * "not given". It is wrong for `--changed-ranges`: `--changed-ranges=` asks to scope the run and names
+     * no range, and folding it into null would scan the whole tree without saying so.
+     *
+     * @param InputInterface $input - Console input to read the option from.
+     * @param string         $name  - Option name to look up.
+     *
+     * @return string|null - The value exactly as typed, including an empty string; null only when the option is absent.
+     */
+    private function providedStringOption(InputInterface $input, string $name): ?string
+    {
+        $rawOption = $input->getOption($name);
+
+        return is_string($rawOption) ? $rawOption : null;
     }
 
     /**
