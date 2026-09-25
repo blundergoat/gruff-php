@@ -304,6 +304,24 @@ foreach ($documentStampChecks as [$documentPath, $stampPattern, $stampLabel]) {
     }
 }
 
+// SUPPORT.md names a release series, not a version, so each of its release-line sentences must name the series
+// Application::VERSION belongs to; a stale line there once promised support for 0.3.x while 0.5.2 shipped.
+$supportBody = file_get_contents("SUPPORT.md");
+if ($supportBody === false) {
+    $fail("could not read SUPPORT.md");
+} elseif ($applicationVersion !== "") {
+    $supportedLine = preg_replace("/^(\d+\.\d+)\..*$/", "$1.x", $applicationVersion);
+    preg_match_all("/current `(\d+\.\d+\.x)` release line/", $supportBody, $supportMatches);
+    if ($supportMatches[1] === []) {
+        $fail("could not find the SUPPORT.md release-line sentence");
+    }
+    foreach ($supportMatches[1] as $supportLine) {
+        if ($supportLine !== $supportedLine) {
+            $fail("SUPPORT.md names the " . $supportLine . " release line but Application::VERSION is " . $applicationVersion . "; the supported line is " . $supportedLine);
+        }
+    }
+}
+
 if ($errors !== []) {
     fwrite(STDOUT, implode("\n", $errors));
     exit(1);

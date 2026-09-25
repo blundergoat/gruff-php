@@ -687,14 +687,74 @@ final class AnalyseCliTest extends CliTestCase
 
             self::assertSame(2, $process->getExitCode(), $process->getErrorOutput());
             $report = $this->decodeJsonOutput($process);
-            $run    = $this->decodedJsonObjectAt($report, 'run');
-            self::assertSame([], $run['inputs'] ?? null);
-            self::assertArrayNotHasKey('config', $run);
+            $runBlock = $this->decodedJsonObjectAt($report, 'run');
+            self::assertSame([], $runBlock['inputs'] ?? null);
+            self::assertArrayNotHasKey('config', $runBlock);
             $diagnostics = $report['diagnostics'] ?? null;
             self::assertIsArray($diagnostics);
             $diagnostic = $this->decodedJsonObject($diagnostics[0] ?? null);
             self::assertSame('config-error', $diagnostic['type'] ?? null);
             self::assertTrue($diagnostic['invalidatesRun'] ?? null);
+        } finally {
+            $this->removeDir($workspace);
+        }
+    }
+
+    /**
+     * Models a user in a sibling directory running `analyse ../a ../b`: two targets with no root inside the launch
+     * directory. The command must publish one run-invalidating target-error diagnostic and no findings, rather than
+     * failing while the report is rendered, and one such target on its own must still analyse.
+     *
+     * @return void
+     * @throws JsonException When the command prints no JSON envelope for the refused run.
+     */
+    public function testAnalyseCommandRefusesSeveralTargetsOutsideTheLaunchDirectoryWithAnEnvelope(): void
+    {
+        $workspace = $this->tempDir();
+        self::assertTrue(mkdir($workspace . '/a'));
+        self::assertTrue(mkdir($workspace . '/b'));
+        self::assertTrue(mkdir($workspace . '/sib'));
+        self::assertNotFalse(file_put_contents($workspace . '/a/one.php', "<?php\necho 1;\n"));
+        self::assertNotFalse(file_put_contents($workspace . '/b/two.php', "<?php\necho 2;\n"));
+
+        try {
+            $process = new Process([
+                                       PHP_BINARY,
+                                       self::PROJECT_ROOT . '/bin/gruff-php',
+                                       'analyse',
+                                       '../a',
+                                       '../b',
+                                       '--no-config',
+                                       '--format',
+                                       'json',
+                                       '--no-cache',
+                                   ], $workspace . '/sib');
+            $process->run();
+
+            self::assertSame(2, $process->getExitCode(), $process->getErrorOutput());
+            $report      = $this->decodeJsonOutput($process);
+            $diagnostics = $report['diagnostics'] ?? null;
+            self::assertIsArray($diagnostics);
+            self::assertCount(1, $diagnostics);
+            $diagnostic = $this->decodedJsonObject($diagnostics[0] ?? null);
+            self::assertSame('target-error', $diagnostic['type'] ?? null);
+            self::assertTrue($diagnostic['invalidatesRun'] ?? null);
+            self::assertSame([], $report['findings'] ?? null);
+
+            $single = new Process([
+                                      PHP_BINARY,
+                                      self::PROJECT_ROOT . '/bin/gruff-php',
+                                      'analyse',
+                                      '../a',
+                                      '--no-config',
+                                      '--format',
+                                      'json',
+                                      '--fail-on',
+                                      'none',
+                                      '--no-cache',
+                                  ], $workspace . '/sib');
+            $single->run();
+            self::assertSame(0, $single->getExitCode(), $single->getErrorOutput());
         } finally {
             $this->removeDir($workspace);
         }

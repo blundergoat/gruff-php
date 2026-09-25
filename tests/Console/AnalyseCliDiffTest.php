@@ -78,10 +78,10 @@ final class AnalyseCliDiffTest extends CliTestCase
 
                 self::assertSame(2, $process->getExitCode(), $process->getErrorOutput());
                 $payload = $this->decodeJsonOutput($process);
-                self::assertIsArray($payload['diagnostics']);
-                self::assertSame(['changed-region'], array_column($payload['diagnostics'], 'type'));
-                self::assertSame(['fatal'], array_column($payload['diagnostics'], 'severity'));
-                self::assertSame([], $payload['findings']);
+                self::assertIsArray($payload['diagnostics'], $ranges);
+                self::assertSame(['changed-region'], array_column($payload['diagnostics'], 'type'), $ranges);
+                self::assertSame(['fatal'], array_column($payload['diagnostics'], 'severity'), $ranges);
+                self::assertSame([], $payload['findings'], $ranges);
             }
         } finally {
             $this->removeDir($tempDir);
@@ -122,7 +122,7 @@ final class AnalyseCliDiffTest extends CliTestCase
 
                 self::assertSame(2, $process->getExitCode(), $process->getErrorOutput());
                 $report = $this->decodeJsonOutput($process);
-                self::assertIsArray($report['diagnostics']);
+                self::assertIsArray($report['diagnostics'], $ranges);
                 self::assertSame(['changed-region'], array_column($report['diagnostics'], 'type'), $ranges);
                 self::assertSame([], $report['findings'], $ranges);
             }

@@ -36,7 +36,7 @@ php bin/gruff-php summary tests/Fixtures/Source/mixed --no-config --top=3
 ```
 
 ```
-gruff-php 0.5.2 summary
+gruff-php 0.6.0 summary
 Composite: B (86.22 / 100)
 Findings: 23 total · 0 error · 6 warning · 17 advisory
 
@@ -85,7 +85,7 @@ php bin/gruff-php summary tests/Fixtures/Source/mixed --no-config --format=json 
 ```json
 {
   "schemaVersion": "gruff.summary.v3",
-  "tool": { "name": "gruff-php", "version": "0.5.2" },
+  "tool": { "name": "gruff-php", "version": "0.6.0" },
   "run": {
     "failOn": "none",
     "format": "json",

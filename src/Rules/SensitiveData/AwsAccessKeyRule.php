@@ -110,6 +110,7 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
      */
     private static function isMaskedKey(string $candidateSecret): bool
     {
+        // Matches an AKIA or ASIA key id whose sixteen-character body is all X, the documented masking.
         return preg_match('/^(?:AKIA|ASIA)X{16}$/', $candidateSecret) === 1;
     }
 }

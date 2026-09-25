@@ -8,7 +8,7 @@ Treat analyzer output as sensitive when scanning private code.
 
 | Version | Supported |
 | --- | --- |
-| Current `0.3.x` release line | Supported. |
+| Current `0.6.x` release line | Supported. |
 | Older development snapshots | Best effort only. |
 
 ## Reporting A Vulnerability

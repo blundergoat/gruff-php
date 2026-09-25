@@ -36,7 +36,7 @@ final class Application extends SymfonyApplication
     /**
      * Version shown by `--version` and stamped onto every report the user sees.
      */
-    public const VERSION = '0.5.2';
+    public const VERSION = '0.6.0';
 
     /**
      * Registers the full command surface so every `gruff-php <command>` a user types is wired up.

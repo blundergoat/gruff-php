@@ -74,7 +74,49 @@ final readonly class AnalyseCommandSetupBuilder
             );
         }
 
-        return $this->buildSetup($input, $output, $symfonyApplication, $projectRoot);
+        return $this->buildSetup(
+            $input,
+            $output,
+            $symfonyApplication,
+            $projectRoot,
+            self::targetOutsideLaunchDirectory($launchDirectory, $requestedPaths),
+        );
+    }
+
+    /**
+     * Name the first of several targets that sits outside the launch directory.
+     *
+     * One such target is supported: `gruff-php analyse /srv/checkout` makes it the project root. Several are not, because
+     * the paths the run reports are resolved against one root, so `../a` and `../b` from a sibling directory would leave
+     * nothing the report can express. The caller refuses that run with an envelope instead of failing mid-render.
+     *
+     * @param string       $launchDirectory - Working directory the command was started from.
+     * @param list<string> $paths           - Scan targets as typed on the command line.
+     *
+     * @return string|null - The first target outside the launch directory when two or more were named, otherwise null.
+     */
+    private static function targetOutsideLaunchDirectory(string $launchDirectory, array $paths): ?string
+    {
+        // A single target, or none, always has a root the run can report against.
+        if (count($paths) < 2) {
+            return null;
+        }
+
+        foreach ($paths as $path) {
+            $absolute = self::isAbsolutePath($path) ? $path : $launchDirectory . DIRECTORY_SEPARATOR . $path;
+            $resolved = realpath($absolute);
+            // A path that does not exist is reported as missing by discovery, not refused here.
+            if ($resolved === false) {
+                continue;
+            }
+
+            // One target outside the launch directory is enough to leave the targets with no shared root to report from.
+            if (!self::isSameOrDescendant($resolved, $launchDirectory)) {
+                return $path;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -179,6 +221,7 @@ final readonly class AnalyseCommandSetupBuilder
      * @param OutputInterface         $output             - Console output used for the optional first-run init prompt.
      * @param SymfonyApplication|null $symfonyApplication - Console application used to dispatch `init`; null skips the first-run config offer.
      * @param string                  $projectRoot        - Working directory the run is anchored to, already known to be readable.
+     * @param string|null             $outsideTarget      - First of several targets outside the launch directory, or null.
      *
      * @return AnalyseCommandSetupResult - Ready setup when every check passes, otherwise the first usage or config error hit.
      */
@@ -187,6 +230,7 @@ final readonly class AnalyseCommandSetupBuilder
         OutputInterface $output,
         ?SymfonyApplication $symfonyApplication,
         string $projectRoot,
+        ?string $outsideTarget,
     ): AnalyseCommandSetupResult {
         $options = AnalyseCommandOptions::fromInput($input);
         // The user passed `--no-config` and `--config` together; obeying one would silently ignore the
@@ -230,6 +274,24 @@ final readonly class AnalyseCommandSetupBuilder
                     $formatResult,
                     $failThreshold->value,
                     'Unsupported mutation budget. Use a non-negative integer.',
+                ),
+                $formatResult,
+            );
+        }
+
+        // Several targets outside the launch directory have no root to report from, so a machine caller reads the
+        // refusal from the envelope rather than a render failure on stderr.
+        if ($outsideTarget !== null) {
+            return AnalyseCommandSetupResult::reportError(
+                $this->usageReport(
+                    $options,
+                    $formatResult,
+                    $failThreshold->value,
+                    sprintf(
+                        'Target "%s" is outside the launch directory; gruff-php analyses several targets only from a directory that contains them all.',
+                        $outsideTarget,
+                    ),
+                    'target-error',
                 ),
                 $formatResult,
             );
@@ -729,7 +791,7 @@ final readonly class AnalyseCommandSetupBuilder
      * @param OutputFormat          $format  - Format the caller will render this error report in.
      * @param string                $failOn  - Fail-on value to record on the report so its threshold field stays accurate.
      * @param string                $message - Human-readable remediation text shown to the user as the diagnostic.
-     * @param string                $type    - Diagnostic category, either 'usage-error' (default) or 'config-error'.
+     * @param string                $type    - Diagnostic category: 'usage-error' (default), 'config-error' or 'target-error'.
      *
      * @return AnalysisReport - Report carrying the diagnostic and invalid exit code.
      */
