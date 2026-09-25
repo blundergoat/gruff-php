@@ -15,6 +15,7 @@ use GruffPhp\Output\Reporter\FailThreshold;
 use GruffPhp\Output\Reporter\FailThresholds;
 use GruffPhp\Output\Reporter\OutputFormat;
 use GruffPhp\Rules\RuleRegistry;
+use GruffPhp\Support\PathHelper;
 use Symfony\Component\Console\Application as SymfonyApplication;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -75,6 +76,16 @@ final readonly class AnalyseCommandSetupBuilder
         }
 
         $input->setArgument('paths', self::targetsForRoot($launchDirectory, $projectRoot, $requestedPaths));
+
+        // A baseline path means what the user typed from the launch directory, as the targets do.
+        foreach (['baseline', 'generate-baseline', 'migrate-baseline'] as $baselineOption) {
+            $typedPath = $input->hasOption($baselineOption) ? $input->getOption($baselineOption) : null;
+
+            // A bare `--baseline` names the default file at the project root, so only a typed path is rewritten.
+            if (is_string($typedPath) && $typedPath !== '') {
+                $input->setOption($baselineOption, self::pathForRoot($launchDirectory, $projectRoot, $typedPath));
+            }
+        }
 
         return $this->buildSetup(
             $input,
@@ -144,6 +155,30 @@ final readonly class AnalyseCommandSetupBuilder
             static fn(string $path): string => self::isAbsolutePath($path) ? $path : $launchDirectory . DIRECTORY_SEPARATOR . $path,
             $paths,
         );
+    }
+
+    /**
+     * Rewrite a path the user typed, such as `--baseline`, so that read against the project root it names the file they
+     * meant from the launch directory. Read against the root, `../../base.json` typed two levels inside the project named
+     * a file above it: a read missed it, and a write landed outside the project.
+     *
+     * @param string $launchDirectory - Working directory the command was started from.
+     * @param string $projectRoot     - Root chosen by projectRootFromTargets().
+     * @param string $path            - The path as typed on the command line.
+     *
+     * @return string - The path as typed when it is absolute or typed from the root, otherwise the same file relative to
+     *                  the root, or its absolute path when it lies outside the project.
+     */
+    public static function pathForRoot(string $launchDirectory, string $projectRoot, string $path): string
+    {
+        // Inside the launch directory the root and the typed path already agree, so the path is passed on as typed.
+        if ($launchDirectory === $projectRoot || PathHelper::isAbsolute($path)) {
+            return $path;
+        }
+
+        $target = PathHelper::canonical(PathHelper::resolveAgainst($launchDirectory, $path));
+
+        return PathHelper::relativeToRoot($target, $projectRoot) ?? $target;
     }
 
     /**
@@ -372,7 +407,7 @@ final readonly class AnalyseCommandSetupBuilder
         }
 
         $options      = $options->withDefaultBaseline($projectRoot);
-        $configLoader = new ConfigLoader($projectRoot, ConfigLoader::packageRoot());
+        $configLoader = new ConfigLoader($projectRoot, ConfigLoader::packageRoot(), shouldResolveFromLaunchDir: true);
         $configResult = $this->config(
             options:       $options,
             registry:      $registry,

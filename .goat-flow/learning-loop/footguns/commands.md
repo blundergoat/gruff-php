@@ -1,6 +1,6 @@
 ---
 category: commands
-last_reviewed: 2026-08-22
+last_reviewed: 2026-09-25
 ---
 
 # CLI Command Footguns
@@ -66,6 +66,25 @@ asserting that the report actually analysed a file produced the valid cost serie
 **Evidence:** Measured 2026-08-16 on `e8bd21a`, reproduced with the fixture behind `tests/Review/AgentWorkflowCliTest.php` (search: `testBranchReviewDeletedFileReportsRemovedFindings`). A branch deleting its only changed PHP file, scanned with `--diff-vs=HEAD --changed-only`, reported `filesDiscovered: 0`, diagnostic `empty-analysis`, no `score` key, and `deltaScore: 11.200000000000003`. The TEXT report printed "the score is not applicable" and `Score delta: +11.20` eleven lines apart. Codex flagged it as P2 on PR #13.
 
 **Prevention:** Grep the suppressed value's producer for every read before adding the guard - here `$score->composite->score` and the separate `$reviewScore` recomputation are two reads of one calculator. A guard that lives at the render site protects one surface; a guard that lives at the value's source protects all of them. Suppressing at the source runs the mirror risk, so audit the renderers too: a type may already be nullable while nothing in production ever produced null, which leaves consumers untested against it. `deltaScore` was `?float` throughout `src/Results/Review/` yet only unit tests ever built one, and `src/Output/Reporter/TextReporter.php` (search: `Score delta`) is its only renderer and already guarded. Derived counts are not affected: the review's `perRuleDelta` block counts findings rather than pricing them, so it still reports what a deletion removed.
+
+## Footgun: ConfigLoader's explicit-path base is shared by the CLI and every in-process caller
+
+**Status:** active | **Created:** 2026-09-25 | **Evidence:** OBSERVED
+
+`src/Engine/Config/ConfigLoader.php` (search: `public function resolveConfigPath`) resolves an explicit config path for
+two kinds of caller. The CLI commands pass the `--config` the user typed, which the family reads against the launch
+directory. The loader's own tests pass a temporary project root and a bare file name, which they expect to be read
+against that root. M10's D25 first changed the base inside `resolveConfigPath` to `getcwd()`. The CLI test passed,
+but 95 tests in `ConfigLoaderTest`, `ConfigLoaderRuleOptionsTest`, `SensitiveExclusionConfigParserTest` and three
+others failed with `Config file not found`.
+
+**Evidence:** the D25 gate run on 2026-09-25 (25 errors, 71 failures). The fix is the constructor flag
+`shouldResolveFromLaunchDir`, which `AnalyseCommandSetupBuilder`, `SummaryCommand`, `ReportCommand`,
+`CheckIgnoreCommand` and `HookCommand` set. `DashboardStateFactory` does not set it, because the dashboard's scan
+subprocess runs with its working directory at the scanned project root.
+
+**Prevention:** Change what a typed CLI path means at the CLI edge, not in a loader other code constructs directly.
+Run the whole suite, not only the new CLI test, before calling the change done.
 
 ## Resolved Entries
 

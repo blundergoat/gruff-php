@@ -701,6 +701,72 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
+     * `--config` means the path the user typed, so from a nested directory `../../cfg.yaml` is read against that
+     * directory, as the `../..` target is, and not against the project root the target resolves to, where it named no
+     * file and the run refused with a config error.
+     *
+     * @return void
+     */
+    public function testAnalyseCommandReadsAnExplicitRelativeConfigFromTheLaunchDirectory(): void
+    {
+        $project = $this->tempDir();
+        self::assertTrue(mkdir($project . '/a/b', 0777, true));
+        self::assertNotFalse(file_put_contents($project . '/a.php', "<?php\necho 1;\n"));
+        self::assertNotFalse(file_put_contents($project . '/cfg.yaml', "schemaVersion: \"gruff-php.config.v0.1\"\nminimumSeverity: error\n"));
+        $arguments = [PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'analyse', '--format', 'json', '--fail-on', 'none', '--no-baseline', '--no-cache'];
+
+        try {
+            $nested = new Process([...$arguments, '--config', '../../cfg.yaml', '../..'], $project . '/a/b');
+            $nested->run();
+            $inside = new Process([...$arguments, '--config', 'cfg.yaml', '.'], $project);
+            $inside->run();
+
+            self::assertSame(0, $nested->getExitCode(), $nested->getOutput() . $nested->getErrorOutput());
+            self::assertSame($this->decodeJsonOutput($inside)['findings'] ?? null, $this->decodeJsonOutput($nested)['findings'] ?? null);
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+
+    /**
+     * A baseline path typed two levels inside the project names the project's own file, for writing and for reading.
+     * Read against the project root it named a file above the project: the write landed there, and the read crashed
+     * rendering the missing file's diagnostic, exiting 1 with nothing on stdout.
+     *
+     * @return void
+     */
+    public function testAnalyseCommandReadsTypedBaselinePathsFromTheLaunchDirectory(): void
+    {
+        $workspace = $this->tempDir();
+        $project   = $workspace . '/outer/project';
+        self::assertTrue(mkdir($project . '/a/b', 0777, true));
+        self::assertNotFalse(file_put_contents($project . '/a.php', "<?php\necho 1;\n"));
+        $arguments = [PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'analyse', '--no-config', '--fail-on', 'none', '--no-cache'];
+
+        try {
+            $generated = new Process([...$arguments, '--generate-baseline', '../../base.json', '../..'], $project . '/a/b');
+            $generated->run();
+            $applied = new Process([...$arguments, '--format', 'json', '--baseline', '../../base.json', '../..'], $project . '/a/b');
+            $applied->run();
+            $outside = new Process([...$arguments, '--format', 'json', '--baseline', '../missing.json', '.'], $project);
+            $outside->run();
+
+            self::assertSame(0, $generated->getExitCode(), $generated->getOutput() . $generated->getErrorOutput());
+            self::assertFileExists($project . '/base.json');
+            self::assertFileDoesNotExist($workspace . '/outer/base.json');
+            self::assertSame(0, $applied->getExitCode(), $applied->getOutput() . $applied->getErrorOutput());
+            $baseline = $this->decodedJsonObjectAt($this->decodeJsonOutput($applied), 'baseline');
+            self::assertTrue($baseline['applied'] ?? null);
+            self::assertSame('base.json', $baseline['path'] ?? null);
+            self::assertSame(2, $outside->getExitCode(), $outside->getErrorOutput());
+            self::assertStringNotContainsString($workspace, $outside->getOutput());
+            self::assertSame('gruff.analysis.v3', $this->decodeJsonOutput($outside)['schemaVersion'] ?? null);
+        } finally {
+            $this->removeDir($workspace);
+        }
+    }
+
+    /**
      * Models a user in a sibling directory running `analyse ../a ../b`: two targets with no root inside the launch
      * directory. The command must publish one run-invalidating target-error diagnostic and no findings, rather than
      * failing while the report is rendered, and one such target on its own must still analyse.

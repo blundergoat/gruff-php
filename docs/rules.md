@@ -450,7 +450,10 @@ library rather than to PHP.
 `sensitive-data.high-entropy-string` reads `minLength` and `entropy` and
 nothing else: lowering `minLength` below 32 widens the scan, down to the
 shortest literal that can reach the `entropy` bar (2^`entropy` characters),
-and a pure-hex literal is skipped at any `entropy`, as in gruff-go. Across the secret rules, a
+and a pure-hex literal is skipped at any `entropy`, as in gruff-go. A literal
+must also hold at least one letter and one digit, the floor FAMILY-CONTRACT
+section 12 sets for all five ports, because a run of one character class clears
+the `entropy` bar by construction and a digit-free mix of cases is an identifier. Across the secret rules, a
 placeholder word such as `test` or `example` suppresses a value only when it
 begins a token, so `latest` and `attestation` still report.
 

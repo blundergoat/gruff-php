@@ -518,7 +518,7 @@ final class ReportCommand extends Command
         }
 
         try {
-            $config = (new ConfigLoader($projectRoot, ConfigLoader::packageRoot()))
+            $config = (new ConfigLoader($projectRoot, ConfigLoader::packageRoot(), shouldResolveFromLaunchDir: true))
                 ->load($this->optionalStringOption($input, 'config'), RuleRegistry::defaults());
         } catch (ConfigException) {
             // Swallow load errors here; the analyse subprocess re-loads the config and reports them itself.

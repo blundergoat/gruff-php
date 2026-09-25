@@ -414,9 +414,12 @@ final readonly class AnalysisReport
             'invalidatesRun' => $diagnostic->isFatal,
         ];
         $filePath = $diagnostic->filePath ?? $diagnostic->path;
+        $machineFile = $filePath === null || $filePath === '' ? null : $this->machineRelativePath($filePath);
 
-        if ($filePath !== null && $filePath !== '') {
-            $payload['file'] = $this->machinePath($filePath);
+        // A file outside the project, such as a baseline kept beside it, has no project-relative form and a host path
+        // may not be published, so the optional key is left out rather than failing the whole report.
+        if ($machineFile !== null && $machineFile !== '') {
+            $payload['file'] = $machineFile;
         }
 
         if ($diagnostic->line !== null && $diagnostic->line > 0) {

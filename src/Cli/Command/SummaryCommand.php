@@ -121,7 +121,7 @@ final class SummaryCommand extends Command
         }
 
         $registry     = RuleRegistry::defaults();
-        $configLoader = new ConfigLoader($projectRoot, ConfigLoader::packageRoot());
+        $configLoader = new ConfigLoader($projectRoot, ConfigLoader::packageRoot(), shouldResolveFromLaunchDir: true);
         $config       = $this->analysisConfig(
             noConfig:               $noConfig,
             configPath:             $configPath,
@@ -451,7 +451,8 @@ final class SummaryCommand extends Command
 
         $output->write($this->renderText($summaryReportData));
 
-        return Command::SUCCESS;
+        // The text digest ends the run the way the JSON one does: a run a parse error invalidated exits 2 in both.
+        return $summaryReportData->analysisReport->exitCode;
     }
 
     /**

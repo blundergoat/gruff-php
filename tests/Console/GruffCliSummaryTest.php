@@ -170,6 +170,37 @@ final class GruffCliSummaryTest extends CliTestCase
     }
 
     /**
+     * Verify the text and JSON digests both exit 2 on a run a parse error invalidated, and 0 once it parses.
+     *
+     * The text digest used to end every run with success, so a gate on `gruff-php summary` passed a broken run.
+     *
+     * @return void
+     */
+    public function testSummaryExitsTwoInTextAndJsonWhenAParseErrorInvalidatesTheRun(): void
+    {
+        $workspace = $this->tempDir();
+        self::assertNotFalse(file_put_contents($workspace . '/Broken.php', "<?php\n\nfunction broken( {\n"));
+
+        try {
+            foreach ([[], ['--format', 'json']] as $formatArguments) {
+                $process = new Process(
+                    [PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'summary', '.', '--no-config', ...$formatArguments],
+                    $workspace,
+                );
+                $process->run();
+                self::assertSame(2, $process->getExitCode(), 'summary ' . implode(' ', $formatArguments) . ': ' . $process->getOutput());
+            }
+
+            self::assertNotFalse(file_put_contents($workspace . '/Broken.php', "<?php\n\nfunction mended(): void\n{\n}\n"));
+            $mended = new Process([PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'summary', '.', '--no-config'], $workspace);
+            $mended->run();
+            self::assertSame(0, $mended->getExitCode(), $mended->getOutput());
+        } finally {
+            $this->removeDir($workspace);
+        }
+    }
+
+    /**
      * Verify summary JSON is the exact findings-free projection of analysis JSON for the same inputs.
      *
      * @return void

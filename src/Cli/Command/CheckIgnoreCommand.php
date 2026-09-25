@@ -158,7 +158,7 @@ final class CheckIgnoreCommand extends Command
         }
 
         try {
-            $configLoader = new ConfigLoader($projectRoot, ConfigLoader::packageRoot());
+            $configLoader = new ConfigLoader($projectRoot, ConfigLoader::packageRoot(), shouldResolveFromLaunchDir: true);
 
             // Load through the same `ConfigLoader` that `analyse` uses, so both commands agree on
             // which paths a given config excludes.

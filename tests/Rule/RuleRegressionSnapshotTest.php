@@ -60,12 +60,14 @@ final class RuleRegressionSnapshotTest extends TestCase
         // other rules raise on that new fixture code. The operator-requested double-check added 39 more: 3 on the
         // dynamic-call fixture's two new pins, 33 on the two inherited-contract fixtures (21 docs tags the narrowed
         // exemption owes, 12 from other rules), and 3 docs tags on older fixtures that exemption no longer hides.
-        self::assertCount(2792, $findings);
+        // M10 D23 (2026-09-25) removed one: synthetic-secrets.php's digit-free mixed-case alphabet run, since a
+        // qualifying high-entropy literal now holds a letter and a digit.
+        self::assertCount(2791, $findings);
         // M08 made sensitive-data markers carry the class the detector already knew: a classified finding now reads
         // `[redacted:aws-access-key]` where it read `[redacted]`. The finding count, the rule set, and every
         // line-free identity are unchanged; only the marker text inside those findings moved.
         self::assertSame(
-            'd7dd1f9fa86e81626c4353f49c3e1256cfbd3966c4b7ca119a4811e6f53738a0',
+            'af314acfbc47b67f3ea79204430a949a061927b5ceabae129512cd281f40cf47',
             hash('sha256', $json),
         );
     }

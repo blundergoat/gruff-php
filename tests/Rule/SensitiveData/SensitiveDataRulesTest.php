@@ -56,8 +56,9 @@ final class SensitiveDataRulesTest extends TestCase
         self::assertRuleCount(JwtTokenRule::ID, 1, $findings);
         self::assertRuleCount(DatabaseUrlPasswordRule::ID, 1, $findings);
         self::assertRuleCount(HardcodedEnvValueRule::ID, 1, $findings);
-        // Two, not three: the fixture's pure-hex digest is a checksum, skipped at any entropy bar since 2026-09-19.
-        self::assertRuleCount(HighEntropyStringRule::ID, 2, $findings);
+        // One, not three: the fixture's pure-hex digest is a checksum, skipped at any entropy bar since 2026-09-19, and
+        // its digit-free mixed-case alphabet run holds no digit, which FAMILY-CONTRACT section 12 requires since 2026-09-25.
+        self::assertRuleCount(HighEntropyStringRule::ID, 1, $findings);
         self::assertRuleCount(PrivateKeyRule::ID, 1, $findings);
 
         $messages      = implode("\n", array_map(static fn(Finding $finding): string => $finding->message, $findings));
@@ -221,6 +222,41 @@ final class SensitiveDataRulesTest extends TestCase
 
             self::assertCount(1, $findings);
             self::assertSame('[redacted]', $findings[0]->metadata['preview'] ?? null);
+        } finally {
+            self::assertTrue(unlink($path));
+        }
+    }
+
+    /**
+     * Verify a literal without both a letter and a digit stays quiet while one mixing them still reports.
+     *
+     * FAMILY-CONTRACT section 12's floor: a lowercase-only or uppercase-only run clears the entropy bar by construction,
+     * and a digit-free mix of cases is an identifier. The single-class literal is the OOXML MIME type gruff-php reported twelve times in the
+     * family corpus; the mixed literal is assembled from parts so this file stores none whole.
+     *
+     * @return void
+     */
+    public function testHighEntropyNeedsALetterAndADigit(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'gruff-class-entropy-');
+        self::assertIsString($path);
+        $path  .= '.php';
+        $lower  = 'application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml';
+        $source = "<?php\n\n"
+                  . '$lower = ' . var_export($lower, true) . ";\n"
+                  . '$upper = ' . var_export(strtoupper($lower), true) . ";\n"
+                  . '$camel = ' . var_export('VxEzAaWdSdWcVvUvRyYa' . 'BvKvBgDqLcQsTgDdKeFmPdRjP', true) . ";\n"
+                  . '$mixed = ' . var_export('k3j9x2m7q1w8e5r4' . 't6y0u9i8o7p6a5s4' . 'd3f2g1h0zb', true) . ";\n";
+        self::assertNotFalse(file_put_contents($path, $source));
+
+        try {
+            $unit     = (new PhpFileParser())->parse(new SourceFile($path, 'tests/Fixtures/SensitiveData/inline-class-entropy.php'));
+            $findings = array_values(array_filter(
+                                         $this->analyseUnits([$unit]),
+                                         static fn(Finding $finding): bool => $finding->ruleId === HighEntropyStringRule::ID,
+            ));
+
+            self::assertSame([6], array_map(static fn(Finding $finding): ?int => $finding->line, $findings));
         } finally {
             self::assertTrue(unlink($path));
         }

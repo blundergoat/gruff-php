@@ -174,6 +174,12 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
                 continue;
             }
 
+            // Without a letter and a digit a literal is not credential-shaped: one character class clears the entropy bar
+            // by construction, and a digit-free mix of cases is an identifier (FAMILY-CONTRACT section 12).
+            if (!$this->hasLetterAndDigit($candidateSecret)) {
+                continue;
+            }
+
             // Below the configured entropy bar the literal reads as ordinary text; the bar is the only entropy gate.
             if (SecretScannerHelper::entropy($candidateSecret) < $entropyThreshold) {
                 continue;
@@ -508,6 +514,22 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
 
         // Remaining HL7-bearing tokens count as metadata only when an explicit HL7 code field names them.
         return str_contains($candidateSecret, 'HL7') && $hasHl7MetadataField;
+    }
+
+    /**
+     * Reports whether a literal carries at least one letter and at least one digit.
+     *
+     * FAMILY-CONTRACT section 12 sets this floor for all five ports: a run of one character class, such as random-letter
+     * test data or a MIME type, clears the entropy bar by construction, and a digit-free mix of cases is an identifier.
+     *
+     * @param string $candidateSecret - Quoted literal being classified.
+     *
+     * @return bool - True when the literal holds both a letter and a digit.
+     */
+    private function hasLetterAndDigit(string $candidateSecret): bool
+    {
+        return strpbrk($candidateSecret, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ') !== false
+            && strpbrk($candidateSecret, '0123456789') !== false;
     }
 
     /**

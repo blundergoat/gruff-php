@@ -71,12 +71,15 @@ final readonly class ConfigLoader
     /**
      * Builds a config loader for one project root, with an optional packaged-config fallback.
      *
-     * @param string      $projectRoot        - Project root used for primary config discovery.
-     * @param string|null $fallbackConfigRoot - Packaged fallback root; null limits discovery to the user's project.
+     * @param string      $projectRoot                - Project root used for primary config discovery.
+     * @param string|null $fallbackConfigRoot         - Packaged fallback root; null limits discovery to the user's project.
+     * @param bool        $shouldResolveFromLaunchDir - True when an explicit path came from a `--config` the user typed,
+     *                                                  so it is read against the launch directory rather than the project root.
      */
     public function __construct(
         private string  $projectRoot,
         private ?string $fallbackConfigRoot = null,
+        private bool    $shouldResolveFromLaunchDir = false,
     ) {
     }
 
@@ -143,9 +146,11 @@ final readonly class ConfigLoader
      */
     public function resolveConfigPath(?string $configPath): ?string
     {
-        // A path the user passed with --config is honoured first.
+        // A path the user passed with --config is honoured first, and means what was typed: relative to the launch
+        // directory, as scan targets are, not to the project root the targets resolve to.
         if ($configPath !== null && $configPath !== '') {
-            $path = PathHelper::resolveAgainst($this->projectRoot, $configPath);
+            $launchDirectory = $this->shouldResolveFromLaunchDir ? getcwd() : false;
+            $path            = PathHelper::resolveAgainst($launchDirectory === false ? $this->projectRoot : $launchDirectory, $configPath);
 
             if (!is_file($path)) {
                 throw new ConfigException(sprintf('Config file not found: %s', $configPath));
