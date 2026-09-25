@@ -74,6 +74,8 @@ final readonly class AnalyseCommandSetupBuilder
             );
         }
 
+        $input->setArgument('paths', self::targetsForRoot($launchDirectory, $projectRoot, $requestedPaths));
+
         return $this->buildSetup(
             $input,
             $output,
@@ -120,6 +122,31 @@ final readonly class AnalyseCommandSetupBuilder
     }
 
     /**
+     * Rewrite each relative target as an absolute path from the launch directory when the project root is elsewhere.
+     *
+     * Discovery reads operands against the project root, so `..` typed from `proj/src` names `proj`, but read against the
+     * root `proj` it named the directory above the project, which was then scanned and failed on its first path.
+     *
+     * @param string       $launchDirectory - Working directory the command was started from.
+     * @param string       $projectRoot     - Root chosen by projectRootFromTargets().
+     * @param list<string> $paths           - Scan targets as typed on the command line.
+     *
+     * @return list<string> - The targets unchanged when the root is the launch directory, otherwise each relative one anchored to it.
+     */
+    public static function targetsForRoot(string $launchDirectory, string $projectRoot, array $paths): array
+    {
+        // Inside the launch directory the root and the operands already agree, so they are passed on exactly as typed.
+        if ($launchDirectory === $projectRoot) {
+            return $paths;
+        }
+
+        return array_map(
+            static fn(string $path): string => self::isAbsolutePath($path) ? $path : $launchDirectory . DIRECTORY_SEPARATOR . $path,
+            $paths,
+        );
+    }
+
+    /**
      * Pick the directory that every reported path is written relative to.
      *
      * Run `gruff-php analyse .` inside a project and the answer is that directory. Run `gruff-php analyse /srv/checkout`
@@ -133,7 +160,7 @@ final readonly class AnalyseCommandSetupBuilder
      * @return string|null - Directory to treat as the project root; null when targets sit under different filesystem roots, such
      *                       as `analyse /srv/api /opt/tools`, leaving no single project to report against.
      */
-    private static function projectRootFromTargets(string $launchDirectory, array $paths): ?string
+    public static function projectRootFromTargets(string $launchDirectory, array $paths): ?string
     {
         // No target was named, so the directory the command ran from is the project.
         if ($paths === []) {

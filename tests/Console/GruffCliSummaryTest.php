@@ -7,7 +7,6 @@ namespace GruffPhp\Tests\Console;
 use GruffPhp\Cli\Application;
 use JsonException;
 use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
 /**
@@ -16,11 +15,8 @@ use Symfony\Component\Process\Process;
  * The suite protects digest sections, omitted finding detail, JSON schema, command registration, options, and config failures.
  * Users exercise these paths when they need a quick terminal overview or a stable summary payload for automation.
  */
-final class GruffCliSummaryTest extends TestCase
+final class GruffCliSummaryTest extends CliTestCase
 {
-    /** Project root used by filesystem and CLI tests. */
-    private const PROJECT_ROOT = __DIR__ . '/../..';
-
     /** Number of source files in the mixed-language summary fixture. */
     private const MIXED_FIXTURE_FILES = 7;
 
@@ -129,6 +125,48 @@ final class GruffCliSummaryTest extends TestCase
         self::assertArrayHasKey('error', $findings);
 
         self::assertArrayNotHasKey('findings', $decoded);
+    }
+
+    /**
+     * Verify summary and analyse JSON are the same from a sibling directory and from a subdirectory of the project as
+     * from inside it.
+     *
+     * Anchored to the launch directory, `summary ../project --format json` threw on the first path outside it and
+     * printed no JSON. Reading operands against the project root, `..` typed from `project/sub` named the directory
+     * above the project, here holding Stray.php, so both commands scanned it and threw.
+     *
+     * @return void
+     * @throws JsonException When a run prints no JSON envelope.
+     */
+    public function testMachineJsonIsTheSameFromAnyLaunchDirectory(): void
+    {
+        $workspace = $this->tempDir();
+        self::assertTrue(mkdir($workspace . '/project/sub', 0o777, true));
+        self::assertTrue(mkdir($workspace . '/sibling'));
+        self::assertNotFalse(file_put_contents(
+            $workspace . '/project/Sample.php',
+            "<?php\n\nfunction sample(\$used, \$unused)\n{\n    return \$used;\n}\n",
+        ));
+        self::assertNotFalse(file_put_contents($workspace . '/Stray.php', "<?php\n\nfunction stray(\$unused)\n{\n}\n"));
+        $launches = [$workspace . '/sibling' => '../project', $workspace . '/project/sub' => '..'];
+
+        try {
+            foreach ([['summary'], ['analyse', '--fail-on', 'none', '--no-cache']] as $command) {
+                $inside = $this->runMachineJson([...$command, '.', '--no-config', '--format', 'json'], $workspace . '/project');
+                foreach ($launches as $launchDirectory => $target) {
+                    $outside = $this->runMachineJson([...$command, $target, '--no-config', '--format', 'json'], $launchDirectory);
+
+                    $runMetadata = $outside['run'] ?? null;
+                    self::assertIsArray($runMetadata, $command[0] . ' ' . $target);
+                    self::assertSame(['.'], $runMetadata['inputs'] ?? null, $command[0] . ' ' . $target . ' inputs');
+                    foreach (['score', 'summary', 'paths', 'diagnostics', 'findings'] as $section) {
+                        self::assertSame($inside[$section] ?? null, $outside[$section] ?? null, $command[0] . ' ' . $target . ' ' . $section);
+                    }
+                }
+            }
+        } finally {
+            $this->removeDir($workspace);
+        }
     }
 
     /**
@@ -259,16 +297,17 @@ final class GruffCliSummaryTest extends TestCase
     /**
      * Run one machine-output CLI command and validate that stdout is a JSON object.
      *
-     * @param list<string> $arguments - CLI arguments appended after the gruff-php binary.
+     * @param list<string> $arguments        - CLI arguments appended after the gruff-php binary.
+     * @param string       $workingDirectory - Directory the command is launched from.
      *
      * @return array<string, mixed> - Decoded string-keyed machine document.
      * @throws JsonException When stdout is not valid JSON.
      */
-    private function runMachineJson(array $arguments): array
+    private function runMachineJson(array $arguments, string $workingDirectory = self::PROJECT_ROOT): array
     {
         $process = new Process(
             array_merge([PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php'], $arguments),
-            self::PROJECT_ROOT,
+            $workingDirectory,
         );
         $process->run();
 

@@ -72,10 +72,10 @@ final class SummaryCommand extends Command
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $projectRoot = $this->projectRoot($output);
-        // Without a readable working directory there is nothing to scan, so stop before pretending to.
-        if ($projectRoot === null) {
-            return Command::FAILURE;
+        $projectRoot = $this->projectRoot($input, $output);
+        // Without a root to report against there is nothing to scan, so stop before pretending to.
+        if (is_int($projectRoot)) {
+            return $projectRoot;
         }
 
         $format = $this->summaryFormat($input, $output);
@@ -152,22 +152,36 @@ final class SummaryCommand extends Command
     }
 
     /**
-     * Anchors the run to the directory the user launched from, since every path shown in the
-     * summary is displayed relative to it.
+     * Anchors the run to the project its targets name, as `analyse` does, since every path shown in the summary is
+     * displayed relative to it. Anchored to the launch directory instead, `summary ../proj --format=json` run from a
+     * sibling threw on the first path outside it and printed no JSON. Also rewrites the `paths` argument so each
+     * relative target is read from the launch directory, as `analyse` does.
      *
-     * @param OutputInterface $output - Destination for the error shown when the working directory is unreadable.
+     * @param InputInterface  $input  - Console input carrying the path operands the root is resolved from.
+     * @param OutputInterface $output - Destination for the error shown when no root can be chosen.
      *
-     * @return string|null - Project root path; null when the working directory can't be read, aborting the summary.
+     * @return string|int - Project root path, or the exit code to stop with: 1 when the working directory can't be read,
+     *                      2 when the targets sit under different filesystem roots.
      */
-    private function projectRoot(OutputInterface $output): ?string
+    private function projectRoot(InputInterface $input, OutputInterface $output): string|int
     {
-        $projectRoot = getcwd();
+        $launchDirectory = getcwd();
         // getcwd() fails when the launch directory was deleted or is unreadable; warn rather than guess a path.
-        if ($projectRoot === false) {
+        if ($launchDirectory === false) {
             $output->writeln('<error>Unable to determine current working directory.</error>');
 
-            return null;
+            return Command::FAILURE;
         }
+
+        $projectRoot = AnalyseCommandSetupBuilder::projectRootFromTargets($launchDirectory, $this->paths($input));
+        // The caller named targets in unrelated projects, so there is no single root to report paths against.
+        if ($projectRoot === null) {
+            $output->writeln('<error>scan targets do not share a filesystem root</error>');
+
+            return Command::INVALID;
+        }
+
+        $input->setArgument('paths', AnalyseCommandSetupBuilder::targetsForRoot($launchDirectory, $projectRoot, $this->paths($input)));
 
         return $projectRoot;
     }
