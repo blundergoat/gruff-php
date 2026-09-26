@@ -192,7 +192,7 @@ final class BaselineStoreTest extends TestCase
         self::assertSame('php', $baselineData->toolLanguage);
         self::assertSame('3b0c1f2e4d5a6978', $baselineData->entries[0]->identity);
         self::assertSame(2, $baselineData->entries[0]->count);
-        self::assertSame('docs.missing-public-phpdoc', $baselineData->entries[0]->ruleId);
+        self::assertSame('docs.missing-phpdoc', $baselineData->entries[0]->ruleId);
         self::assertSame(1, $baselineData->entries[1]->count);
         self::assertSame(1, $baselineData->sensitiveTotal());
     }
@@ -231,7 +231,8 @@ final class BaselineStoreTest extends TestCase
     }
 
     /**
-     * Verify migration refuses in-place targets, keeps the 0.5 input byte-identical, writes a valid v3 file, and translates no 0.5 digest.
+     * Verify migration refuses in-place targets, keeps the 0.5 input byte-identical, writes a valid v3 file, translates no 0.5 digest,
+     * and matches the fixture's group recorded under the retired docs.missing-public-phpdoc id to the renamed rule's finding.
      *
      * @return void
      */
@@ -244,7 +245,7 @@ final class BaselineStoreTest extends TestCase
             $store       = new BaselineStore($root);
 
             $reviewed   = $this->finding(
-                ruleId:   'docs.missing-public-phpdoc',
+                ruleId:   'docs.missing-phpdoc',
                 message:  'Method calculateTotal needs a brief intent description above its declaration (one plain-English line; not a restatement of the method signature).',
                 symbol:   'Example::calculateTotal()',
             );
@@ -271,7 +272,7 @@ final class BaselineStoreTest extends TestCase
             self::assertSame(1, $migration->accepted);
             self::assertCount(1, $migration->writtenBaseline->entries);
             $this->assertLegacyInputUnchanged($root, $legacyBytes);
-            self::assertSame('docs.missing-public-phpdoc', $store->read('gruff-baseline.json')->entries[0]->ruleId);
+            self::assertSame('docs.missing-phpdoc', $store->read('gruff-baseline.json')->entries[0]->ruleId);
         } finally {
             $this->removeDir($root);
         }

@@ -627,9 +627,9 @@ final class ReportCommand extends Command
             // Split a single `a,b,c` value into its individual rule ids.
             foreach (explode(',', $optionValue) as $optionPart) {
                 $trimmedOptionPart = trim($optionPart);
-                // Keep only ids that survive trimming, dropping stray whitespace or empty commas.
+                // Keep only ids that survive trimming, and store a retired id as its replacement so it still filters today's findings.
                 if ($trimmedOptionPart !== '') {
-                    $ruleIds[] = $trimmedOptionPart;
+                    $ruleIds[] = RuleRegistry::canonicalRuleId($trimmedOptionPart);
                 }
             }
         }

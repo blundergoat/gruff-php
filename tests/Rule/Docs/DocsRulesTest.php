@@ -7,7 +7,7 @@ namespace GruffPhp\Tests\Rule\Docs;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Rules\Docs\MissingParamTagRule;
-use GruffPhp\Rules\Docs\MissingPublicPhpdocRule;
+use GruffPhp\Rules\Docs\MissingPhpdocRule;
 use GruffPhp\Rules\Docs\MissingReturnTagRule;
 use GruffPhp\Rules\Docs\PhpdocTagText;
 use GruffPhp\Rules\Docs\ReturnCommentRule;
@@ -87,9 +87,9 @@ final class DocsRulesTest extends DocsRuleTestCase
      *
      * @return void
      */
-    public function testMissingPublicPhpdocDetected(): void
+    public function testMissingPhpdocDetected(): void
     {
-        $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
+        $findings = $this->analyseRule('missing-phpdoc.php', MissingPhpdocRule::ID);
 
         $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
         self::assertContains('MissingPhpdocFixture::undocumented()', $symbols);
@@ -111,7 +111,7 @@ final class DocsRulesTest extends DocsRuleTestCase
      */
     public function testDocumentedMethodNotFlagged(): void
     {
-        $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
+        $findings = $this->analyseRule('missing-phpdoc.php', MissingPhpdocRule::ID);
 
         $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
         self::assertNotContains('MissingPhpdocFixture::documented()', $symbols);
@@ -124,7 +124,7 @@ final class DocsRulesTest extends DocsRuleTestCase
      */
     public function testAccessorsRequirePhpdoc(): void
     {
-        $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
+        $findings = $this->analyseRule('missing-phpdoc.php', MissingPhpdocRule::ID);
 
         $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
         self::assertContains('MissingPhpdocFixture::getTitle()', $symbols);
@@ -139,7 +139,7 @@ final class DocsRulesTest extends DocsRuleTestCase
      */
     public function testPrivateAndProtectedMethodsRequirePhpdoc(): void
     {
-        $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
+        $findings = $this->analyseRule('missing-phpdoc.php', MissingPhpdocRule::ID);
 
         $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
         self::assertContains('MissingPhpdocFixture::privateMethod()', $symbols);
@@ -153,7 +153,7 @@ final class DocsRulesTest extends DocsRuleTestCase
      */
     public function testTrivialTypedPublicMethodRequiresPhpdoc(): void
     {
-        $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
+        $findings = $this->analyseRule('missing-phpdoc.php', MissingPhpdocRule::ID);
 
         $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
         self::assertContains('MissingPhpdocFixture::trivialUndocumented()', $symbols);
@@ -166,7 +166,7 @@ final class DocsRulesTest extends DocsRuleTestCase
      */
     public function testMagicMethodRequiresPhpdoc(): void
     {
-        $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
+        $findings = $this->analyseRule('missing-phpdoc.php', MissingPhpdocRule::ID);
 
         $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
         self::assertContains('MissingPhpdocFixture::__toString()', $symbols);
@@ -179,7 +179,7 @@ final class DocsRulesTest extends DocsRuleTestCase
      */
     public function testRuleInterfaceContractMethodsRequireLocalPhpdoc(): void
     {
-        $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
+        $findings = $this->analyseRule('missing-phpdoc.php', MissingPhpdocRule::ID);
 
         $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
         self::assertContains('RuleContractFixture::definition()', $symbols);
@@ -193,7 +193,7 @@ final class DocsRulesTest extends DocsRuleTestCase
      */
     public function testInternalHelpersAndConventionalReportersRequirePhpdoc(): void
     {
-        $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
+        $findings = $this->analyseRule('missing-phpdoc.php', MissingPhpdocRule::ID);
 
         $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
         self::assertContains('InternalHelper::complexUtility()', $symbols);

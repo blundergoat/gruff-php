@@ -87,6 +87,72 @@ final class BuiltInLockfileSkipCliTest extends CliTestCase
     }
 
     /**
+     * Verify the test-path class skips a key in test, fixture and example files and counts it per rule and file,
+     * after the lockfile row, while production code and a look-alike name still report.
+     *
+     * @return void
+     */
+    public function testTheTestPathClassSkipsSensitiveFindingsAndCountsThem(): void
+    {
+        $project = sys_get_temp_dir() . '/gruff-test-path-skip-' . bin2hex(random_bytes(6));
+        // Assembled here, so no whole secret-shaped literal is stored in this file.
+        $accessKey = 'AKIA' . '2222333344445555';
+        $digest    = 'q7ZxM2kPv9LtB4nR' . 'w8HsD3jFy6GcT5mV' . 'a1UeN0bK';
+        $files     = [
+            self::LOCKFILE_NAME       => sprintf("{\n  \"resolvedDigest\": \"%s\"\n}\n", $digest),
+            'Tests/Fixtures/keys.json' => sprintf("{\n  \"accessKeyId\": \"%s\"\n}\n", $accessKey),
+            'examples/demo.json'       => sprintf("{\n  \"accessKeyId\": \"%s\"\n}\n", $accessKey),
+            'src/LoginTest.php'        => sprintf("<?php\n\n\$accessKeyId = '%s';\n", $accessKey),
+            'src/config.json'          => sprintf("{\n  \"accessKeyId\": \"%s\"\n}\n", $accessKey),
+            'src/latest.php'           => sprintf("<?php\n\n\$accessKeyId = '%s';\n", $accessKey),
+        ];
+
+        $this->writeProjectFiles($project, $files);
+
+        try {
+            $report   = $this->decodeJsonOutput($this->scan($project, 'json'));
+            // Only the two production files may still report the key.
+            $keyFiles = array_values(array_filter(
+                ['Tests/Fixtures/keys.json', 'examples/demo.json', 'src/LoginTest.php', 'src/config.json', 'src/latest.php'],
+                fn(string $filePath): bool => in_array('sensitive-data.aws-access-key', $this->rulesFor($report, $filePath), true),
+            ));
+
+            self::assertSame(['src/config.json', 'src/latest.php'], $keyFiles);
+            $builtIn = array_map(static fn(array $auditRow): array => [$auditRow['index'] ?? null, $auditRow['paths'] ?? null, $auditRow['rule'] ?? null], $this->builtInRows($report));
+            self::assertSame([
+                [0, [self::LOCKFILE_NAME], self::ENTROPY_RULE],
+                [1, ['Tests/Fixtures/keys.json'], 'sensitive-data.aws-access-key'],
+                [2, ['examples/demo.json'], 'sensitive-data.aws-access-key'],
+                [3, ['src/LoginTest.php'], 'sensitive-data.aws-access-key'],
+            ], $builtIn);
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+
+    /**
+     * Writes each file of a temporary project, creating its directories first.
+     *
+     * @param string                $project - Root of the temporary project; created when absent.
+     * @param array<string, string> $contentsByPath - File contents keyed by project-relative path.
+     *
+     * @return void
+     */
+    private function writeProjectFiles(string $project, array $contentsByPath): void
+    {
+        // A nested path such as `Tests/Fixtures/keys.json` needs its directories before the file can be written.
+        foreach ($contentsByPath as $relativePath => $contents) {
+            $directory = dirname($project . '/' . $relativePath);
+            // Each directory is created once, whatever order the files arrive in.
+            if (!is_dir($directory)) {
+                self::assertTrue(mkdir($directory, 0777, true), $directory);
+            }
+
+            self::assertNotFalse(file_put_contents($project . '/' . $relativePath, $contents), $relativePath);
+        }
+    }
+
+    /**
      * Writes one lockfile and its byte-identical twin, so a path-based mechanism is visible.
      *
      * @return string - Project root holding the two files.

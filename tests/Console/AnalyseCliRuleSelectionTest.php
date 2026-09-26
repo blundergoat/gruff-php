@@ -18,7 +18,8 @@ use Symfony\Component\Process\Process;
 final class AnalyseCliRuleSelectionTest extends CliTestCase
 {
     /**
-     * Verify --exclude-rule is execution-level: the excluded rule's findings neither display nor trip the fail gate.
+     * Verify --exclude-rule is execution-level: the excluded rule's findings neither display nor trip the fail gate, and the
+     * retired docs.missing-public-phpdoc id still names the renamed rule.
      *
      * @return void
      * @throws JsonException
@@ -42,16 +43,19 @@ final class AnalyseCliRuleSelectionTest extends CliTestCase
         $controlProcess->run();
         self::assertSame(1, $controlProcess->getExitCode(), 'the fixture must trip the advisory gate for the exclusion proof to mean anything');
 
-        $excludedProcess = new Process([...$baseArguments, '--exclude-rule', 'docs.missing-public-phpdoc'], __DIR__ . '/../..');
-        $excludedProcess->run();
-        self::assertSame(0, $excludedProcess->getExitCode(), $excludedProcess->getErrorOutput());
+        // A flag written before the rename must keep excluding the same rule.
+        foreach (['docs.missing-phpdoc', 'docs.missing-public-phpdoc'] as $excludedRuleId) {
+            $excludedProcess = new Process([...$baseArguments, '--exclude-rule', $excludedRuleId], __DIR__ . '/../..');
+            $excludedProcess->run();
+            self::assertSame(0, $excludedProcess->getExitCode(), $excludedRuleId . ': ' . $excludedProcess->getErrorOutput());
 
-        $report  = $this->decodeJsonOutput($excludedProcess);
-        $summary = $report['summary'] ?? null;
-        self::assertIsArray($summary);
-        $findingCounts = $summary['findings'] ?? null;
-        self::assertIsArray($findingCounts);
-        self::assertSame(0, $findingCounts['total'] ?? null);
+            $report  = $this->decodeJsonOutput($excludedProcess);
+            $summary = $report['summary'] ?? null;
+            self::assertIsArray($summary, $excludedRuleId);
+            $findingCounts = $summary['findings'] ?? null;
+            self::assertIsArray($findingCounts, $excludedRuleId);
+            self::assertSame(0, $findingCounts['total'] ?? null, $excludedRuleId);
+        }
     }
 
     /**

@@ -74,7 +74,7 @@ Pillars are ordered by finding count (loudest first). Pillars with zero findings
 Suppressed findings: 1 via sensitiveExclusions[0] sensitive-data.aws-access-key: 1 (Synthetic key used by the scanner fixtures; not a live credential.)
 ```
 
-`gruff.summary.v3` publishes a top-level `suppressions` array - one `{index, rule, paths, symbol?, reason, suppressed}` row per configured `sensitiveExclusions` entry, including entries that matched nothing - so `summary --format json` reports the same total the text output prints.
+`gruff.summary.v3` publishes a top-level `suppressions` array - one `{index, rule, paths, symbol?, reason, suppressed}` row per configured `sensitiveExclusions` entry, including entries that matched nothing, then the `source: "built-in"` rows the lockfile and test-path skips publish (see [Output formats](output-formats.md)) - so `summary --format json` reports the same total the text output prints.
 
 ## Example - JSON format
 

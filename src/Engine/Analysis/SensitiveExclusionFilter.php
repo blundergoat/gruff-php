@@ -30,6 +30,28 @@ final readonly class SensitiveExclusionFilter
     private const BUILT_IN_LOCKFILE_REASON = 'Lockfile digests are published integrity hashes, so the entropy rule skips package-manager lockfiles by name.';
 
     /**
+     * Reason a user reads on each `builtInTestPath[...]` audit row; every port publishes these exact words (FAMILY-CONTRACT.md section 13a).
+     */
+    public const BUILT_IN_TEST_PATH_REASON = 'Test, fixture and example files hold sample credentials, so sensitive-data rules skip them by path.';
+
+    /**
+     * The one sensitive-data rule that still reads test paths, because finding realistic personal data in fixtures is its job.
+     */
+    private const BUILT_IN_TEST_PATH_EXEMPT_RULE = 'sensitive-data.pii-test-fixture';
+
+    /**
+     * Directory names, compared case-insensitively, that make a path test code, e.g. `Tests/Unit/` or `examples/`.
+     *
+     * @var list<string>
+     */
+    private const BUILT_IN_TEST_PATH_DIRECTORIES = ['test', 'tests', '__tests__', 'spec', 'testdata', 'fixtures', 'examples'];
+
+    /**
+     * Matches a whole base name that marks a test file in any family language, e.g. `LoginTest.php` or `login.spec.ts`.
+     */
+    private const BUILT_IN_TEST_FILE_NAME_PATTERN = '/^(?:.*_test\.go|test_.*\.py|.*_test\.py|.*Test\.php|.*\.(?:test|spec)\.(?:js|jsx|ts|tsx|mjs|cjs))$/D';
+
+    /**
      * The ratified package-manager lockfile names, matched by exact base name at any depth.
      *
      * @var list<string>
@@ -47,13 +69,13 @@ final readonly class SensitiveExclusionFilter
     ];
 
     /**
-     * Partitions findings into those no entry claimed and one audit row per configured entry.
+     * Partitions findings into those nothing claimed, one audit row per configured entry, then the built-in lockfile and test-path rows.
      *
      * @param list<Finding>            $findings - Findings produced by the run, in report order.
      * @param list<SensitiveExclusion> $exclusions - Validated exclusions in configuration order, so a position is its audit index.
      *
-     * @return SensitiveExclusionResult - the surviving findings plus one audit row per configured entry; with nothing configured the findings pass
-     *                                  through untouched and no rows are published.
+     * @return SensitiveExclusionResult - the surviving findings and the audit rows; no rows only when nothing is configured and no built-in
+     *                                  skip claimed a finding
      */
     public function apply(array $findings, array $exclusions): SensitiveExclusionResult
     {
@@ -74,7 +96,8 @@ final readonly class SensitiveExclusionFilter
         }
 
         // A configured entry claims its findings first, so its count stays what the user wrote it for.
-        return $this->applyBuiltInLockfileSkip($survivors, $this->summaries($exclusions, $counts));
+        // The lockfile class runs before the test-path class, so `tests/package-lock.json` gets one audit row, not two.
+        return $this->applyBuiltInTestPathSkip($this->applyBuiltInLockfileSkip($survivors, $this->summaries($exclusions, $counts)));
     }
 
     /**
@@ -122,6 +145,81 @@ final readonly class SensitiveExclusionFilter
         }
 
         return new SensitiveExclusionResult($survivors, $summaries);
+    }
+
+    /**
+     * Hides sensitive-data findings in test, fixture and example files, and publishes one audit row per hidden file and rule.
+     *
+     * A user scanning a project with sample keys in `tests/fixtures/` sees `builtInTestPath[...]` rows instead of findings.
+     * The skip is never silent, and the fixture-PII rule keeps reading these files (FAMILY-CONTRACT.md section 13a).
+     *
+     * @param SensitiveExclusionResult $result - Findings and audit rows left after the user's exclusions and the lockfile skip.
+     *
+     * @return SensitiveExclusionResult - Survivors, then the earlier rows followed by one row per file and rule skipped here.
+     */
+    private function applyBuiltInTestPathSkip(SensitiveExclusionResult $result): SensitiveExclusionResult
+    {
+        $skippedCountByFileAndRule = [];
+        $survivors                 = [];
+
+        // Each finding either stays in the report or is folded into its file's audit row.
+        foreach ($result->findings as $finding) {
+            // Only the pillar's findings in a test, fixture or example file are skipped, and never the fixture-PII rule.
+            if (str_starts_with($finding->ruleId, 'sensitive-data.')
+                && $finding->ruleId !== self::BUILT_IN_TEST_PATH_EXEMPT_RULE
+                && self::isBuiltInTestPath($finding->filePath)) {
+                $fileAndRule                             = $finding->filePath . "\0" . $finding->ruleId;
+                $skippedCountByFileAndRule[$fileAndRule] = ($skippedCountByFileAndRule[$fileAndRule] ?? 0) + 1;
+                continue;
+            }
+
+            $survivors[] = $finding;
+        }
+
+        // Byte order, path first and then rule id, is the order every port publishes these rows in.
+        uksort($skippedCountByFileAndRule, strcmp(...));
+        $summaries = $result->summaries;
+        // Built-in rows are numbered among themselves, so the first test-path row follows the last lockfile row.
+        $nextIndex = count(array_filter($summaries, static fn(SensitiveExclusionSummary $summary): bool => $summary->source !== null));
+
+        // One row per file and rule, which text output shows as `builtInTestPath[tests/keys.php] sensitive-data.aws-access-key: 2`.
+        foreach ($skippedCountByFileAndRule as $fileAndRule => $count) {
+            [$filePath, $ruleId] = explode("\0", (string)$fileAndRule, 2);
+            $summaries[]         = new SensitiveExclusionSummary(
+                index: $nextIndex++,
+                rule: $ruleId,
+                path: $filePath,
+                symbol: null,
+                reason: self::BUILT_IN_TEST_PATH_REASON,
+                suppressed: $count,
+                source: 'built-in',
+            );
+        }
+
+        return new SensitiveExclusionResult($survivors, $summaries);
+    }
+
+    /**
+     * Reports whether a finding's file is test, fixture or example code, e.g. `tests/Unit/KeysTest.php` or `examples/demo.php`.
+     *
+     * @param string $filePath - Project-relative display path of the finding's file, as the report prints it.
+     *
+     * @return bool - true for a directory named in the family list, compared case-insensitively, or a test-file base name
+     */
+    public static function isBuiltInTestPath(string $filePath): bool
+    {
+        $segments = explode('/', str_replace('\\', '/', $filePath));
+        $baseName = (string)array_pop($segments);
+
+        // Any directory on the path, compared case-insensitively, can make it a test, fixture or example path.
+        foreach ($segments as $directory) {
+            if (in_array(strtolower($directory), self::BUILT_IN_TEST_PATH_DIRECTORIES, true)) {
+                return true;
+            }
+        }
+
+        // Otherwise the file name alone must mark a test, e.g. `KeysTest.php`, `keys_test.go` or `keys.spec.ts`.
+        return preg_match(self::BUILT_IN_TEST_FILE_NAME_PATTERN, $baseName) === 1;
     }
 
     /**

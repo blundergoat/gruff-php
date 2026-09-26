@@ -147,7 +147,7 @@ final class ListRulesCommand extends Command
      * Renders one rule's full detail view once the user passed a `<ruleId>`, or hands off to the
      * typo path when that id matches nothing in the registry.
      *
-     * @param string          $ruleId - Rule id the caller asked to inspect; matched exactly against the registry.
+     * @param string          $ruleId - Rule id the caller asked to inspect; matched exactly, with a retired id resolving to its replacement.
      * @param RuleRegistry    $registry - Source of the canonical rule set the lookup and typo suggestions draw from.
      * @param AnalysisConfig  $config - Effective config supplying whether the matched rule is enabled for this project.
      * @param string          $format - Pre-validated output format (`text`, `table`, or `json`) selecting the renderer.
@@ -158,12 +158,13 @@ final class ListRulesCommand extends Command
      */
     private function renderRuleDetail(string $ruleId, RuleRegistry $registry, AnalysisConfig $config, string $format, OutputInterface $output): int
     {
-        $match = null;
-        // Scan the registry for the exact id the user typed; rule ids are matched literally, not fuzzily.
+        $match           = null;
+        $requestedRuleId = RuleRegistry::canonicalRuleId($ruleId);
+        // Scan the registry for the requested id; a retired id such as `docs.missing-public-phpdoc` already resolved to its replacement.
         foreach ($registry->all() as $rule) {
             $definition = $rule->definition();
             // Stop at the first exact hit - that is the rule whose detail view we will render.
-            if ($definition->id === $ruleId) {
+            if ($definition->id === $requestedRuleId) {
                 $match = $definition;
                 break;
             }

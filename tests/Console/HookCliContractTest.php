@@ -51,17 +51,23 @@ final class HookCliContractTest extends CliTestCase
      */
     public function testHookReportsBoundedDeepScanWithoutInvalidatingRun(): void
     {
-        [$process, $report] = $this->runHook(self::PROJECT_ROOT, [
-            'hook',
-            '--no-config',
-            '--deep-scan-budget',
-            '1:1',
-            '--include-rule',
-            'sensitive-data.aws-access-key',
-            '--format',
-            'json',
-            'tests/Fixtures/SensitiveData/synthetic-secrets.php',
-        ]);
+        $project = $this->syntheticSecretsProject();
+
+        try {
+            [$process, $report] = $this->runHook($project, [
+                'hook',
+                '--no-config',
+                '--deep-scan-budget',
+                '1:1',
+                '--include-rule',
+                'sensitive-data.aws-access-key',
+                '--format',
+                'json',
+                'src/synthetic-secrets.php',
+            ]);
+        } finally {
+            $this->removeDir($project);
+        }
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         self::assertNotNull($this->firstFindingByRule($this->findingRows($report), 'sensitive-data.aws-access-key'));

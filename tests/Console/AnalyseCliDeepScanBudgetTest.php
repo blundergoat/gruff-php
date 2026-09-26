@@ -23,6 +23,7 @@ final class AnalyseCliDeepScanBudgetTest extends CliTestCase
      */
     public function testBoundedDeepScanKeepsTextLevelSecurityFindings(): void
     {
+        $project = $this->syntheticSecretsProject();
         $process = new Process([
             PHP_BINARY,
             self::PROJECT_ROOT . '/bin/gruff-php',
@@ -37,9 +38,14 @@ final class AnalyseCliDeepScanBudgetTest extends CliTestCase
             '--no-cache',
             '--deep-scan-budget',
             '1:1',
-            'tests/Fixtures/SensitiveData/synthetic-secrets.php',
-        ], self::PROJECT_ROOT);
-        $process->run();
+            'src/synthetic-secrets.php',
+        ], $project);
+
+        try {
+            $process->run();
+        } finally {
+            $this->removeDir($project);
+        }
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         $report      = $this->decodeJsonOutput($process);

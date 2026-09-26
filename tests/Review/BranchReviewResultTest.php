@@ -29,15 +29,15 @@ final class BranchReviewResultTest extends TestCase
             base:          'main',
             isChangedOnly: false,
             introduced:    [
-                $this->finding('docs.missing-public-phpdoc'),
-                $this->finding('docs.missing-public-phpdoc'),
+                $this->finding('docs.missing-phpdoc'),
+                $this->finding('docs.missing-phpdoc'),
                 $this->finding('modernisation.phpdoc-mixed-overuse'),
             ],
             removed:       [
                 $this->finding('size.method-length'),
                 $this->finding('size.method-length'),
                 $this->finding('size.method-length'),
-                $this->finding('docs.missing-public-phpdoc'),
+                $this->finding('docs.missing-phpdoc'),
             ],
             unchanged:     [],
             deltaScore:    null,
@@ -48,7 +48,7 @@ final class BranchReviewResultTest extends TestCase
         self::assertSame(
             [
                 ['ruleId' => 'size.method-length', 'introduced' => 0, 'removed' => 3, 'net' => -3],
-                ['ruleId' => 'docs.missing-public-phpdoc', 'introduced' => 2, 'removed' => 1, 'net' => 1],
+                ['ruleId' => 'docs.missing-phpdoc', 'introduced' => 2, 'removed' => 1, 'net' => 1],
                 ['ruleId' => 'modernisation.phpdoc-mixed-overuse', 'introduced' => 1, 'removed' => 0, 'net' => 1],
             ],
             $delta,
@@ -65,8 +65,8 @@ final class BranchReviewResultTest extends TestCase
         $result = new BranchReviewResult(
             base:          'main',
             isChangedOnly: false,
-            introduced:    [$this->finding('docs.missing-public-phpdoc')],
-            removed:       [$this->finding('docs.missing-public-phpdoc')],
+            introduced:    [$this->finding('docs.missing-phpdoc')],
+            removed:       [$this->finding('docs.missing-phpdoc')],
             unchanged:     [],
             deltaScore:    null,
         );

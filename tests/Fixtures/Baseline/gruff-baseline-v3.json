@@ -6,7 +6,7 @@
         {
             "identity": "3b0c1f2e4d5a6978",
             "count": 2,
-            "ruleId": "docs.missing-public-phpdoc",
+            "ruleId": "docs.missing-phpdoc",
             "path": "src/Example.php",
             "subject": "Example::calculateTotal()#1"
         },

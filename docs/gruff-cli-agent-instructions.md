@@ -317,7 +317,7 @@ php bin/gruff-php analyse src --format json --fail-on none --include-pillar secu
 The rule-id flags (`--include-rule`, `--exclude-rule`) select rule execution, matching `hook --include-rule`/`--exclude-rule`: an excluded rule does not run at all, so its findings neither display nor count toward the exit code, scoring, or a generated baseline, and `--include-rule` runs only the named rules.
 
 ```bash
-php bin/gruff-php analyse src --format json --fail-on none --exclude-rule docs.missing-public-phpdoc
+php bin/gruff-php analyse src --format json --fail-on none --exclude-rule docs.missing-phpdoc
 php bin/gruff-php analyse src --format json --fail-on none --include-rule complexity.cyclomatic
 ```
 

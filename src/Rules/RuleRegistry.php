@@ -25,7 +25,7 @@ use GruffPhp\Rules\Docs\MissingConstantPhpdocRule;
 use GruffPhp\Rules\Docs\MissingFilePhpdocRule;
 use GruffPhp\Rules\Docs\MissingParamTagRule;
 use GruffPhp\Rules\Docs\MissingPropertyPhpdocRule;
-use GruffPhp\Rules\Docs\MissingPublicPhpdocRule;
+use GruffPhp\Rules\Docs\MissingPhpdocRule;
 use GruffPhp\Rules\Docs\MissingReadmeRule;
 use GruffPhp\Rules\Docs\MissingReturnTagRule;
 use GruffPhp\Rules\Docs\MissingThrowsTagRule;
@@ -171,6 +171,13 @@ final class RuleRegistry
         'naming.suffix-hungarian' => 6,
         'naming.short-variable' => 7,
         'naming.abbreviation-allowlist' => 8,
+    ];
+
+    /**
+     * Retired rule ids and the ids that replaced them, so a config, flag or 0.5 baseline written before a rename keeps working.
+     */
+    private const RULE_ID_ALIASES = [
+        MissingPhpdocRule::LEGACY_ID => MissingPhpdocRule::ID,
     ];
 
     /** @var array<string, RuleInterface|ProjectRuleInterface> */
@@ -347,7 +354,7 @@ final class RuleRegistry
                             new MissingFilePhpdocRule(),
                             new MissingParamTagRule(),
                             new MissingPropertyPhpdocRule(),
-                            new MissingPublicPhpdocRule(),
+                            new MissingPhpdocRule(),
                             new MissingReadmeRule(),
                             new MissingReturnTagRule(),
                             new MissingThrowsTagRule(),
@@ -378,15 +385,28 @@ final class RuleRegistry
     }
 
     /**
-     * Reports whether a rule id is registered.
+     * Maps a retired rule id to the id that replaced it, so every caller compares against the current name.
+     * For example, `--exclude-rule docs.missing-public-phpdoc` excludes `docs.missing-phpdoc`.
+     *
+     * @param string $ruleId - Rule identifier as the user typed it or a stored file recorded it.
+     *
+     * @return string - the replacing id for a retired alias; the input unchanged for every other id, including a typo
+     */
+    public static function canonicalRuleId(string $ruleId): string
+    {
+        return self::RULE_ID_ALIASES[$ruleId] ?? $ruleId;
+    }
+
+    /**
+     * Reports whether a rule id is registered, counting a retired alias as its replacement.
      *
      * @param string $ruleId - Rule identifier to check.
      *
-     * @return bool - true when a rule with this id is registered; false for unknown or misspelled ids
+     * @return bool - true when a rule with this id, or the id this alias names, is registered; false for unknown or misspelled ids
      */
     public function has(string $ruleId): bool
     {
-        return isset($this->rules[$ruleId]);
+        return isset($this->rules[self::canonicalRuleId($ruleId)]);
     }
 
     /**
@@ -411,7 +431,7 @@ final class RuleRegistry
     }
 
     /**
-     * Returns a registered rule by id.
+     * Returns a registered rule by id, resolving a retired alias to its replacement.
      *
      * @param string $ruleId - Rule identifier to look up.
      *
@@ -420,7 +440,7 @@ final class RuleRegistry
      */
     public function get(string $ruleId): RuleInterface|ProjectRuleInterface
     {
-        return $this->rules[$ruleId]
+        return $this->rules[self::canonicalRuleId($ruleId)]
                ?? throw new InvalidArgumentException(sprintf('Unknown rule id "%s".', $ruleId));
     }
 

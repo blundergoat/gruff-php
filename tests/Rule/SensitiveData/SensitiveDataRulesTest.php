@@ -148,9 +148,8 @@ final class SensitiveDataRulesTest extends TestCase
                                  ));
         $reported = array_map(static fn(Finding $finding): string => $finding->ruleId . ':' . $finding->line, $findings);
 
-        // Line 11 is AWS's documented example key. An AWS key is one alphanumeric run, so since 2026-09-19 no
-        // placeholder word can hide it and it reports, as it does in gruff-go. Every other placeholder stays quiet.
-        self::assertSame(['sensitive-data.aws-access-key:11'], $reported);
+        // Line 11 is AWS's documented example key, a vendor-documented sample (FAMILY-CONTRACT.md section 5), so nothing reports.
+        self::assertSame([], $reported);
     }
 
     /**
@@ -335,6 +334,45 @@ final class SensitiveDataRulesTest extends TestCase
             ));
 
             self::assertSame([4, 7, 9], array_map(static fn(Finding $finding): ?int => $finding->line, $findings));
+        } finally {
+            self::assertTrue(unlink($path));
+        }
+    }
+
+    /**
+     * Verify vendor-documented sample values are not reported while a live-shaped key still is.
+     *
+     * AWS's documented example key and the jwt.io sample token are samples (FAMILY-CONTRACT section 5); every value
+     * is assembled from parts so this file stores none of them whole.
+     *
+     * @return void
+     */
+    public function testDocumentedSamplesAreNotReported(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'gruff-documented-samples-');
+        self::assertIsString($path);
+        $path   .= '.php';
+        $example = 'AKIA' . 'IOSFODNN7' . 'EXAMPLE';
+        $live    = 'AKIA' . 'Q7R2M8N4' . 'P6T9V1X3';
+        $jwtSampleToken     = implode('.', [
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9',
+            'eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ',
+            'SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c',
+        ]);
+        $source  = "<?php\n\n"
+                   . '$example = ' . var_export($example, true) . ";\n"
+                   . '$live = ' . var_export($live, true) . ";\n"
+                   . '$token = ' . var_export($jwtSampleToken, true) . ";\n";
+        self::assertNotFalse(file_put_contents($path, $source));
+
+        try {
+            $unit     = (new PhpFileParser())->parse(new SourceFile($path, 'src/documented-samples.php'));
+            $findings = array_values(array_filter(
+                                         $this->analyseUnits([$unit]),
+                                         static fn(Finding $finding): bool => in_array($finding->ruleId, [AwsAccessKeyRule::ID, JwtTokenRule::ID], true),
+            ));
+
+            self::assertSame([[AwsAccessKeyRule::ID, 4]], array_map(static fn(Finding $finding): array => [$finding->ruleId, $finding->line], $findings));
         } finally {
             self::assertTrue(unlink($path));
         }
@@ -590,10 +628,11 @@ final class SensitiveDataRulesTest extends TestCase
             'unbroken testkey'           => ['TESTKEY', true, true],
             'glued testpass'             => ['testpass99', true, true],
             'glued example placeholder'  => ['sk_live_exampleplaceholder', true, true],
-            // AWS's documented example key, assembled so this file never holds it: identifier words split it, whole
-            // alphanumeric runs do not.
+            // AWS's documented example key, assembled so this file never holds it, is a documented sample however it is split.
             'aws example key, words'     => ['AKIA' . 'IOSFODNN7' . 'EXAMPLE', true, true],
-            'aws example key, whole run' => ['AKIA' . 'IOSFODNN7' . 'EXAMPLE', false, false],
+            'aws example key, whole run' => ['AKIA' . 'IOSFODNN7' . 'EXAMPLE', false, true],
+            // A live-shaped key is one alphanumeric run with no placeholder word, so it still reports.
+            'live-shaped key, whole run' => ['AKIA' . 'Q7R2M8N4' . 'P6T9V1X3', false, false],
         ];
     }
 

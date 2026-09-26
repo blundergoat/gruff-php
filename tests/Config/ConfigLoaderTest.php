@@ -16,6 +16,7 @@ use GruffPhp\Results\Finding\Pillar;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Output\Reporter\FailThreshold;
 use GruffPhp\Output\Reporter\FailThresholds;
+use GruffPhp\Rules\Docs\MissingPhpdocRule;
 use GruffPhp\Rules\RuleRegistry;
 use GruffPhp\Rules\Size\FileLengthRule;
 use GruffPhp\Rules\TestQuality\TestMethodTooLongRule;
@@ -640,6 +641,20 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
         );
 
         self::assertFalse($config->ruleSettings(FileLengthRule::ID)->enabled);
+    }
+
+    /**
+     * Verify a rule block and a selection entry keyed by the retired docs.missing-public-phpdoc id configure the renamed rule.
+     *
+     * @return void
+     */
+    public function testRetiredRuleIdConfiguresTheRenamedRule(): void
+    {
+        $path   = $this->writeTempConfig('{"rules":{"docs.missing-public-phpdoc":{"enabled":false}},"selection":{"excludeRules":["docs.missing-public-phpdoc"]}}');
+        $config = (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
+
+        self::assertFalse($config->ruleSettings(MissingPhpdocRule::ID)->enabled);
+        self::assertSame([MissingPhpdocRule::ID], $config->ruleSelection()->excludeRules);
     }
 
     /**

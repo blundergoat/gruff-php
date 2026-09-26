@@ -103,9 +103,18 @@ configuration-only resolution, is reserved and emitted by no current rule.
 Every analysis and summary document includes `suppressions`, with one
 `{index, rule, paths, symbol?, reason, suppressed}` row per configured
 `sensitiveExclusions` entry, including entries that matched nothing. The array
-is empty when no exclusion is configured. No row carries a finding message,
-preview, or matched value. See
+is empty when no exclusion is configured and no built-in skip applied. No row
+carries a finding message, preview, or matched value. See
 [Configuration](configuration.md) for authoring rules and rejections.
+
+The family's two built-in skips also publish rows, after the configured ones,
+numbered from `0` among themselves and marked `source: "built-in"`, which a
+configured row never carries. The lockfile skip adds one row per package-manager
+lockfile whose `sensitive-data.high-entropy-string` findings it removed. The
+test-path skip then adds one row per file and rule it removed, because every
+sensitive-data rule except `sensitive-data.pii-test-fixture` skips test, fixture
+and example files. Text output labels them `builtInLockfile[<path>]` and
+`builtInTestPath[<path>]`.
 
 ### Baseline, trend, and changed-region data
 

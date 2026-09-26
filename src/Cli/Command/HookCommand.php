@@ -455,8 +455,9 @@ final class HookCommand extends Command
             );
         }
 
-        $includeRules    = $this->stringListOption($input, 'include-rule');
-        $excludeRules    = $this->stringListOption($input, 'exclude-rule');
+        // An agent hook may still pass a retired id, e.g. `--exclude-rule docs.missing-public-phpdoc`; keep its replacement.
+        $includeRules    = array_map(RuleRegistry::canonicalRuleId(...), $this->stringListOption($input, 'include-rule'));
+        $excludeRules    = array_map(RuleRegistry::canonicalRuleId(...), $this->stringListOption($input, 'exclude-rule'));
         $ruleFilterError = $this->ruleFilterError($registry, $includeRules, $excludeRules);
         if ($ruleFilterError !== null) {
             throw new ConfigException($ruleFilterError);

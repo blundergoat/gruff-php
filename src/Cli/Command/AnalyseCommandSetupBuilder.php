@@ -500,7 +500,7 @@ final readonly class AnalyseCommandSetupBuilder
     /**
      * Rejects an `--include-rule` whose pillar the active profile never scores, before any file is read.
      *
-     * A command like `gruff-php analyse --profile security --include-rule docs.missing-public-phpdoc`
+     * A command like `gruff-php analyse --profile security --include-rule docs.missing-phpdoc`
      * fails fast here: without this gate it would print a docs error while the user's grade stayed a
      * security-only 100, which reads as a contradiction. A bare `--exclude-rule` stays a plain narrowing.
      *

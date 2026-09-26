@@ -255,7 +255,7 @@ final class ReportCliTest extends CliTestCase
             '--profile',
             'security',
             '--include-rule',
-            'docs.missing-public-phpdoc',
+            'docs.missing-phpdoc',
             '--no-config',
             '--no-baseline',
         ], self::PROJECT_ROOT);
@@ -406,7 +406,7 @@ final class ReportCliTest extends CliTestCase
             'none',
             '--no-config',
             '--include-rule',
-            'docs.missing-public-phpdoc',
+            'docs.missing-phpdoc',
         ], self::PROJECT_ROOT);
         $process->run();
 
@@ -418,7 +418,7 @@ final class ReportCliTest extends CliTestCase
         self::assertCount(1, $findings);
         $firstFinding = $findings[0] ?? null;
         self::assertIsArray($firstFinding);
-        self::assertSame('docs.missing-public-phpdoc', $firstFinding['ruleId'] ?? null);
+        self::assertSame('docs.missing-phpdoc', $firstFinding['ruleId'] ?? null);
     }
 
     /**

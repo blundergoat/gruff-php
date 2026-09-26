@@ -12,6 +12,7 @@ use GruffPhp\Engine\Config\RuleSelection;
 use GruffPhp\Results\Finding\Pillar;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Results\Mutation\MutationAnalysisOptions;
+use GruffPhp\Rules\RuleRegistry;
 use GruffPhp\Output\Reporter\FindingDisplayFilter;
 use Symfony\Component\Console\Input\InputInterface;
 
@@ -196,11 +197,12 @@ final readonly class AnalyseCommandOptions
             minSeverity:            self::optionalStringOption($input, 'min-severity'),
             includePillars:         self::stringListOption($input, 'include-pillar'),
             excludePillars:         self::stringListOption($input, 'exclude-pillar'),
-            includeRules:           self::stringListOption($input, 'include-rule'),
-            excludeRules:           self::stringListOption($input, 'exclude-rule'),
+            // Rule flags accept a retired id, e.g. `--exclude-rule docs.missing-public-phpdoc`, and keep its replacement.
+            includeRules:           array_map(RuleRegistry::canonicalRuleId(...), self::stringListOption($input, 'include-rule')),
+            excludeRules:           array_map(RuleRegistry::canonicalRuleId(...), self::stringListOption($input, 'exclude-rule')),
             presentation:           new PresentationSelectors(
-                                        showRules:   self::stringListOption($input, 'show-rule'),
-                                        hideRules:   self::stringListOption($input, 'hide-rule'),
+                                        showRules:   array_map(RuleRegistry::canonicalRuleId(...), self::stringListOption($input, 'show-rule')),
+                                        hideRules:   array_map(RuleRegistry::canonicalRuleId(...), self::stringListOption($input, 'hide-rule')),
                                         showPillars: self::stringListOption($input, 'show-pillar'),
                                         hidePillars: self::stringListOption($input, 'hide-pillar'),
                                     ),

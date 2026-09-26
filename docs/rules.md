@@ -107,8 +107,8 @@ as used.
 | `docs.missing-constant-phpdoc` | Missing constant PHPDoc | `advisory` | `medium` | yes |
 | `docs.missing-file-phpdoc` | Missing file PHPDoc | `advisory` | `medium` | yes |
 | `docs.missing-param-tag` | Missing @param tag | `advisory` | `high` | yes |
+| `docs.missing-phpdoc` | Missing method PHPDoc | `error` | `high` | yes |
 | `docs.missing-property-phpdoc` | Missing property PHPDoc | `advisory` | `medium` | yes |
-| `docs.missing-public-phpdoc` | Missing method PHPDoc | `error` | `high` | yes |
 | `docs.missing-readme` | Missing README | `warning` | `high` | yes |
 | `docs.missing-return-tag` | Missing @return tag | `advisory` | `high` | yes |
 | `docs.missing-throws-tag` | Missing @throws tag | `advisory` | `medium` | yes |

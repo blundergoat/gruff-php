@@ -14,7 +14,7 @@ use GruffPhp\Rules\Docs\MissingConstantPhpdocRule;
 use GruffPhp\Rules\Docs\MissingFilePhpdocRule;
 use GruffPhp\Rules\Docs\MissingParamTagRule;
 use GruffPhp\Rules\Docs\MissingPropertyPhpdocRule;
-use GruffPhp\Rules\Docs\MissingPublicPhpdocRule;
+use GruffPhp\Rules\Docs\MissingPhpdocRule;
 use GruffPhp\Rules\Docs\MissingThrowsTagRule;
 use GruffPhp\Rules\Docs\RegexCommentRule;
 use GruffPhp\Rules\Docs\StaleParamTagRule;
@@ -85,7 +85,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
      */
     public function testOverrideAwareThrowsRuleUsesInheritedContractsButLocalPhpdocIsRequired(): void
     {
-        $missingPhpdoc        = $this->analyseRule('phpdoc-tags.php', MissingPublicPhpdocRule::ID);
+        $missingPhpdoc        = $this->analyseRule('phpdoc-tags.php', MissingPhpdocRule::ID);
         $missingThrows        = $this->analyseRule('phpdoc-tags.php', MissingThrowsTagRule::ID);
         $missingPhpdocSymbols = array_map(static fn ($finding): ?string => $finding->symbol, $missingPhpdoc);
         $missingThrowsSymbols = array_map(static fn ($finding): ?string => $finding->symbol, $missingThrows);
@@ -465,7 +465,7 @@ final class OrdinarySkeleton
 PHP;
 
         $findings = [
-            ...$this->analyseSourceRule($source, MissingPublicPhpdocRule::ID),
+            ...$this->analyseSourceRule($source, MissingPhpdocRule::ID),
             ...$this->analyseSourceRule($source, MissingParamTagRule::ID),
             ...$this->analyseSourceRule($source, MissingPropertyPhpdocRule::ID),
         ];
@@ -486,7 +486,7 @@ PHP;
                 'docs.missing-param-tag|PartialPromotions::__construct()|missingPromoted',
                 'docs.missing-param-tag|PromotedSkeleton::__construct()|promoted',
                 'docs.missing-param-tag|ProsePromotion::__construct()|promoted',
-                'docs.missing-public-phpdoc|NoDocPromotions::__construct()|',
+                'docs.missing-phpdoc|NoDocPromotions::__construct()|',
             ],
             $ownershipRows,
         );

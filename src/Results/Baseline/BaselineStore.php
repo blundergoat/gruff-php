@@ -6,6 +6,7 @@ namespace GruffPhp\Results\Baseline;
 
 use GruffPhp\Results\Finding\BaselineIdentity;
 use GruffPhp\Results\Finding\Finding;
+use GruffPhp\Rules\RuleRegistry;
 use GruffPhp\Support\PathHelper;
 use JsonException;
 
@@ -179,7 +180,8 @@ final readonly class BaselineStore
                 throw new BaselineException(sprintf('Baseline group %d field "count" must be an integer of at least 1.', $index));
             }
 
-            $legacyGroups[] = ['file' => $file, 'ruleId' => $ruleId, 'message' => $message, 'count' => $count];
+            // A 0.5 group recorded under a retired id, e.g. `docs.missing-public-phpdoc`, matches the finding the renamed rule now emits.
+            $legacyGroups[] = ['file' => $file, 'ruleId' => RuleRegistry::canonicalRuleId($ruleId), 'message' => $message, 'count' => $count];
         }
 
         return $legacyGroups;

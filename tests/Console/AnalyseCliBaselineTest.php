@@ -486,7 +486,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
 
             file_put_contents(
                 $project . '/src/OrderCalculator.php',
-                "<?php\n\ndeclare(strict_types=1);\n\nnamespace Fixtures\\Source\\Code;\n\n/**\n * Documents the public surface so the docs.missing-public-phpdoc finding goes away.\n */\nfinal readonly class OrderCalculator\n{\n    /**\n     * Sum the subtotal and tax to produce the order total.\n     */\n    public function calculateTotal(int \$subtotal, int \$taxAmount): int\n    {\n        return \$subtotal + \$taxAmount;\n    }\n}\n",
+                "<?php\n\ndeclare(strict_types=1);\n\nnamespace Fixtures\\Source\\Code;\n\n/**\n * Documents the public surface so the docs.missing-phpdoc finding goes away.\n */\nfinal readonly class OrderCalculator\n{\n    /**\n     * Sum the subtotal and tax to produce the order total.\n     */\n    public function calculateTotal(int \$subtotal, int \$taxAmount): int\n    {\n        return \$subtotal + \$taxAmount;\n    }\n}\n",
             );
 
             $rerunProcess = new Process([
@@ -600,7 +600,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
 
             $textRun = $this->runInProject($project, ['analyse', 'src', '--format', 'text', '--fail-on', 'none', '--baseline-include-absent']);
             self::assertStringContainsString('Resolved entries:', $textRun->getOutput());
-            self::assertStringContainsString('docs.missing-public-phpdoc', $textRun->getOutput());
+            self::assertStringContainsString('docs.missing-phpdoc', $textRun->getOutput());
 
             $markdownRun = $this->runInProject($project, ['analyse', 'src', '--format', 'markdown', '--fail-on', 'none', '--baseline-include-absent']);
             self::assertStringContainsString('**Baseline:** 0 new, 0 unchanged, 1 resolved', $markdownRun->getOutput());
@@ -716,7 +716,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
                 '--baseline',
                 'gruff-baseline.json',
                 '--include-rule',
-                'docs.missing-public-phpdoc',
+                'docs.missing-phpdoc',
             ], $project);
             $overflowRun->run();
 
@@ -738,7 +738,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
                 '--baseline',
                 'gruff-baseline.json',
                 '--include-rule',
-                'docs.missing-public-phpdoc',
+                'docs.missing-phpdoc',
             ]);
             $withinBudgetReport   = $this->decodeJsonOutput($withinBudgetRun);
             $withinBudgetBaseline = $this->decodedJsonObjectAt($withinBudgetReport, 'baseline');
@@ -759,7 +759,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
      */
     private function writeHandlerGroupBaseline(string $project, int $acceptedCount): void
     {
-        $identity = BaselineIdentity::computeFor('php', 'docs.missing-public-phpdoc', 'src/Handlers.php', 'class@anonymous::handle()#1');
+        $identity = BaselineIdentity::computeFor('php', 'docs.missing-phpdoc', 'src/Handlers.php', 'class@anonymous::handle()#1');
 
         file_put_contents(
             $project . '/gruff-baseline.json',

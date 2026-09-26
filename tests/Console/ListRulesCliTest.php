@@ -88,6 +88,25 @@ final class ListRulesCliTest extends CliTestCase
     }
 
     /**
+     * Verify a user who types the retired docs.missing-public-phpdoc id sees the renamed rule's detail view, not "Unknown rule".
+     *
+     * @return void
+     */
+    public function testListRulesResolvesARetiredIdToItsReplacement(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            self::PROJECT_ROOT . '/bin/gruff-php',
+            'list-rules',
+            'docs.missing-public-phpdoc',
+        ]);
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        self::assertStringContainsString('Rule: docs.missing-phpdoc', $process->getOutput());
+    }
+
+    /**
      * Verify list-rules detail view JSON includes the structured payload.
      *
      * @return void

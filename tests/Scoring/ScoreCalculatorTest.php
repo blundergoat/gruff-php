@@ -81,7 +81,7 @@ final class ScoreCalculatorTest extends TestCase
     public function testScoreReportOmitsMutationPillarWhenInfectionDataIsAbsent(): void
     {
         $score = (new ScoreCalculator())->calculate([
-                                                        $this->finding('docs.missing-public-phpdoc', Pillar::Documentation, Severity::Advisory),
+                                                        $this->finding('docs.missing-phpdoc', Pillar::Documentation, Severity::Advisory),
                                                         $this->finding('security.dangerous-function-call', Pillar::Security, Severity::Error),
                                                     ], 10, null, DiffResult::inactive());
 

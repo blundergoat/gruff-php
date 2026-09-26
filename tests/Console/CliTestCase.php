@@ -104,6 +104,21 @@ abstract class CliTestCase extends TestCase
     }
 
     /**
+     * Copies the synthetic-secrets fixture into a temporary project's `src/`, so sensitive-data rules read it as production code.
+     * A test that needs secret findings uses this, because every sensitive-data rule skips `tests/` and `Fixtures/` paths.
+     *
+     * @return string - Root of the temporary project; the caller removes it with removeDir().
+     */
+    protected function syntheticSecretsProject(): string
+    {
+        $project = $this->tempDir();
+        self::assertTrue(mkdir($project . '/src'));
+        self::assertTrue(copy(self::PROJECT_ROOT . '/tests/Fixtures/SensitiveData/synthetic-secrets.php', $project . '/src/synthetic-secrets.php'));
+
+        return $project;
+    }
+
+    /**
      * Remove a temporary directory tree.
      *
      * @param string $path - Filesystem path.

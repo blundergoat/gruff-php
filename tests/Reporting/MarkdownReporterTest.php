@@ -38,7 +38,7 @@ final class MarkdownReporterTest extends TestCase
     {
         $findings = [
             new Finding(
-                ruleId:     'docs.missing-public-phpdoc',
+                ruleId:     'docs.missing-phpdoc',
                 message:    'Public method has no PHPDoc.',
                 filePath:   'src/Example.php',
                 line:       9,

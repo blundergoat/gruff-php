@@ -75,9 +75,12 @@ final readonly class SensitiveExclusionSummary
      */
     public function describe(): string
     {
-        // A built-in row names the lockfile it skipped, because it has no configured entry to point at.
+        // A built-in row names the file it skipped, because it has no configured entry to point at.
         if ($this->source !== null) {
-            return sprintf('builtInLockfile[%s] %s: %d (%s)', $this->path, $this->rule, $this->suppressed, $this->reason);
+            // The reason tells a test-path skip from a lockfile skip, so the label names the class the user is reading.
+            $label = $this->reason === SensitiveExclusionFilter::BUILT_IN_TEST_PATH_REASON ? 'builtInTestPath' : 'builtInLockfile';
+
+            return sprintf('%s[%s] %s: %d (%s)', $label, $this->path, $this->rule, $this->suppressed, $this->reason);
         }
 
         return sprintf('sensitiveExclusions[%d] %s: %d (%s)', $this->index, $this->rule, $this->suppressed, $this->reason);

@@ -25,13 +25,14 @@ A gate earns its place only if **the cheapest way for the agent to satisfy it is
 
 - Cognitive complexity and nesting pass this test: the cheapest fix is real simplification (guard clauses, a named sub-step), which is exactly what makes the code more verifiable.
 - The test-quality anti-bloat rules pass it: the cheapest fix is a real assertion.
-- "Must have a doc comment" passes it **only if it demands substance** — which is why `docs.missing-public-phpdoc` asks for intent, not a restatement of the signature. A rule whose cheapest passing fix is cosmetic is a candidate for lower severity, not a hard gate.
+- "Must have a doc comment" passes it **only if it demands substance** — which is why `docs.missing-phpdoc` asks for intent, not a restatement of the signature. A rule whose cheapest passing fix is cosmetic is a candidate for lower severity, not a hard gate.
 
 This is also why gruff favours metrics that track human comprehension (cognitive complexity, nesting depth) over pure branch-counting proxies, which can flag a flat, readable guard-chain while waving through genuinely tangled control flow.
 
 ## Why doc comments are mandatory, even on a private one-liner
 
-`docs.missing-public-phpdoc` requires a local doc comment on every method declaration — public, protected, private, abstract, accessor, magic, helper, or interface implementation (the historical rule ID predates this scope; do not infer "public only" from the name).
+`docs.missing-phpdoc` requires a local doc comment on every method declaration: public, protected, private, abstract, accessor, magic, helper, or interface implementation.
+Its id was `docs.missing-public-phpdoc` until that id was retired in 0.6.0, because it read as public-only; the old id still resolves, so a config or flag that names it keeps working.
 
 That is deliberate. Forcing the agent to state intent, usage, contract, and failure behaviour in prose gives the reviewer an independent description to check the implementation against. When the prose and the code disagree, the reviewer has found either a bug or a misunderstanding — which is the whole point. The rule wants content, not boilerplate: a comment that merely restates the signature adds no verifiability and is itself flagged.
 

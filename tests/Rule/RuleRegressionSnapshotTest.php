@@ -62,12 +62,14 @@ final class RuleRegressionSnapshotTest extends TestCase
         // exemption owes, 12 from other rules), and 3 docs tags on older fixtures that exemption no longer hides.
         // M10 D23 (2026-09-25) removed one: synthetic-secrets.php's digit-free mixed-case alphabet run, since a
         // qualifying high-entropy literal now holds a letter and a digit.
-        self::assertCount(2791, $findings);
+        // M10 D33 (2026-09-26) removed one: safe-dummy-values.php line 11, AWS's documented example key, now a documented sample.
+        // M10 D35 renamed docs.missing-public-phpdoc to docs.missing-phpdoc, which moves the hash and no count.
+        self::assertCount(2790, $findings);
         // M08 made sensitive-data markers carry the class the detector already knew: a classified finding now reads
         // `[redacted:aws-access-key]` where it read `[redacted]`. The finding count, the rule set, and every
         // line-free identity are unchanged; only the marker text inside those findings moved.
         self::assertSame(
-            'af314acfbc47b67f3ea79204430a949a061927b5ceabae129512cd281f40cf47',
+            '2537853d7e4797350528bdd8158321141364f01fb503918860e452b246eece34',
             hash('sha256', $json),
         );
     }

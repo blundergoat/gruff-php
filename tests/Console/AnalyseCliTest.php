@@ -653,7 +653,7 @@ final class AnalyseCliTest extends CliTestCase
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         self::assertStringContainsString('::error file=tests/Fixtures/Source/Code/OrderCalculator.php', $process->getOutput());
-        self::assertStringContainsString('title=docs.missing-public-phpdoc', $process->getOutput());
+        self::assertStringContainsString('title=docs.missing-phpdoc', $process->getOutput());
     }
 
     /**

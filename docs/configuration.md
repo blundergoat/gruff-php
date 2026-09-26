@@ -248,9 +248,14 @@ selection:
 
 ## Sensitive Exclusions
 
-`sensitiveExclusions` is the only way to suppress a sensitive-data finding. It is deliberately
+`sensitiveExclusions` is the only setting that suppresses a sensitive-data finding. It is deliberately
 separate from `selection` so the ban on matching reported text is structural rather than a setting
 someone can relax later:
+
+Two built-in skips also hide sensitive-data findings, and count each one in `suppressions`: the
+entropy rule in package-manager lockfiles, and every sensitive-data rule except
+`sensitive-data.pii-test-fixture` in test, fixture and example files. A configured entry applies
+before either, so a finding it claims is counted under the entry.
 
 ```yaml
 sensitiveExclusions:
@@ -382,7 +387,7 @@ remains the way to silence a rule entirely.
 
 ```yaml
 rules:
-  docs.missing-public-phpdoc:
+  docs.missing-phpdoc:
     enabled: true
     excludeFromScore: true
 ```
