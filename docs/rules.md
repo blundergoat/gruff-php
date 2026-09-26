@@ -453,7 +453,8 @@ shortest literal that can reach the `entropy` bar (2^`entropy` characters),
 and a pure-hex literal is skipped at any `entropy`, as in gruff-go. A literal
 must also hold at least one letter and one digit, the floor FAMILY-CONTRACT
 section 12 sets for all five ports, because a run of one character class clears
-the `entropy` bar by construction and a digit-free mix of cases is an identifier. Across the secret rules, a
+the `entropy` bar by construction and a digit-free mix of cases is an identifier.
+Text inside a PEM block whose label names no private key (a certificate, public key, certificate request, PKCS7 bundle or CRL) never reports, because it is public by construction; a private key's block is still scanned. Across the secret rules, a
 placeholder word such as `test` or `example` suppresses a value only when it
 begins a token, so `latest` and `attestation` still report.
 

@@ -130,11 +130,17 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
 
         $findings      = [];
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
+        $armoured      = $this->publicArmourSpans($analysisUnit->source);
         // Weigh each candidate literal the scan found.
         foreach ($matches['value'] ?? [] as $match) {
             [$candidateSecret, $offset] = $match;
             // A literal inside a comment is documentation, not a live value.
             if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
+                continue;
+            }
+
+            // A public PEM block's base64 body is certificate or public-key material, never a secret.
+            if ($this->isInsideSpan($offset, $armoured)) {
                 continue;
             }
 
@@ -530,6 +536,63 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     {
         return strpbrk($candidateSecret, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ') !== false
             && strpbrk($candidateSecret, '0123456789') !== false;
+    }
+
+    /**
+     * Collects the offset spans of complete PEM blocks whose label names no private key.
+     *
+     * A certificate, public key, certificate request, PKCS7 bundle or CRL is public by construction, so its base64 body
+     * is never a secret; a private key's block stays scannable (FAMILY-CONTRACT section 12).
+     *
+     * @param string $source - Full file source being scanned.
+     *
+     * @return list<array{int, int}> - Half-open [start, end) offsets, from each opening marker to the end of its closing marker.
+     */
+    private function publicArmourSpans(string $source): array
+    {
+        $spans = [];
+        preg_match_all('/-----BEGIN ([A-Z0-9 ]+)-----/', $source, $openings, PREG_OFFSET_CAPTURE | PREG_SET_ORDER);
+
+        // Each opening marker is paired with the first closing marker of the same label after it.
+        foreach ($openings as $opening) {
+            [$marker, $start] = $opening[0];
+            $label            = $opening[1][0];
+
+            // A private key's block stays scannable: the key material there is the secret this rule exists for.
+            if (str_contains($label, 'PRIVATE')) {
+                continue;
+            }
+
+            $closing = '-----END ' . $label . '-----';
+            $closingOffset = strpos($source, $closing, $start + strlen($marker));
+
+            // An opening marker without its matching end marker is not a block, so nothing is exempted.
+            if ($closingOffset !== false) {
+                $spans[] = [$start, $closingOffset + strlen($closing)];
+            }
+        }
+
+        return $spans;
+    }
+
+    /**
+     * Reports whether an offset falls inside any of the given half-open spans.
+     *
+     * @param int                   $offset - Byte offset of the candidate literal.
+     * @param list<array{int, int}> $spans  - Half-open [start, end) offsets.
+     *
+     * @return bool - True when a span contains the offset.
+     */
+    private function isInsideSpan(int $offset, array $spans): bool
+    {
+        foreach ($spans as [$start, $end]) {
+            // The candidate sits between an opening marker and the end of its closing marker.
+            if ($offset >= $start && $offset < $end) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

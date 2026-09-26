@@ -263,6 +263,43 @@ final class SensitiveDataRulesTest extends TestCase
     }
 
     /**
+     * Verify a public PEM block's base64 body stays quiet while the same body reports outside armour and inside a
+     * private key's block.
+     *
+     * A certificate is public by construction (FAMILY-CONTRACT section 12). The body and the private-key label are
+     * assembled from parts so this file stores neither whole.
+     *
+     * @return void
+     */
+    public function testHighEntropySkipsPublicPemArmour(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'gruff-pem-entropy-');
+        self::assertIsString($path);
+        $path   .= '.php';
+        $body    = 'k3j9x2m7q1w8e5r4' . 't6y0u9i8o7p6a5s4' . 'd3f2g1h0zb';
+        $private = 'RSA PRIVATE' . ' KEY';
+        $wrap    = static fn(string $label): string => '"-----BEGIN ' . $label . '-----\n" . ' . var_export($body, true)
+            . ' . "\n-----END ' . $label . '-----"';
+        $source  = "<?php\n\n"
+                   . '$certificate = ' . $wrap('CERTIFICATE') . ";\n"
+                   . '$bare = ' . var_export($body, true) . ";\n"
+                   . '$key = ' . $wrap($private) . ";\n";
+        self::assertNotFalse(file_put_contents($path, $source));
+
+        try {
+            $unit     = (new PhpFileParser())->parse(new SourceFile($path, 'tests/Fixtures/SensitiveData/inline-pem-entropy.php'));
+            $findings = array_values(array_filter(
+                                         $this->analyseUnits([$unit]),
+                                         static fn(Finding $finding): bool => $finding->ruleId === HighEntropyStringRule::ID,
+            ));
+
+            self::assertSame([4, 5], array_map(static fn(Finding $finding): ?int => $finding->line, $findings));
+        } finally {
+            self::assertTrue(unlink($path));
+        }
+    }
+
+    /**
      * Verify route and URL path literals are not treated as high-entropy secrets.
      *
      * @return void
