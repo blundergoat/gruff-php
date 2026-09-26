@@ -300,6 +300,47 @@ final class SensitiveDataRulesTest extends TestCase
     }
 
     /**
+     * Verify markers that wrap code rather than a PEM body exempt nothing between them.
+     *
+     * Header and footer constants wrap a secret on line 4, and public markers on lines 6 and 8 wrap a private key's
+     * block on line 7: a block ends at the next marker and holds only base64, so both still report. On line 9 a
+     * one-line block breaks at its escaped line breaks, so its header vouches for nothing after it.
+     *
+     * @return void
+     */
+    public function testHighEntropyReportsBetweenMarkersThatAreNotABlock(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'gruff-pem-markers-');
+        self::assertIsString($path);
+        $path   .= '.php';
+        $body    = 'k3j9x2m7q1w8e5r4' . 't6y0u9i8o7p6a5s4' . 'd3f2g1h0zb';
+        $private = 'RSA PRIVATE' . ' KEY';
+        $openingLiteral = var_export('-----BEGIN CERTIFICATE-----', true);
+        $closingLiteral = var_export('-----END CERTIFICATE-----', true);
+        $source  = "<?php\n\n"
+                   . '$header = ' . $openingLiteral . ";\n"
+                   . '$secret = ' . var_export($body, true) . ";\n"
+                   . '$footer = ' . $closingLiteral . ";\n"
+                   . '$outer = ' . $openingLiteral . ";\n"
+                   . '$key = "-----BEGIN ' . $private . '-----\n" . ' . var_export($body, true) . ' . "\n-----END ' . $private . '-----";' . "\n"
+                   . '$close = ' . $closingLiteral . ";\n"
+                   . '$a = "-----BEGIN CERTIFICATE-----\nComment: x\n"; $k = ' . var_export($body, true) . '; $b = ' . $closingLiteral . ";\n";
+        self::assertNotFalse(file_put_contents($path, $source));
+
+        try {
+            $unit     = (new PhpFileParser())->parse(new SourceFile($path, 'tests/Fixtures/SensitiveData/inline-pem-markers.php'));
+            $findings = array_values(array_filter(
+                                         $this->analyseUnits([$unit]),
+                                         static fn(Finding $finding): bool => $finding->ruleId === HighEntropyStringRule::ID,
+            ));
+
+            self::assertSame([4, 7, 9], array_map(static fn(Finding $finding): ?int => $finding->line, $findings));
+        } finally {
+            self::assertTrue(unlink($path));
+        }
+    }
+
+    /**
      * Verify route and URL path literals are not treated as high-entropy secrets.
      *
      * @return void
