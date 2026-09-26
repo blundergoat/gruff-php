@@ -10,7 +10,7 @@ use Symfony\Component\Process\Process;
 
 /**
  * Covers the shared ignore engine: configured globs stay authoritative under
- * include-ignored, built-in directory and generated-file sources, and git rules.
+ * include-ignored, VCS and fallback directories, and git rules.
  */
 final class PathIgnoreResolverTest extends TestCase
 {
@@ -40,7 +40,10 @@ final class PathIgnoreResolverTest extends TestCase
         return [
             'configured file glob' => ['legacy/Bad.php', '/project/legacy/Bad.php', ['legacy/**'], 'config', 'legacy/**'],
             'configured directory glob' => ['legacy', '/project/legacy', ['legacy/**'], 'config', 'legacy/**'],
-            'generated lockfile' => ['composer.lock', '/project/composer.lock', [], 'generated', 'composer.lock'],
+            'vcs internals' => ['nested/.git/config', '/project/nested/.git/config', [], 'default', '.git'],
+            'php cache' => ['.gruff-cache/cache.php', '/project/.gruff-cache/cache.php', [], 'default', '.gruff-cache'],
+            'phpunit cache' => ['.phpunit.cache/result.php', '/project/.phpunit.cache/result.php', [], 'default', '.phpunit.cache'],
+            'framework cache' => ['var/cache/result.php', '/project/var/cache/result.php', [], 'default', 'var/cache'],
         ];
     }
 
@@ -84,21 +87,63 @@ final class PathIgnoreResolverTest extends TestCase
     }
 
     /**
-     * Verify a built-in directory is reported as the default source and is bypassed by include-ignored.
+     * Verify a built-in directory is reported as ignored by the default source, naming the matched entry.
      *
      * @return void
      */
-    public function testDefaultDirectorySourceAndIncludeIgnoredBypass(): void
+    public function testDefaultDirectoryIsReportedAsTheDefaultSource(): void
     {
-        $resolver = new PathIgnoreResolver('/project');
+        $decision = (new PathIgnoreResolver('/project'))->decide('vendor/acme/V.php', '/project/vendor/acme/V.php', [], false);
 
-        $ignored = $resolver->decide('vendor/acme/V.php', '/project/vendor/acme/V.php', [], false);
-        self::assertTrue($ignored->ignored);
-        self::assertSame('default', $ignored->source);
-        self::assertSame('vendor', $ignored->pattern);
+        self::assertTrue($decision->ignored);
+        self::assertSame('default', $decision->source);
+        self::assertSame('vendor', $decision->pattern);
+    }
 
-        $included = $resolver->decide('vendor/acme/V.php', '/project/vendor/acme/V.php', [], true);
-        self::assertFalse($included->ignored);
+    /**
+     * Verify include-ignored scans a built-in directory that would otherwise be skipped.
+     *
+     * @return void
+     */
+    public function testIncludeIgnoredBypassesADefaultDirectory(): void
+    {
+        $decision = (new PathIgnoreResolver('/project'))->decide('vendor/acme/V.php', '/project/vendor/acme/V.php', [], true);
+
+        self::assertFalse($decision->ignored);
+    }
+
+    /**
+     * Verify VCS internals stay blocked even under include-ignored, which never reaches them.
+     *
+     * @return void
+     */
+    public function testVcsInternalsStayBlockedUnderIncludeIgnored(): void
+    {
+        $decision = (new PathIgnoreResolver('/project'))->decide('.git/config', '/project/.git/config', [], true, true);
+
+        self::assertTrue($decision->ignored);
+        self::assertSame('.git', $decision->pattern);
+    }
+
+    /**
+     * Verify any governing .gitignore disables non-VCS fallback names for its subtree.
+     *
+     * @return void
+     */
+    public function testFallbackDefersToGitignoreInAncestorChain(): void
+    {
+        $root = $this->tempDir();
+        self::assertTrue(mkdir($root . '/packages/app/vendor', 0777, true));
+        file_put_contents($root . '/packages/app/.gitignore', "*.log\n");
+
+        $decision = (new PathIgnoreResolver($root))->decide(
+            'packages/app/vendor/acme.php',
+            $root . '/packages/app/vendor/acme.php',
+            [],
+            false,
+        );
+
+        self::assertFalse($decision->ignored);
     }
 
     /**

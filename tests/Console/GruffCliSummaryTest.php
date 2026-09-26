@@ -7,17 +7,18 @@ namespace GruffPhp\Tests\Console;
 use GruffPhp\Cli\Application;
 use JsonException;
 use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers the summary CLI command: digest section output, suppression of per-finding lines, JSON-schema-conformant output, invalid-option rejection,
- * and registration in the command list.
+ * Covers the one-screen `summary` experience and the compact machine-readable result users can request.
+ *
+ * The suite protects digest sections, omitted finding detail, JSON schema, command registration, options, and config failures.
+ * Users exercise these paths when they need a quick terminal overview or a stable summary payload for automation.
  */
-final class GruffCliSummaryTest extends TestCase
+final class GruffCliSummaryTest extends CliTestCase
 {
-    /** Project root used by filesystem and CLI tests. */
-    private const PROJECT_ROOT = __DIR__ . '/../..';
+    /** Number of source files in the mixed-language summary fixture. */
+    private const MIXED_FIXTURE_FILES = 7;
 
     /**
      * Verify summary runs and shows digest sections.
@@ -45,7 +46,7 @@ final class GruffCliSummaryTest extends TestCase
             '/^Findings: \d+ total · \d+ error · \d+ warning · \d+ advisory$/m',
             $output,
         );
-        self::assertStringContainsString('Score note Per-pillar scores start at 100', $output);
+        self::assertStringContainsString('Score note Each pillar scores on the density of its weighted findings per evaluated file', $output);
         self::assertStringContainsString('Pillars', $output);
         self::assertStringContainsString('Top', $output);
         self::assertStringContainsString('gruff-php analyse --generate-baseline', $output);
@@ -87,61 +88,185 @@ final class GruffCliSummaryTest extends TestCase
      */
     public function testSummaryJsonOutputMatchesSchema(): void
     {
-        $process = new Process([
-                                   PHP_BINARY,
-                                   self::PROJECT_ROOT . '/bin/gruff-php',
-                                   'summary',
-                                   'tests/Fixtures/Source/mixed',
-                                   '--no-config',
-                                   '--format',
-                                   'json',
-                                   '--top',
-                                   '3',
-                               ], self::PROJECT_ROOT);
-        $process->run();
+        $decoded = $this->runMachineJson([
+            'summary',
+            'tests/Fixtures/Source/mixed',
+            '--no-config',
+            '--format',
+            'json',
+        ]);
 
-        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-
-        $decoded = json_decode($process->getOutput(), true, 512, JSON_THROW_ON_ERROR);
-        self::assertIsArray($decoded);
-
-        self::assertSame('gruff.summary.v2', $decoded['schemaVersion'] ?? null);
+        self::assertSame('gruff.summary.v3', $decoded['schemaVersion'] ?? null);
         $tool = $decoded['tool'] ?? null;
         self::assertIsArray($tool);
         self::assertSame('gruff-php', $tool['name'] ?? null);
         self::assertSame(Application::VERSION, $tool['version'] ?? null);
 
-        $scope = $decoded['scope'] ?? null;
-        self::assertIsArray($scope);
-        self::assertSame(['tests/Fixtures/Source/mixed'], $scope['paths'] ?? null);
-        self::assertArrayHasKey('configPath', $scope);
-        self::assertNull($scope['configPath']);
-        self::assertSame(2, $scope['filesDiscovered'] ?? null);
+        $runMetadata = $decoded['run'] ?? null;
+        self::assertIsArray($runMetadata);
+        self::assertSame(['tests/Fixtures/Source/mixed'], $runMetadata['inputs'] ?? null);
+        self::assertArrayNotHasKey('config', $runMetadata);
 
-        $composite = $decoded['composite'] ?? null;
+        $score = $decoded['score'] ?? null;
+        self::assertIsArray($score);
+        $composite = $score['composite'] ?? null;
         self::assertIsArray($composite);
         self::assertArrayHasKey('score', $composite);
         self::assertArrayHasKey('grade', $composite);
 
-        $findings = $decoded['findings'] ?? null;
+        $summary = $decoded['summary'] ?? null;
+        self::assertIsArray($summary);
+        self::assertSame(self::MIXED_FIXTURE_FILES, $summary['discoveredFiles'] ?? null);
+        $findings = $summary['findings'] ?? null;
         self::assertIsArray($findings);
         self::assertArrayHasKey('total', $findings);
         self::assertArrayHasKey('advisory', $findings);
         self::assertArrayHasKey('warning', $findings);
         self::assertArrayHasKey('error', $findings);
 
-        $topRules = $decoded['topRules'] ?? null;
-        self::assertIsArray($topRules);
-        self::assertLessThanOrEqual(3, count($topRules));
+        self::assertArrayNotHasKey('findings', $decoded);
     }
 
     /**
-     * Verify summary applies the configured secret preview allowlist.
+     * Verify summary and analyse JSON are the same from a sibling directory and from a subdirectory of the project as
+     * from inside it.
+     *
+     * Anchored to the launch directory, `summary ../project --format json` threw on the first path outside it and
+     * printed no JSON. Reading operands against the project root, `..` typed from `project/sub` named the directory
+     * above the project, here holding Stray.php, so both commands scanned it and threw.
+     *
+     * @return void
+     * @throws JsonException When a run prints no JSON envelope.
+     */
+    public function testMachineJsonIsTheSameFromAnyLaunchDirectory(): void
+    {
+        $workspace = $this->tempDir();
+        self::assertTrue(mkdir($workspace . '/project/sub', 0o777, true));
+        self::assertTrue(mkdir($workspace . '/sibling'));
+        self::assertNotFalse(file_put_contents(
+            $workspace . '/project/Sample.php',
+            "<?php\n\nfunction sample(\$used, \$unused)\n{\n    return \$used;\n}\n",
+        ));
+        self::assertNotFalse(file_put_contents($workspace . '/Stray.php', "<?php\n\nfunction stray(\$unused)\n{\n}\n"));
+        $launches = [$workspace . '/sibling' => '../project', $workspace . '/project/sub' => '..'];
+
+        try {
+            foreach ([['summary'], ['analyse', '--fail-on', 'none', '--no-cache']] as $command) {
+                $inside = $this->runMachineJson([...$command, '.', '--no-config', '--format', 'json'], $workspace . '/project');
+                foreach ($launches as $launchDirectory => $target) {
+                    $outside = $this->runMachineJson([...$command, $target, '--no-config', '--format', 'json'], $launchDirectory);
+
+                    $runMetadata = $outside['run'] ?? null;
+                    self::assertIsArray($runMetadata, $command[0] . ' ' . $target);
+                    self::assertSame(['.'], $runMetadata['inputs'] ?? null, $command[0] . ' ' . $target . ' inputs');
+                    foreach (['score', 'summary', 'paths', 'diagnostics', 'findings'] as $section) {
+                        self::assertSame($inside[$section] ?? null, $outside[$section] ?? null, $command[0] . ' ' . $target . ' ' . $section);
+                    }
+                }
+            }
+        } finally {
+            $this->removeDir($workspace);
+        }
+    }
+
+    /**
+     * Verify the text and JSON digests both exit 2 on a run a parse error invalidated, and 0 once it parses.
+     *
+     * The text digest used to end every run with success, so a gate on `gruff-php summary` passed a broken run.
+     *
+     * @return void
+     */
+    public function testSummaryExitsTwoInTextAndJsonWhenAParseErrorInvalidatesTheRun(): void
+    {
+        $workspace = $this->tempDir();
+        self::assertNotFalse(file_put_contents($workspace . '/Broken.php', "<?php\n\nfunction broken( {\n"));
+
+        try {
+            foreach ([[], ['--format', 'json']] as $formatArguments) {
+                $process = new Process(
+                    [PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'summary', '.', '--no-config', ...$formatArguments],
+                    $workspace,
+                );
+                $process->run();
+                self::assertSame(2, $process->getExitCode(), 'summary ' . implode(' ', $formatArguments) . ': ' . $process->getOutput());
+            }
+
+            self::assertNotFalse(file_put_contents($workspace . '/Broken.php', "<?php\n\nfunction mended(): void\n{\n}\n"));
+            $mended = new Process([PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'summary', '.', '--no-config'], $workspace);
+            $mended->run();
+            self::assertSame(0, $mended->getExitCode(), $mended->getOutput());
+        } finally {
+            $this->removeDir($workspace);
+        }
+    }
+
+    /**
+     * Verify summary JSON is the exact findings-free projection of analysis JSON for the same inputs.
      *
      * @return void
      * @throws JsonException
      */
-    public function testSummaryAppliesConfiguredSecretPreviewAllowlist(): void
+    public function testSummaryJsonOutputIsExactAnalysisProjection(): void
+    {
+        $summaryDocument = $this->runMachineJson([
+            'summary',
+            'tests/Fixtures/Source/mixed',
+            '--no-config',
+            '--format',
+            'json',
+        ]);
+        $analysisDocument = $this->runMachineJson([
+            'analyse',
+            'tests/Fixtures/Source/mixed',
+            '--no-config',
+            '--no-baseline',
+            '--no-cache',
+            '--no-interaction',
+            '--format',
+            'json',
+            '--fail-on',
+            'none',
+        ]);
+
+        unset($analysisDocument['findings']);
+        $analysisDocument['schemaVersion'] = 'gruff.summary.v3';
+        self::assertSame($analysisDocument, $summaryDocument);
+    }
+
+    /**
+     * Verify both compact formats retain the nonfatal budget diagnostic.
+     *
+     * @return void
+     */
+    public function testSummaryShowsBoundedDeepScanDiagnostic(): void
+    {
+        foreach (['text', 'json'] as $format) {
+            $process = new Process([
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff-php',
+                'summary',
+                '--no-config',
+                '--format',
+                $format,
+                '--deep-scan-budget',
+                '1:1',
+                'tests/Fixtures/Source/mixed/alpha.php',
+            ], self::PROJECT_ROOT);
+            $process->run();
+
+            self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+            self::assertStringContainsString('bounded-deep-scan', strtolower($process->getOutput()), $format);
+            self::assertStringContainsString('maxLines=1; maxBytes=1; override=cli', $process->getOutput(), $format);
+        }
+    }
+
+    /**
+     * Models a user running `summary` with an old non-empty secret-preview list.
+     * The command must exit 2 with the same actionable migration message as `analyse`.
+     *
+     * @return void
+     */
+    public function testSummaryRejectsConfiguredLegacySecretPreview(): void
     {
         $process = new Process([
                                    PHP_BINARY,
@@ -155,23 +280,18 @@ final class GruffCliSummaryTest extends TestCase
                                ], self::PROJECT_ROOT);
         $process->run();
 
-        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-
-        // The allowlist runs before scoring, so the vetted rule leaves both the digest's rule table and
-        // the grade it prints; a summary that still listed it would also still be charging for it.
-        $decoded = json_decode($process->getOutput(), true, 512, JSON_THROW_ON_ERROR);
-        self::assertIsArray($decoded);
-        $topRules = $decoded['topRules'] ?? null;
-        self::assertIsArray($topRules);
-        self::assertNotContains('sensitive-data.aws-access-key', array_column($topRules, 'ruleId'));
-        self::assertContains('sensitive-data.api-key-pattern', array_column($topRules, 'ruleId'));
+        self::assertSame(2, $process->getExitCode());
+        self::assertStringContainsString(
+            '[CONFIG-ERROR] Config key "allowlists.secretPreviews" is removed in 0.6.0: FAMILY-CONTRACT.md section 5 makes category markers unconditional, so the key authorises nothing; delete it from the configuration.',
+            $process->getOutput(),
+        );
     }
 
     /**
      * Verify summary rejects invalid option combinations.
      *
      * @param list<string> $arguments - CLI arguments appended after the base command.
-     * @param string       $message - Expected usage error excerpt.
+     * @param string       $message   - Expected usage error excerpt.
      *
      * @return void
      */
@@ -203,6 +323,36 @@ final class GruffCliSummaryTest extends TestCase
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         self::assertStringContainsString('summary', $process->getOutput());
+    }
+
+    /**
+     * Run one machine-output CLI command and validate that stdout is a JSON object.
+     *
+     * @param list<string> $arguments        - CLI arguments appended after the gruff-php binary.
+     * @param string       $workingDirectory - Directory the command is launched from.
+     *
+     * @return array<string, mixed> - Decoded string-keyed machine document.
+     * @throws JsonException When stdout is not valid JSON.
+     */
+    private function runMachineJson(array $arguments, string $workingDirectory = self::PROJECT_ROOT): array
+    {
+        $process = new Process(
+            array_merge([PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php'], $arguments),
+            $workingDirectory,
+        );
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        $decoded = json_decode($process->getOutput(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertIsArray($decoded);
+
+        $document = [];
+        foreach ($decoded as $key => $value) {
+            self::assertIsString($key);
+            $document[$key] = $value;
+        }
+
+        return $document;
     }
 
     /**

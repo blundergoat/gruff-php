@@ -44,6 +44,12 @@ final readonly class SetupBloatRule implements RuleInterface
             defaultSeverity:   Severity::Advisory,
             confidence:        Confidence::Medium,
             defaultThresholds: ['minSetupLines' => 8],
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A class of short, focused tests over one expensive fixture, where the setUp is long only because the tests are deliberately small.',
+                    'mitigation' => 'The comparison is against the class\'s average test length, so a suite of one-line tests trips it; raise this rule\'s minSetupLines threshold.',
+                ],
+            ],
         );
     }
 

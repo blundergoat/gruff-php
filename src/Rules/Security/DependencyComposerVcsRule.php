@@ -50,6 +50,12 @@ final class DependencyComposerVcsRule implements SourceTextRuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A private VCS repository whose package is already required at an immutable commit.',
+                    'mitigation' => 'The repository type alone is matched and the resolving constraint is never read, so confirm the pinning and accept the finding, or publish through a private registry.',
+                ],
+            ],
         );
     }
 

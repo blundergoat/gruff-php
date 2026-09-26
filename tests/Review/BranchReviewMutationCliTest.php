@@ -58,9 +58,9 @@ final class BranchReviewMutationCliTest extends TestCase
 
             self::assertSame(0, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
             $report   = $this->decodeJson($process);
-            $mutation = $this->arrayValue($report, 'mutation');
+            $mutation = $this->phpTopLevelExtension($report, 'mutation');
             $totals   = $this->arrayValue($mutation, 'totals');
-            $review   = $this->arrayValue($report, 'review');
+            $review   = $this->phpTopLevelExtension($report, 'review');
 
             self::assertEquals(50.0, $totals['msi'] ?? null);
             self::assertEqualsWithDelta(0.0, $this->floatValue($review, 'deltaScore'), 0.001);
@@ -149,6 +149,23 @@ JSON;
     }
 
     /**
+     * Read a PHP-owned v3 top-level extension from decoded analysis output.
+     *
+     * @param array<string, mixed> $payload - Decoded v3 analysis document.
+     * @param string               $key     - PHP extension key to read.
+     *
+     * @return array<string, mixed> - Validated PHP extension object.
+     */
+    private function phpTopLevelExtension(array $payload, string $key): array
+    {
+        $extensions    = $this->arrayValue($payload, 'extensions');
+        $phpExtensions = $this->arrayValue($extensions, 'php');
+        $topLevel      = $this->arrayValue($phpExtensions, 'topLevel');
+
+        return $this->arrayValue($topLevel, $key);
+    }
+
+    /**
      * Read a numeric value from a payload as float.
      *
      * @param array<string, mixed> $payload - Source payload.
@@ -203,7 +220,7 @@ JSON;
     /**
      * Run a Git command in a fixture repository.
      *
-     * @param string $cwd - Working directory.
+     * @param string $cwd  - Working directory.
      * @param string $args - Command arguments.
      *
      * @return void

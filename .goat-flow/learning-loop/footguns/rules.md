@@ -27,7 +27,7 @@ Rule heuristics that search a whole docblock or AST subtree can attribute nested
 
 **Status:** active | **Created:** 2026-05-11 | **Evidence:** OBSERVED
 
-`src/Rules/Docs/MissingPublicPhpdocRule.php` (search: `docs.missing-public-phpdoc`) keeps the historical rule ID for output compatibility, but the rule now requires local PHPDoc on every method declaration, including public, protected, private, abstract, accessor, magic, helper, reporter, and interface implementation methods. Agents must not infer that only public methods are checked from the ID or class name.
+`src/Rules/Docs/MissingPhpdocRule.php` (search: `docs.missing-phpdoc`) requires local PHPDoc on every method declaration, including public, protected, private, abstract, accessor, magic, helper, reporter, and interface implementation methods. Before 0.6.0 its name suggested public-only coverage. The old `docs.missing-public-phpdoc` id is now a compatibility alias in `src/Rules/RuleRegistry.php` (search: `RULE_ID_ALIASES`); maintained config and guidance use `docs.missing-phpdoc`. Agents must not infer narrower semantics from a legacy id.
 
 **Prevention:** When changing rule semantics, update `RuleDefinition` names, config comments, docs, tests, and golden fixtures together while preserving rule IDs only when output compatibility requires it. Regression tests should assert representative methods across all visibilities so the compatibility name cannot silently narrow behavior again.
 

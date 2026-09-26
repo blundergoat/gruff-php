@@ -19,14 +19,30 @@ Supported top-level sections are:
 - `schemaVersion`
 - `extends`
 - `minimumPhpVersion`
+- `deepScanBudget`
 - `minimumSeverity`
+- `failOn`
 - `failureConditions`
 - `paths`
 - `allowlists`
 - `selection`
+- `sensitiveExclusions`
 - `rules`
 
 Unknown top-level keys are rejected so config mistakes fail early.
+
+## Bounded Deep Scans
+
+PHP files are classified before the deep-scan guard runs. By default, a PHP file over either 20,000 lines or 2,000,000 bytes keeps raw-text checks—file size, sensitive-data, and config checks—but skips token masking, PHP parsing, AST walking, and other structural analysis. The file still counts as analysed and every output format includes a nonfatal `bounded-deep-scan` diagnostic naming its path, measured lines and bytes, both limits, and the winning override source.
+
+```yaml
+deepScanBudget:
+  enabled: true
+  maxLines: 20000
+  maxBytes: 2000000
+```
+
+Use `--deep-scan-budget <lines>:<bytes>` to replace both values for one invocation, or `--deep-scan-budget off` to disable the guard. CLI values take precedence over config. Non-PHP text and config files never pass through this guard.
 
 ## Schema Version
 
@@ -59,12 +75,33 @@ names fail fast.
 
 ## Minimum Severity
 
-`minimumSeverity` sets the exit-code threshold per gating command. Keys are
+`minimumSeverity` is the report's display floor. It takes one severity —
+`advisory`, `warning`, or `error` — and hides every finding below it from
+the report:
+
+```yaml
+minimumSeverity: warning
+```
+
+The floor changes what a report shows, never what it decides: a finding it
+hides still counts toward the exit code and the score. `none` is not a floor
+value, and a per-command map is rejected with an error pointing at `failOn`,
+which is the key that gates the exit code.
+
+## Fail On
+
+Across the Gruff family only `analyse` and `report` are accepted by every port, so a
+polyglot repository that shares one `failOn` block should write only those two keys.
+`dashboard` is accepted by gruff-go, gruff-php and gruff-py, and `summary` by gruff-go
+and gruff-ts; each other port refuses the key with exit 2 rather than ignoring it,
+because it ships no gate for that command.
+
+`failOn` sets the exit-code threshold per gating command. Keys are
 `analyse`, `report`, and `dashboard`; values are `advisory`, `warning`,
 `error`, or `none`:
 
 ```yaml
-minimumSeverity:
+failOn:
   analyse: advisory
   report: none
   dashboard: none
@@ -79,14 +116,14 @@ accepted values.
 Precedence when resolving the effective threshold:
 
 1. CLI `--fail-on` flag (when set explicitly)
-2. `minimumSeverity.<command>` from `.gruff-php.yaml`
+2. `failOn.<command>` from `.gruff-php.yaml`
 3. Binary default — `advisory` for `analyse`, `none` for `report` and
    `dashboard`
 
 `analyse`'s binary default lowered from `error` to `advisory` in 0.2.0 so
 that every finding visible in the report can fail CI by default. Pass
-`--fail-on error` or set `minimumSeverity.analyse: error` to restore the
-older behaviour.
+`--fail-on error` or set `failOn.analyse: error` to restore the older
+behaviour.
 
 ## Failure Conditions
 
@@ -105,7 +142,7 @@ failureConditions:
 Any configured cap that is exceeded fails the run. An explicit CLI `--fail-on`
 flag overrides `failureConditions`. To gate only change-introduced findings,
 configure `newFindings` and provide a reference point with `--baseline` or
-`--diff-vs`:
+`--diff-base`:
 
 ```yaml
 failureConditions:
@@ -114,11 +151,15 @@ failureConditions:
       error: 0
 ```
 
-With a baseline reference point, "new" derives from `gruff.baseline.v2` group
-matching: a finding counts as new when its `(file, ruleId, message)` group has
-more live instances than the baseline accepted, so unrelated line shifts never
-re-trigger the gate. Legacy `gruff.baseline.v1` files fail closed — regenerate
-them once with `analyse --generate-baseline`.
+With a baseline reference point, "new" derives from `gruff.baseline.v3`
+identity matching: a finding counts as new when its line-free identity has more
+live instances than the baseline accepted, so unrelated line shifts never
+re-trigger the gate. Legacy files fail closed: carry a `gruff.baseline.v2`
+file's reviews forward once with
+`analyse --migrate-baseline <old> --generate-baseline <new>`, and regenerate a
+`gruff.baseline.v1` file with `analyse --generate-baseline`, adding `--force` at
+the default `gruff-baseline.json`, which `--migrate-baseline` refuses because it
+reads only v2.
 
 ## Paths
 
@@ -135,19 +176,22 @@ paths:
 `paths.ignore` is authoritative in every invocation mode: a matching path is
 excluded from analysis and produces no findings however it was supplied — a
 directory walk, an explicit file operand, or any diff/changed-region scan
-(`--diff`, `--diff -`, `--changed-ranges`, `--since`, `--diff-vs`).
+(`--diff`, `--diff -`, `--changed-ranges`, `--since`, `--diff-base`).
 `--include-ignored` opts back into Git/default-ignored paths only; it never
 overrides `paths.ignore`.
 
-Each excluded path is reported in the JSON report's additive `ignoredPathDetails`
-array (alongside the compatibility `ignoredPaths` string list) with the `source`
-that excluded it (`config`, `default`, `generated`, or `gitignore`) and the
-matching `pattern`:
+Each excluded path is reported in the JSON report's `paths.details` array with a
+canonical `reason`, the `source` that excluded it (`config`, `default`,
+`generated`, or `gitignore`), and the matching `pattern` when that source has
+one. `paths.ignoredPaths` is the ordered path projection of the same rows:
 
 ```json
-"ignoredPathDetails": [
-  { "path": "legacy/Report.php", "source": "config", "pattern": "legacy/**" }
-]
+"paths": {
+  "details": [
+    { "path": "legacy/Report.php", "reason": "config-ignore", "source": "config", "pattern": "legacy/**" }
+  ],
+  "ignoredPaths": ["legacy/Report.php"]
+}
 ```
 
 Use `gruff-php check-ignore <path>...` to ask whether gruff would ignore a path,
@@ -181,13 +225,12 @@ allowlists:
     - ui
     - url
     - utc
-  secretPreviews: []
 ```
 
 `allowlists.acceptedAbbreviations` is matched case-insensitively by
 `naming.abbreviation-allowlist`. Gruff seeds the universal programming terms
-`age`, `app`, `db`, `dto`, `fs`, `id`, `io`, `key`, `log`, `max`, `min`, `now`,
-`raw`, `rx`, `tx`, `ui`, `url`, and `utc` when this key is absent. Supplying the key replaces
+`age`, `app`, `db`, `fs`, `id`, `io`, `key`, `log`, `max`, `min`, `now`, `raw`,
+`rx`, `tx`, `ui`, and `url` when this key is absent. Supplying the key replaces
 that seeded list, so include every universal term the project still accepts as
 well as domain vocabulary such as `dob`. An unaccepted short name remains an
 advisory `CONSIDER` finding; the allowlist is a deliberate project decision,
@@ -202,6 +245,65 @@ selection:
   pillars: [security, complexity]
   excludeRules: [security.weak-crypto]
 ```
+
+## Sensitive Exclusions
+
+`sensitiveExclusions` is the only setting that suppresses a sensitive-data finding. It is deliberately
+separate from `selection` so the ban on matching reported text is structural rather than a setting
+someone can relax later:
+
+Two built-in skips also hide sensitive-data findings, and count each one in `suppressions`: the
+entropy rule in package-manager lockfiles, and every sensitive-data rule except
+`sensitive-data.pii-test-fixture` in test, fixture and example files. A configured entry applies
+before either, so a finding it claims is counted under the entry.
+
+```yaml
+sensitiveExclusions:
+  - rule: sensitive-data.aws-access-key
+    path: tests/Fixtures/SensitiveExclusions/AwsSample.php
+    symbol: Fixtures::awsSample
+    reason: Synthetic key used by the scanner fixtures; not a live credential.
+```
+
+**Entries are authored by hand.** gruff never converts a reported finding, message, or preview value
+into an entry, and there is no command that writes one for you. Every finding you accept is a
+decision you record yourself, with the rationale a later reviewer will read.
+
+An entry suppresses a finding only when all of the following hold:
+
+- the finding's rule id equals `rule` exactly;
+- the finding's project-relative path equals `path` exactly;
+- `symbol` is absent, or the finding's symbol equals it exactly.
+
+Nothing else is suppressed. The same rule in another file keeps reporting, and a different rule in
+the same file keeps reporting. No sensitive-data rule stamps a symbol today, so an entry carrying
+`symbol` legitimately matches nothing - that is correct behaviour, not a bug.
+
+A suppressed finding leaves scoring and the exit code exactly as an accepted baseline finding does,
+and is never invisible: every entry publishes a row in the report's `suppressions` array, and the
+text report prints a `Suppressed findings:` total naming each entry and its reason. An entry that
+matches nothing reports `suppressed: 0` rather than failing, so fixing the underlying problem never
+breaks a build.
+
+`summary` applies the same entries, so its counts and grade agree with `analyse` over the same tree,
+and its text output prints the same `Suppressed findings:` total below the digest. Its
+`gruff.summary.v3` JSON publishes the same `suppressions` array as `analyse`, one
+`{index, rule, paths, symbol?, reason, suppressed}` row per configured entry, so the count is
+readable from `summary --format json` directly.
+
+These shapes are rejected at load time, each with a message naming the entry index and the offending
+key, and each exiting `2`:
+
+| Rejected | Why |
+| --- | --- |
+| `rule` missing, empty, or carrying a wildcard, glob, or regular expression | a blanket suppression hides findings nobody reviewed |
+| `rule` naming a pillar such as `sensitive-data` | a pillar selector is blanket suppression wearing a rule id |
+| `rule` naming an unknown rule id | a typo must fail loudly, not silently suppress nothing |
+| `rule` naming a rule outside the sensitive-data pillar | this section governs that pillar alone; use `selection` for the rest |
+| `path` missing, empty, absolute, containing `..`, or containing a glob | an entry names exactly one reviewed file inside the project |
+| any other key, including `message_contains`, `messageContains`, `value`, and `preview` | matching on reported text reintroduces value-based suppression |
+| `reason` missing, empty, or whitespace-only | a suppression nobody explained is a suppression nobody can review |
+| a second entry with the same `rule`, `path`, and `symbol` | two entries claiming one scope would split the audit count arbitrarily |
 
 ## Rules
 
@@ -268,7 +370,7 @@ metadata keys:
   hatch, for example `allowlists.acceptedAbbreviations` or
   `rules.naming.boolean-prefix.options.acceptedBooleanNames`.
 
-`CONFIGURE` is not emitted unconditionally by any 0.5.1 rule. Abbreviation,
+`CONFIGURE` is not emitted unconditionally by any 0.5.2 rule. Abbreviation,
 every Boolean parameter, and other caller-visible Boolean findings use
 `CONSIDER` because configuration or a compatibility-sensitive rename can both
 be valid. Only private property and private callable names use `APPLY`.
@@ -285,7 +387,7 @@ remains the way to silence a rule entirely.
 
 ```yaml
 rules:
-  docs.missing-public-phpdoc:
+  docs.missing-phpdoc:
     enabled: true
     excludeFromScore: true
 ```

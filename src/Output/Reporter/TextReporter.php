@@ -6,6 +6,7 @@ namespace GruffPhp\Output\Reporter;
 
 use GruffPhp\Engine\Analysis\AnalysisReport;
 use GruffPhp\Engine\Analysis\RunDiagnostic;
+use GruffPhp\Engine\Analysis\SensitiveExclusionSummary;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Mutation\MutationAnalysisResult;
 
@@ -44,7 +45,11 @@ final readonly class TextReporter
 
         // Lead with the composite grade, but only when scoring ran; a metadata-only run has none to show.
         if ($report->score !== null) {
-            $lines[] = sprintf('Composite: %s (%.2f / 100)', $report->score->composite->letter, $report->score->composite->score);
+            // A run that evaluated nothing has no composite: printing 100.00 is what let an empty
+            // directory read as perfect before the M06 break.
+            $lines[] = $report->score->composite === null
+                ? 'Composite: n/a (nothing evaluated)'
+                : sprintf('Composite: %s (%.2f / 100)', $report->score->composite->letter, $report->score->composite->score);
         }
 
         $lines[] = sprintf(
@@ -70,6 +75,7 @@ final readonly class TextReporter
         $this->appendRuleDeltas($lines, $report);
         $this->appendScore($lines, $report);
         $this->appendBaseline($lines, $report);
+        $this->appendSensitiveExclusions($lines, $report);
         $this->appendMutation($lines, $report->mutation);
         $this->appendReview($lines, $report);
         $this->appendFindings($lines, $report->findings);
@@ -91,6 +97,30 @@ final readonly class TextReporter
         $this->appendOutputVolumeHint($lines, $counts['total']);
 
         return implode(PHP_EOL, $lines) . PHP_EOL;
+    }
+
+    /**
+     * Surfaces what the configured `sensitiveExclusions:` entries hid on this run, so a suppressed
+     * sensitive-data finding is a visible number with a rationale beside it rather than an absence
+     * the reader has to notice. Nothing here comes from a matched value: the rule id, the count,
+     * and the reason are all configuration.
+     *
+     * @param list<string>   $lines - Output buffer appended in place; untouched when nothing was suppressed.
+     * @param AnalysisReport $report - Report whose sensitive-exclusion audit rows are summarised.
+     *
+     * @return void
+     */
+    private function appendSensitiveExclusions(array &$lines, AnalysisReport $report): void
+    {
+        $suppressionLine = SensitiveExclusionSummary::describeTotal($report->sensitiveExclusions);
+
+        // With nothing suppressed there is no absence to explain, so the report stays as it was.
+        if ($suppressionLine === null) {
+            return;
+        }
+
+        $lines[] = '';
+        $lines[] = $suppressionLine;
     }
 
     /**
@@ -344,9 +374,9 @@ final readonly class TextReporter
                 $lines[] = sprintf(
                     '    %s %s (resolved %d): %s',
                     $resolvedEntry->ruleId,
-                    $resolvedEntry->filePath,
+                    $resolvedEntry->path,
                     $resolvedEntry->count,
-                    $resolvedEntry->message,
+                    $resolvedEntry->subject,
                 );
             }
         }
@@ -581,9 +611,11 @@ final readonly class TextReporter
                 $location .= sprintf(':%d', $finding->line);
             }
 
-            $lines[] = sprintf('  [%s] %s', $finding->severity->value, $finding->ruleId);
-            $lines[] = sprintf('    %s', $location);
-            $lines[] = sprintf('    %s', $finding->message);
+            // FAMILY-CONTRACT section 1 made the rs/ts dash-line the family canon at this break:
+            // `- [severity] file:line ruleId - message`. gruff-php emitted a three-line block, so the
+            // same finding took three lines here and one line in two sibling ports, and no editor
+            // jump-to-location convention matched.
+            $lines[] = sprintf('- [%s] %s %s - %s', $finding->severity->value, $location, $finding->ruleId, $finding->message);
         }
     }
 }

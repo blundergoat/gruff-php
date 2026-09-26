@@ -63,7 +63,7 @@ final class FailureConditionsCliTest extends CliTestCase
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-        self::assertArrayNotHasKey('failureReason', $this->decodeJsonOutput($process));
+        self::assertNull($this->failureReason($this->decodeJsonOutput($process)));
     }
 
     /**
@@ -85,7 +85,7 @@ final class FailureConditionsCliTest extends CliTestCase
         $jsonRun->run();
 
         self::assertSame(1, $jsonRun->getExitCode());
-        $failureReason = $this->decodeJsonOutput($jsonRun)['failureReason'] ?? null;
+        $failureReason = $this->failureReason($this->decodeJsonOutput($jsonRun));
         self::assertIsArray($failureReason);
         self::assertSame('error', $failureReason['thresholdKind'] ?? null);
         self::assertSame(self::FIXTURE_ERROR_COUNT, $failureReason['count'] ?? null);
@@ -122,7 +122,7 @@ final class FailureConditionsCliTest extends CliTestCase
         $process->run();
 
         self::assertSame(1, $process->getExitCode());
-        $failureReason = $this->decodeJsonOutput($process)['failureReason'] ?? null;
+        $failureReason = $this->failureReason($this->decodeJsonOutput($process));
         self::assertIsArray($failureReason);
         self::assertSame('total', $failureReason['thresholdKind'] ?? null);
     }
@@ -171,9 +171,38 @@ final class FailureConditionsCliTest extends CliTestCase
     }
 
     /**
+     * Read PHP's named failure-reason extension from a canonical analysis report.
+     *
+     * @param array<string, mixed> $report - Decoded v3 analysis document.
+     *
+     * @return array<string, mixed>|null - Failure reason when a count gate tripped.
+     */
+    private function failureReason(array $report): ?array
+    {
+        $extensions = $report['extensions'] ?? null;
+        if (!is_array($extensions)) {
+            return null;
+        }
+
+        $phpExtensions = $extensions['php'] ?? null;
+        if (!is_array($phpExtensions)) {
+            return null;
+        }
+
+        $topLevel = $phpExtensions['topLevel'] ?? null;
+        if (!is_array($topLevel)) {
+            return null;
+        }
+
+        $failureReason = $topLevel['failureReason'] ?? null;
+
+        return is_array($failureReason) ? $this->decodedJsonObject($failureReason) : null;
+    }
+
+    /**
      * Write a fixture file, creating parent directories as needed.
      *
-     * @param string $path - Project-relative file path.
+     * @param string $path     - Project-relative file path.
      * @param string $contents - File contents.
      *
      * @return void

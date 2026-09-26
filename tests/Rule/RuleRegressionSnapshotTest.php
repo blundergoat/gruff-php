@@ -28,7 +28,10 @@ use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers cross-rule regression behaviour over the fixture corpus.
+ * Covers cross-rule report stability over the full fixture corpus users depend on for release confidence.
+ *
+ * Snapshot hashes and catalogue coverage expose any change to finding counts, content, identity, or calibration signal.
+ * Maintainers use this suite before release so users do not receive unexplained report or scoring drift.
  *
  * @phpstan-import-type FindingArray from Finding
  * @phpstan-import-type FindingMetadata from Finding
@@ -47,10 +50,26 @@ final class RuleRegressionSnapshotTest extends TestCase
     {
         [$units, $findings, $json] = $this->analysePaths(['tests/Fixtures']);
 
-        self::assertCount(178, $units);
-        self::assertCount(2670, $findings);
+        // M07 added tests/Fixtures/Baseline/gruff-baseline-v3.json to the corpus, and M19 ten precision fixtures.
+        self::assertCount(193, $units);
+        // M19 (2026-09-19) removed confirmed false positives and nothing else: an immediately invoked closure, a
+        // statically written first-class callable, `#[\Override]` and `{@inheritdoc}` methods, and pure-hex digests.
+        // AWS's documented example key now reports, as the operator decided, and so does one sibling-scope `$x()`.
+        // Its review fixes then added 38 findings, every one on a new fixture line: ten laundering and shadowing
+        // `$x()` shapes, two one-line wrappers, a namespaced `sprintf()`, a concatenated secret, and 24 findings
+        // other rules raise on that new fixture code. The operator-requested double-check added 39 more: 3 on the
+        // dynamic-call fixture's two new pins, 33 on the two inherited-contract fixtures (21 docs tags the narrowed
+        // exemption owes, 12 from other rules), and 3 docs tags on older fixtures that exemption no longer hides.
+        // M10 D23 (2026-09-25) removed one: synthetic-secrets.php's digit-free mixed-case alphabet run, since a
+        // qualifying high-entropy literal now holds a letter and a digit.
+        // M10 D33 (2026-09-26) removed one: safe-dummy-values.php line 11, AWS's documented example key, now a documented sample.
+        // M10 D35 renamed docs.missing-public-phpdoc to docs.missing-phpdoc, which moves the hash and no count.
+        self::assertCount(2790, $findings);
+        // M08 made sensitive-data markers carry the class the detector already knew: a classified finding now reads
+        // `[redacted:aws-access-key]` where it read `[redacted]`. The finding count, the rule set, and every
+        // line-free identity are unchanged; only the marker text inside those findings moved.
         self::assertSame(
-            '2a6dcb6385de754dc238058357640680a337af3ab5138855e0b54671b40a9683',
+            '2537853d7e4797350528bdd8158321141364f01fb503918860e452b246eece34',
             hash('sha256', $json),
         );
     }
@@ -266,6 +285,8 @@ final class RuleRegressionSnapshotTest extends TestCase
     }
 
     /**
+     * Sorts nested finding metadata so the user-visible regression snapshot stays stable across equivalent map ordering.
+     *
      * @param FindingMetadata $metadata - Finding metadata payload.
      *
      * @return FindingMetadata - the metadata with both nested maps and the top level key-sorted for a stable snapshot hash

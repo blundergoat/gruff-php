@@ -15,6 +15,7 @@ use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
+use GruffPhp\Support\DeclarationLine;
 use PhpParser\Node;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
@@ -64,6 +65,12 @@ final readonly class GenericMethodNameRule implements RuleInterface
             optionDescriptions: [
                 'genericNames' => 'Replacement list of function and method names treated as generic; matching is case-insensitive.',
             ],
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'An interface-mandated verb the author cannot rename, such as a PSR-15 handle() or process(), or a queue job\'s handle().',
+                    'mitigation' => 'Only Symfony Console\'s execute(InputInterface, OutputInterface) is recognised as a framework override, so remove the mandated name from options.genericNames.',
+                ],
+            ],
         );
     }
 
@@ -106,7 +113,7 @@ final readonly class GenericMethodNameRule implements RuleInterface
                 ruleId:      $definition->id,
                 message:     sprintf('%s uses a generic name that does not communicate intent.', $symbol),
                 filePath:    $analysisUnit->file->displayPath,
-                line:        $node->getStartLine(),
+                line:        DeclarationLine::of($node),
                 severity:    $definition->defaultSeverity,
                 pillar:      $definition->pillar,
                 tier:        $definition->tier,

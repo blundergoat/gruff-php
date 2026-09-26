@@ -55,6 +55,12 @@ final readonly class HalsteadVolumeRule implements RuleInterface
             defaultSeverity:   Severity::Advisory,
             confidence:        Confidence::Medium,
             severityThreshold: new SeverityThreshold(8000, Severity::Advisory),
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A declarative builder whose bulk is one long literal array, configuration table, or dispatch map, with almost no branching.',
+                    'mitigation' => 'Every literal occurrence counts toward program length, so extract the table to a constant or configuration, or raise this rule\'s threshold and severity.',
+                ],
+            ],
         );
     }
 

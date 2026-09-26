@@ -54,6 +54,21 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     private const WORD_CHARACTER_MAJORITY_RATIO = 0.5;
 
     /**
+     * PCRE's largest `{n,}` repeat count; a longer configured minimum is still enforced by the length check.
+     */
+    private const MAX_SCAN_LENGTH = 65535;
+
+    /**
+     * Any opening or closing PEM marker, so a block can end only at the next one.
+     */
+    private const PEM_MARKER_PATTERN = '/-----(BEGIN|END) ([A-Z0-9 ]+)-----/';
+
+    /**
+     * One line of a PEM body once its string quoting is stripped: base64, a PGP checksum or an armour header.
+     */
+    private const PEM_BODY_LINE_PATTERN = '/^(?:[A-Za-z0-9+\/]+={0,2}|=[A-Za-z0-9+\/]{4}|(?:Version|Comment|Hash|Charset|MessageID|Proc-Type|DEK-Info):.*)$/D';
+
+    /**
      * Ordered alphabets used by parsers/generators; these are keyspaces, not secret material.
      *
      * @var array<string, true>
@@ -110,19 +125,32 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $settings         = $ruleContext->settingsFor($this->definition());
-        $minLength        = (int) $settings->numericThreshold('minLength');
+        // A length below one would make every quoted character a candidate, so the floor never drops under it.
+        $minLength        = max(1, (int) $settings->numericThreshold('minLength'));
         $entropyThreshold = (float) $settings->numericThreshold('entropy');
 
-        // Match every long quoted literal in the source, capturing its value and offset.
-        preg_match_all('/["\'](?<value>[A-Za-z0-9_+\/=.-]{32,})["\']/', $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
+        // A literal shorter than 2^entropy cannot reach that entropy, so the scan starts there even when minLength is
+        // lower; that also keeps a short run such as the `'.'` between two concatenated literals from pairing with a
+        // secret's opening quote.
+        $entropyFloor = (int) min(self::MAX_SCAN_LENGTH, ceil(2 ** max(0.0, $entropyThreshold)));
+        $scanLength   = min(self::MAX_SCAN_LENGTH, max($minLength, $entropyFloor));
+
+        // Match every quoted literal at least the scan length long, so lowering minLength widens the scan.
+        preg_match_all('/["\'](?<value>[A-Za-z0-9_+\/=.-]{' . $scanLength . ',})["\']/', $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
         $findings      = [];
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
+        $armoured      = $this->publicArmourSpans($analysisUnit->source);
         // Weigh each candidate literal the scan found.
-        foreach ($matches['value'] as $match) {
+        foreach ($matches['value'] ?? [] as $match) {
             [$candidateSecret, $offset] = $match;
             // A literal inside a comment is documentation, not a live value.
             if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
+                continue;
+            }
+
+            // A public PEM block's base64 body is certificate or public-key material, never a secret.
+            if ($this->isInsideSpan($offset, $armoured)) {
                 continue;
             }
 
@@ -155,21 +183,33 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
                 continue;
             }
 
-            $entropy = SecretScannerHelper::entropy($candidateSecret);
-            // Below the entropy bar (and not a long hex digest) the literal reads as ordinary text.
-            if ($entropy < $entropyThreshold && !(strlen($candidateSecret) >= 64 && ctype_xdigit($candidateSecret))) {
+            // A pure-hex literal is a checksum or id, never a secret this rule can tell apart. Sixteen symbols cap at
+            // 4.0 bits, under the 4.2 default, but gruff-go skips hex explicitly so that a lowered entropy bar still
+            // cannot turn a digest into a finding, and this port does the same.
+            if (ctype_xdigit($candidateSecret)) {
                 continue;
             }
 
-            $preview    = SecretScannerHelper::redactedPreview($candidateSecret);
+            // Without a letter and a digit a literal is not credential-shaped: one character class clears the entropy bar
+            // by construction, and a digit-free mix of cases is an identifier (FAMILY-CONTRACT section 12).
+            if (!$this->hasLetterAndDigit($candidateSecret)) {
+                continue;
+            }
+
+            // Below the configured entropy bar the literal reads as ordinary text; the bar is the only entropy gate.
+            if (SecretScannerHelper::entropy($candidateSecret) < $entropyThreshold) {
+                continue;
+            }
+
+            $displayMarker = SecretScannerHelper::fixedSecretMarker();
             $findings[] = SecretScannerHelper::finding(
                 analysisUnit: $analysisUnit,
                 ruleId:       self::ID,
-                message:      sprintf('High-entropy string literal detected: %s.', $preview),
+                message:      sprintf('High-entropy string literal detected: %s.', $displayMarker),
                 line:         SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
                 confidence:   Confidence::Medium,
                 detector:     'high-entropy-string',
-                preview:      $preview,
+                displayMarker: $displayMarker,
                 remediation:  'Confirm this is not a credential; move real secrets out of source. '
                     . 'Word-shaped identifiers and slugs are exempt automatically.',
             );
@@ -341,13 +381,8 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     }
 
     /**
-     * Requires the word-segment decomposition that separates identifiers from encoded credentials.
-     *
-     * Split on `[/._-]`, every segment alphanumeric, no non-word segment long enough to be a random
-     * credential tail, and a character-weighted strict majority of alpha-word characters. A segment-count
-     * census would let two short dictionary words outvote one long random run (`config_prod_<32-char
-     * tail>`), so the census weighs characters, not segments, and a single long non-word segment refuses
-     * the exemption outright.
+     * Distinguishes readable identifiers from encoded credentials before a sensitive-data finding reaches the user.
+     * It weighs alpha-word characters across segments; one long random-looking segment keeps the value eligible for scanning.
      *
      * @param string $candidateSecret - Literal already matching an identifier/slug shape.
      *
@@ -359,7 +394,7 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
         $segments = preg_split('#[/._-]+#', $candidateSecret, -1, PREG_SPLIT_NO_EMPTY);
         if (!is_array($segments) || count($segments) < self::IDENTIFIER_MIN_SEGMENTS) {
             // A regex engine error or an unbroken token (no separators) is not an identifier compound; fail
-            // closed so single-run secrets such as 64-char hex digests stay eligible for entropy scanning.
+            // closed so single-run secrets such as unbroken base64 keys stay eligible for entropy scanning.
             return false;
         }
 
@@ -495,6 +530,123 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
 
         // Remaining HL7-bearing tokens count as metadata only when an explicit HL7 code field names them.
         return str_contains($candidateSecret, 'HL7') && $hasHl7MetadataField;
+    }
+
+    /**
+     * Reports whether a literal carries at least one letter and at least one digit.
+     *
+     * FAMILY-CONTRACT section 12 sets this floor for all five ports: a run of one character class, such as random-letter
+     * test data or a MIME type, clears the entropy bar by construction, and a digit-free mix of cases is an identifier.
+     *
+     * @param string $candidateSecret - Quoted literal being classified.
+     *
+     * @return bool - True when the literal holds both a letter and a digit.
+     */
+    private function hasLetterAndDigit(string $candidateSecret): bool
+    {
+        return strpbrk($candidateSecret, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ') !== false
+            && strpbrk($candidateSecret, '0123456789') !== false;
+    }
+
+    /**
+     * Collects the offset spans of the PEM blocks whose label names no private key.
+     *
+     * A certificate, public key, certificate request, PKCS7 bundle or CRL is public by construction, so its body is
+     * never a secret. A block ends at the next marker, which must close the same label, and its body must be
+     * PEM-shaped. Anything else means the markers are not a block, so nothing between them is exempted and a private
+     * key there stays scannable (FAMILY-CONTRACT section 12).
+     *
+     * @param string $source - Full file source being scanned.
+     *
+     * @return list<array{int, int}> - Half-open [start, end) offsets, from each opening marker to the end of its closing marker.
+     */
+    private function publicArmourSpans(string $source): array
+    {
+        $spans = [];
+        preg_match_all('/-----BEGIN ([A-Z0-9 ]+)-----/', $source, $openings, PREG_OFFSET_CAPTURE | PREG_SET_ORDER);
+
+        // Each opening marker can pair only with the next marker, which must close the same label.
+        foreach ($openings as $opening) {
+            [$marker, $start] = $opening[0];
+            $label            = $opening[1][0];
+            $bodyStart        = $start + strlen($marker);
+
+            // A private key's block stays scannable: the key material there is the secret this rule exists for.
+            if (str_contains($label, 'PRIVATE')) {
+                continue;
+            }
+
+            // Another opening marker, a different label or no marker at all means these markers are not a block.
+            if (preg_match(self::PEM_MARKER_PATTERN, $source, $closing, PREG_OFFSET_CAPTURE, $bodyStart) !== 1
+                || $closing[1][0] !== 'END'
+                || $closing[2][0] !== $label) {
+                continue;
+            }
+
+            [$closingMarker, $closingOffset] = $closing[0];
+            // Code, a placeholder or prose between the markers is not a PEM body, so nothing is exempted.
+            if ($this->isPemShapedBody(substr($source, $bodyStart, $closingOffset - $bodyStart))) {
+                $spans[] = [$start, $closingOffset + strlen($closingMarker)];
+            }
+        }
+
+        return $spans;
+    }
+
+    /**
+     * Reports whether every line between two markers is base64, a PGP checksum, an armour header or empty.
+     *
+     * Source code spells a PEM body across string literals, so the body breaks at real and escaped line breaks, and
+     * each line loses its concatenation operators, and its quotes, commas, brackets, comment stars and ASCII
+     * whitespace, first. Splitting at escaped line breaks too keeps a one-line block's header from vouching for the
+     * rest of the line.
+     *
+     * @param string $body - Text between an opening marker and its closing marker.
+     *
+     * @return bool - False when any line is code, a placeholder or prose, or a pattern fails to run.
+     */
+    private function isPemShapedBody(string $body): bool
+    {
+        $segments = preg_split('/\n|\\\\[nrt]/', $body);
+
+        // A pattern that fails to run cannot vouch for the body, so the markers are not treated as a block.
+        if ($segments === false) {
+            return false;
+        }
+
+        foreach ($segments as $segment) {
+            $withoutOperators = preg_replace('/[ \t\r\f\x0B]+[+.]|[+.][ \t\r\f\x0B]+/', '', $segment);
+            $line             = $withoutOperators === null
+                ? null
+                : preg_replace('/[ \t\r\f\x0B"\'`,;()\[\]{}#*\\\\]/', '', $withoutOperators);
+
+            // A pattern that fails to run, or any other line, means the markers wrap code, a placeholder or prose.
+            if ($line === null || ($line !== '' && preg_match(self::PEM_BODY_LINE_PATTERN, $line) !== 1)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Reports whether an offset falls inside any of the given half-open spans.
+     *
+     * @param int                   $offset - Byte offset of the candidate literal.
+     * @param list<array{int, int}> $spans  - Half-open [start, end) offsets.
+     *
+     * @return bool - True when a span contains the offset.
+     */
+    private function isInsideSpan(int $offset, array $spans): bool
+    {
+        foreach ($spans as [$start, $end]) {
+            // The candidate sits between an opening marker and the end of its closing marker.
+            if ($offset >= $start && $offset < $end) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

@@ -49,16 +49,44 @@ abstract class CliTestCase extends TestCase
     {
         $decoded = json_decode($process->getOutput(), true, 512, JSON_THROW_ON_ERROR);
 
-        self::assertIsArray($decoded);
+        return $this->decodedJsonObject($decoded);
+    }
 
-        $report = [];
+    /**
+     * Narrow a decoded JSON object to the string-keyed shape used by machine-report tests.
+     *
+     * @param mixed $value - Decoded JSON value expected to be an object.
+     *
+     * @return array<string, mixed> - The validated JSON object.
+     */
+    protected function decodedJsonObject(mixed $value): array
+    {
+        self::assertIsArray($value);
 
-        foreach ($decoded as $key => $value) {
+        $object = [];
+        foreach ($value as $key => $entryValue) {
             self::assertIsString($key);
-            $report[$key] = $value;
+            $object[$key] = $entryValue;
         }
 
-        return $report;
+        return $object;
+    }
+
+    /**
+     * Read a nested decoded JSON object while validating every object boundary.
+     *
+     * @param array<string, mixed> $payload - Decoded JSON object containing the requested path.
+     * @param string               ...$keys - Ordered object keys to traverse.
+     *
+     * @return array<string, mixed> - The validated object at the requested path.
+     */
+    protected function decodedJsonObjectAt(array $payload, string ...$keys): array
+    {
+        foreach ($keys as $key) {
+            $payload = $this->decodedJsonObject($payload[$key] ?? null);
+        }
+
+        return $payload;
     }
 
     /**
@@ -73,6 +101,21 @@ abstract class CliTestCase extends TestCase
         self::assertTrue(mkdir($path));
 
         return $path;
+    }
+
+    /**
+     * Copies the synthetic-secrets fixture into a temporary project's `src/`, so sensitive-data rules read it as production code.
+     * A test that needs secret findings uses this, because every sensitive-data rule skips `tests/` and `Fixtures/` paths.
+     *
+     * @return string - Root of the temporary project; the caller removes it with removeDir().
+     */
+    protected function syntheticSecretsProject(): string
+    {
+        $project = $this->tempDir();
+        self::assertTrue(mkdir($project . '/src'));
+        self::assertTrue(copy(self::PROJECT_ROOT . '/tests/Fixtures/SensitiveData/synthetic-secrets.php', $project . '/src/synthetic-secrets.php'));
+
+        return $project;
     }
 
     /**

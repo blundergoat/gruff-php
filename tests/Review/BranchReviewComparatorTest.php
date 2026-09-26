@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Review;
 
-use GruffPhp\Results\Baseline\BaselineEntry;
 use GruffPhp\Results\Finding\Confidence;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Pillar;
@@ -128,14 +127,14 @@ final class BranchReviewComparatorTest extends TestCase
 
         // Same (file, ruleId, message) at different lines: all three identities must match.
         self::assertSame($reviewIdentity->key($shifted[0]), $reviewIdentity->key($shifted[1]));
-        self::assertSame(BaselineEntry::groupKeyForFinding($shifted[0]), BaselineEntry::groupKeyForFinding($shifted[1]));
+        self::assertSame(FindingReviewIdentity::groupKeyForFinding($shifted[0]), FindingReviewIdentity::groupKeyForFinding($shifted[1]));
         self::assertSame($shifted[0]->stableIdentity(), $shifted[1]->stableIdentity());
-        // The review key must literally be the baseline group key, not a parallel implementation.
-        self::assertSame(BaselineEntry::groupKeyForFinding($shifted[0]), $reviewIdentity->key($shifted[0]));
+        // The review key must literally be the symbol-less review key, not a parallel implementation.
+        self::assertSame(FindingReviewIdentity::groupKeyForFinding($shifted[0]), $reviewIdentity->key($shifted[0]));
 
         // Different messages at the same line: all three identities must split.
         self::assertNotSame($reviewIdentity->key($reworded[0]), $reviewIdentity->key($reworded[1]));
-        self::assertNotSame(BaselineEntry::groupKeyForFinding($reworded[0]), BaselineEntry::groupKeyForFinding($reworded[1]));
+        self::assertNotSame(FindingReviewIdentity::groupKeyForFinding($reworded[0]), FindingReviewIdentity::groupKeyForFinding($reworded[1]));
         self::assertNotSame($reworded[0]->stableIdentity(), $reworded[1]->stableIdentity());
     }
 
