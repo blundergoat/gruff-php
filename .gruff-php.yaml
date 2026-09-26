@@ -158,7 +158,7 @@ rules:
         options:
             acceptLineComments: false
     # Missing method PHPDoc
-    docs.missing-public-phpdoc:
+    docs.missing-phpdoc:
         enabled: true
     # Missing README
     docs.missing-readme:
@@ -177,7 +177,7 @@ rules:
         options:
             functionNames:
                 - preg_match
-    # A value-returning function or method must describe its result in its @return tag, not just restate the type, so a reviewer can diff the documented contract against the body. Fires only when an @return tag is present but carries no description; missing docblocks and missing @return tags are owned by docs.missing-public-phpdoc and docs.missing-return-tag, and a wholly tags-only docblock by docs.bare-phpdoc-tags. Void/never returns and constructors/destructors are exempt. Advisory by default; opt in to stricter enforcement via .gruff-php.yaml.
+    # A value-returning function or method must describe its result in its @return tag, not just restate the type, so a reviewer can diff the documented contract against the body. Fires only when an @return tag is present but carries no description; missing docblocks and missing @return tags are owned by docs.missing-phpdoc and docs.missing-return-tag, and a wholly tags-only docblock by docs.bare-phpdoc-tags. Void/never returns and constructors/destructors are exempt. Advisory by default; opt in to stricter enforcement via .gruff-php.yaml.
     docs.return-comment:
         enabled: true
     # Stale @param tag
