@@ -2,13 +2,45 @@
 
 Notable user-facing changes to `gruff-php` are listed here.
 
-## 0.6.0 - Unreleased
+## 0.6.0 - 2026-09-27
+
+- Workflow secret warnings skip jobs or steps whose own event guard proves them unreachable for every detected PR event.
+
+- **Image paths in HTML attributes stop looking like secrets** - A whole `src` or `href` value naming an image beside its page no longer receives
+`sensitive-data.high-entropy-string` when that file exists inside the project. A missing image, extra text, a path leaving the project, a symlink on
+the way or the same path outside an attribute still reports.
+
+- **Returned callbacks avoid false execution warnings** - Proved keyed returns and bucket merges stay quiet; unknown stores and returns still report.
+
+- **Registered callbacks keep their callable evidence** - Typed boot and teardown registrations avoid incorrect execution warnings when the owning declaration
+starts with an empty collection and every observed store preserves it. Unknown writes, borrowed references and changed loop values keep their warnings.
+
+- **Callable copies retain their evidence** - Local aliases and resolved `Closure::bind()` calls avoid incorrect execution warnings when their origin is proved.
+Reassignment, ambiguous branches, borrowed references and request-derived targets keep their warnings.
+- **Invoked test helpers count as checks** - Bounded same-class calls and Doctrine's resolved deprecation expectation avoid assertion-free warnings.
+Uncalled helpers and overridden vendor methods remain reportable.
+- **Underscore deployment constants follow fixed-include policy** - Names such as `__SITE_ROOT__` qualify under the existing constant convention.
+Explicit dynamic-constant settings still take precedence.
+
+- **Stored help-article links avoid false entropy warnings** - Complete article paths accept bounded titles, including the short words `a`, `to` and `in`.
+Extra URL components and opaque title suffixes remain eligible for warnings. The exact lowercase-letter-then-digit alphabet is also recognized.
+
+- **Entropy warnings recognize complete public formats and bounded names** - Public alphabets, structured identifiers and repository paths stay quiet
+only when the entire value qualifies; opaque suffixes remain reportable. Property names alone grant no exception.
+The bounded names include EC2 import paths and up to two parent-directory prefixes; the exact observed Hashids alphabet is also recognized.
+The standard Base64 decoder alphabet with one trailing `=`, the exact observed UUID alphabet and bounded help-category routes also stay quiet.
+Complete GitHub commit references use bounded owner, repository and revision formats; additional URL components grant no exception.
+The exact uppercase/lowercase/digit alphabet and nine complete Symfony signature service IDs also stay quiet.
+A help URL assembled from PHP literals stays quiet only when syntax proves the entire concatenation and its complete public route.
+
+- **Proven Composer autoload class names stay quiet** - The entropy rule requires a resolved built-in call and an available local public static
+method; unresolved or unrelated literals retain their normal checks.
 
 Upgrading from 0.5.x: this release changes every machine-readable contract at once. `UPGRADING.md` in this repository gives each break's migration command and the way back: pin the 0.5 line and keep the pre-upgrade configuration and baseline files, which 0.5 still reads.
 
 - **BREAKING: `docs.missing-public-phpdoc` is renamed `docs.missing-phpdoc`** - The rule has always asked for a doc comment on every method, whatever its visibility, and the old name read as public-only. Findings, reports, SARIF and new baselines carry the new id; severity, confidence and message are unchanged. The old id still resolves wherever you wrote it: a `rules:` block or `selection` list in your config, `--include-rule`, `--exclude-rule`, `--show-rule` and `--hide-rule`, and a 0.5 baseline read by `--migrate-baseline`. A config error about such a block still names the key you wrote.
 - **Sensitive-data rules skip test, fixture and example files** - A scan of the family's 57-repository corpus found this pillar's findings in test code were overwhelmingly sample keys and placeholder credentials. Every sensitive-data rule except `sensitive-data.pii-test-fixture` now skips a file under a directory named `test`, `tests`, `__tests__`, `spec`, `testdata`, `fixtures` or `examples` (any letter case), or a file named like a test: `*Test.php`, `*_test.go`, `test_*.py`, `*_test.py`, `*.test.*` or `*.spec.*` for JavaScript and TypeScript. **The trade-off is deliberate: a real credential committed under one of those paths is no longer reported.** The skip is counted, never silent: each skipped file and rule is published as an audit row with `source: "built-in"`, after the lockfile rows. `sensitive-data.pii-test-fixture` still reads these files, because finding realistic personal data in them is its purpose.
-- **Vendor-documented sample values no longer report** - AWS's two example access key ids and secret keys, the sample token jwt.io shows, and fourteen test card numbers the card networks publish are documentation, not credentials. A value that equals one of these 19 exactly and whole is no longer reported by any sensitive-data rule. gruff-php has no card-number rule, so only the AWS and jwt.io samples change what it reports. The values are held as SHA-256 digests, so gruff-php's detectors carry none of them. A real key that merely resembles one still reports.
+- **Vendor-documented sample values no longer report** - AWS's two example access key ids and secret keys, the sample token jwt.io shows, Google's published reCAPTCHA v2 test site key, and fourteen test card numbers the card networks publish are documentation, not credentials. A value that equals one of these 20 exactly and whole is no longer reported by any sensitive-data rule. gruff-php has no card-number rule, so the AWS, jwt.io and reCAPTCHA samples affect its reports. The values are held as SHA-256 digests, so gruff-php's detectors carry none of them. A real key that merely resembles one still reports.
 
 - **`sensitive-data.high-entropy-string` skips package-manager lockfiles by name** - A lockfile records one published integrity digest per resolved package. Every one of them is high-entropy by construction and none is a credential, so a real project's lockfile buried the rule's true findings under thousands of false ones. The rule, and no other, is now skipped in a file whose base name is one of nine ratified lockfile names at any depth: `package-lock.json`, `npm-shrinkwrap.json`, `yarn.lock`, `pnpm-lock.yaml`, `composer.lock`, `Cargo.lock`, `go.sum`, `uv.lock`, `poetry.lock`. **The skip is counted, never silent:** every surface that applies it publishes one audit row per lockfile that had findings, carrying `source: "built-in"`, which is how a consumer tells it from an entry you configured. **Every other sensitive-data rule still reads the file**, so a credential pasted into a lockfile is reported exactly as it would be anywhere else, and the identical bytes under any other file name keep reporting the entropy rule too.
 - **A scope the run could not read is one diagnostic, `changed-region`, with no findings beside it** - A `--changed-ranges` value the run cannot scope to arrived on the hook as `usage-error`, a different name from the one analyse used, and some published their unscoped findings alongside it, so a caller could not tell a narrowed scan from a whole-tree one. The run now exits `2` with exactly one `changed-region` diagnostic and no findings, on the analyse surface and the hook alike.

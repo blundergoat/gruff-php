@@ -9,19 +9,18 @@ use GruffPhp\Results\Finding\Pillar;
 use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
-use GruffPhp\Rules\Naming\IdentifierTokenizer;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\SourceTextRuleInterface;
+use GruffPhp\Rules\Shared\NodeIndex;
+use PhpParser\Node\Expr;
+use PhpParser\Node\Scalar\String_;
 
 /**
- * Flags a long, high-entropy string literal that may be an embedded secret, so the user can confirm it and
- * move real credentials out of source.
+ * Reports long, random-looking literals that users should review for embedded credentials.
  *
- * A source-text rule with a deep false-positive defence: before scoring entropy it exempts values another
- * detector owns (AWS/GitHub/Slack/JWT shapes), file paths and route URLs, gruff config paths, word-shaped
- * identifiers and slugs, known character-set alphabets, framework references, and public clinical-code
- * metadata. Only what survives and clears the entropy threshold reports. Warning, medium confidence.
+ * Scans source text even when detailed syntax is unavailable and reports warnings at medium confidence.
+ * Public formats and proven local autoload class slots stay quiet; provider-specific detectors keep their own findings.
  */
 final readonly class HighEntropyStringRule implements SourceTextRuleInterface
 {
@@ -30,28 +29,6 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
      */
     public const ID = 'sensitive-data.high-entropy-string';
 
-    /**
-     * Minimum separator-delimited segments before a literal can read as an identifier or slug.
-     */
-    private const IDENTIFIER_MIN_SEGMENTS = 2;
-
-    /**
-     * Minimum length for a pure-alphabetic segment to count as a dictionary-like word.
-     */
-    private const WORD_SEGMENT_MIN_LENGTH = 3;
-
-    /**
-     * Any single non-word segment at or above this length reads as the random tail of a prefixed
-     * credential (`config_prod_<random>`, `sk_live_`-style keys), so the identifier exemption is refused
-     * outright regardless of how the character census lands.
-     */
-    private const RANDOM_SEGMENT_REFUSAL_LENGTH = 16;
-
-    /**
-     * Strict-majority ratio for the character-weighted word census: alpha-word characters must exceed
-     * this fraction of all alphanumeric characters across the segments for the exemption to hold.
-     */
-    private const WORD_CHARACTER_MAJORITY_RATIO = 0.5;
 
     /**
      * PCRE's largest `{n,}` repeat count; a longer configured minimum is still enforced by the length check.
@@ -69,16 +46,15 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     private const PEM_BODY_LINE_PATTERN = '/^(?:[A-Za-z0-9+\/]+={0,2}|=[A-Za-z0-9+\/]{4}|(?:Version|Comment|Hash|Charset|MessageID|Proc-Type|DEK-Info):.*)$/D';
 
     /**
-     * Ordered alphabets used by parsers/generators; these are keyspaces, not secret material.
-     *
-     * @var array<string, true>
+     * Image extensions an HTML attribute may name. The list is closed: any other value stays with the entropy rule.
      */
-    private const KNOWN_CHARACTER_SET_LITERALS = [
-        '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'  => true,
-        'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'                           => true,
-        'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_' => true,
-        'abcdefghijklmnopqrstuvwxyz0123456789-_'                          => true,
-    ];
+    private const IMAGE_PATH_PATTERN = '/\.(?:png|jpe?g|gif|svg|webp|ico|avif)$/iD';
+
+    /**
+     * The text before a value's opening quote when the value is a whole src or href attribute: whitespace, the name and `=`.
+     */
+    private const IMAGE_ATTRIBUTE_PREFIX_PATTERN = '/(?:^|\s)(?:src|href)\s*=\s*$/iD';
+
 
     /**
      * Describes the high-entropy-string rule for the registry and reports.
@@ -87,8 +63,7 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Warning at medium confidence: entropy catches real secrets but also rule-path noise,
-        // so this advises rather than blocks.
+        // Medium-confidence warnings ask users to confirm whether an unexplained random-looking value is a credential.
         return new RuleDefinition(
             id:                self::ID,
             name:              'High entropy string',
@@ -102,13 +77,13 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
             ],
             falsePositiveShapes: [
                 [
-                    'shape'      => 'Identifier, slug, and key literals: PHPCS sniff ids (PHPCompatibility.FunctionUse.NewFunctions.ldap_exop_syncFound), '
+                    'shape' => 'Identifier, slug, and key literals: PHPCS sniff ids (PHPCompatibility.FunctionUse.NewFunctions.ldap_exop_syncFound), '
                         . 'class names (WPCOM_REST_API_V2_Endpoint_External_Media), BEM class names, package slugs (Automattic/i18n-check-webpack-plugin), and JSON/YAML-style field keys.',
-                    'mitigation' => 'Exempt automatically: a literal with no +/= that splits on [/._-] runs into two or more alphanumeric segments '
-                        . 'reads as an identifier only when alphabetic words of three or more characters supply strictly more than half of all '
-                        . 'alphanumeric characters and no single non-word segment reaches 16 characters. Prefixed keys (config_prod_<random>), '
-                        . 'slugs with hex tails, and dot-joined JWT/JWE tokens keep flagging because their random runs dominate the character census. '
-                        . 'Quoted object/array keys are skipped because committed secrets live in values, not identifier keys.',
+                    'mitigation' => 'Exempt automatically only when the whole value matches a finite public format or the bounded family name grammar: '
+                        . 'segments have at most 32 characters, ordinary or bounded compound casing and limited numeric runs; at least two segments '
+                        . 'must contribute words of three or more letters and those letters must form a strict majority. Opaque tails invalidate the exception. '
+                        . 'Quoted object/array keys remain distinct from values; a property name alone never exempts its value. Native autoload class '
+                        . 'literals require a resolved built-in callable and an unconditional local class with its public static method.',
                 ],
             ],
         );
@@ -118,32 +93,36 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
      * Reports each long, high-entropy literal that survives the false-positive exemptions.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context supplying the length and entropy thresholds.
+     * @param RuleContext  $ruleContext  - Rule context supplying the length and entropy thresholds.
      *
-     * @return list<\GruffPhp\Results\Finding\Finding> - Findings for suspicious high-entropy literals.
+     * @return list<\GruffPhp\Results\Finding\Finding> - Warnings to review; an empty list means no literal passed the rule's checks.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $settings         = $ruleContext->settingsFor($this->definition());
+        $settings = $ruleContext->settingsFor($this->definition());
         // A length below one would make every quoted character a candidate, so the floor never drops under it.
         $minLength        = max(1, (int) $settings->numericThreshold('minLength'));
         $entropyThreshold = (float) $settings->numericThreshold('entropy');
 
-        // A literal shorter than 2^entropy cannot reach that entropy, so the scan starts there even when minLength is
-        // lower; that also keeps a short run such as the `'.'` between two concatenated literals from pairing with a
-        // secret's opening quote.
+        // A literal shorter than 2^entropy cannot reach the configured bar, so it need not become a candidate.
+        // This also prevents a short concatenation fragment from consuming a following secret's opening quote.
         $entropyFloor = (int) min(self::MAX_SCAN_LENGTH, ceil(2 ** max(0.0, $entropyThreshold)));
         $scanLength   = min(self::MAX_SCAN_LENGTH, max($minLength, $entropyFloor));
 
         // Match every quoted literal at least the scan length long, so lowering minLength widens the scan.
-        preg_match_all('/["\'](?<value>[A-Za-z0-9_+\/=.-]{' . $scanLength . ',})["\']/', $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
+        preg_match_all('/(?<quote>["\'])(?<value>[A-Za-z0-9_+\/=.-]{' . $scanLength . ',})\k<quote>/', $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
-        $findings      = [];
-        $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
-        $armoured      = $this->publicArmourSpans($analysisUnit->source);
-        // Weigh each candidate literal the scan found.
+        $findings        = [];
+        $commentRanges   = SecretScannerHelper::commentRanges($analysisUnit);
+        $armoured        = $this->publicArmourSpans($analysisUnit->source);
+        $publicLiteralOffsets = AutoloadCallableEvidence::classLiteralOffsets($analysisUnit) + $this->publicHelpLiteralOffsets($analysisUnit);
+        // Review each matched value independently; no matches means there are no entropy warnings to return.
         foreach ($matches['value'] ?? [] as $match) {
             [$candidateSecret, $offset] = $match;
+            // Only this exact proven callable slot or constant help-link fragment is public; equal values elsewhere still report.
+            if (isset($publicLiteralOffsets[$offset])) {
+                continue;
+            }
             // A literal inside a comment is documentation, not a live value.
             if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
                 continue;
@@ -159,33 +138,22 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
                 continue;
             }
 
-            $line = $this->lineText($analysisUnit->source, SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset));
             // Entropy in an object/array key belongs to the field name, not a stored secret.
             if ($this->isQuotedKeyLiteral($analysisUnit->source, $candidateSecret, $offset)) {
                 continue;
             }
 
-            // Exempt everything a more specific rule owns, or that is a benign path, identifier, or dummy.
+            // Exempt everything a more specific rule owns, or that is a benign path, identifier, dummy or existing page image.
             if (
                 $this->shouldSkipKnownSecretPattern($candidateSecret)
-                || $this->isPathLikeLiteral($candidateSecret)
-                || $this->isGruffConfigPathLiteral($candidateSecret)
-                || $this->isIdentifierOrSlugLiteral($candidateSecret)
-                || $this->isKnownCharacterSetLiteral($candidateSecret)
-                || $this->isFrameworkIdentifierReference($candidateSecret, $line)
+                || EntropyPublicShape::accepts($candidateSecret)
                 || SecretScannerHelper::isLikelyDummyValue($candidateSecret)
+                || $this->isExistingImageAttributePath($analysisUnit, $ruleContext->projectRoot, $candidateSecret, $offset)
             ) {
                 continue;
             }
 
-            // Public clinical-code identifiers mimic entropy but are standards metadata, not secrets.
-            if ($this->isMedicalStandardsMetadata($candidateSecret, $line)) {
-                continue;
-            }
-
-            // A pure-hex literal is a checksum or id, never a secret this rule can tell apart. Sixteen symbols cap at
-            // 4.0 bits, under the 4.2 default, but gruff-go skips hex explicitly so that a lowered entropy bar still
-            // cannot turn a digest into a finding, and this port does the same.
+            // Hex cannot be distinguished from a checksum here, so it stays quiet even when the user lowers the entropy bar.
             if (ctype_xdigit($candidateSecret)) {
                 continue;
             }
@@ -202,15 +170,15 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
             }
 
             $displayMarker = SecretScannerHelper::fixedSecretMarker();
-            $findings[] = SecretScannerHelper::finding(
-                analysisUnit: $analysisUnit,
-                ruleId:       self::ID,
-                message:      sprintf('High-entropy string literal detected: %s.', $displayMarker),
-                line:         SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
-                confidence:   Confidence::Medium,
-                detector:     'high-entropy-string',
+            $findings[]    = SecretScannerHelper::finding(
+                analysisUnit:  $analysisUnit,
+                ruleId:        self::ID,
+                message:       sprintf('High-entropy string literal detected: %s.', $displayMarker),
+                line:          SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
+                confidence:    Confidence::Medium,
+                detector:      'high-entropy-string',
                 displayMarker: $displayMarker,
-                remediation:  'Confirm this is not a credential; move real secrets out of source. '
+                remediation:   'Confirm this is not a credential; move real secrets out of source. '
                     . 'Word-shaped identifiers and slugs are exempt automatically.',
             );
         }
@@ -219,10 +187,88 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     }
 
     /**
+     * Finds literal fragments belonging to a complete, constant public help URL.
+     *
+     * @param AnalysisUnit $unit - Source with optional syntax; missing or bounded syntax leaves every fragment scannable.
+     * @return array<int, true> - Exact content offsets; an empty map grants no help-link exceptions.
+     */
+    private function publicHelpLiteralOffsets(AnalysisUnit $unit): array
+    {
+        // Large or malformed files may lack reliable syntax, so their strings keep the ordinary entropy checks.
+        if ($unit->hasParseErrors() || $unit->isDeepScanBounded()) {
+            return [];
+        }
+        $concatenations = NodeIndex::nodesOf($unit, Expr\BinaryOp\Concat::class);
+        $nested = [];
+        // Identify children from the AST itself; an inner public URL cannot vouch for an outer dynamic or opaque extension.
+        foreach ($concatenations as $concatenation) {
+            // Both sides may be concatenations, for example when a developer adds a suffix to a parenthesized link.
+            foreach ([$concatenation->left, $concatenation->right] as $operand) {
+                // Only the outermost concatenation may establish a complete value.
+                if ($operand instanceof Expr\BinaryOp\Concat) {
+                    $nested[spl_object_id($operand)] = true;
+                }
+            }
+        }
+        $offsets = [];
+        // Assess each complete expression independently; equal text elsewhere keeps its own warning.
+        foreach ($concatenations as $concatenation) {
+            // A nested expression still has unexamined surrounding content and cannot grant an exception.
+            if (isset($nested[spl_object_id($concatenation)])) {
+                continue;
+            }
+            $parts = $this->constantStringParts($concatenation);
+            // Dynamic content prevents proof of the full URL; an empty list supplies no source value to classify.
+            if ($parts === null || $parts === []) {
+                continue;
+            }
+            $completeUrl = implode('', array_map(static fn (String_ $part): string => $part->value, $parts));
+            // Only a whole bounded help URL can exempt its exact literal fragments.
+            if (!EntropyPublicShape::isHelpArticleUrl($completeUrl)) {
+                continue;
+            }
+            // Each proven fragment maps back to its own opening quote, never to an equal value at another source location.
+            foreach ($parts as $part) {
+                $offsets[$part->getStartFilePos() + 1] = true;
+            }
+        }
+
+        return $offsets;
+    }
+
+    /**
+     * Collects a constant concatenation's strings in source order without executing the application.
+     *
+     * @param Expr $expression - Complete concatenation to inspect.
+     * @return null|list<String_> - Literal parts; null means a variable, call or interpolation leaves the URL unknown.
+     */
+    private function constantStringParts(Expr $expression): ?array
+    {
+        $pending = [$expression];
+        $parts = [];
+        // Walk left to right so the assembled value matches the link a user would open.
+        while ($pending !== []) {
+            $part = array_pop($pending);
+            // A literal contributes its parser-decoded value, including any escaped characters.
+            if ($part instanceof String_) {
+                $parts[] = $part;
+            } elseif ($part instanceof Expr\BinaryOp\Concat) {
+                // Push the right side first so the left side is read next.
+                $pending[] = $part->right;
+                $pending[] = $part->left;
+            } else {
+                // For example, a URL suffix loaded from configuration is not a proven constant.
+                return null;
+            }
+        }
+
+        return $parts;
+    }
+
+    /**
      * Reports whether a more specific detector already owns this literal.
      *
-     * @param string $candidateSecret - Literal under test; a known vendor prefix or token shape means a dedicated
-     *                                rule owns it.
+     * @param string $candidateSecret - Literal to classify; a known vendor prefix or token shape belongs to a dedicated rule.
      *
      * @return bool - True when another rule should handle the literal.
      */
@@ -249,214 +295,75 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
             || (strlen($candidateSecret) <= 48 && ctype_alpha($candidateSecret));
     }
 
-    /**
-     * Reports whether a literal looks like a file path, which trips the length heuristic but holds no secret.
-     *
-     * @param string $candidateSecret - Literal under test; file paths and route URLs trip the length heuristic but
-     *                                hold no secret.
-     *
-     * @return bool - True when the literal looks like a file path.
-     */
-    private function isPathLikeLiteral(string $candidateSecret): bool
-    {
-        if (!str_contains($candidateSecret, '/') && !str_contains($candidateSecret, '\\')) {
-            // No directory separator at all means it cannot be a path, so it stays eligible as a secret.
-            return false;
-        }
-
-        if ($this->isUrlOrRoutePathLiteral($candidateSecret)) {
-            // A URL or route path is benign even without a file extension, so exempt it before the extension check.
-            return true;
-        }
-
-        // Recognize common source/config/documentation/script file extensions in path-like literals.
-        return preg_match('/\\.(?:php|inc|json|xml|neon|ya?ml|txt|md|stub|sh)$/i', $candidateSecret) === 1;
-    }
 
     /**
-     * Reports whether a literal is a public URL or route path, long because of slugs rather than entropy.
+     * Reports whether a quoted value is a whole HTML src or href value naming an existing image beside its page.
      *
-     * @param string $candidateSecret - Literal under test; a long public URL or route path otherwise reads as entropy.
+     * Contract invariant: all three proofs are required - the attribute role, the closed image-extension list and an existing
+     * regular file reached from the page's folder without leaving the project or passing through a symlink - so an attribute
+     * name or a file suffix alone never silences a possible secret.
      *
-     * @return bool - True when the literal is shaped like a public URL path.
+     * @param AnalysisUnit $analysisUnit - Scanned file supplying the source text and the page's absolute path.
+     * @param string       $projectRoot  - Absolute project root that the resolved image must stay inside.
+     * @param string       $candidatePath - Candidate literal content without its quotes.
+     * @param int          $offset       - Byte offset of the literal's first character, one past its opening quote.
+     *
+     * @return bool - True only when every proof holds; false keeps the entropy finding.
      */
-    private function isUrlOrRoutePathLiteral(string $candidateSecret): bool
+    private function isExistingImageAttributePath(AnalysisUnit $analysisUnit, string $projectRoot, string $candidatePath, int $offset): bool
     {
-        if (str_starts_with($candidateSecret, 'https://hooks.slack.com/services/')) {
-            // Slack webhook URLs are genuine secrets despite their URL shape, so never exempt them as routes.
+        // Checks that the literal is relative and ends in one of the closed image extensions.
+        if (str_starts_with($candidatePath, '/') || preg_match(self::IMAGE_PATH_PATTERN, $candidatePath) !== 1) {
+            return false;
+        }
+        $quoteOffset = $offset - 1;
+        $lineBreak   = strrpos(substr($analysisUnit->source, 0, $quoteOffset), "\n");
+        $lineStart   = $lineBreak === false ? 0 : $lineBreak + 1;
+        // Checks that the text before the opening quote on its line ends with a src or href attribute and its equals sign.
+        if (preg_match(self::IMAGE_ATTRIBUTE_PREFIX_PATTERN, substr($analysisUnit->source, $lineStart, $quoteOffset - $lineStart)) !== 1) {
             return false;
         }
 
-        // Match URI schemes so absolute URLs can be normalized before path checks.
-        $hasScheme = preg_match('#^[a-z][a-z0-9+.-]*://#i', $candidateSecret) === 1;
-        if (!$hasScheme && !str_starts_with($candidateSecret, '/') && !str_starts_with($candidateSecret, './') && !str_starts_with($candidateSecret, '../')) {
-            // Without a scheme or a leading path marker there is no route to inspect, so treat it as a possible secret.
+        $root = rtrim(str_replace('\\', '/', $projectRoot), '/');
+        $page = str_replace('\\', '/', $analysisUnit->file->absolutePath);
+        // A page outside the project has no project-relative folder to resolve the image from.
+        if ($root === '' || !str_starts_with($page, $root . '/')) {
             return false;
         }
-
-        $withoutScheme = preg_replace('#^[a-z][a-z0-9+.-]*://#i', '', $candidateSecret);
-        if (!is_string($withoutScheme)) {
-            // A regex engine error yields null; fail closed so a malformed strip is not mistaken for a clean route.
-            return false;
-        }
-
-        $slashOffset = strpos($withoutScheme, '/');
-        $path        = $slashOffset === false ? $withoutScheme : substr($withoutScheme, $slashOffset);
-        if ($path === '' || $path[0] !== '/') {
-            // No rooted path component means there is nothing route-shaped to whitelist.
-            return false;
-        }
-
-        if (str_contains($path, '?') || str_contains($path, '#')) {
-            // Query or fragment markers signal an opaque token tail, not a clean route, so do not exempt it.
-            return false;
-        }
-
-        // Match public route/path characters.
-        $hasPublicPathShape = preg_match('#^/[A-Za-z0-9._~/%:-]+$#', $path) === 1;
-        // Match natural-language path segments rather than opaque tokens.
-        $hasAlphabeticSegment = preg_match('/[A-Za-z]{3,}/', $path) === 1;
-        // Match token separators that are common in credentials but not route paths.
-        $hasTokenSeparator = preg_match('/[+=]/', $path) === 1;
-
-        // Treat as a route only with a real path shape and word-like segments and no credential separators.
-        return $hasPublicPathShape && $hasAlphabeticSegment && !$hasTokenSeparator;
-    }
-
-    /**
-     * Reports whether a literal is a gruff config path (`rules.<id>....`) rather than secret material.
-     *
-     * @param string $candidateSecret - Literal under test; dotted config keys can look high entropy but are public metadata.
-     *
-     * @return bool - true when the literal is a gruff configuration path rather than secret material
-     */
-    private function isGruffConfigPathLiteral(string $candidateSecret): bool
-    {
-        if (
-            !str_starts_with($candidateSecret, 'rules.')
-            && !str_starts_with($candidateSecret, 'paths.')
-            && !str_starts_with($candidateSecret, 'allowlists.')
-            && !str_starts_with($candidateSecret, 'selection.')
-        ) {
-            // Without a known config root, the literal is not a gruff config path and stays eligible for scanning.
-            return false;
-        }
-
-        // Match known config roots followed by dotted path segments; values, URLs, and credentials do not use this shape.
-        return preg_match('/^(?:rules|paths|allowlists|selection)\.[A-Za-z0-9_.-]+$/', $candidateSecret) === 1;
-    }
-
-    /**
-     * Reports whether a literal is an identifier or slug that decomposes into dictionary-like word segments.
-     *
-     * These literals (sniff ids, class names, package slugs) read as high entropy but split into word
-     * segments no encoded credential exhibits.
-     *
-     * @param string $candidateSecret - Literal under test; dotted/underscored identifiers and separator-joined slugs
-     *                                trip the entropy gate without holding secret material.
-     *
-     * @return bool - True when the literal is an identifier or slug rather than secret material.
-     */
-    private function isIdentifierOrSlugLiteral(string $candidateSecret): bool
-    {
-        if (str_contains($candidateSecret, '+') || str_contains($candidateSecret, '=')) {
-            // Padding and token separators appear in encoded credentials but never in identifiers or slugs.
-            return false;
-        }
-
-        // Match the dotted-identifier shape PHPCS sniff ids use: letter-led segments joined by two or more dots.
-        $hasDottedIdentifierShape = preg_match('/^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*){2,}$/', $candidateSecret) === 1;
-        // Match the underscore-identifier shape class names such as WPCOM_REST_API_V2_Endpoint_External_Media use.
-        $hasUnderscoreIdentifierShape = preg_match('/^[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+$/', $candidateSecret) === 1;
-        // Match the slug shape package paths and BEM class names use: alphanumeric segments joined by one or more [/._-] separators.
-        $hasSlugShape = preg_match('#^[A-Za-z0-9]+(?:[/._-]+[A-Za-z0-9]+)+$#', $candidateSecret) === 1;
-        if (!$hasDottedIdentifierShape && !$hasUnderscoreIdentifierShape && !$hasSlugShape) {
-            // Anything outside the three identifier/slug shapes stays eligible for entropy scanning.
-            return false;
-        }
-
-        // The shape alone is not load-bearing: dot-joined JWT/JWE tokens and base64url material with an
-        // underscore satisfy the regexes too, so every shape must also pass the word-segment decomposition.
-        return $this->hasMostlyAlphaWordSegments($candidateSecret);
-    }
-
-    /**
-     * Distinguishes readable identifiers from encoded credentials before a sensitive-data finding reaches the user.
-     * It weighs alpha-word characters across segments; one long random-looking segment keeps the value eligible for scanning.
-     *
-     * @param string $candidateSecret - Literal already matching an identifier/slug shape.
-     *
-     * @return bool - True when alpha-word characters dominate and no segment reads as a random credential tail.
-     */
-    private function hasMostlyAlphaWordSegments(string $candidateSecret): bool
-    {
-        // Split the literal into its separator-delimited segments for the word-shape census.
-        $segments = preg_split('#[/._-]+#', $candidateSecret, -1, PREG_SPLIT_NO_EMPTY);
-        if (!is_array($segments) || count($segments) < self::IDENTIFIER_MIN_SEGMENTS) {
-            // A regex engine error or an unbroken token (no separators) is not an identifier compound; fail
-            // closed so single-run secrets such as unbroken base64 keys stay eligible for entropy scanning.
-            return false;
-        }
-
-        $wordCharacterCount  = 0;
-        $totalCharacterCount = 0;
-        // Weigh each segment's contribution to the word-character census.
-        foreach ($segments as $segment) {
-            if (!ctype_alnum($segment)) {
-                // A non-alphanumeric segment means the literal is not a clean identifier compound.
+        $segments = [];
+        $path = $root;
+        // Check each traversed component before a parent step can discard it.
+        foreach (explode('/', substr(dirname($page), strlen($root)) . '/' . $candidatePath) as $segment) {
+            if (!is_dir($path)) {
                 return false;
             }
-
-            $segmentLength             = strlen($segment);
-            $segmentWordCharacterCount = $this->wordCharacterCountForSegment($segment);
-            if ($segmentLength >= self::RANDOM_SEGMENT_REFUSAL_LENGTH && $segmentWordCharacterCount <= $segmentLength * self::WORD_CHARACTER_MAJORITY_RATIO) {
-                // One long non-word run is exactly the random tail of a prefixed key (`secret-key-<hex>`,
-                // `myapp/prod-keys/<hex>`); no amount of word prefix can make that an identifier.
+            if ($segment === '' || $segment === '.') {
+                continue;
+            }
+            if ($segment === '..') {
+                if ($segments === []) {
+                    return false;
+                }
+                array_pop($segments);
+                $path = dirname($path);
+                continue;
+            }
+            $segments[] = $segment;
+            $path .= '/' . $segment;
+            if (is_link($path)) {
                 return false;
             }
-
-            $totalCharacterCount += $segmentLength;
-            $wordCharacterCount  += $segmentWordCharacterCount;
         }
 
-        // The census is character-weighted: alpha-word characters must strictly outnumber the non-word rest,
-        // so WPCOM_REST_API_V2_Endpoint_External_Media (33 of 35 chars in words) passes while
-        // config_prod_<32-char tail> (10 of 42) fails even though its word segments outnumber the tail.
-        return $wordCharacterCount > $totalCharacterCount * self::WORD_CHARACTER_MAJORITY_RATIO;
-    }
-
-    /**
-     * Counts the dictionary-like alpha characters inside one identifier segment.
-     *
-     * @param string $segment - One separator-free alphanumeric segment.
-     *
-     * @return int - Number of characters belonging to alpha words of at least WORD_SEGMENT_MIN_LENGTH.
-     */
-    private function wordCharacterCountForSegment(string $segment): int
-    {
-        // A whole-alpha segment of real length counts entirely as word characters.
-        if (strlen($segment) >= self::WORD_SEGMENT_MIN_LENGTH && ctype_alpha($segment)) {
-            return strlen($segment);
-        }
-
-        $wordCharacterCount = 0;
-        // Otherwise split the segment and count only its dictionary-like word tokens.
-        foreach ((new IdentifierTokenizer())->tokenize($segment) as $token) {
-            // Count a token only when it is a real alphabetic word of sufficient length.
-            if (strlen($token) >= self::WORD_SEGMENT_MIN_LENGTH && ctype_alpha($token)) {
-                $wordCharacterCount += strlen($token);
-            }
-        }
-
-        return $wordCharacterCount;
+        return is_file($path);
     }
 
     /**
      * Reports whether the literal is used as an object/array key, where entropy belongs to the field name.
      *
-     * @param string $source - Full source text being scanned.
+     * @param string $source          - Full source text being scanned.
      * @param string $candidateSecret - Candidate literal content without its quotes.
-     * @param int    $offset - Byte offset of the candidate content inside the source.
+     * @param int    $offset          - Byte offset of the candidate content inside the source.
      *
      * @return bool - True when the literal is immediately used as an object/array key.
      */
@@ -468,75 +375,10 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
         return preg_match('/^[\'"]\s*(?::|=>)/', $tail) === 1;
     }
 
-    /**
-     * Reports whether the literal is a known parser/generator keyspace alphabet that is intentionally public.
-     *
-     * @param string $candidateSecret - Candidate literal under test.
-     *
-     * @return bool - True when the literal is a known ordered character set.
-     */
-    private function isKnownCharacterSetLiteral(string $candidateSecret): bool
-    {
-        return isset(self::KNOWN_CHARACTER_SET_LITERALS[$candidateSecret]);
-    }
 
     /**
-     * Reports whether the literal is a PHP identifier used as framework metadata, not a secret value.
-     *
-     * @param string $candidateSecret - Candidate literal under test.
-     * @param string $line - Source line carrying the literal.
-     *
-     * @return bool - True when the literal is a PHP identifier used as framework metadata.
-     */
-    private function isFrameworkIdentifierReference(string $candidateSecret, string $line): bool
-    {
-        // Match a plain PHP identifier rather than an opaque token.
-        return preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $candidateSecret) === 1
-            // Match PHPUnit/Pest-style data-provider metadata references.
-            && preg_match('/\bDataProvider\s*\(/', $line) === 1;
-    }
-
-    /**
-     * Reports whether the literal is public clinical-code metadata (HL7/OID) rather than a secret.
-     *
-     * @param string $candidateSecret - Long token under test; clinical code systems use IDs that mimic secret entropy.
-     * @param string $line - Source line of the literal; the surrounding field name is what marks it
-     *                                as metadata.
-     *
-     * @return bool - True when the candidate is medical terminology metadata.
-     */
-    private function isMedicalStandardsMetadata(string $candidateSecret, string $line): bool
-    {
-        // Match clinical terminology field names that carry public standards metadata.
-        if (!preg_match('/(?:CodeSystem|ConceptCode|HL7|OID|ValueSet)/i', $line)) {
-            // Without a clinical field name nearby the token is not standards metadata, so leave it for entropy checks.
-            return false;
-        }
-
-        // Match HL7 value-set codes such as PHVS_ObservationInterpretation_HL7_V3.
-        if (preg_match('/^(?:PH|PHVS)_[A-Za-z0-9_]+_HL7_V\d+$/', $candidateSecret) === 1) {
-            // A recognised HL7 value-set code is public metadata, never a credential.
-            return true;
-        }
-
-        // Match dotted OID identifiers used by medical terminology systems.
-        if (preg_match('/^\d+(?:\.\d+){3,}$/', $candidateSecret) === 1) {
-            // A dotted OID is a public terminology identifier, never a credential.
-            return true;
-        }
-
-        // Match field names that explicitly identify HL7 code metadata.
-        $hasHl7MetadataField = preg_match('/(?:CodeSystemCode|HL7Table|ValueSetCode)/i', $line) === 1;
-
-        // Remaining HL7-bearing tokens count as metadata only when an explicit HL7 code field names them.
-        return str_contains($candidateSecret, 'HL7') && $hasHl7MetadataField;
-    }
-
-    /**
-     * Reports whether a literal carries at least one letter and at least one digit.
-     *
-     * FAMILY-CONTRACT section 12 sets this floor for all five ports: a run of one character class, such as random-letter
-     * test data or a MIME type, clears the entropy bar by construction, and a digit-free mix of cases is an identifier.
+     * Requires both a letter and a digit before presenting a literal as a possible credential.
+     * This family-wide floor keeps digit-free identifiers out of the user's entropy warnings.
      *
      * @param string $candidateSecret - Quoted literal being classified.
      *
@@ -549,16 +391,12 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     }
 
     /**
-     * Collects the offset spans of the PEM blocks whose label names no private key.
-     *
-     * A certificate, public key, certificate request, PKCS7 bundle or CRL is public by construction, so its body is
-     * never a secret. A block ends at the next marker, which must close the same label, and its body must be
-     * PEM-shaped. Anything else means the markers are not a block, so nothing between them is exempted and a private
-     * key there stays scannable (FAMILY-CONTRACT section 12).
+     * Locates public PEM material that users need not review as an entropy warning.
+     * Only a matching next closing marker and a PEM-shaped body grant the exception; private-key material remains scannable.
      *
      * @param string $source - Full file source being scanned.
      *
-     * @return list<array{int, int}> - Half-open [start, end) offsets, from each opening marker to the end of its closing marker.
+     * @return list<array{int, int}> - Half-open public-block spans; an empty list leaves all source eligible for scanning.
      */
     private function publicArmourSpans(string $source): array
     {
@@ -594,14 +432,10 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     }
 
     /**
-     * Reports whether every line between two markers is base64, a PGP checksum, an armour header or empty.
+     * Checks a possible PEM body before hiding public material from the user's entropy warnings.
+     * Real and escaped line breaks separate body lines; quoting and concatenation syntax do not count as body content.
      *
-     * Source code spells a PEM body across string literals, so the body breaks at real and escaped line breaks, and
-     * each line loses its concatenation operators, and its quotes, commas, brackets, comment stars and ASCII
-     * whitespace, first. Splitting at escaped line breaks too keeps a one-line block's header from vouching for the
-     * rest of the line.
-     *
-     * @param string $body - Text between an opening marker and its closing marker.
+     * @param string $body - Text between matching markers; empty content contains no credential material to report.
      *
      * @return bool - False when any line is code, a placeholder or prose, or a pattern fails to run.
      */
@@ -614,9 +448,11 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
             return false;
         }
 
+        // Every body line must qualify; an armour header cannot excuse unrelated text later in the same literal.
         foreach ($segments as $segment) {
             $withoutOperators = preg_replace('/[ \t\r\f\x0B]+[+.]|[+.][ \t\r\f\x0B]+/', '', $segment);
-            $line             = $withoutOperators === null
+            // A failed normalization leaves the body unproven, so it cannot hide possible credentials from the scan.
+            $line = $withoutOperators === null
                 ? null
                 : preg_replace('/[ \t\r\f\x0B"\'`,;()\[\]{}#*\\\\]/', '', $withoutOperators);
 
@@ -630,15 +466,16 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     }
 
     /**
-     * Reports whether an offset falls inside any of the given half-open spans.
+     * Checks whether this candidate lies inside proven public PEM material and may skip an entropy warning.
      *
      * @param int                   $offset - Byte offset of the candidate literal.
-     * @param list<array{int, int}> $spans  - Half-open [start, end) offsets.
+     * @param list<array{int, int}> $spans  - Half-open public-block offsets; an empty list grants no exception.
      *
      * @return bool - True when a span contains the offset.
      */
     private function isInsideSpan(int $offset, array $spans): bool
     {
+        // Check each proven public block; unrelated values beside those blocks still need secret review.
         foreach ($spans as [$start, $end]) {
             // The candidate sits between an opening marker and the end of its closing marker.
             if ($offset >= $start && $offset < $end) {
@@ -649,19 +486,4 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
         return false;
     }
 
-    /**
-     * Returns the source text for a 1-based line number, or empty when unavailable.
-     *
-     * @param string $source - Full file source the literal was matched in.
-     * @param int    $lineNumber - 1-based line number of the literal, as reported by the offset-to-line helper.
-     *
-     * @return string - Line text, or an empty string when unavailable.
-     */
-    private function lineText(string $source, int $lineNumber): string
-    {
-        $lines = explode("\n", $source);
-
-        // Hand back the literal's own line for the metadata field-name check;
-        return $lines[$lineNumber - 1] ?? '';
-    }
 }

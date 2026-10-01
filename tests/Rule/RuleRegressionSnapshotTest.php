@@ -64,12 +64,13 @@ final class RuleRegressionSnapshotTest extends TestCase
         // qualifying high-entropy literal now holds a letter and a digit.
         // M10 D33 (2026-09-26) removed one: safe-dummy-values.php line 11, AWS's documented example key, now a documented sample.
         // M10 D35 renamed docs.missing-public-phpdoc to docs.missing-phpdoc, which moves the hash and no count.
-        self::assertCount(2790, $findings);
+        // M55 removes the bound local-closure call at phpunit-mechanics-smells.php:74; its test-quality findings remain.
+        self::assertCount(2789, $findings);
         // M08 made sensitive-data markers carry the class the detector already knew: a classified finding now reads
         // `[redacted:aws-access-key]` where it read `[redacted]`. The finding count, the rule set, and every
         // line-free identity are unchanged; only the marker text inside those findings moved.
         self::assertSame(
-            '2537853d7e4797350528bdd8158321141364f01fb503918860e452b246eece34',
+            '3aca8e2e15391c2e556252a74be0dbba06df4ea3203fc5563fc0516e220f8fb9',
             hash('sha256', $json),
         );
     }

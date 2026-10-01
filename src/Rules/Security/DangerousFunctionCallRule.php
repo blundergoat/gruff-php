@@ -30,34 +30,11 @@ use PhpParser\Node\Stmt\Property;
 use PhpParser\NodeFinder;
 
 /**
- * Flags calls into PHP's execution and evaluation surface so a reviewer can confirm each one runs trusted input
- * rather than attacker-controlled data, which is where command injection and arbitrary code execution begin.
+ * Reports execution and unresolved dynamic calls so developers can review the target before shipping.
  *
- * The surface is the non-removable built-ins `exec`, `shell_exec`, and `system`, any project-added global functions,
- * `eval`, `assert('...')` on a literal, and dynamic `$callable()` invocations.
- *
- * Runs per file. To keep noise down it first learns which locals, properties, and parameters hold known callables:
- *
- * - closures, arrow functions, `new` objects of a named or anonymous class, first-class callables of a written method
- *   other than reflection's `invoke` or of one of PHP's own functions that takes no callable, such as `strlen(...)`
- *   but not `array_map(...)`, and `[obj, 'method']` callable arrays assigned to a variable, or an inline
- *   `@var callable` docblock on the assignment;
- * - parameters carrying a `callable` or `Closure` type hint, or a `@param` docblock type that names one; a
- *   `callable-string` names a function, so it proves nothing;
- * - properties typed or documented as callable, and properties that collect appended callables;
- * - an enclosing `instanceof` or one-argument `is_callable()` condition that guards the call.
- *
- * An immediately invoked closure, arrow function, or `new` object is its own proof, and `Closure::fromCallable($x)()`
- * is judged exactly as `$x()` would be. `$f(...)` only creates a Closure, so it is never reported.
- *
- * Trust is scoped. A name is trusted only inside the function, method, or closure that proves it; an arrow function
- * also sees its parent's names unless its own parameter shadows them, a closure sees the names it `use`s, and code
- * outside any function shares one file scope. Property trust belongs to the class that declares it. No proof outranks
- * request input: a callee that reads a superglobal, directly or through a local the same function filled from one,
- * is always reported, so `is_callable($_GET['f'])` cannot vouch for `system`; a closure literal is still a closure
- * whatever its body reads. Otherwise reassigning a trusted name is not tracked. Calls through those are trusted,
- * leaving only unproven dynamic targets. Warning at medium confidence, because a name match is evidence for review
- * rather than a proven vulnerability.
+ * - Existing callable declarations, literal closures and guarded calls retain their current policy.
+ * - Bounded local copies and resolved Closure binding add evidence only while assignments remain valid.
+ * - Request-origin callees always remain reportable; callable typing does not prove a harmless body.
  */
 final class DangerousFunctionCallRule implements RuleInterface
 {
@@ -122,15 +99,15 @@ final class DangerousFunctionCallRule implements RuleInterface
             ],
             falsePositiveShapes: [
                 [
-                    'shape'      => 'A constrained internal wrapper that runs a fixed literal command through exec(), system(), or shell_exec().',
+                    'shape' => 'A constrained internal wrapper that runs a fixed literal command through exec(), system(), or shell_exec().',
                     'mitigation' => 'The built-in execution list matches on function name alone and never inspects the argument, and options.additionalFunctions only adds names, so review the wrapper once and accept it.',
                 ],
                 [
-                    'shape'      => 'A dynamic $callable() whose target is defined in another file, such as a container-resolved handler or an injected callable.',
+                    'shape' => 'A dynamic $callable() whose target is defined in another file, such as a container-resolved handler or an injected callable.',
                     'mitigation' => 'Callable provenance is proven only from this file, so add a callable type hint or a `@param callable` docblock, or assign the closure locally to make the target visible.',
                 ],
                 [
-                    'shape'      => 'A callable proven only by an early-return guard such as `if (!is_callable($handler)) { return; }` before the call.',
+                    'shape' => 'A callable proven only by an early-return guard such as `if (!is_callable($handler)) { return; }` before the call.',
                     'mitigation' => 'Only an enclosing `if`, ternary, or `&&` condition proves callability, so move the call inside the guarded branch or type the value as callable.',
                 ],
             ],
@@ -154,8 +131,8 @@ final class DangerousFunctionCallRule implements RuleInterface
         $dangerousFunctions = $this->dangerousFunctions(
             $ruleContext->settingsFor($definition)->stringListOption('additionalFunctions'),
         );
-        $findings           = [];
-        $trust              = $this->callableTrust($analysisUnit);
+        $findings = [];
+        $trust    = $this->callableTrust($analysisUnit);
 
         // Weigh every function call for a dangerous or unresolved dynamic callee.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
@@ -168,7 +145,10 @@ final class DangerousFunctionCallRule implements RuleInterface
                 }
 
                 // Flag it unless the target is a plain name or a slot proven to hold a callable.
-                if (!$call->name instanceof Node\Name && !$this->isKnownCallableInvocation($call, $trust)) {
+                if (!$call->name instanceof Node\Name && !$this->isKnownCallableInvocation($call, $trust)
+                    && !CallableFlowEvidence::hasInvocationEvidence($call, fn (Expr $callbackValue): bool => $this->isProvenCallable($callbackValue, $call, $trust))
+                    && !CallableCollectionEvidence::hasInvocationEvidence($call)
+                    && !CallableCollectionReturnEvidence::hasInvocationEvidence($call)) {
                     $findings[] = $this->finding($analysisUnit, $call, 'dynamic function call');
                 }
 
@@ -229,7 +209,7 @@ final class DangerousFunctionCallRule implements RuleInterface
      */
     private function callableTrust(AnalysisUnit $analysisUnit): array
     {
-        [$variables, $collections] = $this->callableParameterNames($analysisUnit);
+        [$variables, $collections]           = $this->callableParameterNames($analysisUnit);
         [$properties, $collectionProperties] = $this->callablePropertyNames($analysisUnit);
 
         // A closure, arrow function, object, or callable array bound to a plain variable proves that variable in its
@@ -274,9 +254,9 @@ final class DangerousFunctionCallRule implements RuleInterface
         }
 
         return [
-            'variables'            => $variables,
-            'collections'          => $collections,
-            'properties'           => $properties,
+            'variables' => $variables,
+            'collections' => $collections,
+            'properties' => $properties,
             'collectionProperties' => $collectionProperties,
         ];
     }
@@ -421,9 +401,9 @@ final class DangerousFunctionCallRule implements RuleInterface
      * Reports whether a dynamic call's target is proven to hold a callable, which is the gate that turns a
      * finding off.
      *
-     * @param Expr\FuncCall $call  - the dynamic call whose callee is not a plain function name
+     * @param Expr\FuncCall                                                                                                                                                                                                                   $call  - the dynamic call whose callee is not a plain function name
      * @param array{variables: array<int|string, array<string, true>>, collections: array<int|string, array<string, true>>, properties: array<int|string, array<string, true>>, collectionProperties: array<int|string, array<string, true>>} $trust -
-     *   the scoped callable proofs `callableTrust()` learned from this file
+     *                                                                                                                                                                                                                                               the scoped callable proofs `callableTrust()` learned from this file
      *
      * @return bool - true means "trusted callable, do not flag"; false means the target is unproven and the
      *   caller should record a dynamic-call finding (false is the safe default, not a positive denial)
@@ -436,10 +416,10 @@ final class DangerousFunctionCallRule implements RuleInterface
     /**
      * Reports whether one callee expression is proven callable at a call site.
      *
-     * @param Expr          $target - the callee, or the argument `Closure::fromCallable()` wraps
-     * @param Expr\FuncCall $call   - the dynamic call, whose scope and class resolve names
-     * @param array{variables: array<int|string, array<string, true>>, collections: array<int|string, array<string, true>>, properties: array<int|string, array<string, true>>, collectionProperties: array<int|string, array<string, true>>} $trust -
-     *   the scoped callable proofs `callableTrust()` learned from this file
+     * @param Expr                                                                                                                                                                                                                            $target - the callee, or the argument `Closure::fromCallable()` wraps
+     * @param Expr\FuncCall                                                                                                                                                                                                                   $call   - the dynamic call, whose scope and class resolve names
+     * @param array{variables: array<int|string, array<string, true>>, collections: array<int|string, array<string, true>>, properties: array<int|string, array<string, true>>, collectionProperties: array<int|string, array<string, true>>} $trust  -
+     *                                                                                                                                                                                                                                                the scoped callable proofs `callableTrust()` learned from this file
      *
      * @return bool - true for a proven variable or property, a guarded variable, or a syntactic callable; false otherwise
      */
@@ -520,8 +500,8 @@ final class DangerousFunctionCallRule implements RuleInterface
     /**
      * Reports whether a variable name is proven callable in a scope, following the scopes that can see it.
      *
-     * @param string                                  $name  - variable name without `$`
-     * @param FunctionLike|null                       $scope - function-like the use sits in, or null for file scope
+     * @param string                                 $name  - variable name without `$`
+     * @param FunctionLike|null                      $scope - function-like the use sits in, or null for file scope
      * @param array<int|string, array<string, true>> $sets  - proven names per scope key
      *
      * @return bool - true when the scope proves the name, or an arrow function's parent does, or a closure's parent
@@ -999,8 +979,8 @@ final class DangerousFunctionCallRule implements RuleInterface
     /**
      * Reports whether a foreach subject is a proven callable collection, so the loop value variable can be trusted.
      *
-     * @param Expr                                    $expr                 - the `foreach (... as $v)` subject expression
-     * @param Node                                    $context              - the foreach, whose scope and class resolve names
+     * @param Expr                                   $expr                 - the `foreach (... as $v)` subject expression
+     * @param Node                                   $context              - the foreach, whose scope and class resolve names
      * @param array<int|string, array<string, true>> $collections          - variables proven to hold callable collections, per scope
      * @param array<int|string, array<string, true>> $collectionProperties - properties proven to hold callable collections, per class
      *

@@ -174,14 +174,15 @@ final class SecretScannerHelper
     }
 
     /**
-     * SHA-256 digests of the 19 values vendors publish as documentation samples, so code that pastes one from a README never reports.
+     * SHA-256 digests of the 20 values vendors publish as documentation samples, so code that pastes one from a README never reports.
      *
-     * They are AWS's example access key ids and secret keys, the jwt.io sample token and fourteen published test card numbers.
+     * They cover AWS and jwt.io examples, fourteen published test cards and Google's reCAPTCHA v2 test site key.
      * Digests keep the literals out of this source (FAMILY-CONTRACT.md section 5).
      *
      * @var list<string>
      */
     private const DOCUMENTED_SAMPLE_DIGESTS = [
+        '03b970ed8171d73b58bbc9a5c72e3e4eec28503b56b3bb400a0801857dd45614',
         '19ff47cc8024c133d5845d3f8938caca289929031e7d508c3adf7adff177f0c2',
         '1a5d44a2dca19669d72edf4c4f1c27c4c1ca4b4408fbb17f6ce4ad452d78ddb3',
         '1c9d38ed26cd808fa3b02b9b3b988a7caf474e2e42d95789c0fe07e267c80d8f',

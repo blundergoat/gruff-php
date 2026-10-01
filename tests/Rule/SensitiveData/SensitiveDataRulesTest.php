@@ -488,6 +488,70 @@ final class SensitiveDataRulesTest extends TestCase
     }
 
     /**
+     * Verify an HTML image attribute naming an existing image beside its page is not a high-entropy secret.
+     *
+     * Fixture purpose: mutillidae's sixth-review case 4 shows ./images/refresh-button-48px-by-48px.png from src/show-log.php.
+     * Stable contract: only a whole src or href value resolving to an existing image inside the project, without a symlink,
+     * stays quiet; a missing image, extra text, a path leaving the project, a symlinked folder, a value outside an attribute
+     * and an opaque token still report.
+     *
+     * @return void
+     */
+    public function testHighEntropyImageAttributeNamingAnExistingFileIsNotFlagged(): void
+    {
+        $base    = sys_get_temp_dir() . '/gruff-image-attribute-' . bin2hex(random_bytes(6));
+        $project = $base . '/project';
+        $image   = 'refresh-button-48px-by-48px.png';
+        $opaque  = 'k9Qz7Lm2' . 'Xv4Pb8Rt' . '6Yw1Nc3H' . 'd5Fg0Js2Tq';
+        $lines   = [
+            '<span><img width="32px" height="32px" src="./images/' . $image . '" />Refresh Logs</span>',
+            '<a href="./images/' . $image . '">Refresh</a>',
+            '<img src="./images/refresh-button-missing-48px-by-48px.png" />',
+            '<img src="./images/' . $image . '.orig" />',
+            '<img src="../../outside/' . $image . '" />',
+            '<img src="./linked/' . $image . '" />',
+            '<?php $icon = \'./images/' . $image . '\'; ?>',
+            '<img src="' . $opaque . '" />',
+            '<img src="./linked/../images/' . $image . '" />',
+            '<img src="./missing/../images/' . $image . '" />',
+            '<img src="./images/' . $image . '/../' . $image . '" />',
+            '<img src="./images/../images/' . $image . '" />',
+        ];
+        self::assertTrue(mkdir($project . '/src/images', 0o777, true));
+        self::assertTrue(mkdir($base . '/outside'));
+        self::assertNotFalse(file_put_contents($project . '/src/images/' . $image, 'image bytes'));
+        self::assertNotFalse(file_put_contents($base . '/outside/' . $image, 'image bytes'));
+        self::assertTrue(symlink($project . '/src/images', $project . '/src/linked'));
+        self::assertNotFalse(file_put_contents($project . '/src/show-log.php', implode("\n", $lines) . "\n"));
+
+        try {
+            $registry    = RuleRegistry::defaults();
+            $unit        = (new PhpFileParser())->parse(new SourceFile($project . '/src/show-log.php', 'src/show-log.php'));
+            $lineNumbers = array_map(
+                static fn(Finding $finding): ?int => $finding->line,
+                array_values(array_filter(
+                    $registry->analyse([$unit], new RuleContext($project, AnalysisConfig::fromRegistry($registry))),
+                    static fn(Finding $finding): bool => $finding->ruleId === HighEntropyStringRule::ID,
+                )),
+            );
+            sort($lineNumbers);
+
+            self::assertSame([3, 4, 5, 6, 7, 8, 9, 10, 11], $lineNumbers);
+        } finally {
+            // The tree is synthetic; remove the link itself, never the folder it points to, before the real folders.
+            unlink($project . '/src/show-log.php');
+            unlink($project . '/src/linked');
+            unlink($project . '/src/images/' . $image);
+            unlink($base . '/outside/' . $image);
+            rmdir($project . '/src/images');
+            rmdir($project . '/src');
+            rmdir($project);
+            rmdir($base . '/outside');
+            rmdir($base);
+        }
+    }
+
+    /**
      * Verify medical terminology metadata is not treated as embedded secret material.
      *
      * @return void

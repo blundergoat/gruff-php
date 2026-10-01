@@ -52,6 +52,65 @@ final class SecurityRulesTest extends TestCase
     /** Parser used to load fixture files. */
     private PhpFileParser $parser;
 
+    /** Existing composite sinks keep their emissions; only own PR-unreachable secrets become quiet.
+     * @param string $body     - Authored workflow body.
+     * @param int    $expected - Retained secret sink count.
+     * @param string $trigger  - Current mapping trigger syntax.
+     * @return void
+     */
+    #[DataProvider('workflowEventGuardProvider')]
+    public function testWorkflowEventGuards(string $body, int $expected, string $trigger): void
+    {
+        $unit     = new AnalysisUnit(new SourceFile(__FILE__, '.github/workflows/guard.yml'), $trigger . $body, [], [], []);
+        $findings = (new GithubActionsRiskyWorkflowRule())->analyse($unit, new RuleContext(__DIR__, AnalysisConfig::fromRegistry(RuleRegistry::defaults())));
+        $secrets  = array_values(array_filter($findings, static fn(Finding $finding): bool => ($finding->metadata['sink'] ?? null) === 'secrets-in-pr-workflow'));
+        self::assertCount($expected, $secrets);
+    }
+
+    /** Source-owned expression/ownership cases plus PHP's broader two-event policy.
+     * @return array<string, array{string, int, string}> - Named native controls.
+     */
+    public static function workflowEventGuardProvider(): array
+    {
+        return [
+            'expression github.event_name == \'issues\'' => ["jobs:\n  build:\n    if: github.event_name == 'issues'\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 0, "on:\n  pull_request_target:\n"],
+            'expression github.event_name != \'pull_request_target\'' => ["jobs:\n  build:\n    if: github.event_name != 'pull_request_target'\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 0, "on:\n  pull_request_target:\n"],
+            'expression ${{ !(github.event_name == \'pull_request_target\') }}' => ["jobs:\n  build:\n    if: \${{ !(github.event_name == 'pull_request_target') }}\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 0, "on:\n  pull_request_target:\n"],
+            'expression (github.event_name == \'push\' || github.event_name == \'issues\')' => ["jobs:\n  build:\n    if: (github.event_name == 'push' || github.event_name == 'issues')\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 0, "on:\n  pull_request_target:\n"],
+            'expression github.event_name == \'issues\' && inputs.enabled' => ["jobs:\n  build:\n    if: github.event_name == 'issues' && inputs.enabled\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 0, "on:\n  pull_request_target:\n"],
+            'expression inputs.enabled && github.event_name == \'issues\'' => ["jobs:\n  build:\n    if: inputs.enabled && github.event_name == 'issues'\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 0, "on:\n  pull_request_target:\n"],
+            'expression github.event_name == \'PULL_REQUEST_TARGET\'' => ["jobs:\n  build:\n    if: github.event_name == 'PULL_REQUEST_TARGET'\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request_target:\n"],
+            'expression github.event_name == \'pull_request_target\'' => ["jobs:\n  build:\n    if: github.event_name == 'pull_request_target'\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request_target:\n"],
+            'expression github.event_name != \'issues\'' => ["jobs:\n  build:\n    if: github.event_name != 'issues'\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request_target:\n"],
+            'expression inputs.enabled' => ["jobs:\n  build:\n    if: inputs.enabled\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request_target:\n"],
+            'expression github.event_name == \'issues\' || inputs.enabled' => ["jobs:\n  build:\n    if: github.event_name == 'issues' || inputs.enabled\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request_target:\n"],
+            'expression ${{ github.event_name == \'issues\' }} trailing' => ["jobs:\n  build:\n    if: \${{ github.event_name == 'issues' }} trailing\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request_target:\n"],
+            'expression github.event_name == \'issues\' trailing' => ["jobs:\n  build:\n    if: github.event_name == 'issues' trailing\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request_target:\n"],
+            'expression github.event_name == \'issues\' &&' => ["jobs:\n  build:\n    if: github.event_name == 'issues' &&\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request_target:\n"],
+            'expression github.event_name == \'issues\' && contains(inputs.x, \'x\')' => ["jobs:\n  build:\n    if: github.event_name == 'issues' && contains(inputs.x, 'x')\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request_target:\n"],
+            'expression github.event_name == 0' => ["jobs:\n  build:\n    if: github.event_name == 0\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request_target:\n"],
+            'expression !github.event_name == \'issues\'' => ["jobs:\n  build:\n    if: !github.event_name == 'issues'\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request_target:\n"],
+            'ownership 1' => ["jobs:\n  build:\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n    if: github.event_name == 'issues'\n", 0, "on:\n  pull_request_target:\n"],
+            'ownership 2' => ["'jobs':\n  'build':\n    'steps':\n      - 'run': echo \${{ secrets.DEPLOY_TOKEN }}\n        'if': github.event_name == 'issues'\n", 0, "on:\n  pull_request_target:\n"],
+            'ownership 3' => ["jobs:\n  build:\n    steps:\n      - if: github.event_name == 'issues'\n        run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 0, "on:\n  pull_request_target:\n"],
+            'ownership 4' => ["jobs:\n  build:\n    steps:\n      - run: |\n          if: github.event_name == 'issues'\n          echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request_target:\n"],
+            'ownership 5' => ["jobs:\n  build:\n    steps:\n      - run: |\n          echo \${{ secrets.DEPLOY_TOKEN }}\n        if: github.event_name == 'issues'\n", 0, "on:\n  pull_request_target:\n"],
+            'ownership 6' => ["env:\n  TOKEN: \${{ secrets.DEPLOY_TOKEN }}\njobs:\n  build:\n    if: github.event_name == 'issues'\n    steps:\n      - run: echo ready\n", 1, "on:\n  pull_request_target:\n"],
+            'ownership 7' => ["jobs:\n  build:\n    env:\n      TOKEN: \${{ secrets.DEPLOY_TOKEN }}\n    steps:\n      - if: github.event_name == 'issues'\n        run: echo ready\n", 1, "on:\n  pull_request_target:\n"],
+            'ownership 8' => ["jobs:\n  safe:\n    if: github.event_name == 'issues'\n    steps:\n      - run: echo ready\n  build:\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request_target:\n"],
+            'ownership 9' => ["jobs:\n  build:\n    steps:\n      - if: github.event_name == 'issues'\n        run: echo ready\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request_target:\n"],
+            'ownership 10' => ["jobs:\n  build:\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n        with:\n          if: github.event_name == 'issues'\n", 1, "on:\n  pull_request_target:\n"],
+            'ownership 11' => ["jobs:\n  build:\n    if: github.event_name == 'issues'\n    if: inputs.enabled\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request_target:\n"],
+            'ownership 12' => ["jobs:\n  build:\n    if: github.event_name == 'issues'\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n  build:\n    steps:\n      - run: echo ready\n", 1, "on:\n  pull_request_target:\n"],
+            'ownership 13' => ["jobs:\n  build:\n    if: github.event_name == 'issues'\n    env: &shared\n      TOKEN: \${{ secrets.DEPLOY_TOKEN }}\n    steps:\n      - run: echo ready\n", 1, "on:\n  pull_request_target:\n"],
+            'ownership 14' => ["jobs:\n  build:\n    if: github.event_name == 'issues'\n    <<: *shared\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request_target:\n"],
+            'ownership 15' => ["jobs: {build: {if: \"github.event_name == 'issues'\", env: {TOKEN: \${{ secrets.DEPLOY_TOKEN }}}}}\n", 1, "on:\n  pull_request_target:\n"],
+            'both PR events retain not-target job' => ["jobs:\n  build:\n    if: github.event_name != 'pull_request_target'\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request:\n  pull_request_target:\n"],
+            'plain PR guard remains reachable' => ["jobs:\n  build:\n    if: github.event_name == 'PULL_REQUEST'\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request:\n"],
+            'scalar list alias' => ["jobs:\n  build:\n    if: github.event_name == 'issues'\n    env:\n      TOKEN: \${{ secrets.DEPLOY_TOKEN }}\n    steps:\n      - *shared\n", 1, "on:\n  pull_request_target:\n"],
+        ];
+    }
+
     /**
      * Prepare parser fixtures before each rule test.
      *
@@ -304,6 +363,29 @@ final class SecurityRulesTest extends TestCase
 
         self::assertCount(1, $findings);
         self::assertSame(9, $findings[0]->line);
+    }
+
+    /**
+     * Keeps underscore deployment constants quiet unless the user marks them dynamic.
+     *
+     * @return void
+     */
+    public function testUnderscoreDeploymentConstantKeepsDynamicOverrides(): void
+    {
+        $unit = $this->parseSource(
+            "<?php\nrequire __SITE_ROOT__ . '/bootstrap.php';\nrequire _mixedRoot . '/bootstrap.php';\nrequire \$_GET['path'];",
+            'src/bootstrap.php',
+        );
+        $rule     = new VariableIncludeRule();
+        $config   = AnalysisConfig::fromRegistry(RuleRegistry::defaults());
+        $ordinary = $rule->analyse($unit, new RuleContext(__DIR__, $config));
+        self::assertSame([3, 4], self::findingLines($ordinary));
+
+        $configured = $config->withRuleSettings(
+            VariableIncludeRule::ID,
+            new RuleSettings(true, [], ['treatGlobalConstantsAsFixed' => true, 'dynamicPathConstants' => ['__SITE_ROOT__']]),
+        );
+        self::assertSame([2, 3, 4], self::findingLines($rule->analyse($unit, new RuleContext(__DIR__, $configured))));
     }
 
     /**
