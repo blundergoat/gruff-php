@@ -1,6 +1,6 @@
 ---
 category: commands
-last_reviewed: 2026-08-16
+last_reviewed: 2026-09-25
 ---
 
 # CLI Command Footguns
@@ -25,24 +25,25 @@ last_reviewed: 2026-08-16
 
 **Prevention:** For any filter whose job is "keep findings inside scope set S", an empty S means "nothing is in scope" → drop the in-scope-only findings, not "no filter" → keep everything. Only return the input unchanged when the FILTER itself is inactive (no rule ids, no allowlist) — a different condition from an empty scope set. When adding a finding filter, write the empty-scope-set case as an explicit test before the happy path; the `=== [] return $findings` shortcut reads as a harmless guard but silently inverts the filter.
 
-## Footgun: The result cache keys on tool version + config + rule set, not rule source, so a rule-LOGIC change does not invalidate cached findings
-
-**Status:** active | **Created:** 2026-06-14 | **Evidence:** OBSERVED
-
-`src/Engine/Cache/AnalysisFingerprint.php` (search: `forRun`) builds the per-file cache key from the resolved config, the enabled rule ids, and the gruff version (search: `toolVersion`, which writes `'version' => $toolVersion`) — never the rule classes' source. This is correct for end users because every release bumps `Application::VERSION`, which invalidates all entries. But while iterating on a rule's logic *within one version* (the common dev/validation loop), re-running `analyse` against a path that already has a warm `.gruff-cache` returns the OLD findings: same file content + same version + same enabled rules hashes to the same key, so the changed rule logic never re-runs. Observed while validating the guard-clause classifier change (later committed as `84d196d`) — a re-scan of a previously-scanned fixture reported the stale `severity: advisory` / `complexityShape: flat-guard-clauses`, while `--no-cache` on the same path reported the corrected `warning` / `branching`. (ADR-020 documents the cache.)
-
-**Prevention:** Pass `--no-cache` whenever you validate a rule-LOGIC change by re-scanning a path that may have a warm cache (your own prior scans, or a repo's checked-in `.gruff-cache`). Unit tests bypass the cache entirely (they call `$rule->analyse(...)` directly), so this only bites CLI/real-repo validation. Do not bump `Application::VERSION` just to bust the cache for dev iteration — `--no-cache` is the right tool; the version bump is for releases. The preflight full-project scan (`scripts/preflight-checks.sh`, search: `analyse --fail-on advisory --no-cache`) now passes `--no-cache` for exactly this reason, so the release gate re-runs every rule fresh and can never pass or fail on stale findings — added 2026-06-14 after a readonly-rule fix that cleared 3 `size.parameter-count` errors still showed all 3 under a warm-cache preflight (`analyse --no-cache` confirmed 0). But ad-hoc `analyse` runs and your own dev re-scans still reuse the warm cache, so keep passing `--no-cache` there; CI is unaffected either way (cold cache).
-
 ## Footgun: Ignored scans can exit zero: `--include-ignored` bypasses defaults, not configured `paths.ignore`
 
 **Status:** active | **Created:** 2026-06-14 | **Evidence:** ACTUAL_MEASURED
 **Decision changed:** Inspect `ignoredPathDetails.source` and prove `summary.filesParsed > 0` before trusting a scan; choose the remedy for the reported ignore layer.
 **Trigger phase:** VERIFY
-**Incident count:** 2 | **Latest occurrence:** 2026-08-09
+**Incident count:** 3 | **Latest occurrence:** 2026-08-22
 
 `src/Engine/Source/PathIgnoreResolver.php` (search: `Configured paths.ignore wins first and unconditionally`) applies configured `paths.ignore` patterns before it considers `--include-ignored`. The flag bypasses built-in default and generated exclusions only. A scan excluded by project config therefore still exits zero with the flag.
 
 The default-ignore variant affects corpora under `.goat-flow/scratchpad`: scanning the bundled Shopware source parsed 0 files until `--include-ignored` was added, after which it parsed 7,147. The configured-ignore variant recurred during the 0.5.2 substantive-line proof. `.gruff-php.yaml` (search: `'tests/Fixtures/**'`) excluded `tests/Fixtures/Source/mixed/alpha.php`; scans both with and without `--include-ignored` reported `filesParsed: 0`. Passing the existing narrow config `tests/Fixtures/Config/file-length-warning.yaml` parsed one file and reported 11 substantive lines.
+
+The third incident was the M11 scan-cost calibration. The default directory policy at that time
+ignored any path segment named `tmp`, as well as `cache`, `build`, `dist`, `generated`, `coverage`,
+`vendor`, and `node_modules`. A synthetic `.php` probe below
+`/tmp` therefore returned `empty-analysis`, `ignoredPaths: 1`, and pattern `tmp`; the plausible
+elapsed time was pure startup cost. Moving the probe to a non-ignored external scratch root and
+asserting that the report actually analysed a file produced the valid cost series. The current
+family fallback in `src/Engine/Source/PathIgnoreResolver.php` (search: `FALLBACK_DIRECTORIES`)
+does not include `tmp`; inspect the reported ignore source rather than assuming the historical list.
 
 **Prevention:** Read `ignoredPathDetails.source` before changing flags. Use `--include-ignored` for `default` or `generated` exclusions. For a `config` exclusion, pass an explicit config that admits the target, or use `--no-config` only when the run is deliberately calibrating registry defaults. Treat an exit-zero scan as unproven until `summary.filesParsed > 0`; target a corpus source subtree so its dependency directories stay out.
 
@@ -58,7 +59,36 @@ The default-ignore variant affects corpora under `.goat-flow/scratchpad`: scanni
 
 **Prevention:** Grep the suppressed value's producer for every read before adding the guard - here `$score->composite->score` and the separate `$reviewScore` recomputation are two reads of one calculator. A guard that lives at the render site protects one surface; a guard that lives at the value's source protects all of them. Suppressing at the source runs the mirror risk, so audit the renderers too: a type may already be nullable while nothing in production ever produced null, which leaves consumers untested against it. `deltaScore` was `?float` throughout `src/Results/Review/` yet only unit tests ever built one, and `src/Output/Reporter/TextReporter.php` (search: `Score delta`) is its only renderer and already guarded. Derived counts are not affected: the review's `perRuleDelta` block counts findings rather than pricing them, so it still reports what a deletion removed.
 
+## Footgun: ConfigLoader's explicit-path base is shared by the CLI and every in-process caller
+
+**Status:** active | **Created:** 2026-09-25 | **Evidence:** OBSERVED
+
+`src/Engine/Config/ConfigLoader.php` (search: `public function resolveConfigPath`) resolves an explicit config path for
+two kinds of caller. The CLI commands pass the `--config` the user typed, which the family reads against the launch
+directory. The loader's own tests pass a temporary project root and a bare file name, which they expect to be read
+against that root. M10's D25 first changed the base inside `resolveConfigPath` to `getcwd()`. The CLI test passed,
+but 95 tests in `ConfigLoaderTest`, `ConfigLoaderRuleOptionsTest`, `SensitiveExclusionConfigParserTest` and three
+others failed with `Config file not found`.
+
+**Evidence:** the D25 gate run on 2026-09-25 (25 errors, 71 failures). The fix is the constructor flag
+`shouldResolveFromLaunchDir`, which `AnalyseCommandSetupBuilder`, `SummaryCommand`, `ReportCommand`,
+`CheckIgnoreCommand` and `HookCommand` set. `DashboardStateFactory` does not set it, because the dashboard's scan
+subprocess runs with its working directory at the scanned project root.
+
+**Prevention:** Change what a typed CLI path means at the CLI edge, not in a loader other code constructs directly.
+Run the whole suite, not only the new CLI test, before calling the change done.
+
 ## Resolved Entries
+
+## Footgun: The result cache keys on tool version + config + rule set, not rule source, so a rule-LOGIC change does not invalidate cached findings
+
+**Status:** resolved | **Created:** 2026-06-14 | **Evidence:** OBSERVED
+
+**Resolved 2026-09-20 for rule source:** `src/Engine/Cache/AnalysisFingerprint.php` (search: `implementationDigest`) now folds a digest of every PHP file under the analyser's own `src/` into the run key, so an edited rule misses the cache under an unchanged version. The vendored parser and non-PHP data files stay outside the key, so a `composer update` under one version can still serve cached findings. The trap below was live until then and produced a real disagreement: on gruff-php's own tree a cached `analyse` reported 3,255 findings where `summary` and `analyse --no-cache` reported 3,203. `--no-cache` is no longer needed to validate a rule change; the preflight keeps passing it, which costs nothing. See ADR-020's 2026-09-20 addendum.
+
+`src/Engine/Cache/AnalysisFingerprint.php` (search: `forRun`) builds the per-file cache key from the resolved config, the enabled rule ids, and the gruff version (search: `toolVersion`, which writes `'version' => $toolVersion`) — never the rule classes' source. This is correct for end users because every release bumps `Application::VERSION`, which invalidates all entries. But while iterating on a rule's logic *within one version* (the common dev/validation loop), re-running `analyse` against a path that already has a warm `.gruff-cache` returns the OLD findings: same file content + same version + same enabled rules hashes to the same key, so the changed rule logic never re-runs. Observed while validating the guard-clause classifier change (later committed as `84d196d`) — a re-scan of a previously-scanned fixture reported the stale `severity: advisory` / `complexityShape: flat-guard-clauses`, while `--no-cache` on the same path reported the corrected `warning` / `branching`. (ADR-020 documents the cache.)
+
+**Prevention:** Pass `--no-cache` whenever you validate a rule-LOGIC change by re-scanning a path that may have a warm cache (your own prior scans, or a repo's checked-in `.gruff-cache`). Unit tests bypass the cache entirely (they call `$rule->analyse(...)` directly), so this only bites CLI/real-repo validation. Do not bump `Application::VERSION` just to bust the cache for dev iteration — `--no-cache` is the right tool; the version bump is for releases. The preflight full-project scan (`scripts/preflight-checks.sh`, search: `analyse --fail-on advisory --no-cache`) now passes `--no-cache` for exactly this reason, so the release gate re-runs every rule fresh and can never pass or fail on stale findings — added 2026-06-14 after a readonly-rule fix that cleared 3 `size.parameter-count` errors still showed all 3 under a warm-cache preflight (`analyse --no-cache` confirmed 0). But ad-hoc `analyse` runs and your own dev re-scans still reuse the warm cache, so keep passing `--no-cache` there; CI is unaffected either way (cold cache).
 
 ## Footgun: Editing above a baseline-suppressed finding resurfaced it as a new finding
 
@@ -68,9 +98,9 @@ Before baseline v2 (ADR-029), the default-applied `gruff-baseline.json` matched 
 
 **Evidence:** Reproduced 2026-07-03 on the pre-fix binary: one line inserted above the second of two accepted findings reported `new=1, unchanged=1, absent=1`.
 
-**Resolution:** `gruff.baseline.v2` (ADR-029) matches by grouped `(file, ruleId, message)` counts in `src/Results/Baseline/BaselineFilter.php` (search: `byGroup`), so line numbers no longer participate in baseline matching; the same edit now reports `new=0, unchanged=N, absent=0`. Legacy v1 files fail closed with a regenerate instruction.
+**Resolution:** `gruff.baseline.v2` (ADR-029) replaced line-sensitive matching with grouped `(file, ruleId, message)` counts; the same edit then reported `new=0, unchanged=N, absent=0`. Current v3 matching uses stable identities and counts in `src/Results/Baseline/BaselineFilter.php` (search: `groupEligibleFindings`), with reviewed entries indexed by `byIdentity`.
 
-**Prevention:** Baselines survive line shifts now, but the match key includes the message: rewording a rule message invalidates its groups (regenerate after such releases), and a fix-one/add-one swap within the same `(file, ruleId, message)` group is invisible while the live count stays within the accepted count.
+**Prevention:** Check the current identity builder and collision rules before changing finding fields. The historical v2 message-group behavior above is not the v3 identity contract; tests must exercise the current grouping and accepted counts.
 
 ## Footgun: A narrow-path `analyse`/`hook` re-parsed the whole project when built-in project rules were enabled
 
@@ -140,6 +170,6 @@ Before v0.4.0, `src/Cli/Command/MissingConfigPrompt.php` (search: `!$input->isIn
 
 **Evidence:** PR #3 review (CodeRabbit, outside-diff). Three commands performed the same option-reading work three different ways; every new command that added a `--config`-style string option was one Copy/Paste away from the wrong variant.
 
-**Resolution:** `src/Cli/Command/SummaryCommand.php` (search: `private function configPath(InputInterface $input): ?string`) now matches the `is_string($value) && $value !== ''` shape used by the other call sites, so `--config=""` is normalised to null at the read site.
+**Resolution:** `src/Cli/Command/SummaryCommand.php` (search: `private function configPathOption`) normalises `--config=""` to null at the read site.
 
 **Prevention:** Treat an empty-string return from `InputInterface::getOption()` as null at every read site. The minimum helper is `is_string($value) && $value !== '' ? $value : null`. Better: extract a shared `OptionReader::optionalString(InputInterface $input, string $name): ?string` helper and route every `--config`, `--baseline`, `--output`, `--host`, and similar string option through it. Audit any new command that reads a string-valued option against this rule during review — the inconsistency is invisible until a user passes `--name=""`.

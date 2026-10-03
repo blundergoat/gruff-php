@@ -69,6 +69,12 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A deliberate null-object double passed only to satisfy a constructor signature, where having no expectation is the point.',
+                    'mitigation' => 'An unconfigured double reads the same as a forgotten expectation, so build the collaborator as a small fake class instead of a mock.',
+                ],
+            ],
         );
     }
 

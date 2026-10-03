@@ -4,7 +4,8 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-BASELINE_FILE="$REPO_ROOT/.goat-flow/logs/perf/m50-baseline/baseline.json"
+PLATFORM_SLUG="$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)"
+BASELINE_FILE="$SCRIPT_DIR/performance-baselines/${PLATFORM_SLUG}.json"
 RUN_LOG_DIR="$REPO_ROOT/.goat-flow/logs/perf/m50-baseline"
 
 WALL_TOLERANCE="${GRUFF_PERF_WALL_TOLERANCE:-20}"
@@ -20,6 +21,7 @@ if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
     GREEN=$'\033[32m'
     RED=$'\033[31m'
     YELLOW=$'\033[33m'
+    # shellcheck disable=SC2034  # reserved for future table emphasis parity
     BLUE=$'\033[34m'
     RESET=$'\033[0m'
 else
@@ -28,6 +30,7 @@ else
     GREEN=''
     RED=''
     YELLOW=''
+    # shellcheck disable=SC2034  # reserved for future table emphasis parity
     BLUE=''
     RESET=''
 fi
@@ -115,6 +118,10 @@ if ! command -v jq >/dev/null 2>&1; then
     echo "${RED}jq is required.${RESET}" >&2
     exit 2
 fi
+if ! command -v git >/dev/null 2>&1; then
+    echo "${RED}git is required for source provenance.${RESET}" >&2
+    exit 2
+fi
 
 if [[ -z "$CORPUS_SELECTION" ]]; then
     if [[ "$MODE" == "quick" ]]; then
@@ -164,6 +171,60 @@ corpus_extra_args() {
 }
 
 mkdir -p "$RUN_LOG_DIR"
+
+runtime_source_identity() {
+    # shellcheck disable=SC2016  # PHP owns the dollar-prefixed expressions
+    php -r '
+        $root = $argv[1];
+        $included = ["bin/gruff-php", "src", "composer.json", "composer.lock"];
+        $files = [];
+        $visit = static function (string $path) use (&$visit, &$files): void {
+            if (is_link($path) || is_file($path)) {
+                $files[$path] = true;
+                return;
+            }
+            $entries = scandir($path);
+            if ($entries === false) {
+                throw new RuntimeException("Unable to read runtime source path: " . $path);
+            }
+            foreach ($entries as $entry) {
+                if ($entry !== "." && $entry !== "..") {
+                    $visit($path . DIRECTORY_SEPARATOR . $entry);
+                }
+            }
+        };
+        foreach ($included as $relative) {
+            $visit($root . DIRECTORY_SEPARATOR . $relative);
+        }
+        $paths = array_keys($files);
+        sort($paths, SORT_STRING);
+        $manifest = [];
+        foreach ($paths as $path) {
+            $bytes = is_link($path) ? readlink($path) : file_get_contents($path);
+            if ($bytes === false) {
+                throw new RuntimeException("Unable to hash runtime source path: " . $path);
+            }
+            $manifest[] = [
+                "path" => str_replace(DIRECTORY_SEPARATOR, "/", substr($path, strlen($root) + 1)),
+                "sha256" => hash("sha256", $bytes),
+            ];
+        }
+        $pretty = json_encode(
+            $manifest,
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR,
+        );
+        $canonical = preg_replace_callback(
+            "/^( +)/m",
+            static fn (array $match): string => str_repeat(" ", intdiv(strlen($match[1]), 2)),
+            $pretty,
+        ) . "\n";
+        echo json_encode([
+            "includedPaths" => $included,
+            "fileCount" => count($manifest),
+            "digest" => "sha256:" . hash("sha256", $canonical),
+        ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+    ' "$REPO_ROOT"
+}
 
 run_once() {
     local corpus="$1"
@@ -274,8 +335,25 @@ run_corpus() {
 build_run_document() {
     local php_version
     php_version="$(php -r 'echo PHP_VERSION;')"
+    local tool_version
+    tool_version="$(php "$REPO_ROOT/bin/gruff-php" --version 2>&1 | head -1)"
     local created_at
     created_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    local uname_string cpu_model git_commit git_dirty harness_sha wrapper_sha runtime_source
+    uname_string="$(uname -srm 2>/dev/null || echo unknown)"
+    cpu_model="$(awk -F': ' '/^model name/ {print $2; exit}' /proc/cpuinfo 2>/dev/null || true)"
+    [[ -n "$cpu_model" ]] || cpu_model="unknown"
+    git_commit="$(git -C "$REPO_ROOT" rev-parse HEAD)"
+    if [[ -z "$(git -C "$REPO_ROOT" status --porcelain=v1)" ]]; then
+        git_dirty=false
+    else
+        git_dirty=true
+    fi
+    # shellcheck disable=SC2016  # PHP owns $argv
+    harness_sha="sha256:$(php -r 'echo hash_file("sha256", $argv[1]);' "$SCRIPT_DIR/test-performance.sh")"
+    # shellcheck disable=SC2016  # PHP owns $argv
+    wrapper_sha="sha256:$(php -r 'echo hash_file("sha256", $argv[1]);' "$REPO_ROOT/bin/gruff-php")"
+    runtime_source="$(runtime_source_identity)"
 
     local corpora_json="[]"
     local corpus
@@ -286,11 +364,35 @@ build_run_document() {
     done
 
     jq -n \
+        --arg schemaVersion "gruff-perf.v1" \
         --arg phpVersion "$php_version" \
+        --arg toolVersion "$tool_version" \
         --arg createdAt "$created_at" \
         --arg mode "$MODE" \
+        --arg platform "$PLATFORM_SLUG" \
+        --arg uname "$uname_string" \
+        --arg cpu "$cpu_model" \
+        --arg gitCommit "$git_commit" \
+        --argjson gitDirty "$git_dirty" \
+        --arg harnessSha256 "$harness_sha" \
+        --arg wrapperSha256 "$wrapper_sha" \
+        --argjson runtimeSource "$runtime_source" \
         --argjson corpora "$corpora_json" \
-        '{phpVersion: $phpVersion, createdAt: $createdAt, mode: $mode, corpora: $corpora}'
+        '{
+            schemaVersion: $schemaVersion,
+            createdAt: $createdAt,
+            host: {platform: $platform, uname: $uname, cpu: $cpu, php: $phpVersion},
+            source: {
+                gitCommit: $gitCommit,
+                gitDirty: $gitDirty,
+                runtimeSource: $runtimeSource,
+                artifact: {kind: "live-wrapper", sha256: $wrapperSha256},
+                harnessSha256: $harnessSha256,
+                toolVersion: $toolVersion
+            },
+            runner: {mode: $mode, cache: "disabled"},
+            corpora: $corpora
+        }'
 }
 
 print_table_header() {
@@ -408,8 +510,9 @@ write_baseline() {
         fi
     fi
 
+    mkdir -p "$(dirname "$BASELINE_FILE")"
     local doc
-    doc="$(echo "$run_doc" | jq '{phpVersion, createdAt, mode, corpora: (.corpora | map({(.corpus): {wallMs: .wallMs, peakBytes: .peakBytes, filesParsed: .filesParsed, rulesExecuted: .rulesExecuted, topRules: (.rules[0:10] // [])}}) | add // {})}')"
+    doc="$(echo "$run_doc" | jq '{schemaVersion, createdAt, host, source, runner, corpora: (.corpora | map({(.corpus): {wallMs: .wallMs, peakBytes: .peakBytes, filesParsed: .filesParsed, rulesExecuted: .rulesExecuted, topRules: (.rules[0:10] // [])}}) | add // {})}')"
     printf '%s\n' "$doc" >"$BASELINE_FILE"
     echo "${GREEN}Wrote baseline to ${BASELINE_FILE}${RESET}"
 }

@@ -33,6 +33,22 @@ final class ListRulesCommand extends Command
     private const SUGGESTION_DISTANCE = 4;
 
     /**
+     * Knob names the family already publishes for a single-threshold rubric, keyed by rule id.
+     *
+     * The ratified listing shape (M09, 2026-09-09) carries every threshold as a named map the way
+     * gruff-go does. A rubric whose id has a knob name in gruff-go borrows that name; every other
+     * rubric publishes the one-key map `{"threshold": N}` so no new permanent identifier is invented.
+     */
+    private const THRESHOLD_KNOB_NAMES = [
+        'complexity.cognitive'    => 'maxComplexity',
+        'complexity.cyclomatic'   => 'maxComplexity',
+        'complexity.nesting-depth' => 'maxDepth',
+        'size.file-length'        => 'maxLines',
+        'size.method-length'      => 'maxLines',
+        'size.parameter-count'    => 'maxParameters',
+    ];
+
+    /**
      * Declares the `list-rules` command name, its optional `<ruleId>` argument, and the `--format`
      * flag - everything the user can type after `gruff-php list-rules`.
      *
@@ -82,7 +98,7 @@ final class ListRulesCommand extends Command
             );
         }
 
-        /** @var list<array{id: string, name: string, pillar: string, tier: string, defaultSeverity: string, confidence: string, defaultEnabled: bool, thresholds: array<string, int|float>|\stdClass, options: array<string, int|float|bool|string|array<array-key, int|float|bool|string>>|\stdClass, description: string}> $rows Accumulator shape is built from rule definitions for table rendering. */
+        /** @var list<array{id: string, name: string, pillar: string, tier: string, defaultSeverity: string, confidence: string, defaultEnabled: bool, thresholds?: array<string, int|float>, options: array<string, int|float|bool|string|array<array-key, int|float|bool|string>>|\stdClass, description: string}> $rows Accumulator shape is built from rule definitions for table rendering; a row may also carry falsePositiveShapes. */
         $rows = [];
 
         // No id given: build one catalogue row per registered rule, tagging each with whether this
@@ -131,7 +147,7 @@ final class ListRulesCommand extends Command
      * Renders one rule's full detail view once the user passed a `<ruleId>`, or hands off to the
      * typo path when that id matches nothing in the registry.
      *
-     * @param string          $ruleId - Rule id the caller asked to inspect; matched exactly against the registry.
+     * @param string          $ruleId - Rule id the caller asked to inspect; matched exactly, with a retired id resolving to its replacement.
      * @param RuleRegistry    $registry - Source of the canonical rule set the lookup and typo suggestions draw from.
      * @param AnalysisConfig  $config - Effective config supplying whether the matched rule is enabled for this project.
      * @param string          $format - Pre-validated output format (`text`, `table`, or `json`) selecting the renderer.
@@ -142,12 +158,13 @@ final class ListRulesCommand extends Command
      */
     private function renderRuleDetail(string $ruleId, RuleRegistry $registry, AnalysisConfig $config, string $format, OutputInterface $output): int
     {
-        $match = null;
-        // Scan the registry for the exact id the user typed; rule ids are matched literally, not fuzzily.
+        $match           = null;
+        $requestedRuleId = RuleRegistry::canonicalRuleId($ruleId);
+        // Scan the registry for the requested id; a retired id such as `docs.missing-public-phpdoc` already resolved to its replacement.
         foreach ($registry->all() as $rule) {
             $definition = $rule->definition();
             // Stop at the first exact hit - that is the rule whose detail view we will render.
-            if ($definition->id === $ruleId) {
+            if ($definition->id === $requestedRuleId) {
                 $match = $definition;
                 break;
             }
@@ -230,8 +247,8 @@ final class ListRulesCommand extends Command
      * @param RuleDefinition $definition - Rule whose metadata, thresholds, options, and escape hatches are serialised.
      * @param bool           $enabled - Effective project enabled state; emitted as the `defaultEnabled` field.
      *
-     * @return array - JSON-ready detail document; empty option/threshold maps are stdClass so they
-     *                   encode as `{}` rather than `[]`
+     * @return array - JSON-ready detail document; empty option maps are stdClass so they encode as
+     *                   `{}` rather than `[]`, and `thresholds` is present only for a tunable rule
      * @phpstan-return array{
      *     id: string,
      *     name: string,
@@ -241,7 +258,7 @@ final class ListRulesCommand extends Command
      *     confidence: string,
      *     defaultEnabled: bool,
      *     description: string,
-     *     thresholds: array<string, int|float|string>|\stdClass,
+     *     thresholds?: array<string, int|float>,
      *     options: array<string, int|float|bool|string|array<array-key, int|float|bool|string>>|\stdClass,
      *     optionDescriptions: array<string, string>|\stdClass,
      *     escapeHatches: list<array{path: string, description: string}>,
@@ -250,13 +267,7 @@ final class ListRulesCommand extends Command
      */
     private function ruleDetailPayload(RuleDefinition $definition, bool $enabled): array
     {
-        $single     = $definition->severityThreshold;
-        $thresholds = $single instanceof \GruffPhp\Engine\Config\SeverityThreshold
-            ? ['threshold' => $single->threshold, 'severity' => $single->severity->value]
-            : ($definition->defaultThresholds === [] ? (object)[] : $definition->defaultThresholds);
-
-        // An empty thresholds map becomes stdClass so this detail JSON shows `thresholds: {}` rather than an array.
-        return [
+        $payload = [
             'id'                  => $definition->id,
             'name'                => $definition->name,
             'pillar'              => $definition->pillar->value,
@@ -265,12 +276,19 @@ final class ListRulesCommand extends Command
             'confidence'          => $definition->confidence->value,
             'defaultEnabled'      => $enabled,
             'description'         => $definition->description(),
-            'thresholds'          => $thresholds,
             'options'             => $definition->defaultOptions === [] ? (object)[] : $definition->defaultOptions,
             'optionDescriptions'  => $definition->optionDescriptions === [] ? (object)[] : $definition->optionDescriptions,
             'escapeHatches'       => $this->escapeHatchesFor($definition),
             'falsePositiveShapes' => $definition->falsePositiveShapes,
         ];
+
+        // A rule with no tunable threshold omits the key; an absent key is the family's "none".
+        $thresholds = $this->thresholdsPayload($definition);
+        if ($thresholds !== null) {
+            $payload['thresholds'] = $thresholds;
+        }
+
+        return $payload;
     }
 
     /**
@@ -430,20 +448,28 @@ final class ListRulesCommand extends Command
      * @param RuleDefinition $definition - Rule whose metadata, thresholds, and options populate the catalogue row.
      * @param bool           $enabled - Effective project enabled state; emitted as the `defaultEnabled` field.
      *
-     * @return array{id: string, name: string, pillar: string, tier: string, defaultSeverity: string, confidence: string, defaultEnabled: bool,
-     *                   thresholds: array<string, int|float|string>|\stdClass, options: array<string, int|float|bool|string|array<array-key,
-     *                   int|float|bool|string>>|\stdClass, description: string} - one catalogue row of rule metadata for table or JSON output; empty
-     *                   option/threshold maps are stdClass so they encode as `{}` rather than `[]`
+     * @return array - one catalogue row of rule metadata for table or JSON output; empty option maps
+     *                   are stdClass so they encode as `{}` rather than `[]`, `thresholds` is present
+     *                   only for a tunable rule, and `falsePositiveShapes` only for rules that
+     *                   catalogue guidance
+     *
+     * @phpstan-return array{
+     *     id: string,
+     *     name: string,
+     *     pillar: string,
+     *     tier: string,
+     *     defaultSeverity: string,
+     *     confidence: string,
+     *     defaultEnabled: bool,
+     *     thresholds?: array<string, int|float>,
+     *     options: array<string, int|float|bool|string|array<array-key, int|float|bool|string>>|\stdClass,
+     *     description: string,
+     *     falsePositiveShapes?: list<array{shape: string, mitigation: string}>
+     * }
      */
     private function ruleMetadataRow(RuleDefinition $definition, bool $enabled): array
     {
-        $single     = $definition->severityThreshold;
-        $thresholds = $single instanceof \GruffPhp\Engine\Config\SeverityThreshold
-            ? ['threshold' => $single->threshold, 'severity' => $single->severity->value]
-            : ($definition->defaultThresholds === [] ? (object)[] : $definition->defaultThresholds);
-
-        // Coerce an empty thresholds map to stdClass so this row's `thresholds` stays object-typed across every rule listed.
-        return [
+        $ruleMetadata = [
             'id'              => $definition->id,
             'name'            => $definition->name,
             'pillar'          => $definition->pillar->value,
@@ -451,9 +477,47 @@ final class ListRulesCommand extends Command
             'defaultSeverity' => $definition->defaultSeverity->value,
             'confidence'      => $definition->confidence->value,
             'defaultEnabled'  => $enabled,
-            'thresholds'      => $thresholds,
             'options'         => $definition->defaultOptions === [] ? (object)[] : $definition->defaultOptions,
             'description'     => $definition->description(),
         ];
+
+        // A rule with no tunable threshold omits the key; an absent key is the family's "none".
+        $thresholds = $this->thresholdsPayload($definition);
+        if ($thresholds !== null) {
+            $ruleMetadata['thresholds'] = $thresholds;
+        }
+
+        // Catalogued guidance rides along only where a rule has some; an absent key means none is
+        // catalogued, which reads differently from a rule that documents an empty list.
+        if ($definition->falsePositiveShapes !== []) {
+            $ruleMetadata['falsePositiveShapes'] = $definition->falsePositiveShapes;
+        }
+
+        return $ruleMetadata;
+    }
+
+    /**
+     * Projects a rule's default thresholds into the family listing shape: a named knob map, or
+     * nothing at all for a rule with no tunable threshold.
+     *
+     * A single-threshold rubric (ADR-008's `threshold`/`severity` pair) publishes its number under
+     * the knob name gruff-go already uses for the same rule id, or under `threshold` when no port
+     * names that knob. The pair's severity is not repeated here: it always equals the rule's
+     * `defaultSeverity`, which the row publishes once. Named-knob rules publish their map as is.
+     *
+     * @param RuleDefinition $definition - Rule whose severity threshold or named defaults are projected.
+     *
+     * @return array<string, int|float>|null - Knob-name-to-number map, or null when the rule has no threshold.
+     */
+    private function thresholdsPayload(RuleDefinition $definition): ?array
+    {
+        $single = $definition->severityThreshold;
+        if ($single instanceof \GruffPhp\Engine\Config\SeverityThreshold) {
+            $knob = self::THRESHOLD_KNOB_NAMES[$definition->id] ?? 'threshold';
+
+            return [$knob => $single->threshold];
+        }
+
+        return $definition->defaultThresholds === [] ? null : $definition->defaultThresholds;
     }
 }

@@ -18,10 +18,11 @@ use PhpParser\Node;
 use PhpParser\Node\Expr;
 
 /**
- * Flags a single test that drives several distinct system-under-test calls and asserts many times over them - a
- * sign one method is covering multiple behaviours and would fail for more than one reason. Counts the distinct
- * calls on the busiest receiver against an assertion floor, ignoring output reads and teardown so a test that
- * merely inspects one result is left alone. Advisory, low confidence.
+ * Flags a single test that drives several distinct system-under-test calls and asserts many times over them,
+ * a sign one method covers multiple behaviours and would fail for more than one reason.
+ *
+ * It counts the distinct calls on the busiest receiver against an assertion floor, ignoring output reads and teardown,
+ * so a test that merely inspects one result is left alone. Advisory at low confidence.
  */
 final readonly class EagerTestRule implements RuleInterface
 {
@@ -98,6 +99,12 @@ final readonly class EagerTestRule implements RuleInterface
             defaultSeverity:   Severity::Advisory,
             confidence:        Confidence::Low,
             defaultThresholds: ['minAssertions' => 3],
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'One scenario that legitimately drives several calls on the same receiver, such as a builder chain or a state machine stepped through its transitions.',
+                    'mitigation' => 'Distinct calls on the busiest receiver are counted without judging whether they form one scenario, so raise this rule\'s minAssertions threshold.',
+                ],
+            ],
         );
     }
 
@@ -129,7 +136,7 @@ final readonly class EagerTestRule implements RuleInterface
                 ruleId:      self::ID,
                 message:     sprintf('%s asserts %d times across multiple apparent SUT calls.', $scope->symbol, $assertionCount),
                 filePath:    $analysisUnit->file->displayPath,
-                line:        $scope->line,
+                line:        $scope->anchorLine(),
                 severity:    Severity::Advisory,
                 pillar:      Pillar::TestQuality,
                 tier:        RuleTier::V01,
@@ -481,10 +488,9 @@ final readonly class EagerTestRule implements RuleInterface
      */
     private function isCallChainExpression(Expr $expr): bool
     {
-        // Method/static/function call results are "result variables" whose subsequent method
-        // calls are getters on the result, not fresh SUT calls. `new X()` is intentionally
-        // excluded - constructor outputs are usually the SUT itself, and calls on them are
-        // genuine SUT exercise.
+        // A call result is a result variable, so later method calls on it read that result rather than exercising the SUT again.
+        //
+        // `new X()` is deliberately excluded: a constructor output is usually the SUT itself, so calls on it are genuine exercise.
         return $expr instanceof Expr\MethodCall
             || $expr instanceof Expr\StaticCall
             || $expr instanceof Expr\FuncCall;

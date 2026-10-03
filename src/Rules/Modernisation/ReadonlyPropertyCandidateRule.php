@@ -22,10 +22,10 @@ use PhpParser\NodeFinder;
  * Flags a property that is only ever assigned once, in the constructor of a final class, so the user can
  * consider marking it `readonly` and letting the engine enforce that immutability.
  *
- * Runs per file on PHP 8.1+ targets. It limits itself to eligible shapes - a final, non-readonly class
- * with no parent and no traits - then reports each typed property the constructor assigns and no later
- * method mutates or unsets. Advisory only: reflection or hydration may rely on mutability, so gruff-php
- * suggests rather than gates.
+ * Runs per file on PHP 8.1+ targets, and only on a final, non-readonly class with no parent and no traits.
+ *
+ * Within that shape it reports each typed property the constructor assigns and no later method mutates or unsets.
+ * Advisory only, because reflection or hydration may still rely on mutability, so gruff-php suggests rather than gates.
  */
 final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
 {
@@ -48,6 +48,16 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A property written after construction through a dynamic name ($this->$field = ...) or by reflection, as a hydrator or ORM does.',
+                    'mitigation' => 'Only statically named assignments and unsets count as late writes, so confirm no dynamic or reflective write exists before applying readonly.',
+                ],
+                [
+                    'shape'      => 'A property mutated only by being passed to a function by reference, such as sort($this->items).',
+                    'mitigation' => 'A by-reference mutation produces no assignment node and stays invisible here, so check for one before applying readonly.',
+                ],
+            ],
         );
     }
 

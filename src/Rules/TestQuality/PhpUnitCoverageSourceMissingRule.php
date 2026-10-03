@@ -59,6 +59,12 @@ final class PhpUnitCoverageSourceMissingRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A project whose coverage source is supplied on the command line or by a CI profile rather than declared in the PHPUnit configuration file.',
+                    'mitigation' => 'Only the configuration file is read, so declare the source there as well, or accept the advisory for suites that never measure coverage.',
+                ],
+            ],
         );
     }
 

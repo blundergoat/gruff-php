@@ -50,10 +50,12 @@ final class SensitiveDataAllowanceRulesTest extends TestCase
     public static function fixtureLineExpectations(): array
     {
         return [
-            'base64, hex, npm-integrity, dot-joined, and prefixed-key tokens flag as high entropy' => [
+            // Line 6 is a pure-hex checksum. Until 2026-09-19 a 64-character hex literal reported through an
+            // override that ignored the configured entropy bar; a hex literal is now skipped at any bar, as in gruff-go.
+            'base64, npm-integrity, dot-joined, and prefixed-key tokens flag as high entropy; a pure-hex checksum does not' => [
                 self::SECRET_FIXTURE,
                 HighEntropyStringRule::ID,
-                [5, 6, 7, self::DOT_JOINED_TOKEN_LINE, 11, 12, 13, 14],
+                [5, 7, self::DOT_JOINED_TOKEN_LINE, 11, 12, 13, 14],
             ],
             'JWT literal flags under the dedicated JWT rule'                         => [self::SECRET_FIXTURE, JwtTokenRule::ID, [9]],
             'AWS key id flags under the dedicated AWS rule'                          => [self::SECRET_FIXTURE, AwsAccessKeyRule::ID, [8]],

@@ -18,7 +18,15 @@ final readonly class ScoreReport
     /**
      * Bundles the composite grade with the pillar, file, and distribution breakdowns a report renders.
      *
-     * @param Grade              $composite - Overall letter grade and score for the whole run - the headline figure.
+     * @param Grade|null         $composite - Overall letter grade and score for the whole run - the headline figure, null when nothing
+     *                                      applicable was evaluated and there is no health to report.
+     * @param list<array{file: string, symbol: string, ruleIds: list<string>, findings: int, weight: float}> $clusters - Correlated concepts
+     *                                           that billed one shared weight, so a reader can see which findings the grade counted once.
+     * @param list<array{ruleId: string, findings: int, weight: float}> $ruleAttribution - How much weight each native rule removed from the
+     *                                           score; the native ruleId is the ratified attribution key.
+     * @param int                $evaluatedFiles - Ratified scoring denominator: PHP files that survived discovery and parsed. Published so a
+     *                                           reader can reproduce the composite without guessing which file count it used.
+     * @param list<string>       $scoredPillars - Every pillar the run could reach, so the composite's denominator is visible rather than inferred.
      * @param list<PillarScore>  $pillars - Per-pillar scores that make up the breakdown table.
      * @param list<FileScore>    $topOffenders - Lowest-scoring files, worst first, for the "fix these first" list; empty when nothing scored.
      * @param array<string, int> $complexityDistribution - Method counts per cyclomatic-complexity bucket, for the histogram.
@@ -26,7 +34,11 @@ final readonly class ScoreReport
      * @param string             $explanation - Plain-English note on how the score was reached, shown under the headline.
      */
     public function __construct(
-        public Grade  $composite,
+        public ?Grade $composite,
+        public array  $clusters,
+        public array  $ruleAttribution,
+        public int    $evaluatedFiles,
+        public array  $scoredPillars,
         public array  $pillars,
         public array  $topOffenders,
         public array  $complexityDistribution,
@@ -40,7 +52,11 @@ final readonly class ScoreReport
      * dashboard reads the same grade a person sees in the terminal.
      *
      * @return array{
-     *     composite: array{score: float, grade: string},
+     *     composite: array{score: float|null, grade: string|null},
+     *     clusters: list<array{file: string, symbol: string, ruleIds: list<string>, findings: int, weight: float}>,
+     *     ruleAttribution: list<array{ruleId: string, findings: int, weight: float}>,
+     *     evaluatedFiles: int,
+     *     scoredPillars: list<string>,
      *     pillars: list<array{
      *         pillar: string,
      *         applicable: bool,
@@ -54,8 +70,8 @@ final readonly class ScoreReport
      *     }>,
      *     topOffenders: list<array{
      *         file: string,
-     *         score: float,
-     *         grade: string,
+     *         score: float|null,
+     *         grade: string|null,
      *         findings: int,
      *         advisory: int,
      *         warning: int,
@@ -74,7 +90,11 @@ final readonly class ScoreReport
     public function toArray(): array
     {
         return [
-            'composite'              => $this->composite->toArray(),
+            'composite'              => $this->composite?->toArray() ?? ['score' => null, 'grade' => null],
+            'clusters'               => $this->clusters,
+            'ruleAttribution'        => $this->ruleAttribution,
+            'evaluatedFiles'         => $this->evaluatedFiles,
+            'scoredPillars'          => $this->scoredPillars,
             'pillars'                => array_map(
                 static fn(PillarScore $pillar): array => $pillar->toArray(),
                 $this->pillars,

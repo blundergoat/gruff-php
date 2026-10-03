@@ -53,6 +53,12 @@ final readonly class MissingThrowsTagRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A guard clause that throws for a state the author treats as unreachable, such as a LogicException behind an already-validated invariant.',
+                    'mitigation' => 'Any throw in the method\'s own scope requires the tag, so document the guard as an internal invariant or restructure so the impossible state cannot throw.',
+                ],
+            ],
         );
     }
 

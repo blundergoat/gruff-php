@@ -49,7 +49,8 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
     }
 
     /**
-     * Reports each database URL that embeds a password, redacting the password in the preview.
+     * Reports each database URL that embeds a password so users can move it to runtime configuration.
+     * The finding carries only the fixed marker; user, password, host, path, and length never reach output.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
@@ -77,7 +78,7 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
         // Weigh each URL the scan found.
         foreach ($matches[0] as $index => $match) {
-            [$databaseUrl, $offset] = $match;
+            [, $offset] = $match;
             // A URL inside a comment is an example, not a live credential.
             if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
                 continue;
@@ -89,21 +90,17 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
                 continue;
             }
 
-            // Redact the password in the preview so the finding never carries the real value.
-            $preview = preg_replace('#:' . preg_quote($password, '#') . '@#', ':<redacted:' . strlen($password) . ' chars>@', $databaseUrl);
-            // Fall back to a fully redacted URL if the replace could not run.
-            if (!is_string($preview)) {
-                $preview = '<redacted database URL>';
-            }
+            // The scheme is the one part of a connection string the URL already publishes in plain text.
+            $displayMarker = SecretScannerHelper::connectionStringMarker($matches['scheme'][$index][0]);
 
             $findings[] = SecretScannerHelper::finding(
                 analysisUnit: $analysisUnit,
                 ruleId:       self::ID,
-                message:      sprintf('Database connection string contains an inline password: %s.', $preview),
+                message:      sprintf('Database connection string contains an inline password: %s.', $displayMarker),
                 line:         SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
                 confidence:   Confidence::High,
                 detector:     'database-url-password',
-                preview:      $preview,
+                displayMarker: $displayMarker,
                 remediation:  'Move database passwords into a secret store or runtime environment variable.',
             );
         }

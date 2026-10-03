@@ -49,6 +49,12 @@ final readonly class FirstClassCallableCandidateRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A two-element data pair such as [$value, \'label\'] passed as an argument, assigned, or returned, which is not a callable at all.',
+                    'mitigation' => 'Argument, assignment, and return positions are the only callable contexts checked, so give the pair explicit keys or ignore the advisory for data tuples.',
+                ],
+            ],
         );
     }
 

@@ -11,93 +11,160 @@ Use `text` for local terminal scans:
 vendor/bin/gruff-php analyse src --format text --fail-on warning
 ```
 
-Text keeps the established finding block in 0.5.1. Machine-readable
+Text keeps the established finding block in 0.5.2. Machine-readable
 `remediationAction` and `configurationKey` metadata is not added to this
 presentation.
 
 ## JSON
 
-Use `json` for automation. JSON reports use `gruff.analysis.v2`.
+Use `json` for automation. Analysis reports use `gruff.analysis.v3`:
 
 ```sh
 vendor/bin/gruff-php analyse src --format json --fail-on none > gruff-php.json
 ```
 
-Each finding carries two identifier fields:
+Version 3 is the coordinated family machine contract. Paths are
+project-relative POSIX paths, `run.projectRoot` is `.`, and unavailable
+optional fields are omitted rather than emitted as `null`. The one
+exception is the composite: a run that evaluated nothing emits
+`score.composite.score` and `score.composite.grade` as `null` rather
+than omitting them. The shared top-level sections are `schemaVersion`,
+`tool`, `run`, `summary`, `score`, `diagnostics`, `findings`, `paths`,
+and `suppressions`. `baseline`, `diff`, `displayFilter`, and
+`extensions` appear only when their features are active.
 
-- `fingerprint` — 16-character SHA-256 prefix over `ruleId + file + line +
-  endLine + column + symbol + message`. The precise, line-sensitive identity
-  emitted per finding and mirrored into SARIF as `gruffFingerprint`.
-- `stableIdentity` — 16-character SHA-256 prefix over `ruleId + file +
-  symbol + message` (or `ruleId + file + message` when symbol is null). The
-  line-insensitive identity intended for custom diff tooling that needs
-  to track "the same finding" across unrelated edits that shift line
-  numbers. Two findings of the same rule on the same symbol and message
-  share a `stableIdentity` but have different `fingerprint` values.
+### Migrating v2 consumers
 
-Classified findings keep their human-readable top-level `remediation` string
-and add action data inside the existing `metadata` object:
+Version 3 is a hard break with no v2 writer or compatibility flag:
+
+| v2 | v3 |
+|---|---|
+| absolute or working-directory-dependent paths | project-relative POSIX paths and `run.projectRoot: "."` |
+| `findings[].filePath` or duplicate path aliases | `findings[].file` |
+| nullable `column`, `endLine`, or `symbol` | omit the unavailable key |
+| `score.composite` plus `score.grade` | `score.composite.score` plus `score.composite.grade` |
+| `score.topOffenders[].filePath` | `score.topOffenders[].file` |
+| top-level `ignoredPaths`, `ignoredPathDetails`, and `missingPaths` | `paths.ignoredPaths`, `paths.details`, and `paths.missingPaths` |
+| top-level `suppressedCount` and `diff.suppressedCount` | `summary.suppressedFindings` and `diff.filteredFindings` |
+| top-level `trend`, `mutation`, or `review` | `extensions.php.topLevel.{trend,mutation,review}` |
+| independent compact summary fields | the `gruff.summary.v3` analysis projection |
+
+The adapter preserves native fingerprint and `stableIdentity` values, every
+score and grade, baseline matching, action metadata, and exit-code decisions:
+the envelope projects what the analyser computed and does not recompute it.
+What each of those values *is* did change in this release - see
+[`CHANGELOG.md`](../CHANGELOG.md) and [`UPGRADING.md`](../UPGRADING.md).
+
+### Findings and identities
+
+Every finding has one `file` path. `column`, `endLine`, and `symbol` are
+present only when known. `metadata.locationPrecision` is
+`scanner-pinpointed` when a column is known and `line-only` otherwise.
+
+Each finding carries two identifiers:
+
+- `fingerprint` — the 16-character, line-sensitive SHA-256 prefix. It is a
+  JSON-only field: SARIF does not carry it.
+- `stableIdentity` — the 16-character, line-insensitive identity for matching
+  the same logical finding across unrelated line shifts.
+
+Two findings for the same rule, symbol, and message can share a
+`stableIdentity` while retaining distinct `fingerprint` values. PHP baseline
+matching is count arithmetic over the line-free `identity` digest in each
+`gruff.baseline.v3` `occurrences` row, which is neither of these two fields;
+see [Baseline, trend, and changed-region data](#baseline-trend-and-changed-region-data).
+SARIF publishes that same baseline identity under `gruffFingerprint`.
+
+Classified findings retain top-level `remediation` and action data inside
+`metadata`:
 
 ```json
 {
   "remediation": "Rename the identifier or add the abbreviation to allowlists.acceptedAbbreviations with a documented meaning.",
   "metadata": {
     "remediationAction": "CONSIDER",
-    "configurationKey": "allowlists.acceptedAbbreviations"
+    "configurationKey": "allowlists.acceptedAbbreviations",
+    "locationPrecision": "line-only"
   }
 }
 ```
 
-`remediationAction` is `APPLY` for a direct source fix, `CONSIDER` for optional
-or compatibility-sensitive advice, or `CONFIGURE` for a deterministic
-configuration-only resolution. `CONFIGURE` is part of the contract but no
-0.5.1 rule emits it unconditionally. `configurationKey` is optional and, when
-present, is the full config path for an available hatch. These additive fields
-do not change `gruff.analysis.v2`, finding identities, scoring, or exit gates.
+`remediationAction` is `APPLY` for a direct source fix or `CONSIDER` for
+optional or compatibility-sensitive advice. `CONFIGURE`, for a
+configuration-only resolution, is reserved and emitted by no current rule.
+`configurationKey` is optional.
 
-Baselines do not match on either hash: `gruff.baseline.v2` files store grouped
-count rows `{file, ruleId, message, count}` and matching is count arithmetic
-per `(file, ruleId, message)` group, so line numbers never affect baseline
-results. For line-shift-resilient diff tooling, use `stableIdentity`.
+### Paths and suppressions
 
-When a baseline is generated or applied, the `gruff.analysis.v2` payload
-includes a `baseline` object: `path`, `generated`, `totalEntries` (group rows
-loaded), `suppressedFindings`, `staleEvaluation` (`full-project`,
-`not-evaluated-diff-scope`, or `generated`), `staleEntries` (absent group row
-count), `source` (`explicit` or `default`), `stale` (absent group rows
-`{file, ruleId, message, count}` where `count` is the resolved instance total
-for that group), and `buckets` (`new` / `unchanged` / `absent` instance
-tallies).
+`paths.details` contains each excluded path with a canonical `reason`,
+`source`, and `pattern` when a pattern caused the skip.
+`paths.ignoredPaths` is the exact ordered path projection of those details.
 
-Trend history (`--history-file`) appends one entry per run and stamps the
-run's score scope. The reported `trend.scope` names the series, and
-`trend.delta` compares like-for-like scopes only: a full-project score is
-compared with the latest full-project entry, a diff/changed-region score
-(`--diff`, `--since`, `--changed-ranges`) with the latest diff entry, and
-`previousScore`/`delta` are null when the history holds no earlier entry of
-the same scope.
+Every analysis and summary document includes `suppressions`, with one
+`{index, rule, paths, symbol?, reason, suppressed}` row per configured
+`sensitiveExclusions` entry, including entries that matched nothing. The array
+is empty when no exclusion is configured and no built-in skip applied. No row
+carries a finding message, preview, or matched value. See
+[Configuration](configuration.md) for authoring rules and rejections.
 
-Changed-region reports (`--diff`, `--since`, or `--changed-ranges`) include a
-top-level `suppressedCount`, mirrored as `diff.suppressedCount`, when diff
-filtering is active. It counts findings anchored in the changed/requested files
-that were produced by the analysis run and then removed because they were
-outside the selected hunk or symbol. Project-wide rules still use whole-project
-context before filtering, but project-rule findings anchored outside the
-changed/requested files are outside the invocation scope and are not included in
-the suppression total.
+The family's two built-in skips also publish rows, after the configured ones,
+numbered from `0` among themselves and marked `source: "built-in"`, which a
+configured row never carries. The lockfile skip adds one row per package-manager
+lockfile whose `sensitive-data.high-entropy-string` findings it removed. The
+test-path skip then adds one row per file and rule it removed, because every
+sensitive-data rule except `sensitive-data.pii-test-fixture` skips test, fixture
+and example files. Text output labels them `builtInLockfile[<path>]` and
+`builtInTestPath[<path>]`.
+
+### Baseline, trend, and changed-region data
+
+When a PHP baseline is generated or applied, the canonical `baseline`
+object contains its entries, path, generation and staleness data, and
+`suppressedFindings`. The native `new`, `unchanged`, `absent`, `collision`,
+`notEligible`, and `sensitiveCounted` bucket tallies live at
+`baseline.extensions.php.baseline.buckets`. Baseline files
+are `gruff.baseline.v3`: a top-level `occurrences` array of
+`{identity, count, ruleId, path, subject}` rows beside `toolLanguage`,
+`generatedAt`, and a `sensitive` object recording that sensitive findings are
+never eligible. A `gruff.baseline.v2` file fails closed with exit `2` and names
+`--migrate-baseline`. A `gruff.baseline.v1` file fails closed and names
+`--generate-baseline`, because its reviews cannot be carried forward.
+
+Trend history remains scope-aware. Its machine representation moves to
+`extensions.php.topLevel.trend`: full-project scores compare only with earlier
+full-project scores, and changed-region scores compare only with earlier diff
+scores.
+
+Changed-region reports produced by `--diff`, `--since`, or
+`--changed-ranges` publish the number removed by region filtering at both
+`summary.suppressedFindings` and `diff.filteredFindings`; the values are
+equal. Full scans omit both fields and omit `diff`.
 
 `--changed-scope=symbol` keeps ordinary symbol-local findings when the changed
-hunk touches their enclosing declaration, but file and class aggregate findings
-such as `size.file-length`, `size.class-length`, and `docs.todo-density` are kept
-only when the hunk touches their reported anchor. Use `--changed-scope=file` for
-changed-file review workflows that intentionally want file-level aggregates and
-class aggregate findings whose reported span overlaps the changed hunk.
+hunk touches their declaration. File and class aggregates are kept only when
+the hunk touches their reported anchor. Use `--changed-scope=file` when a
+changed-file workflow intentionally wants file-level aggregates and class
+aggregates whose reported span overlaps the hunk.
+
+## Summary
+
+`summary --format json` emits the exact findings-free projection of the
+corresponding analysis document. Only the top-level `findings` array is
+removed and the schema changes to `gruff.summary.v3`:
+
+```sh
+vendor/bin/gruff-php summary src --format json
+```
+
+Counts, scores, diagnostics, paths, suppressions, baseline, diff, and extensions
+therefore keep their analysis values. Text summary remains the compact human
+view.
 
 ## Hook
 
 `gruff-php hook --format json` carries the same `remediation` string and
 `metadata.remediationAction` / `metadata.configurationKey` fields in each
-`gruff.hook.v1` finding. The hook presenter passes non-threshold metadata
+`gruff.hook.v2` finding. The hook presenter passes non-threshold metadata
 through unchanged; its existing threshold normalisation preserves the action
 keys alongside measured values. Hook new-only fingerprints deliberately omit
 both action keys, so a finding accepted before action metadata was introduced
@@ -125,7 +192,7 @@ and `--file` (pass paths positionally instead).
 
 Use `markdown` for pull request comments and release notes.
 
-Markdown keeps its established finding rows in 0.5.1 and does not render the
+Markdown keeps its established finding rows in 0.5.2 and does not render the
 new action metadata. Use JSON, hook, or SARIF when a consumer needs the
 machine-readable action distinction.
 
@@ -146,15 +213,20 @@ Use `sarif` for GitHub code scanning or other SARIF consumers:
 vendor/bin/gruff-php analyse src --format sarif --fail-on none > gruff-php.sarif
 ```
 
-Each SARIF result carries two `partialFingerprints` keys that map onto the
-JSON finding identity fields:
+A SARIF result for an ordinary finding carries one `partialFingerprints` key:
 
-- `gruffFingerprint` — the precise, line-sensitive `fingerprint`. Byte-compatible
-  with earlier releases; changes whenever the finding's location changes.
-- `gruffStableIdentity` — the line-insensitive `stableIdentity`. Survives
-  unrelated edits that shift line numbers, so SARIF consumers (for example
-  GitHub Code Scanning) can keep an alert open across line drift instead of
-  closing and reopening it.
+- `gruffFingerprint` — the ratified family identity, the same durable value
+  baseline matching reads. It is line-free, so SARIF consumers (for example
+  GitHub Code Scanning) keep an alert open across unrelated edits that shift
+  line numbers instead of closing and reopening it.
+
+A sensitive-data result carries no `partialFingerprints` object at all, so a
+secret is never given a durable name in a system gruff does not control; its
+alerts close at this break and later occurrences arrive ungrouped.
+
+The php-only `gruffStableIdentity` key is gone; the JSON finding object still
+publishes `stableIdentity`, documented under
+[Findings and identities](#findings-and-identities).
 
 When a finding is classified, SARIF carries the human remediation at
 `result.properties.remediation` and the action fields at

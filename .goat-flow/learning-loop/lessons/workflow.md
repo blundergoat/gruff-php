@@ -1,6 +1,6 @@
 ---
 category: workflow
-last_reviewed: 2026-07-04
+last_reviewed: 2026-10-03
 ---
 
 # Workflow Lessons
@@ -79,7 +79,7 @@ The corpus-level regression test (`tests/Rule/RuleRegressionSnapshotTest.php` in
 
 **Created:** 2026-05-27
 
-**What happened:** `ConfigLoader` throws `ConfigException` (extends `RuntimeException`) at every config-validation boundary — schemaVersion missing/mismatched, unknown rule id, malformed `minimumSeverity`, etc. The exception carries only a message; it has no hint field. CLI surfaces consume it inconsistently: `SummaryCommand.php:239` prints `<error>[CONFIG-ERROR] %s</error>` and returns null; `AnalyseCommandSetupBuilder.php:235` converts to a structured `usageReport` with `type: 'config-error'`; `ReportCommand.php:403` and `DashboardStateFactory.php:185` swallow silently (`catch (ConfigException) { return null; }`). None of the surfaces add an actionable next step. An operator who hits a `schemaVersion` mismatch from `summary` reads "Config must include schemaVersion: ..." and has to consult docs to learn that `gruff-php init --force` is the documented fix.
+**What happened:** `ConfigLoader` throws `ConfigException` (extends `RuntimeException`) at every config-validation boundary — schemaVersion missing/mismatched, unknown rule id, malformed `minimumSeverity`, etc. The exception carries only a message; it has no hint field. CLI surfaces consume it inconsistently: `src/Cli/Command/SummaryCommand.php` (search: `[CONFIG-ERROR]`) prints `<error>[CONFIG-ERROR] %s</error>` and returns null; `src/Cli/Command/AnalyseCommandSetupBuilder.php` (search: `'config-error'`) converts to a structured `usageReport` with `type: 'config-error'`; `src/Cli/Command/ReportCommand.php` and `src/Cli/Dashboard/DashboardStateFactory.php` (search: `catch (ConfigException)`) swallow the error at that point. (Re-checked 2026-10-03: those two catches now document that a later config load reports the error, and `ConfigException` still has no hint field.) None of the surfaces add an actionable next step. An operator who hits a `schemaVersion` mismatch from `summary` reads "Config must include schemaVersion: ..." and has to consult docs to learn that `gruff-php init --force` is the documented fix.
 
 Cross-port: gruff-ts hit the exact same trap with worse symptoms (raw Node stack trace), captured in `gruff-ts/.goat-flow/lessons/workflow.md` "Lesson: user-facing CLI commands must catch known error classes and print graceful messages" (2026-05-27). The fix there was a typed `ConfigLoadError` with a `suggestion` field plus a `runWithConfigErrorHandling` wrapper. gruff-php has the catch boundary already; it's missing the hint payload and the consistent rendering.
 
@@ -151,7 +151,7 @@ The fixture-per-field migration cost is roughly linear in the number of fixtures
 - Never invoke `git commit` or `git push` via Bash. Treat both as user-only operations forever, in this repo and in every other repo, for every session. There is no scenario in which the agent should run these.
 - When changes are ready to commit: stage with `git add <files>`, run the agreed checks (`composer check` / `composer test` / etc.), and write the commit message to `.goat-flow/scratchpad/commit.md`. Then tell the user the message is staged and stop. Do not retry, do not propose a workaround, do not suggest the user use `! git commit ...` — they will commit themselves whichever way they prefer.
 - If the harness denies `git commit` or `git push` once, treat it as a permanent signal for the rest of the session and never attempt either again. Do not interpret silence or further user instructions as a re-authorisation.
-- If you want a permission-layer enforcement, suggest `Bash(git commit:*)` and `Bash(git push:*)` entries under `permissions.deny` in `.claude/settings.json` — but do not edit that file without explicit user instruction.
+- Permission-layer enforcement now exists: `.claude/settings.json` (search: `Bash(*git commit*)`) denies both commands, and `.goat-flow/hooks/deny-git-mutations.sh` blocks Git and GitHub writes before execution. A denial is the rule working, not an obstacle to route around.
 
 ## Lesson: Tick the per-task checkboxes when flipping a plan to complete
 
@@ -161,7 +161,7 @@ The fixture-per-field migration cost is roughly linear in the number of fixtures
 
 **Root cause:** Treating the top-of-file `Status:` line as the single source of truth for milestone completion. The status line is a summary; the per-task checkboxes are the audit trail. Skipping them leaves a future reader unable to tell which individual tasks were done, deferred, or silently dropped — and it falsely signals that the plan was never executed even when the work shipped.
 
-**Prevention:** Whenever a plan's `Status:` field flips to `complete` (or any task's status changes), tick every `- [ ]` line in `## Assumptions`, `## Tasks`, and `## Testing Gate` that the work actually covered before claiming the milestone done. If a checkbox cannot be ticked, leave it unchecked and add a one-line note explaining why — `Status: complete` with mixed checkboxes is still valid, but only when the unticked items are deliberate. Use `sed -i 's|^- \[ \]|- [x]|g' <plan>` for whole-plan completion or edit individual lines for partial progress. Verify with `grep -c '^- \[x\]' <plan>` before claiming done.
+**Prevention:** Whenever a plan's `Status:` field flips to `complete` (or any task's status changes), tick every `- [ ]` line in `## Assumptions`, `## Tasks`, and `## Testing Gate` that the work actually covered before claiming the milestone done. If a checkbox cannot be ticked, leave it unchecked and add a one-line note explaining why — `Status: complete` with mixed checkboxes is still valid, but only when the unticked items are deliberate. Tick each line individually as its work is verified; never bulk-tick with `sed`, because a blanket replace cannot tell done from deferred and once marked deferred items complete (`.goat-flow/learning-loop/lessons/discipline.md`, search: `Tick task checkboxes the moment the item is done`). Verify with `grep -c '^- \[x\]' <plan>` before claiming done.
 
 ## Lesson: Reconcile shipped work back into task checkboxes immediately
 

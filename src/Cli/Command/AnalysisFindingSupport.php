@@ -4,53 +4,17 @@ declare(strict_types=1);
 
 namespace GruffPhp\Cli\Command;
 
-use GruffPhp\Engine\Config\AnalysisConfig;
 use GruffPhp\Results\Finding\Finding;
-use GruffPhp\Results\Finding\Pillar;
 use GruffPhp\Support\PathHelper;
 
 /**
  * Stateless helpers that tidy findings and paths after a scan, before the user ever sees them.
  *
- * The `analyse` command and the branch-review builder lean on this to suppress secret findings the
- * user has already vetted in config, narrow results to the files a changed-only or branch review
- * actually touched, and rewrite long absolute paths into the short project-relative form shown in
- * reports. It also canonicalises the paths a user types on the command line so they match cleanly.
- * Every method is side-effect free (it never mutates its inputs), though some consult the filesystem
- * (realpath, file existence) so a path that moves on disk between runs can change the tidied result.
+ * Changed-code and branch-review flows use them to scope findings and show short project-relative paths.
+ * Methods never mutate their inputs; filesystem lookups only resolve the paths users supplied.
  */
 final readonly class AnalysisFindingSupport
 {
-    /**
-     * Removes secret-like findings the user has already vetted, so an allowlisted value in their
-     * config stops resurfacing as noise on every scan.
-     *
-     * @param list<Finding> $findings - Findings produced for the run.
-     * @param AnalysisConfig $config - Effective config supplying the secret-preview allowlist; an empty allowlist suppresses nothing.
-     *
-     * @return list<Finding> - Findings with allowlisted secret previews removed; unchanged when the allowlist is empty.
-     */
-    public function filterAllowedSecretPreviews(array $findings, AnalysisConfig $config): array
-    {
-        $allowedPreviews = $config->allowedSecretPreviews();
-        // With no previews allowlisted there is nothing to hide, so hand back every finding untouched.
-        if ($allowedPreviews === []) {
-            return $findings;
-        }
-
-        return array_values(array_filter(
-            $findings,
-            static function (Finding $finding) use ($allowedPreviews): bool {
-                $preview = $finding->metadata['preview'] ?? null;
-
-                // Keep the finding unless it is a sensitive-data hit whose string preview is on the allowlist.
-                return $finding->pillar !== Pillar::SensitiveData
-                    || !is_string($preview)
-                    || !in_array($preview, $allowedPreviews, true);
-            },
-        ));
-    }
-
     /**
      * Narrows findings to the files the user actually touched, so a changed-only or branch review
      * reports on this diff instead of the whole project.
@@ -80,7 +44,7 @@ final readonly class AnalysisFindingSupport
      * path does not surface project-wide issues from files that were never requested.
      *
      * @param list<Finding> $findings - Findings to filter.
-     * @param list<string>  $projectRuleIds - Rule ids whose output came from project-wide context; empty means no rule needs scoping and every finding is kept.
+     * @param list<string>  $projectRuleIds - Project-wide rule ids; empty means no rule needs scoping and every finding is kept.
      * @param list<string>  $filePaths - Project-relative display paths in the requested source set; an empty set drops every project-rule finding.
      *
      * @return list<Finding> - Findings with out-of-scope project-rule rows removed.
@@ -137,7 +101,8 @@ final readonly class AnalysisFindingSupport
         $root       = rtrim(PathHelper::normalizeSeparators($realRoot), '/');
         $normalized = [];
 
-        // Walk each finding, shortening absolute paths that sit under the project root so displayed locations stay readable; ones outside it are left untouched.
+        // Shorten absolute paths under the project root so user-visible locations stay readable.
+        // Findings outside the root keep their original path.
         foreach ($findings as $finding) {
             $path = PathHelper::normalizeSeparators($finding->filePath);
             // Already relative, so it is display-ready; keep it as-is and move on to the next finding.
@@ -193,7 +158,8 @@ final readonly class AnalysisFindingSupport
             // An absolute path (say the user pasted `/home/me/proj/src`) must be pulled back inside the project first.
             if (PathHelper::isAbsolute($candidate)) {
                 $candidate = rtrim(PathHelper::canonical($candidate), '/');
-                // Rebase against the root: the root itself becomes `.`, a path under it becomes its relative tail, and anything outside the project is dropped.
+                // Rebase the root to `.` and child paths to their relative tail.
+                // Anything outside the user's project is dropped from this scoped set.
                 if ($candidate === $root) {
                     $candidate = '.';
                 } elseif (str_starts_with($candidate, $root . '/')) {

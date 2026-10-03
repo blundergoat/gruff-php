@@ -83,3 +83,24 @@ way); and the cap was raised to 32768 — measured at ~39MB per 4096 entries, so
 steady-state worst case. The cap is sized against the DISCOVERED file count (PHP plus text
 units), not the count of files with findings: shopware discovers 17,543 units, so the first
 16384 cap silently routed it into the over-cap skip and the motivating repo never warmed.
+
+## Addendum (2026-09-20): the key gained the analyser's own sources
+
+Decision 1 keyed the run on the gruff version and never on the rules' source. That held for a released user, because
+every release moves `Application::VERSION`. It failed for a source checkout: gruff-php's own tree at `4b8b9d6` served
+3,255 findings from `analyse . --no-config` while `summary . --no-config` and `analyse . --no-config --no-cache` both
+reported 3,203, because M19 had changed rule logic under one version string and 2,620 of 3,000 cache entries predated
+it. The family's v3 contract makes the summary the projection of the analysis, so the two may not disagree.
+
+The operator decided on 2026-09-20 (0.6.0 plan, M46 decision 11) that the key gains the rule implementation.
+`AnalysisFingerprint::forRun` now folds in a digest of every PHP file under the analyser's `src/`, relative path beside
+bytes, computed once per run. Measured the same day: all four of cached `analyse` twice, `analyse --no-cache` and
+`summary` report 3,203, and the digest costs about 13 ms per run over 289 files.
+
+The guarantee is exactly that: a change to gruff-php's own PHP sources invalidates the cache under an unchanged
+version. It does not cover the vendored parser, `bin/gruff-php`, or any non-PHP data file, so a `composer update`
+that changes parser behaviour under one gruff version can still serve cached findings; the companion test
+`testANonSourceFileLeavesTheKeyAlone` pins that boundary deliberately. Widening the digest to the dependency lock
+is a separate decision nobody has asked for. Stale entries are not deleted; they simply stop matching and age out
+under the entry cap.
+

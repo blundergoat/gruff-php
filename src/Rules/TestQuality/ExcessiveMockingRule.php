@@ -42,6 +42,12 @@ final readonly class ExcessiveMockingRule implements RuleInterface
             defaultSeverity:   Severity::Advisory,
             confidence:        Confidence::Medium,
             defaultThresholds: ['maxMocks' => 3],
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A test for a coordinator whose real job is to orchestrate several collaborators, so the mock count reflects the production design.',
+                    'mitigation' => 'Doubles are counted without weighing the unit\'s responsibility, so raise this rule\'s maxMocks threshold for suites where coordinators are the subject.',
+                ],
+            ],
         );
     }
 
@@ -79,7 +85,7 @@ final readonly class ExcessiveMockingRule implements RuleInterface
                 ruleId:      self::ID,
                 message:     sprintf('%s creates %d mocks; more than %d usually signals over-specified collaborators.', $scope->symbol, $mockCount, $maxMocks),
                 filePath:    $analysisUnit->file->displayPath,
-                line:        $scope->line,
+                line:        $scope->anchorLine(),
                 severity:    Severity::Advisory,
                 pillar:      Pillar::TestQuality,
                 tier:        RuleTier::V01,

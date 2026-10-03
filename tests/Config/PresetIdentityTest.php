@@ -65,7 +65,6 @@ final class PresetIdentityTest extends TestCase
             'rules' => $rules,
             'minimumPhpVersion' => $config->minimumPhpVersion(),
             'acceptedAbbreviations' => $config->acceptedAbbreviations(),
-            'allowedSecretPreviews' => $config->allowedSecretPreviews(),
         ];
     }
 }

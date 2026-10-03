@@ -388,8 +388,9 @@ final class RuleRegistryTest extends TestCase
         $json = json_encode($definitions, JSON_THROW_ON_ERROR);
 
         self::assertCount(128, $definitions);
+        // M10 D35 (2026-09-26) renamed docs.missing-public-phpdoc to docs.missing-phpdoc, and docs.return-comment's description names it.
         self::assertSame(
-            'efa8942d8f840536dd18' . '0e20b6576cce513620c7b6af3d28ac8f39a62b830e04',
+            '17e6c4c93156058d08b9' . '8a5ee1828de5ea50dcccc4505915858766b2af23ca06',
             hash('sha256', $json),
         );
     }

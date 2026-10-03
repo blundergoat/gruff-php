@@ -74,7 +74,7 @@ final readonly class DataProviderAnnotationRule implements RuleInterface
                 ruleId:      self::ID,
                 message:     sprintf('%s uses @dataProvider instead of the PHPUnit attribute form.', $scope->symbol),
                 filePath:    $analysisUnit->file->displayPath,
-                line:        $scope->line,
+                line:        $scope->anchorLine(),
                 severity:    Severity::Advisory,
                 pillar:      Pillar::TestQuality,
                 tier:        RuleTier::V01,

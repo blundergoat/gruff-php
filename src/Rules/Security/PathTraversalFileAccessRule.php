@@ -67,6 +67,12 @@ final class PathTraversalFileAccessRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A path already confined before use, such as one resolved with realpath() and compared against a base directory, or a basename taken from an allow-list.',
+                    'mitigation' => 'The check asks whether request data reaches the argument, not whether a guard exists, so build the final path in a local that does not reference the superglobal.',
+                ],
+            ],
         );
     }
 

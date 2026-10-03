@@ -46,6 +46,16 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A file declaring two or more fully documented types; only a single documented class-like satisfies the file-level requirement.',
+                    'mitigation' => 'Add a one-line file docblock above the first statement, or split the types into one file each.',
+                ],
+                [
+                    'shape'      => 'A top-of-file banner written as a plain block or line comment rather than a `/** */` docblock.',
+                    'mitigation' => 'Only a structured docblock counts as file documentation, so convert the banner to `/** ... */`.',
+                ],
+            ],
         );
     }
 

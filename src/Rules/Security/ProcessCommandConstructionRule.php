@@ -65,6 +65,12 @@ final class ProcessCommandConstructionRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A procedural command whose interpolated value is properly escaped, such as exec(\'convert \' . escapeshellarg($file)).',
+                    'mitigation' => 'The procedural path triggers on concatenation or interpolation alone and models no escaping function, so keep the escaping and accept the finding, or pass a proc_open() argv array.',
+                ],
+            ],
         );
     }
 

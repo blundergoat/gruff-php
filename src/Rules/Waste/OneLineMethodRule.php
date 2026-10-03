@@ -12,6 +12,7 @@ use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Rules\Complexity\CyclomaticComplexityRule;
+use GruffPhp\Rules\Docs\DocsInheritanceHelper;
 use GruffPhp\Rules\Shared\CallableReferenceResolver;
 use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Contracts\RuleContext;
@@ -118,6 +119,10 @@ final readonly class OneLineMethodRule implements RuleInterface
                     'shape' => 'A first-class/callable-array callback boundary where a named comparator or serializer is the intentional contract.',
                     'mitigation' => 'Exact same-class first-class and supported callable-array references are exempt automatically. Dynamic/framework callbacks, string callables, and parent-declared methods referenced through a child class name stay conservative; add their qualified declarations to options.allowedSymbols.',
                 ],
+                [
+                    'shape' => 'A method implementing an interface or abstract method declared in another file, where inlining it removes a method the contract requires.',
+                    'mitigation' => 'Contracts are resolved within one file, so the finding asks the reviewer to CONSIDER rather than APPLY. Mark the method `{@inheritdoc}` or `#[\\Override]`, or add its qualified symbol to options.allowedSymbols.',
+                ],
             ],
         );
     }
@@ -146,6 +151,7 @@ final readonly class OneLineMethodRule implements RuleInterface
         $classMethods       = $this->methodsWithoutCallbackReferences($analysisUnit, $callbackReferences);
         $factoryMethodIds   = $factoryExempt ? $this->namedAlternativeFactoryMethodIds($analysisUnit) : [];
         $contractMethodIds  = $this->contractMethodIds($analysisUnit);
+        $inheritanceHelper  = new DocsInheritanceHelper();
         $findings           = [];
 
         // Evaluate only declarations that were not already proven to be named callback boundaries.
@@ -166,17 +172,17 @@ final readonly class OneLineMethodRule implements RuleInterface
                 continue;
             }
 
-            $statement = $classMethod->stmts[0] ?? null;
-            if (!$statement instanceof Return_ && !$statement instanceof Expression) {
+            $statement = $this->oneLineDelegatingStatement($classMethod, $nodeFinder);
+            if ($statement === null) {
                 continue;
             }
 
-            if ($statement->getStartLine() !== $statement->getEndLine()) {
-                continue;
-            }
-
-            $expression = $statement instanceof Return_ ? $statement->expr : $statement->expr;
-            if (!$expression instanceof Expr || !$this->containsCall($expression, $nodeFinder)) {
+            // `{@inheritdoc}`, `#[Override]`, or a documented same-file ancestor names a contract this file cannot see,
+            // but only a class-like that can inherit one has such a contract.
+            if (
+                $inheritanceHelper->canInheritContract($classMethod)
+                && $inheritanceHelper->hasInheritedContractDoc($classMethod, $analysisUnit->statements, $nodeFinder)
+            ) {
                 continue;
             }
 
@@ -201,12 +207,99 @@ final readonly class OneLineMethodRule implements RuleInterface
                     'method' => $classMethod->name->toString(),
                     'parameterCount' => count($classMethod->params),
                     'statementKind' => $statement instanceof Return_ ? 'return' : 'expression',
-                    ...RemediationAction::Apply->metadata(self::ALLOWED_SYMBOLS_CONFIGURATION_KEY),
+                    // CONSIDER, not APPLY: an interface or abstract parent declared in another file is invisible
+                    // here, and inlining a method that contract requires is a fatal error.
+                    ...RemediationAction::Consider->metadata(self::ALLOWED_SYMBOLS_CONFIGURATION_KEY),
                 ],
             );
         }
 
         return $findings;
+    }
+
+    /**
+     * Returns a method's only statement when that statement is a one-line delegation worth reporting.
+     *
+     * @param ClassMethod $classMethod - Candidate that already passed the shape and exemption checks.
+     * @param NodeFinder  $nodeFinder  - Shared finder reused across methods to avoid per-call allocation.
+     *
+     * @return Return_|Expression|null - The single one-line statement whose work is a call; null when the body spans
+     *   lines, calls nothing outside an assignment's left-hand subscript, or only delegates to the same parent method.
+     */
+    private function oneLineDelegatingStatement(ClassMethod $classMethod, NodeFinder $nodeFinder): Return_|Expression|null
+    {
+        $statement = $classMethod->stmts[0] ?? null;
+        if (!$statement instanceof Return_ && !$statement instanceof Expression) {
+            return null;
+        }
+
+        $expression = $statement->expr;
+        if ($statement->getStartLine() !== $statement->getEndLine() || !$expression instanceof Expr) {
+            return null;
+        }
+
+        if ($this->isParentDelegation($expression, $classMethod)) {
+            // An override whose whole body is its own parent call exists to keep the parent's hook, not to wrap it.
+            return null;
+        }
+
+        if ($expression instanceof Expr\Assign || $expression instanceof Expr\AssignOp || $expression instanceof Expr\AssignRef) {
+            // An assignment works through its right-hand side and its target; a call inside a subscript only picks the slot.
+            $isWrapper = $this->containsCall($expression->expr, $nodeFinder)
+                || $this->hasTargetCallOutsideSubscripts($expression->var, $nodeFinder);
+
+            return $isWrapper ? $statement : null;
+        }
+
+        return $this->containsCall($expression, $nodeFinder) ? $statement : null;
+    }
+
+    /**
+     * Reports whether an assignment target makes a call anywhere but inside an array subscript.
+     *
+     * @param Expr       $target     - The assignment's left-hand side.
+     * @param NodeFinder $nodeFinder - Shared finder reused across methods to avoid per-call allocation.
+     *
+     * @return bool - True for `$this->target()->value = ...`; false for `$this->rows[$this->key()] = ...`, whose call
+     *   only chooses the slot.
+     */
+    private function hasTargetCallOutsideSubscripts(Expr $target, NodeFinder $nodeFinder): bool
+    {
+        $subscriptCalls = [];
+        // Set aside every call inside a subscript before the whole target is searched.
+        foreach ($nodeFinder->findInstanceOf([$target], Expr\ArrayDimFetch::class) as $fetch) {
+            // An append `[]` has no subscript to search.
+            if ($fetch->dim === null) {
+                continue;
+            }
+
+            // Mark each call inside this subscript by identity.
+            foreach ($nodeFinder->find([$fetch->dim], self::isCallNode(...)) as $call) {
+                $subscriptCalls[spl_object_id($call)] = true;
+            }
+        }
+
+        return $nodeFinder->findFirst(
+            [$target],
+            static fn(Node $node): bool => self::isCallNode($node) && !isset($subscriptCalls[spl_object_id($node)]),
+        ) !== null;
+    }
+
+    /**
+     * Reports whether an expression is a call to the parent's method of the same name.
+     *
+     * @param Expr        $expression  - The method's only expression.
+     * @param ClassMethod $classMethod - The method whose own name the parent call must match.
+     *
+     * @return bool - True for `parent::name(...)` inside `name()`, compared case-insensitively as PHP resolves methods.
+     */
+    private function isParentDelegation(Expr $expression, ClassMethod $classMethod): bool
+    {
+        return $expression instanceof Expr\StaticCall
+            && $expression->class instanceof Name
+            && strtolower($expression->class->toString()) === 'parent'
+            && $expression->name instanceof Node\Identifier
+            && strtolower($expression->name->toString()) === strtolower($classMethod->name->toString());
     }
 
     /**
@@ -365,13 +458,22 @@ final readonly class OneLineMethodRule implements RuleInterface
     private function containsCall(Expr $expression, NodeFinder $nodeFinder): bool
     {
         // A wrapper only counts when its one expression actually delegates work, so look for any call node.
-        return $nodeFinder->findFirst([$expression], static function (Node $node): bool {
-            // Method/static/function calls and `new` are the delegations that make a one-liner a wrapper.
-            return $node instanceof Expr\MethodCall
-                || $node instanceof Expr\StaticCall
-                || $node instanceof Expr\FuncCall
-                || $node instanceof Expr\New_;
-        }) !== null;
+        return $nodeFinder->findFirst([$expression], self::isCallNode(...)) !== null;
+    }
+
+    /**
+     * Reports whether a node is a call or an object creation.
+     *
+     * @param Node $node - Candidate node from a finder walk.
+     *
+     * @return bool - True for method, static, and function calls and `new`, the delegations that make a one-liner a wrapper.
+     */
+    private static function isCallNode(Node $node): bool
+    {
+        return $node instanceof Expr\MethodCall
+            || $node instanceof Expr\StaticCall
+            || $node instanceof Expr\FuncCall
+            || $node instanceof Expr\New_;
     }
 
     /**

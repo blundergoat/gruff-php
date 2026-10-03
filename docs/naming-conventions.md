@@ -47,7 +47,6 @@ paths:
 
 allowlists:
   acceptedAbbreviations: []
-  secretPreviews: []
 
 selection:
   tiers: []

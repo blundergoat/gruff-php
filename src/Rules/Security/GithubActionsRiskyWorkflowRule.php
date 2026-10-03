@@ -53,12 +53,22 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
     {
         // Advertise this as a medium-confidence Security warning so downstream gating can weigh it.
         return new RuleDefinition(
-            id:              self::ID,
-            name:            'Risky GitHub Actions workflow',
-            pillar:          Pillar::Security,
-            tier:            RuleTier::V01,
-            defaultSeverity: Severity::Warning,
-            confidence:      Confidence::Medium,
+            id:                  self::ID,
+            name:                'Risky GitHub Actions workflow',
+            pillar:              Pillar::Security,
+            tier:                RuleTier::V01,
+            defaultSeverity:     Severity::Warning,
+            confidence:          Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape' => 'A first-party action deliberately tracked at a branch-shaped ref such as @main, inside a repository that controls that action.',
+                    'mitigation' => 'A ref named dev, head, latest, main, master, or trunk is treated as floating regardless of ownership, so pin to a commit SHA or a version tag.',
+                ],
+                [
+                    'shape' => 'A run: step that interpolates github.event data inside an already-quoted assignment, where the value cannot break out of the shell word.',
+                    'mitigation' => 'The workflow is scanned line by line as text with no shell-quoting model, so pass the value through env: and reference the variable instead.',
+                ],
+            ],
         );
     }
 
@@ -66,7 +76,7 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
      * Reports each risky pattern in a GitHub Actions workflow YAML file.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
      *
      * @return list<Finding> - Findings for risky workflow patterns.
      */
@@ -80,6 +90,7 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
         $findings             = [];
         $lines                = preg_split('/\R/', $analysisUnit->source);
         $hasPullRequestEvent  = $this->hasPullRequestEvent($analysisUnit->source);
+        $unreachable          = WorkflowEventGuard::unreachableSecretLines($analysisUnit->source);
         $runBlockIndent       = null;
         $reportedRunBlockLine = null;
 
@@ -90,6 +101,9 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
 
             // Emit a finding for each risky sink found on the line.
             foreach ($sinks as $sink) {
+                if ($sink === 'secrets-in-pr-workflow' && isset($unreachable[$lineNumber])) {
+                    continue;
+                }
                 $findings[] = $this->finding($analysisUnit, $lineNumber, $sink);
             }
         }
@@ -115,9 +129,9 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
     /**
      * Collects the risky sinks on one line, tracking multiline run-block state across lines.
      *
-     * @param string   $line - One raw YAML line, leading indentation intact for block-scalar tracking.
-     * @param bool     $hasPullRequestEvent - True when a pull_request event is present, gating secret leaks.
-     * @param int|null $runBlockIndent - Current block scalar run indentation, updated in place.
+     * @param string   $line                 - One raw YAML line, leading indentation intact for block-scalar tracking.
+     * @param bool     $hasPullRequestEvent  - True when a pull_request event is present, gating secret leaks.
+     * @param int|null $runBlockIndent       - Current block scalar run indentation, updated in place.
      * @param int|null $reportedRunBlockLine - First reported run-block interpolation line, updated in place.
      *
      * @return list<string> - Per-line sinks, including at most one run-block interpolation per block.
@@ -153,7 +167,7 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
     /**
      * Collects the single-line risky sinks that need no multiline run-block state.
      *
-     * @param string $line - One raw YAML line to scan for single-line risky patterns.
+     * @param string $line                - One raw YAML line to scan for single-line risky patterns.
      * @param bool   $hasPullRequestEvent - True when a pull_request event is present, enabling the secrets-in-PR sink.
      *
      * @return list<string> - Single-line sinks that do not need multiline run-block state.
@@ -191,8 +205,8 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
     /**
      * Resets run-block state once a non-empty line dedents back to the parent level.
      *
-     * @param string   $line - Current YAML line; its indentation decides whether the run block closed.
-     * @param int|null $runBlockIndent - Active run-block indentation, cleared in place once the block ends.
+     * @param string   $line                 - Current YAML line; its indentation decides whether the run block closed.
+     * @param int|null $runBlockIndent       - Active run-block indentation, cleared in place once the block ends.
      * @param int|null $reportedRunBlockLine - Already-reported interpolation marker, cleared in place with the indent.
      *
      * @return void
@@ -373,8 +387,8 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
      * Builds the workflow finding.
      *
      * @param AnalysisUnit $analysisUnit - Unit under analysis, supplying the display path attached to the finding.
-     * @param int          $line - 1-based line where the risky pattern was matched.
-     * @param string       $sink - Sink identifier naming the matched pattern; carried into message and metadata.
+     * @param int          $line         - 1-based line where the risky pattern was matched.
+     * @param string       $sink         - Sink identifier naming the matched pattern; carried into message and metadata.
      *
      * @return Finding - Security finding.
      */

@@ -14,6 +14,19 @@ Use that command for the full machine-readable metadata, including thresholds an
 
 Total rules: 128
 
+## False-positive guidance
+
+74 of the 128 rules publish `falsePositiveShapes`: a list of shapes the detector is
+known to misfire on, each paired with the mitigation that answers it. Every rule at
+`medium` or `low` confidence carries at least one, because a heuristic rule owes the
+reader the cases where its heuristic is wrong. A rule that catalogues nothing omits
+the field rather than publishing an empty list, so an absent field means "nothing
+catalogued yet", never "reviewed and found to have no false positives".
+
+The catalogue (`list-rules --format=json`) and the per-rule detail view publish the
+same guidance text. Both read it from the rule's own `RuleDefinition`, which is the
+single place this text is written.
+
 ## Remediation action metadata
 
 Selected findings carry a machine-readable `metadata.remediationAction`. The
@@ -24,18 +37,18 @@ behaviour:
 - `CONSIDER` marks optional or compatibility-sensitive advice that needs human
   judgement.
 - `CONFIGURE` is reserved for a deterministic configuration-only resolution;
-  no rule emits it unconditionally in 0.5.1.
+  no current rule emits it.
 
 When a deliberate configuration hatch exists, `metadata.configurationKey`
-contains its full path. Regex comments, missing constant documentation, and
-one-line wrappers emit `APPLY`; abbreviation and named-argument findings emit
+contains its full path. Regex comments and missing constant documentation emit
+`APPLY`; one-line wrappers, abbreviation and named-argument findings emit
 `CONSIDER`; Boolean naming emits `APPLY` for private property and private
 callable names, while every parameter and other caller-visible declaration
 emits `CONSIDER`. PHP named arguments make parameter-only renames
 compatibility-sensitive even for private methods, promoted private state,
 closures, and arrow functions.
 JSON, hook, and SARIF transport these fields. Text and Markdown keep their
-existing finding presentation in 0.5.1.
+existing finding presentation in 0.5.2.
 
 ## Summary By Pillar
 
@@ -94,8 +107,8 @@ as used.
 | `docs.missing-constant-phpdoc` | Missing constant PHPDoc | `advisory` | `medium` | yes |
 | `docs.missing-file-phpdoc` | Missing file PHPDoc | `advisory` | `medium` | yes |
 | `docs.missing-param-tag` | Missing @param tag | `advisory` | `high` | yes |
+| `docs.missing-phpdoc` | Missing method PHPDoc | `error` | `high` | yes |
 | `docs.missing-property-phpdoc` | Missing property PHPDoc | `advisory` | `medium` | yes |
-| `docs.missing-public-phpdoc` | Missing method PHPDoc | `error` | `high` | yes |
 | `docs.missing-readme` | Missing README | `warning` | `high` | yes |
 | `docs.missing-return-tag` | Missing @return tag | `advisory` | `high` | yes |
 | `docs.missing-throws-tag` | Missing @throws tag | `advisory` | `medium` | yes |
@@ -159,6 +172,15 @@ says. The default is false, so a docblock is required.
 | --- | --- | --- | --- | --- |
 | `complexity.maintainability-index` | Maintainability index | `advisory` | `medium` | yes |
 | `waste.one-line-method` | One-line method | `advisory` | `medium` | yes |
+
+`waste.one-line-method` emits `CONSIDER`, never `APPLY`: an interface or
+abstract parent declared in another file is invisible to it, and inlining a
+method that contract requires is a fatal error. It skips a method marked
+`#[\Override]`; a method marked `{@inheritdoc}` in a class-like that can
+inherit a contract (a class that extends, implements, or uses a trait, an
+enum that implements or uses a trait, or a trait); an override whose body
+is `parent::sameName()`; and a call that sits only in an assignment's
+subscript.
 
 `waste.one-line-method` ships with `minInFileCallers: 2` and
 `namedAlternativeFactoryExempt: true`. The first skips wrappers that are
@@ -228,6 +250,12 @@ scalar classes are not a default gruff rubric because safe enum
 migrations require consumer-boundary audits across serialization,
 templates, JavaScript/TypeScript, telemetry, JSON, and agent/runtime
 interfaces.
+
+`modernisation.named-argument-opportunity` never reports a call to one of
+PHP's variadic built-ins, such as `sprintf()`, `pack()`, `array_merge()` or
+`compact()`, or a dynamic callee whose declaration it cannot see: their extra
+arguments have no names. A namespaced function that merely shares a
+built-in's short name, such as `\App\sprintf()`, is still advised.
 
 `modernisation.named-argument-opportunity` reports only when positional
 arguments are likely to hide meaning: many positional arguments, adjacent
@@ -349,9 +377,11 @@ case-insensitive.
 | `security.variable-include` | Variable include or require path | `warning` | `medium` | yes |
 | `security.weak-crypto` | Weak cryptography primitives | `warning` | `high` | yes |
 
+`security.github-actions-risky-workflow` omits its `secrets-in-pr-workflow` warning only when an own job or step guard proves the reference unreachable for every detected PR event. Exact case-insensitive `github.event_name` comparisons support a whole expression wrapper, parentheses, negation, AND and OR. Unknown, malformed or unsupported guards, aliases and ambiguous ownership retain warnings. Step guards cannot cover job/workflow env or siblings. PHP keeps its current plain `pull_request` and `pull_request_target` mapping/list trigger detection.
+
 `security.variable-include` treats two provable shapes as fixed paths in
 addition to literals and `__DIR__`/`__FILE__`: ALL-CAPS global constants
-(the `define('ABSPATH', ...)` bootstrap convention; class constants and
+(the `define('ABSPATH', ...)` bootstrap convention, including leading underscores such as `__SITE_ROOT__`; class constants and
 non-ALL-CAPS names such as `conf` stay dynamic) and locals whose every
 same-scope plain assignment is itself a fixed expression, with at least
 one before the include. Any tainted or second non-fixed assignment,
@@ -372,6 +402,35 @@ instead - interpolating a local into the template still flags, so
 keyword (SELECT/INSERT/UPDATE/DELETE/ALTER/DROP/CREATE/SHOW/FROM/WHERE)
 must appear in the literal fragments, which keeps non-SQL `query()`
 receivers such as `DOMXPath` quiet without receiver type resolution.
+
+`security.dangerous-function-call` trusts a dynamic call only through a
+proof PHP itself accepts: a closure, arrow function, `new` object of a
+written class, or first-class callable of a written method other than
+reflection's `invoke(...)`, or of one of PHP's own functions that takes no
+callable (`strlen(...)`, never `array_map(...)`, `call_user_func(...)`, or a
+userland function whose body this file cannot see), assigned to the
+variable; a
+`callable` or `Closure` type hint, or a `@param` or inline `@var` docblock
+naming one (`callable-string` names a function, so it proves nothing); an
+enclosing `instanceof` or one-argument `is_callable()` test; a property
+its class types as callable; or an immediately invoked closure. A proof
+holds only in the function that makes it, plus arrow functions that do not
+shadow the name and the closures that `use` it. No proof outranks request
+input: a callee that reads a superglobal, directly or through a local the
+same function filled from one, always reports, unless that local was last
+bound to a closure literal.
+`Closure::fromCallable($x)()` is judged as `$x()`, and `$f(...)` only builds a
+Closure, so it never reports.
+
+Bounded local aliases now preserve callable evidence through ordinary assignments and resolved built-in `Closure::bind()` calls.
+New alias facts stop at ambiguous branches, reassignment, borrowed references, unknown receivers, runtime-created locals or eight alias steps.
+Both sides of a coalescing expression must qualify. Earlier declaration-based trust retains its existing behavior and is not flow-sensitive.
+
+Callbacks returned by one visible same-class method stay quiet when a non-public property starts empty.
+Every observed write must append an untouched typed callback.
+The method may return one keyed bucket with an empty fallback, or merge selected buckets into an empty result with PHP's `array_merge()`.
+The call must bind every argument by position, and the loop must use one unchanged result.
+Unknown returns, property writes and references keep the warning.
 
 `security.dangerous-function-call` adds `options.additionalFunctions` to
 its built-in execution list rather than replacing it, so the built-ins
@@ -400,21 +459,31 @@ library rather than to PHP.
 | `sensitive-data.private-key` | Private key material | `warning` | `high` | yes |
 | `sensitive-data.url-credentials` | URL embedded credentials | `warning` | `high` | yes |
 
-`sensitive-data.high-entropy-string` no longer flags identifier- and
-slug-shaped literals: a literal that contains no `+`/`=` and splits on
-`[/._-]` into two or more alphanumeric segments reads as an identifier
-(PHPCS sniff ids such as
-`PHPCompatibility.FunctionUse.NewFunctions.ldap_exop_syncFound`, class
-names such as `WPCOM_REST_API_V2_Endpoint_External_Media`, package
-slugs such as `Automattic/i18n-check-webpack-plugin`), not secret
-material — but only when alphabetic words of three or more characters
-supply strictly more than half of all alphanumeric characters, and no
-single non-word segment reaches 16 characters. The census is
-character-weighted, so a couple of short dictionary words cannot
-outvote a long random run: prefixed keys (`config_prod_<random>`),
-slugs with hex tails (`myapp/prod-keys/<hex>`), word-prefixed digests
-(`secret-key-<64-char hex>`), base64/hex tokens, npm `sha512-...`
-integrity hashes, and dot-joined JWT/JWE tokens all keep flagging.
+`sensitive-data.high-entropy-string` reads `minLength` and `entropy` and
+nothing else: lowering `minLength` below 32 widens the scan, down to the
+shortest literal that can reach the `entropy` bar (2^`entropy` characters),
+and a pure-hex literal is skipped at any `entropy`, as in gruff-go. A literal
+must also hold at least one letter and one digit, the floor FAMILY-CONTRACT
+section 12 sets for all five ports, because a run of one character class clears
+the `entropy` bar by construction and a digit-free mix of cases is an identifier.
+Text inside a PEM block whose label names no private key (a certificate, public key, certificate request, PKCS7 bundle or CRL) never reports, because it is public by construction; a private key's block is still scanned. A block ends at the next marker, which must close the same label, and holds only base64, a PGP checksum or armour headers once string quoting is stripped, so a secret between two marker constants still reports. Across the secret rules, a
+placeholder word such as `test` or `example` suppresses a value only when it
+begins a token, so `latest` and `attestation` still report.
+
+`sensitive-data.high-entropy-string` recognizes finite whole-value alphabets and public formats, including bounded help routes and clinical codes. A
+quoted value is examined in full; a public-looking substring or property name cannot exempt unrelated text.
+
+Structured names and repository paths are quiet only when every segment meets the family grammar: at most 32 characters, bounded numeric runs,
+ordinary or bounded compound casing, and a strict majority of word letters contributed by at least two segments. Approved model codes, timestamps and
+the exact i18n and ec2 segments contribute no word letters. At most two leading ../ components or one ./, rooted or hidden prefix is allowed;
+additional leading prefixes and opaque tails fail the exception. A whole HTML `src` or `href` value that names an existing image beside its page,
+inside the project and reached without a symlink, also stays quiet.
+
+A quoted Composer autoload class slot can also stay quiet when syntax proves a resolved built-in registration or removal call and an unconditional
+local class with the named public static method. Missing syntax, an unresolved binding, another argument position or the same value elsewhere grants
+no exception. A literal concatenation can prove a complete HTTPS support.halaxy.com article route with bounded words and no query or fragment;
+only the exact participating literals stay quiet. Dynamic or opaque extensions invalidate the whole concatenation, including nested pieces.
+Quoted object and array keys retain their existing treatment; provider-specific detections and configured thresholds remain active.
 
 `sensitive-data.pii-test-fixture` now accepts two fixture shapes its
 remediation already recommends: emails whose domain ends in a reserved
@@ -483,6 +552,10 @@ behaviour-heavy classes keep the configured severity.
 | `test-quality.trivial-assertion` | Trivial assertion | `warning` | `high` | yes |
 | `test-quality.trivial-snapshot` | Trivial snapshot | `advisory` | `medium` | yes |
 | `test-quality.unused-mock` | Unused mock variable | `advisory` | `high` | yes |
+
+`test-quality.no-assertions` follows invoked methods on the same class, up to eight method bodies; unused helpers and callback references do not count.
+It also recognizes `expectDeprecationWithIdentifier` from the resolved Doctrine `VerifyDeprecations` trait when no local override or trait adaptation changes it.
+External helpers, unresolved receivers and cycles without a recognized check still report. An assertion-like helper name alone supplies no evidence.
 
 `test-quality.extends-production-class` recognises a `*TestCase` parent
 after ignoring underscores, so snake_case bases such as

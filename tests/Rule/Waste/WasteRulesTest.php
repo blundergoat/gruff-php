@@ -287,11 +287,32 @@ final class WasteRulesTest extends TestCase
         self::assertSame(Severity::Advisory, $rowsFinding->severity);
         self::assertSame(Pillar::Maintainability, $rowsFinding->pillar);
         self::assertSame('return', $rowsFinding->metadata['statementKind']);
-        self::assertSame(RemediationAction::Apply->value, $rowsFinding->metadata['remediationAction'] ?? null);
+        // CONSIDER, never APPLY: a contract declared in another file is invisible here, and inlining one is a fatal error.
+        self::assertSame(RemediationAction::Consider->value, $rowsFinding->metadata['remediationAction'] ?? null);
         self::assertSame(
             'rules.waste.one-line-method.options.allowedSymbols',
             $rowsFinding->metadata['configurationKey'] ?? null,
         );
+    }
+
+    /**
+     * Verify an inherited contract, a parent delegation, and a call inside an assignment's left-hand subscript are
+     * not reported as one-line wrappers, while an ordinary private wrapper, a call elsewhere in an assignment target,
+     * and an `@inheritDoc` on a class with nothing to inherit still are.
+     *
+     * @return void
+     */
+    public function testOneLineMethodRuleRespectsInheritedContractsAndRootExpressions(): void
+    {
+        $findings = $this->analyseRule('one-line-methods.php', OneLineMethodRule::ID);
+        $symbols  = array_map(static fn($finding): ?string => $finding->symbol, $findings);
+
+        self::assertNotContains('InheritedContractFixture::resolveRoute()', $symbols);
+        self::assertNotContains('ParentDelegationFixture::before()', $symbols);
+        self::assertNotContains('SubscriptAssignmentFixture::addCustomStringFunction()', $symbols);
+        self::assertContains('PrivatePassThroughFixture::rows()', $symbols);
+        self::assertContains('TargetCallAssignmentFixture::setThrough()', $symbols);
+        self::assertContains('StandaloneInheritDocFixture::habit()', $symbols);
     }
 
     /**

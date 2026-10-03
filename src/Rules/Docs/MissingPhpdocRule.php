@@ -15,6 +15,7 @@ use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
+use GruffPhp\Support\DeclarationLine;
 use PhpParser\Node\Stmt\ClassMethod;
 
 /**
@@ -24,12 +25,17 @@ use PhpParser\Node\Stmt\ClassMethod;
  * Runs per file over every method declaration, reporting each one with no local PHPDoc block. High
  * confidence. Inherited or trait-provided documentation does not count; the rule wants a local block.
  */
-final readonly class MissingPublicPhpdocRule implements RuleInterface
+final readonly class MissingPhpdocRule implements RuleInterface
 {
     /**
      * Stable rule identifier for missing method PHPDoc findings.
      */
-    public const ID = 'docs.missing-public-phpdoc';
+    public const ID = 'docs.missing-phpdoc';
+
+    /**
+     * Id the rule carried before 0.6.0, when its name read as public-only; the registry still resolves it, so 0.5 configs and flags keep working.
+     */
+    public const LEGACY_ID = 'docs.missing-public-phpdoc';
 
     /**
      * Describes the missing-method-PHPDoc rule for the registry and reports.
@@ -93,7 +99,7 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
             ruleId:      $definition->id,
             message:     sprintf('Method %s needs a brief intent description above its declaration (one plain-English line; not a restatement of the method signature).', $symbol),
             filePath:    $analysisUnit->file->displayPath,
-            line:        $classMethod->getStartLine(),
+            line:        DeclarationLine::of($classMethod),
             severity:    $definition->defaultSeverity,
             pillar:      $definition->pillar,
             tier:        $definition->tier,

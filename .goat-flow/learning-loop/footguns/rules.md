@@ -1,6 +1,6 @@
 ---
 category: rules
-last_reviewed: 2026-08-14
+last_reviewed: 2026-10-03
 ---
 
 # Rule Footguns
@@ -27,7 +27,7 @@ Rule heuristics that search a whole docblock or AST subtree can attribute nested
 
 **Status:** active | **Created:** 2026-05-11 | **Evidence:** OBSERVED
 
-`src/Rules/Docs/MissingPublicPhpdocRule.php` (search: `docs.missing-public-phpdoc`) keeps the historical rule ID for output compatibility, but the rule now requires local PHPDoc on every method declaration, including public, protected, private, abstract, accessor, magic, helper, reporter, and interface implementation methods. Agents must not infer that only public methods are checked from the ID or class name.
+`src/Rules/Docs/MissingPhpdocRule.php` (search: `docs.missing-phpdoc`) requires local PHPDoc on every method declaration, including public, protected, private, abstract, accessor, magic, helper, reporter, and interface implementation methods. Before 0.6.0 its name suggested public-only coverage. The old `docs.missing-public-phpdoc` id is now a compatibility alias in `src/Rules/RuleRegistry.php` (search: `RULE_ID_ALIASES`); maintained config and guidance use `docs.missing-phpdoc`. Agents must not infer narrower semantics from a legacy id.
 
 **Prevention:** When changing rule semantics, update `RuleDefinition` names, config comments, docs, tests, and golden fixtures together while preserving rule IDs only when output compatibility requires it. Regression tests should assert representative methods across all visibilities so the compatibility name cannot silently narrow behavior again.
 
@@ -59,7 +59,7 @@ Constructor-promoted properties are represented as `Node\Param` entries with vis
 
 **Status:** active | **Created:** 2026-05-25 | **Evidence:** OBSERVED
 
-The rule registry's true count lives only in `src/Rules/RuleRegistry.php` (the `NAMING_RULE_PRIORITY` constant plus the public registration block), but human-readable counts of the same facts are stamped in five other artefacts that don't auto-update. The five stamp locations are:
+The rule registry's true count lives only in `src/Rules/RuleRegistry.php` (search: `NAMING_RULE_PRIORITY`) - that constant plus the public registration block - but human-readable counts of the same facts are stamped in five other artefacts that don't auto-update. The five stamp locations are:
 
 ```text
 README.md                       — quality-table line ("Rule catalogue")
@@ -70,6 +70,8 @@ docs/rules.md                   — per-pillar section heading  ### `naming` (N)
 ```
 
 PR #6 retired `naming.parameter-type-name`, dropping the registry count from 120 → 119 and the naming-pillar count from 12 → 11. The PR updated the `docs/rules.md` pillar tally but missed the other four stamps. CodeRabbit's outside-diff sweep caught two of the four (the `docs/rules.md` section heading and the `architecture.md` prose); the two README stamps weren't in the PR's touched-file set so neither AI reviewer surfaced them.
+
+Since then, preflight gates the two README stamps: the Documentation drift step in `scripts/preflight-checks.sh` (search: `Compare every per-pillar table row in the README`) fails when a README pillar row or the `N rules across N pillars` claim disagrees with `list-rules`. For `docs/rules.md` it checks only the `Total rules:` line and the false-positive-shape count, so the `docs/rules.md` pillar tally and section heading and the prose count in `.goat-flow/architecture.md` (search: `rule ids through`) are still manual. Re-checked 2026-10-03.
 
 **Prevention:** When retiring or adding a rule, after editing `src/Rules/RuleRegistry.php` run a sweep over the five stamp locations above. Greppable form:
 

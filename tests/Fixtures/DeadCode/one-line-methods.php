@@ -588,3 +588,54 @@ final class PayloadNormaliser
         return $session;
     }
 }
+
+// Slim Route::resolveRoute: the interface lives in another file, so only `{@inheritdoc}` names the contract.
+final class InheritedContractFixture implements ExternalRouteResolverInterface
+{
+    /**
+     * {@inheritdoc}
+     */
+    public function resolveRoute(string $uri): array
+    {
+        return $this->dispatcher->dispatch($uri);
+    }
+}
+
+// WordPress before(): an override whose body is its own parent call keeps the parent's hook.
+final class ParentDelegationFixture extends ExternalHookBase
+{
+    public function before(string $hook): void
+    {
+        parent::before($hook);
+    }
+}
+
+// doctrine/orm addCustomStringFunction: the only call sits in the assignment's left-hand subscript.
+final class SubscriptAssignmentFixture
+{
+    private array $functions = [];
+
+    public function addCustomStringFunction(string $name, string $className): void
+    {
+        $this->functions[strtolower($name)] = $className;
+    }
+}
+
+// A call outside the subscript is still the method's work: this setter delegates through `target()`.
+final class TargetCallAssignmentFixture
+{
+    public function setThrough(int $value): void
+    {
+        $this->target()->value = $value;
+    }
+}
+
+// A standalone class inherits no contract, so a habitual `{@inheritDoc}` hides nothing.
+final class StandaloneInheritDocFixture
+{
+    /** {@inheritDoc} */
+    public function habit(int $value): int
+    {
+        return strlen((string) $value);
+    }
+}

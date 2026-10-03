@@ -46,6 +46,12 @@ final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A loop assertion whose compared value already identifies the row, such as asserting on a keyed array whose diff names the failing entry.',
+                    'mitigation' => 'The check is for a message argument, not for whether the failure is already diagnosable, so add a short message naming the iteration.',
+                ],
+            ],
         );
     }
 

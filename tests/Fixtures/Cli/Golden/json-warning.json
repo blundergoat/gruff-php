@@ -1,145 +1,92 @@
 {
-    "schemaVersion": "gruff.analysis.v2",
+    "schemaVersion": "gruff.analysis.v3",
     "tool": {
         "name": "gruff-php",
         "version": "0.5.2"
     },
     "run": {
-        "format": "json",
         "failOn": "error",
-        "config": "tests/Fixtures/Config/file-length-warning.yaml",
-        "paths": [
+        "format": "json",
+        "inputs": [
             "tests/Fixtures/Source/mixed/alpha.php"
         ],
-        "filters": {
-            "active": false,
-            "minSeverity": null,
-            "includePillars": [],
-            "excludePillars": [],
-            "includeRules": [],
-            "excludeRules": []
-        }
+        "projectRoot": ".",
+        "config": "tests/Fixtures/Config/file-length-warning.yaml"
     },
     "summary": {
-        "filesDiscovered": 1,
-        "filesParsed": 1,
-        "ignoredPaths": 0,
-        "missingPaths": 0,
-        "parseErrors": 0,
+        "analysedFiles": 1,
+        "diagnostics": 0,
+        "discoveredFiles": 1,
+        "exitCode": 0,
         "findings": {
             "advisory": 2,
             "warning": 2,
             "error": 0,
             "total": 4
         },
-        "exitCode": 0
+        "findingsByPillar": {
+            "documentation": 1,
+            "naming": 2,
+            "size": 1
+        },
+        "ignoredPaths": 0,
+        "missingPaths": 0,
+        "parseErrors": 0,
+        "parsedFiles": 1,
+        "skippedFiles": 0
     },
-    "ignoredPaths": [],
-    "ignoredPathDetails": [],
-    "missingPaths": [],
-    "diagnostics": [],
-    "findings": [
-        {
-            "ruleId": "size.file-length",
-            "message": "File has 11 substantive lines, above the warning threshold of 3.",
-            "file": "tests/Fixtures/Source/mixed/alpha.php",
-            "line": 1,
-            "endLine": 27,
-            "column": null,
-            "symbol": null,
-            "severity": "warning",
-            "pillar": "size",
-            "secondaryPillars": [],
-            "tier": "v0.1",
-            "confidence": "high",
-            "remediation": "Split oversized files or move responsibilities into smaller units.",
-            "fingerprint": "c58ffd67445ab336",
-            "stableIdentity": "26fa0bda604599a5",
-            "metadata": {
-                "lines": 11,
-                "threshold": 3,
-                "thresholdType": "warning"
-            }
-        },
-        {
-            "ruleId": "naming.class-file-mismatch",
-            "message": "Class Alpha does not match file name alpha.php.",
-            "file": "tests/Fixtures/Source/mixed/alpha.php",
-            "line": 12,
-            "endLine": null,
-            "column": null,
-            "symbol": "Alpha",
-            "severity": "warning",
-            "pillar": "naming",
-            "secondaryPillars": [],
-            "tier": "v0.1",
-            "confidence": "high",
-            "remediation": "Rename the file to Alpha.php or the class to alpha.",
-            "fingerprint": "3b9c556468b6bc15",
-            "stableIdentity": "106e7b2df944f9fd",
-            "metadata": {}
-        },
-        {
-            "ruleId": "docs.return-comment",
-            "message": "Alpha::value() has a bare @return tag; describe what the returned value represents, not just its type.",
-            "file": "tests/Fixtures/Source/mixed/alpha.php",
-            "line": 19,
-            "endLine": null,
-            "column": null,
-            "symbol": "Alpha::value()",
-            "severity": "advisory",
-            "pillar": "documentation",
-            "secondaryPillars": [],
-            "tier": "v0.1",
-            "confidence": "high",
-            "remediation": "Describe the result after the @return type, e.g. `@return Foo - parsed result; null when the lookup misses`, so the contract states what the value means at the edges.",
-            "fingerprint": "3043a43c48c8541d",
-            "stableIdentity": "20f27d197b4777d9",
-            "metadata": {}
-        },
-        {
-            "ruleId": "naming.identifier-quality",
-            "message": "Method name \"value\" is generic and does not communicate clear intent.",
-            "file": "tests/Fixtures/Source/mixed/alpha.php",
-            "line": 19,
-            "endLine": null,
-            "column": null,
-            "symbol": "Alpha::value()",
-            "severity": "advisory",
-            "pillar": "naming",
-            "secondaryPillars": [],
-            "tier": "v0.1",
-            "confidence": "medium",
-            "remediation": "Rename the identifier to describe its domain role or action. If the placeholder or generic token is intentional, add it to `rules.naming.identifier-quality.options.placeholderNames`, `genericTokens`, or `ignoredNames` in `.gruff-php.yaml`.",
-            "fingerprint": "25633f1c266ca38f",
-            "stableIdentity": "f726935116318593",
-            "metadata": {
-                "identifierKind": "method",
-                "identifierName": "value",
-                "variant": "generic",
-                "tokens": [
-                    "value"
-                ],
-                "matchedToken": "value"
-            }
-        }
-    ],
     "score": {
         "composite": {
-            "score": 96.1,
-            "grade": "A"
+            "score": 85.68,
+            "grade": "B"
         },
+        "clusters": [],
+        "ruleAttribution": [
+            {
+                "ruleId": "docs.return-comment",
+                "findings": 1,
+                "weight": 1
+            },
+            {
+                "ruleId": "naming.class-file-mismatch",
+                "findings": 1,
+                "weight": 4
+            },
+            {
+                "ruleId": "naming.identifier-quality",
+                "findings": 1,
+                "weight": 0.75
+            },
+            {
+                "ruleId": "size.file-length",
+                "findings": 1,
+                "weight": 4
+            }
+        ],
+        "evaluatedFiles": 1,
+        "scoredPillars": [
+            "size",
+            "complexity",
+            "maintainability",
+            "dead-code",
+            "naming",
+            "documentation",
+            "modernisation",
+            "security",
+            "sensitive-data",
+            "test-quality"
+        ],
         "pillars": [
             {
                 "pillar": "size",
                 "applicable": true,
-                "score": 84,
-                "grade": "B",
+                "score": 51.22,
+                "grade": "F",
                 "findings": 1,
                 "advisory": 0,
                 "warning": 1,
                 "error": 0,
-                "penalty": 16
+                "penalty": 4
             },
             {
                 "pillar": "complexity",
@@ -177,24 +124,24 @@
             {
                 "pillar": "naming",
                 "applicable": true,
-                "score": 81,
-                "grade": "B",
+                "score": 51.03,
+                "grade": "F",
                 "findings": 2,
                 "advisory": 1,
                 "warning": 1,
                 "error": 0,
-                "penalty": 19
+                "penalty": 4.75
             },
             {
                 "pillar": "documentation",
                 "applicable": true,
-                "score": 96,
-                "grade": "A",
+                "score": 54.55,
+                "grade": "F",
                 "findings": 1,
                 "advisory": 1,
                 "warning": 0,
                 "error": 0,
-                "penalty": 4
+                "penalty": 1
             },
             {
                 "pillar": "modernisation",
@@ -244,17 +191,14 @@
         "topOffenders": [
             {
                 "file": "tests/Fixtures/Source/mixed/alpha.php",
-                "score": 51.25,
+                "score": 50.51,
                 "grade": "F",
                 "findings": 4,
                 "advisory": 2,
                 "warning": 2,
                 "error": 0,
-                "penalty": 48.75,
-                "maxCyclomatic": null,
-                "maxCognitive": null,
-                "maxLines": 11,
-                "mutationScore": null
+                "penalty": 9.75,
+                "maxLines": 11
             }
         ],
         "complexityDistribution": {
@@ -265,14 +209,98 @@
             "21+": 0
         },
         "scope": "full-project",
-        "explanation": "Per-pillar scores start at 100 and subtract weighted finding penalties; correlated size and complexity findings on one symbol share a single penalty; the composite is the average of applicable pillar scores. Mutation is omitted when no Infection report is supplied."
+        "explanation": "Each pillar scores on the density of its weighted findings per evaluated file, on a curve from 50 to 100, so a larger project is not penalised for its size; correlated size and complexity findings on one symbol share a single weight; the composite is the average of applicable pillar scores. Mutation is omitted when no Infection report is supplied."
     },
-    "diff": {
-        "active": false,
-        "mode": "full-project",
-        "base": null,
-        "changedFiles": 0,
-        "message": "Diff mode is disabled.",
-        "files": []
-    }
+    "diagnostics": [],
+    "findings": [
+        {
+            "ruleId": "size.file-length",
+            "message": "File has 11 substantive lines, above the warning threshold of 3.",
+            "file": "tests/Fixtures/Source/mixed/alpha.php",
+            "line": 1,
+            "severity": "warning",
+            "pillar": "size",
+            "secondaryPillars": [],
+            "tier": "v0.1",
+            "confidence": "high",
+            "remediation": "Split oversized files or move responsibilities into smaller units.",
+            "fingerprint": "c58ffd67445ab336",
+            "stableIdentity": "26fa0bda604599a5",
+            "metadata": {
+                "lines": 11,
+                "threshold": 3,
+                "thresholdType": "warning",
+                "locationPrecision": "line-only"
+            },
+            "endLine": 27
+        },
+        {
+            "ruleId": "naming.class-file-mismatch",
+            "message": "Class Alpha does not match file name alpha.php.",
+            "file": "tests/Fixtures/Source/mixed/alpha.php",
+            "line": 12,
+            "severity": "warning",
+            "pillar": "naming",
+            "secondaryPillars": [],
+            "tier": "v0.1",
+            "confidence": "high",
+            "remediation": "Rename the file to Alpha.php or the class to alpha.",
+            "fingerprint": "3b9c556468b6bc15",
+            "stableIdentity": "106e7b2df944f9fd",
+            "metadata": {
+                "locationPrecision": "line-only"
+            },
+            "symbol": "Alpha"
+        },
+        {
+            "ruleId": "docs.return-comment",
+            "message": "Alpha::value() has a bare @return tag; describe what the returned value represents, not just its type.",
+            "file": "tests/Fixtures/Source/mixed/alpha.php",
+            "line": 19,
+            "severity": "advisory",
+            "pillar": "documentation",
+            "secondaryPillars": [],
+            "tier": "v0.1",
+            "confidence": "high",
+            "remediation": "Describe the result after the @return type, e.g. `@return Foo - parsed result; null when the lookup misses`, so the contract states what the value means at the edges.",
+            "fingerprint": "3043a43c48c8541d",
+            "stableIdentity": "20f27d197b4777d9",
+            "metadata": {
+                "locationPrecision": "line-only"
+            },
+            "symbol": "Alpha::value()"
+        },
+        {
+            "ruleId": "naming.identifier-quality",
+            "message": "Method name \"value\" is generic and does not communicate clear intent.",
+            "file": "tests/Fixtures/Source/mixed/alpha.php",
+            "line": 19,
+            "severity": "advisory",
+            "pillar": "naming",
+            "secondaryPillars": [],
+            "tier": "v0.1",
+            "confidence": "medium",
+            "remediation": "Rename the identifier to describe its domain role or action. If the placeholder or generic token is intentional, add it to `rules.naming.identifier-quality.options.placeholderNames`, `genericTokens`, or `ignoredNames` in `.gruff-php.yaml`.",
+            "fingerprint": "25633f1c266ca38f",
+            "stableIdentity": "f726935116318593",
+            "metadata": {
+                "identifierKind": "method",
+                "identifierName": "value",
+                "variant": "generic",
+                "tokens": [
+                    "value"
+                ],
+                "matchedToken": "value",
+                "locationPrecision": "line-only"
+            },
+            "symbol": "Alpha::value()"
+        }
+    ],
+    "paths": {
+        "analysedFiles": 1,
+        "details": [],
+        "ignoredPaths": [],
+        "missingPaths": []
+    },
+    "suppressions": []
 }

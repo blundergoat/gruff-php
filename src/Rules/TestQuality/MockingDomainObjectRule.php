@@ -47,6 +47,12 @@ final readonly class MockingDomainObjectRule implements RuleInterface
             confidence:         Confidence::Low,
             isEnabledByDefault: true,
             defaultOptions:     ['domainNamespaces' => []],
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A configured domain namespace that also holds interfaces or ports which are meant to be doubled.',
+                    'mitigation' => 'Matching is by namespace prefix and does not separate value objects from ports, so narrow options.domainNamespaces to the value-object namespaces only.',
+                ],
+            ],
         );
     }
 

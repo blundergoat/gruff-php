@@ -43,6 +43,12 @@ final readonly class TestLongerThanSutRule implements RuleInterface
             defaultSeverity:   Severity::Advisory,
             confidence:        Confidence::Low,
             defaultThresholds: ['minTestLines' => 12],
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A long test around a single call whose length is real table-driven coverage, such as one call checked against many expected fields.',
+                    'mitigation' => 'The real system under test is never measured, only the test\'s own length and call count, so raise this rule\'s minTestLines threshold.',
+                ],
+            ],
         );
     }
 
@@ -77,7 +83,7 @@ final readonly class TestLongerThanSutRule implements RuleInterface
                 ruleId:      self::ID,
                 message:     sprintf('%s is long while exercising only %d apparent SUT call.', $scope->symbol, count($sutCalls)),
                 filePath:    $analysisUnit->file->displayPath,
-                line:        $scope->line,
+                line:        $scope->anchorLine(),
                 severity:    Severity::Advisory,
                 pillar:      Pillar::TestQuality,
                 tier:        RuleTier::V01,
