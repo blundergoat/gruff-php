@@ -1,19 +1,9 @@
 ---
 category: setup
-last_reviewed: 2026-08-14
+last_reviewed: 2026-10-03
 ---
 
 # Setup Footguns
-
-## Footgun: goat-flow content audit requires a goat-flow-dashboard-views line in a consumer code map
-
-**Status:** active | **Created:** 2026-07-20 | **Evidence:** OBSERVED
-
-goat-flow 1.14.0's `audit --check-content` runs `code-map-dashboard-view-drift` unconditionally on any project with `.goat-flow/code-map.md`. When the target has no `src/dashboard/views/*.html` (true for every consumer project - the npm package ships dist-only), the check falls back to goat-flow's own manifest view list and fails unless the code map contains a line with `views/`, the phrase `HTML view`, and a first parenthesised group listing exactly the goat-flow dashboard view names. `.goat-flow/code-map.md` (search: `src/dashboard/views/ HTML view files`) carries that line on the `node_modules/` entry, phrased truthfully as describing the upstream package.
-
-**Evidence:** This session's 1.13.0 to 1.14.0 upgrade: `audit . --agent claude --check-content` reported `code-map-dashboard-view-drift` ("Code map lists dashboard views as none") with no `src/dashboard/views` on disk. Check source: `node_modules/@blundergoat/goat-flow/dist/cli/audit/check-factual-semantic-drift.js` (search: `readDashboardViewFiles`) - the manifest fallback fires whenever the glob returns zero files.
-
-**Prevention:** Do not strip the odd-looking dashboard-views sentence from the `node_modules/` line in `.goat-flow/code-map.md` during cleanup passes; removing it re-fails the content gate. Keep any other parenthesised text on that line after the view-name list, because the checker parses only the first parenthesised group. This is an upstream check leaking goat-flow self-repo facts into consumer audits - worth reporting to goat-flow; drop the line only after upstream gates the check.
 
 ## Footgun: Package bin bootstraps must use Composer's consumer autoloader
 
@@ -21,7 +11,7 @@ goat-flow 1.14.0's `audit --check-content` runs `code-map-dashboard-view-drift` 
 
 `bin/gruff-php` (search: `$GLOBALS['_composer_autoload_path']`) must prefer Composer's generated bin-proxy autoload path when run from an installed project's `vendor/bin/gruff-php`. A package-local bootstrap such as `__DIR__ . '/../vendor/autoload.php'` works in this checkout, but fails after `composer require --dev blundergoat/gruff-php` because installed dependencies do not carry their own nested `vendor/autoload.php`.
 
-**Evidence:** External install reproduction in `/home/devgoat/projects/strands-php-client`: `vendor/bin/gruff-php init` from package `v0.1.2` failed opening `vendor/blundergoat/gruff-php/bin/../vendor/autoload.php`. Composer's generated proxy at `/home/devgoat/projects/strands-php-client/vendor/bin/gruff-php` sets `$GLOBALS['_composer_autoload_path']` before including the package bin.
+**Evidence:** External install reproduction in `/home/devgoat/projects/strands-php-client`: `vendor/bin/gruff-php init` from package `v0.1.2` failed opening `vendor/blundergoat/gruff-php/bin/../vendor/autoload.php`. Composer's generated proxy at `/home/devgoat/projects/strands-php-client/vendor/bin/gruff-php` sets `$GLOBALS['_composer_autoload_path']` before including the package bin. The regression test the prevention asks for now exists: `tests/Console/ListRulesCliTest.php` (search: `testInstalledVendorBinProxyUsesConsumerAutoloader`) installs the package into a temporary consumer project and runs `vendor/bin/gruff-php init`. It passed on 2026-10-03.
 
 **Prevention:** CLI package bins need a regression test that installs the package into a consumer project and executes `vendor/bin/<tool>`, not only `php bin/<tool>` inside the source checkout. Keep the source-checkout fallback for direct development, but make the Composer proxy autoload path the first candidate.
 
@@ -53,13 +43,37 @@ goat-flow 1.14.0's `audit --check-content` runs `code-map-dashboard-view-drift` 
 **Decision changed:** Whether to act on `goat-flow audit`'s printed repair command when the drift scope covers `.goat-flow/hooks/`.
 **Trigger phase:** ACT
 
-`goat-flow audit . --harness --agent claude` exits 1 with `hookCoverage` reporting `requiredIneffective: 3, effective: 0` and `drift` listing 8 artifacts, and every hook row prints `repairCommand: goat-flow hooks sync`. Running it would overwrite three hook scripts that carry fixes existing nowhere upstream. `.goat-flow/hooks/deny-dangerous.sh` (search: `--no-run-if-empty`) keeps `-e`, `-i`, `-l`, `--eof`, `--replace` and `--max-lines` in the no-argument xargs branch; `xargs --help` documents all six as optional-argument flags, so the shipped template consumes the following token and can walk past the real command. `.goat-flow/hooks/post-turn-safety.sh` (search: `is_normalized_credential_key`) adds the credential-label classifier, and `.goat-flow/hooks/gruff-code-quality.sh` (search: `reported span intersects`) counts findings whose whole span overlaps an edit rather than only the primary line.
+Two installed hooks carry fixes that the published goat-flow 1.17.0 templates lack, so `goat-flow hooks sync`, or `goat-flow install --force-path` on either file, would delete them. `.goat-flow/hooks/gruff-code-quality.sh` (search: `reported span intersects`) counts a finding when any part of its reported span overlaps the edit in the legacy fallback path (`changed_findings_report` and `suppressed_count`). The 1.17.0 template checks spans only on the contract path (search: `attributable_line_or_span`). `.goat-flow/hooks/post-turn-safety.sh` (search: `quoted path case failed`) unescapes `\"` in quoted Git paths before the Bash 3 compatibility scanner decodes them.
 
-**Evidence:** Measured 2026-08-14. Grep counts for `is_normalized_credential_key`, `CREDENTIAL_ASSIGNMENT_RE`, the xargs no-argument branch, and `reported span intersects` are 2/3/1/1 in the installed copies and 0 in both the published `node_modules/@blundergoat/goat-flow` 1.15.1 package and the `/home/devgoat/projects/goat-flow` checkout at `v1.15.0-57-g6ba24713`, so this is divergence rather than publication version skew. All three hooks pass their self-tests (`deny-dangerous.sh --self-test` reports `executed=400, skipped=0`). Four skill and reference artifacts under `.claude/skills/` and `.goat-flow/skill-docs/playbooks/` are adapted the same way; gruff reports zero findings on both the pristine templates and the installed copies, so this project's own quality gate did not force those edits.
+Both fixes are inert in this checkout today. `php bin/gruff-php hook --capabilities --format json` advertises `gruff.hook.v2`, so the hook uses the contract path. Bash 5.2 runs the native post-turn scanner. They still change what goat-flow reports: `hooks list` marks both hooks `installed-content-diverged`, and `hooks verify --trusted-target` returns `not-configured` with reason `hook-not-installed` for the post-turn and Gruff groups.
 
-**Prevention:** Treat a `drift` or `installation-stale` audit result whose paths include `.goat-flow/hooks/` as a report, not an instruction. Diff the installed copy against `node_modules/@blundergoat/goat-flow/workflow/hooks/<name>` before syncing, and land the local fix upstream in the goat-flow checkout first so the sync is a no-op. Re-running the self-tests after any sync is the only proof the policy corpus survived.
+**Evidence:** Re-measured 2026-10-03 during the 1.16.0 to 1.17.0 upgrade. `install --dry-run` classified five hook files as `both-changed` against the 1.15.1 baseline. Two earlier local fixes are now upstream: the xargs optional-argument flags in `.goat-flow/hooks/deny-dangerous/guard-runtime.sh` (search: `--show-limits|-e|-i|-l|--eof|--replace|--max-lines`) and curl `headers=@` detection in `.goat-flow/hooks/deny-dangerous/patterns-paths.sh` (search: `only headers=@file reads`). Those files now match the template. The local shared credential classifier was dropped: the 1.17.0 native and fallback copies carry the same 40 exclusion and 32 inclusion patterns it did. Negative controls: adding the local tests to the unmodified 1.17.0 hooks fails with `fallback finding-span overlap failed` and `quoted path case failed on scanner 1`. After the merge, `deny-dangerous.sh --self-test` reports `executed=906, skipped=871` and `deny-git-mutations.sh --self-test` reports `executed=910, skipped=892`, and both pass. Five skill and playbook files that carried cosmetic-only local edits were restored to the 1.17.0 templates the same day, so `Skill Template Drift` in `goat-flow audit` lists only these two hooks.
+
+**Prevention:** Treat `drift`, `installation-stale` or `both-changed` rows that cover `.goat-flow/hooks/` as a report, not an instruction. Before syncing or forcing a path, three-way merge each file against the previous release's template: install `@blundergoat/goat-flow@<old>` into the scratchpad as the merge base, then check whether upstream already contains each local fix. Re-apply only the fixes that a negative-control self-test shows are missing. Land remaining fixes in the goat-flow checkout so the next upgrade is a no-op, and re-run all four hook self-tests after any sync.
+
+## Footgun: `goat-flow install` silently drops the `.env*` deny catch-alls from `.claude/settings.json`
+
+**Status:** active | **Created:** 2026-10-03 | **Evidence:** ACTUAL_MEASURED
+**Decision changed:** Whether a goat-flow upgrade needs a manual diff of `.claude/settings.json` before it is accepted.
+**Trigger phase:** VERIFY
+
+`goat-flow install` replaces the `Read(**/.env*)` and `Edit(**/.env*)` deny rules with eight named variants so `.env.example` stays readable. The rewrite lives in `node_modules/@blundergoat/goat-flow/dist/cli/install-command.js` (search: `rule === "Read(**/.env*)"`) and the variant list in `node_modules/@blundergoat/goat-flow/workflow/install-goat-flow.sh` (search: `ENV_DENY_EXPANSIONS`). After the rewrite, other variants such as `.env.backup` or `.env.prod` are open to Claude's Read and Edit tools, because the Bash deny hook covers only shell commands. This project added both catch-alls back by hand after earlier upgrades removed them: `Read` in `bafe1f7` and `Edit` in `cc89c13`.
+
+**Evidence:** Measured 2026-10-03 during the 1.17.0 upgrade. The install output listed every retired rule it removed, including `Bash(*sudo *)` and `Read(**/secrets/**)`, but printed nothing about the two `.env*` rules. `git diff .claude/settings.json` showed both gone, and they were restored by hand after the install. `.codex/config.toml` never carried a catch-all, so the Codex profile was unaffected.
+
+**Prevention:** After any `goat-flow install`, diff `.claude/settings.json` against `HEAD` and restore `Read(**/.env*)` and `Edit(**/.env*)` if they are missing. The install log is not a complete list of removals.
 
 ## Resolved Entries
+
+## Footgun: goat-flow content audit requires a goat-flow-dashboard-views line in a consumer code map
+
+**Status:** resolved | **Created:** 2026-07-20 | **Resolved:** 2026-10-03 | **Evidence:** OBSERVED
+
+goat-flow 1.14.0's `audit --check-content` ran `code-map-dashboard-view-drift` on any project with `.goat-flow/code-map.md`. With no `src/dashboard/views/*.html` on disk, the check fell back to goat-flow's own manifest view list, so a consumer code map had to carry a line listing goat-flow's dashboard view names. This project kept that line on the `node_modules/` entry of its code map.
+
+**Resolution:** goat-flow 1.17.0 treats the selected project's files as the only view authority (`node_modules/@blundergoat/goat-flow/dist/cli/audit/check-factual-semantic-drift.js`, search: `an explicit inventory must match target files exactly`). After the upgrade, the workaround line itself failed `audit --check-content` with `code-map-dashboard-view-drift`. The line was removed on 2026-10-03; with no claim and no view files, the check sees absence on both sides.
+
+**Prevention:** Do not add a dashboard-views inventory back to `.goat-flow/code-map.md`; this project has no `src/dashboard/views/`, so any listed view fails the content audit. Before adding a workaround for an upstream check, re-read the checker source in the installed goat-flow version, and re-check the workaround after each upgrade.
 
 ## Footgun: classmap-authoritative hid newly added src/ classes in dev
 

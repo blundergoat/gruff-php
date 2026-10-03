@@ -1,4 +1,4 @@
-# CLAUDE.md - instructions v1.5.2 / goat-flow 1.15.1 (2026-08-11)
+# CLAUDE.md - instructions v1.5.3 / goat-flow 1.17.0 (2026-10-03)
 gruff-php is an opinionated PHP code-quality analyzer; its mission is to govern AI-generated code so a human can verify, trust, and sign off on it (legible, secure, genuinely tested). Current invariant: keep app claims and commands grounded in real source/config files.
 
 ## Truth Order
@@ -32,12 +32,12 @@ Current app/quality surface: `composer.json`, `composer.lock`, `bin/gruff-php`, 
 
 - Learning loop: `.goat-flow/learning-loop/footguns/`, `.goat-flow/learning-loop/lessons/`, `.goat-flow/learning-loop/patterns/`, `.goat-flow/learning-loop/decisions/`
 - Skill reference: `.goat-flow/skill-docs/`
-- Tool playbooks: `.goat-flow/skill-docs/playbooks/README.md` is the full index (tools such as `browser-use.md` and `page-capture.md`; disciplines such as `writing-style.md`) - read when a request names one and BEFORE declaring a tool unavailable
+- Tool playbooks: `.goat-flow/skill-docs/playbooks/README.md` is the full index (tools such as `browser-use.md` and `page-capture.md`; disciplines such as `writing-human-facing-prose.md` and `test-selection.md`) - read when a request names one and BEFORE declaring a tool unavailable
 - Orientation: `.goat-flow/architecture.md`, `.goat-flow/code-map.md`, `.goat-flow/glossary.md`
 
 ## Commit Messages
 
-Use concise free-form subjects unless the project owner chooses a stricter convention. Full guidance lives in `docs/coding-standards/git-commit-message.md`.
+When drafting a commit message, use the Conventional `type(scope): subject` form; `docs/coding-standards/git-commit-message.md` owns the branch-derived `#<digits>` prefix and the body rules.
 
 ## Essential Commands
 
@@ -60,7 +60,7 @@ node node_modules/@blundergoat/goat-flow/dist/cli/cli.js audit . --agent claude 
 When a goat-* skill is active, its Step 0 replaces READ and selects the skill mode/depth. SCOPE still gates writes: the skill's mode or user approval must permit them. Resume at ACT after Step 0 output.
 
 ### READ
-Read relevant files before changes. For URL, local HTML, localhost, screenshot, rendered UI, or browser-visible behavior, check browser evidence first with `command -v browser-use || command -v browser-use-python`. Cross-doc: read every file describing the same concept. Use INDEX-first retrieval across `.goat-flow/learning-loop/{footguns,lessons,patterns}/INDEX.md`; include `.goat-flow/learning-loop/decisions/INDEX.md` for architecture, policy, or setup work. Open source entries only on candidate hits; grep bucket files only after the INDEX pass or on a known retrieval miss; reword once on zero hits, then record the miss instead of broad-loading a bucket. Before declaring any tool or capability unavailable, read the matching playbook in `.goat-flow/skill-docs/playbooks/` (e.g. `browser-use.md`, `page-capture.md`) and run that doc's "Availability Check" section verbatim - project-local CLI tools at `~/.local/bin/` are valid; do not conflate "no harness/MCP tool" with "no tool". Prose surfaces route the same way before writing: `CHANGELOG.md` needs `changelog.md`; release notes need `release-notes.md`; README, `docs/`, PR/issue text, and learning-loop entry bodies need `writing-style.md`.
+Read relevant files before changes. For URL, local HTML, localhost, screenshot, rendered UI, or browser-visible behavior, check browser evidence first with `command -v browser-use || command -v browser-use-python`. Cross-doc: read every file describing the same concept. Use INDEX-first retrieval across `.goat-flow/learning-loop/{footguns,lessons,patterns}/INDEX.md`; include `.goat-flow/learning-loop/decisions/INDEX.md` for architecture, policy, or setup work. Open source entries only on candidate hits; grep bucket files only after the INDEX pass or on a known retrieval miss; reword once on zero hits, then record the miss instead of broad-loading a bucket. Before declaring any tool or capability unavailable, read the matching playbook in `.goat-flow/skill-docs/playbooks/` (e.g. `browser-use.md`, `page-capture.md`) and run that doc's "Availability Check" section verbatim - project-local CLI tools at `~/.local/bin/` are valid; do not conflate "no harness/MCP tool" with "no tool". Prose surfaces route the same way before writing: `CHANGELOG.md` needs `changelog.md`; release notes need `release-notes.md`; README prose, `docs/`, PR/issue text, and learning-loop entry bodies need `writing-human-facing-prose.md`; skills, playbooks, instruction files, hook messages, and README discovery rows need `writing-agent-facing-instructions.md` - the trigger is touching the surface, not the request naming it. Before creating, changing, reviewing, consolidating, moving, or pruning tests, read `.goat-flow/skill-docs/playbooks/test-selection.md`.
 
 ### SCOPE
 Declare files allowed to change, non-goals, and max blast radius before writes. Treat framework setup as limited to goat-flow artifacts and agent-owned config unless the user widens scope.
@@ -103,6 +103,7 @@ Footguns go in `.goat-flow/learning-loop/footguns/<category>.md`; lessons in `.g
 | Tool playbooks (README index; tools e.g. browser-use, page-capture; disciplines e.g. changelog, release notes, prose style) | `.goat-flow/skill-docs/playbooks/` - read when a request names one, and BEFORE declaring a tool unavailable |
 | Skill-authoring methodology | `.goat-flow/skill-docs/skill-quality-testing/` - load the README, then the topical authoring guide |
 | Orientation | `.goat-flow/architecture.md`, `.goat-flow/code-map.md`, `.goat-flow/glossary.md` |
+| Security policy (optional; read by `goat-security`) | `.goat-flow/security-policy.md` |
 | Claude skills/config | `.claude/skills/`, `.claude/settings.json` |
 | Codex skills/config | `.agents/skills/`, `.codex/config.toml`, `.codex/hooks.json` |
 | Shared hook scripts | `.goat-flow/hooks/` |

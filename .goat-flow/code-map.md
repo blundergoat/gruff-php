@@ -1,6 +1,6 @@
 # Code Map - gruff-php
 
-Last reviewed 2026-08-07. Captures the current source surface as wired in `composer.json`, `bin/gruff-php`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
+Last reviewed 2026-08-07; the agent-harness map, baseline entries, and Composer script list were reconciled with source on 2026-10-03. Captures the current source surface as wired in `composer.json`, `bin/gruff-php`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
 
 ## Top-level layout
 
@@ -18,13 +18,13 @@ Last reviewed 2026-08-07. Captures the current source surface as wired in `compo
 |-- resources/                = shipped config presets under profiles/ (`gruff.starter`, `gruff.recommended`, `gruff.strict`), resolved by `ConfigLoader::resolveExtendsReference()` for `extends:` (ADR-021)
 |-- .gruff-php.yaml           = this project's own gruff config: schemaVersion, minimumPhpVersion, minimumSeverity, paths.ignore, allowlists, and per-rule tuning
 |-- infection.json5           = Infection mutation-testing config scoped to `src/`
-|-- composer.json             = Composer metadata, runtime deps, bin, autoload, `check`/`phpstan`/`security:scan`/`test` scripts
+|-- composer.json             = Composer metadata, runtime deps, bin, autoload, `audit:dependencies`/`check`/`format`/`format:check`/`perf`/`phpstan`/`security:scan`/`test` scripts
 |-- composer.lock             = resolved Composer dependency versions
 |-- phpstan.neon.dist         = PHPStan 2 level 10 config for `src/` and `tests/`
 |-- phpunit.xml.dist          = PHPUnit 12 test suite config
 |-- package.json              = harness-only Node manifest (no app code consumes it)
 |-- package-lock.json         = npm lockfile for harness Node tooling
-|-- node_modules/             = harness Node tooling install, gitignored; the vendored @blundergoat/goat-flow package is dist-only, so its upstream src/dashboard/views/ HTML view files (about, home, hooks, plans, projects, prompts, quality, settings, setup, skills, workspace) are not on disk here
+|-- node_modules/             = harness Node tooling install (the dist-only @blundergoat/goat-flow CLI), gitignored
 |-- vendor/                   = Composer install (gitignored)
 |-- baselines/                = local scratch baselines from dogfood runs (gitignored, untracked; some still carry legacy `gruff.baseline.v1`)
 |-- history.json              = local `--history-file` trend output (gitignored, untracked)
@@ -35,12 +35,12 @@ Last reviewed 2026-08-07. Captures the current source surface as wired in `compo
 |-- .editorconfig             = editor settings
 |-- .gitattributes            = git export/diff rules
 |-- .gitignore                = root ignore rules
-|-- .github/                  = repository-facing guidance and CI workflow, including the gruff security-profile SARIF upload job
+|-- .github/                  = repository-facing guidance and CI workflow, including the gruff security-profile SARIF upload job, plus the Copilot instruction file, skills, and hook registration
 |-- .idea/                    = JetBrains IDE settings (developer-local)
 |-- .goat-flow/               = goat-flow project memory and reference docs
 |-- .claude/                  = Claude Code settings and installed skills
 |-- .codex/                   = Codex hooks/config surface
-`-- .agents/                  = shared peer-agent skill root (Codex/Gemini)
+`-- .agents/                  = shared peer-agent skill root (Codex/Gemini) plus the antigravity hook registration
 ```
 
 ## Application surface
@@ -76,7 +76,7 @@ Application source map:
     |   |-- Hook/ = hook finding filtering, scope attribution, identity, and presenter values
     |   +-- Reporter/ = text, JSON, HTML, Markdown, GitHub annotations, hotspot, SARIF, format, display-filter, and fail-threshold output
     |-- Results/ = serialisable analysis results and optional enrichment payloads
-    |   |-- Baseline/ = baseline read/write/apply/report values for gruff.baseline.v2 grouped counts
+    |   |-- Baseline/ = baseline read/write/apply/migrate/report values for gruff.baseline.v3 identity rows
     |   |-- Diff/ = Git diff ranges, diff-mode metadata, and changed-line finding filter
     |   |-- Finding/ = finding value, severity, confidence, pillar, and tier enums
     |   |-- Mutation/ = Infection report parsing, optional Infection run wrapper, mutation findings, budgets, and mutation payloads
@@ -188,7 +188,8 @@ tests/
 |-- code-map.md                               = this repository map
 |-- glossary.md                               = project and harness terms
 |-- config.yaml                               = goat-flow version, installed skills, and global hook desired state
-|-- hooks/                                    = shared hook scripts, including deny-dangerous, gruff-code-quality, and post-turn-safety
+|-- security-policy.md                        = optional project security policy (`.goat-flow/security-policy.md`) that goat-security reads
+|-- hooks/                                    = shared hook scripts (deny-dangerous, deny-git-mutations, gruff-code-quality, post-turn-safety), the deny-dangerous/ policy modules, and the Node launcher runtime with its vendor/ dependencies
 |-- learning-loop/
 |   |-- decisions/                            = ADRs, including ADR-028 for source namespace consolidation
 |   |-- footguns/                             = reproducible traps with evidence
@@ -197,7 +198,7 @@ tests/
 |-- skill-docs/
 |   |-- skill-conventions.md                  = shared full-depth skill conventions
 |   |-- skill-preamble.md                     = shared goat-* skill preamble
-|   |-- playbooks/                            = tool and discipline playbooks: browser-use.md, changelog.md, code-comments.md, gruff-code-quality.md, hook-policy-testing.md, observability.md, page-capture.md, release-notes.md, skill-playbook-authoring-sync.md, writing-style.md, plus the README.md index
+|   |-- playbooks/                            = tool and discipline playbooks; README.md is the index
 |   `-- skill-quality-testing/                = supporting docs for skill-quality-testing
 |-- plans/                                    = local milestone/task workspace (gitignored content under it)
 |-- scratchpad/                               = local temporary notes (gitignored content under it)
@@ -208,6 +209,7 @@ tests/
 |-- settings.local.json                       = developer-local Claude Code settings (gitignored)
 `-- skills/
     |-- goat/
+    |-- goat-clarity/
     |-- goat-critique/
     |-- goat-debug/
     |-- goat-plan/
@@ -216,18 +218,17 @@ tests/
     `-- goat-security/
 
 .codex/
-|-- config.toml                               = Codex hooks feature config
-`-- hooks.json                                = Codex hook registration for the shared hooks: PreToolUse (deny-dangerous), PostToolUse on `apply_patch` (gruff-code-quality), and Stop (post-turn-safety), all added in goat-flow 1.15.1
+|-- config.toml                               = Codex hooks feature flag and the goat-flow permission profile
+`-- hooks.json                                = Codex hook registration: PreToolUse (deny-dangerous, deny-git-mutations), PostToolUse on `apply_patch` (gruff-code-quality), and Stop (post-turn-safety)
 
 .agents/
-`-- skills/                                   = peer-agent skills mirroring `.claude/skills/`
-    |-- goat/
-    |-- goat-critique/
-    |-- goat-debug/
-    |-- goat-plan/
-    |-- goat-qa/
-    |-- goat-review/
-    `-- goat-security/
+|-- hooks.json                                = antigravity hook registration for the shared hooks
+`-- skills/                                   = peer-agent skills mirroring `.claude/skills/`, including goat-clarity
+
+.github/
+|-- copilot-instructions.md                   = standalone Copilot instruction file
+|-- hooks/hooks.json                          = Copilot hook registration for the shared hooks
+`-- skills/                                   = Copilot skills mirroring `.claude/skills/`, including goat-clarity
 ```
 
 ## Notes
@@ -236,4 +237,4 @@ tests/
 - CI lives in `.github/workflows/ci.yml`: `verify` runs Composer checks and preflight on PHP 8.3/8.4, `security` gates on `composer security:scan` with read-only permissions, and `security-sarif` uploads gruff SARIF on non-PR events with `security-events: write`.
 - `composer.json`'s `check` script lints every committed PHP source/test file with `php -l` via `find src tests -name '*.php'` (excluding the intentional `tests/Fixtures/Source/syntax-error` fixtures), so new files are linted automatically rather than from a hand-maintained list.
 - Pillars currently emitted by registered static rules: Size, Complexity, Maintainability, DeadCode, Naming, Documentation, Modernisation, Security, SensitiveData, TestQuality. Optional Infection ingestion emits Mutation findings. Other `Pillar::*` cases (Coupling, Architecture, Design) are reserved; Design emptied when the project rules were retired (ADR-026).
-- Static baselines are explicit `gruff.baseline.v2` JSON files of grouped count rows. Matching is count arithmetic per `(file, ruleId, message)` group (ADR-029), so line shifts never resurface accepted debt; legacy v1 files fail closed with a regenerate instruction. Inline suppression comments are intentionally absent.
+- Static baselines are explicit `gruff.baseline.v3` JSON files with one `occurrences` row per line-free identity and its accepted count (ADR-033, superseding ADR-029), so line shifts never resurface accepted debt. A `gruff.baseline.v2` file fails closed until `--migrate-baseline` carries its reviews into a separate v3 file; a v1 file fails closed with a regenerate instruction. Inline suppression comments are intentionally absent.

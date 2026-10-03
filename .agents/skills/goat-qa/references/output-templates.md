@@ -1,15 +1,24 @@
 ---
-goat-flow-reference-version: "1.15.1"
+goat-flow-reference-version: "1.17.0"
 ---
 # goat-qa Output Templates
 
-Read this reference only when rendering the final response. Select the template matching the mode and gate reached; do not combine templates from different phases.
+Read this reference only when rendering the final response. Select the template matching the mode and gate reached. Never combine templates from different modes, and never combine a gate report with the plan that follows it. One exception: within Standard, explicit test-plan intent releases the Phase 2 gate, and that one response carries the Phase 2 blocks first and the Phase 3 plan after them, under a single Refuted Candidates ledger and a single Verification Integrity section covering the whole response. Audit has no such release and always waits after A4.
 
-## Regression Guard mode
+### Regression Guard mode
 
 ```markdown
 ## Regression Guards
 | Invariant | Current Coverage | Recommended Guard | Owner | Proof Class |
+
+**Test-selection record**
+| Disposition | Regression and impact | Current overlap | Stable contract | Level | Evidence status | Owner or path and semantic anchor | Handoff invariant and next check |
+|-------------|-----------------------|-----------------|-----------------|-------|-----------------|-----------------------------------|----------------------------------|
+
+## Refuted Candidates
+| Claim | Why Excluded | File | Line | Evidence Quality | Evidence Method | Evidence Summary | Command | Exit Code | Excerpt |
+|-------|--------------|------|------|------------------|-----------------|------------------|---------|-----------|---------|
+<!-- One row per `kill as false positive`; write `None` when there are no rows. Use `—` for nullable or optional fields. -->
 
 ## Verification Integrity
 - Prior fix evidence: [file, command output, or human-approved record]
@@ -19,7 +28,7 @@ Read this reference only when rendering the final response. Select the template 
 - Evidence limit: [unavailable source, runtime, or tool context]
 ```
 
-## Standard mode - Phase 2 output (diff-driven, present at BLOCKING GATE)
+### Standard mode - Phase 2 output (diff-driven, present at BLOCKING GATE)
 
 ```markdown
 ## TL;DR  <!-- what changed, what's at risk, biggest testing gaps -->
@@ -33,6 +42,15 @@ Read this reference only when rendering the final response. Select the template 
 
 ### Misaligned Effort  <!-- test cases that don't match code changes in this branch -->
 | Test Case | Maps to Change | Assessment | Proof Class |
+
+**Test-selection record**
+| Disposition | Regression and impact | Current overlap | Stable contract | Level | Evidence status | Owner or path and semantic anchor | Handoff invariant and next check |
+|-------------|-----------------------|-----------------|-----------------|-------|-----------------|-----------------------------------|----------------------------------|
+
+## Refuted Candidates
+| Claim | Why Excluded | File | Line | Evidence Quality | Evidence Method | Evidence Summary | Command | Exit Code | Excerpt |
+|-------|--------------|------|------|------------------|-----------------|------------------|---------|-----------|---------|
+<!-- One row per `kill as false positive`; write `None` when there are no rows. Use `—` for nullable or optional fields. -->
 
 ## Verification Integrity
 - Intent spec: [PR/issue/test plan URL or `no-intent-spec`]
@@ -48,13 +66,25 @@ Read this reference only when rendering the final response. Select the template 
 - Assessed by: [agent]
 ```
 
-## Standard mode - Phase 3 output (generate only after Phase 2 gate approval)
+### Standard mode - Phase 3 output (after the Phase 2 gate is approved or auto-released)
+
+When the gate auto-released, the Phase 2 blocks above already appear in this same response; emit
+this plan after them and do not repeat the ledger or the integrity section.
 
 ```markdown
 ## Targeted Testing Plan
 ### Must test before shipping  <!-- Matrix Blocking pairs; include manual steps, failure symptoms, time, proof class -->
 ### Should test if time allows  <!-- Matrix High-value pairs; include proof class -->
 ### Safe to skip  <!-- Matrix Defer pairs; include rationale and proof class -->
+
+**Test-selection record**
+| Disposition | Regression and impact | Current overlap | Stable contract | Level | Evidence status | Owner or path and semantic anchor | Handoff invariant and next check |
+|-------------|-----------------------|-----------------|-----------------|-------|-----------------|-----------------------------------|----------------------------------|
+
+## Refuted Candidates
+| Claim | Why Excluded | File | Line | Evidence Quality | Evidence Method | Evidence Summary | Command | Exit Code | Excerpt |
+|-------|--------------|------|------|------------------|-----------------|------------------|---------|-----------|---------|
+<!-- One row per `kill as false positive`; write `None` when there are no rows. Use `—` for nullable or optional fields. -->
 
 ## Verification Integrity
 
@@ -65,7 +95,7 @@ Read this reference only when rendering the final response. Select the template 
 ## Flow Diagram  <!-- only on request -->
 ```
 
-## Audit mode (no diff - A1–A4 shape)
+### Audit mode (no diff - A1–A4 shape)
 
 ```markdown
 ## TL;DR  <!-- which files carry load-bearing behaviour, coverage shape, biggest gaps -->
@@ -87,6 +117,15 @@ Read this reference only when rendering the final response. Select the template 
 ### Defer  <!-- Matrix Defer pairs; each item includes proof class -->
 ### Misaligned effort  <!-- Evidence-backed test-to-risk mismatches, or `none found` -->
 
+**Test-selection record**
+| Disposition | Regression and impact | Current overlap | Stable contract | Level | Evidence status | Owner or path and semantic anchor | Handoff invariant and next check |
+|-------------|-----------------------|-----------------|-----------------|-------|-----------------|-----------------------------------|----------------------------------|
+
+## Refuted Candidates
+| Claim | Why Excluded | File | Line | Evidence Quality | Evidence Method | Evidence Summary | Command | Exit Code | Excerpt |
+|-------|--------------|------|------|------------------|-----------------|------------------|---------|-----------|---------|
+<!-- One row per `kill as false positive`; write `None` when there are no rows. Use `—` for nullable or optional fields. -->
+
 ## Verification Integrity
 - Intent spec: [audit scope rationale or `no-intent-spec`]
 - Tests read: [list]
@@ -102,7 +141,7 @@ Read this reference only when rendering the final response. Select the template 
 ## Flow Diagram  <!-- only on request -->
 ```
 
-## Audit post-gate plan (after A4 approval)
+### Audit post-gate plan (after A4 approval)
 
 ```markdown
 ## Targeted Testing Plan
@@ -110,6 +149,15 @@ Read this reference only when rendering the final response. Select the template 
 ### High-value additions
 ### Defer
 ### Misaligned effort
+
+**Test-selection record**
+| Disposition | Regression and impact | Current overlap | Stable contract | Level | Evidence status | Owner or path and semantic anchor | Handoff invariant and next check |
+|-------------|-----------------------|-----------------|-----------------|-------|-----------------|-----------------------------------|----------------------------------|
+
+## Refuted Candidates
+| Claim | Why Excluded | File | Line | Evidence Quality | Evidence Method | Evidence Summary | Command | Exit Code | Excerpt |
+|-------|--------------|------|------|------------------|-----------------|------------------|---------|-----------|---------|
+<!-- One row per `kill as false positive`; write `None` when there are no rows. Use `—` for nullable or optional fields. -->
 
 ## Verification Integrity
 <!-- Preserve A4 evidence limits; name test executors. -->
