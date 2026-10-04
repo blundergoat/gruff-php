@@ -18,20 +18,15 @@ use GruffPhp\Rules\Security\DebugModeEnabledRule;
 use GruffPhp\Rules\Security\DisabledSslVerificationRule;
 use GruffPhp\Rules\Security\ErrorSuppressionRule;
 use GruffPhp\Rules\Security\ExtractCompactUserInputRule;
-use GruffPhp\Rules\Security\GithubActionsRiskyWorkflowRule;
 use GruffPhp\Rules\Security\HeaderInjectionRule;
-use GruffPhp\Rules\Security\InsecureRandomRule;
-use GruffPhp\Rules\Security\PathTraversalFileAccessRule;
 use GruffPhp\Rules\Security\ProcessCommandConstructionRule;
 use GruffPhp\Rules\Security\RequestControlledUrlRule;
-use GruffPhp\Rules\Security\SensitiveDataLoggingRule;
 use GruffPhp\Rules\Security\SilentCatchRule;
 use GruffPhp\Rules\Security\SqlConcatenationRule;
 use GruffPhp\Rules\Security\UnsafeArchiveExtractionRule;
 use GruffPhp\Rules\Security\UnsafeXmlLoadingRule;
 use GruffPhp\Rules\Security\UnsafeUnserializeRule;
 use GruffPhp\Rules\Security\VariableIncludeRule;
-use GruffPhp\Rules\Security\WeakCryptoRule;
 use GruffPhp\Engine\Source\SourceFile;
 use PhpParser\Error;
 use PhpParser\Node\Stmt;
@@ -42,7 +37,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers the security findings users see for dangerous execution, deserialisation, logger data, request input, workflows, and disabled rules.
+ * Covers the security findings users see for dangerous execution, deserialisation, request input, and disabled rules.
  *
  * Focused cases keep safe application code quiet while exact finding lines show which risky call a user needs to review.
  * Registry-wide cases ensure those precision fixes still work as part of a normal Gruff PHP scan.
@@ -51,65 +46,6 @@ final class SecurityRulesTest extends TestCase
 {
     /** Parser used to load fixture files. */
     private PhpFileParser $parser;
-
-    /** Existing composite sinks keep their emissions; only own PR-unreachable secrets become quiet.
-     * @param string $body     - Authored workflow body.
-     * @param int    $expected - Retained secret sink count.
-     * @param string $trigger  - Current mapping trigger syntax.
-     * @return void
-     */
-    #[DataProvider('workflowEventGuardProvider')]
-    public function testWorkflowEventGuards(string $body, int $expected, string $trigger): void
-    {
-        $unit     = new AnalysisUnit(new SourceFile(__FILE__, '.github/workflows/guard.yml'), $trigger . $body, [], [], []);
-        $findings = (new GithubActionsRiskyWorkflowRule())->analyse($unit, new RuleContext(__DIR__, AnalysisConfig::fromRegistry(RuleRegistry::defaults())));
-        $secrets  = array_values(array_filter($findings, static fn(Finding $finding): bool => ($finding->metadata['sink'] ?? null) === 'secrets-in-pr-workflow'));
-        self::assertCount($expected, $secrets);
-    }
-
-    /** Source-owned expression/ownership cases plus PHP's broader two-event policy.
-     * @return array<string, array{string, int, string}> - Named native controls.
-     */
-    public static function workflowEventGuardProvider(): array
-    {
-        return [
-            'expression github.event_name == \'issues\'' => ["jobs:\n  build:\n    if: github.event_name == 'issues'\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 0, "on:\n  pull_request_target:\n"],
-            'expression github.event_name != \'pull_request_target\'' => ["jobs:\n  build:\n    if: github.event_name != 'pull_request_target'\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 0, "on:\n  pull_request_target:\n"],
-            'expression ${{ !(github.event_name == \'pull_request_target\') }}' => ["jobs:\n  build:\n    if: \${{ !(github.event_name == 'pull_request_target') }}\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 0, "on:\n  pull_request_target:\n"],
-            'expression (github.event_name == \'push\' || github.event_name == \'issues\')' => ["jobs:\n  build:\n    if: (github.event_name == 'push' || github.event_name == 'issues')\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 0, "on:\n  pull_request_target:\n"],
-            'expression github.event_name == \'issues\' && inputs.enabled' => ["jobs:\n  build:\n    if: github.event_name == 'issues' && inputs.enabled\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 0, "on:\n  pull_request_target:\n"],
-            'expression inputs.enabled && github.event_name == \'issues\'' => ["jobs:\n  build:\n    if: inputs.enabled && github.event_name == 'issues'\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 0, "on:\n  pull_request_target:\n"],
-            'expression github.event_name == \'PULL_REQUEST_TARGET\'' => ["jobs:\n  build:\n    if: github.event_name == 'PULL_REQUEST_TARGET'\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request_target:\n"],
-            'expression github.event_name == \'pull_request_target\'' => ["jobs:\n  build:\n    if: github.event_name == 'pull_request_target'\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request_target:\n"],
-            'expression github.event_name != \'issues\'' => ["jobs:\n  build:\n    if: github.event_name != 'issues'\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request_target:\n"],
-            'expression inputs.enabled' => ["jobs:\n  build:\n    if: inputs.enabled\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request_target:\n"],
-            'expression github.event_name == \'issues\' || inputs.enabled' => ["jobs:\n  build:\n    if: github.event_name == 'issues' || inputs.enabled\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request_target:\n"],
-            'expression ${{ github.event_name == \'issues\' }} trailing' => ["jobs:\n  build:\n    if: \${{ github.event_name == 'issues' }} trailing\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request_target:\n"],
-            'expression github.event_name == \'issues\' trailing' => ["jobs:\n  build:\n    if: github.event_name == 'issues' trailing\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request_target:\n"],
-            'expression github.event_name == \'issues\' &&' => ["jobs:\n  build:\n    if: github.event_name == 'issues' &&\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request_target:\n"],
-            'expression github.event_name == \'issues\' && contains(inputs.x, \'x\')' => ["jobs:\n  build:\n    if: github.event_name == 'issues' && contains(inputs.x, 'x')\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request_target:\n"],
-            'expression github.event_name == 0' => ["jobs:\n  build:\n    if: github.event_name == 0\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request_target:\n"],
-            'expression !github.event_name == \'issues\'' => ["jobs:\n  build:\n    if: !github.event_name == 'issues'\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request_target:\n"],
-            'ownership 1' => ["jobs:\n  build:\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n    if: github.event_name == 'issues'\n", 0, "on:\n  pull_request_target:\n"],
-            'ownership 2' => ["'jobs':\n  'build':\n    'steps':\n      - 'run': echo \${{ secrets.DEPLOY_TOKEN }}\n        'if': github.event_name == 'issues'\n", 0, "on:\n  pull_request_target:\n"],
-            'ownership 3' => ["jobs:\n  build:\n    steps:\n      - if: github.event_name == 'issues'\n        run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 0, "on:\n  pull_request_target:\n"],
-            'ownership 4' => ["jobs:\n  build:\n    steps:\n      - run: |\n          if: github.event_name == 'issues'\n          echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request_target:\n"],
-            'ownership 5' => ["jobs:\n  build:\n    steps:\n      - run: |\n          echo \${{ secrets.DEPLOY_TOKEN }}\n        if: github.event_name == 'issues'\n", 0, "on:\n  pull_request_target:\n"],
-            'ownership 6' => ["env:\n  TOKEN: \${{ secrets.DEPLOY_TOKEN }}\njobs:\n  build:\n    if: github.event_name == 'issues'\n    steps:\n      - run: echo ready\n", 1, "on:\n  pull_request_target:\n"],
-            'ownership 7' => ["jobs:\n  build:\n    env:\n      TOKEN: \${{ secrets.DEPLOY_TOKEN }}\n    steps:\n      - if: github.event_name == 'issues'\n        run: echo ready\n", 1, "on:\n  pull_request_target:\n"],
-            'ownership 8' => ["jobs:\n  safe:\n    if: github.event_name == 'issues'\n    steps:\n      - run: echo ready\n  build:\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request_target:\n"],
-            'ownership 9' => ["jobs:\n  build:\n    steps:\n      - if: github.event_name == 'issues'\n        run: echo ready\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request_target:\n"],
-            'ownership 10' => ["jobs:\n  build:\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n        with:\n          if: github.event_name == 'issues'\n", 1, "on:\n  pull_request_target:\n"],
-            'ownership 11' => ["jobs:\n  build:\n    if: github.event_name == 'issues'\n    if: inputs.enabled\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request_target:\n"],
-            'ownership 12' => ["jobs:\n  build:\n    if: github.event_name == 'issues'\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n  build:\n    steps:\n      - run: echo ready\n", 1, "on:\n  pull_request_target:\n"],
-            'ownership 13' => ["jobs:\n  build:\n    if: github.event_name == 'issues'\n    env: &shared\n      TOKEN: \${{ secrets.DEPLOY_TOKEN }}\n    steps:\n      - run: echo ready\n", 1, "on:\n  pull_request_target:\n"],
-            'ownership 14' => ["jobs:\n  build:\n    if: github.event_name == 'issues'\n    <<: *shared\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request_target:\n"],
-            'ownership 15' => ["jobs: {build: {if: \"github.event_name == 'issues'\", env: {TOKEN: \${{ secrets.DEPLOY_TOKEN }}}}}\n", 1, "on:\n  pull_request_target:\n"],
-            'both PR events retain not-target job' => ["jobs:\n  build:\n    if: github.event_name != 'pull_request_target'\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request:\n  pull_request_target:\n"],
-            'plain PR guard remains reachable' => ["jobs:\n  build:\n    if: github.event_name == 'PULL_REQUEST'\n    steps:\n      - run: echo \${{ secrets.DEPLOY_TOKEN }}\n", 1, "on:\n  pull_request:\n"],
-            'scalar list alias' => ["jobs:\n  build:\n    if: github.event_name == 'issues'\n    env:\n      TOKEN: \${{ secrets.DEPLOY_TOKEN }}\n    steps:\n      - *shared\n", 1, "on:\n  pull_request_target:\n"],
-        ];
-    }
 
     /**
      * Prepare parser fixtures before each rule test.
@@ -220,42 +156,6 @@ final class SecurityRulesTest extends TestCase
     }
 
     /**
-     * Verify static logger text that names sensitive concepts is not treated as leaked data.
-     *
-     * @return void
-     */
-    public function testStaticSensitiveLoggerMessagesAreNotFlagged(): void
-    {
-        $findings = $this->findingsForRule($this->staticLoggerMessageUnit(), SensitiveDataLoggingRule::ID);
-
-        self::assertSame([], $findings);
-    }
-
-    /**
-     * Verify runtime sensitive log values still produce findings.
-     *
-     * @return void
-     */
-    public function testSensitiveLoggerRuntimeValuesStillFlagged(): void
-    {
-        $findings = $this->findingsForRule($this->runtimeLoggerValueUnit(), SensitiveDataLoggingRule::ID);
-
-        self::assertCount(2, $findings);
-    }
-
-    /**
-     * Verify LLM usage counters stay loggable while credential-shaped and singular token values still produce warnings.
-     *
-     * @return void
-     */
-    public function testTokenUsageMetricsAreNotTreatedAsCredentials(): void
-    {
-        $findings = $this->findingsForRule($this->tokenContextLoggerUnit(), SensitiveDataLoggingRule::ID);
-
-        self::assertSame([15, 16, 17], self::findingLines($findings));
-    }
-
-    /**
      * Verify request data security heuristics detected.
      *
      * @return void
@@ -267,8 +167,6 @@ final class SecurityRulesTest extends TestCase
         self::assertRuleCount(UnsafeUnserializeRule::ID, 1, $findings);
         self::assertRuleCount(HeaderInjectionRule::ID, 2, $findings);
         self::assertRuleCount(ExtractCompactUserInputRule::ID, 3, $findings);
-        self::assertRuleCount(WeakCryptoRule::ID, 3, $findings);
-        self::assertRuleCount(InsecureRandomRule::ID, 3, $findings);
         self::assertRuleCount(ErrorSuppressionRule::ID, 1, $findings);
         self::assertRuleCount(SilentCatchRule::ID, 1, $findings);
     }
@@ -300,7 +198,6 @@ final class SecurityRulesTest extends TestCase
             'named extract arguments resolve' => ['named-argument-sinks.php', ExtractCompactUserInputRule::ID, [19, 20]],
             'named ini_set arguments resolve' => ['named-argument-sinks.php', DebugModeEnabledRule::ID, [25, 26]],
             'named curl_setopt arguments resolve' => ['named-argument-sinks.php', DisabledSslVerificationRule::ID, [31, 32]],
-            'named path arguments resolve' => ['named-argument-sinks.php', PathTraversalFileAccessRule::ID, [37, 38]],
             'named xml arguments resolve' => ['named-argument-sinks.php', UnsafeXmlLoadingRule::ID, [43, 44]],
             // 104: a callable parameter in a sibling function no longer proves this one's variable. 111, 112, 114:
             // request-chosen targets, including through Closure::fromCallable and a first-class `$x(...)` reference.
@@ -451,23 +348,9 @@ final class SecurityRulesTest extends TestCase
         $findings = $this->analyse('cumulative-security.php');
 
         self::assertRuleCount(ProcessCommandConstructionRule::ID, 1, $findings);
-        self::assertRuleCount(PathTraversalFileAccessRule::ID, 1, $findings);
         self::assertRuleCount(RequestControlledUrlRule::ID, 1, $findings);
         self::assertRuleCount(UnsafeXmlLoadingRule::ID, 1, $findings);
         self::assertRuleCount(UnsafeArchiveExtractionRule::ID, 1, $findings);
-        self::assertRuleCount(SensitiveDataLoggingRule::ID, 1, $findings);
-    }
-
-    /**
-     * Verify risky GitHub Actions workflow patterns detected.
-     *
-     * @return void
-     */
-    public function testGithubActionsWorkflowRisksDetected(): void
-    {
-        $findings = $this->analyse('.github/workflows/risky-workflow.yml');
-
-        self::assertRuleCount(GithubActionsRiskyWorkflowRule::ID, 6, $findings);
     }
 
     /**
@@ -477,10 +360,7 @@ final class SecurityRulesTest extends TestCase
      */
     public function testSafeWrappersAndLiteralPatternsAreNotFlagged(): void
     {
-        $findings = [
-            ...$this->analyse('safe-patterns.php'),
-            ...$this->analyse('.github/workflows/safe-workflow.yml'),
-        ];
+        $findings = $this->analyse('safe-patterns.php');
 
         $securityFindings = array_values(array_filter(
                                              $findings,
@@ -510,10 +390,7 @@ final class SecurityRulesTest extends TestCase
     public function testCumulativeSecurityFixtureCoversEverySecurityRuleWithoutDuplicateFindings(): void
     {
         $findings = array_values(array_filter(
-                                     [
-                                         ...$this->analyse('cumulative-security.php'),
-                                         ...$this->analyse('.github/workflows/cumulative-workflow.yml'),
-                                     ],
+                                     $this->analyse('cumulative-security.php'),
                                      static fn(Finding $finding): bool => str_starts_with($finding->ruleId, 'security.'),
                                  ));
 
@@ -521,21 +398,16 @@ final class SecurityRulesTest extends TestCase
         $expectedRuleIds = [
             DangerousFunctionCallRule::ID,
             ProcessCommandConstructionRule::ID,
-            PathTraversalFileAccessRule::ID,
             RequestControlledUrlRule::ID,
             UnsafeXmlLoadingRule::ID,
             UnsafeArchiveExtractionRule::ID,
-            SensitiveDataLoggingRule::ID,
-            GithubActionsRiskyWorkflowRule::ID,
             UnsafeUnserializeRule::ID,
-            WeakCryptoRule::ID,
             VariableIncludeRule::ID,
             SqlConcatenationRule::ID,
             HeaderInjectionRule::ID,
             ErrorSuppressionRule::ID,
             SilentCatchRule::ID,
             ExtractCompactUserInputRule::ID,
-            InsecureRandomRule::ID,
             DisabledSslVerificationRule::ID,
         ];
 
@@ -816,91 +688,6 @@ final class CallableCollectionFixture
 }
 PHP,
             'tests/Fixtures/Security/inline-callable-collection.php',
-        );
-    }
-
-    /**
-     * Parse the static logger message fixture into an analysis unit.
-     *
-     * @return AnalysisUnit - unit whose constant log messages only mention secret-like words, so SensitiveDataLoggingRule must stay clean
-     */
-    private function staticLoggerMessageUnit(): AnalysisUnit
-    {
-        // Constant log messages that merely mention secret-like words are not leaks; this fixture must stay clean.
-        return $this->parseSource(
-            <<<'PHP'
-<?php
-
-final class StaticLoggerMessageFixture
-{
-    public function record(object $logger): void
-    {
-        $logger->info('flushing PreferenceAuthUser and AuthCredential', ['method' => __METHOD__, 'line' => __LINE__]);
-        $logger->info('user already has a valid AuthCredentialToken', ['method' => __METHOD__, 'line' => __LINE__]);
-        $logger->warning('token refresh skipped for a static branch');
-    }
-}
-PHP,
-            'tests/Fixtures/Security/inline-static-logger-message.php',
-        );
-    }
-
-    /**
-     * Parse the runtime logger value fixture into an analysis unit.
-     *
-     * @return AnalysisUnit - unit logging a runtime $password and a token-keyed context, the genuine leaks the rule must catch
-     */
-    private function runtimeLoggerValueUnit(): AnalysisUnit
-    {
-        // Logging a runtime $password and a token-keyed context is the genuine leak the rule must catch here.
-        return $this->parseSource(
-            <<<'PHP'
-<?php
-
-final class RuntimeLoggerValueFixture
-{
-    public function record(object $logger, string $password, string $token): void
-    {
-        $logger->warning($password);
-        $logger->info('token refresh failed', ['token' => $token]);
-    }
-}
-PHP,
-            'tests/Fixtures/Security/inline-runtime-logger-value.php',
-        );
-    }
-
-    /**
-     * Parse logs containing safe LLM counters and real credential tokens, matching what an API client may record after a request.
-     *
-     * @return AnalysisUnit - log calls whose usage and first-token timing metrics stay quiet while credential contexts flag on lines 15 to 17
-     */
-    private function tokenContextLoggerUnit(): AnalysisUnit
-    {
-        // An API client may log provider usage after a response, but logging credential or ambiguous singular token values must still warn the user.
-        return $this->parseSource(
-            <<<'PHP'
-<?php
-
-final class TokenContextLoggerFixture
-{
-    public function record(object $logger, array $usage): void
-    {
-        $inputTokens       = $usage['input'];
-        $outputTokens      = $usage['output'];
-        $totalTokens       = $usage['total'];
-        $cachedInputTokens = $usage['cached'];
-
-        $logger->info('usage', [$inputTokens, $outputTokens, $totalTokens, $cachedInputTokens]);
-        $logger->info('usage', ['gen_ai.usage.input_tokens' => $usage['input']]);
-        $logger->info('timing', ['ttft_ms' => $usage['timeToFirstTextTokenMs']]);
-        $logger->warning('credential', ['access_token' => $usage['access']]);
-        $logger->warning('credential', ['refresh_token' => $usage['refresh']]);
-        $logger->warning('credential', ['input_token' => $usage['inputToken']]);
-    }
-}
-PHP,
-            'tests/Fixtures/Security/inline-token-context-logger.php',
         );
     }
 

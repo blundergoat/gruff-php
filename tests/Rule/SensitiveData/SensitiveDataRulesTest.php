@@ -6,9 +6,8 @@ namespace GruffPhp\Tests\Rule\SensitiveData;
 
 use GruffPhp\Engine\Config\AnalysisConfig;
 use GruffPhp\Engine\Config\ConfigLoader;
-use GruffPhp\Results\Finding\Confidence;
+use GruffPhp\Engine\Config\RuleSettings;
 use GruffPhp\Results\Finding\Finding;
-use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Engine\Parser\PhpFileParser;
 use GruffPhp\Rules\Contracts\RuleContext;
@@ -16,8 +15,6 @@ use GruffPhp\Rules\RuleRegistry;
 use GruffPhp\Rules\SensitiveData\ApiKeyPatternRule;
 use GruffPhp\Rules\SensitiveData\AwsAccessKeyRule;
 use GruffPhp\Rules\SensitiveData\DatabaseUrlPasswordRule;
-use GruffPhp\Rules\SensitiveData\HardcodedEnvValueRule;
-use GruffPhp\Rules\SensitiveData\HighEntropyStringRule;
 use GruffPhp\Rules\SensitiveData\JwtTokenRule;
 use GruffPhp\Rules\SensitiveData\PhiPatternRule;
 use GruffPhp\Rules\SensitiveData\PiiTestFixtureRule;
@@ -33,7 +30,7 @@ use Symfony\Component\Process\Process;
 /**
  * Covers the safe sensitive-data findings users receive from source, config, fixtures, and CLI reports.
  *
- * Scenarios protect fixed markers, PHI/PII context, placeholders, comments, entropy exclusions, occurrence counts, and renderer containment.
+ * Scenarios protect fixed markers, PHI/PII context, placeholders, comments, occurrence counts, and renderer containment.
  * Users exercise these paths when source analysis or a rendered report encounters credential-like content.
  */
 final class SensitiveDataRulesTest extends TestCase
@@ -55,10 +52,6 @@ final class SensitiveDataRulesTest extends TestCase
         self::assertRuleCount(ApiKeyPatternRule::ID, 14, $findings);
         self::assertRuleCount(JwtTokenRule::ID, 1, $findings);
         self::assertRuleCount(DatabaseUrlPasswordRule::ID, 1, $findings);
-        self::assertRuleCount(HardcodedEnvValueRule::ID, 1, $findings);
-        // One, not three: the fixture's pure-hex digest is a checksum, skipped at any entropy bar since 2026-09-19, and
-        // its digit-free mixed-case alphabet run holds no digit, which FAMILY-CONTRACT section 12 requires since 2026-09-25.
-        self::assertRuleCount(HighEntropyStringRule::ID, 1, $findings);
         self::assertRuleCount(PrivateKeyRule::ID, 1, $findings);
 
         $messages      = implode("\n", array_map(static fn(Finding $finding): string => $finding->message, $findings));
@@ -118,8 +111,6 @@ final class SensitiveDataRulesTest extends TestCase
         $findings = $this->analyseUnits([$unit]);
 
         self::assertRuleCount(DatabaseUrlPasswordRule::ID, 1, $findings);
-        self::assertRuleCount(HardcodedEnvValueRule::ID, 1, $findings);
-        self::assertRuleCount(HighEntropyStringRule::ID, 1, $findings);
     }
 
     /**
@@ -185,158 +176,9 @@ final class SensitiveDataRulesTest extends TestCase
         self::assertRuleCount(AwsAccessKeyRule::ID, 0, $findings);
         self::assertRuleCount(JwtTokenRule::ID, 0, $findings);
         self::assertRuleCount(DatabaseUrlPasswordRule::ID, 0, $findings);
-        self::assertRuleCount(HardcodedEnvValueRule::ID, 0, $findings);
-        self::assertRuleCount(HighEntropyStringRule::ID, 0, $findings);
         self::assertRuleCount(PhiPatternRule::ID, 0, $findings);
         self::assertRuleCount(PiiTestFixtureRule::ID, 0, $findings);
         self::assertRuleCount(PrivateKeyRule::ID, 1, $findings);
-    }
-
-    /**
-     * Verify hardcoded env value requires secret like value evidence.
-     *
-     * @return void
-     */
-    public function testHardcodedEnvValueRequiresSecretLikeValueEvidence(): void
-    {
-        $path = tempnam(sys_get_temp_dir(), 'gruff-safe-env-');
-        self::assertIsString($path);
-        $path   .= '.php';
-        $source = "<?php\n\n"
-                  . 'const QBO_ACCESS_TOKEN_EXPIRES_AT = ' . var_export('accessTokenExpiresAt', true) . ";\n"
-                  . 'const QBO_REFRESH_TOKEN_VALID_PERIOD = ' . var_export('refreshTokenValidationPeriod', true) . ";\n"
-                  . 'const ACCESS_TOKEN_PAYMENTS_KEY = ' . var_export('AirwallexApiRequester.payments', true) . ";\n"
-                  . '$header = ' . var_export('AUTH_MODE_X_' . 'API_KEY=x-api-key', true) . ";\n"
-                  . '$prefix = ' . var_export('TOKEN_CACHE_' . 'KEY_PREFIX=voice.' . 'olb.oauth_token.pg_', true) . ";\n"
-                  . '$formId = ' . var_export('OLB_VOICE_CSRF_' . 'TOKEN_ID=olb_voice_agent', true) . ";\n"
-                  . '$secret = ' . var_export('API_TOKEN=' . 'qR8vT3mK6p' . 'L9xS2nD4eG', true) . ";\n";
-        self::assertNotFalse(file_put_contents($path, $source));
-
-        try {
-            $unit     = (new PhpFileParser())->parse(new SourceFile($path, 'tests/Fixtures/SensitiveData/inline-env-values.php'));
-            $findings = array_values(array_filter(
-                                         $this->analyseUnits([$unit]),
-                                         static fn(Finding $finding): bool => $finding->ruleId === HardcodedEnvValueRule::ID,
-            ));
-
-            self::assertCount(1, $findings);
-            self::assertSame('[redacted]', $findings[0]->metadata['preview'] ?? null);
-        } finally {
-            self::assertTrue(unlink($path));
-        }
-    }
-
-    /**
-     * Verify a literal without both a letter and a digit stays quiet while one mixing them still reports.
-     *
-     * FAMILY-CONTRACT section 12's floor: a lowercase-only or uppercase-only run clears the entropy bar by construction,
-     * and a digit-free mix of cases is an identifier. The single-class literal is the OOXML MIME type gruff-php reported twelve times in the
-     * family corpus; the mixed literal is assembled from parts so this file stores none whole.
-     *
-     * @return void
-     */
-    public function testHighEntropyNeedsALetterAndADigit(): void
-    {
-        $path = tempnam(sys_get_temp_dir(), 'gruff-class-entropy-');
-        self::assertIsString($path);
-        $path  .= '.php';
-        $lower  = 'application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml';
-        $source = "<?php\n\n"
-                  . '$lower = ' . var_export($lower, true) . ";\n"
-                  . '$upper = ' . var_export(strtoupper($lower), true) . ";\n"
-                  . '$camel = ' . var_export('VxEzAaWdSdWcVvUvRyYa' . 'BvKvBgDqLcQsTgDdKeFmPdRjP', true) . ";\n"
-                  . '$mixed = ' . var_export('k3j9x2m7q1w8e5r4' . 't6y0u9i8o7p6a5s4' . 'd3f2g1h0zb', true) . ";\n";
-        self::assertNotFalse(file_put_contents($path, $source));
-
-        try {
-            $unit     = (new PhpFileParser())->parse(new SourceFile($path, 'tests/Fixtures/SensitiveData/inline-class-entropy.php'));
-            $findings = array_values(array_filter(
-                                         $this->analyseUnits([$unit]),
-                                         static fn(Finding $finding): bool => $finding->ruleId === HighEntropyStringRule::ID,
-            ));
-
-            self::assertSame([6], array_map(static fn(Finding $finding): ?int => $finding->line, $findings));
-        } finally {
-            self::assertTrue(unlink($path));
-        }
-    }
-
-    /**
-     * Verify a public PEM block's base64 body stays quiet while the same body reports outside armour and inside a
-     * private key's block.
-     *
-     * A certificate is public by construction (FAMILY-CONTRACT section 12). The body and the private-key label are
-     * assembled from parts so this file stores neither whole.
-     *
-     * @return void
-     */
-    public function testHighEntropySkipsPublicPemArmour(): void
-    {
-        $path = tempnam(sys_get_temp_dir(), 'gruff-pem-entropy-');
-        self::assertIsString($path);
-        $path   .= '.php';
-        $body    = 'k3j9x2m7q1w8e5r4' . 't6y0u9i8o7p6a5s4' . 'd3f2g1h0zb';
-        $private = 'RSA PRIVATE' . ' KEY';
-        $wrap    = static fn(string $label): string => '"-----BEGIN ' . $label . '-----\n" . ' . var_export($body, true)
-            . ' . "\n-----END ' . $label . '-----"';
-        $source  = "<?php\n\n"
-                   . '$certificate = ' . $wrap('CERTIFICATE') . ";\n"
-                   . '$bare = ' . var_export($body, true) . ";\n"
-                   . '$key = ' . $wrap($private) . ";\n";
-        self::assertNotFalse(file_put_contents($path, $source));
-
-        try {
-            $unit     = (new PhpFileParser())->parse(new SourceFile($path, 'tests/Fixtures/SensitiveData/inline-pem-entropy.php'));
-            $findings = array_values(array_filter(
-                                         $this->analyseUnits([$unit]),
-                                         static fn(Finding $finding): bool => $finding->ruleId === HighEntropyStringRule::ID,
-            ));
-
-            self::assertSame([4, 5], array_map(static fn(Finding $finding): ?int => $finding->line, $findings));
-        } finally {
-            self::assertTrue(unlink($path));
-        }
-    }
-
-    /**
-     * Verify markers that wrap code rather than a PEM body exempt nothing between them.
-     *
-     * Header and footer constants wrap a secret on line 4, and public markers on lines 6 and 8 wrap a private key's
-     * block on line 7: a block ends at the next marker and holds only base64, so both still report. On line 9 a
-     * one-line block breaks at its escaped line breaks, so its header vouches for nothing after it.
-     *
-     * @return void
-     */
-    public function testHighEntropyReportsBetweenMarkersThatAreNotABlock(): void
-    {
-        $path = tempnam(sys_get_temp_dir(), 'gruff-pem-markers-');
-        self::assertIsString($path);
-        $path   .= '.php';
-        $body    = 'k3j9x2m7q1w8e5r4' . 't6y0u9i8o7p6a5s4' . 'd3f2g1h0zb';
-        $private = 'RSA PRIVATE' . ' KEY';
-        $openingLiteral = var_export('-----BEGIN CERTIFICATE-----', true);
-        $closingLiteral = var_export('-----END CERTIFICATE-----', true);
-        $source  = "<?php\n\n"
-                   . '$header = ' . $openingLiteral . ";\n"
-                   . '$secret = ' . var_export($body, true) . ";\n"
-                   . '$footer = ' . $closingLiteral . ";\n"
-                   . '$outer = ' . $openingLiteral . ";\n"
-                   . '$key = "-----BEGIN ' . $private . '-----\n" . ' . var_export($body, true) . ' . "\n-----END ' . $private . '-----";' . "\n"
-                   . '$close = ' . $closingLiteral . ";\n"
-                   . '$a = "-----BEGIN CERTIFICATE-----\nComment: x\n"; $k = ' . var_export($body, true) . '; $b = ' . $closingLiteral . ";\n";
-        self::assertNotFalse(file_put_contents($path, $source));
-
-        try {
-            $unit     = (new PhpFileParser())->parse(new SourceFile($path, 'tests/Fixtures/SensitiveData/inline-pem-markers.php'));
-            $findings = array_values(array_filter(
-                                         $this->analyseUnits([$unit]),
-                                         static fn(Finding $finding): bool => $finding->ruleId === HighEntropyStringRule::ID,
-            ));
-
-            self::assertSame([4, 7, 9], array_map(static fn(Finding $finding): ?int => $finding->line, $findings));
-        } finally {
-            self::assertTrue(unlink($path));
-        }
     }
 
     /**
@@ -379,209 +221,6 @@ final class SensitiveDataRulesTest extends TestCase
     }
 
     /**
-     * Verify route and URL path literals are not treated as high-entropy secrets.
-     *
-     * @return void
-     */
-    public function testHighEntropyRoutePathsAreNotFlagged(): void
-    {
-        $path = tempnam(sys_get_temp_dir(), 'gruff-route-entropy-');
-        self::assertIsString($path);
-        $path   .= '.php';
-        $secret = 'M7qP2vL9' . 'xZ4aB8nC' . '3dF6gH1j' . 'K5mN0rS2' . 'tV9wY4zQ';
-        $source = "<?php\n\n"
-                  . '$help = ' . var_export('/hc/en-au/sections/360005188513-Appointments', true) . ";\n"
-                  . '$report = ' . var_export('/hc/en-au/sections/360005149694-Communication-Report', true) . ";\n"
-                  . '$secret = ' . var_export($secret, true) . ";\n";
-        self::assertNotFalse(file_put_contents($path, $source));
-
-        try {
-            $unit     = (new PhpFileParser())->parse(new SourceFile($path, 'tests/Fixtures/SensitiveData/inline-route-entropy.php'));
-            $findings = array_values(array_filter(
-                                         $this->analyseUnits([$unit]),
-                                         static fn(Finding $finding): bool => $finding->ruleId === HighEntropyStringRule::ID,
-            ));
-
-            self::assertCount(1, $findings);
-            self::assertSame('[redacted]', $findings[0]->metadata['preview'] ?? null);
-        } finally {
-            self::assertTrue(unlink($path));
-        }
-    }
-
-    /**
-     * Verify opaque dotted tokens stay entropy-eligible while JWTs remain the JWT rule's alone.
-     *
-     * @return void
-     */
-    public function testDottedOpaqueTokensAreEntropyEligibleWhileJwtsStayDelegated(): void
-    {
-        $tempPath = tempnam(sys_get_temp_dir(), 'gruff-dotted-token-entropy-');
-        self::assertIsString($tempPath);
-        $path = $tempPath . '.php';
-        self::assertTrue(rename($tempPath, $path));
-        // Both tokens are concatenated from short chunks so this test file's own source never
-        // matches gruff's secret scanners; only the generated fixture carries the full literals.
-        $opaqueToken = 'vTr4K2mQ.9fXZ81beLKw' . '72mYh37Rp.hV5c2LqN8d' . 'WjS6xTAGy';
-        $sampleJwt   = 'eyJhbGciOiJIUzI1NiIs' . 'InR5cCI6IkpXVCJ9.eyJ' . 'zdWIiOiIxMjM0NTY3ODkw' . 'In0.dozjgNryP4J3jVmN' . 'Hl0w5N65nCX63nCz';
-        $source      = "<?php\n\n"
-                  . '$sessionToken = ' . var_export($opaqueToken, true) . ";\n"
-                  . '$sampleJwt = ' . var_export($sampleJwt, true) . ";\n"
-                  . '$routeName = ' . var_export('authentication.permissions.middleware-groups', true) . ";\n"
-                  . '$versionLabel = ' . var_export('3.11.4-security-hardening-release-notes', true) . ";\n"
-                  . '$metricsDomain = ' . var_export('telemetry.blundergoat-analytics.example', true) . ";\n"
-                  . '$archivePath = ' . var_export('storage/app.private/uploads.tmp/archive-name.tar.gz', true) . ";\n";
-        try {
-            self::assertNotFalse(file_put_contents($path, $source));
-
-            $unit        = (new PhpFileParser())->parse(new SourceFile($path, 'tests/Fixtures/SensitiveData/inline-dotted-token-entropy.php'));
-            $findings    = $this->analyseUnits([$unit]);
-            $highEntropy = array_values(array_filter(
-                                            $findings,
-                                            static fn(Finding $finding): bool => $finding->ruleId === HighEntropyStringRule::ID,
-                                        ));
-            $jwtFindings = array_values(array_filter(
-                                            $findings,
-                                            static fn(Finding $finding): bool => $finding->ruleId === JwtTokenRule::ID,
-                                        ));
-
-            // The opaque dotted token reports as high entropy only; the JWT reports under the JWT rule only
-            // (no double report); the dotted route, version, domain, and path literals all stay silent.
-            self::assertCount(1, $highEntropy);
-            self::assertSame(3, $highEntropy[0]->line);
-            self::assertSame('[redacted]', $highEntropy[0]->metadata['preview'] ?? null);
-            self::assertCount(1, $jwtFindings);
-            self::assertSame(4, $jwtFindings[0]->line);
-        } finally {
-            self::assertTrue(unlink($path));
-        }
-    }
-
-    /**
-     * Verify gruff configuration path literals are not treated as high-entropy secrets.
-     *
-     * @return void
-     */
-    public function testHighEntropyGruffConfigPathsAreNotFlagged(): void
-    {
-        $path = tempnam(sys_get_temp_dir(), 'gruff-config-path-entropy-');
-        self::assertIsString($path);
-        $path   .= '.php';
-        $secret = 'M7qP2vL9' . 'xZ4aB8nC' . '3dF6gH1j' . 'K5mN0rS2' . 'tV9wY4zQ';
-        $source = "<?php\n\n"
-                  . '$configPath = ' . var_export('rules.naming.identifier-quality.excludeFromScore', true) . ";\n"
-                  . '$secret = ' . var_export($secret, true) . ";\n";
-        self::assertNotFalse(file_put_contents($path, $source));
-
-        try {
-            $unit     = (new PhpFileParser())->parse(new SourceFile($path, 'tests/Fixtures/SensitiveData/inline-config-path-entropy.php'));
-            $findings = array_values(array_filter(
-                                         $this->analyseUnits([$unit]),
-                                         static fn(Finding $finding): bool => $finding->ruleId === HighEntropyStringRule::ID,
-            ));
-
-            self::assertCount(1, $findings);
-            self::assertSame('[redacted]', $findings[0]->metadata['preview'] ?? null);
-        } finally {
-            self::assertTrue(unlink($path));
-        }
-    }
-
-    /**
-     * Verify an HTML image attribute naming an existing image beside its page is not a high-entropy secret.
-     *
-     * Fixture purpose: mutillidae's sixth-review case 4 shows ./images/refresh-button-48px-by-48px.png from src/show-log.php.
-     * Stable contract: only a whole src or href value resolving to an existing image inside the project, without a symlink,
-     * stays quiet; a missing image, extra text, a path leaving the project, a symlinked folder, a value outside an attribute
-     * and an opaque token still report.
-     *
-     * @return void
-     */
-    public function testHighEntropyImageAttributeNamingAnExistingFileIsNotFlagged(): void
-    {
-        $base    = sys_get_temp_dir() . '/gruff-image-attribute-' . bin2hex(random_bytes(6));
-        $project = $base . '/project';
-        $image   = 'refresh-button-48px-by-48px.png';
-        $opaque  = 'k9Qz7Lm2' . 'Xv4Pb8Rt' . '6Yw1Nc3H' . 'd5Fg0Js2Tq';
-        $lines   = [
-            '<span><img width="32px" height="32px" src="./images/' . $image . '" />Refresh Logs</span>',
-            '<a href="./images/' . $image . '">Refresh</a>',
-            '<img src="./images/refresh-button-missing-48px-by-48px.png" />',
-            '<img src="./images/' . $image . '.orig" />',
-            '<img src="../../outside/' . $image . '" />',
-            '<img src="./linked/' . $image . '" />',
-            '<?php $icon = \'./images/' . $image . '\'; ?>',
-            '<img src="' . $opaque . '" />',
-            '<img src="./linked/../images/' . $image . '" />',
-            '<img src="./missing/../images/' . $image . '" />',
-            '<img src="./images/' . $image . '/../' . $image . '" />',
-            '<img src="./images/../images/' . $image . '" />',
-        ];
-        self::assertTrue(mkdir($project . '/src/images', 0o777, true));
-        self::assertTrue(mkdir($base . '/outside'));
-        self::assertNotFalse(file_put_contents($project . '/src/images/' . $image, 'image bytes'));
-        self::assertNotFalse(file_put_contents($base . '/outside/' . $image, 'image bytes'));
-        self::assertTrue(symlink($project . '/src/images', $project . '/src/linked'));
-        self::assertNotFalse(file_put_contents($project . '/src/show-log.php', implode("\n", $lines) . "\n"));
-
-        try {
-            $registry    = RuleRegistry::defaults();
-            $unit        = (new PhpFileParser())->parse(new SourceFile($project . '/src/show-log.php', 'src/show-log.php'));
-            $lineNumbers = array_map(
-                static fn(Finding $finding): ?int => $finding->line,
-                array_values(array_filter(
-                    $registry->analyse([$unit], new RuleContext($project, AnalysisConfig::fromRegistry($registry))),
-                    static fn(Finding $finding): bool => $finding->ruleId === HighEntropyStringRule::ID,
-                )),
-            );
-            sort($lineNumbers);
-
-            self::assertSame([3, 4, 5, 6, 7, 8, 9, 10, 11], $lineNumbers);
-        } finally {
-            // The tree is synthetic; remove the link itself, never the folder it points to, before the real folders.
-            unlink($project . '/src/show-log.php');
-            unlink($project . '/src/linked');
-            unlink($project . '/src/images/' . $image);
-            unlink($base . '/outside/' . $image);
-            rmdir($project . '/src/images');
-            rmdir($project . '/src');
-            rmdir($project);
-            rmdir($base . '/outside');
-            rmdir($base);
-        }
-    }
-
-    /**
-     * Verify medical terminology metadata is not treated as embedded secret material.
-     *
-     * @return void
-     */
-    public function testHighEntropyMedicalStandardMetadataIsNotFlagged(): void
-    {
-        $path = tempnam(sys_get_temp_dir(), 'gruff-medical-entropy-');
-        self::assertIsString($path);
-        $path   .= '.php';
-        $secret = 'M7qP2vL9' . 'xZ4aB8nC' . '3dF6gH1j' . 'K5mN0rS2' . 'tV9wY4zQ';
-        $source = "<?php\n\n"
-                  . '$metadata = ' . var_export('{"ConceptCode":"A","CodeSystemOID":"2.16.840.1.113883.5.83","CodeSystemCode":"PH_ObservationInterpretation_HL7_V3","ValueSetCode":"PHVS_ObservationInterpretation_HL7_V3"}', true) . ";\n"
-                  . '$secret = ' . var_export($secret, true) . ";\n";
-        self::assertNotFalse(file_put_contents($path, $source));
-
-        try {
-            $unit     = (new PhpFileParser())->parse(new SourceFile($path, 'tests/Fixtures/SensitiveData/inline-medical-entropy.php'));
-            $findings = array_values(array_filter(
-                                         $this->analyseUnits([$unit]),
-                                         static fn(Finding $finding): bool => $finding->ruleId === HighEntropyStringRule::ID,
-            ));
-
-            self::assertCount(1, $findings);
-            self::assertSame('[redacted]', $findings[0]->metadata['preview'] ?? null);
-        } finally {
-            self::assertTrue(unlink($path));
-        }
-    }
-
-    /**
      * Verify placeholder PHI examples are suppressed without muting real-looking values.
      *
      * @return void
@@ -613,59 +252,6 @@ final class SensitiveDataRulesTest extends TestCase
         } finally {
             self::assertTrue(unlink($path));
         }
-    }
-
-    /**
-     * Threshold configurations and the entropy-rule lines each must report.
-     *
-     * @return array<string, array{0: string|null, 1: list<int>}> - config fixture path, or null for defaults, and the exact lines
-     */
-    public static function highEntropyThresholdCases(): array
-    {
-        return [
-            // Defaults: 32 characters and 4.2 bits. Line 3 carries 4.0 bits, line 5 is 24 characters, line 6 is hex,
-            // and line 7 concatenates a 34-character literal onto a short one.
-            'defaults report only the long, high-entropy literals' => [null, [4, 7]],
-            // A lowered bar admits line 3's 4.0 bits, and a pure-hex digest still stays silent.
-            'entropy 3.5 admits the 4.0-bit literal, never the digest' => ['tests/Fixtures/Config/high-entropy-entropy-3-5.yaml', [3, 4, 7]],
-            'minLength 48 excludes the 34-character literals' => ['tests/Fixtures/Config/high-entropy-min-length-48.yaml', []],
-            // Below 32 the candidate pattern itself must widen, or a lowered minLength would do nothing.
-            'minLength 20 admits the 24-character literal' => ['tests/Fixtures/Config/high-entropy-min-length-20.yaml', [4, 5, 7]],
-            // The widened pattern must not pair the `'.'` between line 7's literals and swallow the secret's quote.
-            'minLength 1 keeps each literal whole' => ['tests/Fixtures/Config/high-entropy-min-length-1.yaml', [4, 5, 7]],
-            // Past PCRE's repeat limit the pattern must still compile, or the rule would warn and report nothing.
-            'minLength 70000 compiles and reports nothing' => ['tests/Fixtures/Config/high-entropy-min-length-70000.yaml', []],
-        ];
-    }
-
-    /**
-     * Verify both configured thresholds are load-bearing in both directions, read through project configuration the
-     * way a user's `.gruff-php.yaml` reaches the rule, and that the rule keeps the decided family contract.
-     *
-     * @param string|null $configPath    - Project-relative config fixture, or null for registry defaults.
-     * @param list<int>   $expectedLines - Exact lines of `entropy-thresholds.php` the rule must report.
-     *
-     * @return void
-     */
-    #[DataProvider('highEntropyThresholdCases')]
-    public function testHighEntropyThresholdsAreLoadBearing(?string $configPath, array $expectedLines): void
-    {
-        $registry = RuleRegistry::defaults();
-        $config   = $configPath === null ? null : (new ConfigLoader(self::PROJECT_ROOT))->load($configPath, $registry);
-        $findings = $this->analyseUnits([$this->unitForPath('tests/Fixtures/SensitiveData/entropy-thresholds.php')], $config);
-        $lines    = array_values(array_map(
-            static fn(Finding $finding): ?int => $finding->line,
-            array_filter($findings, static fn(Finding $finding): bool => $finding->ruleId === HighEntropyStringRule::ID),
-        ));
-
-        self::assertSame($expectedLines, $lines);
-
-        // The family contract decided on 2026-09-02: warning, medium confidence, on by default, 32 and 4.2.
-        $definition = (new HighEntropyStringRule())->definition();
-        self::assertSame(Severity::Warning, $definition->defaultSeverity);
-        self::assertSame(Confidence::Medium, $definition->confidence);
-        self::assertTrue($definition->isEnabledByDefault);
-        self::assertEquals(['minLength' => 32, 'entropy' => 4.2], $definition->defaultThresholds);
     }
 
     /**
@@ -724,7 +310,7 @@ final class SensitiveDataRulesTest extends TestCase
     {
         $registry = RuleRegistry::defaults();
         $config   = (new ConfigLoader(self::PROJECT_ROOT))->load(
-            'tests/Fixtures/Config/disable-high-entropy.yaml',
+            'tests/Fixtures/Config/disable-jwt-token.yaml',
             $registry,
         );
         $findings = $this->analyseUnits(
@@ -732,7 +318,7 @@ final class SensitiveDataRulesTest extends TestCase
             $config,
         );
 
-        self::assertRuleCount(HighEntropyStringRule::ID, 0, $findings);
+        self::assertRuleCount(JwtTokenRule::ID, 0, $findings);
         self::assertRuleCount(AwsAccessKeyRule::ID, 1, $findings);
     }
 
@@ -793,7 +379,7 @@ final class SensitiveDataRulesTest extends TestCase
      * Analyse sensitive-data fixtures and return findings for assertions.
      *
      * @param list<AnalysisUnit> $units - Pre-parsed units to run the default rule set over.
-     * @param ?AnalysisConfig    $config - Override config; null applies the registry defaults.
+     * @param ?AnalysisConfig    $config - Override config; null applies the registry defaults with the database-URL rule switched on.
      *
      * @return list<Finding> - aggregated findings the default rule set produced across the units; empty when none fired
      */
@@ -803,8 +389,30 @@ final class SensitiveDataRulesTest extends TestCase
 
         return $registry->analyse(
             $units,
-            new RuleContext(self::PROJECT_ROOT, $config ?? AnalysisConfig::fromRegistry($registry)),
+            new RuleContext(self::PROJECT_ROOT, $config ?? self::configWithDatabaseUrlRule($registry)),
         );
+    }
+
+    /**
+     * Builds the default config with the database-URL rule switched on, since it ships off by default.
+     *
+     * @param RuleRegistry $registry - Default registry the config is seeded from.
+     *
+     * @return AnalysisConfig - registry defaults with `sensitive-data.database-url-password` enabled
+     */
+    private static function configWithDatabaseUrlRule(RuleRegistry $registry): AnalysisConfig
+    {
+        $config   = AnalysisConfig::fromRegistry($registry);
+        $settings = $config->ruleSettings(DatabaseUrlPasswordRule::ID);
+
+        // It ships off by default; enabling it here mirrors a project that sets `enabled: true` for it.
+        return $config->withRuleSettings(DatabaseUrlPasswordRule::ID, new RuleSettings(
+            true,
+            $settings->thresholds,
+            $settings->options,
+            $settings->severityThreshold,
+            $settings->excludeFromScore,
+        ));
     }
 
     /**

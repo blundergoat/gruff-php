@@ -1,4 +1,4 @@
 schemaVersion: gruff-php.config.v0.1
 rules:
-    sensitive-data.high-entropy-string:
+    sensitive-data.jwt-token:
         enabled: false

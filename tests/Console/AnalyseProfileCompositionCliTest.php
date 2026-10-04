@@ -50,7 +50,7 @@ final class AnalyseProfileCompositionCliTest extends CliTestCase
     {
         return [
             'security profile with security include'  => [['--profile', 'security', '--include-rule', 'security.dangerous-function-call']],
-            'security profile with exclude narrowing' => [['--profile', 'security', '--exclude-rule', 'security.weak-crypto']],
+            'security profile with exclude narrowing' => [['--profile', 'security', '--exclude-rule', 'security.header-injection']],
             'default profile with docs include'       => [['--include-rule', 'docs.missing-phpdoc']],
         ];
     }

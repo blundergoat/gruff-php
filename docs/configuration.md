@@ -243,7 +243,7 @@ Selection narrows the active rule set:
 ```yaml
 selection:
   pillars: [security, complexity]
-  excludeRules: [security.weak-crypto]
+  excludeRules: [security.header-injection]
 ```
 
 ## Sensitive Exclusions
@@ -252,10 +252,9 @@ selection:
 separate from `selection` so the ban on matching reported text is structural rather than a setting
 someone can relax later:
 
-Two built-in skips also hide sensitive-data findings, and count each one in `suppressions`: the
-entropy rule in package-manager lockfiles, and every sensitive-data rule except
-`sensitive-data.pii-test-fixture` in test, fixture and example files. A configured entry applies
-before either, so a finding it claims is counted under the entry.
+A built-in test-path skip also hides sensitive-data findings in test, fixture and example files, and counts each one in `suppressions`.
+It covers every sensitive-data rule except `sensitive-data.pii-test-fixture`.
+A configured entry applies first, so a finding it claims is counted under the entry.
 
 ```yaml
 sensitiveExclusions:

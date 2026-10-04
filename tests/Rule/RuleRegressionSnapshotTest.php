@@ -15,6 +15,9 @@ use GruffPhp\Rules\Complexity\MaintainabilityIndexRule;
 use GruffPhp\Rules\Docs\MissingReadmeRule;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\RuleRegistry;
+use GruffPhp\Rules\Security\DependencyComposerPathRule;
+use GruffPhp\Rules\Security\DependencyComposerVcsRule;
+use GruffPhp\Rules\SensitiveData\DatabaseUrlPasswordRule;
 use GruffPhp\Rules\Size\AverageMethodLengthRule;
 use GruffPhp\Rules\Size\ClassLengthRule;
 use GruffPhp\Rules\Size\FileLengthRule;
@@ -51,7 +54,9 @@ final class RuleRegressionSnapshotTest extends TestCase
         [$units, $findings, $json] = $this->analysePaths(['tests/Fixtures']);
 
         // M07 added tests/Fixtures/Baseline/gruff-baseline-v3.json to the corpus, and M19 ten precision fixtures.
-        self::assertCount(193, $units);
+        // Precision-floor M19 (2026-10-04) removed ten fixtures that served only retired rules, renamed the detector-selection config
+        // to Config/disable-jwt-token.yaml, and added Config/enable-default-off-rules.yaml.
+        self::assertCount(184, $units);
         // M19 (2026-09-19) removed confirmed false positives and nothing else: an immediately invoked closure, a
         // statically written first-class callable, `#[\Override]` and `{@inheritdoc}` methods, and pure-hex digests.
         // AWS's documented example key now reports, as the operator decided, and so does one sibling-scope `$x()`.
@@ -65,12 +70,14 @@ final class RuleRegressionSnapshotTest extends TestCase
         // M10 D33 (2026-09-26) removed one: safe-dummy-values.php line 11, AWS's documented example key, now a documented sample.
         // M10 D35 renamed docs.missing-public-phpdoc to docs.missing-phpdoc, which moves the hash and no count.
         // M55 removes the bound local-closure call at phpunit-mechanics-smells.php:74; its test-quality findings remain.
-        self::assertCount(2789, $findings);
+        // Precision-floor M19 (2026-10-04) removed 47: 40 from the nine retired rules (ADR-034), 5 from the three rules
+        // now off by default, and the two docs.missing-file-phpdoc findings on the deleted entropy fixtures.
+        self::assertCount(2742, $findings);
         // M08 made sensitive-data markers carry the class the detector already knew: a classified finding now reads
         // `[redacted:aws-access-key]` where it read `[redacted]`. The finding count, the rule set, and every
         // line-free identity are unchanged; only the marker text inside those findings moved.
         self::assertSame(
-            '3aca8e2e15391c2e556252a74be0dbba06df4ea3203fc5563fc0516e220f8fb9',
+            '99a3044f1d70cdd15b10caa1702952f70b61872c4e4841240ae0d0c734cd0751',
             hash('sha256', $json),
         );
     }
@@ -93,6 +100,9 @@ final class RuleRegressionSnapshotTest extends TestCase
                              HalsteadVolumeRule::ID,
                              MaintainabilityIndexRule::ID,
                              MissingReadmeRule::ID,
+                             DependencyComposerPathRule::ID,
+                             DependencyComposerVcsRule::ID,
+                             DatabaseUrlPasswordRule::ID,
                              AverageMethodLengthRule::ID,
                              ClassLengthRule::ID,
                              FileLengthRule::ID,
@@ -181,6 +191,11 @@ final class RuleRegressionSnapshotTest extends TestCase
             ...$this->analysePaths(
             ['tests/Fixtures/TestQuality/testdox-readability.php'],
             (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/enable-testdox-readability.yaml', $registry),
+        )[1],
+            // These three ship off by default, so the default corpus scan never reaches them; this scenario turns them on.
+            ...$this->analysePaths(
+            ['tests/Fixtures/Security/ComposerDependency', 'tests/Fixtures/SensitiveData'],
+            (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/enable-default-off-rules.yaml', $registry),
         )[1],
         );
 

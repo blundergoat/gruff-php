@@ -12,11 +12,11 @@ to three near-match suggestions and exits with code 2.
 This rule catalogue is generated from `php bin/gruff-php list-rules --format json`.
 Use that command for the full machine-readable metadata, including thresholds and options.
 
-Total rules: 128
+Total rules: 119
 
 ## False-positive guidance
 
-74 of the 128 rules publish `falsePositiveShapes`: a list of shapes the detector is
+68 of the 119 rules publish `falsePositiveShapes`: a list of shapes the detector is
 known to misfire on, each paired with the mitigation that answers it. Every rule at
 `medium` or `low` confidence carries at least one, because a heuristic rule owes the
 reader the cases where its heuristic is wrong. A rule that catalogues nothing omits
@@ -60,8 +60,8 @@ existing finding presentation in 0.5.2.
 | `maintainability` | 2 |
 | `modernisation` | 9 |
 | `naming` | 11 |
-| `security` | 25 |
-| `sensitive-data` | 11 |
+| `security` | 19 |
+| `sensitive-data` | 8 |
 | `size` | 7 |
 | `test-quality` | 34 |
 
@@ -347,37 +347,33 @@ list, not an addition. Setting it drops the built-in vocabulary entirely,
 so repeat any built-in name the project still wants flagged. Matching is
 case-insensitive.
 
-### `security` (25)
+### `security` (19)
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
 | --- | --- | --- | --- | --- |
 | `security.dangerous-function-call` | Dangerous function calls | `warning` | `medium` | yes |
 | `security.debug-mode-enabled` | Debug error display enabled | `warning` | `medium` | yes |
-| `security.dependency-composer-path` | Composer path repository | `warning` | `medium` | yes |
+| `security.dependency-composer-path` | Composer path repository | `warning` | `medium` | no |
 | `security.dependency-composer-script` | Composer install-time shell script | `warning` | `medium` | yes |
-| `security.dependency-composer-unpinned` | Unpinned Composer dependency constraint | `warning` | `medium` | yes |
-| `security.dependency-composer-vcs` | Composer VCS repository | `warning` | `medium` | yes |
+| `security.dependency-composer-vcs` | Composer VCS repository | `warning` | `medium` | no |
 | `security.disabled-ssl-verification` | Disabled SSL verification | `warning` | `high` | yes |
 | `security.error-suppression` | Error suppression operator | `warning` | `high` | yes |
 | `security.extract-compact-user-input` | extract or compact on request data | `warning` | `medium` | yes |
-| `security.github-actions-risky-workflow` | Risky GitHub Actions workflow | `warning` | `medium` | yes |
 | `security.header-injection` | Header injection risk | `warning` | `medium` | yes |
-| `security.insecure-random` | Insecure random source | `warning` | `high` | yes |
-| `security.path-traversal-file-access` | Path traversal file access | `warning` | `medium` | yes |
 | `security.permissive-cors` | Permissive CORS with credentials | `warning` | `medium` | yes |
 | `security.process-command-construction` | Process command construction | `warning` | `medium` | yes |
 | `security.reflected-xss` | Reflected XSS sink | `warning` | `medium` | yes |
 | `security.request-controlled-url` | Request-controlled URL | `warning` | `medium` | yes |
-| `security.sensitive-data-logging` | Sensitive data logging | `warning` | `medium` | yes |
 | `security.silent-catch` | Silent catch block | `warning` | `high` | yes |
 | `security.sql-concatenation` | SQL string concatenation | `warning` | `medium` | yes |
 | `security.unsafe-archive-extraction` | Unsafe archive extraction | `warning` | `medium` | yes |
 | `security.unsafe-unserialize` | Unsafe unserialize usage | `warning` | `medium` | yes |
 | `security.unsafe-xml-loading` | Unsafe XML loading | `warning` | `medium` | yes |
 | `security.variable-include` | Variable include or require path | `warning` | `medium` | yes |
-| `security.weak-crypto` | Weak cryptography primitives | `warning` | `high` | yes |
 
-`security.github-actions-risky-workflow` omits its `secrets-in-pr-workflow` warning only when an own job or step guard proves the reference unreachable for every detected PR event. Exact case-insensitive `github.event_name` comparisons support a whole expression wrapper, parentheses, negation, AND and OR. Unknown, malformed or unsupported guards, aliases and ambiguous ownership retain warnings. Step guards cannot cover job/workflow env or siblings. PHP keeps its current plain `pull_request` and `pull_request_target` mapping/list trigger detection.
+`security.dependency-composer-path` and `security.dependency-composer-vcs` are off by default since 0.6.0 (ADR-034).
+In the 0.6.0 precision measurement both of the path rule's judged findings were wrong, and both of the VCS rule's were correct but not worth acting on.
+Two findings each are too few to delete a rule on. Set `rules.<id>.enabled: true` to run one.
 
 `security.variable-include` treats two provable shapes as fixed paths in
 addition to literals and `__DIR__`/`__FILE__`: ALL-CAPS global constants
@@ -443,47 +439,27 @@ constructor call - `$pdo->query()`, `$zip->extractTo()`, `new Process()` -
 still match by position only, because their parameter names belong to the
 library rather than to PHP.
 
-### `sensitive-data` (11)
+### `sensitive-data` (8)
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
 | --- | --- | --- | --- | --- |
 | `sensitive-data.api-key-pattern` | Common API key pattern | `warning` | `high` | yes |
 | `sensitive-data.aws-access-key` | AWS access key | `warning` | `high` | yes |
-| `sensitive-data.database-url-password` | Database URL password | `warning` | `high` | yes |
+| `sensitive-data.database-url-password` | Database URL password | `warning` | `high` | no |
 | `sensitive-data.gcp-service-account-key` | GCP service-account key | `warning` | `high` | yes |
-| `sensitive-data.hardcoded-env-value` | Hardcoded environment value | `warning` | `medium` | yes |
-| `sensitive-data.high-entropy-string` | High entropy string | `warning` | `medium` | yes |
 | `sensitive-data.jwt-token` | JWT token literal | `warning` | `medium` | yes |
 | `sensitive-data.phi-pattern` | PHI identifier pattern | `warning` | `medium` | yes |
 | `sensitive-data.pii-test-fixture` | PII in test fixture | `warning` | `medium` | yes |
 | `sensitive-data.private-key` | Private key material | `warning` | `high` | yes |
-| `sensitive-data.url-credentials` | URL embedded credentials | `warning` | `high` | yes |
 
-`sensitive-data.high-entropy-string` reads `minLength` and `entropy` and
-nothing else: lowering `minLength` below 32 widens the scan, down to the
-shortest literal that can reach the `entropy` bar (2^`entropy` characters),
-and a pure-hex literal is skipped at any `entropy`, as in gruff-go. A literal
-must also hold at least one letter and one digit, the floor FAMILY-CONTRACT
-section 12 sets for all five ports, because a run of one character class clears
-the `entropy` bar by construction and a digit-free mix of cases is an identifier.
-Text inside a PEM block whose label names no private key (a certificate, public key, certificate request, PKCS7 bundle or CRL) never reports, because it is public by construction; a private key's block is still scanned. A block ends at the next marker, which must close the same label, and holds only base64, a PGP checksum or armour headers once string quoting is stripped, so a secret between two marker constants still reports. Across the secret rules, a
-placeholder word such as `test` or `example` suppresses a value only when it
-begins a token, so `latest` and `attestation` still report.
+`sensitive-data.database-url-password` is off by default since 0.6.0: the 0.6.0
+precision measurement found it wrong on all nine of its judged findings, too few
+to delete on (ADR-034). Set `rules.sensitive-data.database-url-password.enabled:
+true` to run it.
 
-`sensitive-data.high-entropy-string` recognizes finite whole-value alphabets and public formats, including bounded help routes and clinical codes. A
-quoted value is examined in full; a public-looking substring or property name cannot exempt unrelated text.
-
-Structured names and repository paths are quiet only when every segment meets the family grammar: at most 32 characters, bounded numeric runs,
-ordinary or bounded compound casing, and a strict majority of word letters contributed by at least two segments. Approved model codes, timestamps and
-the exact i18n and ec2 segments contribute no word letters. At most two leading ../ components or one ./, rooted or hidden prefix is allowed;
-additional leading prefixes and opaque tails fail the exception. A whole HTML `src` or `href` value that names an existing image beside its page,
-inside the project and reached without a symlink, also stays quiet.
-
-A quoted Composer autoload class slot can also stay quiet when syntax proves a resolved built-in registration or removal call and an unconditional
-local class with the named public static method. Missing syntax, an unresolved binding, another argument position or the same value elsewhere grants
-no exception. A literal concatenation can prove a complete HTTPS support.halaxy.com article route with bounded words and no query or fragment;
-only the exact participating literals stay quiet. Dynamic or opaque extensions invalidate the whole concatenation, including nested pieces.
-Quoted object and array keys retain their existing treatment; provider-specific detections and configured thresholds remain active.
+Across the secret rules, a placeholder word such as `test` or `example`
+suppresses a value only when it begins a token, so `latest` and `attestation`
+still report.
 
 `sensitive-data.pii-test-fixture` now accepts two fixture shapes its
 remediation already recommends: emails whose domain ends in a reserved

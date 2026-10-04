@@ -5,17 +5,16 @@ declare(strict_types=1);
 namespace GruffPhp\Tests\Rule\Security;
 
 use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Config\RuleSettings;
 use GruffPhp\Results\Finding\Confidence;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Pillar;
 use GruffPhp\Results\Finding\Severity;
-use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Engine\Parser\PhpFileParser;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\RuleRegistry;
 use GruffPhp\Rules\Security\DependencyComposerPathRule;
 use GruffPhp\Rules\Security\DependencyComposerScriptRule;
-use GruffPhp\Rules\Security\DependencyComposerUnpinnedRule;
 use GruffPhp\Rules\Security\DependencyComposerVcsRule;
 use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
@@ -23,8 +22,8 @@ use PHPUnit\Framework\TestCase;
 /**
  * Covers the Composer dependency warnings users see when Gruff PHP scans a project manifest.
  *
- * It verifies repository sources, install scripts, and unbounded installable packages while platform requirements stay quiet.
- * Line assertions keep each warning anchored to the dependency entry the user needs to edit.
+ * It verifies repository sources and install scripts.
+ * The path and VCS rules ship off by default, so these tests enable them to prove what each reports once a project turns it on.
  */
 final class DependencyComposerRulesTest extends TestCase
 {
@@ -67,49 +66,6 @@ final class DependencyComposerRulesTest extends TestCase
     }
 
     /**
-     * Verify only unbounded constraints fire and pinned/ranged ones do not.
-     *
-     * @return void
-     */
-    public function testUnpinnedConstraintsDetectedAndPinnedConstraintsIgnored(): void
-    {
-        $findings = $this->findingsForRule(self::RISKY_FIXTURE, DependencyComposerUnpinnedRule::ID);
-
-        self::assertCount(5, $findings);
-
-        $packages = array_map(static fn(Finding $finding): mixed => $finding->metadata['package'] ?? null, $findings);
-        self::assertContains('acme/wildcard-lib', $packages);
-        self::assertContains('acme/partial-wildcard-lib', $packages);
-        self::assertContains('acme/branch-lib', $packages);
-        self::assertContains('acme/unbounded-helper', $packages);
-        self::assertContains('acme/mixed-range-lib', $packages);
-        self::assertNotContains('acme/pinned-lib', $packages);
-        self::assertNotContains('php', $packages);
-    }
-
-    /**
-     * Verify Composer platform requirements stay quiet and installable package warnings point into their actual dependency sections.
-     *
-     * @return void
-     */
-    public function testPlatformRequirementsAreIgnoredAndPackageLinesUseDependencySections(): void
-    {
-        $findings = $this->findingsForManifestSource(
-            $this->platformRequirementsManifestSource(),
-            DependencyComposerUnpinnedRule::ID,
-        );
-
-        self::assertSame(
-            ['vendor/runtime-package', 'vendor/dev-tool'],
-            array_map(static fn(Finding $finding): mixed => $finding->metadata['package'] ?? null, $findings),
-        );
-        $findingLines = array_map(static fn(Finding $finding): ?int => $finding->line, $findings);
-
-        self::assertNotContains(null, $findingLines, 'Each package warning should point to the manifest entry the user can edit.');
-        self::assertSame([15, 18], $findingLines);
-    }
-
-    /**
      * Verify a shell/remote install-time script is flagged and a safe one is not.
      *
      * @return void
@@ -136,7 +92,6 @@ final class DependencyComposerRulesTest extends TestCase
         foreach ([
                      DependencyComposerVcsRule::ID,
                      DependencyComposerPathRule::ID,
-                     DependencyComposerUnpinnedRule::ID,
                      DependencyComposerScriptRule::ID,
                  ] as $ruleId) {
             self::assertSame([], $this->findingsForRule(self::CLEAN_FIXTURE, $ruleId), $ruleId);
@@ -156,7 +111,7 @@ final class DependencyComposerRulesTest extends TestCase
                                                      SourceFile::TYPE_TEXT,
                                                  ));
         $registry = RuleRegistry::defaults();
-        $findings = $registry->analyse([$unit], new RuleContext(self::PROJECT_ROOT, AnalysisConfig::fromRegistry($registry)));
+        $findings = $registry->analyse([$unit], new RuleContext(self::PROJECT_ROOT, $this->configWithEveryDependencyRule($registry)));
 
         $dependencyFindings = array_values(array_filter(
                                                $findings,
@@ -185,63 +140,34 @@ final class DependencyComposerRulesTest extends TestCase
                                                      SourceFile::TYPE_TEXT,
                                                  ));
         $registry = RuleRegistry::defaults();
-        $findings = $registry->analyse([$unit], new RuleContext(self::PROJECT_ROOT, AnalysisConfig::fromRegistry($registry)));
+        $findings = $registry->analyse([$unit], new RuleContext(self::PROJECT_ROOT, $this->configWithEveryDependencyRule($registry)));
 
         return array_values(array_filter($findings, static fn(Finding $finding): bool => $finding->ruleId === $ruleId));
     }
 
     /**
-     * Provides a manifest where platform requirements and real packages use the same open-range syntax a user may scan.
+     * Builds the default config with the path and VCS repository rules switched on, since both ship off by default.
      *
-     * @return string - complete non-empty Composer JSON with earlier duplicate package names for line-location coverage
+     * @param RuleRegistry $registry - Default registry the config is seeded from.
+     *
+     * @return AnalysisConfig - registry defaults with every Composer dependency rule enabled
      */
-    private function platformRequirementsManifestSource(): string
+    private function configWithEveryDependencyRule(RuleRegistry $registry): AnalysisConfig
     {
-        // Users may mention package names in keywords before declaring them, but warnings must still point into the dependency sections.
-        return <<<'JSON'
-{
-    "keywords": [
-        "vendor/runtime-package",
-        "vendor/dev-tool",
-        "php"
-    ],
-    "require": {
-        "php": ">=8.2",
-        "php-64bit": "*",
-        "ext-json": "*",
-        "lib-icu": "*",
-        "composer": ">=2",
-        "composer-plugin-api": ">=2",
-        "composer-runtime-api": ">=2",
-        "vendor/runtime-package": ">=1.2"
-    },
-    "require-dev": {
-        "vendor/dev-tool": ">=2.0"
-    }
-}
-JSON;
-    }
+        $config = AnalysisConfig::fromRegistry($registry);
 
-    /**
-     * Analyse inline Composer JSON and return one rule's user-visible findings without creating a fixture file.
-     *
-     * @param string $manifestSource - Complete manifest JSON; an empty string behaves like an invalid manifest and returns no findings.
-     * @param string $ruleId         - Rule identifier to retain; an empty or unknown identifier returns no findings.
-     *
-     * @return list<Finding> - findings emitted by the named rule, or an empty list when the manifest or rule produces none
-     */
-    private function findingsForManifestSource(string $manifestSource, string $ruleId): array
-    {
-        $analysisUnit = new AnalysisUnit(
-            new SourceFile(__FILE__, 'composer.json', SourceFile::TYPE_TEXT),
-            $manifestSource,
-            [],
-            [],
-            [],
-        );
-        $registry = RuleRegistry::defaults();
-        $findings = $registry->analyse([$analysisUnit], new RuleContext(self::PROJECT_ROOT, AnalysisConfig::fromRegistry($registry)));
+        // Both ship off by default; enabling them here mirrors a project that sets `enabled: true` for each.
+        foreach ([DependencyComposerPathRule::ID, DependencyComposerVcsRule::ID] as $ruleId) {
+            $settings = $config->ruleSettings($ruleId);
+            $config   = $config->withRuleSettings($ruleId, new RuleSettings(
+                true,
+                $settings->thresholds,
+                $settings->options,
+                $settings->severityThreshold,
+                $settings->excludeFromScore,
+            ));
+        }
 
-        return array_values(array_filter($findings, static fn(Finding $finding): bool => $finding->ruleId === $ruleId));
+        return $config;
     }
 }

@@ -72,28 +72,12 @@ selection:
     # named arguments across the existing call sites is deferred to a deliberate pass.
     excludeRules:
         - modernisation.named-argument-opportunity
-# Sensitive-data findings are suppressed only here, and only by hand.
-# gruff never converts a reported finding, message, or preview value into an entry.
-# Each entry needs one exact sensitive-data rule id, one project-relative path, and a reason;
-# an optional `symbol` narrows it further. Every entry is published in the report's
-# `suppressions` array with the count it hid, so an entry that matches nothing reports 0.
-# This repository accepts none: its synthetic credential fixtures live under tests/Fixtures/**,
-# which paths.ignore already excludes from the self-scan.
+# Sensitive-data findings are suppressed only here, and only by hand; gruff never turns a reported finding, message or preview into an entry.
+#
+# - Each entry needs one exact sensitive-data rule id, one project-relative path and a reason; an optional `symbol` narrows it further.
+# - Every entry is published in the report's `suppressions` array with the count it hid, so an entry that matches nothing reports 0.
+# - This repository accepts the one entry below; its other synthetic credentials live under tests/Fixtures/**, which paths.ignore excludes.
 sensitiveExclusions:
-    # The regression snapshot asserts a SHA-256 of the whole fixture report, so a 64-character hex
-    # digest is the point of the test rather than a credential. It is recorded here rather than by
-    # loosening the detector: the entropy threshold is a calibration decision owned by the precision
-    # milestone, and tuning it to make one of our own commits pass would be the wrong repair.
-    - rule: sensitive-data.high-entropy-string
-      path: tests/Rule/RuleRegressionSnapshotTest.php
-      reason: Snapshot digest of the fixture-corpus report; a hex SHA-256, not a credential.
-    # npm records one integrity digest per resolved package. They are base64 SHA-512 checksums of
-    # published tarballs, high-entropy by construction and carrying no secret. The lockfile is excluded
-    # here rather than by lowering the entropy threshold, which would weaken the detector for real
-    # source. A rule-level lockfile guard is a family question and stays in backlog.md.
-    - rule: sensitive-data.high-entropy-string
-      path: package-lock.json
-      reason: npm integrity digests over published tarballs; checksums, not credentials.
     # The literal is a synthetic AWS-shaped identifier asserting that a warm cache entry is not reused
     # when the deep-scan budget changes. It has never been a live credential and is not derived from one.
     - rule: sensitive-data.aws-access-key
@@ -414,16 +398,13 @@ rules:
         enabled: true
     # Composer path repository
     security.dependency-composer-path:
-        enabled: true
+        enabled: false
     # Composer install-time shell script
     security.dependency-composer-script:
         enabled: true
-    # Unpinned Composer dependency constraint
-    security.dependency-composer-unpinned:
-        enabled: true
     # Composer VCS repository
     security.dependency-composer-vcs:
-        enabled: true
+        enabled: false
     # Disabled SSL verification
     security.disabled-ssl-verification:
         enabled: true
@@ -433,17 +414,8 @@ rules:
     # extract or compact on request data
     security.extract-compact-user-input:
         enabled: true
-    # Risky GitHub Actions workflow
-    security.github-actions-risky-workflow:
-        enabled: true
     # Header injection risk
     security.header-injection:
-        enabled: true
-    # Insecure random source
-    security.insecure-random:
-        enabled: true
-    # Path traversal file access
-    security.path-traversal-file-access:
         enabled: true
     # Wildcard Access-Control-Allow-Origin combined with Access-Control-Allow-Credentials: true.
     security.permissive-cors:
@@ -456,9 +428,6 @@ rules:
         enabled: true
     # Request-controlled URL
     security.request-controlled-url:
-        enabled: true
-    # Sensitive data logging
-    security.sensitive-data-logging:
         enabled: true
     # Silent catch block
     security.silent-catch:
@@ -478,9 +447,6 @@ rules:
     # Variable include or require path
     security.variable-include:
         enabled: true
-    # Weak cryptography primitives
-    security.weak-crypto:
-        enabled: true
     # Common API key pattern
     sensitive-data.api-key-pattern:
         enabled: true
@@ -489,19 +455,10 @@ rules:
         enabled: true
     # Database URL password
     sensitive-data.database-url-password:
-        enabled: true
+        enabled: false
     # Committed Google Cloud service-account key JSON (type: service_account with an embedded private key).
     sensitive-data.gcp-service-account-key:
         enabled: true
-    # Hardcoded environment value
-    sensitive-data.hardcoded-env-value:
-        enabled: true
-    # High entropy string
-    sensitive-data.high-entropy-string:
-        enabled: true
-        thresholds:
-            minLength: 32
-            entropy: 4.2
     # JWT token literal
     sensitive-data.jwt-token:
         enabled: true
@@ -513,9 +470,6 @@ rules:
         enabled: true
     # Private key material
     sensitive-data.private-key:
-        enabled: true
-    # HTTP(S) URL with an inline user:password@host credential.
-    sensitive-data.url-credentials:
         enabled: true
     # Average method length (logical lines: statements only, averaged across the type's methods)
     size.average-method-length:

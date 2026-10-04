@@ -31,7 +31,7 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
     /**
      * Describes the database-URL-password sensitive-data rule for the registry and reports.
      *
-     * @return RuleDefinition - Rule metadata and defaults (warning severity, high confidence).
+     * @return RuleDefinition - warning severity, high confidence; ships off by default, so only a config can turn it on
      */
     public function definition(): RuleDefinition
     {
@@ -39,12 +39,15 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
         // unambiguous credential, not a heuristic guess; the dummy-value and comment filters below cut the
         // residual false positives, so callers can gate on these findings without manual triage.
         return new RuleDefinition(
-            id:              self::ID,
-            name:            'Database URL password',
-            pillar:          Pillar::SensitiveData,
-            tier:            RuleTier::V01,
-            defaultSeverity: Severity::Warning,
-            confidence:      Confidence::High,
+            id:                 self::ID,
+            name:               'Database URL password',
+            pillar:             Pillar::SensitiveData,
+            tier:               RuleTier::V01,
+            defaultSeverity:    Severity::Warning,
+            confidence:         Confidence::High,
+            // Off unless a project sets `enabled: true`: the 0.6.0 precision measurement found all nine judged findings wrong (ADR-034).
+            // Nine findings are too few to delete the rule on, so it stays available for projects that want it.
+            isEnabledByDefault: false,
         );
     }
 

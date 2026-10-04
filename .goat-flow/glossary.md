@@ -72,7 +72,7 @@ The set of built-in rules plus their public metadata. `list-rules --format json`
 
 ### Rule ID
 
-Stable public identifier for one rule, using dotted gruff-family names such as `size.method-length`, `docs.missing-param-tag`, and `sensitive-data.high-entropy-string`. Some dead-code pillar rules retain `waste.*` IDs for historical continuity.
+Stable public identifier for one rule, using dotted gruff-family names such as `size.method-length`, `docs.missing-param-tag`, and `sensitive-data.aws-access-key`. Some dead-code pillar rules retain `waste.*` IDs for historical continuity.
 
 ### SARIF
 

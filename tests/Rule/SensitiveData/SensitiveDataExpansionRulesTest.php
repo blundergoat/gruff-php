@@ -11,19 +11,20 @@ use GruffPhp\Results\Finding\Pillar;
 use GruffPhp\Engine\Parser\PhpFileParser;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\RuleRegistry;
-use GruffPhp\Rules\SensitiveData\DatabaseUrlPasswordRule;
 use GruffPhp\Rules\SensitiveData\GcpServiceAccountKeyRule;
 use GruffPhp\Rules\SensitiveData\PhiPatternRule;
 use GruffPhp\Rules\SensitiveData\PiiTestFixtureRule;
 use GruffPhp\Rules\SensitiveData\PrivateKeyRule;
-use GruffPhp\Rules\SensitiveData\UrlEmbeddedCredentialsRule;
 use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers the M12 sensitive-data expansion: GCP service-account keys and
- * HTTP(S) URL-embedded credentials, with overlap precedence and no-leak proof.
+ * Covers the GCP service-account key rule as a user meets it when a key file is committed.
+ *
+ * - A real key reports once with a redacted marker, a placeholder key stays quiet, and the private-key rule reports its own line.
+ * - No report format (text, JSON, SARIF, GitHub, Markdown or HTML) prints the raw key body.
+ * - Schema field names and placeholder identifiers do not fire the PHI or PII rules.
  */
 final class SensitiveDataExpansionRulesTest extends TestCase
 {
@@ -35,9 +36,6 @@ final class SensitiveDataExpansionRulesTest extends TestCase
 
     /** Placeholder GCP service-account key. */
     private const GCP_PLACEHOLDER = 'tests/Fixtures/SensitiveData/gcp-service-account-placeholder.json';
-
-    /** URL-embedded-credentials fixture. */
-    private const URL_FIXTURE = 'tests/Fixtures/SensitiveData/url-credentials.php';
 
     /** Schema-field-name and placeholder PHI/PII fixture. */
     private const PHI_GUARD_FIXTURE = 'tests/Fixtures/SensitiveData/phi-schema-placeholders.php';
@@ -87,50 +85,16 @@ final class SensitiveDataExpansionRulesTest extends TestCase
     }
 
     /**
-     * Verify http(s) URL credentials fire and the password is redacted.
-     *
-     * @return void
-     */
-    public function testUrlEmbeddedCredentialsDetected(): void
-    {
-        $findings = $this->findingsForRule(self::URL_FIXTURE, UrlEmbeddedCredentialsRule::ID);
-
-        self::assertCount(2, $findings);
-        foreach ($findings as $finding) {
-            $preview = $finding->metadata['preview'] ?? null;
-            self::assertIsString($preview, sprintf('Finding on line %s should expose a string preview.', (string)$finding->line));
-            self::assertStringContainsString('redacted', $preview, sprintf('Finding on line %s should redact the password.', (string)$finding->line));
-        }
-    }
-
-    /**
-     * Verify the URL-credentials rule ignores DB schemes (handled elsewhere) and
-     * safe URLs, with no overlap against the database-url rule.
-     *
-     * @return void
-     */
-    public function testUrlCredentialsScopeAndNoDatabaseOverlap(): void
-    {
-        $urlFindings = $this->findingsForRule(self::URL_FIXTURE, UrlEmbeddedCredentialsRule::ID);
-        $dbFindings  = $this->findingsForRule(self::URL_FIXTURE, DatabaseUrlPasswordRule::ID);
-
-        // url-credentials handles only http(s); the mysql:// URL is the database rule's job.
-        self::assertCount(2, $urlFindings);
-        self::assertCount(1, $dbFindings);
-        self::assertNotSame($urlFindings[0]->line, $dbFindings[0]->line);
-    }
-
-    /**
-     * Verify no renderer leaks the raw key body or URL password.
+     * Verify no renderer leaks the raw key body.
      *
      * @return void
      */
     public function testNewDetectorsDoNotLeakRawSecretsAcrossFormats(): void
     {
-        $rawSecrets = ['MIIBVgIBADANBgkqhkiG', 's3cr3tValue', 'Tok3nXyZ9'];
+        $rawSecrets = ['MIIBVgIBADANBgkqhkiG'];
 
         foreach (['text', 'json', 'sarif', 'github', 'markdown', 'html'] as $format) {
-            $output = $this->runGruff(['analyse', self::GCP_FIXTURE, self::URL_FIXTURE, '--format', $format, '--fail-on', 'none', '--no-config']);
+            $output = $this->runGruff(['analyse', self::GCP_FIXTURE, '--format', $format, '--fail-on', 'none', '--no-config']);
 
             foreach ($rawSecrets as $secret) {
                 self::assertStringNotContainsString($secret, $output, sprintf('%s report leaked a raw secret.', $format));

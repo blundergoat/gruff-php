@@ -183,8 +183,9 @@ final class ListRulesCliTest extends CliTestCase
         )));
 
         self::assertSame(0, $exitCode, $process->getErrorOutput());
-        self::assertCount(128, $rules);
-        self::assertCount(70, $mediumOrLowRules);
+        // Precision-floor M19 (2026-10-04) retired nine rules, six of them medium or low confidence (ADR-034).
+        self::assertCount(119, $rules);
+        self::assertCount(64, $mediumOrLowRules);
         self::assertSame([], $withoutGuidance);
         self::assertSame([], $blankGuidance);
         self::assertNotEmpty($shapelessRules);
@@ -521,7 +522,7 @@ final class ListRulesCliTest extends CliTestCase
         // A rubric with no knob name anywhere in the family publishes the one-key map.
         self::assertSame(['threshold' => 10], $rulesById['docs.todo-density']['thresholds'] ?? null);
         // A rule with its own named defaults publishes them unchanged.
-        self::assertSame(['minLength' => 32, 'entropy' => 4.2], $rulesById['sensitive-data.high-entropy-string']['thresholds'] ?? null);
+        self::assertSame(['minWords' => 2], $rulesById['test-quality.testdox-readability']['thresholds'] ?? null);
         // A rule with no threshold omits the key rather than publishing `{}`.
         self::assertArrayNotHasKey('thresholds', $rulesById['security.header-injection'] ?? []);
         self::assertSame([], $pairShaped);

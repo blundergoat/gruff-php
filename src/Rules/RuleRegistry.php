@@ -59,40 +59,31 @@ use GruffPhp\Rules\Security\DangerousFunctionCallRule;
 use GruffPhp\Rules\Security\DebugModeEnabledRule;
 use GruffPhp\Rules\Security\DependencyComposerPathRule;
 use GruffPhp\Rules\Security\DependencyComposerScriptRule;
-use GruffPhp\Rules\Security\DependencyComposerUnpinnedRule;
 use GruffPhp\Rules\Security\DependencyComposerVcsRule;
 use GruffPhp\Rules\Security\DisabledSslVerificationRule;
 use GruffPhp\Rules\Security\ErrorSuppressionRule;
 use GruffPhp\Rules\Security\ExtractCompactUserInputRule;
-use GruffPhp\Rules\Security\GithubActionsRiskyWorkflowRule;
 use GruffPhp\Rules\Security\HeaderInjectionRule;
-use GruffPhp\Rules\Security\InsecureRandomRule;
-use GruffPhp\Rules\Security\PathTraversalFileAccessRule;
 use GruffPhp\Rules\Security\PermissiveCorsRule;
 use GruffPhp\Rules\Security\ProcessCommandConstructionRule;
 use GruffPhp\Rules\Security\ReflectedXssRule;
 use GruffPhp\Rules\Security\RequestControlledUrlRule;
-use GruffPhp\Rules\Security\SensitiveDataLoggingRule;
 use GruffPhp\Rules\Security\SilentCatchRule;
 use GruffPhp\Rules\Security\SqlConcatenationRule;
 use GruffPhp\Rules\Security\UnsafeArchiveExtractionRule;
 use GruffPhp\Rules\Security\UnsafeXmlLoadingRule;
 use GruffPhp\Rules\Security\UnsafeUnserializeRule;
 use GruffPhp\Rules\Security\VariableIncludeRule;
-use GruffPhp\Rules\Security\WeakCryptoRule;
 use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Size\SubstantiveLineCounter;
 use GruffPhp\Rules\SensitiveData\ApiKeyPatternRule;
 use GruffPhp\Rules\SensitiveData\AwsAccessKeyRule;
 use GruffPhp\Rules\SensitiveData\DatabaseUrlPasswordRule;
 use GruffPhp\Rules\SensitiveData\GcpServiceAccountKeyRule;
-use GruffPhp\Rules\SensitiveData\HardcodedEnvValueRule;
-use GruffPhp\Rules\SensitiveData\HighEntropyStringRule;
 use GruffPhp\Rules\SensitiveData\JwtTokenRule;
 use GruffPhp\Rules\SensitiveData\PhiPatternRule;
 use GruffPhp\Rules\SensitiveData\PiiTestFixtureRule;
 use GruffPhp\Rules\SensitiveData\PrivateKeyRule;
-use GruffPhp\Rules\SensitiveData\UrlEmbeddedCredentialsRule;
 use GruffPhp\Rules\Shared\ProjectRuleAccumulator;
 use GruffPhp\Rules\Shared\ProjectSourceTextRuleAccumulator;
 use GruffPhp\Rules\Shared\RuleRunnerObserver;
@@ -283,38 +274,29 @@ final class RuleRegistry
                             new AwsAccessKeyRule(),
                             new DatabaseUrlPasswordRule(),
                             new GcpServiceAccountKeyRule(),
-                            new HardcodedEnvValueRule(),
-                            new HighEntropyStringRule(),
                             new JwtTokenRule(),
                             new PhiPatternRule(),
                             new PiiTestFixtureRule(),
                             new PrivateKeyRule(),
-                            new UrlEmbeddedCredentialsRule(),
                             new DangerousFunctionCallRule(),
                             new DebugModeEnabledRule(),
                             new DependencyComposerPathRule(),
                             new DependencyComposerScriptRule(),
-                            new DependencyComposerUnpinnedRule(),
                             new DependencyComposerVcsRule(),
                             new DisabledSslVerificationRule(),
                             new ErrorSuppressionRule(),
                             new ExtractCompactUserInputRule(),
-                            new GithubActionsRiskyWorkflowRule(),
                             new HeaderInjectionRule(),
-                            new InsecureRandomRule(),
-                            new PathTraversalFileAccessRule(),
                             new PermissiveCorsRule(),
                             new ProcessCommandConstructionRule(),
                             new ReflectedXssRule(),
                             new RequestControlledUrlRule(),
-                            new SensitiveDataLoggingRule(),
                             new SilentCatchRule(),
                             new SqlConcatenationRule(),
                             new UnsafeArchiveExtractionRule(),
                             new UnsafeXmlLoadingRule(),
                             new UnsafeUnserializeRule(),
                             new VariableIncludeRule(),
-                            new WeakCryptoRule(),
                             new ConditionalTestLogicRule(),
                             new DataProviderAnnotationRule(),
                             new EagerTestRule(),

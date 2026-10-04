@@ -1,0 +1,8 @@
+schemaVersion: gruff-php.config.v0.1
+rules:
+    security.dependency-composer-path:
+        enabled: true
+    security.dependency-composer-vcs:
+        enabled: true
+    sensitive-data.database-url-password:
+        enabled: true

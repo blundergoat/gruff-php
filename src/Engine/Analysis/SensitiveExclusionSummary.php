@@ -28,7 +28,7 @@ final readonly class SensitiveExclusionSummary
      * @param string|null $symbol - Symbol narrowing the scope; null when the entry covers the whole file.
      * @param string      $reason - Rationale supplied by whoever accepted the finding.
      * @param int         $suppressed - Findings this entry removed from the run; zero is a valid, non-failing result.
-     * @param string|null $source - `built-in` on a row the family's lockfile skip produced; null on a configured entry's row.
+     * @param string|null $source - `built-in` on a row the test-path skip produced; null on a row for an entry the user configured.
      */
     public function __construct(
         public int     $index,
@@ -75,12 +75,10 @@ final readonly class SensitiveExclusionSummary
      */
     public function describe(): string
     {
-        // A built-in row names the file it skipped, because it has no configured entry to point at.
+        // A built-in row names the file it skipped, since no config entry exists to point at.
+        // The test-path skip is the only built-in class, e.g. `builtInTestPath[tests/keys.php] sensitive-data.aws-access-key: 2`.
         if ($this->source !== null) {
-            // The reason tells a test-path skip from a lockfile skip, so the label names the class the user is reading.
-            $label = $this->reason === SensitiveExclusionFilter::BUILT_IN_TEST_PATH_REASON ? 'builtInTestPath' : 'builtInLockfile';
-
-            return sprintf('%s[%s] %s: %d (%s)', $label, $this->path, $this->rule, $this->suppressed, $this->reason);
+            return sprintf('builtInTestPath[%s] %s: %d (%s)', $this->path, $this->rule, $this->suppressed, $this->reason);
         }
 
         return sprintf('sensitiveExclusions[%d] %s: %d (%s)', $this->index, $this->rule, $this->suppressed, $this->reason);

@@ -15,7 +15,7 @@ use GruffPhp\Rules\Naming\IdentifierTokenizer;
 /**
  * Shared detector utilities turn matched source into safe, consistently located sensitive findings.
  *
- * Scanners use them for comment ranges, line lookup, fixed markers, placeholder checks, paths, entropy, and finding construction.
+ * Scanners use them for comment ranges, line lookup, fixed markers, placeholder checks, paths, and finding construction.
  * The helpers are static and side-effect free except for an immutable per-file comment-range cache.
  */
 final class SecretScannerHelper
@@ -127,7 +127,7 @@ final class SecretScannerHelper
 
     /**
      * Returns the bare zero-payload marker, shown when a detector classified nothing more specific.
-     * Generic-assignment and entropy matches always use this: they name no class the user can act on.
+     * A provider pattern with no ratified category, or a malformed connection scheme, falls back to it: neither names a class the user can act on.
      *
      * @return string - non-empty classification-only marker with no value-derived characters or length
      */
@@ -264,21 +264,6 @@ final class SecretScannerHelper
     }
 
     /**
-     * Reports whether the file's basename is `.env` or a `.env.*` variant.
-     *
-     * @param string $displayPath - Project-relative path being scanned.
-     *
-     * @return bool - true when the basename is `.env` or a `.env.*` variant; callers relax dummy-value filtering
-     */
-    public static function isEnvFile(string $displayPath): bool
-    {
-        $basename = basename($displayPath);
-
-        // Match `.env` and variants like `.env.local`; callers relax dummy-value filtering for these files.
-        return $basename === '.env' || str_starts_with($basename, '.env.');
-    }
-
-    /**
      * Reports whether the path lives under a test or fixtures directory (test, tests, fixture, fixtures).
      *
      * @param string $displayPath - Project-relative path being scanned.
@@ -316,34 +301,6 @@ final class SecretScannerHelper
 
         // No secret-context fragment present, so the line gives the detector no reason to escalate.
         return false;
-    }
-
-    /**
-     * Computes the Shannon entropy of a string in bits per character.
-     *
-     * @param string $secretValue - Candidate secret value.
-     *
-     * @return float - bits-per-character Shannon entropy; callers compare it against a threshold to flag secret-shaped literals
-     */
-    public static function entropy(string $secretValue): float
-    {
-        $length = strlen($secretValue);
-        if ($length === 0) {
-            // An empty string carries zero Shannon entropy by definition; returning here also keeps the
-            // per-character probability quotient $count / $length well-defined, since $length is its divisor.
-            return 0.0;
-        }
-
-        $counts  = count_chars($secretValue, 1);
-        $entropy = 0.0;
-
-        // Sum each character's contribution to the total entropy.
-        foreach ($counts as $count) {
-            $probability = $count / $length;
-            $entropy     -= $probability * log($probability, 2);
-        }
-
-        return $entropy;
     }
 
     /**

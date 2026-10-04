@@ -10,7 +10,6 @@ use GruffPhp\Engine\Parser\PhpFileParser;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\RuleRegistry;
 use GruffPhp\Rules\SensitiveData\AwsAccessKeyRule;
-use GruffPhp\Rules\SensitiveData\HighEntropyStringRule;
 use GruffPhp\Rules\SensitiveData\JwtTokenRule;
 use GruffPhp\Rules\SensitiveData\PiiTestFixtureRule;
 use GruffPhp\Engine\Source\SourceFile;
@@ -18,28 +17,22 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers sensitive-data allowance precision: real-secret and real-PII counter-fixtures must keep
- * flagging while identifier/slug literals and synthetic PII shapes pass the built-in allowances.
+ * Covers sensitive-data allowance precision: real secrets and real personal data keep reporting.
+ * Synthetic PII, such as a reserved-domain email or a `fake` street address, passes the built-in allowances.
  */
 final class SensitiveDataAllowanceRulesTest extends TestCase
 {
     /** Project root used to resolve fixture paths. */
     private const PROJECT_ROOT = __DIR__ . '/../../..';
 
-    /** Real-secret counter-fixture: every shape in it must always flag. */
+    /** Real-secret counter-fixture whose JWT and AWS key must always flag under their dedicated rules. */
     private const SECRET_FIXTURE = 'tests/Fixtures/SensitiveData/secret-counter-shapes.php';
-
-    /** Identifier/slug literals the entropy gate must not mistake for secrets. */
-    private const IDENTIFIER_FIXTURE = 'tests/Fixtures/SensitiveData/identifier-slug-literals.php';
 
     /** Realistic PII counter-fixture: every value in it must always flag. */
     private const PII_REALISTIC_FIXTURE = 'tests/Fixtures/SensitiveData/pii-realistic.php';
 
     /** Synthetic PII shapes covered by the reserved-domain and marker-word allowances. */
     private const PII_SYNTHETIC_FIXTURE = 'tests/Fixtures/SensitiveData/pii-synthetic-allowed.php';
-
-    /** Fixture line of the dot-joined base64url token that must never read as a dotted identifier. */
-    private const DOT_JOINED_TOKEN_LINE = 10;
 
     /**
      * List fixture/rule pairs with the exact lines each rule must flag.
@@ -50,17 +43,9 @@ final class SensitiveDataAllowanceRulesTest extends TestCase
     public static function fixtureLineExpectations(): array
     {
         return [
-            // Line 6 is a pure-hex checksum. Until 2026-09-19 a 64-character hex literal reported through an
-            // override that ignored the configured entropy bar; a hex literal is now skipped at any bar, as in gruff-go.
-            'base64, npm-integrity, dot-joined, and prefixed-key tokens flag as high entropy; a pure-hex checksum does not' => [
-                self::SECRET_FIXTURE,
-                HighEntropyStringRule::ID,
-                [5, 7, self::DOT_JOINED_TOKEN_LINE, 11, 12, 13, 14],
-            ],
             'JWT literal flags under the dedicated JWT rule'                         => [self::SECRET_FIXTURE, JwtTokenRule::ID, [9]],
             'AWS key id flags under the dedicated AWS rule'                          => [self::SECRET_FIXTURE, AwsAccessKeyRule::ID, [8]],
             'realistic email, address, and phone PII flags'                          => [self::PII_REALISTIC_FIXTURE, PiiTestFixtureRule::ID, [5, 6, 7]],
-            'identifier and slug literals pass the entropy gate'                     => [self::IDENTIFIER_FIXTURE, HighEntropyStringRule::ID, []],
             'reserved-domain emails and marker addresses pass the PII gate'          => [self::PII_SYNTHETIC_FIXTURE, PiiTestFixtureRule::ID, []],
         ];
     }
@@ -78,22 +63,6 @@ final class SensitiveDataAllowanceRulesTest extends TestCase
     public function testFixtureLinesFlagExactly(string $fixturePath, string $ruleId, array $expectedLines): void
     {
         self::assertSame($expectedLines, $this->flaggedLines($fixturePath, $ruleId));
-    }
-
-    /**
-     * Verify the dotted-identifier allowance never swallows dot-joined token material.
-     *
-     * @return void
-     */
-    public function testDotJoinedTokenIsNotExemptAsDottedIdentifier(): void
-    {
-        $flaggedLines = $this->flaggedLines(self::SECRET_FIXTURE, HighEntropyStringRule::ID);
-
-        self::assertContains(
-            self::DOT_JOINED_TOKEN_LINE,
-            $flaggedLines,
-            'A dot-joined base64url token must keep flagging: its segments are not word-shaped, so the dotted-identifier allowance must not cover it.',
-        );
     }
 
     /**
