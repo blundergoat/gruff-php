@@ -13,6 +13,7 @@ use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
+use GruffPhp\Rules\Size\SubstantiveLineCounter;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Name;
 
@@ -69,8 +70,10 @@ final readonly class TestLongerThanSutRule implements RuleInterface
         // Weigh every test scope in the file.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             $sutCalls = $this->sutCalls($scope);
+            // Code lines only (FAMILY-CONTRACT section 12): comments, attributes and blank lines are free.
+            $testLines = max(1, SubstantiveLineCounter::countRange($analysisUnit, $scope->line, $scope->endLine ?? $scope->line));
             // Only long tests with a single SUT call and at least one assertion qualify.
-            if ($scope->lineCount() < $minTestLines || count($sutCalls) > 1 || TestQualityNodeHelper::assertionCalls($scope) === []) {
+            if ($testLines < $minTestLines || count($sutCalls) > 1 || TestQualityNodeHelper::assertionCalls($scope) === []) {
                 continue;
             }
 
@@ -90,7 +93,7 @@ final readonly class TestLongerThanSutRule implements RuleInterface
                 confidence:  Confidence::Low,
                 symbol:      $scope->symbol,
                 remediation: 'Review whether setup and assertions can be simplified or split; this static rule cannot measure the SUT directly.',
-                metadata:    ['testLines' => $scope->lineCount(), 'sutCalls' => count($sutCalls)],
+                metadata:    ['testLines' => $testLines, 'sutCalls' => count($sutCalls)],
             );
         }
 

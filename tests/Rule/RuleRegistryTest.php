@@ -378,8 +378,9 @@ final class RuleRegistryTest extends TestCase
         self::assertCount(119, $definitions);
         // M10 D35 (2026-09-26) renamed docs.missing-public-phpdoc to docs.missing-phpdoc, and docs.return-comment's description names it.
         // Precision-floor M19 (2026-10-04) retired nine rules and turned three off by default (ADR-034).
+        // The constant and property PHPDoc descriptions name run coverage (CHANGELOG: `One comment documents a run of constants`).
         self::assertSame(
-            '9480b26747c1cc40cec4' . 'ff52695dfeda0a1dda6709cea61ec1ccb48ceb9e2f5e',
+            '72b64242d89b90838061' . '698026cf6eeeda8f3f69cab4972400b693b70cbb78e4',
             hash('sha256', $json),
         );
     }

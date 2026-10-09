@@ -476,12 +476,12 @@ rules:
         enabled: true
         threshold: 50
         severity: error
-    # Class length (substantive lines: blank and comment-only lines are free)
+    # Class length (substantive lines: blank, comment-only and attribute-only lines are free)
     size.class-length:
         enabled: true
         threshold: 800
         severity: error
-    # File length (substantive lines: blank and comment-only lines are free)
+    # File length (substantive lines: blank, comment-only and attribute-only lines are free)
     size.file-length:
         enabled: true
         threshold: 1000

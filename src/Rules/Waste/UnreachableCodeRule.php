@@ -96,8 +96,8 @@ final readonly class UnreachableCodeRule implements RuleInterface
 
         // Walk the block in source order, tracking whether it has already terminated.
         foreach ($stmts as $stmt) {
-            // A positioned statement after a terminator is unreachable.
-            if ($terminated && $stmt->getStartLine() > 0) {
+            // A positioned statement after a terminator is unreachable; a Nop holds only a trailing comment or a lone `;`.
+            if ($terminated && !$stmt instanceof Stmt\Nop && $stmt->getStartLine() > 0) {
                 $findings[] = new Finding(
                     ruleId:      $definition->id,
                     message:     'Unreachable code after terminating statement.',

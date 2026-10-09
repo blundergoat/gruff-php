@@ -66,3 +66,11 @@ container-measure rationale (scroll distance) is superseded by the family princi
 documentation must never push a unit over a size budget - the same argument that ended raw
 counting at the file level applies to the class span under PSR-4's one-class-per-file reality.
 `size.method-length` is unchanged: it still counts distinct statement start lines, the logical metric defined above.
+
+## Amendment (2026-10-09, code lines in every line count)
+
+Every line count in this port counts code lines, as FAMILY-CONTRACT.md section 12 requires (search `Code lines in every line count`): blank lines, comment-only lines and attribute-only lines are free.
+
+- `GruffPhp\Rules\Size\SubstantiveLineCounter` leaves attribute lines free, including every line of a multi-line `#[...]` group; a line holding an attribute and code still counts. `size.file-length` and `size.class-length` inherit this through the counter.
+- `test-quality.setup-bloat`, `test-quality.test-longer-than-sut` and `test-quality.test-method-too-long` measure with the shared counter instead of physical lines or line-prefix guesses (`test-quality.test-method-too-long` reads its comment-and-attribute mask and still leaves lone brackets out); no threshold changes.
+- `size.method-length` and `size.average-method-length` keep the logical metric, distinct non-Nop statement start lines, which already leaves comments, attributes and blank lines out.

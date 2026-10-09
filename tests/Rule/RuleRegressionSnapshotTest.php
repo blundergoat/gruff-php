@@ -72,12 +72,17 @@ final class RuleRegressionSnapshotTest extends TestCase
         // M55 removes the bound local-closure call at phpunit-mechanics-smells.php:74; its test-quality findings remain.
         // Precision-floor M19 (2026-10-04) removed 47: 40 from the nine retired rules (ADR-034), 5 from the three rules
         // now off by default, and the two docs.missing-file-phpdoc findings on the deleted entropy fixtures.
-        self::assertCount(2742, $findings);
+        // The run-coverage and code-line CHANGELOG entries removed 6 and added 1: docs.missing-constant-phpdoc now covers an unbroken
+        // run by structure, which clears four constants in missing-constant-phpdoc-line-comment.php and reports
+        // RESET_GROUP_BETA_PATTERN, whose run has another commented constant; waste.unreachable-code no longer reports
+        // the trailing `// reported` comment in dynamic-call-precision.php; and test-longer-than-sut counts code
+        // lines, which clears testHasLotsOfWhitespaceAndComments in test-method-too-long.php.
+        self::assertCount(2737, $findings);
         // M08 made sensitive-data markers carry the class the detector already knew: a classified finding now reads
         // `[redacted:aws-access-key]` where it read `[redacted]`. The finding count, the rule set, and every
         // line-free identity are unchanged; only the marker text inside those findings moved.
         self::assertSame(
-            '99a3044f1d70cdd15b10caa1702952f70b61872c4e4841240ae0d0c734cd0751',
+            'a89bbf660e73680a46f2165c6daf2f77bfee85092dd7f4af8765264eb39ad65c',
             hash('sha256', $json),
         );
     }

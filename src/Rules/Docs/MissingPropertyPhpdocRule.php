@@ -30,7 +30,9 @@ use PhpParser\Node\Stmt\Trait_;
  * the invariant it maintains.
  *
  * Runs per file over classes, traits, interfaces, and enums. Each property declaration needs a docblock
- * unless the opt-in line-comment setting finds meaningful prose physically attached above its statement.
+ * unless the opt-in line-comment setting finds meaningful prose physically attached above its statement. A
+ * docblock above the first property of an unbroken run (no blank line or other statement between) covers the whole run, unless another
+ * property in the run has a docblock of its own.
  * Advisory, medium confidence - enforcement is opt-in and documenting trivial properties is team-dependent.
  */
 final readonly class MissingPropertyPhpdocRule implements RuleInterface
@@ -70,7 +72,7 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
             defaultSeverity:    Severity::Advisory,
             confidence:         Confidence::Medium,
             defaultOptions:     ['acceptLineComments' => false],
-            description:        'Requires declared properties to explain their purpose with PHPDoc; an opt-in toggle also accepts meaningful attached line comments.',
+            description:        'Requires declared properties to explain their purpose with PHPDoc, where a docblock above the first property of an unbroken run covers the run unless another property in it has its own; an opt-in toggle also accepts meaningful attached line comments.',
             optionDescriptions: [
                 'acceptLineComments' => 'When true, a physically attached // or # comment with meaning beyond the property name satisfies the rule.',
             ],
@@ -164,29 +166,55 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
     ): array {
         $findings = [];
 
-        // Check each declared property for a docblock.
-        foreach ($classLike->getProperties() as $property) {
-            // PHPDoc always covers a declaration; meaningful line comments do so only under the opt-in toggle.
-            if (
-                $property->getDocComment() !== null
-                || ($shouldAcceptLineComments && $this->hasMeaningfulAttachedLineComment($property, $analysisUnit->source))
-            ) {
-                continue;
-            }
+        // Check each unbroken run of property declarations; a blank line or any other statement ends a run.
+        foreach (PhysicalCommentAttachment::unbrokenRuns($classLike->stmts, Property::class, $analysisUnit->source) as $propertyRun) {
+            $isRunCovered = $this->isRunCoveredByDocblock($propertyRun, $analysisUnit->source);
+            foreach ($propertyRun as $position => $property) {
+                // PHPDoc always covers a declaration, the docblock above a covered run's first property covers
+                // the rest of the run, and meaningful line comments count only under the opt-in toggle.
+                if (
+                    $property->getDocComment() !== null
+                    || ($position > 0 && $isRunCovered)
+                    || ($shouldAcceptLineComments && $this->hasMeaningfulAttachedLineComment($property, $analysisUnit->source))
+                ) {
+                    continue;
+                }
 
-            // One declaration can name several properties, so report each.
-            foreach ($property->props as $propertyProperty) {
-                $findings[] = $this->declaredPropertyFinding(
-                    propertyName: $propertyProperty->name->toString(),
-                    className:    $className,
-                    line:         DeclarationLine::of($property),
-                    definition:   $definition,
-                    analysisUnit: $analysisUnit,
-                );
+                // One declaration can name several properties, so report each.
+                foreach ($property->props as $propertyProperty) {
+                    $findings[] = $this->declaredPropertyFinding(
+                        propertyName: $propertyProperty->name->toString(),
+                        className:    $className,
+                        line:         DeclarationLine::of($property),
+                        definition:   $definition,
+                        analysisUnit: $analysisUnit,
+                    );
+                }
             }
         }
 
         return $findings;
+    }
+
+    /**
+     * Reports whether a docblock above a run's first property covers the whole run: it does unless a later
+     * property in the run has a docblock of its own, which marks per-property documentation.
+     *
+     * @param non-empty-list<Property> $propertyRun - Unbroken run of property declarations, in source order.
+     * @param string                   $source - Whole-file source used to reject detached and trailing docblocks.
+     *
+     * @return bool - True when the first property's docblock documents every property in the run.
+     */
+    private function isRunCoveredByDocblock(array $propertyRun, string $source): bool
+    {
+        // A later property with its own docblock keeps every docblock in the run to its own property.
+        foreach (array_slice($propertyRun, 1) as $member) {
+            if (PhysicalCommentAttachment::hasOwnComment($member, $source, true)) {
+                return false;
+            }
+        }
+
+        return PhysicalCommentAttachment::hasOwnComment($propertyRun[0], $source, true);
     }
 
     /**

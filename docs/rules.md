@@ -121,25 +121,21 @@ as used.
 `docs.missing-constant-phpdoc` distinguishes missing documentation from
 useful local documentation. By default, constants may use an immediately
 preceding meaningful `//`, `#`, or block comment when the prose is useful
-to a human reviewer and attached directly to the constant. A short
-consecutive constant group can share one local group comment when the
-comment names the group, such as supported roles or keys. Existing group
-words such as `keys` and `values` retain contiguous uncapped coverage. New
-`patterns` and `regexes` family comments cover at most five declared names,
-including multiple names in one statement; the sixth and later names need a
-new group comment, and a visibility change ends the bounded family. A mixed
-comment such as `keys and patterns` uses the shipped uncapped behavior.
-Findings beyond that five-name cap retain the nearby comment kind and expose
-`commentQuality: bounded-group-overflow`, `groupCoverageExceeded: true`, and
-`groupCoverageLimit: 5`, instead of claiming that no nearby comment exists.
-Missing comments, detached comments, structural boundaries, generic comments
-such as `// constant`, and comments that only duplicate the constant name
-still fire.
+to a human reviewer and attached directly to the constant. A PHPDoc or
+meaningful comment above the first constant of an unbroken run covers
+every constant in the run, whatever words it uses. A blank line or any
+other statement ends the run; a change of visibility does not. When
+another constant in the run has a comment of its own, each comment covers
+only its own constant. Missing comments, detached comments, generic
+comments such as `// constant`, and comments that only duplicate the
+constant name still fire.
 
 Projects that publish constants as API documentation can opt back into
 PHPDoc for public/protected constants with
 `requirePhpdocForApiConstants: true`, or only for exported paths with
-`apiPathPatterns`.
+`apiPathPatterns`. In that mode each exported constant needs a PHPDoc of
+its own; one covered only by its run's comment reports with
+`groupedLocalComment: true`.
 
 `docs.regex-comment` resolves purpose documentation from the narrowest source
 outwards: an own-line comment immediately above the configured call, an
@@ -161,10 +157,14 @@ call is statically the exact three-argument
 `preg_replace('/\s+/', ' ', $subject)` transformation. Larger or unrelated
 callables still need local purpose comments for their configured calls.
 
-`docs.missing-property-phpdoc` accepts a physically attached `//` or `#`
-comment in place of a docblock when `options.acceptLineComments` is true.
-The comment must carry meaning beyond what the property name already
-says. The default is false, so a docblock is required.
+`docs.missing-property-phpdoc` accepts a docblock above the first property
+of an unbroken run, with no blank line or other statement between the
+properties, as documentation for every property in the run. When another
+property in the run has a docblock of its own, each docblock covers only
+its own property. A physically attached `//` or `#` comment documents a
+property only when `options.acceptLineComments` is true; it must carry
+meaning beyond what the property name already says, and it never covers a
+run. The default is false, so a docblock is required.
 
 ### `maintainability` (2)
 

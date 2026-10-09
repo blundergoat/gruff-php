@@ -13,6 +13,7 @@ use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
+use GruffPhp\Rules\Size\SubstantiveLineCounter;
 
 /**
  * Flags a test method whose meaningful body (blanks, comments, and lone brackets excluded) runs past the
@@ -63,7 +64,8 @@ final readonly class TestMethodTooLongRule implements RuleInterface
             (int)$settings->numericThreshold('maxMeaningfulLines'),
             $settings->option('pathOverrides'),
         );
-        $sourceLines = explode("\n", $analysisUnit->source);
+        // Comments and attributes are blanked by the shared counter (FAMILY-CONTRACT section 12).
+        $sourceLines = SubstantiveLineCounter::maskedLines($analysisUnit);
         $findings    = [];
 
         // Weigh every test scope in the file.
@@ -105,13 +107,13 @@ final readonly class TestMethodTooLongRule implements RuleInterface
     }
 
     /**
-     * Counts the meaningful body lines of a test method, skipping blanks, comments, and lone brackets.
+     * Counts the meaningful body lines of a test method: code lines other than a lone bracket or separator.
      *
-     * @param list<string> $sourceLines - All source lines of the unit, indexed from zero (line N is index N-1).
+     * @param list<string> $sourceLines - Comment- and attribute-masked source lines, indexed from zero (line N is index N-1).
      * @param int          $startLine - First source line of the test scope, inclusive (1-based).
      * @param int          $endLine - Last source line of the test scope, inclusive (1-based).
      *
-     * @return int - meaningful line tally compared against the threshold; blanks, comments, and lone brackets are excluded
+     * @return int - meaningful line tally compared against the threshold; blanks, comments, attributes and lone brackets are excluded
      */
     private function countMeaningfulLines(array $sourceLines, int $startLine, int $endLine): int
     {
@@ -134,16 +136,6 @@ final readonly class TestMethodTooLongRule implements RuleInterface
 
             // A lone bracket or separator is scaffolding, not a real line.
             if (in_array($line, ['{', '}', '},', ');', '];', '),', ',', ');'], true)) {
-                continue;
-            }
-
-            // Line comments do not count toward the body.
-            if (str_starts_with($line, '//') || str_starts_with($line, '#')) {
-                continue;
-            }
-
-            // Docblock and block-comment lines do not count either.
-            if (str_starts_with($line, '*') || str_starts_with($line, '/*') || str_starts_with($line, '*/')) {
                 continue;
             }
 

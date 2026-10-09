@@ -14,6 +14,7 @@ use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
+use GruffPhp\Rules\Size\SubstantiveLineCounter;
 use PhpParser\Node\Stmt;
 
 /**
@@ -80,9 +81,9 @@ final readonly class SetupBloatRule implements RuleInterface
                     continue;
                 }
 
-                // Record the span of each real test method for the average.
+                // Record the code lines of each real test method for the average.
                 if (TestQualityNodeHelper::isTestMethod($method)) {
-                    $testLineCounts[] = max(1, $method->getEndLine() - $method->getStartLine() + 1);
+                    $testLineCounts[] = max(1, SubstantiveLineCounter::countRange($analysisUnit, $method->getStartLine(), $method->getEndLine()));
                 }
             }
 
@@ -91,7 +92,8 @@ final readonly class SetupBloatRule implements RuleInterface
                 continue;
             }
 
-            $setupLines       = max(1, $setup->getEndLine() - $setup->getStartLine() + 1);
+            // Code lines only (FAMILY-CONTRACT section 12): comments, attributes and blank lines are free on both sides.
+            $setupLines       = max(1, SubstantiveLineCounter::countRange($analysisUnit, $setup->getStartLine(), $setup->getEndLine()));
             $averageTestLines = array_sum($testLineCounts) / count($testLineCounts);
             // Only flag a setUp() that is over the cap and longer than the typical test.
             if ($setupLines < $minSetupLines || $setupLines <= $averageTestLines) {
