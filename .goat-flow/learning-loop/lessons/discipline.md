@@ -1,6 +1,6 @@
 ---
 category: discipline
-last_reviewed: 2026-05-31
+last_reviewed: 2026-10-03
 ---
 
 # Discipline

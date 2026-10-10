@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\Docs;
 
+use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Rules\Docs\MissingParamTagRule;
-use GruffPhp\Rules\Docs\MissingPublicPhpdocRule;
+use GruffPhp\Rules\Docs\MissingPhpdocRule;
 use GruffPhp\Rules\Docs\MissingReturnTagRule;
 use GruffPhp\Rules\Docs\PhpdocTagText;
 use GruffPhp\Rules\Docs\ReturnCommentRule;
@@ -18,13 +19,77 @@ use GruffPhp\Rules\Docs\ReturnCommentRule;
 final class DocsRulesTest extends DocsRuleTestCase
 {
     /**
+     * Verify an inherited contract satisfies the return and param tags only for what it really declares, whether a
+     * same-file ancestor documents it or `{@inheritdoc}` or `#[Override]` points elsewhere, and that the return-tag
+     * message asks only for the tag.
+     *
+     * @return void
+     */
+    public function testInheritedContractsSatisfyReturnAndParamTags(): void
+    {
+        $returnFindings = [
+            ...$this->analyseRule('inherited-contract-tags.php', MissingReturnTagRule::ID),
+            ...$this->analyseRule('inherited-contract-namespaces.php', MissingReturnTagRule::ID),
+        ];
+        $paramFindings  = [
+            ...$this->analyseRule('inherited-contract-tags.php', MissingParamTagRule::ID),
+            ...$this->analyseRule('inherited-contract-namespaces.php', MissingParamTagRule::ID),
+        ];
+        $returnSymbols  = array_map(static fn(Finding $finding): string => (string) $finding->symbol, $returnFindings);
+        $paramSymbols   = array_map(
+            static fn(Finding $finding): string => $finding->symbol . ' $' . (is_string($finding->metadata['parameter'] ?? null) ? $finding->metadata['parameter'] : ''),
+            $paramFindings,
+        );
+        sort($returnSymbols);
+        sort($paramSymbols);
+
+        // Only what a visible or marked contract really documents is exempt: find(), count(), exists(), purge() and
+        // AuditedRepository::save() stay silent, while a constructor, a parameter the override adds, a parent with
+        // prose only, a prose mention of @inheritdoc, a marker with nothing to inherit, a same-named class in another
+        // namespace, a namespaced Override attribute, a method whose parent's run() is private, and a parameter a
+        // parent never documents under that name all still owe their tags; an extending interface's marker holds.
+        self::assertSame([
+            'AuditedRepository::rename()',
+            'HalfDocumentedPair::pair()',
+            'Job::run()',
+            'Job::stop()',
+            'ProseOnlyChild::remove()',
+            'ProseOnlyRepository::remove()',
+            'PublicRunner::run()',
+            'StandaloneRepository::lookup()',
+            'StandaloneRepository::tally()',
+            'SwappedPair::pair()',
+        ], $returnSymbols);
+        self::assertSame([
+            'AuditedRepository::rename() $name',
+            'AuditedRepository::rename() $recordId',
+            'HalfDocumentedPair::pair() $right',
+            'Job::run() $limit',
+            'Job::stop() $code',
+            'PromotingService::__construct() $retryLimit',
+            'PromotingService::__construct() $serviceName',
+            'ProseOnlyChild::remove() $recordId',
+            'ProseOnlyRepository::remove() $recordId',
+            'PublicRunner::run() $limit',
+            'StandaloneRepository::lookup() $recordId',
+            'StandaloneRepository::tally() $limit',
+            'SwappedPair::pair() $right',
+            'WideningRepository::save() $audit',
+        ], $paramSymbols);
+        self::assertSame(
+            'AuditedRepository::rename() has a docblock but no @return tag declaring its return contract.',
+            $returnFindings[0]->message,
+        );
+    }
+
+    /**
      * Verify missing public phpdoc detected.
      *
      * @return void
      */
-    public function testMissingPublicPhpdocDetected(): void
+    public function testMissingPhpdocDetected(): void
     {
-        $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
+        $findings = $this->analyseRule('missing-phpdoc.php', MissingPhpdocRule::ID);
 
         $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
         self::assertContains('MissingPhpdocFixture::undocumented()', $symbols);
@@ -46,7 +111,7 @@ final class DocsRulesTest extends DocsRuleTestCase
      */
     public function testDocumentedMethodNotFlagged(): void
     {
-        $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
+        $findings = $this->analyseRule('missing-phpdoc.php', MissingPhpdocRule::ID);
 
         $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
         self::assertNotContains('MissingPhpdocFixture::documented()', $symbols);
@@ -59,7 +124,7 @@ final class DocsRulesTest extends DocsRuleTestCase
      */
     public function testAccessorsRequirePhpdoc(): void
     {
-        $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
+        $findings = $this->analyseRule('missing-phpdoc.php', MissingPhpdocRule::ID);
 
         $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
         self::assertContains('MissingPhpdocFixture::getTitle()', $symbols);
@@ -74,7 +139,7 @@ final class DocsRulesTest extends DocsRuleTestCase
      */
     public function testPrivateAndProtectedMethodsRequirePhpdoc(): void
     {
-        $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
+        $findings = $this->analyseRule('missing-phpdoc.php', MissingPhpdocRule::ID);
 
         $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
         self::assertContains('MissingPhpdocFixture::privateMethod()', $symbols);
@@ -88,7 +153,7 @@ final class DocsRulesTest extends DocsRuleTestCase
      */
     public function testTrivialTypedPublicMethodRequiresPhpdoc(): void
     {
-        $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
+        $findings = $this->analyseRule('missing-phpdoc.php', MissingPhpdocRule::ID);
 
         $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
         self::assertContains('MissingPhpdocFixture::trivialUndocumented()', $symbols);
@@ -101,7 +166,7 @@ final class DocsRulesTest extends DocsRuleTestCase
      */
     public function testMagicMethodRequiresPhpdoc(): void
     {
-        $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
+        $findings = $this->analyseRule('missing-phpdoc.php', MissingPhpdocRule::ID);
 
         $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
         self::assertContains('MissingPhpdocFixture::__toString()', $symbols);
@@ -114,7 +179,7 @@ final class DocsRulesTest extends DocsRuleTestCase
      */
     public function testRuleInterfaceContractMethodsRequireLocalPhpdoc(): void
     {
-        $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
+        $findings = $this->analyseRule('missing-phpdoc.php', MissingPhpdocRule::ID);
 
         $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
         self::assertContains('RuleContractFixture::definition()', $symbols);
@@ -128,7 +193,7 @@ final class DocsRulesTest extends DocsRuleTestCase
      */
     public function testInternalHelpersAndConventionalReportersRequirePhpdoc(): void
     {
-        $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
+        $findings = $this->analyseRule('missing-phpdoc.php', MissingPhpdocRule::ID);
 
         $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
         self::assertContains('InternalHelper::complexUtility()', $symbols);

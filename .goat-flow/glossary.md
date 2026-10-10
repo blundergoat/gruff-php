@@ -1,6 +1,6 @@
 # Glossary - gruff-php
 
-Last reviewed 2026-05-24.
+Last reviewed 2026-05-24; the Analysis Report, Baseline, Changed-Code Scan, Display Filter, and Branch Review Mode entries were reconciled with source on 2026-10-03.
 
 This glossary defines terms used by `gruff-php`, its public reports, and local project memory. Keep shared gruff-family terms aligned with the sibling implementations; keep PHP-specific differences explicit rather than making them look identical.
 
@@ -12,15 +12,15 @@ This glossary defines terms used by `gruff-php`, its public reports, and local p
 
 ### Analysis Report
 
-The complete result of one scan: schema version, tool metadata, run metadata, paths, summary counts, score data, diagnostics, findings, baseline state, and optional diff/review/mutation state. Native JSON uses `gruff.analysis.v2`.
+The complete result of one scan: schema version, tool metadata, run metadata, paths, summary counts, score data, diagnostics, findings, baseline state, and optional diff/review/mutation state. Native JSON uses `gruff.analysis.v3`.
 
 ### Baseline
 
-A reviewed-finding suppression file. `gruff-php` writes and reads `gruff.baseline.v2`: grouped count rows keyed by `(file, ruleId, message)`, matched by count arithmetic so accepted findings stay suppressed across line shifts without disabling rules.
+A reviewed-finding suppression file. `gruff-php` writes and reads `gruff.baseline.v3`: one `occurrences` row per line-free identity (tool language, rule ID, path, and subject) carrying the accepted `count`, so accepted findings stay suppressed across line shifts without disabling rules. A `gruff.baseline.v2` file fails closed until `--migrate-baseline` carries it forward; sensitive-data findings are never baseline-eligible.
 
 ### Changed-Code Scan
 
-A scan filtered to changed lines or files. `--diff` filters current findings through local Git diff output; `--diff-vs=<base>` compares current findings against a base ref.
+A scan filtered to changed lines or files. `--diff` filters current findings through local Git diff output; `--diff-base=<base>` (also spelled `--diff-vs`) compares current findings against a base ref.
 
 ### Confidence
 
@@ -36,7 +36,7 @@ A run-level problem such as a usage error, config error, missing path, parse err
 
 ### Display Filter
 
-A report-only filter such as `--min-severity`, include/exclude pillar, or include/exclude rule. Display filters change rendered output, not rule execution, scoring, or baseline generation.
+A report-only filter such as `--min-severity`, `--include-pillar`/`--exclude-pillar`, or `--show-*`/`--hide-*` for rules and pillars. Display filters change rendered output, not rule execution, scoring, or baseline generation. `--include-rule` and `--exclude-rule` are not display filters: they select which rules execute.
 
 ### Exit Codes
 
@@ -52,7 +52,7 @@ A stable 16-character hash derived from finding identity fields. Baselines and d
 
 ### Gruff Config
 
-Project configuration that tunes discovery, allowlists, rule selection, and per-rule thresholds/severity/options. Shared keys are `paths.ignore`, `allowlists.acceptedAbbreviations`, `allowlists.secretPreviews`, `selection`, and `rules.<id>`.
+Project configuration that tunes discovery, allowlists, rule selection, and per-rule thresholds/severity/options. Shared keys are `paths.ignore`, `allowlists.acceptedAbbreviations`, `selection`, and `rules.<id>`.
 
 ### Hotspot Output
 
@@ -72,7 +72,7 @@ The set of built-in rules plus their public metadata. `list-rules --format json`
 
 ### Rule ID
 
-Stable public identifier for one rule, using dotted gruff-family names such as `size.method-length`, `docs.missing-param-tag`, and `sensitive-data.high-entropy-string`. Some dead-code pillar rules retain `waste.*` IDs for historical continuity.
+Stable public identifier for one rule, using dotted gruff-family names such as `size.method-length`, `docs.missing-param-tag`, and `sensitive-data.aws-access-key`. Some dead-code pillar rules retain `waste.*` IDs for historical continuity.
 
 ### SARIF
 
@@ -118,7 +118,7 @@ Per-file parsed state containing the source file, raw source text, AST statement
 
 ### Branch Review Mode
 
-The `--diff-vs=<base>` workflow. It compares current findings with a Git archive snapshot of a base ref and can be narrowed to changed files with `--changed-only`.
+The `--diff-base=<base>` workflow (also spelled `--diff-vs`). It compares current findings with a Git archive snapshot of a base ref and can be narrowed to changed files with `--changed-only`.
 
 ### Infection Report
 

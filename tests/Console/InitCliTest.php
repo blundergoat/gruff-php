@@ -253,11 +253,11 @@ final class InitCliTest extends CliTestCase
     }
 
     /**
-     * Verify the scaffold emits the canonical schemaVersion + binary-default minimumSeverity block.
+     * Verify the scaffold emits the canonical schemaVersion + binary-default failOn block.
      *
      * @return void
      */
-    public function testInitEmitsSchemaVersionAndMinimumSeverityBlock(): void
+    public function testInitEmitsSchemaVersionAndFailOnBlock(): void
     {
         $project = $this->tempDir();
 
@@ -277,7 +277,7 @@ final class InitCliTest extends CliTestCase
             self::assertSame('gruff-php.config.v0.1', $decoded['schemaVersion'] ?? null);
             self::assertSame(
                 ['analyse' => 'advisory', 'report' => 'none', 'dashboard' => 'none'],
-                $decoded['minimumSeverity'] ?? null,
+                $decoded['failOn'] ?? null,
             );
         } finally {
             $this->removeDir($project);
@@ -285,11 +285,11 @@ final class InitCliTest extends CliTestCase
     }
 
     /**
-     * Verify --force preserves a hand-edited minimumSeverity block byte-equivalent.
+     * Verify --force preserves a hand-edited failOn block byte-equivalent.
      *
      * @return void
      */
-    public function testInitForcePreservesExistingMinimumSeverityBlock(): void
+    public function testInitForcePreservesExistingFailOnBlock(): void
     {
         $project    = $this->tempDir();
         $configPath = $project . '/' . ConfigLoader::DEFAULT_CONFIG_FILE;
@@ -297,7 +297,7 @@ final class InitCliTest extends CliTestCase
         try {
             file_put_contents($configPath, implode("\n", [
                 'schemaVersion: gruff-php.config.v0.1',
-                'minimumSeverity:',
+                'failOn:',
                 '    analyse: error',
                 '    report: warning',
                 '    dashboard: warning',
@@ -317,7 +317,7 @@ final class InitCliTest extends CliTestCase
             $decoded = $this->decodedConfig($configPath);
             self::assertSame(
                 ['analyse' => 'error', 'report' => 'warning', 'dashboard' => 'warning'],
-                $decoded['minimumSeverity'] ?? null,
+                $decoded['failOn'] ?? null,
             );
         } finally {
             $this->removeDir($project);
@@ -359,11 +359,11 @@ final class InitCliTest extends CliTestCase
      *
      * @return void
      */
-    public function testInitForceRejectsExistingMinimumSeverityWithNonGatingCommand(): void
+    public function testInitForceRejectsExistingFailOnWithNonGatingCommand(): void
     {
         $project    = $this->tempDir();
         $configPath = $project . '/' . ConfigLoader::DEFAULT_CONFIG_FILE;
-        $original   = "schemaVersion: gruff-php.config.v0.1\nminimumSeverity:\n    summary: error\n";
+        $original   = "schemaVersion: gruff-php.config.v0.1\nfailOn:\n    summary: error\n";
 
         try {
             file_put_contents($configPath, $original);
@@ -377,7 +377,7 @@ final class InitCliTest extends CliTestCase
             $process->run();
 
             self::assertNotSame(0, $process->getExitCode());
-            self::assertStringContainsString('minimumSeverity.summary', $process->getOutput() . $process->getErrorOutput());
+            self::assertStringContainsString('failOn.summary', $process->getOutput() . $process->getErrorOutput());
             self::assertSame($original, file_get_contents($configPath));
         } finally {
             $this->removeDir($project);
@@ -435,7 +435,7 @@ final class InitCliTest extends CliTestCase
     {
         self::assertArrayHasKey('schemaVersion', $decoded);
         self::assertArrayHasKey('minimumPhpVersion', $decoded);
-        self::assertArrayHasKey('minimumSeverity', $decoded);
+        self::assertArrayHasKey('failOn', $decoded);
         self::assertArrayHasKey('paths', $decoded);
         self::assertArrayHasKey('allowlists', $decoded);
         self::assertArrayHasKey('selection', $decoded);

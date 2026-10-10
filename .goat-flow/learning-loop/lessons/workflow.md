@@ -1,6 +1,6 @@
 ---
 category: workflow
-last_reviewed: 2026-07-04
+last_reviewed: 2026-10-10
 ---
 
 # Workflow Lessons
@@ -75,11 +75,28 @@ last_reviewed: 2026-07-04
 
 The corpus-level regression test (`tests/Rule/RuleRegressionSnapshotTest.php` in this repo) catches the worst case — total rule extinction — but the per-rule fixture is the right place for the explicit before/after demonstration. Same audit applies to any rule that adds a context-aware exemption: PHPStan `@var` scaffold in `waste.redundant-variable`, function-doc keywords in `docs.regex-comment`, and any future exemption based on AST or docblock context.
 
+**Recurrence 2026-10-10:** M15's stub and loop-context repairs invalidated three old positive fixtures. Kept their intended warnings by replacing a third stub with a real mock, removing the expected row identifier from a repeated-loop control, and giving a string-actual control two iterations. Evidence: `tests/Fixtures/TestQuality/phpunit-mechanics-smells.php` (search: `testUsesTooManyMocks`), `cumulative-test-quality.php` (search: `testLoopCalculateTotal`) and `loop-assertion-without-message.php` (search: `cancelled`). Read the changed source first; retain the intended failing invariant rather than lowering an assertion count.
+
+**Snapshot follow-up 2026-10-10:** The M15 candidate export carried only two fixture files, so its discovery could not reproduce the committed snapshot. Full fixture discovery with the archived rules and three pre-edit fixture substitutions reproduced 184 units, 2,740 findings and the exact old hash before the expectations changed. Reproduce the old hash from the actual snapshot inputs; never approve a replacement from a partial export. Evidence: `tests/Rule/RuleRegressionSnapshotTest.php` (search: "testDefaultRuleRegistryFindingsStayStableAcrossFixtures").
+
+## Lesson: keep PHP data-provider names outside test discovery
+
+**Created:** 2026-10-10
+**Decision changed:** Give PHPUnit providers names without a test prefix, then check both test and assertion totals.
+**Trigger phase:** ACT
+**Caught at:** VERIFY
+**Incident count:** 1
+**Latest occurrence:** 2026-10-10
+
+**Prevention:** Name providers for their cases and reference them through DataProvider. A public test-prefixed provider can be discovered as a test too.
+
+M15 initially called its provider testRoleCases. PHPUnit ran 21 tests with 20 assertions and reported warning and risky results. Renaming it roleCases restored 20 tests and 20 assertions. Evidence: `tests/Rule/TestQuality/TestQualityPrecisionTest.php` (search: `DataProvider('roleCases')`).
+
 ## Lesson: Validator throws need an actionable hint, and the CLI catch must render it
 
 **Created:** 2026-05-27
 
-**What happened:** `ConfigLoader` throws `ConfigException` (extends `RuntimeException`) at every config-validation boundary — schemaVersion missing/mismatched, unknown rule id, malformed `minimumSeverity`, etc. The exception carries only a message; it has no hint field. CLI surfaces consume it inconsistently: `SummaryCommand.php:239` prints `<error>[CONFIG-ERROR] %s</error>` and returns null; `AnalyseCommandSetupBuilder.php:235` converts to a structured `usageReport` with `type: 'config-error'`; `ReportCommand.php:403` and `DashboardStateFactory.php:185` swallow silently (`catch (ConfigException) { return null; }`). None of the surfaces add an actionable next step. An operator who hits a `schemaVersion` mismatch from `summary` reads "Config must include schemaVersion: ..." and has to consult docs to learn that `gruff-php init --force` is the documented fix.
+**What happened:** `ConfigLoader` throws `ConfigException` (extends `RuntimeException`) at every config-validation boundary — schemaVersion missing/mismatched, unknown rule id, malformed `minimumSeverity`, etc. The exception carries only a message; it has no hint field. CLI surfaces consume it inconsistently: `src/Cli/Command/SummaryCommand.php` (search: `[CONFIG-ERROR]`) prints `<error>[CONFIG-ERROR] %s</error>` and returns null; `src/Cli/Command/AnalyseCommandSetupBuilder.php` (search: `'config-error'`) converts to a structured `usageReport` with `type: 'config-error'`; `src/Cli/Command/ReportCommand.php` and `src/Cli/Dashboard/DashboardStateFactory.php` (search: `catch (ConfigException)`) swallow the error at that point. (Re-checked 2026-10-03: those two catches now document that a later config load reports the error, and `ConfigException` still has no hint field.) None of the surfaces add an actionable next step. An operator who hits a `schemaVersion` mismatch from `summary` reads "Config must include schemaVersion: ..." and has to consult docs to learn that `gruff-php init --force` is the documented fix.
 
 Cross-port: gruff-ts hit the exact same trap with worse symptoms (raw Node stack trace), captured in `gruff-ts/.goat-flow/lessons/workflow.md` "Lesson: user-facing CLI commands must catch known error classes and print graceful messages" (2026-05-27). The fix there was a typed `ConfigLoadError` with a `suggestion` field plus a `runWithConfigErrorHandling` wrapper. gruff-php has the catch boundary already; it's missing the hint payload and the consistent rendering.
 
@@ -151,7 +168,7 @@ The fixture-per-field migration cost is roughly linear in the number of fixtures
 - Never invoke `git commit` or `git push` via Bash. Treat both as user-only operations forever, in this repo and in every other repo, for every session. There is no scenario in which the agent should run these.
 - When changes are ready to commit: stage with `git add <files>`, run the agreed checks (`composer check` / `composer test` / etc.), and write the commit message to `.goat-flow/scratchpad/commit.md`. Then tell the user the message is staged and stop. Do not retry, do not propose a workaround, do not suggest the user use `! git commit ...` — they will commit themselves whichever way they prefer.
 - If the harness denies `git commit` or `git push` once, treat it as a permanent signal for the rest of the session and never attempt either again. Do not interpret silence or further user instructions as a re-authorisation.
-- If you want a permission-layer enforcement, suggest `Bash(git commit:*)` and `Bash(git push:*)` entries under `permissions.deny` in `.claude/settings.json` — but do not edit that file without explicit user instruction.
+- Permission-layer enforcement now exists: `.claude/settings.json` (search: `Bash(*git commit*)`) denies both commands, and `.goat-flow/hooks/deny-git-mutations.sh` blocks Git and GitHub writes before execution. A denial is the rule working, not an obstacle to route around.
 
 ## Lesson: Tick the per-task checkboxes when flipping a plan to complete
 
@@ -161,7 +178,7 @@ The fixture-per-field migration cost is roughly linear in the number of fixtures
 
 **Root cause:** Treating the top-of-file `Status:` line as the single source of truth for milestone completion. The status line is a summary; the per-task checkboxes are the audit trail. Skipping them leaves a future reader unable to tell which individual tasks were done, deferred, or silently dropped — and it falsely signals that the plan was never executed even when the work shipped.
 
-**Prevention:** Whenever a plan's `Status:` field flips to `complete` (or any task's status changes), tick every `- [ ]` line in `## Assumptions`, `## Tasks`, and `## Testing Gate` that the work actually covered before claiming the milestone done. If a checkbox cannot be ticked, leave it unchecked and add a one-line note explaining why — `Status: complete` with mixed checkboxes is still valid, but only when the unticked items are deliberate. Use `sed -i 's|^- \[ \]|- [x]|g' <plan>` for whole-plan completion or edit individual lines for partial progress. Verify with `grep -c '^- \[x\]' <plan>` before claiming done.
+**Prevention:** Whenever a plan's `Status:` field flips to `complete` (or any task's status changes), tick every `- [ ]` line in `## Assumptions`, `## Tasks`, and `## Testing Gate` that the work actually covered before claiming the milestone done. If a checkbox cannot be ticked, leave it unchecked and add a one-line note explaining why — `Status: complete` with mixed checkboxes is still valid, but only when the unticked items are deliberate. Tick each line individually as its work is verified; never bulk-tick with `sed`, because a blanket replace cannot tell done from deferred and once marked deferred items complete (`.goat-flow/learning-loop/lessons/discipline.md`, search: `Tick task checkboxes the moment the item is done`). Verify with `grep -c '^- \[x\]' <plan>` before claiming done.
 
 ## Lesson: Reconcile shipped work back into task checkboxes immediately
 
@@ -176,6 +193,11 @@ The fixture-per-field migration cost is roughly linear in the number of fixtures
 ## Lesson: Adding a rule cascades through fixtures, goldens, and existing tests
 
 **Created:** 2026-05-11 (M31)
+**Decision changed:** When changing a rule default, inspect detector-test helpers as well as registry snapshots. Enable opt-in rules explicitly in detector fixtures and preserve separate checks of the default catalogue.
+**Trigger phase:** ACT
+**Caught at:** VERIFY
+**Incident count:** 3
+**Latest occurrence:** 2026-10-10
 
 **What happened:** M31 added six new rules: `modernisation.phpdoc-mixed-overuse` (phase 1) and four `docs.missing-*-phpdoc` rules plus `design.single-implementor-interface` (phases 2 + 3). After phase 2 implementation the test suite went red with seven failures even though the new rules' own unit tests passed: existing fixtures in `tests/Fixtures/Source/Code/OrderCalculator.php` and `tests/Fixtures/Source/mixed/alpha.php` had no class-level or file-level docblocks, so the new docs rules added findings the existing CLI/registry tests did not expect (baselined count `1` became `3`, the RuleRegistry test's expected `lines: 19` became `26` after the docblock added 7 lines, golden snapshots stopped matching). Each fixture had been deliberately authored to fire exactly one rule for the older tests. The fix was per-fixture: add docblocks to keep the originally-targeted rule the only one firing, regenerate the goldens (`text-warning.txt`, `json-warning.json`), and update inline line-number expectations in `tests/Console/GruffCliTest.php` and `tests/Rule/RuleRegistryTest.php`.
 
@@ -187,6 +209,10 @@ The fixture-per-field migration cost is roughly linear in the number of fixtures
 3. **Inline expected-value assertions in `tests/Console/` and `tests/Rule/`.** Search for the affected fixture's filename plus literal numbers (line counts, line numbers) before assuming the file is unaffected. The `RuleRegistry::analyse` finding count and the file-length metadata `lines` value drift even when no test directly mentions the new rule.
 
 For the dogfood snapshots also expect new findings on the gruff source tree itself (new rule fires on the new rule files) and on test files that don't have docblocks. Those are signal, not regression, as long as every diff is contained to files added in the same PR.
+
+**Recurrence 2026-10-10:** M15 turned eight test-quality rules off by default and updated the registry and full-fixture snapshots. The first full suite still failed eight cases because three test-quality helpers built AnalysisConfig from registry defaults. Their expected findings now required explicit opt-in configuration. Load the existing calibration config only when a caller supplies no override; preserve the original assertions and override settings. Evidence: `tests/Rule/TestQuality/TestQualityCalibrationRulesTest.php`, `tests/Rule/TestQuality/TestQualityConfigurationRulesTest.php` and `tests/Rule/TestQuality/TestQualityRulesTest.php` (search: "enable-default-off-rules.yaml").
+
+**Recurrence 2026-10-10:** The additional test-longer-than-sut default left its code-line control disabled. Enable it explicitly in `tests/Rule/CodeLineCountingTest.php` (search: `testTestLongerThanSutComparesCodeLines`); preserve both boundary assertions.
 
 ## Lesson: Respect explicit rule style even when it restates native syntax
 

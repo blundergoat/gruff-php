@@ -46,6 +46,12 @@ final readonly class MatchExpressionCandidateRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A switch that relies on loose comparison, for example mixing string and integer case labels against a numeric subject.',
+                    'mitigation' => 'Only the all-direct-return shape is checked, not comparison semantics; keep the switch where loose matching is deliberate.',
+                ],
+            ],
         );
     }
 

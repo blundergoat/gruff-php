@@ -91,6 +91,8 @@ final readonly class PublicMethodCountRule implements RuleInterface
                 ? ($classLike->name?->toString() ?? sprintf('class@anonymous:%d', $classLike->getStartLine()))
                 : ($classLike->name?->toString() ?? sprintf('enum@%d', $classLike->getStartLine()));
 
+            $band = LimitBand::of($publicCount, $settings->lowestHighValueThreshold());
+
             $findings[] = new Finding(
                 ruleId:  $definition->id,
                 message: sprintf(
@@ -102,18 +104,19 @@ final readonly class PublicMethodCountRule implements RuleInterface
                 ),
                 filePath:         $analysisUnit->file->displayPath,
                 line:             $classLike->getStartLine(),
-                severity:         $thresholdMatch->severity,
+                severity:         LimitBand::severity($band, $thresholdMatch->severity),
                 pillar:           $definition->pillar,
                 tier:             $definition->tier,
                 confidence:       $definition->confidence,
                 endLine:          $classLike->getEndLine() > 0 ? $classLike->getEndLine() : null,
                 symbol:           $symbol,
-                remediation:      'Split the class into smaller, focused interfaces and implementations.',
+                remediation:      LimitBand::advice($band, LimitBand::LOWER_PUBLIC_METHOD, LimitBand::SPLIT_CLASS),
                 secondaryPillars: $definition->secondaryPillars,
                 metadata:         [
                     'publicMethods' => $publicCount,
                     'threshold' => $thresholdMatch->threshold,
                     'thresholdType' => $thresholdMatch->severity->value,
+                    LimitBand::KEY => $band,
                 ],
             );
         }

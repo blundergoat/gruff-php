@@ -59,7 +59,8 @@ final class PublicMethodCountRuleTest extends TestCase
      */
     public function testWarningForTooManyPublicMethods(): void
     {
-        $findings = $this->analyse('many-public-methods.php', ['warning' => 15, 'error' => 25]);
+        // A warning tier of 10 puts the 16 public methods at one and a half times the limit, so the finding keeps warning severity.
+        $findings = $this->analyse('many-public-methods.php', ['warning' => 10, 'error' => 25]);
 
         self::assertCount(1, $findings);
         self::assertSame(PublicMethodCountRule::ID, $findings[0]->ruleId);

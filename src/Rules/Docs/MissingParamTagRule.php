@@ -15,9 +15,11 @@ use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
+use PhpParser\Node;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
+use PhpParser\NodeFinder;
 
 /**
  * Flags a documented method or function whose parameters have no matching `@param` tag, so the user keeps
@@ -25,8 +27,11 @@ use PhpParser\Node\Stmt\Function_;
  *
  * Runs per file over documented function-likes that carry contract prose or tags. A constructor skeleton
  * also enforces tags for promoted parameters only, keeping property documentation under one rule without
- * changing ordinary skeleton parameters. A depth-aware parser reads the documented parameter names,
- * tolerating multi-line array shapes. Advisory, high confidence.
+ * changing ordinary skeleton parameters. An override owes no tag for a parameter its inherited contract
+ * documents: one the same-file overridden method declares and documents at the same position, or every
+ * parameter when `{@inheritdoc}` or `#[\Override]` points at a contract in another file. Constructors never
+ * inherit. A depth-aware parser reads the documented parameter names, tolerating multi-line array shapes.
+ * Advisory, high confidence.
  */
 final readonly class MissingParamTagRule implements RuleInterface
 {
@@ -64,6 +69,8 @@ final readonly class MissingParamTagRule implements RuleInterface
     {
         $definition = $this->definition();
         $nodes      = NodeIndex::nodesOfAny($analysisUnit, [ClassMethod::class, Function_::class]);
+        $nodeFinder        = new NodeFinder();
+        $inheritanceHelper = new DocsInheritanceHelper();
 
         $findings = [];
 
@@ -85,28 +92,18 @@ final readonly class MissingParamTagRule implements RuleInterface
                 continue;
             }
 
-            $documentedParams = $this->extractParamNames($docText);
-            $symbol           = CyclomaticComplexityRule::resolveSymbol($node);
+            $owingParams = $this->paramsOwingTags(
+                node:              $node,
+                hasContractDoc:    $hasContractDoc,
+                documentedParams:  $this->extractParamNames($docText),
+                statements:        $analysisUnit->statements,
+                nodeFinder:        $nodeFinder,
+                inheritanceHelper: $inheritanceHelper,
+            );
+            $symbol      = CyclomaticComplexityRule::resolveSymbol($node);
 
-            // Check each signature parameter has a matching tag.
-            foreach ($node->params as $param) {
-                // Preserve skeleton behaviour for ordinary parameters; only promoted properties gain an owner.
-                if (!$hasContractDoc && !$param->isPromoted()) {
-                    continue;
-                }
-
-                // Only a plain named parameter can be matched by name.
-                if (!$param->var instanceof Variable || !is_string($param->var->name)) {
-                    continue;
-                }
-
-                $paramName = $param->var->name;
-
-                // A documented parameter is fine.
-                if (in_array($paramName, $documentedParams, true)) {
-                    continue;
-                }
-
+            // Report each signature parameter that owes its own tag.
+            foreach ($owingParams as $paramName => $param) {
                 $findings[] = new Finding(
                     ruleId:      $definition->id,
                     message:     sprintf('Parameter $%s in %s needs an @param tag with a brief description (one plain-English clause; not a restatement of the type signature).', $paramName, $symbol),
@@ -241,6 +238,103 @@ final readonly class MissingParamTagRule implements RuleInterface
         $stripped = preg_replace('/\*\/\s*$/', '', $stripped) ?? '';
 
         return preg_replace('/^\s*\*\s?/m', '', $stripped) ?? '';
+    }
+
+    /**
+     * Returns the parameters that owe an `@param` tag of their own.
+     *
+     * @param ClassMethod|Function_ $node              - Documented function-like being checked.
+     * @param bool                  $hasContractDoc    - Whether its docblock carries a contract rather than a skeleton.
+     * @param list<string>          $documentedParams  - Parameter names its own docblock already documents.
+     * @param list<Node\Stmt>       $statements        - The unit's statements, searched for the overridden method.
+     * @param NodeFinder            $nodeFinder        - Shared finder reused across nodes.
+     * @param DocsInheritanceHelper $inheritanceHelper - Resolves same-file ancestors and inheritance markers.
+     *
+     * @return array<string, Node\Param> - owing parameters keyed by name, in signature order; a skeleton owes only its
+     *   promoted parameters, and a parameter its own docblock or an inherited contract documents owes nothing
+     */
+    private function paramsOwingTags(
+        ClassMethod|Function_ $node,
+        bool $hasContractDoc,
+        array $documentedParams,
+        array $statements,
+        NodeFinder $nodeFinder,
+        DocsInheritanceHelper $inheritanceHelper,
+    ): array {
+        $owing = [];
+        // Weigh each plainly named signature parameter; a skeleton keeps its promoted properties only.
+        foreach ($node->params as $param) {
+            $paramName = $this->paramName($param);
+            if ($paramName !== null && ($hasContractDoc || $param->isPromoted()) && !in_array($paramName, $documentedParams, true)) {
+                $owing[$paramName] = $param;
+            }
+        }
+
+        // An inherited contract can discharge what is left; that lookup walks the file, so it runs only when needed.
+        $inherited = $owing === [] ? [] : $this->inheritedParamNames($node, $statements, $nodeFinder, $inheritanceHelper);
+
+        return array_diff_key($owing, array_flip($inherited));
+    }
+
+    /**
+     * Returns the parameters of a method that an inherited contract already documents.
+     *
+     * @param ClassMethod|Function_ $node              - Documented function-like with at least one undocumented parameter.
+     * @param list<Node\Stmt>       $statements        - The unit's statements, searched for the overridden method.
+     * @param NodeFinder            $nodeFinder        - Shared finder reused across nodes.
+     * @param DocsInheritanceHelper $inheritanceHelper - Resolves same-file ancestors and inheritance markers.
+     *
+     * @return list<string> - this method's parameter names the same-file overridden method both declares and documents,
+     *   matched by name or, for a renamed parameter, by position; or every name when `{@inheritdoc}` or `#[\Override]` points at a contract in another file; empty
+     *   for a function, a constructor (PHP inherits no constructor signature, and a promoted parameter declares a
+     *   property only this class can document), or a method with no inherited contract
+     */
+    private function inheritedParamNames(
+        ClassMethod|Function_ $node,
+        array $statements,
+        NodeFinder $nodeFinder,
+        DocsInheritanceHelper $inheritanceHelper,
+    ): array {
+        if (!$node instanceof ClassMethod || strtolower($node->name->toString()) === '__construct') {
+            return [];
+        }
+
+        $ownNames       = array_map($this->paramName(...), $node->params);
+        $ancestorMethod = $inheritanceHelper->sameFileAncestorMethod($node, $statements, $nodeFinder);
+        if (!$ancestorMethod instanceof ClassMethod) {
+            // The contract lives in another file, so a marker the class can honour stands in for every parameter.
+            return $inheritanceHelper->hasInheritanceMarker($node) ? array_values(array_filter($ownNames, is_string(...))) : [];
+        }
+
+        // A visible ancestor that inherits its own contract through a marker covers every position it declares.
+        $ancestorDocumented = $inheritanceHelper->hasInheritanceMarker($ancestorMethod)
+            ? array_filter(array_map($this->paramName(...), $ancestorMethod->params), is_string(...))
+            : $this->extractParamNames($ancestorMethod->getDocComment()?->getText() ?? '');
+        $ancestorNames = array_map($this->paramName(...), $ancestorMethod->params);
+        $inherited     = [];
+
+        // A parameter the ancestor also declares is matched by name; a renamed one by its position. Either way it is
+        // inherited only when the ancestor documents it, and one the override adds past the signature is owed here.
+        foreach ($ownNames as $position => $ownName) {
+            $ancestorName = in_array($ownName, $ancestorNames, true) ? $ownName : ($ancestorNames[$position] ?? null);
+            if ($ownName !== null && $ancestorName !== null && in_array($ancestorName, $ancestorDocumented, true)) {
+                $inherited[] = $ownName;
+            }
+        }
+
+        return $inherited;
+    }
+
+    /**
+     * Returns a parameter's plain variable name.
+     *
+     * @param Node\Param|null $param - Parameter to read, or null past the end of a signature.
+     *
+     * @return string|null - the name without `$`; null for a missing or dynamically named parameter
+     */
+    private function paramName(?Node\Param $param): ?string
+    {
+        return $param?->var instanceof Variable && is_string($param->var->name) ? $param->var->name : null;
     }
 
     /**

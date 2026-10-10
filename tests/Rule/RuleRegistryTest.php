@@ -45,38 +45,29 @@ use GruffPhp\Rules\Security\DangerousFunctionCallRule;
 use GruffPhp\Rules\Security\DebugModeEnabledRule;
 use GruffPhp\Rules\Security\DependencyComposerPathRule;
 use GruffPhp\Rules\Security\DependencyComposerScriptRule;
-use GruffPhp\Rules\Security\DependencyComposerUnpinnedRule;
 use GruffPhp\Rules\Security\DependencyComposerVcsRule;
 use GruffPhp\Rules\Security\DisabledSslVerificationRule;
 use GruffPhp\Rules\Security\ErrorSuppressionRule;
 use GruffPhp\Rules\Security\ExtractCompactUserInputRule;
-use GruffPhp\Rules\Security\GithubActionsRiskyWorkflowRule;
 use GruffPhp\Rules\Security\HeaderInjectionRule;
-use GruffPhp\Rules\Security\InsecureRandomRule;
-use GruffPhp\Rules\Security\PathTraversalFileAccessRule;
 use GruffPhp\Rules\Security\PermissiveCorsRule;
 use GruffPhp\Rules\Security\ProcessCommandConstructionRule;
 use GruffPhp\Rules\Security\ReflectedXssRule;
 use GruffPhp\Rules\Security\RequestControlledUrlRule;
-use GruffPhp\Rules\Security\SensitiveDataLoggingRule;
 use GruffPhp\Rules\Security\SilentCatchRule;
 use GruffPhp\Rules\Security\SqlConcatenationRule;
 use GruffPhp\Rules\Security\UnsafeArchiveExtractionRule;
 use GruffPhp\Rules\Security\UnsafeXmlLoadingRule;
 use GruffPhp\Rules\Security\UnsafeUnserializeRule;
 use GruffPhp\Rules\Security\VariableIncludeRule;
-use GruffPhp\Rules\Security\WeakCryptoRule;
 use GruffPhp\Rules\SensitiveData\ApiKeyPatternRule;
 use GruffPhp\Rules\SensitiveData\AwsAccessKeyRule;
 use GruffPhp\Rules\SensitiveData\DatabaseUrlPasswordRule;
 use GruffPhp\Rules\SensitiveData\GcpServiceAccountKeyRule;
-use GruffPhp\Rules\SensitiveData\HardcodedEnvValueRule;
-use GruffPhp\Rules\SensitiveData\HighEntropyStringRule;
 use GruffPhp\Rules\SensitiveData\JwtTokenRule;
 use GruffPhp\Rules\SensitiveData\PhiPatternRule;
 use GruffPhp\Rules\SensitiveData\PiiTestFixtureRule;
 use GruffPhp\Rules\SensitiveData\PrivateKeyRule;
-use GruffPhp\Rules\SensitiveData\UrlEmbeddedCredentialsRule;
 use GruffPhp\Rules\Size\AverageMethodLengthRule;
 use GruffPhp\Rules\Size\ClassLengthRule;
 use GruffPhp\Rules\Size\FileLengthRule;
@@ -152,24 +143,21 @@ final class RuleRegistryTest extends TestCase
             ReadonlyPropertyCandidateRule::ID, ApiKeyPatternRule::ID,
             AwsAccessKeyRule::ID, DatabaseUrlPasswordRule::ID,
             GcpServiceAccountKeyRule::ID,
-            HardcodedEnvValueRule::ID, HighEntropyStringRule::ID,
             JwtTokenRule::ID, PhiPatternRule::ID,
             PiiTestFixtureRule::ID, PrivateKeyRule::ID,
-            UrlEmbeddedCredentialsRule::ID,
             DangerousFunctionCallRule::ID, DebugModeEnabledRule::ID,
             DependencyComposerPathRule::ID, DependencyComposerScriptRule::ID,
-            DependencyComposerUnpinnedRule::ID, DependencyComposerVcsRule::ID,
+            DependencyComposerVcsRule::ID,
             DisabledSslVerificationRule::ID,
             ErrorSuppressionRule::ID, ExtractCompactUserInputRule::ID,
-            GithubActionsRiskyWorkflowRule::ID, HeaderInjectionRule::ID,
-            InsecureRandomRule::ID, PathTraversalFileAccessRule::ID,
+            HeaderInjectionRule::ID,
             PermissiveCorsRule::ID,
             ProcessCommandConstructionRule::ID, ReflectedXssRule::ID,
             RequestControlledUrlRule::ID,
-            SensitiveDataLoggingRule::ID, SilentCatchRule::ID, SqlConcatenationRule::ID,
+            SilentCatchRule::ID, SqlConcatenationRule::ID,
             UnsafeArchiveExtractionRule::ID, UnsafeXmlLoadingRule::ID,
             UnsafeUnserializeRule::ID, VariableIncludeRule::ID,
-            WeakCryptoRule::ID, ConditionalTestLogicRule::ID,
+            ConditionalTestLogicRule::ID,
             DataProviderAnnotationRule::ID, EagerTestRule::ID,
             ExcessiveMockingRule::ID, MagicNumberAssertionRule::ID,
             MockOnlyTestRule::ID, MysteryGuestRule::ID, NoAssertionsRule::ID,
@@ -216,7 +204,7 @@ final class RuleRegistryTest extends TestCase
         self::assertSame(Severity::Warning, $findings[0]->severity);
         self::assertSame(Pillar::Size, $findings[0]->pillar);
         // 11 substantive lines: the fixture's blank and comment-only lines are free under file-length.
-        self::assertSame(['lines' => 11, 'threshold' => 3, 'thresholdType' => 'warning'], $findings[0]->metadata);
+        self::assertSame(['lines' => 11, 'threshold' => 3, 'thresholdType' => 'warning', 'limitBand' => 'upper'], $findings[0]->metadata);
     }
 
     /**
@@ -387,9 +375,14 @@ final class RuleRegistryTest extends TestCase
         usort($definitions, static fn(array $left, array $right): int => $left['id'] <=> $right['id']);
         $json = json_encode($definitions, JSON_THROW_ON_ERROR);
 
-        self::assertCount(128, $definitions);
+        self::assertCount(119, $definitions);
+        // M10 D35 (2026-09-26) renamed docs.missing-public-phpdoc to docs.missing-phpdoc, and docs.return-comment's description names it.
+        // Precision-floor M19 (2026-10-04) retired nine rules and turned three off by default (ADR-034).
+        // The constant and property PHPDoc descriptions name run coverage (CHANGELOG: `One comment documents a run of constants`).
+        // Precision-floor M14 turned complexity.halstead-volume off by default (CHANGELOG 0.6.0).
+        // Precision-floor M15 makes the low-confidence SUT-name heuristic advisory.
         self::assertSame(
-            'efa8942d8f840536dd18' . '0e20b6576cce513620c7b6af3d28ac8f39a62b830e04',
+            '3e6a03c76267085f9327aea633aa1401cdc9753eaff56bb777b620efabdfe5ae',
             hash('sha256', $json),
         );
     }

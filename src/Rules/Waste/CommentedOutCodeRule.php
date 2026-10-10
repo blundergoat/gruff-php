@@ -45,6 +45,12 @@ final readonly class CommentedOutCodeRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'Explanatory prose that names a variable and an assignment in the same sentence, which alone reaches the two-signal bar.',
+                    'mitigation' => 'Signals are counted per line with no parse, so reword the comment to describe the behaviour without writing the assignment out.',
+                ],
+            ],
         );
     }
 

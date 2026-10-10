@@ -39,9 +39,9 @@ final class VariableIncludeRule implements RuleInterface
     public const ID = 'security.variable-include';
 
     /**
-     * Pattern an ALL-CAPS global constant name must match to count as a fixed deployment path.
+     * Pattern for ALL-CAPS deployment constants, including leading underscores such as __SITE_ROOT__.
      */
-    private const FIXED_CONSTANT_NAME_PATTERN = '/^[A-Z][A-Z0-9_]*$/';
+    private const FIXED_CONSTANT_NAME_PATTERN = '/^_*[A-Z][A-Z0-9_]*$/';
 
     /**
      * Global path-inspection functions that cannot mutate an include-path local passed by value.
@@ -50,11 +50,11 @@ final class VariableIncludeRule implements RuleInterface
      */
     private const NON_MUTATING_PATH_FUNCTIONS = [
         'file_exists' => true,
-        'is_dir'      => true,
-        'is_file'     => true,
+        'is_dir' => true,
+        'is_file' => true,
         'is_readable' => true,
         'is_writable' => true,
-        'realpath'    => true,
+        'realpath' => true,
     ];
 
     /**
@@ -66,27 +66,27 @@ final class VariableIncludeRule implements RuleInterface
     {
         // Medium confidence: a dynamic path is suspicious but often safe (allow-listed upstream), so warn not error.
         return new RuleDefinition(
-            id:                  self::ID,
-            name:                'Variable include or require path',
-            pillar:              Pillar::Security,
-            tier:                RuleTier::V01,
-            defaultSeverity:     Severity::Warning,
-            confidence:          Confidence::Medium,
-            defaultOptions:      [
+            id:              self::ID,
+            name:            'Variable include or require path',
+            pillar:          Pillar::Security,
+            tier:            RuleTier::V01,
+            defaultSeverity: Severity::Warning,
+            confidence:      Confidence::Medium,
+            defaultOptions:  [
                                      'treatGlobalConstantsAsFixed' => true,
-                                     'dynamicPathConstants'        => [],
+                                     'dynamicPathConstants' => [],
                                  ],
             optionDescriptions:  [
                                      'treatGlobalConstantsAsFixed' => 'Treat ALL-CAPS global constants (ABSPATH, WC_ABSPATH, ...) as fixed path segments; class constants and non-ALL-CAPS names always stay dynamic.',
-                                     'dynamicPathConstants'        => 'Constant names to keep treating as dynamic even when treatGlobalConstantsAsFixed is on, for projects whose path constants carry runtime data.',
+                                     'dynamicPathConstants' => 'Constant names to keep treating as dynamic even when treatGlobalConstantsAsFixed is on, for projects whose path constants carry runtime data.',
                                  ],
             falsePositiveShapes: [
                                      [
-                                         'shape'      => 'Bootstrap include concatenating an ALL-CAPS deployment constant with a literal (require_once ABSPATH . \'wp-admin/x.php\').',
+                                         'shape' => 'Bootstrap include concatenating an ALL-CAPS deployment constant with a literal (require_once ABSPATH . \'wp-admin/x.php\').',
                                          'mitigation' => 'Recognised as fixed by default; list the constant in options.dynamicPathConstants to re-flag it.',
                                      ],
                                      [
-                                         'shape'      => 'Include through a local whose only same-scope assignments are fixed paths ($dir = __DIR__ . \'/inc/\'; require $dir . \'z.php\').',
+                                         'shape' => 'Include through a local whose only same-scope assignments are fixed paths ($dir = __DIR__ . \'/inc/\'; require $dir . \'z.php\').',
                                          'mitigation' => 'Recognised as fixed when every same-scope assignment is provably fixed; any tainted or unprovable assignment keeps the include flagged.',
                                      ],
                                  ],
@@ -97,7 +97,7 @@ final class VariableIncludeRule implements RuleInterface
      * Reports include and require expressions built from dynamic paths.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
      *
      * @return list<Finding> - Findings for variable include paths; empty when every include uses a fixed path.
      */
@@ -142,11 +142,11 @@ final class VariableIncludeRule implements RuleInterface
      * Reports whether an include path resolves to a fixed value - a literal, or a path derived only from
      * compile-time constants - so bootstrap includes stay unflagged.
      *
-     * @param Expr         $expression - Include/require path expression, recursed into for concatenation and dirname() wrappers.
-     * @param AnalysisUnit $analysisUnit - Unit owning the include, used for same-scope assignment propagation.
+     * @param Expr         $expression                  - Include/require path expression, recursed into for concatenation and dirname() wrappers.
+     * @param AnalysisUnit $analysisUnit                - Unit owning the include, used for same-scope assignment propagation.
      * @param bool         $shouldTreatConstantsAsFixed - Whether ALL-CAPS global constants count as fixed segments.
-     * @param list<string> $dynamicConstantNames - Constant names configured to stay dynamic.
-     * @param bool         $canFollowAssignments - Whether variable leaves may be resolved through same-scope assignments.
+     * @param list<string> $dynamicConstantNames        - Constant names configured to stay dynamic.
+     * @param bool         $canFollowAssignments        - Whether variable leaves may be resolved through same-scope assignments.
      *
      * @return bool - True when the include path cannot vary from request or runtime data.
      */
@@ -208,11 +208,11 @@ final class VariableIncludeRule implements RuleInterface
     /**
      * Reports whether a dirname() wrapper preserves a fixed include path.
      *
-     * @param Expr\FuncCall $call - dirname() call to inspect.
-     * @param AnalysisUnit  $analysisUnit - Unit owning the include, used for same-scope assignment propagation.
+     * @param Expr\FuncCall $call                        - dirname() call to inspect.
+     * @param AnalysisUnit  $analysisUnit                - Unit owning the include, used for same-scope assignment propagation.
      * @param bool          $shouldTreatConstantsAsFixed - Whether ALL-CAPS global constants count as fixed segments.
-     * @param list<string>  $dynamicConstantNames - Constant names configured to stay dynamic.
-     * @param bool          $canFollowAssignments - Whether variable leaves may be resolved through same-scope assignments.
+     * @param list<string>  $dynamicConstantNames        - Constant names configured to stay dynamic.
+     * @param bool          $canFollowAssignments        - Whether variable leaves may be resolved through same-scope assignments.
      *
      * @return bool - True when dirname() is applied to a fixed path with a literal (or absent) levels argument.
      */
@@ -223,7 +223,7 @@ final class VariableIncludeRule implements RuleInterface
         array         $dynamicConstantNames,
         bool          $canFollowAssignments,
     ): bool {
-        $path = SecurityNodeHelper::sinkArgumentValue($call, 0);
+        $path             = SecurityNodeHelper::sinkArgumentValue($call, 0);
         $isFixedInnerPath = $path instanceof Expr && $this->isFixedIncludeExpression(
             expression:                  $path,
             analysisUnit:                $analysisUnit,
@@ -245,7 +245,7 @@ final class VariableIncludeRule implements RuleInterface
     /**
      * Reports whether a bare constant fetch names a fixed deployment-path constant.
      *
-     * @param Expr\ConstFetch $constant - Constant fetch inside the include path.
+     * @param Expr\ConstFetch $constant             - Constant fetch inside the include path.
      * @param list<string>    $dynamicConstantNames - Constant names configured to stay dynamic.
      *
      * @return bool - True when the name matches the ALL-CAPS define() pattern and is not configured as dynamic.
@@ -264,7 +264,7 @@ final class VariableIncludeRule implements RuleInterface
             return false;
         }
 
-        // Only the ALL-CAPS define() pattern (ABSPATH, WC_ABSPATH, ...) is trusted; lowercase names stay flagged.
+        // Deployment constants may start with underscores; lowercase names still leave the include path unresolved.
         return preg_match(self::FIXED_CONSTANT_NAME_PATTERN, $name) === 1;
     }
 
@@ -277,10 +277,10 @@ final class VariableIncludeRule implements RuleInterface
      * compound assignment, by-reference use, call argument, foreach binding, global/static declaration,
      * or destructuring) disqualifies the variable because its value can no longer be proven fixed.
      *
-     * @param Expr\Variable $variable - Variable used as (part of) the include path.
-     * @param AnalysisUnit  $analysisUnit - Unit owning the include.
+     * @param Expr\Variable $variable                    - Variable used as (part of) the include path.
+     * @param AnalysisUnit  $analysisUnit                - Unit owning the include.
      * @param bool          $shouldTreatConstantsAsFixed - Whether ALL-CAPS global constants count as fixed segments.
-     * @param list<string>  $dynamicConstantNames - Constant names configured to stay dynamic.
+     * @param list<string>  $dynamicConstantNames        - Constant names configured to stay dynamic.
      *
      * @return bool - True when every same-scope assignment to the variable is fixed and one precedes the include.
      */
@@ -337,9 +337,9 @@ final class VariableIncludeRule implements RuleInterface
     /**
      * Lists the plain same-scope assignments to a variable name.
      *
-     * @param string            $name - Variable name without the leading `$`.
+     * @param string            $name       - Variable name without the leading `$`.
      * @param list<Stmt>        $statements - Statements of the owning scope.
-     * @param FunctionLike|null $scope - Owning function-like scope, or null for file scope.
+     * @param FunctionLike|null $scope      - Owning function-like scope, or null for file scope.
      *
      * @return list<Expr\Assign> - assignments whose target is exactly the named variable, in source order.
      */
@@ -369,9 +369,9 @@ final class VariableIncludeRule implements RuleInterface
     /**
      * Reports whether any write to a variable defeats the fixed-assignment proof.
      *
-     * @param string            $name - Variable name without the leading `$`.
-     * @param list<Stmt>        $statements - Statements of the owning scope.
-     * @param FunctionLike|null $scope - Owning function-like scope, or null for file scope.
+     * @param string            $name         - Variable name without the leading `$`.
+     * @param list<Stmt>        $statements   - Statements of the owning scope.
+     * @param FunctionLike|null $scope        - Owning function-like scope, or null for file scope.
      * @param int               $sinkPosition - Byte offset of the include-path variable.
      *
      * @return bool - True when the name is a parameter or can be written through any construct other than a plain assignment.
@@ -395,7 +395,7 @@ final class VariableIncludeRule implements RuleInterface
     /**
      * Reports whether a candidate can affect the include expression by source order.
      *
-     * @param Node $candidate - Candidate write or call node.
+     * @param Node $candidate    - Candidate write or call node.
      * @param int  $sinkPosition - Byte offset of the include-path variable.
      *
      * @return bool - True when the candidate precedes the include, or ordering is unavailable.
@@ -410,7 +410,7 @@ final class VariableIncludeRule implements RuleInterface
     /**
      * Reports whether a name is bound as a parameter of the given scope.
      *
-     * @param string       $name - Variable name without the leading `$`.
+     * @param string       $name  - Variable name without the leading `$`.
      * @param FunctionLike $scope - Function-like scope owning the include.
      *
      * @return bool - True when any declared parameter binds the name.
@@ -432,7 +432,7 @@ final class VariableIncludeRule implements RuleInterface
      * Reports whether a node is a write that defeats the fixed-assignment proof for a variable name.
      *
      * @param Node   $candidate - Node to classify.
-     * @param string $name - Variable name without the leading `$`.
+     * @param string $name      - Variable name without the leading `$`.
      *
      * @return bool - True for compound/by-ref assignments, call arguments, foreach bindings, global/static declarations,
      *                by-ref closure captures, and destructuring assignments that touch the name.
@@ -525,7 +525,7 @@ final class VariableIncludeRule implements RuleInterface
      * Reports whether a binding expression (variable, list, or array pattern) binds a name.
      *
      * @param Expr   $binding - Foreach value/key var or destructuring target.
-     * @param string $name - Variable name without the leading `$`.
+     * @param string $name    - Variable name without the leading `$`.
      *
      * @return bool - True when any variable leaf inside the binding carries the name.
      */
@@ -543,7 +543,7 @@ final class VariableIncludeRule implements RuleInterface
      * Reports whether a global or static statement declares a name.
      *
      * @param Stmt\Global_|Stmt\Static_ $declaration - Declaration statement to inspect.
-     * @param string                    $name - Variable name without the leading `$`.
+     * @param string                    $name        - Variable name without the leading `$`.
      *
      * @return bool - True when the declaration lists the name.
      */

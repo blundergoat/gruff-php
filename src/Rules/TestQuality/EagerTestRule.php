@@ -18,10 +18,11 @@ use PhpParser\Node;
 use PhpParser\Node\Expr;
 
 /**
- * Flags a single test that drives several distinct system-under-test calls and asserts many times over them - a
- * sign one method is covering multiple behaviours and would fail for more than one reason. Counts the distinct
- * calls on the busiest receiver against an assertion floor, ignoring output reads and teardown so a test that
- * merely inspects one result is left alone. Advisory, low confidence.
+ * Flags a single test that drives several distinct system-under-test calls and asserts many times over them,
+ * a sign one method covers multiple behaviours and would fail for more than one reason.
+ *
+ * It counts the distinct calls on the busiest receiver against an assertion floor, ignoring output reads and teardown,
+ * so a test that merely inspects one result is left alone. Advisory at low confidence.
  */
 final readonly class EagerTestRule implements RuleInterface
 {
@@ -91,13 +92,19 @@ final readonly class EagerTestRule implements RuleInterface
     {
         // Advisory by default with a 3-assertion floor, so casual two-assert tests never trip this heuristic.
         return new RuleDefinition(
-            id:                self::ID,
-            name:              'Eager test',
-            pillar:            Pillar::TestQuality,
-            tier:              RuleTier::V01,
-            defaultSeverity:   Severity::Advisory,
-            confidence:        Confidence::Low,
-            defaultThresholds: ['minAssertions' => 3],
+            id:                  self::ID,
+            name:                'Eager test',
+            pillar:              Pillar::TestQuality,
+            tier:                RuleTier::V01,
+            defaultSeverity:     Severity::Advisory,
+            confidence:          Confidence::Low,
+            defaultThresholds:   ['minAssertions' => 3],
+            falsePositiveShapes: [
+                [
+                    'shape' => 'One scenario that legitimately drives several calls on the same receiver, such as a builder chain or a state machine stepped through its transitions.',
+                    'mitigation' => 'Distinct calls on the busiest receiver are counted without judging whether they form one scenario, so raise this rule\'s minAssertions threshold.',
+                ],
+            ],
         );
     }
 
@@ -105,7 +112,7 @@ final readonly class EagerTestRule implements RuleInterface
      * Reports tests that assert many times across multiple apparent SUT calls.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
      *
      * @return list<Finding> - Findings for eager tests.
      */
@@ -129,13 +136,13 @@ final readonly class EagerTestRule implements RuleInterface
                 ruleId:      self::ID,
                 message:     sprintf('%s asserts %d times across multiple apparent SUT calls.', $scope->symbol, $assertionCount),
                 filePath:    $analysisUnit->file->displayPath,
-                line:        $scope->line,
+                line:        $scope->anchorLine(),
                 severity:    Severity::Advisory,
                 pillar:      Pillar::TestQuality,
                 tier:        RuleTier::V01,
                 confidence:  Confidence::Low,
                 symbol:      $scope->symbol,
-                remediation: 'Split unrelated behaviors into focused tests when the assertions cover different responsibilities.',
+                remediation: 'Keep the assertions that prove the behaviour this test names. Move assertions about another behaviour into the test that already covers it, or drop them when another test already proves it; give that behaviour its own test only when no test covers it yet.',
                 metadata:    ['assertions' => $assertionCount, 'sutCalls' => array_values($sutCalls)],
             );
         }
@@ -146,7 +153,7 @@ final readonly class EagerTestRule implements RuleInterface
     /**
      * Collects the distinct method calls made on likely system-under-test receivers.
      *
-     * @param  TestQualityScope $scope - Single test method whose body is searched for SUT exercise calls.
+     * @param TestQualityScope $scope - Single test method whose body is searched for SUT exercise calls.
      *
      * @return array<string, string> - Distinct method names keyed by name, taken from the busiest receiver only.
      */
@@ -190,7 +197,7 @@ final readonly class EagerTestRule implements RuleInterface
     /**
      * Reports whether the call sits inside an enclosing assertion expression.
      *
-     * @param  Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Candidate SUT call whose ancestors are
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Candidate SUT call whose ancestors are
      *                                                            walked for an enclosing assertion.
      *
      * @return bool - True when the call is only part of an assertion expression.
@@ -217,7 +224,7 @@ final readonly class EagerTestRule implements RuleInterface
     /**
      * Reports whether the call sits inside a finally block, marking it as teardown.
      *
-     * @param  Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Candidate call whose ancestors are
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Candidate call whose ancestors are
      *                                                            walked for an enclosing finally block.
      *
      * @return bool - True when the call belongs to teardown rather than exercise.
@@ -242,10 +249,10 @@ final readonly class EagerTestRule implements RuleInterface
     /**
      * Reports whether the call reads or shapes test output rather than exercising the SUT.
      *
-     * @param  Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Candidate call under inspection; only
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Candidate call under inspection; only
      *                                                            method calls can be observations.
-     * @param  string $name - Called method name resolved by the caller; compared against the lower-case
-     *                      observation conventions.
+     * @param string                                        $name - Called method name resolved by the caller; compared against the lower-case
+     *                                                            observation conventions.
      *
      * @return bool - True when the call reads or shapes test output rather than exercising the SUT.
      */
@@ -281,7 +288,7 @@ final readonly class EagerTestRule implements RuleInterface
     /**
      * Reports whether the method call targets the bare `$this` test case.
      *
-     * @param  Expr\MethodCall $call - Method call whose receiver is checked for being the bare `$this` test case.
+     * @param Expr\MethodCall $call - Method call whose receiver is checked for being the bare `$this` test case.
      *
      * @return bool - True when the call is a direct test-case helper call.
      */
@@ -294,7 +301,7 @@ final readonly class EagerTestRule implements RuleInterface
     /**
      * Returns a stable receiver identity for grouping SUT calls, or null.
      *
-     * @param  Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Call to key by receiver; free functions
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Call to key by receiver; free functions
      *                                                            and self/parent/static yield null.
      *
      * @return string|null - Stable receiver identity for SUT call grouping, or null when the call has no groupable receiver.
@@ -328,7 +335,7 @@ final readonly class EagerTestRule implements RuleInterface
     /**
      * Returns the receiver identity for a method-call receiver expression, or null.
      *
-     * @param  Expr $receiver - Receiver expression to key; method-call chains are unwound to their root before keying.
+     * @param Expr $receiver - Receiver expression to key; method-call chains are unwound to their root before keying.
      *
      * @return string|null - Receiver identity for method-call grouping, or null when the receiver is dynamic.
      */
@@ -360,8 +367,8 @@ final readonly class EagerTestRule implements RuleInterface
     /**
      * Returns the receiver identity for a property-held SUT such as `$this->sut`, or null.
      *
-     * @param  Expr\PropertyFetch $receiver - Property access (such as `$this->sut`) keyed as owner plus
-     *                                      property name; dynamic names yield null.
+     * @param Expr\PropertyFetch $receiver - Property access (such as `$this->sut`) keyed as owner plus
+     *                                     property name; dynamic names yield null.
      *
      * @return string|null - Receiver identity for property-held SUTs, or null when the property or owner is dynamic.
      */
@@ -384,7 +391,7 @@ final readonly class EagerTestRule implements RuleInterface
     /**
      * Returns the receiver with the widest distinct call surface.
      *
-     * @param  array<string, array<string, string>> $callsByReceiver - Distinct call-name sets keyed by receiver identity.
+     * @param array<string, array<string, string>> $callsByReceiver - Distinct call-name sets keyed by receiver identity.
      *
      * @return array<string, string> - The single widest call set; empty when no receiver was recorded.
      */
@@ -406,7 +413,7 @@ final readonly class EagerTestRule implements RuleInterface
     /**
      * Returns the root receiver variable name, or null for dynamic receivers.
      *
-     * @param  Expr $receiver - Receiver expression unwound through method-call chains to its root variable.
+     * @param Expr $receiver - Receiver expression unwound through method-call chains to its root variable.
      *
      * @return string|null - Receiver variable name, or null for dynamic/non-variable receivers.
      */
@@ -428,7 +435,7 @@ final readonly class EagerTestRule implements RuleInterface
     /**
      * Reports whether the method name follows a result-observation convention.
      *
-     * @param  string $name - Method name to classify against the get/has/is prefixes and the bare `count` reader.
+     * @param string $name - Method name to classify against the get/has/is prefixes and the bare `count` reader.
      *
      * @return bool - True when the method name follows a result-observation convention.
      */
@@ -448,7 +455,7 @@ final readonly class EagerTestRule implements RuleInterface
     /**
      * Collects the variables that receive call-result values.
      *
-     * @param  TestQualityScope $scope - Test method whose assignments are scanned for call-result variables.
+     * @param TestQualityScope $scope - Test method whose assignments are scanned for call-result variables.
      *
      * @return array<string, true> - Set of local variable names (keyed by name) that hold a call result.
      */
@@ -475,16 +482,15 @@ final readonly class EagerTestRule implements RuleInterface
     /**
      * Reports whether the expression is a call whose result marks its target as a result value.
      *
-     * @param  Expr $expr - Right-hand side of an assignment; a call expression marks its target as a result variable.
+     * @param Expr $expr - Right-hand side of an assignment; a call expression marks its target as a result variable.
      *
      * @return bool - True when the expression is a call result.
      */
     private function isCallChainExpression(Expr $expr): bool
     {
-        // Method/static/function call results are "result variables" whose subsequent method
-        // calls are getters on the result, not fresh SUT calls. `new X()` is intentionally
-        // excluded - constructor outputs are usually the SUT itself, and calls on them are
-        // genuine SUT exercise.
+        // A call result is a result variable, so later method calls on it read that result rather than exercising the SUT again.
+        //
+        // `new X()` is deliberately excluded: a constructor output is usually the SUT itself, so calls on it are genuine exercise.
         return $expr instanceof Expr\MethodCall
             || $expr instanceof Expr\StaticCall
             || $expr instanceof Expr\FuncCall;
@@ -493,10 +499,10 @@ final readonly class EagerTestRule implements RuleInterface
     /**
      * Reports whether the receiver roots at a known result variable.
      *
-     * @param  Expr                $receiver - Receiver expression unwound to its root variable before
-     *                                              the membership test.
-     * @param  array<string, true> $resultVariables - Result-variable name set from collectResultVariables(),
-     *                                              keyed by variable name.
+     * @param Expr                $receiver        - Receiver expression unwound to its root variable before
+     *                                             the membership test.
+     * @param array<string, true> $resultVariables - Result-variable name set from collectResultVariables(),
+     *                                             keyed by variable name.
      *
      * @return bool - True when the receiver roots at a known result variable.
      */

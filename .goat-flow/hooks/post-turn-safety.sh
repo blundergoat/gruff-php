@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # post-turn-safety.sh
-# goat-flow-hook-version: 1.15.1
+# goat-flow-hook-version: 1.17.0
 #
 # Purpose:
 #   Universal Stop-event safety guard for supported agents. This hook checks
@@ -35,6 +35,9 @@
 set -uo pipefail
 shopt -s extglob
 
+# Bash imports SECONDS from the parent environment, so start hook budgets and result timing at this process boundary.
+SECONDS=0
+
 # Bash 3.2 ships with supported macOS versions. Keep this compatibility path
 # free of associative arrays, mapfile, and Bash-4 parameter expansions. The
 # force flag executes this exact path under newer Bash during integration tests.
@@ -52,8 +55,9 @@ fallback_temp_sequence=0
 fallback_max_seconds="${GOAT_FLOW_POST_TURN_SAFETY_MAX_SECONDS:-60}"
 fallback_max_bytes="${GOAT_FLOW_POST_TURN_SAFETY_MAX_BYTES:-1048576}"
 fallback_max_findings="${GOAT_FLOW_POST_TURN_SAFETY_MAX_FINDINGS:-20}"
+post_turn_native_workspace=""
 post_turn_action="scan"
-post_turn_hook_version="1.15.1"
+post_turn_hook_version="1.17.0"
 post_turn_result_schema="goat-flow.hook-result.v1"
 post_turn_migrated_result_mode=0
 post_turn_result_records_path=""
@@ -337,6 +341,29 @@ try {
   return 0
 }
 
+# Resolve the verified managed installation root when Git cannot provide a scan root.
+# The launcher starts Bash from this directory, and the installed hook shape prevents a
+# direct invocation in an arbitrary non-Git directory from creating continuation state.
+resolve_stop_reentry_root_without_git() {
+  local managed_root=""
+
+  # Only a validated provider Stop can participate in a bounded continuation cycle.
+  if [ "$stop_payload_present" -eq 0 ] || [ -z "$stop_session_fingerprint" ]; then
+    return 1
+  fi
+  if ! managed_root="$(pwd -P 2>/dev/null)" || [ -z "$managed_root" ]; then
+    return 1
+  fi
+  # State ownership requires a complete, non-symlinked managed hook installation.
+  if [ -L "$managed_root/.goat-flow" ] || [ ! -d "$managed_root/.goat-flow/hooks" ] || \
+    [ -L "$managed_root/.goat-flow/hooks" ] || \
+    [ ! -f "$managed_root/.goat-flow/hooks/post-turn-safety.sh" ] || \
+    [ -L "$managed_root/.goat-flow/hooks/post-turn-safety.sh" ]; then
+    return 1
+  fi
+  printf '%s\n' "$managed_root"
+}
+
 # Resolve the ignored owner-local state file used to bound a repeated Stop failure.
 # The path contains hashes only, so it never stores the user's session ID or changed content.
 # The record is session-specific, so the filename must be too: two sessions working in one
@@ -453,11 +480,14 @@ stop_reentry_state_matches() {
   if [ ! -f "$stop_state_path" ] || [ -L "$stop_state_path" ] || [ ! -O "$stop_state_path" ]; then
     return 1
   fi
-  read_stop_state_mode "$stop_state_path" || return 1
-  # Group or public access would expose or permit tampering with the continuation record.
-  if [ "$stop_state_mode" != "600" ]; then
-    return 1
-  fi
+  # Git Bash exposes synthetic mode bits; native ACLs own Windows access control.
+  # Keep owner, regular-file, session and failure checks on every host, and require private POSIX modes where meaningful.
+  case "${OSTYPE:-}" in
+    msys*|cygwin*) ;;
+    *)
+      read_stop_state_mode "$stop_state_path" || return 1
+      [ "$stop_state_mode" = "600" ] || return 1 ;;
+  esac
   IFS=' ' read -r state_version saved_session_fingerprint saved_failure_fingerprint unexpected_state_text <"$stop_state_path" || return 1
   # Extra, empty, or malformed fields mean the state cannot represent this exact user cycle.
   if [ "$state_version" != "v1" ] || [ -n "$unexpected_state_text" ] || \
@@ -498,6 +528,614 @@ finish_infrastructure_failure() {
   return 2
 }
 
+# Bound an early Git-root failure using the managed installation rather than a Git root.
+# If the launch boundary cannot be re-established, keep the user's turn blocked.
+finish_repository_root_failure() {
+  local failure_identity="$1"
+  local managed_root=""
+
+  if ! managed_root="$(resolve_stop_reentry_root_without_git)"; then
+    return 2
+  fi
+  finish_infrastructure_failure "$managed_root" "$failure_identity"
+}
+
+# Scan only the explicit Git roots configured for a managed non-Git controller.
+# Each child emits the existing provider-neutral envelope, so aggregation never parses human stderr
+# or reimplements detector decisions. Exit 3 means the complete configured root contract could not
+# be established and preserves the bounded single-project root failure below.
+run_controller_child_scans() {
+  local controller_root=""
+  local controller_result=""
+  local controller_status=0
+  local hook_script="${BASH_SOURCE[0]}"
+
+  # A child whose Git commands fail must report that failure instead of recursively widening scope.
+  if [ "${GOAT_FLOW_POST_TURN_CONTROLLER_CHILD:-0}" = 1 ]; then
+    return 3
+  fi
+  if ! command -v node >/dev/null 2>&1 || \
+    ! controller_root="$(pwd -P 2>/dev/null)" || [ -z "$controller_root" ]; then
+    return 3
+  fi
+
+  # shellcheck disable=SC2016 # Literal JavaScript must not expand shell or provider text.
+  controller_result="$(
+    GOAT_FLOW_CONTROLLER_PARENT_MIGRATED="$post_turn_migrated_result_mode" \
+      GOAT_FLOW_CONTROLLER_SESSION_FINGERPRINT="$stop_session_fingerprint" \
+      GOAT_FLOW_CONTROLLER_STOP_ACTIVE="$stop_hook_active" \
+      POST_TURN_HOOK_VERSION="$post_turn_hook_version" \
+      node -e '
+const { readFileSync, realpathSync, statSync } = require("node:fs");
+const { spawnSync } = require("node:child_process");
+const path = require("node:path");
+
+const hookScript = path.resolve(process.argv[1], process.argv[2]);
+const controllerRoot = realpathSync(process.argv[1]);
+const startedAt = Date.now();
+const resultSchema = "goat-flow.hook-result.v1";
+const provider = process.env.GOAT_FLOW_HOOK_PROVIDER || "claude";
+const hookVersion = process.env.POST_TURN_HOOK_VERSION || "unknown";
+const adapterVersion = process.env.GOAT_FLOW_HOOK_ADAPTER_VERSION || "1";
+const parentMigrated = process.env.GOAT_FLOW_CONTROLLER_PARENT_MIGRATED === "1";
+const sessionFingerprint = process.env.GOAT_FLOW_CONTROLLER_SESSION_FINGERPRINT || "";
+const stopHookActive = process.env.GOAT_FLOW_CONTROLLER_STOP_ACTIVE === "1";
+const configuredSeconds = Number(process.env.GOAT_FLOW_POST_TURN_SAFETY_MAX_SECONDS || "60");
+const maximumMilliseconds = Number.isInteger(configuredSeconds) && configuredSeconds > 0
+  ? configuredSeconds * 1000
+  : 60_000;
+const allowedOutcomes = new Set(["pass", "block", "advisory", "incomplete", "unavailable"]);
+const allowedCoverage = new Set(["complete", "partial", "none"]);
+
+function syntheticResult(reasonCode, message) {
+  return {
+    schema: resultSchema,
+    hookId: "post-turn-safety",
+    event: "turn-stop",
+    outcome: reasonCode === "hook-unavailable" || reasonCode === "execution-timeout"
+      ? "unavailable"
+      : "incomplete",
+    coverage: { status: "none", attemptedUnits: 1, completedUnits: 0, skippedUnits: 1 },
+    reasonCode,
+    // Whole-child scope uses the same target a real child reports, so aggregation prefixes it once.
+    findings: [{ code: reasonCode, message, target: "project" }],
+    execution: {
+      hookVersion,
+      provider,
+      providerMode: "controller-child",
+      adapterName: `${provider}-turn-stop`,
+      adapterVersion,
+      durationMs: 0,
+    },
+  };
+}
+
+function validChildResult(value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  if (value.schema !== resultSchema || value.hookId !== "post-turn-safety" || value.event !== "turn-stop") return false;
+  if (!allowedOutcomes.has(value.outcome) || typeof value.reasonCode !== "string") return false;
+  const coverage = value.coverage;
+  if (coverage === null || typeof coverage !== "object" || Array.isArray(coverage)) return false;
+  if (!allowedCoverage.has(coverage.status)) return false;
+  if (![coverage.attemptedUnits, coverage.completedUnits, coverage.skippedUnits].every(Number.isInteger)) return false;
+  if (coverage.attemptedUnits !== 1 || coverage.completedUnits < 0 || coverage.skippedUnits < 0) return false;
+  if (coverage.completedUnits + coverage.skippedUnits > coverage.attemptedUnits) return false;
+  if (!Array.isArray(value.findings) || value.findings.length > 20) return false;
+  if (!value.findings.every((finding) => finding !== null && typeof finding === "object" && !Array.isArray(finding) &&
+    typeof finding.code === "string" && finding.code.trim().length > 0 &&
+    typeof finding.message === "string" && finding.message.trim().length > 0 &&
+    (finding.target === undefined || (typeof finding.target === "string" && finding.target.trim().length > 0)))) return false;
+  const execution = value.execution;
+  return execution !== null && typeof execution === "object" && !Array.isArray(execution) &&
+    execution.provider === provider && execution.hookVersion === hookVersion;
+}
+
+function prefixTarget(childName, target) {
+  if (typeof target !== "string" || target === "project") return childName;
+  return `${childName}/${target}`;
+}
+
+const singleQuote = String.fromCharCode(39);
+
+function stripYamlComment(text) {
+  let inSingle = false;
+  let inDouble = false;
+  let escaped = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (inDouble && character === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (!inDouble && character === singleQuote) {
+      if (inSingle && text[index + 1] === singleQuote) {
+        index += 1;
+        continue;
+      }
+      inSingle = !inSingle;
+      continue;
+    }
+    if (!inSingle && character === "\"") {
+      inDouble = !inDouble;
+      continue;
+    }
+    if (!inSingle && !inDouble && character === "#" &&
+      (index === 0 || /\s/u.test(text[index - 1]))) {
+      return text.slice(0, index).trimEnd();
+    }
+  }
+  return text.trimEnd();
+}
+
+function yamlStringScalar(rawValue) {
+  const value = stripYamlComment(rawValue).trim();
+  if (value.length === 0) return null;
+  if (value.startsWith(singleQuote) && value.endsWith(singleQuote)) {
+    return value.slice(1, -1).split(singleQuote + singleQuote).join(singleQuote);
+  }
+  if (value.startsWith("\"") && value.endsWith("\"")) {
+    try {
+      const decoded = JSON.parse(value);
+      return typeof decoded === "string" ? decoded : null;
+    } catch {
+      return null;
+    }
+  }
+  if (/^(?:null|~|true|false)$/iu.test(value) || /^[-+]?\d+(?:\.\d+)?$/u.test(value)) {
+    return null;
+  }
+  return value;
+}
+
+function yamlMappingValue(line, expectedKey) {
+  const separatorIndex = line.indexOf(":");
+  if (separatorIndex < 0) return null;
+  const parsedKey = yamlStringScalar(line.slice(0, separatorIndex));
+  return parsedKey === expectedKey
+    ? line.slice(separatorIndex + 1).trim()
+    : null;
+}
+
+function yamlFlowStringList(rawValue) {
+  const value = stripYamlComment(rawValue).trim();
+  if (!value.startsWith("[") || !value.endsWith("]")) return null;
+  const body = value.slice(1, -1);
+  if (body.trim().length === 0) return [];
+  const rawItems = [];
+  let item = "";
+  let inSingle = false;
+  let inDouble = false;
+  let escaped = false;
+  for (let index = 0; index < body.length; index += 1) {
+    const character = body[index];
+    if (escaped) {
+      item += character;
+      escaped = false;
+      continue;
+    }
+    if (inDouble && character === "\\") {
+      item += character;
+      escaped = true;
+      continue;
+    }
+    if (!inDouble && character === singleQuote) {
+      item += character;
+      if (inSingle && body[index + 1] === singleQuote) {
+        item += body[index + 1];
+        index += 1;
+        continue;
+      }
+      inSingle = !inSingle;
+      continue;
+    }
+    if (!inSingle && character === "\"") {
+      item += character;
+      inDouble = !inDouble;
+      continue;
+    }
+    if (!inSingle && !inDouble && character === ",") {
+      rawItems.push(item);
+      item = "";
+      continue;
+    }
+    item += character;
+  }
+  if (inSingle || inDouble || escaped) return null;
+  rawItems.push(item);
+  const parsedItems = rawItems.map(yamlStringScalar);
+  return parsedItems.every((candidate) => typeof candidate === "string")
+    ? parsedItems
+    : null;
+}
+
+// Return the raw value text for one key of a single-line flow mapping, or null when the
+// text is not a balanced flow mapping. Registration accepts these shapes, so the runtime
+// parser must read them too instead of silently dropping configured child scans.
+function yamlFlowMappingValue(rawValue, expectedKey) {
+  const value = stripYamlComment(rawValue).trim();
+  if (!value.startsWith("{") || !value.endsWith("}")) return null;
+  const body = value.slice(1, -1);
+  const rawEntries = [];
+  let entry = "";
+  let depth = 0;
+  let inSingle = false;
+  let inDouble = false;
+  let escaped = false;
+  for (let index = 0; index < body.length; index += 1) {
+    const character = body[index];
+    if (escaped) {
+      entry += character;
+      escaped = false;
+      continue;
+    }
+    if (inDouble && character === "\\") {
+      entry += character;
+      escaped = true;
+      continue;
+    }
+    if (!inDouble && character === singleQuote) {
+      entry += character;
+      if (inSingle && body[index + 1] === singleQuote) {
+        entry += body[index + 1];
+        index += 1;
+        continue;
+      }
+      inSingle = !inSingle;
+      continue;
+    }
+    if (!inSingle && character === "\"") {
+      entry += character;
+      inDouble = !inDouble;
+      continue;
+    }
+    if (!inSingle && !inDouble) {
+      if (character === "{" || character === "[") depth += 1;
+      if (character === "}" || character === "]") depth -= 1;
+      if (depth < 0) return null;
+      if (character === "," && depth === 0) {
+        rawEntries.push(entry);
+        entry = "";
+        continue;
+      }
+    }
+    entry += character;
+  }
+  if (inSingle || inDouble || escaped || depth !== 0) return null;
+  rawEntries.push(entry);
+  for (const rawEntry of rawEntries) {
+    let separatorIndex = -1;
+    let keySingle = false;
+    let keyDouble = false;
+    let keyEscaped = false;
+    for (let index = 0; index < rawEntry.length; index += 1) {
+      const character = rawEntry[index];
+      if (keyEscaped) {
+        keyEscaped = false;
+        continue;
+      }
+      if (keyDouble && character === "\\") {
+        keyEscaped = true;
+        continue;
+      }
+      if (!keyDouble && character === singleQuote) {
+        keySingle = !keySingle;
+        continue;
+      }
+      if (!keySingle && character === "\"") {
+        keyDouble = !keyDouble;
+        continue;
+      }
+      if (keySingle || keyDouble) continue;
+      if (character === "{" || character === "[") break;
+      if (character === ":") {
+        separatorIndex = index;
+        break;
+      }
+    }
+    if (separatorIndex < 0) continue;
+    const parsedKey = yamlStringScalar(rawEntry.slice(0, separatorIndex));
+    if (parsedKey === expectedKey) return rawEntry.slice(separatorIndex + 1).trim();
+  }
+  return null;
+}
+
+function lineIndent(line) {
+  if (line.includes("\t")) return -1;
+  return line.length - line.trimStart().length;
+}
+
+function configuredScanRoots() {
+  let configText;
+  try {
+    configText = readFileSync(path.join(controllerRoot, ".goat-flow", "config.yaml"), "utf8");
+  } catch {
+    return null;
+  }
+  const lines = configText.replace(/\r\n?/gu, "\n").split("\n");
+  let hooksInlineValue = null;
+  const hooksIndex = lines.findIndex((line) => {
+    if (lineIndent(line) !== 0) return false;
+    const value = yamlMappingValue(stripYamlComment(line).trim(), "hooks");
+    if (value === null) return false;
+    hooksInlineValue = value;
+    return true;
+  });
+  if (hooksIndex < 0) return null;
+  // A flow-style hooks mapping carries the whole hook table on one line.
+  if (hooksInlineValue !== "") {
+    const hookValue = yamlFlowMappingValue(hooksInlineValue, "post-turn-safety");
+    if (hookValue === null) return null;
+    const rootsValue = yamlFlowMappingValue(hookValue, "scan-roots");
+    if (rootsValue === null) return null;
+    return yamlFlowStringList(rootsValue);
+  }
+  let hooksEnd = lines.length;
+  for (let index = hooksIndex + 1; index < lines.length; index += 1) {
+    const cleanLine = stripYamlComment(lines[index]);
+    if (cleanLine.trim().length > 0 && lineIndent(lines[index]) <= 0) {
+      hooksEnd = index;
+      break;
+    }
+  }
+  let hookIndex = -1;
+  let hookIndent = -1;
+  let hookInlineValue = null;
+  for (let index = hooksIndex + 1; index < hooksEnd; index += 1) {
+    const indent = lineIndent(lines[index]);
+    if (indent <= 0) continue;
+    const value = yamlMappingValue(
+      stripYamlComment(lines[index]).trim(),
+      "post-turn-safety",
+    );
+    if (value === null) continue;
+    if (value === "") {
+      hookIndex = index;
+      hookIndent = indent;
+    } else {
+      hookInlineValue = value;
+    }
+    break;
+  }
+  // A flow-style hook entry keeps its scan roots inline beneath a block hooks mapping.
+  if (hookIndex < 0 && hookInlineValue !== null) {
+    const rootsValue = yamlFlowMappingValue(hookInlineValue, "scan-roots");
+    if (rootsValue === null) return null;
+    return yamlFlowStringList(rootsValue);
+  }
+  if (hookIndex < 0) return null;
+  for (let index = hookIndex + 1; index < hooksEnd; index += 1) {
+    const cleanLine = stripYamlComment(lines[index]);
+    const trimmedLine = cleanLine.trim();
+    if (trimmedLine.length === 0) continue;
+    const indent = lineIndent(lines[index]);
+    if (indent <= hookIndent) break;
+    const inlineValue = yamlMappingValue(trimmedLine, "scan-roots");
+    if (inlineValue === null) continue;
+    if (inlineValue.length > 0) return yamlFlowStringList(inlineValue);
+    const roots = [];
+    for (let rootIndex = index + 1; rootIndex < hooksEnd; rootIndex += 1) {
+      const rootLine = stripYamlComment(lines[rootIndex]);
+      if (rootLine.trim().length === 0) continue;
+      if (lineIndent(lines[rootIndex]) <= indent) break;
+      const itemMatch = /^-\s+(.+)$/u.exec(rootLine.trim());
+      if (!itemMatch) return null;
+      const root = yamlStringScalar(itemMatch[1]);
+      if (root === null) return null;
+      roots.push(root);
+    }
+    return roots;
+  }
+  return null;
+}
+
+const configuredRoots = configuredScanRoots();
+if (!Array.isArray(configuredRoots) || configuredRoots.length === 0) process.exit(3);
+
+const scanUnits = [];
+for (const configuredRoot of configuredRoots) {
+  if (configuredRoot.length === 0 || path.isAbsolute(configuredRoot) ||
+    /^[A-Za-z]:[\\/]/u.test(configuredRoot) || /^\\\\/u.test(configuredRoot)) {
+    process.exit(3);
+  }
+  const childPath = path.resolve(controllerRoot, configuredRoot);
+  const lexicalRelative = path.relative(controllerRoot, childPath);
+  if (lexicalRelative === ".." || lexicalRelative.startsWith(`..${path.sep}`) || path.isAbsolute(lexicalRelative)) {
+    process.exit(3);
+  }
+  let childRealPath;
+  try {
+    childRealPath = realpathSync(childPath);
+    if (!statSync(childRealPath).isDirectory()) process.exit(3);
+  } catch {
+    process.exit(3);
+  }
+  const physicalRelative = path.relative(controllerRoot, childRealPath);
+  if (physicalRelative === ".." || physicalRelative.startsWith(`..${path.sep}`) || path.isAbsolute(physicalRelative)) {
+    process.exit(3);
+  }
+  const rootLookup = spawnSync("git", ["-C", childRealPath, "rev-parse", "--show-toplevel"], {
+    encoding: "utf8",
+    timeout: Math.min(maximumMilliseconds, 5000),
+    windowsHide: true,
+  });
+  if (rootLookup.error || rootLookup.status !== 0 || typeof rootLookup.stdout !== "string" || rootLookup.stdout.trim().length === 0) {
+    process.exit(3);
+  }
+  let gitRoot;
+  try {
+    gitRoot = realpathSync(rootLookup.stdout.trim());
+  } catch {
+    process.exit(3);
+  }
+  if (gitRoot !== childRealPath) process.exit(3);
+  scanUnits.push({
+    name: physicalRelative.split(path.sep).join("/"),
+    root: childRealPath,
+  });
+}
+
+const childPayload = sessionFingerprint.length > 0
+  ? JSON.stringify({ session_id: sessionFingerprint, hook_event_name: "Stop", stop_hook_active: stopHookActive })
+  : "";
+const childResults = [];
+for (const scanUnit of scanUnits) {
+  if (scanUnit.failure) {
+    childResults.push({ name: scanUnit.name, result: scanUnit.failure });
+    continue;
+  }
+  const elapsedMilliseconds = Date.now() - startedAt;
+  const remainingMilliseconds = maximumMilliseconds - elapsedMilliseconds;
+  if (remainingMilliseconds <= 0) {
+    childResults.push({ name: scanUnit.name, result: syntheticResult("execution-timeout", "Controller safety-scan budget expired before this child ran") });
+    continue;
+  }
+  const childEnvironment = {
+    ...process.env,
+    GOAT_FLOW_HOOK_PROVIDER: provider,
+    GOAT_FLOW_HOOK_EVENT: "turn-stop",
+    GOAT_FLOW_HOOK_PROVIDER_MODE: "controller-child",
+    GOAT_FLOW_HOOK_ADAPTER_VERSION: adapterVersion,
+    GOAT_FLOW_HOOK_RESULT_PROTOCOL: resultSchema,
+    GOAT_FLOW_POST_TURN_CONTROLLER_CHILD: "1",
+    GOAT_FLOW_POST_TURN_SAFETY_MAX_SECONDS: String(Math.max(1, Math.ceil(remainingMilliseconds / 1000))),
+  };
+  const childExecution = spawnSync("bash", [hookScript], {
+    cwd: scanUnit.root,
+    encoding: "utf8",
+    input: childPayload,
+    env: childEnvironment,
+    timeout: remainingMilliseconds,
+    windowsHide: true,
+    maxBuffer: 20_000,
+  });
+  if (childExecution.error) {
+    const reasonCode = childExecution.error.code === "ETIMEDOUT" ? "execution-timeout" : "hook-unavailable";
+    const message = reasonCode === "execution-timeout"
+      ? "Child safety scan exceeded the controller deadline"
+      : "Child safety scan could not start";
+    childResults.push({ name: scanUnit.name, result: syntheticResult(reasonCode, message) });
+    continue;
+  }
+  let childResult;
+  try {
+    childResult = JSON.parse((childExecution.stdout || "").trim());
+  } catch {
+    childResult = null;
+  }
+  if (childExecution.status !== 0 || !validChildResult(childResult)) {
+    childResults.push({ name: scanUnit.name, result: syntheticResult("hook-unavailable", "Child safety scan did not return a valid result") });
+    continue;
+  }
+  childResults.push({ name: scanUnit.name, result: childResult });
+}
+
+const coverage = childResults.reduce((total, child) => ({
+  attemptedUnits: total.attemptedUnits + child.result.coverage.attemptedUnits,
+  completedUnits: total.completedUnits + child.result.coverage.completedUnits,
+  skippedUnits: total.skippedUnits + child.result.coverage.skippedUnits,
+}), { attemptedUnits: 0, completedUnits: 0, skippedUnits: 0 });
+const coverageStatus = coverage.completedUnits === coverage.attemptedUnits && coverage.skippedUnits === 0
+  ? "complete"
+  : coverage.completedUnits === 0 ? "none" : "partial";
+const nonPassResults = childResults.filter((child) => child.result.outcome !== "pass");
+const everyNonPassBounded = nonPassResults.length > 0 && nonPassResults.every((child) =>
+  child.result.outcome === "incomplete" && child.result.reasonCode === "bounded-reentry-ended");
+let outcome = "pass";
+let reasonCode = "completed-clean";
+if (childResults.some((child) => child.result.outcome === "block")) {
+  outcome = "block";
+  reasonCode = "policy-blocked";
+} else if (childResults.some((child) => child.result.outcome === "unavailable")) {
+  outcome = "unavailable";
+  reasonCode = "hook-unavailable";
+} else if (nonPassResults.length > 0) {
+  outcome = nonPassResults.some((child) => child.result.outcome === "incomplete")
+    ? "incomplete"
+    : "advisory";
+  reasonCode = everyNonPassBounded ? "bounded-reentry-ended" : outcome === "advisory" ? "findings-reported" : "coverage-incomplete";
+}
+// The retained window must include what decided the aggregate outcome, so findings from
+// outcome-deciding children fill the cap first and the rest keep their deterministic order.
+const collectedFindings = childResults.flatMap((child) => child.result.findings.map((finding) => ({
+  isDecisive: child.result.outcome === outcome,
+  finding: {
+    code: finding.code,
+    message: finding.message,
+    target: prefixTarget(child.name, finding.target),
+  },
+})));
+const findings = [
+  ...collectedFindings.filter((entry) => entry.isDecisive),
+  ...collectedFindings.filter((entry) => !entry.isDecisive),
+].slice(0, 20).map((entry) => entry.finding);
+const aggregateResult = {
+  schema: resultSchema,
+  hookId: "post-turn-safety",
+  event: "turn-stop",
+  outcome,
+  coverage: { status: coverageStatus, ...coverage },
+  reasonCode,
+  findings,
+  execution: {
+    hookVersion,
+    provider,
+    providerMode: "managed-controller",
+    adapterName: `${provider}-turn-stop`,
+    adapterVersion,
+    durationMs: Date.now() - startedAt,
+  },
+};
+
+if (parentMigrated) {
+  process.stdout.write(`${JSON.stringify(aggregateResult)}\n`);
+  process.exit(0);
+}
+if (outcome === "pass") process.exit(0);
+for (const finding of findings) {
+  process.stderr.write(`post-turn-safety: ${finding.target}: ${finding.message}\n`);
+}
+// A legacy host has no adapter to read `bounded-reentry-ended`, so the controller must end the
+// exhausted cycle itself. Without this the turn can never stop: every later Stop repeats the same
+// unchanged child failure, while the single-project path ends that cycle after one replay.
+if (reasonCode === "bounded-reentry-ended") {
+  process.stderr.write("post-turn-safety: ending repeated Stop after unchanged infrastructure failure; no clean scan was recorded.\n");
+  process.exit(0);
+}
+if (outcome === "block") {
+  process.stderr.write("post-turn-safety: fix or remove the flagged changed content before stopping.\n");
+} else {
+  process.stderr.write("post-turn-safety: controller scan incomplete.\n");
+}
+process.exit(2);
+' "$controller_root" "$hook_script"
+  )"
+  controller_status=$?
+
+  # An absent or invalid explicit list leaves the bounded fail-closed Git-root path authoritative.
+  if [ "$controller_status" -eq 3 ]; then
+    return 3
+  fi
+  # Once child scope is established, stale single-root failure state cannot affect this topology.
+  clear_stop_reentry_state "$controller_root" >/dev/null 2>&1
+  if [ -n "$controller_result" ]; then
+    printf '%s\n' "$controller_result"
+  fi
+  # Only the controller's own release and block decisions may reach the user's coding agent.
+  # A crashed or killed controller would otherwise exit non-blocking, silently skipping every child.
+  case "$controller_status" in
+    0 | 2) ;;
+    *)
+      printf 'post-turn-safety: controller scan could not complete.\n' >&2
+      controller_status=2
+      ;;
+  esac
+  return "$controller_status"
+}
+
 # Detector shapes are shared by the Bash 3 compatibility and optimized paths.
 # Keep thresholds and placeholder decisions in this Bash-3-safe block
 # so either execution path cannot silently define a different security policy.
@@ -510,36 +1148,6 @@ API_TOKEN_RE='sk-[A-Za-z0-9][A-Za-z0-9_-]{31,}'
 PRIVATE_KEY_RE='-----BEGIN[[:space:]](RSA[[:space:]]|DSA[[:space:]]|EC[[:space:]]|OPENSSH[[:space:]])?PRIVATE[[:space:]]KEY-----'
 PLACEHOLDER_ALL_X_RE='^(gh[pousr]_|github_pat_|npm_|sk-)?x+$'
 PLACEHOLDER_MARKER_RE='(^|[_-])(example|placeholder|changeme|change-me|change_me|dummy|fake|sample|test|redacted|xxxx|your-token|your_token|your-key|your_key|your-api-key|your_api_key|not-a-secret)([_-]|$)'
-CREDENTIAL_ASSIGNMENT_RE='^[[:space:]]*(([eE][xX][pP][oO][rR][tT]|[aA][rR][gG]|[eE][nN][vV])[[:space:]]+)?([A-Za-z_][A-Za-z0-9_-]*)[[:space:]]*[:=][[:space:]]*(.*)$'
-
-# Exclude normalized labels that describe credential metadata rather than credentials.
-is_excluded_credential_key() {
-  local key="$1"
-  case "$key" in
-    tokens | *tokens | tokenizer | tokeniser | tokenize | *tokenizer* | *tokeniser* | *tokenize* | *_count | *_index | *_id | *_name | *_type | *_header | *_url | *_path | *_list | *_re | *_pattern | *_field)
-      return 0
-      ;;
-    *not_secret | *not_a_secret | *non_secret | *no_secret | *not_token | *not_a_token | *non_token | *no_token | *not_password | *not_a_password | *non_password | *no_password | *not_api_key | *not_an_api_key | *non_api_key | *no_api_key | *not_private_key | *not_a_private_key | *non_private_key | *no_private_key)
-      return 0
-      ;;
-  esac
-  return 1
-}
-
-# Recognize one already-normalized credential label for both scanner implementations.
-is_normalized_credential_key() {
-  local key="$1"
-  is_excluded_credential_key "$key" && return 1
-  case "$key" in
-    token | secret | secrets | password | passwords | api_key | apikey | private_key | access_token | auth_token | refresh_token | bearer_token | client_secret | client_secrets | secret_key | secret_keys)
-      return 0
-      ;;
-    *_api_key | *_apikey | *_private_key | *_access_token | *_auth_token | *_refresh_token | *_bearer_token | *_client_secret | *_client_secrets | *_secret_key | *_secret_keys | *_password | *_passwords | *_token | *_secret | *_secrets)
-      return 0
-      ;;
-  esac
-  return 1
-}
 
 # Recognize varied literal values so ordinary words do not interrupt the user's turn.
 has_credential_entropy() {
@@ -637,22 +1245,8 @@ fallback_trim() {
   FALLBACK_TRIMMED="${FALLBACK_TRIMMED%%+([[:space:]])}"
 }
 
-# Adapt portable trimming to the shared credential classifier.
-# shellcheck disable=SC2317 # Shared policy invokes this adapter before the native path replaces it.
-classifier_trim_text() {
-  fallback_trim "$1"
-  CREDENTIAL_CLASSIFIER_TEXT="$FALLBACK_TRIMMED"
-}
-
-# Adapt portable lowercasing to the shared credential classifier.
-# shellcheck disable=SC2317 # Shared policy invokes this adapter before the native path replaces it.
-classifier_lower_text() {
-  fallback_lower "$1" || return 1
-  CREDENTIAL_CLASSIFIER_TEXT="$FALLBACK_LOWER"
-}
-
-# Normalize a credential label once for both scanner implementations.
-normalize_credential_key() {
+# Normalize a credential label so equivalent UI/config naming styles get one decision.
+fallback_normalize_key() {
   local raw="$1"
   local first=""
   local second=""
@@ -686,14 +1280,8 @@ normalize_credential_key() {
     i=$((i + 1))
   done
 
-  classifier_lower_text "$second" || return 1
-  NORMALIZED_KEY="${CREDENTIAL_CLASSIFIER_TEXT//-/_}"
-}
-
-# Recognize credential labels across common config naming styles.
-is_credential_key() {
-  normalize_credential_key "$1" || return 1
-  is_normalized_credential_key "$NORMALIZED_KEY"
+  fallback_lower "$second" || return 1
+  FALLBACK_NORMALIZED_KEY="${FALLBACK_LOWER//-/_}"
 }
 
 # Emit one compatibility finding per family and path without repeating user guidance.
@@ -716,14 +1304,14 @@ $path|$family
   fi
 }
 
-# Keep documented placeholder values usable in examples and setup screens on either scanner.
-is_placeholder_token() {
+# Keep documented placeholder values usable in examples and setup screens.
+fallback_is_placeholder() {
   local value
   # Normalization failure is already incomplete, so do not add a speculative secret finding.
-  if ! classifier_lower_text "$1"; then
+  if ! fallback_lower "$1"; then
     return 0
   fi
-  value="$CREDENTIAL_CLASSIFIER_TEXT"
+  value="$FALLBACK_LOWER"
   case "$value" in
     "" | akiaiosfodnn7example | asiaiosfodnn7example)
       return 0
@@ -744,8 +1332,8 @@ suffix_ends_assignment() {
     # A bare statement terminator, as in `export TOKEN="abc123";`.
     ";") return 0 ;;
     ";"*)
-      classifier_trim_text "${1#;}"
-      after_terminator="$CREDENTIAL_CLASSIFIER_TEXT"
+      fallback_trim "${1#;}"
+      after_terminator="$FALLBACK_TRIMMED"
       # Only spacing or a trailing comment after the semicolon, still one value.
       case "$after_terminator" in
         "" | \#*) return 0 ;;
@@ -786,9 +1374,9 @@ fallback_is_dockerfile_path() {
   return 1
 }
 
-# Extract one literal credential value under the policy shared by both scanners.
-# Sets LITERAL_VALUE on success; references and expressions stay allowed.
-literal_assignment_value() {
+# Extracts the literal a stock macOS user placed in a credential assignment.
+# Sets FALLBACK_LITERAL_VALUE on success; references and expressions stay allowed.
+fallback_literal_assignment_value() {
   local dotted_identifier_re
   local literal_value
   local operator_expression_re
@@ -800,9 +1388,9 @@ literal_assignment_value() {
   local value_first_segment
   local value_first_segment_lower
 
-  LITERAL_VALUE=""
-  classifier_trim_text "$1"
-  raw_assignment_value="$CREDENTIAL_CLASSIFIER_TEXT"
+  FALLBACK_LITERAL_VALUE=""
+  fallback_trim "$1"
+  raw_assignment_value="$FALLBACK_TRIMMED"
   # Keep language-formatted strings in the allowed expression path.
   case "$raw_assignment_value" in
     [fF]\"* | [fF]\'* | [fF][rR]\"* | [fF][rR]\'* | [rR][fF]\"* | [rR][fF]\'*)
@@ -824,11 +1412,11 @@ literal_assignment_value() {
       # References stay allowed because they do not embed a credential.
       is_reference_or_interpolation "$literal_value" && return 1
       text_after_closing_quote="${text_after_opening_quote#*\"}"
-      classifier_trim_text "$text_after_closing_quote"
-      text_after_closing_quote="$CREDENTIAL_CLASSIFIER_TEXT"
+      fallback_trim "$text_after_closing_quote"
+      text_after_closing_quote="$FALLBACK_TRIMMED"
       # Only an assignment-ending suffix may follow the closing quote.
       suffix_ends_assignment "$text_after_closing_quote" || return 1
-      LITERAL_VALUE="$literal_value"
+      FALLBACK_LITERAL_VALUE="$literal_value"
       return 0
       ;;
     \'*)
@@ -841,19 +1429,19 @@ literal_assignment_value() {
       # References stay allowed because they do not embed a credential.
       is_reference_or_interpolation "$literal_value" && return 1
       text_after_closing_quote="${text_after_opening_quote#*\'}"
-      classifier_trim_text "$text_after_closing_quote"
-      text_after_closing_quote="$CREDENTIAL_CLASSIFIER_TEXT"
+      fallback_trim "$text_after_closing_quote"
+      text_after_closing_quote="$FALLBACK_TRIMMED"
       # Only an assignment-ending suffix may follow the closing quote.
       suffix_ends_assignment "$text_after_closing_quote" || return 1
-      LITERAL_VALUE="$literal_value"
+      FALLBACK_LITERAL_VALUE="$literal_value"
       return 0
       ;;
   esac
 
   # Remove a trailing user comment before classifying an unquoted value.
   unquoted_assignment_value="${raw_assignment_value%%#*}"
-  classifier_trim_text "$unquoted_assignment_value"
-  unquoted_assignment_value="$CREDENTIAL_CLASSIFIER_TEXT"
+  fallback_trim "$unquoted_assignment_value"
+  unquoted_assignment_value="$FALLBACK_TRIMMED"
   # An empty value gives the user no credential to rotate.
   [ -n "$unquoted_assignment_value" ] || return 1
   # Expression punctuation keeps ordinary code out of credential warnings.
@@ -870,8 +1458,8 @@ literal_assignment_value() {
   # Dotted config references stay allowed unless their first segment is token-like.
   if [[ "$unquoted_assignment_value" =~ $dotted_identifier_re ]]; then
     value_first_segment="${unquoted_assignment_value%%.*}"
-    classifier_lower_text "$value_first_segment" || return 1
-    value_first_segment_lower="$CREDENTIAL_CLASSIFIER_TEXT"
+    fallback_lower "$value_first_segment" || return 1
+    value_first_segment_lower="$FALLBACK_LOWER"
     case "$value_first_segment_lower" in
       app | application | cfg | conf | config | configs | configuration | constant | constants | context | credentials | credential | creds | ctx | default | defaults | env | environ | environment | os | process | self | setting | settings | this)
         return 1
@@ -894,7 +1482,7 @@ literal_assignment_value() {
   fi
   # Require enough character variety to avoid warning on ordinary words.
   has_credential_entropy "$unquoted_assignment_value" || return 1
-  LITERAL_VALUE="$unquoted_assignment_value"
+  FALLBACK_LITERAL_VALUE="$unquoted_assignment_value"
   return 0
 }
 
@@ -905,17 +1493,29 @@ fallback_scan_literal_assignment() {
   local credential_key_text="$2"
   local assignment_value_text="$3"
   local literal_value
+  local normalized_credential_key
 
-  # An unnormalizable or non-credential label cannot become a user-facing credential family.
-  is_credential_key "$credential_key_text" || return 0
+  # An unnormalizable label cannot safely become a user-facing credential family.
+  if ! fallback_normalize_key "$credential_key_text"; then
+    return 0
+  fi
+  normalized_credential_key="$FALLBACK_NORMALIZED_KEY"
+  case "$normalized_credential_key" in
+    tokens | *tokens | tokenizer | tokeniser | tokenize | *tokenizer* | *tokeniser* | *tokenize* | *_count | *_index | *_id | *_name | *_type | *_header | *_url | *_path | *_list | *_re | *_pattern | *_field | *not_secret | *not_a_secret | *non_secret | *no_secret | *not_token | *not_a_token | *non_token | *no_token | *not_password | *not_a_password | *non_password | *no_password | *not_api_key | *not_an_api_key | *non_api_key | *no_api_key | *not_private_key | *not_a_private_key | *non_private_key | *no_private_key)
+      return 0
+      ;;
+    token | secret | secrets | password | passwords | api_key | apikey | private_key | access_token | auth_token | refresh_token | bearer_token | client_secret | client_secrets | secret_key | secret_keys | *_api_key | *_apikey | *_private_key | *_access_token | *_auth_token | *_refresh_token | *_bearer_token | *_client_secret | *_client_secrets | *_secret_key | *_secret_keys | *_password | *_passwords | *_token | *_secret | *_secrets)
+      ;;
+    *) return 0 ;;
+  esac
 
   # Parse only embedded literals; references remain safe for the user.
-  literal_assignment_value "$assignment_value_text" || return 0
-  literal_value="$LITERAL_VALUE"
+  fallback_literal_assignment_value "$assignment_value_text" || return 0
+  literal_value="$FALLBACK_LITERAL_VALUE"
   # Short values are not credential-shaped enough to interrupt the turn.
   [ "${#literal_value}" -ge 12 ] || return 0
   # Documented placeholders stay usable in examples and setup screens.
-  is_placeholder_token "$literal_value" && return 0
+  fallback_is_placeholder "$literal_value" && return 0
   fallback_report "$changed_file_path" "credential assignment ($credential_key_text)"
 }
 
@@ -923,10 +1523,12 @@ fallback_scan_literal_assignment() {
 fallback_scan_assignment() {
   local path="$1"
   local line="$2"
+  local assignment_re='^[[:space:]]*((export|EXPORT)[[:space:]]+)?([A-Za-z_][A-Za-z0-9_-]*)[[:space:]]*[:=][[:space:]]*(.+)$'
+
   case "$line" in
     [Ee][Nn][Vv]\ * | [Aa][Rr][Gg]\ *) line="${line#* }" ;;
   esac
-  [[ "$line" =~ $CREDENTIAL_ASSIGNMENT_RE ]] || return 0
+  [[ "$line" =~ $assignment_re ]] || return 0
   fallback_scan_literal_assignment "$path" "${BASH_REMATCH[3]}" "${BASH_REMATCH[4]}"
 }
 
@@ -1032,37 +1634,37 @@ fallback_scan_line() {
   # A changed AWS-shaped value tells the user which credential family to rotate.
   if [[ "$line" =~ $AWS_TOKEN_RE ]]; then
     token="${BASH_REMATCH[0]}"
-    is_placeholder_token "$token" || fallback_report "$path" "AWS access key"
+    fallback_is_placeholder "$token" || fallback_report "$path" "AWS access key"
   fi
   # Both legacy and fine-grained GitHub tokens share one user-facing family.
   if [[ "$line" =~ $GITHUB_LEGACY_TOKEN_RE ]]; then
     token="${BASH_REMATCH[0]}"
-    is_placeholder_token "$token" || fallback_report "$path" "GitHub token"
+    fallback_is_placeholder "$token" || fallback_report "$path" "GitHub token"
   # Fine-grained GitHub tokens use a different current provider prefix.
   elif [[ "$line" =~ $GITHUB_FINE_GRAINED_TOKEN_RE ]]; then
     token="${BASH_REMATCH[0]}"
-    is_placeholder_token "$token" || fallback_report "$path" "GitHub token"
+    fallback_is_placeholder "$token" || fallback_report "$path" "GitHub token"
   fi
   # A changed npm token tells the user which registry credential to rotate.
   if [[ "$line" =~ $NPM_TOKEN_RE ]]; then
     token="${BASH_REMATCH[0]}"
-    is_placeholder_token "$token" || fallback_report "$path" "npm token"
+    fallback_is_placeholder "$token" || fallback_report "$path" "npm token"
   fi
   # A changed Slack token tells the user which workspace credential to rotate.
   if [[ "$line" =~ $SLACK_TOKEN_RE ]]; then
     token="${BASH_REMATCH[0]}"
-    is_placeholder_token "$token" || fallback_report "$path" "Slack token"
+    fallback_is_placeholder "$token" || fallback_report "$path" "Slack token"
   fi
   # A labelled provider token takes priority so it is reported only once.
   if [[ "$line" =~ (OPENAI|ANTHROPIC|API_KEY|TOKEN).*($API_TOKEN_RE) ]]; then
     token="${BASH_REMATCH[2]}"
-    is_placeholder_token "$token" || fallback_report "$path" "API token"
+    fallback_is_placeholder "$token" || fallback_report "$path" "API token"
     api_token_reported=1
   fi
   # A bare provider token still blocks when no nearby label was present.
   if [ "$api_token_reported" -eq 0 ] && [[ "$line" =~ (^|[^A-Za-z0-9_])($API_TOKEN_RE)([^A-Za-z0-9_]|$) ]]; then
     token="${BASH_REMATCH[2]}"
-    is_placeholder_token "$token" || fallback_report "$path" "API token"
+    fallback_is_placeholder "$token" || fallback_report "$path" "API token"
   fi
   # A private-key header means the changed file can expose a complete key block.
   if [[ "$line" =~ $PRIVATE_KEY_RE ]]; then
@@ -1285,10 +1887,15 @@ post_turn_self_test() (
   local scanner_setting
   local self_test_root
   local self_test_script="${BASH_SOURCE[0]}"
-  local synthetic_assignment_secret="Ab3dEf5hIj7lMn9p"
   local synthetic_aws_token="AKIA${POST_TURN_SELF_TEST_TOKEN_SUFFIX:-1234567890ABCDEF}"
+  local synthetic_assignment_prefix="Abcdef1"
+  local synthetic_assignment_value="${synthetic_assignment_prefix}234567890"
 
   # A relative invocation must remain callable after the fixture changes working directory.
+  # Node on Windows can pass BASH_SOURCE as a drive-qualified path; normalize before the POSIX absolute-path check.
+  if command -v cygpath >/dev/null 2>&1; then
+    self_test_script="$(cygpath -u -- "$self_test_script")" || return 1
+  fi
   case "$self_test_script" in
     /*) ;;
     *) self_test_script="$(pwd)/$self_test_script" ;;
@@ -1317,7 +1924,7 @@ post_turn_self_test() (
     return 2
   fi
 
-  # Native and Bash 3 compatibility users must see the same decisions and result classes.
+  # Native and Bash 3 compatibility users must see the same three result classes.
   for scanner_setting in 0 1; do
     printf 'API_KEY=your_api_key_here\n' >"$self_test_root/settings.env"
     GOAT_FLOW_POST_TURN_SAFETY_FORCE_BASH3_FALLBACK="$scanner_setting" \
@@ -1329,18 +1936,8 @@ post_turn_self_test() (
       return 2
     fi
 
-    printf 'EXPORT API_KEY=%s\n' "$synthetic_assignment_secret" >"$self_test_root/settings.env"
-    GOAT_FLOW_POST_TURN_SAFETY_FORCE_BASH3_FALLBACK="$scanner_setting" \
-      bash "$self_test_script" </dev/null >/dev/null 2>&1
-    hook_result=$?
-    # Assignment prefixes must not create a compatibility-path bypass.
-    if [ "$hook_result" -ne 2 ]; then
-      printf 'post-turn-safety self-test: uppercase export case failed on scanner %s\n' "$scanner_setting" >&2
-      return 2
-    fi
-
     printf 'API_KEY=your_api_key_here\n' >"$self_test_root/settings.env"
-    printf 'API_KEY=%s\n' "$synthetic_assignment_secret" >"$self_test_root/$quoted_fixture_path"
+    printf 'API_KEY=%s\n' "$synthetic_assignment_value" >"$self_test_root/$quoted_fixture_path"
     hook_output="$(GOAT_FLOW_POST_TURN_SAFETY_FORCE_BASH3_FALLBACK="$scanner_setting" \
       bash "$self_test_script" </dev/null 2>&1)"
     hook_result=$?
@@ -1357,7 +1954,7 @@ post_turn_self_test() (
       printf 'API_KEY=your_api_key_here\n' >"$self_test_root/$candidate_name"
       candidate_index=$((candidate_index + 1))
     done
-    printf 'API_KEY=%s\n' "$synthetic_assignment_secret" >"$self_test_root/candidate-065.cfg"
+    printf 'API_KEY=%s\n' "$synthetic_assignment_value" >"$self_test_root/candidate-065.cfg"
     GOAT_FLOW_POST_TURN_SAFETY_FORCE_BASH3_FALLBACK="$scanner_setting" \
       bash "$self_test_script" </dev/null >/dev/null 2>&1
     hook_result=$?
@@ -1369,12 +1966,44 @@ post_turn_self_test() (
     rm -f -- "$self_test_root"/candidate-*.cfg
 
     printf 'AWS_ACCESS_KEY_ID=%s\n' "$synthetic_aws_token" >"$self_test_root/settings.env"
+    GOAT_FLOW_POST_TURN_SAFETY_MAX_BYTES=invalid \
+      GOAT_FLOW_POST_TURN_SAFETY_FORCE_BASH3_FALLBACK="$scanner_setting" \
+      bash "$self_test_script" </dev/null >/dev/null 2>&1
+    hook_result=$?
+    # Invalid byte-limit text must fall back without suppressing a real finding.
+    if [ "$hook_result" -ne 2 ]; then
+      printf 'post-turn-safety self-test: invalid byte limit failed on scanner %s\n' "$scanner_setting" >&2
+      return 2
+    fi
+
+    printf 'API_KEY=your_api_key_here\n' >"$self_test_root/settings.env"
+    GOAT_FLOW_POST_TURN_SAFETY_MAX_BYTES=0001 \
+      GOAT_FLOW_POST_TURN_SAFETY_FORCE_BASH3_FALLBACK="$scanner_setting" \
+      bash "$self_test_script" </dev/null >/dev/null 2>&1
+    hook_result=$?
+    # A leading-zero limit is invalid and must not turn safe changed text into a coverage failure.
+    if [ "$hook_result" -ne 0 ]; then
+      printf 'post-turn-safety self-test: leading-zero byte limit failed on scanner %s\n' "$scanner_setting" >&2
+      return 2
+    fi
+
+    printf 'AWS_ACCESS_KEY_ID=%s\n' "$synthetic_aws_token" >"$self_test_root/settings.env"
     GOAT_FLOW_POST_TURN_SAFETY_FORCE_BASH3_FALLBACK="$scanner_setting" \
       bash "$self_test_script" </dev/null >/dev/null 2>&1
     hook_result=$?
     # A high-confidence changed token should block the user's turn.
     if [ "$hook_result" -ne 2 ]; then
       printf 'post-turn-safety self-test: finding case failed on scanner %s\n' "$scanner_setting" >&2
+      return 2
+    fi
+
+    printf 'EXPORT TOKEN=%s\n' "$synthetic_assignment_value" >"$self_test_root/settings.env"
+    GOAT_FLOW_POST_TURN_SAFETY_FORCE_BASH3_FALLBACK="$scanner_setting" \
+      bash "$self_test_script" </dev/null >/dev/null 2>&1
+    hook_result=$?
+    # Uppercase shell export syntax must block identically in native and Bash 3 scanners.
+    if [ "$hook_result" -ne 2 ]; then
+      printf 'post-turn-safety self-test: EXPORT finding case failed on scanner %s\n' "$scanner_setting" >&2
       return 2
     fi
 
@@ -1402,21 +2031,23 @@ fallback_main() {
   local head_status
 
   case "$fallback_max_seconds" in '' | *[!0-9]*) fallback_max_seconds=60 ;; esac
-  case "$fallback_max_bytes" in '' | *[!0-9]*) fallback_max_bytes=1048576 ;; esac
+  case "$fallback_max_bytes" in '' | *[!0-9]* | 0[0-9]*) fallback_max_bytes=1048576 ;; esac
   case "$fallback_max_findings" in '' | *[!0-9]*) fallback_max_findings=20 ;; esac
 
   # Without a Git root, the hook cannot identify the project changes for this turn.
   if ! root=$(git rev-parse --show-toplevel 2>/dev/null) || [ -z "$root" ]; then
     post_turn_result_detail="The selected Git repository root could not be opened"
     printf 'post-turn-safety: scan incomplete (git repository root unavailable).\n' >&2
-    return 2
+    finish_repository_root_failure "fallback:git repository root unavailable"
+    return $?
   fi
 
   # A root the process cannot enter cannot be scanned on the user's behalf.
   if ! cd "$root" 2>/dev/null; then
     post_turn_result_detail="The selected Git repository root could not be entered"
     printf 'post-turn-safety: scan incomplete (repository root cannot be entered).\n' >&2
-    return 2
+    finish_repository_root_failure "fallback:repository root cannot be entered"
+    return $?
   fi
 
   # Temporary scan output is required before Git content can be inspected safely.
@@ -1531,6 +2162,26 @@ if ! read_stop_context; then
   exit 2
 fi
 
+current_directory_is_git_top_level() {
+  local selected_root=""
+  local discovered_root=""
+  selected_root="$(pwd -P 2>/dev/null)" || return 1
+  discovered_root="$(git rev-parse --show-toplevel 2>/dev/null)" || return 1
+  discovered_root="$(cd "$discovered_root" 2>/dev/null && pwd -P)" || return 1
+  [ -n "$selected_root" ] && [ "$selected_root" = "$discovered_root" ]
+}
+
+# A managed controller outside its own Git top level scans only its explicit, wholly valid roots.
+# Status 3 means the list was absent or invalid, so bounded root-failure recovery remains authoritative.
+if [ "${GOAT_FLOW_POST_TURN_CONTROLLER_CHILD:-0}" != 1 ] && \
+  ! current_directory_is_git_top_level; then
+  run_controller_child_scans
+  controller_scan_status=$?
+  if [ "$controller_scan_status" -ne 3 ]; then
+    exit "$controller_scan_status"
+  fi
+fi
+
 # Stock macOS Bash uses the compatibility implementation with the same Stop context.
 if ((BASH_VERSINFO[0] < 4)) || [ "${GOAT_FLOW_POST_TURN_SAFETY_FORCE_BASH3_FALLBACK:-0}" = 1 ]; then
   finish_post_turn_scan "fallback" fallback_main "$@"
@@ -1543,6 +2194,9 @@ shopt -s extglob
 
 MAX_FILE_BYTES="${GOAT_FLOW_POST_TURN_SAFETY_MAX_BYTES:-1048576}"
 MAX_FINDINGS="${GOAT_FLOW_POST_TURN_SAFETY_MAX_FINDINGS:-20}"
+case "$MAX_FILE_BYTES" in
+  '' | *[!0-9]* | 0[0-9]*) MAX_FILE_BYTES=1048576 ;;
+esac
 # Wall-clock budget for the whole scan. The registered agent-side hook timeout
 # must stay above this so the incomplete-scan diagnostic below prints before
 # the runner kills the process (same layering as gruff-code-quality.sh).
@@ -1649,15 +2303,77 @@ strip_space() {
   STRIPPED="${STRIPPED%%+([[:space:]])}"
 }
 
-# Replace only the compatibility mechanics; the credential decisions above stay shared.
-classifier_trim_text() {
-  strip_space "$1"
-  CREDENTIAL_CLASSIFIER_TEXT="$STRIPPED"
+# Keep documented placeholder values usable in examples and setup screens.
+is_placeholder_token() {
+  local value
+  value="${1,,}"
+  case "$value" in
+    "" | akiaiosfodnn7example | asiaiosfodnn7example)
+      return 0
+      ;;
+  esac
+  [[ "$value" =~ $PLACEHOLDER_ALL_X_RE ]] && return 0
+  [[ "$value" =~ $PLACEHOLDER_MARKER_RE ]]
 }
 
-# Lowercase without a subprocess on the native scanner's per-line path.
-classifier_lower_text() {
-  CREDENTIAL_CLASSIFIER_TEXT="${1,,}"
+# Exclude labels such as token counts or secret names that do not hold credentials.
+is_excluded_credential_key() {
+  local key="$1"
+  case "$key" in
+    tokens | *tokens | tokenizer | tokeniser | tokenize | *tokenizer* | *tokeniser* | *tokenize* | *_count | *_index | *_id | *_name | *_type | *_header | *_url | *_path | *_list | *_re | *_pattern | *_field)
+      return 0
+      ;;
+    *not_secret | *not_a_secret | *non_secret | *no_secret | *not_token | *not_a_token | *non_token | *no_token | *not_password | *not_a_password | *non_password | *no_password | *not_api_key | *not_an_api_key | *non_api_key | *no_api_key | *not_private_key | *not_a_private_key | *non_private_key | *no_private_key)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+# Normalize credential labels so camelCase and kebab-case receive the same verdict.
+# This keeps user feedback consistent across common config styles.
+# $1 is the label; sets NORMALIZED_KEY, which is empty only when the input is empty.
+normalize_credential_key() {
+  local raw="$1" first="" second="" c i n
+  n=${#raw}
+  # Walk the original label so camelCase boundaries become visible to the classifier.
+  for ((i = 0; i < n; i++)); do
+    c=${raw:i:1}
+    # A lowercase-to-uppercase boundary starts a new credential-label word.
+    if ((i > 0)) && [[ ${raw:i-1:1} == [[:lower:][:digit:]] && $c == [[:upper:]] ]]; then
+      first+="_"
+    fi
+    first+="$c"
+  done
+  n=${#first}
+  # Walk the intermediate label so acronym endings also become separate words.
+  for ((i = 0; i < n; i++)); do
+    c=${first:i:1}
+    # The last capital before lowercase text starts the next readable word.
+    if ((i > 0 && i + 1 < n)) && [[ ${first:i-1:1} == [[:upper:]] && $c == [[:upper:]] && ${first:i+1:1} == [[:lower:]] ]]; then
+      second+="_"
+    fi
+    second+="$c"
+  done
+  second="${second,,}"
+  NORMALIZED_KEY="${second//-/_}"
+}
+
+# Recognize credential labels across common config naming styles.
+is_credential_key() {
+  local key
+  normalize_credential_key "$1"
+  key="$NORMALIZED_KEY"
+  is_excluded_credential_key "$key" && return 1
+  case "$key" in
+    token | secret | secrets | password | passwords | api_key | apikey | private_key | access_token | auth_token | refresh_token | bearer_token | client_secret | client_secrets | secret_key | secret_keys)
+      return 0
+      ;;
+    *_api_key | *_apikey | *_private_key | *_access_token | *_auth_token | *_refresh_token | *_bearer_token | *_client_secret | *_client_secrets | *_secret_key | *_secret_keys | *_password | *_passwords | *_token | *_secret | *_secrets)
+      return 0
+      ;;
+  esac
+  return 1
 }
 
 # Warn when one changed config assignment embeds a literal credential the user can rotate.
@@ -1747,6 +2463,107 @@ scan_dockerfile_assignment() {
   scan_literal_credential_assignment "$path" "$key" "$raw_value"
 }
 
+# Extracts a literal secret-looking value from an assignment right-hand side.
+# On success sets LITERAL_VALUE and returns 0; returns 1 when the value is a
+# reference, expression, identifier, or otherwise not a literal credential.
+literal_assignment_value() {
+  local after
+  local bare
+  local dotted_identifier_re
+  local first_segment
+  local first_segment_lower
+  local operator_expression_re
+  local raw
+  local rest
+  local value
+
+  LITERAL_VALUE=""
+  strip_space "$1"
+  raw="$STRIPPED"
+  case "$raw" in
+    [fF]\"* | [fF]\'* | [fF][rR]\"* | [fF][rR]\'* | [rR][fF]\"* | [rR][fF]\'*)
+      return 1
+      ;;
+  esac
+
+  case "${raw:0:1}" in
+    '"')
+      rest="${raw:1}"
+      [[ "$rest" == *\"* ]] || return 1
+      value="${rest%%\"*}"
+      case "$value" in
+        *[[:space:]]* | *'$'*) return 1 ;;
+      esac
+      is_reference_or_interpolation "$value" && return 1
+      after="${rest#*\"}"
+      strip_space "$after"
+      after="$STRIPPED"
+      # Only an assignment-ending suffix may follow the closing quote.
+      suffix_ends_assignment "$after" || return 1
+      LITERAL_VALUE="$value"
+      return 0
+      ;;
+    "'")
+      rest="${raw:1}"
+      [[ "$rest" == *"'"* ]] || return 1
+      value="${rest%%\'*}"
+      case "$value" in
+        *[[:space:]]*) return 1 ;;
+      esac
+      is_reference_or_interpolation "$value" && return 1
+      after="${rest#*\'}"
+      strip_space "$after"
+      after="$STRIPPED"
+      # Only an assignment-ending suffix may follow the closing quote.
+      suffix_ends_assignment "$after" || return 1
+      LITERAL_VALUE="$value"
+      return 0
+      ;;
+  esac
+
+  bare="${raw%%#*}"
+  strip_space "$bare"
+  bare="$STRIPPED"
+  # An empty assignment gives the user no credential to rotate.
+  [ -n "$bare" ] || return 1
+  case "$bare" in
+    *[[:space:]]* | *"("* | *")"* | *"["* | *"]"* | *"{"* | *"}"* | *","* | *";"* | *"<"* | *">"* | *"|"* | *"&"* | *'`'* | *'$'*)
+      return 1
+      ;;
+  esac
+  # A simple lowercase identifier is a runtime reference, not an embedded user secret.
+  if [[ "$bare" =~ ^[a-z_][a-z0-9_]*$ ]]; then
+    return 1
+  fi
+  dotted_identifier_re='^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)+$'
+  # Common dotted config references stay allowed unless their first segment is token-like.
+  if [[ "$bare" =~ $dotted_identifier_re ]]; then
+    first_segment="${bare%%.*}"
+    first_segment_lower="${first_segment,,}"
+    case "$first_segment_lower" in
+      app | application | cfg | conf | config | configs | configuration | constant | constants | context | credentials | credential | creds | ctx | default | defaults | env | environ | environment | os | process | self | setting | settings | this)
+        return 1
+        ;;
+    esac
+    # Low-entropy dotted prefixes behave like ordinary application references.
+    if ! has_credential_entropy "$first_segment"; then
+      return 1
+    fi
+  fi
+  operator_expression_re='^([A-Za-z_][A-Za-z0-9_]*)([+*/%=]|==|!=)([A-Za-z_][A-Za-z0-9_]*)$'
+  # Identifier-led expressions stay allowed unless the left side itself is token-shaped.
+  if [[ "$bare" =~ $operator_expression_re ]]; then
+    has_credential_entropy "${BASH_REMATCH[1]}" || return 1
+  fi
+  # Short or punctuated expressions are not high-confidence rotatable credentials.
+  if [[ ! "$bare" =~ ^[A-Za-z0-9._+/=~-]{12,}$ ]]; then
+    return 1
+  fi
+  has_credential_entropy "$bare" || return 1
+  LITERAL_VALUE="$bare"
+  return 0
+}
+
 # Identify Dockerfile paths before applying their user-facing assignment grammar.
 is_dockerfile_path() {
   local basename
@@ -1803,6 +2620,7 @@ scan_env_assignment() {
   local line="$2"
   local key
   local raw_value
+  local env_assignment_re='^[[:space:]]*((export|EXPORT|arg|ARG|env|ENV)[[:space:]]+)?([A-Za-z_][A-Za-z0-9_-]*)[[:space:]]*[:=][[:space:]]*(.*)$'
 
   # Docker users need container grammar; other config files use normal assignments.
   if is_dockerfile_path "$path"; then
@@ -1810,7 +2628,7 @@ scan_env_assignment() {
     return 0
   fi
 
-  [[ "$line" =~ $CREDENTIAL_ASSIGNMENT_RE ]] || return 0
+  [[ "$line" =~ $env_assignment_re ]] || return 0
   key="${BASH_REMATCH[3]}"
   raw_value="${BASH_REMATCH[4]}"
   scan_literal_credential_assignment "$path" "$key" "$raw_value"
@@ -2318,102 +3136,101 @@ run_diff_batch() {
 # Arguments are paths; an empty list is clean because there is no declared content.
 # Returns nonzero only when scanning cannot complete; findings feed the final verdict.
 scan_content_files() {
-  local -a files=("$@") chunk=() env_chunk=() g_path=() g_ln=() g_line=() s_path=() s_ln=() s_line=()
+  local -a files=("$@") env_files=() g_path=() g_ln=() g_line=() s_path=() s_ln=() s_line=()
   local -A file_order=()
-  local path rest i gi si cur="" global_output stem_output
+  local -a chunk=()
+  local path rest i gi si cur="" grep_output
 
   ((${#files[@]} > 0)) || return 0
+  # Record stable file order and the subset that admits config assignment checks.
+  for ((i = 0; i < ${#files[@]}; i++)); do
+    file_order["${files[i]}"]=$i
+    # Only config-shaped user files need the credential-stem candidate stream.
+    if is_env_assignment_file "${files[i]}"; then
+      env_files+=("${files[i]}")
+    fi
+  done
+
   set -- "${files[@]}"
-  # Select and merge candidates one path chunk at a time so result storage stays bounded.
+  # Read global detector candidates from each bounded full-content batch.
   while (($# > 0)); do
     budget_check || return 0
     chunk=("${@:1:CHUNK_SIZE}")
     # Advance to the user's next bounded content batch without losing unusual names.
     if (($# > CHUNK_SIZE)); then shift "$CHUNK_SIZE"; else shift $#; fi
-
-    env_chunk=()
-    g_path=()
-    g_ln=()
-    g_line=()
-    s_path=()
-    s_ln=()
-    s_line=()
-    file_order=()
-    cur=""
-    # Record stable order and the config-shaped subset for only this bounded batch.
-    for ((i = 0; i < ${#chunk[@]}; i++)); do
-      file_order["${chunk[i]}"]=$i
-      if is_env_assignment_file "${chunk[i]}"; then
-        env_chunk+=("${chunk[i]}")
-      fi
-    done
-
     next_temp_path "content-global-hits"
-    global_output="$TEMP_PATH"
+    grep_output="$TEMP_PATH"
     # Candidate selection must finish before any file in this batch can pass.
-    if ! capture_grep_output "$global_output" "content candidate grep failed" -aUHnZE --null -e "$CONTENT_GLOBAL_RE" -- "${chunk[@]}"; then
+    if ! capture_grep_output "$grep_output" "content candidate grep failed" -aUHnZE --null -e "$CONTENT_GLOBAL_RE" -- "${chunk[@]}"; then
       return 1
     fi
-    # Preserve global candidates only until this batch has been scanned.
+    # Preserve each path, line number, and line body for ordered user-facing scanning.
     while IFS= read -r -d '' path && IFS= read -r rest; do
       g_path+=("$path")
       g_ln+=("${rest%%:*}")
       g_line+=("${rest#*:}")
-    done <"$global_output"
+    done <"$grep_output"
+  done
 
-    # Only admitted config files need the second, credential-label candidate stream.
-    if ((${#env_chunk[@]} > 0)); then
-      next_temp_path "content-stem-hits"
-      stem_output="$TEMP_PATH"
-      if ! capture_grep_output "$stem_output" "content candidate grep failed" -iaUHnZE --null -e "$CONTENT_STEM_RE" -- "${env_chunk[@]}"; then
-        return 1
-      fi
-      while IFS= read -r -d '' path && IFS= read -r rest; do
-        s_path+=("$path")
-        s_ln+=("${rest%%:*}")
-        s_line+=("${rest#*:}")
-      done <"$stem_output"
+  set -- ${env_files[@]+"${env_files[@]}"}
+  # Read config-stem candidates from each bounded admitted-file batch.
+  while (($# > 0)); do
+    budget_check || return 0
+    chunk=("${@:1:CHUNK_SIZE}")
+    # Advance to the user's next bounded config batch without losing unusual names.
+    if (($# > CHUNK_SIZE)); then shift "$CHUNK_SIZE"; else shift $#; fi
+    next_temp_path "content-stem-hits"
+    grep_output="$TEMP_PATH"
+    # Config candidate selection must finish before these files can pass.
+    if ! capture_grep_output "$grep_output" "content candidate grep failed" -iaUHnZE --null -e "$CONTENT_STEM_RE" -- "${chunk[@]}"; then
+      return 1
     fi
+    # Preserve each config path, line number, and line body for ordered scanning.
+    while IFS= read -r -d '' path && IFS= read -r rest; do
+      s_path+=("$path")
+      s_ln+=("${rest%%:*}")
+      s_line+=("${rest#*:}")
+    done <"$grep_output"
+  done
 
-    gi=0
-    si=0
-    # Merge both ordered streams before advancing to the next bounded path batch.
-    while ((gi < ${#g_path[@]} || si < ${#s_path[@]})); do
-      budget_check || return 0
-      local g_ok=0 s_ok=0 g_key=0 s_key=0 pick_path pick_line
-      # A remaining global candidate gets a sortable file-and-line key.
-      if ((gi < ${#g_path[@]})); then
-        g_ok=1
-        g_key=$((${file_order[${g_path[gi]}]:-0} * 10000000 + g_ln[gi]))
-      fi
-      # A remaining config candidate gets the same sortable file-and-line key.
-      if ((si < ${#s_path[@]})); then
-        s_ok=1
-        s_key=$((${file_order[${s_path[si]}]:-0} * 10000000 + s_ln[si]))
-      fi
-      # Select the earlier candidate and consume duplicate matches once.
-      if ((g_ok && s_ok && g_key == s_key)); then
-        pick_path="${g_path[gi]}"
-        pick_line="${g_line[gi]}"
-        gi=$((gi + 1))
-        si=$((si + 1))
-      # A remaining or earlier global candidate is the next user line to scan.
-      elif ((g_ok)) && { ((!s_ok)) || ((g_key < s_key)); }; then
-        pick_path="${g_path[gi]}"
-        pick_line="${g_line[gi]}"
-        gi=$((gi + 1))
-      else
-        pick_path="${s_path[si]}"
-        pick_line="${s_line[si]}"
-        si=$((si + 1))
-      fi
-      # A new user file resets conflict-marker state before its first candidate line.
-      if [ "$pick_path" != "$cur" ]; then
-        cur="$pick_path"
-        reset_merge_conflict_scan "$cur"
-      fi
-      scan_line "$pick_path" "$pick_line"
-    done
+  gi=0
+  si=0
+  # Merge global and config candidates in the order the user wrote them.
+  while ((gi < ${#g_path[@]} || si < ${#s_path[@]})); do
+    budget_check || return 0
+    local g_ok=0 s_ok=0 g_key=0 s_key=0 pick_path pick_line
+    # A remaining global candidate gets a sortable file-and-line key.
+    if ((gi < ${#g_path[@]})); then
+      g_ok=1
+      g_key=$((${file_order[${g_path[gi]}]:-0} * 10000000 + g_ln[gi]))
+    fi
+    # A remaining config candidate gets the same sortable file-and-line key.
+    if ((si < ${#s_path[@]})); then
+      s_ok=1
+      s_key=$((${file_order[${s_path[si]}]:-0} * 10000000 + s_ln[si]))
+    fi
+    # Select the earlier candidate and consume duplicate matches once.
+    if ((g_ok && s_ok && g_key == s_key)); then
+      pick_path="${g_path[gi]}"
+      pick_line="${g_line[gi]}"
+      gi=$((gi + 1))
+      si=$((si + 1))
+    # A remaining or earlier global candidate is the next user line to scan.
+    elif ((g_ok)) && { ((!s_ok)) || ((g_key < s_key)); }; then
+      pick_path="${g_path[gi]}"
+      pick_line="${g_line[gi]}"
+      gi=$((gi + 1))
+    else
+      pick_path="${s_path[si]}"
+      pick_line="${s_line[si]}"
+      si=$((si + 1))
+    fi
+    # A new user file resets conflict-marker state before its first candidate line.
+    if [ "$pick_path" != "$cur" ]; then
+      cur="$pick_path"
+      reset_merge_conflict_scan "$cur"
+    fi
+    scan_line "$pick_path" "$pick_line"
   done
 }
 
@@ -2438,6 +3255,11 @@ collect_z() {
 }
 
 # Run the optimized scan and return the coding agent's final Stop decision.
+cleanup_post_turn_native_workspace() {
+  [ -n "${post_turn_native_workspace:-}" ] || return 0
+  rm -rf -- "$post_turn_native_workspace"
+}
+
 main() {
   local root
   local WORKDIR
@@ -2446,14 +3268,16 @@ main() {
   if ! root="$(repo_root)" || [ -z "$root" ]; then
     post_turn_result_detail="The selected Git repository root could not be opened"
     printf 'post-turn-safety: scan incomplete (git repository root unavailable).\n' >&2
-    return 2
+    finish_repository_root_failure "native:git repository root unavailable"
+    return $?
   fi
 
-  cd "$root" 2>/dev/null || {
+  if ! cd "$root" 2>/dev/null; then
     post_turn_result_detail="The selected Git repository root could not be entered"
     printf 'post-turn-safety: scan incomplete (repository root cannot be entered).\n' >&2
-    return 2
-  }
+    finish_repository_root_failure "native:repository root cannot be entered"
+    return $?
+  fi
 
   WORKDIR="$(mktemp -d 2>/dev/null)" || WORKDIR=""
   # Temporary scan output is required before Git content can be inspected safely.
@@ -2463,8 +3287,8 @@ main() {
     finish_infrastructure_failure "$root" "native:scan workspace unavailable"
     return $?
   fi
-  # shellcheck disable=SC2064
-  trap "rm -rf '$WORKDIR'" EXIT
+  post_turn_native_workspace="$WORKDIR"
+  trap cleanup_post_turn_native_workspace EXIT
   post_turn_result_records_path="$WORKDIR/hook-result-records"
 
   local head_present=0

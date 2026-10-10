@@ -14,12 +14,14 @@ use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
+use PhpParser\Node;
+use PhpParser\Node\Expr;
 use PhpParser\Node\Stmt;
 
 /**
- * Flags an `if` statement inside a test body - branching means the test can take a path that quietly skips
- * its assertions, so its outcome depends on control flow rather than a fixed scenario. Runs over every test;
- * matrix-style suites can exempt paths via `ignoredPathPatterns`. Advisory, high confidence.
+ * Flags test-owned `if` statements that can choose which scenario or assertions run.
+ * Fixture callbacks and terminating PHPUnit skip guards stay quiet; matrix-style suites can exempt
+ * paths via `ignoredPathPatterns`. Runs over every test. Advisory, high confidence.
  */
 final readonly class ConditionalTestLogicRule implements RuleInterface
 {
@@ -37,13 +39,14 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
     {
         // Advisory: linear tests are a strong default, but matrix-style suites legitimately branch, so teams opt in.
         return new RuleDefinition(
-            id:              self::ID,
-            name:            'Conditional test logic',
-            pillar:          Pillar::TestQuality,
-            tier:            RuleTier::V01,
-            defaultSeverity: Severity::Advisory,
-            confidence:      Confidence::High,
-            defaultOptions:  ['ignoredPathPatterns' => []],
+            id:                 self::ID,
+            name:               'Conditional test logic',
+            pillar:             Pillar::TestQuality,
+            tier:               RuleTier::V01,
+            defaultSeverity:    Severity::Advisory,
+            confidence:         Confidence::High,
+            isEnabledByDefault: false,
+            defaultOptions:     ['ignoredPathPatterns' => []],
         );
     }
 
@@ -51,7 +54,7 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
      * Reports test cases that hide behaviour behind conditionals.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
      *
      * @return list<Finding> - Findings for conditional logic inside tests.
      */
@@ -69,8 +72,11 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
 
         // Weigh every test scope in the file.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
-            // Every if statement inside the test body is a branch worth flagging.
+            // Fixture callbacks own their branches; terminating skip guards select supported environments.
             foreach (NodeIndex::descendantsOfAny($scope->node, [Stmt\If_::class]) as $conditional) {
+                if (!$this->isTestOwned($conditional, $scope->node) || $this->isSkipGuard($conditional)) {
+                    continue;
+                }
                 $findings[] = new Finding(
                     ruleId:      self::ID,
                     message:     sprintf('%s contains conditional logic; tests should usually be linear.', $scope->symbol),
@@ -81,7 +87,7 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
                     tier:        RuleTier::V01,
                     confidence:  Confidence::High,
                     symbol:      $scope->symbol,
-                    remediation: 'Split branches into separate test cases with explicit setup and expectations. If a path exercises framework-driven matrix tests where conditional branching is unavoidable, add it to `rules.test-quality.conditional-logic.options.ignoredPathPatterns` in `.gruff-php.yaml`.',
+                    remediation: 'Move the branching out of the test body: give each case its own #[DataProvider] row with its input and expected value, so every row runs the same straight-line assertions.',
                 );
             }
         }
@@ -90,10 +96,72 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
     }
 
     /**
+     * Keeps fixture callback control flow outside the enclosing test's branch policy.
+     *
+     * @param Node $node - Conditional found below the test scope.
+     * @param Node $test - Method or Pest callback owning the test.
+     * @return bool - True when no nested callable separates the conditional from the test.
+     */
+    private function isTestOwned(Node $node, Node $test): bool
+    {
+        for ($parent = $node->getAttribute('parent'); $parent instanceof Node && $parent !== $test; $parent = $parent->getAttribute('parent')) {
+            if ($parent instanceof Node\FunctionLike) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Accepts a branch consisting only of PHPUnit's terminating skip and an optional return.
+     *
+     * @param Stmt\If_ $conditional - Test-owned branch; else arms or additional work remain policy.
+     * @return bool - True when the branch can only skip this unsupported scenario.
+     */
+    private function isSkipGuard(Stmt\If_ $conditional): bool
+    {
+        if ($conditional->else !== null || $conditional->elseifs !== []) {
+            return false;
+        }
+
+        $hasSkip = false;
+        foreach ($conditional->stmts as $statement) {
+            if ($hasSkip && $statement instanceof Stmt\Return_ && $statement->expr === null) {
+                continue;
+            }
+            if (!$statement instanceof Stmt\Expression || !$this->isPhpUnitSkip($statement->expr)) {
+                return false;
+            }
+            $hasSkip = true;
+        }
+
+        return $hasSkip;
+    }
+
+    /**
+     * Binds the skip to PHPUnit's current instance or class rather than a foreign receiver.
+     *
+     * @param Expr $expression - Sole executable action in a possible skip guard.
+     * @return bool - True for a direct markTestSkipped call with a supplied reason.
+     */
+    private function isPhpUnitSkip(Expr $expression): bool
+    {
+        if ((!$expression instanceof Expr\MethodCall && !$expression instanceof Expr\StaticCall)
+            || TestQualityNodeHelper::callName($expression) !== 'marktestskipped' || $expression->args === []) {
+            return false;
+        }
+
+        return $expression instanceof Expr\MethodCall
+            ? $expression->var instanceof Expr\Variable && $expression->var->name === 'this'
+            : $expression->class instanceof Node\Name && in_array(strtolower($expression->class->toString()), ['self', 'static'], true);
+    }
+
+    /**
      * Reports whether a project-configured path exemption applies.
      *
      * @param string       $displayPath - Repository-relative path of the analysed file, used as the fnmatch subject.
-     * @param list<string> $patterns - Glob patterns the caller configured to exempt known matrix-style test paths.
+     * @param list<string> $patterns    - Glob patterns the caller configured to exempt known matrix-style test paths.
      *
      * @return bool - True when the display path matches an ignored pattern.
      */

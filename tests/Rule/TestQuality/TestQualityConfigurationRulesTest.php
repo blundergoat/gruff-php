@@ -64,8 +64,8 @@ final class TestQualityConfigurationRulesTest extends TestCase
         $defaultFindings = $this->analysePath('tests/Fixtures/TestQuality/mocking-domain-object.php');
         self::assertRuleCount(MockingDomainObjectRule::ID, 0, $defaultFindings);
 
-        $registry        = RuleRegistry::defaults();
-        $config          = (new ConfigLoader(self::PROJECT_ROOT))->load(
+        $registry = RuleRegistry::defaults();
+        $config   = (new ConfigLoader(self::PROJECT_ROOT))->load(
             'tests/Fixtures/Config/enable-mocking-domain-object.yaml',
             $registry,
         );
@@ -267,9 +267,9 @@ final class TestQualityConfigurationRulesTest extends TestCase
     /**
      * Assert the expected test-quality finding count for a rule.
      *
-     * @param string        $ruleId - Rule identifier whose findings are counted.
+     * @param string        $ruleId        - Rule identifier whose findings are counted.
      * @param int           $expectedCount - Exact number of findings the rule must emit.
-     * @param list<Finding> $findings - Findings to filter down to the requested rule id.
+     * @param list<Finding> $findings      - Findings to filter down to the requested rule id.
      *
      * @return void
      */
@@ -323,8 +323,8 @@ final class TestQualityConfigurationRulesTest extends TestCase
     /**
      * Analyse test-quality fixtures and return findings for assertions.
      *
-     * @param string              $path - Single fixture path to analyse.
-     * @param AnalysisConfig|null $config - Overriding config, or null to use the registry defaults.
+     * @param string              $path   - Single fixture path to analyse.
+     * @param AnalysisConfig|null $config - Overriding config, or null to enable the default-off calibration rules.
      *
      * @return list<Finding> - all findings the default registry emits for the single fixture; empty when the fixture is clean
      */
@@ -336,8 +336,8 @@ final class TestQualityConfigurationRulesTest extends TestCase
     /**
      * Analyse test-quality fixtures and return findings for assertions.
      *
-     * @param list<string>        $paths - Fixture paths to parse and analyse together.
-     * @param AnalysisConfig|null $config - Overriding config, or null to use the registry defaults.
+     * @param list<string>        $paths  - Fixture paths to parse and analyse together.
+     * @param AnalysisConfig|null $config - Overriding config, or null to enable the default-off calibration rules.
      *
      * @return list<Finding> - findings the default registry emits across all parsed fixtures combined; empty when none fire
      */
@@ -345,10 +345,11 @@ final class TestQualityConfigurationRulesTest extends TestCase
     {
         $registry = RuleRegistry::defaults();
         $units    = array_map(fn(string $path): AnalysisUnit => $this->unitForPath($path), $paths);
+        $config ??= (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/enable-default-off-rules.yaml', $registry);
 
         return $registry->analyse(
             $units,
-            new RuleContext(self::PROJECT_ROOT, $config ?? AnalysisConfig::fromRegistry($registry)),
+            new RuleContext(self::PROJECT_ROOT, $config),
         );
     }
 

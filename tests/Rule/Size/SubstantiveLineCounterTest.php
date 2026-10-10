@@ -8,6 +8,7 @@ use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Engine\Parser\PhpFileParser;
 use GruffPhp\Engine\Source\SourceFile;
 use GruffPhp\Rules\Size\SubstantiveLineCounter;
+use PhpParser\Node\AttributeGroup;
 use PhpParser\Node\Stmt\ClassLike;
 use PhpParser\NodeFinder;
 use PHPUnit\Framework\TestCase;
@@ -15,7 +16,8 @@ use Symfony\Component\Finder\Finder;
 use WeakReference;
 
 /**
- * Proves the optimized substantive-line counter stays identical to the original masking implementation.
+ * Proves the optimized substantive-line counter stays identical to a plain repeated-replacement masking of
+ * comment tokens and parsed attribute groups.
  */
 final class SubstantiveLineCounterTest extends TestCase
 {
@@ -232,11 +234,11 @@ final class SubstantiveLineCounterTest extends TestCase
     }
 
     /**
-     * Reproduce the original comment masking algorithm exactly.
+     * Reproduce the masking with plain repeated replacement: comment tokens, then parsed attribute groups.
      *
-     * @param AnalysisUnit $analysisUnit - Unit whose comment tokens are blanked in place.
+     * @param AnalysisUnit $analysisUnit - Unit whose comment tokens and attribute groups are blanked in place.
      *
-     * @return list<string> - Source lines with comment bytes replaced by spaces except for newlines.
+     * @return list<string> - Source lines with comment and attribute bytes replaced by spaces except for newlines.
      */
     private function referenceMaskedLines(AnalysisUnit $analysisUnit): array
     {
@@ -249,6 +251,14 @@ final class SubstantiveLineCounterTest extends TestCase
 
             $blanked = preg_replace('/[^\n]/', ' ', $token->text) ?? $token->text;
             $masked  = substr_replace($masked, $blanked, $token->pos, strlen($token->text));
+        }
+
+        // Attribute lines are free like comment lines (FAMILY-CONTRACT section 12).
+        foreach ((new NodeFinder())->findInstanceOf($analysisUnit->statements, AttributeGroup::class) as $attributeGroup) {
+            $start   = $attributeGroup->getStartFilePos();
+            $length  = $attributeGroup->getEndFilePos() - $start + 1;
+            $blanked = preg_replace('/[^\n]/', ' ', substr($masked, $start, $length)) ?? '';
+            $masked  = substr_replace($masked, $blanked, $start, $length);
         }
 
         return explode("\n", $masked);

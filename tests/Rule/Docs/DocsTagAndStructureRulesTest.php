@@ -14,7 +14,7 @@ use GruffPhp\Rules\Docs\MissingConstantPhpdocRule;
 use GruffPhp\Rules\Docs\MissingFilePhpdocRule;
 use GruffPhp\Rules\Docs\MissingParamTagRule;
 use GruffPhp\Rules\Docs\MissingPropertyPhpdocRule;
-use GruffPhp\Rules\Docs\MissingPublicPhpdocRule;
+use GruffPhp\Rules\Docs\MissingPhpdocRule;
 use GruffPhp\Rules\Docs\MissingThrowsTagRule;
 use GruffPhp\Rules\Docs\RegexCommentRule;
 use GruffPhp\Rules\Docs\StaleParamTagRule;
@@ -28,9 +28,6 @@ use GruffPhp\Rules\Shared\PhysicalCommentAttachment;
  */
 final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
 {
-    /** Expected maximum names covered by one bounded pattern-family comment. */
-    private const BOUNDED_GROUP_LIMIT = 5;
-
     /**
      * Verify stale param tag detected.
      *
@@ -85,7 +82,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
      */
     public function testOverrideAwareThrowsRuleUsesInheritedContractsButLocalPhpdocIsRequired(): void
     {
-        $missingPhpdoc        = $this->analyseRule('phpdoc-tags.php', MissingPublicPhpdocRule::ID);
+        $missingPhpdoc        = $this->analyseRule('phpdoc-tags.php', MissingPhpdocRule::ID);
         $missingThrows        = $this->analyseRule('phpdoc-tags.php', MissingThrowsTagRule::ID);
         $missingPhpdocSymbols = array_map(static fn ($finding): ?string => $finding->symbol, $missingPhpdoc);
         $missingThrowsSymbols = array_map(static fn ($finding): ?string => $finding->symbol, $missingThrows);
@@ -465,7 +462,7 @@ final class OrdinarySkeleton
 PHP;
 
         $findings = [
-            ...$this->analyseSourceRule($source, MissingPublicPhpdocRule::ID),
+            ...$this->analyseSourceRule($source, MissingPhpdocRule::ID),
             ...$this->analyseSourceRule($source, MissingParamTagRule::ID),
             ...$this->analyseSourceRule($source, MissingPropertyPhpdocRule::ID),
         ];
@@ -486,7 +483,7 @@ PHP;
                 'docs.missing-param-tag|PartialPromotions::__construct()|missingPromoted',
                 'docs.missing-param-tag|PromotedSkeleton::__construct()|promoted',
                 'docs.missing-param-tag|ProsePromotion::__construct()|promoted',
-                'docs.missing-public-phpdoc|NoDocPromotions::__construct()|',
+                'docs.missing-phpdoc|NoDocPromotions::__construct()|',
             ],
             $ownershipRows,
         );
@@ -598,10 +595,7 @@ PHP;
                 'MAX_PAGES',
                 'PRIVATE_TODO_COMMENT',
                 'PRIVATE_DETACHED_COMMENT',
-                'PATIENT_OVERFLOW_PATTERN',
-                'COMPARISON_ZETA_PATTERN',
-                'VISIBILITY_PROTECTED_PATTERN',
-                'SINGLE_MATCHER_FOLLOWER',
+                'RESET_GROUP_BETA_PATTERN',
                 'RESET_AFTER_LOCAL_PATTERN',
                 'BLANK_AFTER_GROUP_PATTERN',
                 'METHOD_AFTER_GROUP_PATTERN',
@@ -624,10 +618,6 @@ PHP;
         self::assertArrayNotHasKey('commentKind', $byConstant['PRIVATE_DETACHED_COMMENT']->metadata);
         self::assertSame('missing', $byConstant['TRAILING_COMMENT_FOLLOWER']->metadata['commentQuality'] ?? null);
         self::assertArrayNotHasKey('commentKind', $byConstant['TRAILING_COMMENT_FOLLOWER']->metadata);
-
-        $this->assertBoundedGroupOverflow($byConstant['PATIENT_OVERFLOW_PATTERN']);
-        $this->assertBoundedGroupOverflow($byConstant['COMPARISON_ZETA_PATTERN']);
-        $this->assertSameStatementGroupOverflow();
     }
 
     /**
@@ -668,11 +658,12 @@ PHP;
         self::assertTrue($patientReference->metadata['requiresApiPhpdoc'] ?? null);
         self::assertTrue($patientReference->metadata['groupedLocalComment'] ?? null);
 
+        // The sixth constant under one comment is covered like the rest of its run; strict mode still wants PHPDoc.
         $patientOverflow = $byConstant['PATIENT_OVERFLOW_PATTERN'];
-        $this->assertBoundedGroupOverflow($patientOverflow);
+        self::assertSame('meaningful', $patientOverflow->metadata['commentQuality'] ?? null);
         self::assertTrue($patientOverflow->metadata['requiresApiPhpdoc'] ?? null);
-        self::assertArrayNotHasKey('groupedLocalComment', $patientOverflow->metadata);
-        self::assertStringContainsString('also requires PHPDoc', $patientOverflow->message);
+        self::assertTrue($patientOverflow->metadata['groupedLocalComment'] ?? null);
+        self::assertStringContainsString('requires PHPDoc for exported constants', $patientOverflow->message);
     }
 
     /**
@@ -760,44 +751,6 @@ PHP, RegexCommentRule::ID);
         self::assertFalse(PhysicalCommentAttachment::isCommentOnlyLine('    /* Match the supported marker. */ $unrelated = 1;'));
         self::assertFalse(PhysicalCommentAttachment::isCommentOnlyLine('    /* Context. */ $unrelated = 1; /* Match the supported marker. */'));
         self::assertFalse(PhysicalCommentAttachment::isCommentOnlyLine('    /* Unclosed context.'));
-    }
-
-    /**
-     * Verify one multi-name declaration reports only the names beyond a bounded group comment.
-     *
-     * @return void
-     */
-    private function assertSameStatementGroupOverflow(): void
-    {
-        $findings = $this->analyseSourceRule(<<<'PHP'
-<?php
-final class PatternBag
-{
-    // Validation patterns used by the supported inputs.
-    public const A = 'a', B = 'b', C = 'c', D = 'd', E = 'e', F = 'f';
-}
-PHP, MissingConstantPhpdocRule::ID);
-
-        self::assertCount(1, $findings);
-        self::assertSame('PatternBag::F', $findings[0]->symbol);
-        $this->assertBoundedGroupOverflow($findings[0]);
-        self::assertStringContainsString('Start a new adjacent patterns/regexes group comment', $findings[0]->remediation ?? '');
-    }
-
-    /**
-     * Assert the shared machine-readable shape for a name beyond a bounded group comment.
-     *
-     * @param Finding $finding - Overflow finding to inspect.
-     *
-     * @return void
-     */
-    private function assertBoundedGroupOverflow(Finding $finding): void
-    {
-        self::assertSame('bounded-group-overflow', $finding->metadata['commentQuality'] ?? null);
-        self::assertSame('line', $finding->metadata['commentKind'] ?? null);
-        self::assertTrue($finding->metadata['groupCoverageExceeded'] ?? null);
-        self::assertSame(self::BOUNDED_GROUP_LIMIT, $finding->metadata['groupCoverageLimit'] ?? null);
-        self::assertStringContainsString('exceeds the 5-name coverage limit', $finding->message);
     }
 
     /**

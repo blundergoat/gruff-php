@@ -10,6 +10,7 @@ use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Pillar;
 use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
+use GruffPhp\Rules\Size\LimitBand;
 use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Contracts\RuleContext;
@@ -23,13 +24,13 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 
 /**
- * Flags a function or method whose cyclomatic complexity - the number of independent branches through
- * it - climbs above the configured threshold, since more branches mean more paths to test and follow.
+ * Flags a function or method whose control-flow decision count climbs above the configured threshold.
  *
- * Runs per file over every function-like node with a body, counting decision points (ifs, loops,
- * catches, short-circuit operators, match arms, non-default cases). Anything over the threshold (default
- * warning above 20) is reported; a well-structured flat guard-clause method is softened to advisory so
- * the shape is not over-penalised.
+ * Runs per file over every function-like node with a body, counting ifs, loops, catches and short-circuit
+ * operators; a switch or match with non-default choices contributes one dispatch decision.
+ *
+ * Findings below one and a half times the active limit are advisory; the upper band keeps the configured
+ * severity, except that a flat guard-clause method stays advisory.
  */
 final readonly class CyclomaticComplexityRule implements RuleInterface
 {
@@ -112,7 +113,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
                 continue;
             }
 
-            $ccn            = self::computeCyclomaticComplexity($node);
+            $ccn            = self::dispatchOnceComplexity($node);
             $thresholdMatch = $settings->highValueThresholdMatch($ccn);
 
             // A count within the threshold is fine, so skip it.
@@ -122,7 +123,8 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
 
             $symbol = self::resolveSymbol($node);
             $isFlatGuardFlow = ComplexityShapeClassifier::isFlatGuardClauseFlow($node);
-            $severity = $isFlatGuardFlow ? Severity::Advisory : $thresholdMatch->severity;
+            $band = LimitBand::of($ccn, $settings->lowestHighValueThreshold());
+            $severity = LimitBand::severity($band, $isFlatGuardFlow ? Severity::Advisory : $thresholdMatch->severity);
 
             $findings[] = new Finding(
                 ruleId:  $definition->id,
@@ -149,7 +151,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
                 confidence:       $definition->confidence,
                 endLine:          $node->getEndLine() > 0 ? $node->getEndLine() : null,
                 symbol:           $symbol,
-                remediation:      'Reduce branching by extracting conditions or splitting the method.',
+                remediation:      LimitBand::advice($band, LimitBand::LOWER_METHOD, LimitBand::SIMPLIFY_PATH),
                 secondaryPillars: $definition->secondaryPillars,
                 metadata:         [
                     'complexity' => $ccn,
@@ -157,11 +159,49 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
                     'thresholdType' => $severity->value,
                     'rawThresholdType' => $thresholdMatch->severity->value,
                     'complexityShape' => $isFlatGuardFlow ? ComplexityShapeClassifier::SHAPE_FLAT_GUARD_CLAUSES : 'branching',
+                    LimitBand::KEY => $band,
                 ],
             );
         }
 
         return $findings;
+    }
+
+    /**
+     * Counts the decisions this rule reports: the shared cyclomatic number with each switch and each match counted once.
+     *
+     * A flat dispatch over many cases is one decision for the reader. The maintainability index keeps reading
+     * computeCyclomaticComplexity, which counts each non-default case and match-arm condition.
+     *
+     * @param ClassMethod|Function_ $node - Function-like node whose decisions are counted.
+     *
+     * @return int - Cyclomatic complexity with every switch and match counted as one decision.
+     */
+    private static function dispatchOnceComplexity(Node $node): int
+    {
+        $ccn = self::computeCyclomaticComplexity($node);
+
+        // Take back every case or arm condition after the first, so each dispatch adds exactly one point.
+        foreach (NodeIndex::bodyDescendants($node) as $child) {
+            // A switch's non-default cases were each counted once.
+            if ($child instanceof Stmt\Switch_) {
+                $cases = count(array_filter($child->cases, static fn (Stmt\Case_ $case): bool => $case->cond !== null));
+                $ccn  -= max($cases - 1, 0);
+            }
+
+            // A match's arm conditions were each counted once.
+            if ($child instanceof Expr\Match_) {
+                $conditions = 0;
+                // The default arm has no conditions.
+                foreach ($child->arms as $arm) {
+                    $conditions += $arm->conds === null ? 0 : count($arm->conds);
+                }
+
+                $ccn -= max($conditions - 1, 0);
+            }
+        }
+
+        return $ccn;
     }
 
     /**

@@ -224,7 +224,7 @@ final class TestQualityRulesTest extends TestCase
                                      $this->analysePath('tests/Fixtures/TestQuality/eager-test-mutation-cases.php', $config),
                                      static fn(Finding $finding): bool => $finding->ruleId === EagerTestRule::ID,
                                  ));
-        $symbols  = array_map(static fn(Finding $finding): ?string => $finding->symbol, $findings);
+        $symbols = array_map(static fn(Finding $finding): ?string => $finding->symbol, $findings);
 
         self::assertContains('EagerNegativeMutationCasesTest::testTwoAssertionMultiActStaysBelowDefaultThreshold()', $symbols);
     }
@@ -296,8 +296,8 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Verify each single-rule fixture emits exactly the expected finding count.
      *
-     * @param string $fixture - Fixture path under tests/Fixtures/TestQuality to analyse.
-     * @param string $ruleId - Rule identifier whose findings are counted.
+     * @param string $fixture       - Fixture path under tests/Fixtures/TestQuality to analyse.
+     * @param string $ruleId        - Rule identifier whose findings are counted.
      * @param int    $expectedCount - Exact number of findings the rule must emit on the fixture.
      *
      * @return void
@@ -410,11 +410,11 @@ final class TestQualityRulesTest extends TestCase
                                          $findings,
                                          static fn(Finding $finding): bool => $finding->ruleId === MockWithoutExpectationRule::ID,
                                      ));
-        $variants     = array_values(array_filter(
+        $variants = array_values(array_filter(
                                          array_map(static fn(Finding $finding): mixed => $finding->metadata['variant'] ?? null, $mockFindings),
                                          'is_string',
                                      ));
-        $variables    = array_values(array_filter(
+        $variables = array_values(array_filter(
                                          array_map(static fn(Finding $finding): mixed => $finding->metadata['variable'] ?? null, $mockFindings),
                                          'is_string',
                                      ));
@@ -466,8 +466,8 @@ final class TestQualityRulesTest extends TestCase
         $defaultFindings = $this->analysePath('tests/Fixtures/TestQuality/multiple-aaa-cycles.php');
         self::assertRuleCount(MultipleAaaCyclesRule::ID, 1, $defaultFindings);
 
-        $registry           = RuleRegistry::defaults();
-        $config             = (new ConfigLoader(self::PROJECT_ROOT))->load(
+        $registry = RuleRegistry::defaults();
+        $config   = (new ConfigLoader(self::PROJECT_ROOT))->load(
             'tests/Fixtures/Config/enable-multiple-aaa-cycles.yaml',
             $registry,
         );
@@ -535,8 +535,8 @@ final class TestQualityRulesTest extends TestCase
         $defaultFindings = $this->analysePath('tests/Fixtures/TestQuality/testdox-readability.php');
         self::assertRuleCount(TestdoxReadabilityRule::ID, 1, $defaultFindings);
 
-        $registry           = RuleRegistry::defaults();
-        $config             = (new ConfigLoader(self::PROJECT_ROOT))->load(
+        $registry = RuleRegistry::defaults();
+        $config   = (new ConfigLoader(self::PROJECT_ROOT))->load(
             'tests/Fixtures/Config/enable-testdox-readability.yaml',
             $registry,
         );
@@ -551,9 +551,9 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Assert the expected test-quality finding count for a rule.
      *
-     * @param string        $ruleId - Rule identifier whose findings are counted.
+     * @param string        $ruleId        - Rule identifier whose findings are counted.
      * @param int           $expectedCount - Exact number of findings the rule must emit.
-     * @param list<Finding> $findings - Findings to filter down to the requested rule id.
+     * @param list<Finding> $findings      - Findings to filter down to the requested rule id.
      *
      * @return void
      */
@@ -569,9 +569,9 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Assert the static-analysis-redundant rule stays silent while a neighbouring rule solely owns the fixture's smell.
      *
-     * @param string $fixture - Fixture path whose neighbouring-rule ownership is verified.
+     * @param string $fixture     - Fixture path whose neighbouring-rule ownership is verified.
      * @param string $ownerRuleId - Rule identifier expected to solely own the fixture's smell.
-     * @param int    $ownerCount - Exact number of findings the owning rule must emit.
+     * @param int    $ownerCount  - Exact number of findings the owning rule must emit.
      *
      * @return void
      */
@@ -587,7 +587,7 @@ final class TestQualityRulesTest extends TestCase
      * Return sorted string metadata values for stable assertions.
      *
      * @param list<Finding> $findings - Findings whose metadata should be inspected.
-     * @param string        $key - Metadata key to read.
+     * @param string        $key      - Metadata key to read.
      *
      * @return list<string> - String values sorted ascending.
      */
@@ -606,8 +606,8 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Analyse test-quality fixtures and return findings for assertions.
      *
-     * @param string              $path - Single fixture path to analyse.
-     * @param AnalysisConfig|null $config - Overriding config, or null to use the registry defaults.
+     * @param string              $path   - Single fixture path to analyse.
+     * @param AnalysisConfig|null $config - Overriding config, or null to enable the default-off calibration rules.
      *
      * @return list<Finding> - every finding emitted across all rules for the single fixture; empty when nothing fired
      */
@@ -632,8 +632,8 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Analyse test-quality fixtures and return findings for assertions.
      *
-     * @param list<string>        $paths - Fixture paths to parse and analyse together.
-     * @param AnalysisConfig|null $config - Overriding config, or null to use the registry defaults.
+     * @param list<string>        $paths  - Fixture paths to parse and analyse together.
+     * @param AnalysisConfig|null $config - Overriding config, or null to enable the default-off calibration rules.
      *
      * @return list<Finding> - every finding the default registry emits across the combined fixtures; empty when nothing fired
      */
@@ -641,10 +641,11 @@ final class TestQualityRulesTest extends TestCase
     {
         $registry = RuleRegistry::defaults();
         $units    = array_map(fn(string $path): AnalysisUnit => $this->unitForPath($path), $paths);
+        $config ??= (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/enable-default-off-rules.yaml', $registry);
 
         return $registry->analyse(
             $units,
-            new RuleContext(self::PROJECT_ROOT, $config ?? AnalysisConfig::fromRegistry($registry)),
+            new RuleContext(self::PROJECT_ROOT, $config),
         );
     }
 

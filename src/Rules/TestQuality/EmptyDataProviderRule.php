@@ -14,6 +14,7 @@ use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
+use GruffPhp\Support\DeclarationLine;
 use PhpParser\Node;
 use PhpParser\Node\Arg;
 use PhpParser\Node\Expr;
@@ -156,7 +157,7 @@ final readonly class EmptyDataProviderRule implements RuleInterface
                     $providerName,
                 ),
                 filePath:    $analysisUnit->file->displayPath,
-                line:        $testMethod->getStartLine(),
+                line:        DeclarationLine::of($testMethod),
                 severity:    Severity::Error,
                 pillar:      Pillar::TestQuality,
                 tier:        RuleTier::V01,

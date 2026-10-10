@@ -27,9 +27,9 @@ final class AnalysisReportTest extends TestCase
     public function testFindingCountsByRuleAggregatesAndRanks(): void
     {
         $report = $this->reportFor([
-                                       $this->finding('docs.missing-public-phpdoc', Severity::Advisory),
-                                       $this->finding('docs.missing-public-phpdoc', Severity::Warning),
-                                       $this->finding('docs.missing-public-phpdoc', Severity::Advisory),
+                                       $this->finding('docs.missing-phpdoc', Severity::Advisory),
+                                       $this->finding('docs.missing-phpdoc', Severity::Warning),
+                                       $this->finding('docs.missing-phpdoc', Severity::Advisory),
                                        $this->finding('size.method-length', Severity::Error),
                                        $this->finding('size.method-length', Severity::Error),
                                        $this->finding('alpha.rule', Severity::Advisory),
@@ -37,7 +37,7 @@ final class AnalysisReportTest extends TestCase
 
         self::assertSame(
             [
-                ['ruleId' => 'docs.missing-public-phpdoc', 'total' => 3, 'advisory' => 2, 'warning' => 1, 'error' => 0],
+                ['ruleId' => 'docs.missing-phpdoc', 'total' => 3, 'advisory' => 2, 'warning' => 1, 'error' => 0],
                 ['ruleId' => 'size.method-length', 'total' => 2, 'advisory' => 0, 'warning' => 0, 'error' => 2],
                 ['ruleId' => 'alpha.rule', 'total' => 1, 'advisory' => 1, 'warning' => 0, 'error' => 0],
             ],

@@ -39,10 +39,9 @@ final class AnalyseCliMutationTest extends CliTestCase
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
 
         $report   = $this->decodeJsonOutput($process);
-        $mutation = $report['mutation'] ?? null;
+        $mutation = $this->decodedJsonObjectAt($report, 'extensions', 'php', 'topLevel', 'mutation');
         $findings = $report['findings'] ?? null;
 
-        self::assertIsArray($mutation);
         $totals = $mutation['totals'] ?? null;
         self::assertIsArray($totals);
         self::assertEquals(50.0, $totals['msi'] ?? null);
@@ -122,7 +121,7 @@ final class AnalyseCliMutationTest extends CliTestCase
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-        self::assertStringContainsString('**Score drivers:** Per-pillar scores start at 100', $process->getOutput());
+        self::assertStringContainsString('**Score drivers:** Each pillar scores on the density of its weighted findings per evaluated file', $process->getOutput());
         self::assertStringContainsString('Mutation uses the supplied Infection MSI as the mutation pillar score.', $process->getOutput());
         self::assertStringContainsString('**Mutation:** MSI 50.00%', $process->getOutput());
         self::assertStringContainsString('**Mutation statuses:** escaped=1, killed=2, timed out=1.', $process->getOutput());
@@ -159,10 +158,9 @@ final class AnalyseCliMutationTest extends CliTestCase
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
 
         $report   = $this->decodeJsonOutput($process);
-        $mutation = $report['mutation'] ?? null;
+        $mutation = $this->decodedJsonObjectAt($report, 'extensions', 'php', 'topLevel', 'mutation');
         $findings = $report['findings'] ?? null;
 
-        self::assertIsArray($mutation);
         $baseline = $mutation['baseline'] ?? null;
         $budget   = $mutation['budget'] ?? null;
         self::assertIsArray($baseline);

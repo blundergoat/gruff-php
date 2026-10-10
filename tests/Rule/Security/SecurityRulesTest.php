@@ -18,20 +18,15 @@ use GruffPhp\Rules\Security\DebugModeEnabledRule;
 use GruffPhp\Rules\Security\DisabledSslVerificationRule;
 use GruffPhp\Rules\Security\ErrorSuppressionRule;
 use GruffPhp\Rules\Security\ExtractCompactUserInputRule;
-use GruffPhp\Rules\Security\GithubActionsRiskyWorkflowRule;
 use GruffPhp\Rules\Security\HeaderInjectionRule;
-use GruffPhp\Rules\Security\InsecureRandomRule;
-use GruffPhp\Rules\Security\PathTraversalFileAccessRule;
 use GruffPhp\Rules\Security\ProcessCommandConstructionRule;
 use GruffPhp\Rules\Security\RequestControlledUrlRule;
-use GruffPhp\Rules\Security\SensitiveDataLoggingRule;
 use GruffPhp\Rules\Security\SilentCatchRule;
 use GruffPhp\Rules\Security\SqlConcatenationRule;
 use GruffPhp\Rules\Security\UnsafeArchiveExtractionRule;
 use GruffPhp\Rules\Security\UnsafeXmlLoadingRule;
 use GruffPhp\Rules\Security\UnsafeUnserializeRule;
 use GruffPhp\Rules\Security\VariableIncludeRule;
-use GruffPhp\Rules\Security\WeakCryptoRule;
 use GruffPhp\Engine\Source\SourceFile;
 use PhpParser\Error;
 use PhpParser\Node\Stmt;
@@ -42,8 +37,10 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers the security rule pack: dangerous execution and deserialisation, dynamic-call discrimination, sensitive-logger handling, request-data
- * heuristics, workflow risks, and config-driven disables.
+ * Covers the security findings users see for dangerous execution, deserialisation, request input, and disabled rules.
+ *
+ * Focused cases keep safe application code quiet while exact finding lines show which risky call a user needs to review.
+ * Registry-wide cases ensure those precision fixes still work as part of a normal Gruff PHP scan.
  */
 final class SecurityRulesTest extends TestCase
 {
@@ -159,30 +156,6 @@ final class SecurityRulesTest extends TestCase
     }
 
     /**
-     * Verify static logger text that names sensitive concepts is not treated as leaked data.
-     *
-     * @return void
-     */
-    public function testStaticSensitiveLoggerMessagesAreNotFlagged(): void
-    {
-        $findings = $this->findingsForRule($this->staticLoggerMessageUnit(), SensitiveDataLoggingRule::ID);
-
-        self::assertSame([], $findings);
-    }
-
-    /**
-     * Verify runtime sensitive log values still produce findings.
-     *
-     * @return void
-     */
-    public function testSensitiveLoggerRuntimeValuesStillFlagged(): void
-    {
-        $findings = $this->findingsForRule($this->runtimeLoggerValueUnit(), SensitiveDataLoggingRule::ID);
-
-        self::assertCount(2, $findings);
-    }
-
-    /**
      * Verify request data security heuristics detected.
      *
      * @return void
@@ -194,8 +167,6 @@ final class SecurityRulesTest extends TestCase
         self::assertRuleCount(UnsafeUnserializeRule::ID, 1, $findings);
         self::assertRuleCount(HeaderInjectionRule::ID, 2, $findings);
         self::assertRuleCount(ExtractCompactUserInputRule::ID, 3, $findings);
-        self::assertRuleCount(WeakCryptoRule::ID, 3, $findings);
-        self::assertRuleCount(InsecureRandomRule::ID, 3, $findings);
         self::assertRuleCount(ErrorSuppressionRule::ID, 1, $findings);
         self::assertRuleCount(SilentCatchRule::ID, 1, $findings);
     }
@@ -211,8 +182,12 @@ final class SecurityRulesTest extends TestCase
         return [
             'variable include attack shapes' => ['variable-include-precision.php', VariableIncludeRule::ID, [9, 10, 13, 17, 19, 20, 32]],
             'sql concatenation attack shapes' => ['sql-concatenation-precision.php', SqlConcatenationRule::ID, [7, 8, 9, 10, 25]],
-            'procedural sql sinks follow one unambiguous local assignment' => ['procedural-sink-precision.php', SqlConcatenationRule::ID, [8, 21, 22, 23, 24, 59, 60]],
-            'procedural command sinks flag dynamic command strings' => ['procedural-sink-precision.php', ProcessCommandConstructionRule::ID, [13, 61, 75, 76]],
+            'procedural sql sinks follow one unambiguous local assignment' => [
+                'procedural-sink-precision.php', SqlConcatenationRule::ID, [8, 21, 22, 23, 24, 59, 60],
+            ],
+            'procedural command sinks flag dynamic command strings' => [
+                'procedural-sink-precision.php', ProcessCommandConstructionRule::ID, [13, 61, 75, 76],
+            ],
             // 54/64/82: a conditional rebind never hides a real parser, including sibling-branch sinks,
             // and a conditional construction counts as possibly-XML; the rebind on the sink's own path stays silent.
             'xml loaders need xml receivers' => ['xml-receiver-gating.php', UnsafeXmlLoadingRule::ID, [22, 27, 33, 38, 54, 64, 82]],
@@ -223,8 +198,11 @@ final class SecurityRulesTest extends TestCase
             'named extract arguments resolve' => ['named-argument-sinks.php', ExtractCompactUserInputRule::ID, [19, 20]],
             'named ini_set arguments resolve' => ['named-argument-sinks.php', DebugModeEnabledRule::ID, [25, 26]],
             'named curl_setopt arguments resolve' => ['named-argument-sinks.php', DisabledSslVerificationRule::ID, [31, 32]],
-            'named path arguments resolve' => ['named-argument-sinks.php', PathTraversalFileAccessRule::ID, [37, 38]],
             'named xml arguments resolve' => ['named-argument-sinks.php', UnsafeXmlLoadingRule::ID, [43, 44]],
+            // 104: a callable parameter in a sibling function no longer proves this one's variable. 111, 112, 114:
+            // request-chosen targets, including through Closure::fromCallable and a first-class `$x(...)` reference.
+            // 124: an early-return guard is a known residual the rule does not read. Every other call is a proven shape.
+            'dynamic calls prove callability the way PHP does' => ['dynamic-call-precision.php', DangerousFunctionCallRule::ID, [104, 111, 112, 114, 124, 132, 137, 140, 141, 144, 146, 154, 161, 167, 177, 196, 199]],
         ];
     }
 
@@ -282,6 +260,29 @@ final class SecurityRulesTest extends TestCase
 
         self::assertCount(1, $findings);
         self::assertSame(9, $findings[0]->line);
+    }
+
+    /**
+     * Keeps underscore deployment constants quiet unless the user marks them dynamic.
+     *
+     * @return void
+     */
+    public function testUnderscoreDeploymentConstantKeepsDynamicOverrides(): void
+    {
+        $unit = $this->parseSource(
+            "<?php\nrequire __SITE_ROOT__ . '/bootstrap.php';\nrequire _mixedRoot . '/bootstrap.php';\nrequire \$_GET['path'];",
+            'src/bootstrap.php',
+        );
+        $rule     = new VariableIncludeRule();
+        $config   = AnalysisConfig::fromRegistry(RuleRegistry::defaults());
+        $ordinary = $rule->analyse($unit, new RuleContext(__DIR__, $config));
+        self::assertSame([3, 4], self::findingLines($ordinary));
+
+        $configured = $config->withRuleSettings(
+            VariableIncludeRule::ID,
+            new RuleSettings(true, [], ['treatGlobalConstantsAsFixed' => true, 'dynamicPathConstants' => ['__SITE_ROOT__']]),
+        );
+        self::assertSame([2, 3, 4], self::findingLines($rule->analyse($unit, new RuleContext(__DIR__, $configured))));
     }
 
     /**
@@ -347,23 +348,9 @@ final class SecurityRulesTest extends TestCase
         $findings = $this->analyse('cumulative-security.php');
 
         self::assertRuleCount(ProcessCommandConstructionRule::ID, 1, $findings);
-        self::assertRuleCount(PathTraversalFileAccessRule::ID, 1, $findings);
         self::assertRuleCount(RequestControlledUrlRule::ID, 1, $findings);
         self::assertRuleCount(UnsafeXmlLoadingRule::ID, 1, $findings);
         self::assertRuleCount(UnsafeArchiveExtractionRule::ID, 1, $findings);
-        self::assertRuleCount(SensitiveDataLoggingRule::ID, 1, $findings);
-    }
-
-    /**
-     * Verify risky GitHub Actions workflow patterns detected.
-     *
-     * @return void
-     */
-    public function testGithubActionsWorkflowRisksDetected(): void
-    {
-        $findings = $this->analyse('.github/workflows/risky-workflow.yml');
-
-        self::assertRuleCount(GithubActionsRiskyWorkflowRule::ID, 6, $findings);
     }
 
     /**
@@ -373,10 +360,7 @@ final class SecurityRulesTest extends TestCase
      */
     public function testSafeWrappersAndLiteralPatternsAreNotFlagged(): void
     {
-        $findings = [
-            ...$this->analyse('safe-patterns.php'),
-            ...$this->analyse('.github/workflows/safe-workflow.yml'),
-        ];
+        $findings = $this->analyse('safe-patterns.php');
 
         $securityFindings = array_values(array_filter(
                                              $findings,
@@ -406,10 +390,7 @@ final class SecurityRulesTest extends TestCase
     public function testCumulativeSecurityFixtureCoversEverySecurityRuleWithoutDuplicateFindings(): void
     {
         $findings = array_values(array_filter(
-                                     [
-                                         ...$this->analyse('cumulative-security.php'),
-                                         ...$this->analyse('.github/workflows/cumulative-workflow.yml'),
-                                     ],
+                                     $this->analyse('cumulative-security.php'),
                                      static fn(Finding $finding): bool => str_starts_with($finding->ruleId, 'security.'),
                                  ));
 
@@ -417,21 +398,16 @@ final class SecurityRulesTest extends TestCase
         $expectedRuleIds = [
             DangerousFunctionCallRule::ID,
             ProcessCommandConstructionRule::ID,
-            PathTraversalFileAccessRule::ID,
             RequestControlledUrlRule::ID,
             UnsafeXmlLoadingRule::ID,
             UnsafeArchiveExtractionRule::ID,
-            SensitiveDataLoggingRule::ID,
-            GithubActionsRiskyWorkflowRule::ID,
             UnsafeUnserializeRule::ID,
-            WeakCryptoRule::ID,
             VariableIncludeRule::ID,
             SqlConcatenationRule::ID,
             HeaderInjectionRule::ID,
             ErrorSuppressionRule::ID,
             SilentCatchRule::ID,
             ExtractCompactUserInputRule::ID,
-            InsecureRandomRule::ID,
             DisabledSslVerificationRule::ID,
         ];
 
@@ -712,57 +688,6 @@ final class CallableCollectionFixture
 }
 PHP,
             'tests/Fixtures/Security/inline-callable-collection.php',
-        );
-    }
-
-    /**
-     * Parse the static logger message fixture into an analysis unit.
-     *
-     * @return AnalysisUnit - unit whose constant log messages only mention secret-like words, so SensitiveDataLoggingRule must stay clean
-     */
-    private function staticLoggerMessageUnit(): AnalysisUnit
-    {
-        // Constant log messages that merely mention secret-like words are not leaks; this fixture must stay clean.
-        return $this->parseSource(
-            <<<'PHP'
-<?php
-
-final class StaticLoggerMessageFixture
-{
-    public function record(object $logger): void
-    {
-        $logger->info('flushing PreferenceAuthUser and AuthCredential', ['method' => __METHOD__, 'line' => __LINE__]);
-        $logger->info('user already has a valid AuthCredentialToken', ['method' => __METHOD__, 'line' => __LINE__]);
-        $logger->warning('token refresh skipped for a static branch');
-    }
-}
-PHP,
-            'tests/Fixtures/Security/inline-static-logger-message.php',
-        );
-    }
-
-    /**
-     * Parse the runtime logger value fixture into an analysis unit.
-     *
-     * @return AnalysisUnit - unit logging a runtime $password and a token-keyed context, the genuine leaks the rule must catch
-     */
-    private function runtimeLoggerValueUnit(): AnalysisUnit
-    {
-        // Logging a runtime $password and a token-keyed context is the genuine leak the rule must catch here.
-        return $this->parseSource(
-            <<<'PHP'
-<?php
-
-final class RuntimeLoggerValueFixture
-{
-    public function record(object $logger, string $password, string $token): void
-    {
-        $logger->warning($password);
-        $logger->info('token refresh failed', ['token' => $token]);
-    }
-}
-PHP,
-            'tests/Fixtures/Security/inline-runtime-logger-value.php',
         );
     }
 

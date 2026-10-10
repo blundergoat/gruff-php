@@ -46,6 +46,12 @@ final class UnsafeUnserializeRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'An unserialize() of trusted internal data, such as a value the application wrote to its own cache or database.',
+                    'mitigation' => 'Any non-literal payload is reported regardless of provenance, so pass [\'allowed_classes\' => false], which is recognised as safe, or store the value as JSON.',
+                ],
+            ],
         );
     }
 

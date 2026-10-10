@@ -19,7 +19,7 @@ final readonly class FileScore
      * Captures one file's grade, severity tallies, penalty, and optional peak metrics for the offenders list.
      *
      * @param string     $filePath - Display path of the scored file, as the user sees it in the report.
-     * @param Grade      $grade - Letter grade and score for the file.
+     * @param Grade|null $grade - Letter grade and score for the file, null when the run evaluated nothing.
      * @param int        $findings - Total findings counted against the file.
      * @param int        $advisory - Advisory-severity findings in the file.
      * @param int        $warning - Warning-severity findings in the file.
@@ -32,7 +32,7 @@ final readonly class FileScore
      */
     public function __construct(
         public string $filePath,
-        public Grade  $grade,
+        public ?Grade $grade,
         public int    $findings,
         public int    $advisory,
         public int    $warning,
@@ -55,8 +55,8 @@ final readonly class FileScore
      *
      * @return array{
      *     file: string,
-     *     score: float,
-     *     grade: string,
+     *     score: float|null,
+     *     grade: string|null,
      *     findings: int,
      *     advisory: int,
      *     warning: int,
@@ -72,8 +72,8 @@ final readonly class FileScore
     {
         return [
             'file'          => $this->filePath,
-            'score'         => $this->grade->score,
-            'grade'         => $this->grade->letter,
+            'score'         => $this->grade?->score,
+            'grade'         => $this->grade?->letter,
             'findings'      => $this->findings,
             'advisory'      => $this->advisory,
             'warning'       => $this->warning,

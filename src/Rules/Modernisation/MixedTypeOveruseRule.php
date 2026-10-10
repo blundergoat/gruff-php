@@ -48,6 +48,12 @@ final readonly class MixedTypeOveruseRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A public method implementing an interface that itself declares mixed, such as ArrayAccess::offsetGet or JsonSerializable::jsonSerialize.',
+                    'mitigation' => 'Narrowing the native signature would break the contract, so keep mixed there and narrow through @param and @return PHPDoc instead.',
+                ],
+            ],
         );
     }
 

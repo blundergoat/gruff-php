@@ -78,7 +78,7 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<\GruffPhp\Results\Finding\Finding> - one finding per non-dummy key-like literal outside comments; empty means clean (no prefix hit, or
+     * @return list<\GruffPhp\Results\Finding\Finding> - One finding per non-dummy key outside comments; empty means no reportable prefix hit or
      *                                         every match was a comment or dummy value), not an error
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
@@ -96,9 +96,9 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
 
         // Run each provider's key pattern over the source.
-        foreach ($this->patterns() as $definition) {
+        foreach ($this->patterns() as $providerPattern) {
             // Match every occurrence of this provider's key shape, capturing each offset.
-            preg_match_all($definition['pattern'], $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
+            preg_match_all($providerPattern['pattern'], $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
             // Weigh each candidate this pattern found.
             foreach ($matches[0] as $match) {
@@ -113,20 +113,42 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
                     continue;
                 }
 
-                $preview    = SecretScannerHelper::redactedPreview($candidateSecret);
+                $displayMarker = SecretScannerHelper::categoryMarker(self::markerCategory($providerPattern['name']));
                 $findings[] = SecretScannerHelper::finding(
                     analysisUnit: $analysisUnit,
                     ruleId:       self::ID,
-                    message:      sprintf('Potential %s API key detected: %s.', $definition['name'], $preview),
+                    message:      sprintf('Potential %s API key detected: %s.', $providerPattern['name'], $displayMarker),
                     line:         SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
                     confidence:   Confidence::High,
-                    detector:     $definition['name'],
-                    preview:      $preview,
+                    detector:     $providerPattern['name'],
+                    displayMarker: $displayMarker,
                     remediation:  'Remove committed API keys and rotate the credential if it was real.',
                 );
             }
         }
 
         return $findings;
+    }
+
+    /**
+     * Maps one provider pattern name to the marker category section 5 ratifies for it.
+     * A provider the family never ratified returns null, so its finding carries the bare marker rather than a new one.
+     *
+     * @param string $providerName - Name of the pattern that matched, as `patterns()` declares it.
+     *
+     * @return string|null - the ratified category, or null when this provider has none
+     */
+    private static function markerCategory(string $providerName): ?string
+    {
+        return match ($providerName) {
+            'stripe' => 'stripe-live-key',
+            'github', 'github-fine-grained', 'github-oauth' => 'github-token',
+            'anthropic' => 'anthropic-api-key',
+            'slack', 'slack-webhook' => 'slack-token',
+            'npm' => 'npm-token',
+            'google-api-key' => 'google-api-key',
+            'gitlab' => 'gitlab-token',
+            default => null,
+        };
     }
 }

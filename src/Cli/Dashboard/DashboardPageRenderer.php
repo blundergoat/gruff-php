@@ -21,7 +21,7 @@ final readonly class DashboardPageRenderer
      * current settings, plus the iframe that will hold each scan's report. This is the first thing a
      * user sees after running `gruff-php dashboard` and opening the localhost URL.
      *
-     * @param array{project: string, paths: string, scanScope: string, failOn: string, config: string, baseline: string, noBaseline: string, noConfig: string, includeIgnored: string, reportInteractive: string} $state - Current form state echoed back into the controls so the panel reopens on the user's last choices.
+     * @param array{project: string, paths: string, scanScope: string, failOn: string, config: string, baseline: string, noBaseline: string, noConfig: string, deepScanBudget: string, includeIgnored: string, reportInteractive: string} $state - Current form state echoed back into the controls so the panel reopens on the user's last choices.
      *
      * @return string - Complete dashboard shell HTML.
      */
@@ -47,6 +47,7 @@ final readonly class DashboardPageRenderer
             . $this->field('Config path', 'config', $state['config'], '.gruff-php.yaml')
             . $this->field('Baseline', 'baseline', $state['baseline'], 'gruff-baseline.json')
             . '</div>'
+            . $this->field('Deep-scan budget', 'deepScanBudget', $state['deepScanBudget'], '20000:2000000 or off')
             . '<div class="field-grid">'
             . '<label>Scan scope<select name="scanScope">'
             . $this->option('full', $state['scanScope'], 'whole branch')
@@ -75,11 +76,11 @@ final readonly class DashboardPageRenderer
      * fill its status line with the run's exit code, duration, and command. Called once per scan the
      * user triggers, just before the report is streamed into the iframe.
      *
-     * @param string       $html - Report HTML produced by the scan subprocess.
+     * @param string       $html        - Report HTML produced by the scan subprocess.
      * @param string       $projectRoot - Project root the scan ran against; included in the metadata payload posted to the parent frame, though the panel does not surface it today.
-     * @param list<string> $command - Full scan argv; normalised to a copy-pasteable command for display.
-     * @param int          $exitCode - Scan process exit code the status line reports to the user.
-     * @param int          $durationMs - Wall-clock scan time in milliseconds shown beside the exit code.
+     * @param list<string> $command     - Full scan argv; normalised to a copy-pasteable command for display.
+     * @param int          $exitCode    - Scan process exit code the status line reports to the user.
+     * @param int          $durationMs  - Wall-clock scan time in milliseconds shown beside the exit code.
      *
      * @return string - Report HTML with the parent-frame scan-metadata script injected.
      */
@@ -124,9 +125,9 @@ final readonly class DashboardPageRenderer
      * gives the user the message, the exit code and duration, and the raw detail instead of a blank frame.
      * (A subprocess that exits non-zero but still emits HTML is shown as a normal report, not this page.)
      *
-     * @param string $message - Short, human-readable summary of what went wrong.
-     * @param string $detail - Fuller error text (often captured stderr) shown in the page's detail block.
-     * @param int    $exitCode - Scan process exit code, surfaced so the user can tell a crash from a clean failure.
+     * @param string $message    - Short, human-readable summary of what went wrong.
+     * @param string $detail     - Fuller error text (often captured stderr) shown in the page's detail block.
+     * @param int    $exitCode   - Scan process exit code, surfaced so the user can tell a crash from a clean failure.
      * @param int    $durationMs - Wall-clock scan time in milliseconds shown alongside the exit code.
      *
      * @return string - Complete dashboard error HTML.
@@ -146,9 +147,9 @@ final readonly class DashboardPageRenderer
      * Renders one labelled text input for the controls panel, pre-filled with the user's current value.
      * Used to build the project, paths, config, and baseline fields the user edits before a scan.
      *
-     * @param string $label - Human-readable control label shown above the input.
-     * @param string $name - Form field name bound to a scan query parameter.
-     * @param string $fieldValue - Current value to pre-fill; reflected user input, so it is escaped here; empty when the user has not filled it in.
+     * @param string $label       - Human-readable control label shown above the input.
+     * @param string $name        - Form field name bound to a scan query parameter.
+     * @param string $fieldValue  - Current value to pre-fill; reflected user input, so it is escaped here; empty when the user has not filled it in.
      * @param string $placeholder - Greyed-out hint shown while the field is empty; an empty string means show no hint at all.
      *
      * @return string - Escaped label-and-input HTML for one control.
@@ -170,8 +171,8 @@ final readonly class DashboardPageRenderer
      * the "scan scope" and "fail on" selects so they reopen on the setting the user last picked.
      *
      * @param string      $optionValue - Value submitted when the user picks this option.
-     * @param string      $selected - The dropdown's current value; this option is marked selected when it matches.
-     * @param string|null $label - Visible option text; null means fall back to showing the raw $optionValue.
+     * @param string      $selected    - The dropdown's current value; this option is marked selected when it matches.
+     * @param string|null $label       - Visible option text; null means fall back to showing the raw $optionValue.
      *
      * @return string - Escaped option HTML.
      */

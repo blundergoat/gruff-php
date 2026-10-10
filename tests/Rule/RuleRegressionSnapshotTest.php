@@ -15,11 +15,24 @@ use GruffPhp\Rules\Complexity\MaintainabilityIndexRule;
 use GruffPhp\Rules\Docs\MissingReadmeRule;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\RuleRegistry;
+use GruffPhp\Rules\Security\DependencyComposerPathRule;
+use GruffPhp\Rules\Security\DependencyComposerVcsRule;
+use GruffPhp\Rules\SensitiveData\DatabaseUrlPasswordRule;
 use GruffPhp\Rules\Size\AverageMethodLengthRule;
 use GruffPhp\Rules\Size\ClassLengthRule;
 use GruffPhp\Rules\Size\FileLengthRule;
 use GruffPhp\Rules\Size\MethodLengthRule;
+use GruffPhp\Rules\TestQuality\ConditionalTestLogicRule;
+use GruffPhp\Rules\TestQuality\ExcessiveMockingRule;
+use GruffPhp\Rules\TestQuality\ExtendsProductionClassRule;
+use GruffPhp\Rules\TestQuality\LoopAssertionWithoutMessageRule;
+use GruffPhp\Rules\TestQuality\MockOnlyTestRule;
 use GruffPhp\Rules\TestQuality\MockingDomainObjectRule;
+use GruffPhp\Rules\TestQuality\NoAssertionsRule;
+use GruffPhp\Rules\TestQuality\SleepInTestRule;
+use GruffPhp\Rules\TestQuality\SutNotCalledRule;
+use GruffPhp\Rules\TestQuality\TestLongerThanSutRule;
+use GruffPhp\Rules\TestQuality\UnusedMockRule;
 use GruffPhp\Rules\TestQuality\PhpUnitCoverageSourceMissingRule;
 use GruffPhp\Rules\TestQuality\PhpUnitDeprecationsNotFatalRule;
 use GruffPhp\Rules\TestQuality\PhpUnitStrictFlagsMissingRule;
@@ -28,7 +41,10 @@ use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers cross-rule regression behaviour over the fixture corpus.
+ * Covers cross-rule report stability over the full fixture corpus users depend on for release confidence.
+ *
+ * Snapshot hashes and catalogue coverage expose any change to finding counts, content, identity, or calibration signal.
+ * Maintainers use this suite before release so users do not receive unexplained report or scoring drift.
  *
  * @phpstan-import-type FindingArray from Finding
  * @phpstan-import-type FindingMetadata from Finding
@@ -47,10 +63,46 @@ final class RuleRegressionSnapshotTest extends TestCase
     {
         [$units, $findings, $json] = $this->analysePaths(['tests/Fixtures']);
 
-        self::assertCount(178, $units);
-        self::assertCount(2670, $findings);
+        // M07 added tests/Fixtures/Baseline/gruff-baseline-v3.json to the corpus, and M19 ten precision fixtures.
+        // Precision-floor M19 (2026-10-04) removed ten fixtures that served only retired rules, renamed the detector-selection config
+        // to Config/disable-jwt-token.yaml, and added Config/enable-default-off-rules.yaml.
+        self::assertCount(184, $units);
+        // M19 (2026-09-19) removed confirmed false positives and nothing else: an immediately invoked closure, a
+        // statically written first-class callable, `#[\Override]` and `{@inheritdoc}` methods, and pure-hex digests.
+        // AWS's documented example key now reports, as the operator decided, and so does one sibling-scope `$x()`.
+        // Its review fixes then added 38 findings, every one on a new fixture line: ten laundering and shadowing
+        // `$x()` shapes, two one-line wrappers, a namespaced `sprintf()`, a concatenated secret, and 24 findings
+        // other rules raise on that new fixture code. The operator-requested double-check added 39 more: 3 on the
+        // dynamic-call fixture's two new pins, 33 on the two inherited-contract fixtures (21 docs tags the narrowed
+        // exemption owes, 12 from other rules), and 3 docs tags on older fixtures that exemption no longer hides.
+        // M10 D23 (2026-09-25) removed one: synthetic-secrets.php's digit-free mixed-case alphabet run, since a
+        // qualifying high-entropy literal now holds a letter and a digit.
+        // M10 D33 (2026-09-26) removed one: safe-dummy-values.php line 11, AWS's documented example key, now a documented sample.
+        // M10 D35 renamed docs.missing-public-phpdoc to docs.missing-phpdoc, which moves the hash and no count.
+        // M55 removes the bound local-closure call at phpunit-mechanics-smells.php:74; its test-quality findings remain.
+        // Precision-floor M19 (2026-10-04) removed 47: 40 from the nine retired rules (ADR-034), 5 from the three rules
+        // now off by default, and the two docs.missing-file-phpdoc findings on the deleted entropy fixtures.
+        // The run-coverage and code-line CHANGELOG entries removed 6 and added 1: docs.missing-constant-phpdoc now covers an unbroken
+        // run by structure, which clears four constants in missing-constant-phpdoc-line-comment.php and reports
+        // RESET_GROUP_BETA_PATTERN, whose run has another commented constant; waste.unreachable-code no longer reports
+        // the trailing `// reported` comment in dynamic-call-precision.php; and test-longer-than-sut counts code
+        // lines, which clears testHasLotsOfWhitespaceAndComments in test-method-too-long.php.
+        // Precision-floor M14's cognitive repair added two guard-clause methods to Complexity/cognitive.php: each adds a
+        // docs.missing-phpdoc finding, and the class's 26 public methods now pass size.public-method-count's limit of 25.
+        // The repair itself moves no finding or measured value in this corpus.
+        // Precision-floor M15 clears four loop-context findings: one identifying expected value and three
+        // singleton loops. A repeated-loop control now uses a fixed expected literal, adding one magic-number finding.
+        // M15 default-off policy removes 42 findings from eight test-quality rules; explicit calibration still covers them.
+        // M15 additionally makes two insufficient-evidence rules opt-in, removing 11 fixture findings.
+        self::assertCount(2684, $findings);
+        // M08 made sensitive-data markers carry the class the detector already knew: a classified finding now reads
+        // `[redacted:aws-access-key]` where it read `[redacted]`. The finding count, the rule set, and every
+        // line-free identity are unchanged; only the marker text inside those findings moved.
+        // Precision-floor M14 banded the size and complexity rules: a finding under one and a half times its limit is
+        // advisory with do-not-add advice, every banded finding carries limitBand, and complexity advice asks for a
+        // simpler path. The count and every identity are unchanged; severity, advice and metadata moved the hash.
         self::assertSame(
-            '2a6dcb6385de754dc238058357640680a337af3ab5138855e0b54671b40a9683',
+            'c513be7f7695b792264e92761e47aee6ae27a9909ada22e51ceb433dbff45c74',
             hash('sha256', $json),
         );
     }
@@ -62,25 +114,38 @@ final class RuleRegressionSnapshotTest extends TestCase
      */
     public function testDefaultAndSupplementalCalibrationScenariosCoverEveryRegisteredRule(): void
     {
-        $registry = RuleRegistry::defaults();
+        $registry            = RuleRegistry::defaults();
         [, $defaultFindings] = $this->analysePaths(['tests/Fixtures']);
-        $registeredRuleIds = array_map(static fn($rule): string => $rule->definition()->id, $registry->all());
-        $defaultRuleIds    = $this->uniqueRuleIds($defaultFindings);
-        $defaultMissing    = array_values(array_diff($registeredRuleIds, $defaultRuleIds));
+        $registeredRuleIds   = array_map(static fn($rule): string => $rule->definition()->id, $registry->all());
+        $defaultRuleIds      = $this->uniqueRuleIds($defaultFindings);
+        $defaultMissing      = array_values(array_diff($registeredRuleIds, $defaultRuleIds));
 
         self::assertSame([
                              CyclomaticComplexityRule::ID,
                              HalsteadVolumeRule::ID,
                              MaintainabilityIndexRule::ID,
                              MissingReadmeRule::ID,
+                             DependencyComposerPathRule::ID,
+                             DependencyComposerVcsRule::ID,
+                             DatabaseUrlPasswordRule::ID,
                              AverageMethodLengthRule::ID,
                              ClassLengthRule::ID,
                              FileLengthRule::ID,
                              MethodLengthRule::ID,
+                             ConditionalTestLogicRule::ID,
+                             ExcessiveMockingRule::ID,
+                             ExtendsProductionClassRule::ID,
+                             LoopAssertionWithoutMessageRule::ID,
+                             MockOnlyTestRule::ID,
                              MockingDomainObjectRule::ID,
+                             NoAssertionsRule::ID,
                              PhpUnitCoverageSourceMissingRule::ID,
                              PhpUnitDeprecationsNotFatalRule::ID,
                              PhpUnitStrictFlagsMissingRule::ID,
+                             SleepInTestRule::ID,
+                             SutNotCalledRule::ID,
+                             TestLongerThanSutRule::ID,
+                             UnusedMockRule::ID,
                          ], $defaultMissing);
 
         $supplementalRuleIds = $this->uniqueRuleIds($this->supplementalCalibrationFindings());
@@ -91,8 +156,8 @@ final class RuleRegressionSnapshotTest extends TestCase
     /**
      * Analyse fixture paths and return findings for assertions.
      *
-     * @param list<string>        $paths - Fixture paths to parse and analyse.
-     * @param AnalysisConfig|null $config - Optional config override, or null to use default-registry config.
+     * @param list<string>        $paths       - Fixture paths to parse and analyse.
+     * @param AnalysisConfig|null $config      - Optional config override, or null to use default-registry config.
      * @param string              $projectRoot - Project root used to resolve fixture paths and rule context.
      *
      * @return array{0: list<AnalysisUnit>, 1: list<Finding>, 2: string} - parsed units, raw findings, and canonical JSON for the analysed paths, in
@@ -110,12 +175,12 @@ final class RuleRegressionSnapshotTest extends TestCase
             static fn(SourceFile $file): AnalysisUnit => $phpFileParser->parse($file),
             $files,
         );
-        $findings      = $registry->analyse($units, new RuleContext(
+        $findings = $registry->analyse($units, new RuleContext(
             $projectRoot,
             $config ?? AnalysisConfig::fromRegistry($registry),
         ));
-        $payload       = $this->canonicalFindingPayload($findings);
-        $json          = json_encode($payload, JSON_THROW_ON_ERROR);
+        $payload = $this->canonicalFindingPayload($findings);
+        $json    = json_encode($payload, JSON_THROW_ON_ERROR);
 
         self::assertSame(count($files), count($units));
 
@@ -134,9 +199,11 @@ final class RuleRegressionSnapshotTest extends TestCase
 
         array_push(
                $findings,
+            // Rooted at tests/Fixtures, so the maintainability index, which skips test paths, reads these as source files.
             ...$this->analysePaths(
-            ['tests/Fixtures/Complexity'],
+            ['Complexity'],
             (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/complexity-low-thresholds.yaml', $registry),
+            self::PROJECT_ROOT . '/tests/Fixtures',
         )[1],
         );
         array_push(
@@ -161,6 +228,11 @@ final class RuleRegressionSnapshotTest extends TestCase
             ...$this->analysePaths(
             ['tests/Fixtures/TestQuality/testdox-readability.php'],
             (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/enable-testdox-readability.yaml', $registry),
+        )[1],
+            // Exercise opt-in rules explicitly, including M15's test-quality defaults.
+            ...$this->analysePaths(
+            ['tests/Fixtures/Security/ComposerDependency', 'tests/Fixtures/SensitiveData', 'tests/Fixtures/TestQuality'],
+            (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/enable-default-off-rules.yaml', $registry),
         )[1],
         );
 
@@ -266,6 +338,8 @@ final class RuleRegressionSnapshotTest extends TestCase
     }
 
     /**
+     * Sorts nested finding metadata so the user-visible regression snapshot stays stable across equivalent map ordering.
+     *
      * @param FindingMetadata $metadata - Finding metadata payload.
      *
      * @return FindingMetadata - the metadata with both nested maps and the top level key-sorted for a stable snapshot hash

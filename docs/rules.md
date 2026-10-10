@@ -12,7 +12,20 @@ to three near-match suggestions and exits with code 2.
 This rule catalogue is generated from `php bin/gruff-php list-rules --format json`.
 Use that command for the full machine-readable metadata, including thresholds and options.
 
-Total rules: 128
+Total rules: 119
+
+## False-positive guidance
+
+68 of the 119 rules publish `falsePositiveShapes`: a list of shapes the detector is
+known to misfire on, each paired with the mitigation that answers it. Every rule at
+`medium` or `low` confidence carries at least one, because a heuristic rule owes the
+reader the cases where its heuristic is wrong. A rule that catalogues nothing omits
+the field rather than publishing an empty list, so an absent field means "nothing
+catalogued yet", never "reviewed and found to have no false positives".
+
+The catalogue (`list-rules --format=json`) and the per-rule detail view publish the
+same guidance text. Both read it from the rule's own `RuleDefinition`, which is the
+single place this text is written.
 
 ## Remediation action metadata
 
@@ -24,18 +37,18 @@ behaviour:
 - `CONSIDER` marks optional or compatibility-sensitive advice that needs human
   judgement.
 - `CONFIGURE` is reserved for a deterministic configuration-only resolution;
-  no rule emits it unconditionally in 0.5.1.
+  no current rule emits it.
 
 When a deliberate configuration hatch exists, `metadata.configurationKey`
-contains its full path. Regex comments, missing constant documentation, and
-one-line wrappers emit `APPLY`; abbreviation and named-argument findings emit
+contains its full path. Regex comments and missing constant documentation emit
+`APPLY`; one-line wrappers, abbreviation and named-argument findings emit
 `CONSIDER`; Boolean naming emits `APPLY` for private property and private
 callable names, while every parameter and other caller-visible declaration
 emits `CONSIDER`. PHP named arguments make parameter-only renames
 compatibility-sensitive even for private methods, promoted private state,
 closures, and arrow functions.
 JSON, hook, and SARIF transport these fields. Text and Markdown keep their
-existing finding presentation in 0.5.1.
+existing finding presentation in 0.5.2.
 
 ## Summary By Pillar
 
@@ -47,8 +60,8 @@ existing finding presentation in 0.5.1.
 | `maintainability` | 2 |
 | `modernisation` | 9 |
 | `naming` | 11 |
-| `security` | 25 |
-| `sensitive-data` | 11 |
+| `security` | 19 |
+| `sensitive-data` | 8 |
 | `size` | 7 |
 | `test-quality` | 34 |
 
@@ -60,7 +73,7 @@ existing finding presentation in 0.5.1.
 | --- | --- | --- | --- | --- |
 | `complexity.cognitive` | Cognitive complexity | `error` | `high` | yes |
 | `complexity.cyclomatic` | Cyclomatic complexity | `warning` | `high` | yes |
-| `complexity.halstead-volume` | Halstead volume | `advisory` | `medium` | yes |
+| `complexity.halstead-volume` | Halstead volume | `advisory` | `medium` | no |
 | `complexity.nesting-depth` | Maximum nesting depth | `error` | `high` | yes |
 
 ### `dead-code` (10)
@@ -94,8 +107,8 @@ as used.
 | `docs.missing-constant-phpdoc` | Missing constant PHPDoc | `advisory` | `medium` | yes |
 | `docs.missing-file-phpdoc` | Missing file PHPDoc | `advisory` | `medium` | yes |
 | `docs.missing-param-tag` | Missing @param tag | `advisory` | `high` | yes |
+| `docs.missing-phpdoc` | Missing method PHPDoc | `error` | `high` | yes |
 | `docs.missing-property-phpdoc` | Missing property PHPDoc | `advisory` | `medium` | yes |
-| `docs.missing-public-phpdoc` | Missing method PHPDoc | `error` | `high` | yes |
 | `docs.missing-readme` | Missing README | `warning` | `high` | yes |
 | `docs.missing-return-tag` | Missing @return tag | `advisory` | `high` | yes |
 | `docs.missing-throws-tag` | Missing @throws tag | `advisory` | `medium` | yes |
@@ -108,25 +121,21 @@ as used.
 `docs.missing-constant-phpdoc` distinguishes missing documentation from
 useful local documentation. By default, constants may use an immediately
 preceding meaningful `//`, `#`, or block comment when the prose is useful
-to a human reviewer and attached directly to the constant. A short
-consecutive constant group can share one local group comment when the
-comment names the group, such as supported roles or keys. Existing group
-words such as `keys` and `values` retain contiguous uncapped coverage. New
-`patterns` and `regexes` family comments cover at most five declared names,
-including multiple names in one statement; the sixth and later names need a
-new group comment, and a visibility change ends the bounded family. A mixed
-comment such as `keys and patterns` uses the shipped uncapped behavior.
-Findings beyond that five-name cap retain the nearby comment kind and expose
-`commentQuality: bounded-group-overflow`, `groupCoverageExceeded: true`, and
-`groupCoverageLimit: 5`, instead of claiming that no nearby comment exists.
-Missing comments, detached comments, structural boundaries, generic comments
-such as `// constant`, and comments that only duplicate the constant name
-still fire.
+to a human reviewer and attached directly to the constant. A PHPDoc or
+meaningful comment above the first constant of an unbroken run covers
+every constant in the run, whatever words it uses. A blank line or any
+other statement ends the run; a change of visibility does not. When
+another constant in the run has a comment of its own, each comment covers
+only its own constant. Missing comments, detached comments, generic
+comments such as `// constant`, and comments that only duplicate the
+constant name still fire.
 
 Projects that publish constants as API documentation can opt back into
 PHPDoc for public/protected constants with
 `requirePhpdocForApiConstants: true`, or only for exported paths with
-`apiPathPatterns`.
+`apiPathPatterns`. In that mode each exported constant needs a PHPDoc of
+its own; one covered only by its run's comment reports with
+`groupedLocalComment: true`.
 
 `docs.regex-comment` resolves purpose documentation from the narrowest source
 outwards: an own-line comment immediately above the configured call, an
@@ -148,10 +157,14 @@ call is statically the exact three-argument
 `preg_replace('/\s+/', ' ', $subject)` transformation. Larger or unrelated
 callables still need local purpose comments for their configured calls.
 
-`docs.missing-property-phpdoc` accepts a physically attached `//` or `#`
-comment in place of a docblock when `options.acceptLineComments` is true.
-The comment must carry meaning beyond what the property name already
-says. The default is false, so a docblock is required.
+`docs.missing-property-phpdoc` accepts a docblock above the first property
+of an unbroken run, with no blank line or other statement between the
+properties, as documentation for every property in the run. When another
+property in the run has a docblock of its own, each docblock covers only
+its own property. A physically attached `//` or `#` comment documents a
+property only when `options.acceptLineComments` is true; it must carry
+meaning beyond what the property name already says, and it never covers a
+run. The default is false, so a docblock is required.
 
 ### `maintainability` (2)
 
@@ -159,6 +172,15 @@ says. The default is false, so a docblock is required.
 | --- | --- | --- | --- | --- |
 | `complexity.maintainability-index` | Maintainability index | `advisory` | `medium` | yes |
 | `waste.one-line-method` | One-line method | `advisory` | `medium` | yes |
+
+`waste.one-line-method` emits `CONSIDER`, never `APPLY`: an interface or
+abstract parent declared in another file is invisible to it, and inlining a
+method that contract requires is a fatal error. It skips a method marked
+`#[\Override]`; a method marked `{@inheritdoc}` in a class-like that can
+inherit a contract (a class that extends, implements, or uses a trait, an
+enum that implements or uses a trait, or a trait); an override whose body
+is `parent::sameName()`; and a call that sits only in an assignment's
+subscript.
 
 `waste.one-line-method` ships with `minInFileCallers: 2` and
 `namedAlternativeFactoryExempt: true`. The first skips wrappers that are
@@ -187,7 +209,20 @@ clauses that each exit early (return, throw, or exit) are reported at
 advisory severity when they cross the configured threshold. Nested
 decision trees, loops, switch/match
 sprawl, try/catch control flow, and mixed-responsibility methods keep the
-configured warning/error severity.
+configured warning/error severity at one and a half times the limit or more;
+below that a cyclomatic, cognitive or nesting-depth finding is a lower-band advisory notice (see
+"Two bands" under `size`). Upper-band complexity advice asks for a simpler
+execution path, not extracted helpers.
+
+`complexity.cyclomatic` reports each `switch` and each `match` as one decision,
+however many cases or arm conditions it has; the maintainability index keeps
+the full count. `complexity.maintainability-index` reports nothing in a file of
+the family's test-path class: a `test`, `tests`, `__tests__`, `spec`,
+`testdata`, `fixtures` or `examples` folder, or a `*Test.php` file.
+`complexity.halstead-volume` is off by default since 0.6.0. `complexity.cognitive` scores an early-exit guard (an `if` with
+no `elseif` or `else` whose body is one `return`, `continue`, `break` or
+`throw`) without its nesting penalty, and scores `switch` case bodies at the
+switch's own level.
 
 `modernisation.phpdoc-mixed-overuse` exempts two type shapes that
 legitimately carry a `mixed` leaf. First, unstructured array/list bag
@@ -228,6 +263,12 @@ scalar classes are not a default gruff rubric because safe enum
 migrations require consumer-boundary audits across serialization,
 templates, JavaScript/TypeScript, telemetry, JSON, and agent/runtime
 interfaces.
+
+`modernisation.named-argument-opportunity` never reports a call to one of
+PHP's variadic built-ins, such as `sprintf()`, `pack()`, `array_merge()` or
+`compact()`, or a dynamic callee whose declaration it cannot see: their extra
+arguments have no names. A namespaced function that merely shares a
+built-in's short name, such as `\App\sprintf()`, is still advised.
 
 `modernisation.named-argument-opportunity` reports only when positional
 arguments are likely to hide meaning: many positional arguments, adjacent
@@ -319,39 +360,37 @@ list, not an addition. Setting it drops the built-in vocabulary entirely,
 so repeat any built-in name the project still wants flagged. Matching is
 case-insensitive.
 
-### `security` (25)
+### `security` (19)
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
 | --- | --- | --- | --- | --- |
 | `security.dangerous-function-call` | Dangerous function calls | `warning` | `medium` | yes |
 | `security.debug-mode-enabled` | Debug error display enabled | `warning` | `medium` | yes |
-| `security.dependency-composer-path` | Composer path repository | `warning` | `medium` | yes |
+| `security.dependency-composer-path` | Composer path repository | `warning` | `medium` | no |
 | `security.dependency-composer-script` | Composer install-time shell script | `warning` | `medium` | yes |
-| `security.dependency-composer-unpinned` | Unpinned Composer dependency constraint | `warning` | `medium` | yes |
-| `security.dependency-composer-vcs` | Composer VCS repository | `warning` | `medium` | yes |
+| `security.dependency-composer-vcs` | Composer VCS repository | `warning` | `medium` | no |
 | `security.disabled-ssl-verification` | Disabled SSL verification | `warning` | `high` | yes |
 | `security.error-suppression` | Error suppression operator | `warning` | `high` | yes |
 | `security.extract-compact-user-input` | extract or compact on request data | `warning` | `medium` | yes |
-| `security.github-actions-risky-workflow` | Risky GitHub Actions workflow | `warning` | `medium` | yes |
 | `security.header-injection` | Header injection risk | `warning` | `medium` | yes |
-| `security.insecure-random` | Insecure random source | `warning` | `high` | yes |
-| `security.path-traversal-file-access` | Path traversal file access | `warning` | `medium` | yes |
 | `security.permissive-cors` | Permissive CORS with credentials | `warning` | `medium` | yes |
 | `security.process-command-construction` | Process command construction | `warning` | `medium` | yes |
 | `security.reflected-xss` | Reflected XSS sink | `warning` | `medium` | yes |
 | `security.request-controlled-url` | Request-controlled URL | `warning` | `medium` | yes |
-| `security.sensitive-data-logging` | Sensitive data logging | `warning` | `medium` | yes |
 | `security.silent-catch` | Silent catch block | `warning` | `high` | yes |
 | `security.sql-concatenation` | SQL string concatenation | `warning` | `medium` | yes |
 | `security.unsafe-archive-extraction` | Unsafe archive extraction | `warning` | `medium` | yes |
 | `security.unsafe-unserialize` | Unsafe unserialize usage | `warning` | `medium` | yes |
 | `security.unsafe-xml-loading` | Unsafe XML loading | `warning` | `medium` | yes |
 | `security.variable-include` | Variable include or require path | `warning` | `medium` | yes |
-| `security.weak-crypto` | Weak cryptography primitives | `warning` | `high` | yes |
+
+`security.dependency-composer-path` and `security.dependency-composer-vcs` are off by default since 0.6.0 (ADR-034).
+In the 0.6.0 precision measurement both of the path rule's judged findings were wrong, and both of the VCS rule's were correct but not worth acting on.
+Two findings each are too few to delete a rule on. Set `rules.<id>.enabled: true` to run one.
 
 `security.variable-include` treats two provable shapes as fixed paths in
 addition to literals and `__DIR__`/`__FILE__`: ALL-CAPS global constants
-(the `define('ABSPATH', ...)` bootstrap convention; class constants and
+(the `define('ABSPATH', ...)` bootstrap convention, including leading underscores such as `__SITE_ROOT__`; class constants and
 non-ALL-CAPS names such as `conf` stay dynamic) and locals whose every
 same-scope plain assignment is itself a fixed expression, with at least
 one before the include. Any tainted or second non-fixed assignment,
@@ -373,6 +412,35 @@ keyword (SELECT/INSERT/UPDATE/DELETE/ALTER/DROP/CREATE/SHOW/FROM/WHERE)
 must appear in the literal fragments, which keeps non-SQL `query()`
 receivers such as `DOMXPath` quiet without receiver type resolution.
 
+`security.dangerous-function-call` trusts a dynamic call only through a
+proof PHP itself accepts: a closure, arrow function, `new` object of a
+written class, or first-class callable of a written method other than
+reflection's `invoke(...)`, or of one of PHP's own functions that takes no
+callable (`strlen(...)`, never `array_map(...)`, `call_user_func(...)`, or a
+userland function whose body this file cannot see), assigned to the
+variable; a
+`callable` or `Closure` type hint, or a `@param` or inline `@var` docblock
+naming one (`callable-string` names a function, so it proves nothing); an
+enclosing `instanceof` or one-argument `is_callable()` test; a property
+its class types as callable; or an immediately invoked closure. A proof
+holds only in the function that makes it, plus arrow functions that do not
+shadow the name and the closures that `use` it. No proof outranks request
+input: a callee that reads a superglobal, directly or through a local the
+same function filled from one, always reports, unless that local was last
+bound to a closure literal.
+`Closure::fromCallable($x)()` is judged as `$x()`, and `$f(...)` only builds a
+Closure, so it never reports.
+
+Bounded local aliases now preserve callable evidence through ordinary assignments and resolved built-in `Closure::bind()` calls.
+New alias facts stop at ambiguous branches, reassignment, borrowed references, unknown receivers, runtime-created locals or eight alias steps.
+Both sides of a coalescing expression must qualify. Earlier declaration-based trust retains its existing behavior and is not flow-sensitive.
+
+Callbacks returned by one visible same-class method stay quiet when a non-public property starts empty.
+Every observed write must append an untouched typed callback.
+The method may return one keyed bucket with an empty fallback, or merge selected buckets into an empty result with PHP's `array_merge()`.
+The call must bind every argument by position, and the loop must use one unchanged result.
+Unknown returns, property writes and references keep the warning.
+
 `security.dangerous-function-call` adds `options.additionalFunctions` to
 its built-in execution list rather than replacing it, so the built-ins
 cannot be configured away. Matching is case-insensitive.
@@ -384,37 +452,27 @@ constructor call - `$pdo->query()`, `$zip->extractTo()`, `new Process()` -
 still match by position only, because their parameter names belong to the
 library rather than to PHP.
 
-### `sensitive-data` (11)
+### `sensitive-data` (8)
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
 | --- | --- | --- | --- | --- |
 | `sensitive-data.api-key-pattern` | Common API key pattern | `warning` | `high` | yes |
 | `sensitive-data.aws-access-key` | AWS access key | `warning` | `high` | yes |
-| `sensitive-data.database-url-password` | Database URL password | `warning` | `high` | yes |
+| `sensitive-data.database-url-password` | Database URL password | `warning` | `high` | no |
 | `sensitive-data.gcp-service-account-key` | GCP service-account key | `warning` | `high` | yes |
-| `sensitive-data.hardcoded-env-value` | Hardcoded environment value | `warning` | `medium` | yes |
-| `sensitive-data.high-entropy-string` | High entropy string | `warning` | `medium` | yes |
 | `sensitive-data.jwt-token` | JWT token literal | `warning` | `medium` | yes |
 | `sensitive-data.phi-pattern` | PHI identifier pattern | `warning` | `medium` | yes |
 | `sensitive-data.pii-test-fixture` | PII in test fixture | `warning` | `medium` | yes |
 | `sensitive-data.private-key` | Private key material | `warning` | `high` | yes |
-| `sensitive-data.url-credentials` | URL embedded credentials | `warning` | `high` | yes |
 
-`sensitive-data.high-entropy-string` no longer flags identifier- and
-slug-shaped literals: a literal that contains no `+`/`=` and splits on
-`[/._-]` into two or more alphanumeric segments reads as an identifier
-(PHPCS sniff ids such as
-`PHPCompatibility.FunctionUse.NewFunctions.ldap_exop_syncFound`, class
-names such as `WPCOM_REST_API_V2_Endpoint_External_Media`, package
-slugs such as `Automattic/i18n-check-webpack-plugin`), not secret
-material — but only when alphabetic words of three or more characters
-supply strictly more than half of all alphanumeric characters, and no
-single non-word segment reaches 16 characters. The census is
-character-weighted, so a couple of short dictionary words cannot
-outvote a long random run: prefixed keys (`config_prod_<random>`),
-slugs with hex tails (`myapp/prod-keys/<hex>`), word-prefixed digests
-(`secret-key-<64-char hex>`), base64/hex tokens, npm `sha512-...`
-integrity hashes, and dot-joined JWT/JWE tokens all keep flagging.
+`sensitive-data.database-url-password` is off by default since 0.6.0: the 0.6.0
+precision measurement found it wrong on all nine of its judged findings, too few
+to delete on (ADR-034). Set `rules.sensitive-data.database-url-password.enabled:
+true` to run it.
+
+Across the secret rules, a placeholder word such as `test` or `example`
+suppresses a value only when it begins a token, so `latest` and `attestation`
+still report.
 
 `sensitive-data.pii-test-fixture` now accepts two fixture shapes its
 remediation already recommends: emails whose domain ends in a reserved
@@ -445,27 +503,45 @@ dependency fan-in. `size.property-count` similarly lowers final readonly
 data carriers to advisory when width is the only signal, while mutable or
 behaviour-heavy classes keep the configured severity.
 
+**Two bands.** Every `size.*` and `complexity.*` rule except
+`size.average-method-length`, `complexity.halstead-volume` and
+`complexity.maintainability-index` reports in one of two bands
+(FAMILY-CONTRACT.md section 12, "Size and complexity findings in two bands").
+A unit over its limit but under one and a half times it is an advisory
+notice, whatever the configured tier, with `limitBand: lower` in its metadata
+and advice not to add to it. At one and a half times the limit or more the
+finding keeps its severity, including the read-only data-carrier and
+flat-guard softening above, carries `limitBand: upper`, and asks you to split
+the unit or simplify its execution path. The limit is the lowest configured
+tier, or the unit's own limit where it has one: the promoted value-object
+ceiling, or the constructor cap when `constructorMaxParameters` is set.
+Messages keep naming the tier the value crossed, so a baseline entry keeps
+matching when a unit crosses the boundary. A `--fail-on warning` or
+`--fail-on error` gate no longer fails on a lower-band notice; the default
+`analyse` gate, `advisory`, still does. Size and complexity rules only ever
+measure `.php` source; configuration and data files never reach them.
+
 ### `test-quality` (34)
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
 | --- | --- | --- | --- | --- |
-| `test-quality.conditional-logic` | Conditional test logic | `advisory` | `high` | yes |
+| `test-quality.conditional-logic` | Conditional test logic | `advisory` | `high` | no |
 | `test-quality.data-provider-annotation` | Data provider annotation | `advisory` | `high` | yes |
 | `test-quality.eager-test` | Eager test | `advisory` | `low` | yes |
 | `test-quality.empty-data-provider` | Empty data provider | `error` | `high` | yes |
 | `test-quality.exception-type-only` | Exception type-only assertion | `advisory` | `medium` | yes |
-| `test-quality.excessive-mocking` | Excessive mocking | `advisory` | `medium` | yes |
-| `test-quality.extends-production-class` | Test extends production class | `error` | `high` | yes |
+| `test-quality.excessive-mocking` | Excessive mocking | `advisory` | `medium` | no |
+| `test-quality.extends-production-class` | Test extends production class | `error` | `high` | no |
 | `test-quality.global-state-mutation` | Global state mutation in test | `warning` | `medium` | yes |
-| `test-quality.loop-assertion-without-message` | Assertion in loop without message | `advisory` | `medium` | yes |
+| `test-quality.loop-assertion-without-message` | Assertion in loop without message | `advisory` | `medium` | no |
 | `test-quality.magic-number-assertion` | Magic number assertion | `advisory` | `low` | yes |
-| `test-quality.mock-only-test` | Mock-only test | `warning` | `medium` | yes |
+| `test-quality.mock-only-test` | Mock-only test | `warning` | `medium` | no |
 | `test-quality.mock-without-expectation` | Mock without expectation | `warning` | `medium` | yes |
 | `test-quality.mocking-domain-object` | Mocking a domain object | `advisory` | `low` | yes |
 | `test-quality.multiple-aaa-cycles` | Multiple arrange-act-assert cycles | `advisory` | `low` | yes |
 | `test-quality.mystery-guest` | Mystery guest | `advisory` | `medium` | yes |
 | `test-quality.naming-consistency` | Test naming consistency | `advisory` | `high` | yes |
-| `test-quality.no-assertions` | Test without assertions | `error` | `medium` | yes |
+| `test-quality.no-assertions` | Test without assertions | `error` | `medium` | no |
 | `test-quality.phpunit-coverage-source-missing` | PHPUnit coverage source missing | `advisory` | `medium` | yes |
 | `test-quality.phpunit-deprecations-not-fatal` | PHPUnit deprecations not fatal | `warning` | `high` | yes |
 | `test-quality.phpunit-strict-flags-missing` | PHPUnit strict flags missing | `warning` | `high` | yes |
@@ -473,16 +549,36 @@ behaviour-heavy classes keep the configured severity.
 | `test-quality.repeated-structure-missing-data-provider` | Repeated test structure missing data provider | `advisory` | `low` | yes |
 | `test-quality.setup-bloat` | Setup bloat | `advisory` | `medium` | yes |
 | `test-quality.skipped-without-reason` | Skipped test without reason | `warning` | `high` | yes |
-| `test-quality.sleep-in-test` | Sleep or wall-clock read in test | `warning` | `high` | yes |
+| `test-quality.sleep-in-test` | Sleep or wall-clock read in test | `warning` | `high` | no |
 | `test-quality.static-analysis-redundant-test` | Static-analysis-redundant test candidate | `advisory` | `high` | yes |
-| `test-quality.sut-not-called` | Test name mentions SUT that is not called | `error` | `low` | yes |
+| `test-quality.sut-not-called` | Test name mentions SUT that is not called | `advisory` | `low` | no |
 | `test-quality.tautological-type-assertion` | Tautological type assertion | `error` | `high` | yes |
-| `test-quality.test-longer-than-sut` | Test longer than apparent SUT | `advisory` | `low` | yes |
+| `test-quality.test-longer-than-sut` | Test longer than apparent SUT | `advisory` | `low` | no |
 | `test-quality.test-method-too-long` | Test method too long | `advisory` | `high` | yes |
 | `test-quality.testdox-readability` | Testdox readability | `advisory` | `low` | yes |
 | `test-quality.trivial-assertion` | Trivial assertion | `warning` | `high` | yes |
 | `test-quality.trivial-snapshot` | Trivial snapshot | `advisory` | `medium` | yes |
-| `test-quality.unused-mock` | Unused mock variable | `advisory` | `high` | yes |
+| `test-quality.unused-mock` | Unused mock variable | `advisory` | `high` | no |
+
+These eight rules are off by default after calibration left them below the 70% test-quality precision floor: `test-quality.conditional-logic`, `test-quality.excessive-mocking`, `test-quality.extends-production-class`, `test-quality.loop-assertion-without-message`, `test-quality.mock-only-test`, `test-quality.no-assertions`, `test-quality.sleep-in-test` and `test-quality.unused-mock`. Set the chosen rule's `rules.<rule-id>.enabled` to `true` to opt in. Excessive-mocking's before version exceeded the audit disagreement limit twice; its default-off decision retains that caveat and makes no calibrated improvement claim.
+
+`test-quality.sut-not-called` and `test-quality.test-longer-than-sut` are also opt-in because their frozen cards leave precision insufficient (28 and 50 unresolved cards out of 50). This is an operator policy decision, not a measured floor failure. Enable either with `rules.<rule-id>.enabled: true`.
+
+`test-quality.no-assertions` follows invoked methods on the same class, up to eight method bodies; unused helpers and callback references do not count.
+It also recognizes `expectDeprecationWithIdentifier` from the resolved Doctrine `VerifyDeprecations` trait when no local override or trait adaptation changes it.
+External helpers, unresolved receivers and cycles without a recognized check still report. An assertion-like helper name alone supplies no evidence.
+
+`test-quality.no-assertions` also accepts Symfony user-deprecation message expectations, registered Prophecy terminal expectations and a local receiver created by `Illuminate\Testing\Fluent\AssertableJson::fromArray` with `where` or `whereContains`. Unused callbacks, first-class callable references, foreign builders and rebound receivers do not establish that fluent expectation.
+
+PHPUnit `createStub()` supplies values and does not count as a mock. `test-quality.conditional-logic` ignores branches owned by nested fixture callbacks and a reasoned PHPUnit skip guard with no alternative branch or additional work.
+
+`test-quality.loop-assertion-without-message` accepts a literal singleton, a direct assertion followed by an exit, or an expected value that identifies the loop binding. In a keyed table the key identifies the row; its value alone may repeat.
+
+`test-quality.sleep-in-test` accepts uniqid entropy and a single clock-plus-duration deadline in an event-pump loop whose timeout branch only fails the test. Rebound deadlines, foreign failure calls, unused pump callbacks and timing-dependent assertions remain reportable.
+
+`test-quality.sut-not-called` is advisory and compares visible calls with a verb-and-object prefix from the test name. A lone verb is insufficient evidence of the intended subject.
+
+A test directory or a public test method must independently establish the class as a test; a production basename such as OrderTest.php does not.
 
 `test-quality.extends-production-class` recognises a `*TestCase` parent
 after ignoring underscores, so snake_case bases such as

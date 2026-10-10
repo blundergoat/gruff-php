@@ -45,6 +45,16 @@ final class HeaderInjectionRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A header value already validated in place, for example matched against an allow-list or rebuilt through a cast, where the superglobal still appears in the expression.',
+                    'mitigation' => 'Validation does not clear taint; assign the checked value to a separate local built without referencing the superglobal, then pass that local to header().',
+                ],
+                [
+                    'shape'      => 'A header built from a server-controlled $_SERVER entry rather than attacker-supplied input.',
+                    'mitigation' => 'The whole $_SERVER superglobal is classified as request-controlled, so resolve the value through validated configuration instead of reading it at the sink.',
+                ],
+            ],
         );
     }
 

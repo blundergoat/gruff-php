@@ -86,6 +86,12 @@ final class DependencyComposerScriptRule implements SourceTextRuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A benign lifecycle command that merely contains a matched fragment, such as a `php -r` version probe or a backtick inside a quoted message.',
+                    'mitigation' => 'Matching is substring-based rather than shell parsing, so move the step to a reviewed PHP callable or accept the finding.',
+                ],
+            ],
         );
     }
 

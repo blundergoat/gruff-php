@@ -48,6 +48,22 @@ final readonly class RuleSettings
     }
 
     /**
+     * The limit a size or complexity band is measured against: the lowest threshold at which a "higher is worse"
+     * measurement reports.
+     *
+     * @return int|float - The single-threshold override when one is set, otherwise the warning threshold.
+     */
+    public function lowestHighValueThreshold(): int|float
+    {
+        // A single-threshold override replaces the ladder, so it is the only limit in force.
+        if ($this->severityThreshold instanceof SeverityThreshold) {
+            return $this->severityThreshold->threshold;
+        }
+
+        return $this->numericThreshold('warning');
+    }
+
+    /**
      * Reads a named numeric threshold the rule relies on, failing loudly if config left it missing or
      * non-numeric - a rule misconfiguration, not a user-facing input error.
      *

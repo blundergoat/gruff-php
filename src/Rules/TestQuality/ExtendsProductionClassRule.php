@@ -20,6 +20,7 @@ use PhpParser\Node\Stmt;
  * Flags a test class (`*Test`/`*Tests`) that extends a non-test base which is not a recognised `*TestCase`
  * - a sign the test inherits from a production class to reach its internals instead of exercising it through
  * its public surface. Runs per class; extra bases are configurable. Error severity, high confidence.
+ * A test directory or public test method must independently establish that the class is a test.
  */
 final readonly class ExtendsProductionClassRule implements RuleInterface
 {
@@ -47,13 +48,14 @@ final readonly class ExtendsProductionClassRule implements RuleInterface
     {
         // Error: a test inheriting production internals couples to private state instead of the public surface.
         return new RuleDefinition(
-            id:              self::ID,
-            name:            'Test extends production class',
-            pillar:          Pillar::TestQuality,
-            tier:            RuleTier::V01,
-            defaultSeverity: Severity::Error,
-            confidence:      Confidence::High,
-            defaultOptions:  [
+            id:                 self::ID,
+            name:               'Test extends production class',
+            pillar:             Pillar::TestQuality,
+            tier:               RuleTier::V01,
+            defaultSeverity:    Severity::Error,
+            confidence:         Confidence::High,
+            isEnabledByDefault: false,
+            defaultOptions:     [
                 'additionalTestBaseClasses' => self::DEFAULT_ADDITIONAL_TEST_BASE_CLASSES,
             ],
             optionDescriptions: [
@@ -72,7 +74,7 @@ final readonly class ExtendsProductionClassRule implements RuleInterface
      * Reports test classes that inherit directly from production classes.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
      *
      * @return list<Finding> - Findings for tests extending production types.
      */
@@ -96,6 +98,11 @@ final readonly class ExtendsProductionClassRule implements RuleInterface
 
             // Only *Test / *Tests classes are test classes we judge.
             if (!str_ends_with($className, 'Test') && !str_ends_with($className, 'Tests')) {
+                continue;
+            }
+
+            // A production domain can use Test as a noun; a class-name suffix alone proves no PHPUnit role.
+            if (!$this->hasTestEvidence($class, $analysisUnit->file->displayPath)) {
                 continue;
             }
 
@@ -132,5 +139,29 @@ final readonly class ExtendsProductionClassRule implements RuleInterface
         }
 
         return $findings;
+    }
+
+    /**
+     * Requires a test directory or a declared test method before judging a Test-named class.
+     *
+     * @param Stmt\Class_ $class - Named class whose production parent is being reviewed.
+     * @param string      $path  - Project-relative path; a Test.php basename alone is insufficient.
+     * @return bool - True when the class has independent test-role evidence.
+     */
+    private function hasTestEvidence(Stmt\Class_ $class, string $path): bool
+    {
+        // Only directory components identify a test path; a production OrderTest.php basename remains ambiguous.
+        if (preg_match('~(?:^|/)(?:test|tests|__tests__|spec)/~i', str_replace('\\', '/', $path)) === 1) {
+            return true;
+        }
+
+        foreach ($class->getMethods() as $method) {
+            if (TestQualityNodeHelper::isTestMethod($method)
+                || $method->isPublic() && str_starts_with($method->name->toString(), 'test')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

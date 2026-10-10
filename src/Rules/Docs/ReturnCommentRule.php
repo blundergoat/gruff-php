@@ -54,7 +54,7 @@ final readonly class ReturnCommentRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
             confidence:      Confidence::High,
-            description:     'A value-returning function or method must describe its result in its @return tag, not just restate the type, so a reviewer can diff the documented contract against the body. Fires only when an @return tag is present but carries no description; missing docblocks and missing @return tags are owned by docs.missing-public-phpdoc and docs.missing-return-tag, and a wholly tags-only docblock by docs.bare-phpdoc-tags. Void/never returns and constructors/destructors are exempt. Advisory by default; opt in to stricter enforcement via .gruff-php.yaml.',
+            description:     'A value-returning function or method must describe its result in its @return tag, not just restate the type, so a reviewer can diff the documented contract against the body. Fires only when an @return tag is present but carries no description; missing docblocks and missing @return tags are owned by docs.missing-phpdoc and docs.missing-return-tag, and a wholly tags-only docblock by docs.bare-phpdoc-tags. Void/never returns and constructors/destructors are exempt. Advisory by default; opt in to stricter enforcement via .gruff-php.yaml.',
         );
     }
 
@@ -83,7 +83,7 @@ final readonly class ReturnCommentRule implements RuleInterface
             $docComment = $node->getDocComment();
 
             if ($docComment === null) {
-                // No docblock: docs.missing-public-phpdoc owns the gap, so stay silent to avoid double-reporting.
+                // No docblock: docs.missing-phpdoc owns the gap, so stay silent to avoid double-reporting.
                 continue;
             }
 

@@ -34,12 +34,19 @@ final readonly class MockOnlyTestRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id:              self::ID,
-            name:            'Mock-only test',
-            pillar:          Pillar::TestQuality,
-            tier:            RuleTier::V01,
-            defaultSeverity: Severity::Warning,
-            confidence:      Confidence::Medium,
+            id:                  self::ID,
+            name:                'Mock-only test',
+            pillar:              Pillar::TestQuality,
+            tier:                RuleTier::V01,
+            defaultSeverity:     Severity::Warning,
+            confidence:          Confidence::Medium,
+            isEnabledByDefault:  false,
+            falsePositiveShapes: [
+                [
+                    'shape' => 'A collaboration test whose contract genuinely is the interaction, such as proving an event was dispatched or a port was called with a mapped payload.',
+                    'mitigation' => 'The rule cannot tell an interaction contract from missing behaviour coverage, so add one assertion on a real returned value, or accept the finding.',
+                ],
+            ],
         );
     }
 
@@ -47,7 +54,7 @@ final readonly class MockOnlyTestRule implements RuleInterface
      * Reports tests that verify mock interactions without a real assertion.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
      *
      * @return list<Finding> - Findings for mock-only tests.
      */
@@ -75,7 +82,7 @@ final readonly class MockOnlyTestRule implements RuleInterface
                 ruleId:      self::ID,
                 message:     sprintf('%s verifies mock interactions without a real assertion.', $scope->symbol),
                 filePath:    $analysisUnit->file->displayPath,
-                line:        $scope->line,
+                line:        $scope->anchorLine(),
                 severity:    Severity::Warning,
                 pillar:      Pillar::TestQuality,
                 tier:        RuleTier::V01,

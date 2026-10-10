@@ -7,6 +7,7 @@ namespace GruffPhp\Tests\Reporting;
 use GruffPhp\Engine\Analysis\AnalysisReport;
 use GruffPhp\Results\Diff\DiffResult;
 use GruffPhp\Results\Finding\Confidence;
+use GruffPhp\Results\Finding\BaselineIdentity;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Pillar;
 use GruffPhp\Results\Finding\RemediationAction;
@@ -49,7 +50,7 @@ final class SarifReporterTest extends TestCase
      */
     public function testSarifReporterEmitsRegistryRulesResultIdentityAndRunProperties(): void
     {
-        $finding  = new Finding(
+        $finding = new Finding(
             ruleId:           'security.dangerous-function-call',
             message:          'Dangerous call to eval().',
             filePath:         './src\\app.php',
@@ -69,14 +70,14 @@ final class SarifReporterTest extends TestCase
             ),
         );
         $findings = [$finding];
-        $score    = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive());
+        $score    = (new ScoreCalculator())->calculate($findings, 10, null, DiffResult::inactive());
         $report   = $this->report($findings, $score);
 
-        $payload       = $this->decode((new SarifReporter())->render($report));
-        $sarifRun      = $this->stringKeyedArray($this->listValue($payload, 'runs')[0] ?? null);
-        $driver        = $this->stringKeyedArray($this->stringKeyedArray($this->stringKeyedArray($sarifRun, 'tool'), 'driver'));
-        $rules         = $this->listValue($driver, 'rules');
-        $ruleIds       = array_map(
+        $payload  = $this->decode((new SarifReporter())->render($report));
+        $sarifRun = $this->stringKeyedArray($this->listValue($payload, 'runs')[0] ?? null);
+        $driver   = $this->stringKeyedArray($this->stringKeyedArray($this->stringKeyedArray($sarifRun, 'tool'), 'driver'));
+        $rules    = $this->listValue($driver, 'rules');
+        $ruleIds  = array_map(
             fn(mixed $rule): string => $this->stringValue($this->stringKeyedArray($rule), 'id'),
             $rules,
         );
@@ -121,8 +122,11 @@ final class SarifReporterTest extends TestCase
         self::assertSame($expectedStartColumn, $region['startColumn'] ?? null);
         self::assertSame($expectedEndLine, $region['endLine'] ?? null);
         $partialFingerprints = $this->stringKeyedArray($result, 'partialFingerprints');
-        self::assertSame($finding->fingerprint(), $this->stringValue($partialFingerprints, 'gruffFingerprint'));
-        self::assertSame($finding->stableIdentity(), $this->stringValue($partialFingerprints, 'gruffStableIdentity'));
+        // Code scanning groups alerts by the ratified durable identity, the same name baseline matching reads.
+        self::assertSame(
+            BaselineIdentity::identityOf($finding, 1),
+            $this->stringValue($partialFingerprints, 'gruffFingerprint'),
+        );
         self::assertArrayNotHasKey('primary', $partialFingerprints);
         $resultProperties = $this->stringKeyedArray($result, 'properties');
         self::assertSame(['maintainability'], $this->listValue($resultProperties, 'secondaryPillars'));
@@ -131,11 +135,12 @@ final class SarifReporterTest extends TestCase
         self::assertSame('CONSIDER', $resultMetadata['remediationAction'] ?? null);
         self::assertSame('allowlists.acceptedAbbreviations', $resultMetadata['configurationKey'] ?? null);
         $runProperties = $this->stringKeyedArray($sarifRun, 'properties');
-        self::assertSame('gruff.analysis.v2', $this->stringValue($runProperties, 'gruffSchemaVersion'));
+        self::assertSame('gruff.analysis.v3', $this->stringValue($runProperties, 'gruffSchemaVersion'));
+        self::assertNotNull($score->composite, 'the fixture evaluated files, so it must carry a composite');
         self::assertSame($score->composite->score, $runProperties['score'] ?? null);
         self::assertSame($score->composite->letter, $runProperties['grade'] ?? null);
         $jsonPayload = $this->decode((new JsonReporter())->render($report));
-        self::assertSame('gruff.analysis.v2', $this->stringValue($jsonPayload, 'schemaVersion'));
+        self::assertSame('gruff.analysis.v3', $this->stringValue($jsonPayload, 'schemaVersion'));
         $jsonFinding  = $this->stringKeyedArray($this->listValue($jsonPayload, 'findings')[0] ?? null);
         $jsonMetadata = $this->stringKeyedArray($jsonFinding, 'metadata');
         self::assertSame('CONSIDER', $jsonMetadata['remediationAction'] ?? null);
@@ -163,7 +168,7 @@ final class SarifReporterTest extends TestCase
             $this->listValue($driver, 'rules'),
         ));
         $runProperties = $this->stringKeyedArray($sarifRun, 'properties');
-        self::assertSame('gruff.analysis.v2', $this->stringValue($runProperties, 'gruffSchemaVersion'));
+        self::assertSame('gruff.analysis.v3', $this->stringValue($runProperties, 'gruffSchemaVersion'));
         self::assertArrayNotHasKey('score', $runProperties);
         self::assertArrayNotHasKey('grade', $runProperties);
     }
@@ -172,7 +177,7 @@ final class SarifReporterTest extends TestCase
      * Verify severity values map to SARIF result levels.
      *
      * @param Severity $severity - Finding severity to render.
-     * @param string   $level - Expected SARIF level.
+     * @param string   $level    - Expected SARIF level.
      *
      * @return void
      * @throws JsonException
@@ -183,7 +188,7 @@ final class SarifReporterTest extends TestCase
         $payload = $this->decode((new SarifReporter())->render($this->report([
                                                                                  $this->finding(severity: $severity),
                                                                              ])));
-        $result  = $this->stringKeyedArray($this->listValue($this->sarifRun($payload), 'results')[0] ?? null);
+        $result = $this->stringKeyedArray($this->listValue($this->sarifRun($payload), 'results')[0] ?? null);
 
         self::assertSame($level, $this->stringValue($result, 'level'));
     }
@@ -202,12 +207,12 @@ final class SarifReporterTest extends TestCase
     }
 
     /**
-     * Verify the stable partial fingerprint survives line drift while the precise fingerprint does not.
+     * Verify one code-scanning alert survives a line shift, because the fingerprint carries no line.
      *
      * @return void
      * @throws JsonException
      */
-    public function testSarifReporterStableIdentitySurvivesLineShiftWhilePreciseFingerprintChanges(): void
+    public function testSarifFingerprintSurvivesALineShift(): void
     {
         $lineBeforeShift = 10;
         $lineAfterShift  = 20;
@@ -215,18 +220,38 @@ final class SarifReporterTest extends TestCase
                                                                                          $this->finding(line: $lineBeforeShift),
                                                                                          $this->finding(line: $lineAfterShift),
                                                                                      ])));
-        $results         = $this->listValue($this->sarifRun($payload), 'results');
-        $first           = $this->stringKeyedArray($this->stringKeyedArray($results[0] ?? null), 'partialFingerprints');
-        $second          = $this->stringKeyedArray($this->stringKeyedArray($results[1] ?? null), 'partialFingerprints');
+        $results = $this->listValue($this->sarifRun($payload), 'results');
+        $first   = $this->stringKeyedArray($this->stringKeyedArray($results[0] ?? null), 'partialFingerprints');
+        $second  = $this->stringKeyedArray($this->stringKeyedArray($results[1] ?? null), 'partialFingerprints');
 
         self::assertSame(
-            $this->stringValue($first, 'gruffStableIdentity'),
-            $this->stringValue($second, 'gruffStableIdentity'),
-        );
-        self::assertNotSame(
             $this->stringValue($first, 'gruffFingerprint'),
             $this->stringValue($second, 'gruffFingerprint'),
         );
+    }
+
+    /**
+     * Verify a sensitive finding carries no fingerprints at all, so no secret gets a durable name in code scanning.
+     *
+     * @return void
+     * @throws JsonException
+     */
+    public function testSarifPublishesNoFingerprintForASensitiveFinding(): void
+    {
+        $secret  = new Finding(
+            ruleId:     'sensitive-data.aws-access-key',
+            message:    'Possible AWS access key.',
+            filePath:   'src/app.php',
+            line:       3,
+            severity:   Severity::Error,
+            pillar:     Pillar::SensitiveData,
+            tier:       RuleTier::V01,
+            confidence: Confidence::High,
+        );
+        $payload = $this->decode((new SarifReporter())->render($this->report([$secret])));
+        $result  = $this->stringKeyedArray($this->listValue($this->sarifRun($payload), 'results')[0] ?? null);
+
+        self::assertArrayNotHasKey('partialFingerprints', $result);
     }
 
     /**
@@ -240,9 +265,9 @@ final class SarifReporterTest extends TestCase
         $mutationAnalysisResult = new MutationAnalysisResult(new InfectionReport(
                                                                  reportPath: 'infection.json',
                                                                  stats:      [
-                                                                                 'totalMutantsCount'    => 1,
-                                                                                 'msi'                  => 0.0,
-                                                                                 'coveredCodeMsi'       => 0.0,
+                                                                                 'totalMutantsCount' => 1,
+                                                                                 'msi' => 0.0,
+                                                                                 'coveredCodeMsi' => 0.0,
                                                                                  'mutationCodeCoverage' => 100.0,
                                                                              ],
                                                                  mutants:    [
@@ -256,13 +281,13 @@ final class SarifReporterTest extends TestCase
                                                                                  ),
                                                                              ],
                                                              ));
-        $finding                = (new MutationFindingFactory())->findingsFor($mutationAnalysisResult)[0];
-        $payload                = $this->decode((new SarifReporter())->render($this->report([$finding])));
-        $sarifRun               = $this->sarifRun($payload);
-        $driver                 = $this->stringKeyedArray($this->stringKeyedArray($this->stringKeyedArray($sarifRun, 'tool'), 'driver'));
-        $rules                  = $this->listValue($driver, 'rules');
-        $result                 = $this->stringKeyedArray($this->listValue($sarifRun, 'results')[0] ?? null);
-        $ruleIndex              = $result['ruleIndex'] ?? null;
+        $finding   = (new MutationFindingFactory())->findingsFor($mutationAnalysisResult)[0];
+        $payload   = $this->decode((new SarifReporter())->render($this->report([$finding])));
+        $sarifRun  = $this->sarifRun($payload);
+        $driver    = $this->stringKeyedArray($this->stringKeyedArray($this->stringKeyedArray($sarifRun, 'tool'), 'driver'));
+        $rules     = $this->listValue($driver, 'rules');
+        $result    = $this->stringKeyedArray($this->listValue($sarifRun, 'results')[0] ?? null);
+        $ruleIndex = $result['ruleIndex'] ?? null;
         self::assertIsInt($ruleIndex);
         $matchingRule = $this->stringKeyedArray($rules[$ruleIndex] ?? null);
 
@@ -314,7 +339,7 @@ final class SarifReporterTest extends TestCase
      */
     public function testSarifReporterPreservesNativeJsonSchemaAndFindingCount(): void
     {
-        $report   = $this->report([
+        $report = $this->report([
                                       $this->finding(ruleId: 'fixture.warning', severity: Severity::Warning),
                                       $this->finding(ruleId: 'fixture.advisory', severity: Severity::Advisory),
                                   ]);
@@ -322,7 +347,7 @@ final class SarifReporterTest extends TestCase
         $sarif    = $this->decode((new SarifReporter())->render($report));
         $sarifRun = $this->sarifRun($sarif);
 
-        self::assertSame('gruff.analysis.v2', $this->stringValue($json, 'schemaVersion'));
+        self::assertSame('gruff.analysis.v3', $this->stringValue($json, 'schemaVersion'));
         self::assertSame($this->stringValue($json, 'schemaVersion'), $this->stringValue($this->stringKeyedArray($sarifRun, 'properties'), 'gruffSchemaVersion'));
         self::assertCount(count($this->listValue($json, 'findings')), $this->listValue($sarifRun, 'results'));
         self::assertSame(
@@ -339,7 +364,7 @@ final class SarifReporterTest extends TestCase
 
     /**
      * @param list<Finding>    $findings - Findings to attach to the report.
-     * @param ScoreReport|null $score - Precomputed score, or null to let assertions exercise an unscored report.
+     * @param ScoreReport|null $score    - Precomputed score, or null to let assertions exercise an unscored report.
      *
      * @return AnalysisReport - a sarif-format report carrying only the given findings and optional score, so a test renders a known input
      */
@@ -365,9 +390,9 @@ final class SarifReporterTest extends TestCase
     /**
      * Build a focused finding for SARIF renderer tests.
      *
-     * @param string   $ruleId - Emitted as the SARIF ruleId; defaulted so tests override only what they assert.
+     * @param string   $ruleId   - Emitted as the SARIF ruleId; defaulted so tests override only what they assert.
      * @param string   $filePath - Artifact path the SARIF location should reference, relative to the scanned root.
-     * @param int|null $line - One-based location line; null exercises rendering when a finding has no line.
+     * @param int|null $line     - One-based location line; null exercises rendering when a finding has no line.
      * @param Severity $severity - Drives the mapped SARIF result level; varied to check the severity-to-level mapping.
      *
      * @return Finding - a single finding built from the given fields, ready to render through the SARIF reporter and assert against
@@ -432,7 +457,7 @@ final class SarifReporterTest extends TestCase
 
     /**
      * @param JsonArray $payload - Source array.
-     * @param string    $key - Key whose value must itself be an array; the test fails if it is absent or scalar.
+     * @param string    $key     - Key whose value must itself be an array; the test fails if it is absent or scalar.
      *
      * @return list<JsonValue> - the child array re-indexed as a 0-based list so positional access ignores the original keys
      */
@@ -448,7 +473,7 @@ final class SarifReporterTest extends TestCase
      * Normalize a decoded JSON value or keyed child to an array payload.
      *
      * @param mixed       $payload - Decoded JSON node; mixed because it comes from json_decode, and non-arrays fail.
-     * @param string|null $key - When set, descend into that child first; null treats $payload itself as the target.
+     * @param string|null $key     - When set, descend into that child first; null treats $payload itself as the target.
      *
      * @return JsonArray - the resolved node narrowed to a JSON object, after the test has failed on any non-array or scalar leaf
      */
@@ -464,7 +489,7 @@ final class SarifReporterTest extends TestCase
     /**
      * Assert that decoded SARIF contains an object at the requested key.
      *
-     * @param mixed              $payload - Value under test; passes only when it is an array whose leaves are all JSON scalars.
+     * @param mixed $payload - Value under test; passes only when it is an array whose leaves are all JSON scalars.
      *
      * @phpstan-assert JsonArray $payload
      *
@@ -494,7 +519,7 @@ final class SarifReporterTest extends TestCase
 
     /**
      * @param JsonArray $payload - Source array.
-     * @param string    $key - Key whose value must be a string; the test fails if it is missing or non-string.
+     * @param string    $key     - Key whose value must be a string; the test fails if it is missing or non-string.
      *
      * @return string - the string value at $key, after the assertion has failed the test on a missing or non-string field
      */

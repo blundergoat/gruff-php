@@ -1,0 +1,28 @@
+schemaVersion: gruff-php.config.v0.1
+rules:
+    security.dependency-composer-path:
+        enabled: true
+    security.dependency-composer-vcs:
+        enabled: true
+    sensitive-data.database-url-password:
+        enabled: true
+    test-quality.conditional-logic:
+        enabled: true
+    test-quality.excessive-mocking:
+        enabled: true
+    test-quality.extends-production-class:
+        enabled: true
+    test-quality.loop-assertion-without-message:
+        enabled: true
+    test-quality.mock-only-test:
+        enabled: true
+    test-quality.no-assertions:
+        enabled: true
+    test-quality.sleep-in-test:
+        enabled: true
+    test-quality.unused-mock:
+        enabled: true
+    test-quality.sut-not-called:
+        enabled: true
+    test-quality.test-longer-than-sut:
+        enabled: true

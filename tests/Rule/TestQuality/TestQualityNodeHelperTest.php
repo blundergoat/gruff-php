@@ -214,15 +214,15 @@ final class TestQualityNodeHelperTest extends TestCase
      */
     public function testArgumentLiteralPestAndMagicNumberHelpers(): void
     {
-        $scope               = $this->scopesByName()['testLiteralAndMagicNumbers'];
-        $calls               = TestQualityNodeHelper::calls($scope);
-        $helperCall          = $this->firstNamedCall($calls, 'helper');
-        $dynamicCall         = array_values(array_filter(
+        $scope       = $this->scopesByName()['testLiteralAndMagicNumbers'];
+        $calls       = TestQualityNodeHelper::calls($scope);
+        $helperCall  = $this->firstNamedCall($calls, 'helper');
+        $dynamicCall = array_values(array_filter(
                                                 $calls,
                                                 static fn(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool => $call instanceof Expr\FuncCall
                                                                                                                         && TestQualityNodeHelper::functionName($call) === null,
                                             ))[0] ?? null;
-        $integerHelperCall   = array_values(array_filter(
+        $integerHelperCall = array_values(array_filter(
                                                 $calls,
                                                 static fn(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool => TestQualityNodeHelper::callName($call) === 'helper'
                                                                                                                         && TestQualityNodeHelper::literalValue(TestQualityNodeHelper::firstArgValue($call)) === 2,
@@ -302,7 +302,6 @@ final class TestQualityNodeHelperTest extends TestCase
 
         self::assertSame([
                              'createmock',
-                             'createstub',
                              'getmockbuilder',
                              'mock',
                              'partialmock',
@@ -380,7 +379,7 @@ final class TestQualityNodeHelperTest extends TestCase
      * Return the first call with the requested normalised name.
      *
      * @param list<Expr\FuncCall|Expr\MethodCall|Expr\StaticCall> $calls - Calls to inspect.
-     * @param string                                              $name - Normalised call name.
+     * @param string                                              $name  - Normalised call name.
      *
      * @return Expr\FuncCall|Expr\MethodCall|Expr\StaticCall - the first call matching the name; the test fails if none matches
      */
