@@ -73,7 +73,7 @@ existing finding presentation in 0.5.2.
 | --- | --- | --- | --- | --- |
 | `complexity.cognitive` | Cognitive complexity | `error` | `high` | yes |
 | `complexity.cyclomatic` | Cyclomatic complexity | `warning` | `high` | yes |
-| `complexity.halstead-volume` | Halstead volume | `advisory` | `medium` | yes |
+| `complexity.halstead-volume` | Halstead volume | `advisory` | `medium` | no |
 | `complexity.nesting-depth` | Maximum nesting depth | `error` | `high` | yes |
 
 ### `dead-code` (10)
@@ -209,7 +209,20 @@ clauses that each exit early (return, throw, or exit) are reported at
 advisory severity when they cross the configured threshold. Nested
 decision trees, loops, switch/match
 sprawl, try/catch control flow, and mixed-responsibility methods keep the
-configured warning/error severity.
+configured warning/error severity at one and a half times the limit or more;
+below that a cyclomatic, cognitive or nesting-depth finding is a lower-band advisory notice (see
+"Two bands" under `size`). Upper-band complexity advice asks for a simpler
+execution path, not extracted helpers.
+
+`complexity.cyclomatic` reports each `switch` and each `match` as one decision,
+however many cases or arm conditions it has; the maintainability index keeps
+the full count. `complexity.maintainability-index` reports nothing in a file of
+the family's test-path class: a `test`, `tests`, `__tests__`, `spec`,
+`testdata`, `fixtures` or `examples` folder, or a `*Test.php` file.
+`complexity.halstead-volume` is off by default since 0.6.0. `complexity.cognitive` scores an early-exit guard (an `if` with
+no `elseif` or `else` whose body is one `return`, `continue`, `break` or
+`throw`) without its nesting penalty, and scores `switch` case bodies at the
+switch's own level.
 
 `modernisation.phpdoc-mixed-overuse` exempts two type shapes that
 legitimately carry a `mixed` leaf. First, unstructured array/list bag
@@ -489,6 +502,24 @@ and advisory above it, because field count alone is not the same risk as
 dependency fan-in. `size.property-count` similarly lowers final readonly
 data carriers to advisory when width is the only signal, while mutable or
 behaviour-heavy classes keep the configured severity.
+
+**Two bands.** Every `size.*` and `complexity.*` rule except
+`size.average-method-length`, `complexity.halstead-volume` and
+`complexity.maintainability-index` reports in one of two bands
+(FAMILY-CONTRACT.md section 12, "Size and complexity findings in two bands").
+A unit over its limit but under one and a half times it is an advisory
+notice, whatever the configured tier, with `limitBand: lower` in its metadata
+and advice not to add to it. At one and a half times the limit or more the
+finding keeps its severity, including the read-only data-carrier and
+flat-guard softening above, carries `limitBand: upper`, and asks you to split
+the unit or simplify its execution path. The limit is the lowest configured
+tier, or the unit's own limit where it has one: the promoted value-object
+ceiling, or the constructor cap when `constructorMaxParameters` is set.
+Messages keep naming the tier the value crossed, so a baseline entry keeps
+matching when a unit crosses the boundary. A `--fail-on warning` or
+`--fail-on error` gate no longer fails on a lower-band notice; the default
+`analyse` gate, `advisory`, still does. Size and complexity rules only ever
+measure `.php` source; configuration and data files never reach them.
 
 ### `test-quality` (34)
 

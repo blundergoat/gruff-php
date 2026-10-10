@@ -93,6 +93,8 @@ final readonly class ClassLengthRule implements RuleInterface
 
             $symbol = $this->resolveSymbol($node);
 
+            $band = LimitBand::of($length, $settings->lowestHighValueThreshold());
+
             $findings[] = new Finding(
                 ruleId:  $definition->id,
                 message: sprintf(
@@ -104,18 +106,19 @@ final readonly class ClassLengthRule implements RuleInterface
                 ),
                 filePath:         $analysisUnit->file->displayPath,
                 line:             $startLine,
-                severity:         $thresholdMatch->severity,
+                severity:         LimitBand::severity($band, $thresholdMatch->severity),
                 pillar:           $definition->pillar,
                 tier:             $definition->tier,
                 confidence:       $definition->confidence,
                 endLine:          $endLine,
                 symbol:           $symbol,
-                remediation:      'Split large classes into smaller, focused units.',
+                remediation:      LimitBand::advice($band, LimitBand::LOWER_CLASS, LimitBand::SPLIT_CLASS),
                 secondaryPillars: $definition->secondaryPillars,
                 metadata:         [
                     'lines' => $length,
                     'threshold' => $thresholdMatch->threshold,
                     'thresholdType' => $thresholdMatch->severity->value,
+                    LimitBand::KEY => $band,
                 ],
             );
         }

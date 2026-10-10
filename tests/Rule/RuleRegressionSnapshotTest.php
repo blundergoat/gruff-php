@@ -77,12 +77,18 @@ final class RuleRegressionSnapshotTest extends TestCase
         // RESET_GROUP_BETA_PATTERN, whose run has another commented constant; waste.unreachable-code no longer reports
         // the trailing `// reported` comment in dynamic-call-precision.php; and test-longer-than-sut counts code
         // lines, which clears testHasLotsOfWhitespaceAndComments in test-method-too-long.php.
-        self::assertCount(2737, $findings);
+        // Precision-floor M14's cognitive repair added two guard-clause methods to Complexity/cognitive.php: each adds a
+        // docs.missing-phpdoc finding, and the class's 26 public methods now pass size.public-method-count's limit of 25.
+        // The repair itself moves no finding or measured value in this corpus.
+        self::assertCount(2740, $findings);
         // M08 made sensitive-data markers carry the class the detector already knew: a classified finding now reads
         // `[redacted:aws-access-key]` where it read `[redacted]`. The finding count, the rule set, and every
         // line-free identity are unchanged; only the marker text inside those findings moved.
+        // Precision-floor M14 banded the size and complexity rules: a finding under one and a half times its limit is
+        // advisory with do-not-add advice, every banded finding carries limitBand, and complexity advice asks for a
+        // simpler path. The count and every identity are unchanged; severity, advice and metadata moved the hash.
         self::assertSame(
-            'a89bbf660e73680a46f2165c6daf2f77bfee85092dd7f4af8765264eb39ad65c',
+            '5f1454e7dbfed821c677853f39613efc158f44fc921df01476d7e53b2f8b1221',
             hash('sha256', $json),
         );
     }
@@ -169,9 +175,11 @@ final class RuleRegressionSnapshotTest extends TestCase
 
         array_push(
                $findings,
+            // Rooted at tests/Fixtures, so the maintainability index, which skips test paths, reads these as source files.
             ...$this->analysePaths(
-            ['tests/Fixtures/Complexity'],
+            ['Complexity'],
             (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/complexity-low-thresholds.yaml', $registry),
+            self::PROJECT_ROOT . '/tests/Fixtures',
         )[1],
         );
         array_push(

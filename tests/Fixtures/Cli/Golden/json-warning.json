@@ -223,13 +223,14 @@
             "secondaryPillars": [],
             "tier": "v0.1",
             "confidence": "high",
-            "remediation": "Split oversized files or move responsibilities into smaller units.",
+            "remediation": "Split this file by responsibility, one responsibility per file.",
             "fingerprint": "c58ffd67445ab336",
             "stableIdentity": "26fa0bda604599a5",
             "metadata": {
                 "lines": 11,
                 "threshold": 3,
                 "thresholdType": "warning",
+                "limitBand": "upper",
                 "locationPrecision": "line-only"
             },
             "endLine": 27

@@ -4,6 +4,27 @@ Notable user-facing changes to `gruff-php` are listed here.
 
 ## 0.6.0 - 2026-09-27
 
+- **BREAKING: `complexity.halstead-volume` is off by default** - It was worth acting on 10 times in 18 judged findings, under the
+  0.60 floor, and the findings that were not are straight-line arithmetic, registration tables and option wiring whose volume no
+  bounded repair removes. Enable it with `rules.complexity.halstead-volume.enabled: true`; a config that already sets it keeps
+  it on.
+- **The maintainability index skips test files** - `complexity.maintainability-index` reports nothing in a file under a `test`,
+  `tests`, `__tests__`, `spec`, `testdata`, `fixtures` or `examples` folder or named `*Test.php`, where sequential setup and
+  assertions lower the index without making the code harder to follow.
+
+- **Flat dispatch and early-exit guards score as simpler paths** - `complexity.cyclomatic` counts a `switch` or `match` as one
+  decision, and `complexity.cognitive` charges no nesting penalty for an early-exit guard and keeps `switch` case bodies at the
+  switch's level. The maintainability index keeps the full cyclomatic count.
+
+- **BREAKING: size and complexity findings report in two bands** - A unit over its limit but under one and a half times it now
+reports as an advisory notice, `limitBand: lower`, that asks you not to add to it. At one and a half times the limit or more the
+finding keeps its severity, `limitBand: upper`, and asks you to split the unit or simplify its execution path (FAMILY-CONTRACT.md
+section 12). This covers `size.file-length`, `size.class-length`, `size.method-length`, `size.parameter-count`,
+`size.property-count`, `size.public-method-count`, `complexity.cognitive`, `complexity.cyclomatic` and
+`complexity.nesting-depth`, whatever tier a config sets. Messages are unchanged, so baselines keep matching. A
+`--fail-on warning` or `--fail-on error` gate stops failing on lower-band findings; the default `analyse` gate still fails on
+them. Complexity advice no longer suggests extracting conditions or nested logic.
+
 - **Returned callbacks avoid false execution warnings** - Proved keyed returns and bucket merges stay quiet; unknown stores and returns still report.
 
 - **Registered callbacks keep their callable evidence** - Typed boot and teardown registrations avoid incorrect execution warnings when the owning declaration

@@ -10,6 +10,7 @@ use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Pillar;
 use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
+use GruffPhp\Rules\Size\LimitBand;
 use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Contracts\RuleContext;
@@ -32,8 +33,10 @@ use PhpParser\Node\Stmt\Function_;
  *
  * Runs per file over every function-like node with a body. Unlike cyclomatic complexity, it charges more
  * for deeply nested branches and for switching between && and ||, but only once for a whole switch or
- * match. Anything over the threshold (default error above 20) is reported; a flat guard-clause method is
- * softened to advisory so the shape is not over-penalised.
+ * match.
+ *
+ * Findings below one and a half times the active limit are advisory; the upper band keeps the configured
+ * severity, except that a flat guard-clause method stays advisory.
  */
 final readonly class CognitiveComplexityRule implements RuleInterface
 {
@@ -95,7 +98,8 @@ final readonly class CognitiveComplexityRule implements RuleInterface
 
             $symbol = CyclomaticComplexityRule::resolveSymbol($node);
             $isFlatGuardFlow = ComplexityShapeClassifier::isFlatGuardClauseFlow($node);
-            $severity = $isFlatGuardFlow ? Severity::Advisory : $thresholdMatch->severity;
+            $band = LimitBand::of($cc, $settings->lowestHighValueThreshold());
+            $severity = LimitBand::severity($band, $isFlatGuardFlow ? Severity::Advisory : $thresholdMatch->severity);
 
             $findings[] = new Finding(
                 ruleId:  $definition->id,
@@ -122,7 +126,7 @@ final readonly class CognitiveComplexityRule implements RuleInterface
                 confidence:       $definition->confidence,
                 endLine:          $node->getEndLine() > 0 ? $node->getEndLine() : null,
                 symbol:           $symbol,
-                remediation:      'Reduce nesting and extract complex conditions into named methods.',
+                remediation:      LimitBand::advice($band, LimitBand::LOWER_METHOD, LimitBand::SIMPLIFY_PATH),
                 secondaryPillars: $definition->secondaryPillars,
                 metadata:         [
                     'complexity' => $cc,
@@ -130,6 +134,7 @@ final readonly class CognitiveComplexityRule implements RuleInterface
                     'thresholdType' => $severity->value,
                     'rawThresholdType' => $thresholdMatch->severity->value,
                     'complexityShape' => $isFlatGuardFlow ? ComplexityShapeClassifier::SHAPE_FLAT_GUARD_CLAUSES : 'branching',
+                    LimitBand::KEY => $band,
                 ],
             );
         }
@@ -213,16 +218,18 @@ final readonly class CognitiveComplexityRule implements RuleInterface
     }
 
     /**
-     * Scores an if chain: +1 plus nesting for the head, +1 per elseif/else, plus the recursive bodies.
+     * Scores an if chain: +1 for the head, plus nesting unless it is an early-exit guard; +1 per elseif/else, plus the bodies.
      *
      * @param Stmt\If_ $node - The `if` construct, including its elseif / else child blocks.
-     * @param int      $nesting - Current nesting depth; the head increment grows with it.
+     * @param int      $nesting - Current nesting depth; only a non-guard head adds this penalty.
      *
      * @return int - Combined score of the head, each elseif / else, and the recursively scored bodies.
      */
     private static function walkIf(Stmt\If_ $node, int $nesting): int
     {
-        $total = 1 + $nesting + self::walkBooleanOperators($node->cond);
+        // Returning early is the advice this rule gives, so a guard that exits pays no nesting penalty.
+        $penalty = self::isEarlyExitGuard($node) ? 0 : $nesting;
+        $total   = 1 + $penalty + self::walkBooleanOperators($node->cond);
 
         // Score each branch of the if/elseif/else chain.
         foreach (StmtChildVisitor::childBlocks($node) as $block) {
@@ -247,24 +254,47 @@ final readonly class CognitiveComplexityRule implements RuleInterface
     }
 
     /**
-     * Scores a switch: +1 plus nesting for the construct, plus each case body one level deeper.
+     * Scores a switch: +1 plus nesting for the construct, plus each case body at the switch's own level.
      *
      * @param Stmt\Switch_ $node - The `switch` construct whose case bodies are scored.
      * @param int          $nesting - Current nesting depth; the switch increment grows with it.
      *
-     * @return int - The switch increment plus each case body scored one level deeper.
+     * @return int - The switch increment plus each case body scored at the switch's own nesting level.
      */
     private static function walkSwitch(Stmt\Switch_ $node, int $nesting): int
     {
         $total = 1 + $nesting;
 
-        // Score each case body one nesting level deeper.
+        // Cases are siblings of one dispatch, so their bodies keep the switch's own nesting level.
         foreach (StmtChildVisitor::childBlocks($node) as $block) {
-            $total += self::walkStatements($block->statements, $nesting + 1);
+            $total += self::walkStatements($block->statements, $nesting);
         }
 
-        // The switch's own increment plus each case body scored one level deeper.
+        // The switch's own increment plus each case body scored at the switch's level.
         return $total;
+    }
+
+    /**
+     * Reports whether an if statement is a guard clause: no elseif or else, and a body of one return, continue, break
+     * or throw.
+     *
+     * @param Stmt\If_ $node - If statement being classified.
+     *
+     * @return bool - True when the statement only exits early.
+     */
+    private static function isEarlyExitGuard(Stmt\If_ $node): bool
+    {
+        // A guard has one exit statement and no alternative branch.
+        if ($node->elseifs !== [] || $node->else !== null || count($node->stmts) !== 1) {
+            return false;
+        }
+
+        $exit = $node->stmts[0];
+
+        return $exit instanceof Stmt\Return_
+            || $exit instanceof Stmt\Continue_
+            || $exit instanceof Stmt\Break_
+            || ($exit instanceof Stmt\Expression && $exit->expr instanceof Expr\Throw_);
     }
 
     /**
@@ -420,7 +450,7 @@ final readonly class CognitiveComplexityRule implements RuleInterface
      *
      * Mirrors cognitive `switch`: one increment for the construct, never per arm, so a small match
      * stays cheap while a match stuffed with nested logic costs what the reader actually pays.
-     * Cyclomatic complexity intentionally differs by charging every arm as a branch.
+     * The shared cyclomatic count used by the maintainability index still charges each arm condition.
      *
      * @param Expr\Match_ $match - The `match` expression whose subject, arm conditions, and arm bodies are scored.
      * @param int         $nesting - Current nesting depth; the match increment grows with it.

@@ -204,7 +204,7 @@ final class RuleRegistryTest extends TestCase
         self::assertSame(Severity::Warning, $findings[0]->severity);
         self::assertSame(Pillar::Size, $findings[0]->pillar);
         // 11 substantive lines: the fixture's blank and comment-only lines are free under file-length.
-        self::assertSame(['lines' => 11, 'threshold' => 3, 'thresholdType' => 'warning'], $findings[0]->metadata);
+        self::assertSame(['lines' => 11, 'threshold' => 3, 'thresholdType' => 'warning', 'limitBand' => 'upper'], $findings[0]->metadata);
     }
 
     /**
@@ -379,8 +379,9 @@ final class RuleRegistryTest extends TestCase
         // M10 D35 (2026-09-26) renamed docs.missing-public-phpdoc to docs.missing-phpdoc, and docs.return-comment's description names it.
         // Precision-floor M19 (2026-10-04) retired nine rules and turned three off by default (ADR-034).
         // The constant and property PHPDoc descriptions name run coverage (CHANGELOG: `One comment documents a run of constants`).
+        // Precision-floor M14 turned complexity.halstead-volume off by default (CHANGELOG 0.6.0).
         self::assertSame(
-            '72b64242d89b90838061' . '698026cf6eeeda8f3f69cab4972400b693b70cbb78e4',
+            'c0a760661acf322312f7' . 'b37f21977d4bc599618a013adb895702157fc4419377',
             hash('sha256', $json),
         );
     }
