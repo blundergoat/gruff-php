@@ -35,7 +35,7 @@ final readonly class NoAssertionsRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Error severity: a test that asserts nothing proves nothing, so it should fail the gate by default.
+        // Error severity applies when enabled; calibration leaves this rule opt-in.
         return new RuleDefinition(
             id:                  self::ID,
             name:                'Test without assertions',
@@ -43,6 +43,7 @@ final readonly class NoAssertionsRule implements RuleInterface
             tier:                RuleTier::V01,
             defaultSeverity:     Severity::Error,
             confidence:          Confidence::Medium,
+            isEnabledByDefault:  false,
             falsePositiveShapes: [
                 [
                     'shape' => 'A test whose checks run inside a project helper with a domain name, such as seeInDatabase() or verifyRendered(), rather than an assert-prefixed call.',
@@ -67,7 +68,9 @@ final readonly class NoAssertionsRule implements RuleInterface
         // Weigh every test scope in the file.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             // A test with any observable expectation is already proving something.
-            if ($this->hasObservableExpectation($scope) || InvokedTestMethodEvidence::hasExpectation($scope, $analysisUnit)) {
+            if ($this->hasObservableExpectation($scope)
+                || InvokedTestMethodEvidence::hasExpectation($scope, $analysisUnit)
+                || FluentJsonAssertionEvidence::hasExpectation($scope, $analysisUnit)) {
                 continue;
             }
 
@@ -81,7 +84,7 @@ final readonly class NoAssertionsRule implements RuleInterface
                 tier:        RuleTier::V01,
                 confidence:  Confidence::Medium,
                 symbol:      $scope->symbol,
-                remediation: 'Add an assertion or expectation that proves observable behavior, or disable this rule for custom assertion wrappers.',
+                remediation: 'Add an assertion or expectation that proves the observable behaviour this test names.',
                 metadata:    ['framework' => $scope->isPest ? 'pest' : 'phpunit'],
             );
         }

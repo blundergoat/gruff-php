@@ -4,6 +4,15 @@ Notable user-facing changes to `gruff-php` are listed here.
 
 ## 0.6.0 - 2026-09-27
 
+- **BREAKING: two more test-quality checks are opt-in** - `test-quality.sut-not-called` and `test-quality.test-longer-than-sut` have insufficient precision evidence, with 28/50 and 50/50 unresolved cards. Enable either with `rules.<id>.enabled: true`; existing explicit settings remain effective. This policy decision makes no new floor-failure or deletion claim.
+
+- **BREAKING: eight test-quality rules are off by default** - Calibration left `test-quality.conditional-logic`, `test-quality.excessive-mocking`, `test-quality.extends-production-class`, `test-quality.loop-assertion-without-message`, `test-quality.mock-only-test`, `test-quality.no-assertions`, `test-quality.sleep-in-test` and `test-quality.unused-mock` below the 70% precision floor. Set `rules.<rule-id>.enabled: true` to keep a chosen rule on; existing explicit settings still apply. Excessive-mocking's before version failed both audit rounds, so its off-by-default decision carries that caveat.
+
+- **Test findings follow the visible verification** - Terminating skip guards and branches inside fixture callbacks no longer report as conditional test logic. Stubs no longer count as mocks; registered Prophecy, Symfony deprecation and bound Laravel JSON expectations count as checks. Looped assertions accept an identifying expected value, a singleton or a direct exit.
+- **SUT-name mismatches are advisory** - The name heuristic matches a verb-and-object prefix against visible calls, including outcome suffixes and inflected verbs. A single verb cannot establish a subject.
+- **A production class named Test needs independent test evidence** - Inheritance findings require a test directory or a public test method; a basename alone is insufficient.
+- **Incidental clock reads stay quiet** - Clock values used only as uniqid entropy or as a failure-only event-pump deadline no longer report. Blocking sleeps and clocks that determine success still report.
+
 - **BREAKING: `complexity.halstead-volume` is off by default** - It was worth acting on 10 times in 18 judged findings, under the
   0.60 floor, and the findings that were not are straight-line arithmetic, registration tables and option wiring whose volume no
   bounded repair removes. Enable it with `rules.complexity.halstead-volume.enabled: true`; a config that already sets it keeps

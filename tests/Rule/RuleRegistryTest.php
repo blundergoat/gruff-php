@@ -380,8 +380,9 @@ final class RuleRegistryTest extends TestCase
         // Precision-floor M19 (2026-10-04) retired nine rules and turned three off by default (ADR-034).
         // The constant and property PHPDoc descriptions name run coverage (CHANGELOG: `One comment documents a run of constants`).
         // Precision-floor M14 turned complexity.halstead-volume off by default (CHANGELOG 0.6.0).
+        // Precision-floor M15 makes the low-confidence SUT-name heuristic advisory.
         self::assertSame(
-            'c0a760661acf322312f7' . 'b37f21977d4bc599618a013adb895702157fc4419377',
+            '3e6a03c76267085f9327aea633aa1401cdc9753eaff56bb777b620efabdfe5ae',
             hash('sha256', $json),
         );
     }

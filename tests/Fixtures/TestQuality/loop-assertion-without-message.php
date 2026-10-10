@@ -27,7 +27,7 @@ final class LoopAssertionWithoutMessageTest extends TestCase
     // Positive: a string actual value is not a message argument.
     public function testStringActualValueWithoutMessage(): void
     {
-        foreach (['pending'] as $status) {
+        foreach (['pending', 'cancelled'] as $status) {
             self::assertSame('paid', $status);
         }
     }

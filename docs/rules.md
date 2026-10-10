@@ -525,23 +525,23 @@ measure `.php` source; configuration and data files never reach them.
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
 | --- | --- | --- | --- | --- |
-| `test-quality.conditional-logic` | Conditional test logic | `advisory` | `high` | yes |
+| `test-quality.conditional-logic` | Conditional test logic | `advisory` | `high` | no |
 | `test-quality.data-provider-annotation` | Data provider annotation | `advisory` | `high` | yes |
 | `test-quality.eager-test` | Eager test | `advisory` | `low` | yes |
 | `test-quality.empty-data-provider` | Empty data provider | `error` | `high` | yes |
 | `test-quality.exception-type-only` | Exception type-only assertion | `advisory` | `medium` | yes |
-| `test-quality.excessive-mocking` | Excessive mocking | `advisory` | `medium` | yes |
-| `test-quality.extends-production-class` | Test extends production class | `error` | `high` | yes |
+| `test-quality.excessive-mocking` | Excessive mocking | `advisory` | `medium` | no |
+| `test-quality.extends-production-class` | Test extends production class | `error` | `high` | no |
 | `test-quality.global-state-mutation` | Global state mutation in test | `warning` | `medium` | yes |
-| `test-quality.loop-assertion-without-message` | Assertion in loop without message | `advisory` | `medium` | yes |
+| `test-quality.loop-assertion-without-message` | Assertion in loop without message | `advisory` | `medium` | no |
 | `test-quality.magic-number-assertion` | Magic number assertion | `advisory` | `low` | yes |
-| `test-quality.mock-only-test` | Mock-only test | `warning` | `medium` | yes |
+| `test-quality.mock-only-test` | Mock-only test | `warning` | `medium` | no |
 | `test-quality.mock-without-expectation` | Mock without expectation | `warning` | `medium` | yes |
 | `test-quality.mocking-domain-object` | Mocking a domain object | `advisory` | `low` | yes |
 | `test-quality.multiple-aaa-cycles` | Multiple arrange-act-assert cycles | `advisory` | `low` | yes |
 | `test-quality.mystery-guest` | Mystery guest | `advisory` | `medium` | yes |
 | `test-quality.naming-consistency` | Test naming consistency | `advisory` | `high` | yes |
-| `test-quality.no-assertions` | Test without assertions | `error` | `medium` | yes |
+| `test-quality.no-assertions` | Test without assertions | `error` | `medium` | no |
 | `test-quality.phpunit-coverage-source-missing` | PHPUnit coverage source missing | `advisory` | `medium` | yes |
 | `test-quality.phpunit-deprecations-not-fatal` | PHPUnit deprecations not fatal | `warning` | `high` | yes |
 | `test-quality.phpunit-strict-flags-missing` | PHPUnit strict flags missing | `warning` | `high` | yes |
@@ -549,20 +549,36 @@ measure `.php` source; configuration and data files never reach them.
 | `test-quality.repeated-structure-missing-data-provider` | Repeated test structure missing data provider | `advisory` | `low` | yes |
 | `test-quality.setup-bloat` | Setup bloat | `advisory` | `medium` | yes |
 | `test-quality.skipped-without-reason` | Skipped test without reason | `warning` | `high` | yes |
-| `test-quality.sleep-in-test` | Sleep or wall-clock read in test | `warning` | `high` | yes |
+| `test-quality.sleep-in-test` | Sleep or wall-clock read in test | `warning` | `high` | no |
 | `test-quality.static-analysis-redundant-test` | Static-analysis-redundant test candidate | `advisory` | `high` | yes |
-| `test-quality.sut-not-called` | Test name mentions SUT that is not called | `error` | `low` | yes |
+| `test-quality.sut-not-called` | Test name mentions SUT that is not called | `advisory` | `low` | no |
 | `test-quality.tautological-type-assertion` | Tautological type assertion | `error` | `high` | yes |
-| `test-quality.test-longer-than-sut` | Test longer than apparent SUT | `advisory` | `low` | yes |
+| `test-quality.test-longer-than-sut` | Test longer than apparent SUT | `advisory` | `low` | no |
 | `test-quality.test-method-too-long` | Test method too long | `advisory` | `high` | yes |
 | `test-quality.testdox-readability` | Testdox readability | `advisory` | `low` | yes |
 | `test-quality.trivial-assertion` | Trivial assertion | `warning` | `high` | yes |
 | `test-quality.trivial-snapshot` | Trivial snapshot | `advisory` | `medium` | yes |
-| `test-quality.unused-mock` | Unused mock variable | `advisory` | `high` | yes |
+| `test-quality.unused-mock` | Unused mock variable | `advisory` | `high` | no |
+
+These eight rules are off by default after calibration left them below the 70% test-quality precision floor: `test-quality.conditional-logic`, `test-quality.excessive-mocking`, `test-quality.extends-production-class`, `test-quality.loop-assertion-without-message`, `test-quality.mock-only-test`, `test-quality.no-assertions`, `test-quality.sleep-in-test` and `test-quality.unused-mock`. Set the chosen rule's `rules.<rule-id>.enabled` to `true` to opt in. Excessive-mocking's before version exceeded the audit disagreement limit twice; its default-off decision retains that caveat and makes no calibrated improvement claim.
+
+`test-quality.sut-not-called` and `test-quality.test-longer-than-sut` are also opt-in because their frozen cards leave precision insufficient (28 and 50 unresolved cards out of 50). This is an operator policy decision, not a measured floor failure. Enable either with `rules.<rule-id>.enabled: true`.
 
 `test-quality.no-assertions` follows invoked methods on the same class, up to eight method bodies; unused helpers and callback references do not count.
 It also recognizes `expectDeprecationWithIdentifier` from the resolved Doctrine `VerifyDeprecations` trait when no local override or trait adaptation changes it.
 External helpers, unresolved receivers and cycles without a recognized check still report. An assertion-like helper name alone supplies no evidence.
+
+`test-quality.no-assertions` also accepts Symfony user-deprecation message expectations, registered Prophecy terminal expectations and a local receiver created by `Illuminate\Testing\Fluent\AssertableJson::fromArray` with `where` or `whereContains`. Unused callbacks, first-class callable references, foreign builders and rebound receivers do not establish that fluent expectation.
+
+PHPUnit `createStub()` supplies values and does not count as a mock. `test-quality.conditional-logic` ignores branches owned by nested fixture callbacks and a reasoned PHPUnit skip guard with no alternative branch or additional work.
+
+`test-quality.loop-assertion-without-message` accepts a literal singleton, a direct assertion followed by an exit, or an expected value that identifies the loop binding. In a keyed table the key identifies the row; its value alone may repeat.
+
+`test-quality.sleep-in-test` accepts uniqid entropy and a single clock-plus-duration deadline in an event-pump loop whose timeout branch only fails the test. Rebound deadlines, foreign failure calls, unused pump callbacks and timing-dependent assertions remain reportable.
+
+`test-quality.sut-not-called` is advisory and compares visible calls with a verb-and-object prefix from the test name. A lone verb is insufficient evidence of the intended subject.
+
+A test directory or a public test method must independently establish the class as a test; a production basename such as OrderTest.php does not.
 
 `test-quality.extends-production-class` recognises a `*TestCase` parent
 after ignoring underscores, so snake_case bases such as

@@ -37,16 +37,17 @@ final readonly class TestLongerThanSutRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id:                self::ID,
-            name:              'Test longer than apparent SUT',
-            pillar:            Pillar::TestQuality,
-            tier:              RuleTier::V01,
-            defaultSeverity:   Severity::Advisory,
-            confidence:        Confidence::Low,
-            defaultThresholds: ['minTestLines' => 12],
+            id:                  self::ID,
+            name:                'Test longer than apparent SUT',
+            pillar:              Pillar::TestQuality,
+            tier:                RuleTier::V01,
+            defaultSeverity:     Severity::Advisory,
+            confidence:          Confidence::Low,
+            defaultThresholds:   ['minTestLines' => 12],
+            isEnabledByDefault:  false,
             falsePositiveShapes: [
                 [
-                    'shape'      => 'A long test around a single call whose length is real table-driven coverage, such as one call checked against many expected fields.',
+                    'shape' => 'A long test around a single call whose length is real table-driven coverage, such as one call checked against many expected fields.',
                     'mitigation' => 'The real system under test is never measured, only the test\'s own length and call count, so raise this rule\'s minTestLines threshold.',
                 ],
             ],
@@ -57,7 +58,7 @@ final readonly class TestLongerThanSutRule implements RuleInterface
      * Reports long tests that appear to exercise only one SUT call.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
      *
      * @return list<Finding> - Findings for tests with disproportionate setup/assertion size.
      */
@@ -160,7 +161,7 @@ final readonly class TestLongerThanSutRule implements RuleInterface
     /**
      * Reports whether a receiver looks like a test harness (by variable name or inline new).
      *
-     * @param Expr         $receiver - Method-call receiver, matched as a named variable or an inline `new`.
+     * @param Expr         $receiver       - Method-call receiver, matched as a named variable or an inline `new`.
      * @param list<string> $variableTokens - Lowercase variable-name fragments accepted as harnesses.
      *
      * @return bool - True when the receiver looks like a test harness.

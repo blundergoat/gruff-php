@@ -35,16 +35,17 @@ final readonly class ExcessiveMockingRule implements RuleInterface
     {
         // Medium confidence: mock count is a heuristic for over-specification, so this is advisory and tunable.
         return new RuleDefinition(
-            id:                self::ID,
-            name:              'Excessive mocking',
-            pillar:            Pillar::TestQuality,
-            tier:              RuleTier::V01,
-            defaultSeverity:   Severity::Advisory,
-            confidence:        Confidence::Medium,
-            defaultThresholds: ['maxMocks' => 3],
+            id:                  self::ID,
+            name:                'Excessive mocking',
+            pillar:              Pillar::TestQuality,
+            tier:                RuleTier::V01,
+            defaultSeverity:     Severity::Advisory,
+            confidence:          Confidence::Medium,
+            isEnabledByDefault:  false,
+            defaultThresholds:   ['maxMocks' => 3],
             falsePositiveShapes: [
                 [
-                    'shape'      => 'A test for a coordinator whose real job is to orchestrate several collaborators, so the mock count reflects the production design.',
+                    'shape' => 'A test for a coordinator whose real job is to orchestrate several collaborators, so the mock count reflects the production design.',
                     'mitigation' => 'Doubles are counted without weighing the unit\'s responsibility, so raise this rule\'s maxMocks threshold for suites where coordinators are the subject.',
                 ],
             ],
@@ -55,7 +56,7 @@ final readonly class ExcessiveMockingRule implements RuleInterface
      * Reports tests that create more mocks than the configured threshold.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
      *
      * @return list<Finding> - Findings for heavily mocked tests.
      */

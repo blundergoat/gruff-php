@@ -21,7 +21,7 @@ use PhpParser\NodeFinder;
 /**
  * Flags a PHPUnit test whose name implies a specific behaviour (`testParsesHeader...`) yet whose body never
  * calls a method matching that name - a hint the test drifted from what it claims to exercise, or that its
- * name overstates its coverage. A camelCase-name heuristic; subprocess tests are exempt. Error severity, low confidence.
+ * name overstates its coverage. A camelCase-name heuristic; subprocess tests are exempt. Advisory severity, low confidence.
  */
 final readonly class SutNotCalledRule implements RuleInterface
 {
@@ -94,52 +94,53 @@ final readonly class SutNotCalledRule implements RuleInterface
      * @var array<string, string>
      */
     private const VERB_ALIASES = [
-        'analyses'   => 'analyse',
-        'analyzes'   => 'analyze',
-        'builds'     => 'build',
+        'analyses' => 'analyse',
+        'analyzes' => 'analyze',
+        'builds' => 'build',
         'calculates' => 'calculate',
-        'calls'      => 'call',
-        'creates'    => 'create',
-        'decodes'    => 'decode',
-        'detects'    => 'detect',
-        'discovers'  => 'discover',
-        'encodes'    => 'encode',
-        'escapes'    => 'escape',
-        'finds'      => 'find',
-        'formats'    => 'format',
-        'handles'    => 'handle',
-        'loads'      => 'load',
-        'parses'     => 'parse',
-        'processes'  => 'process',
-        'reads'      => 'read',
-        'records'    => 'record',
-        'renders'    => 'render',
-        'resolves'   => 'resolve',
-        'sends'      => 'send',
-        'writes'     => 'write',
+        'calls' => 'call',
+        'creates' => 'create',
+        'decodes' => 'decode',
+        'detects' => 'detect',
+        'discovers' => 'discover',
+        'encodes' => 'encode',
+        'escapes' => 'escape',
+        'finds' => 'find',
+        'formats' => 'format',
+        'handles' => 'handle',
+        'loads' => 'load',
+        'parses' => 'parse',
+        'processes' => 'process',
+        'reads' => 'read',
+        'records' => 'record',
+        'renders' => 'render',
+        'resolves' => 'resolve',
+        'sends' => 'send',
+        'writes' => 'write',
     ];
 
     /**
      * Describes the sut-not-called rule for the registry and reports.
      *
-     * @return RuleDefinition - rule identity, pillar, tier, and the low-confidence Error default callers may downgrade
+     * @return RuleDefinition - rule identity, pillar, tier, and the low-confidence advisory default
      */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id:              self::ID,
-            name:            'Test name mentions SUT that is not called',
-            pillar:          Pillar::TestQuality,
-            tier:            RuleTier::V01,
-            defaultSeverity: Severity::Error,
-            confidence:      Confidence::Low,
+            id:                  self::ID,
+            name:                'Test name mentions SUT that is not called',
+            pillar:              Pillar::TestQuality,
+            tier:                RuleTier::V01,
+            defaultSeverity:     Severity::Advisory,
+            confidence:          Confidence::Low,
+            isEnabledByDefault:  false,
             falsePositiveShapes: [
                 [
-                    'shape'      => 'A test that does exercise the named behaviour but reaches it through a differently named entry point, such as __invoke() or a facade that forwards to the method.',
-                    'mitigation' => 'The inferred method name must appear as a literal call name, so call the named method directly or rename the test after the entry point it uses.',
+                    'shape' => 'A test that does exercise the named behaviour but reaches it through a differently named entry point, such as __invoke() or a facade that forwards to the method.',
+                    'mitigation' => 'The heuristic matches visible call prefixes, so review whether the named behavior is exercised through an indirect entry point.',
                 ],
                 [
-                    'shape'      => 'A test whose name begins with a recognised verb that is prose rather than a method, so an unrelated word is inferred as the system under test.',
+                    'shape' => 'A test whose name begins with a recognised verb that is prose rather than a method, so an unrelated word is inferred as the system under test.',
                     'mitigation' => 'Candidates are derived from camelCase tokens before the first outcome marker, so rename the test so its verb phrase matches the method it calls.',
                 ],
             ],
@@ -150,7 +151,7 @@ final readonly class SutNotCalledRule implements RuleInterface
      * Reports tests whose name implies a SUT call that is absent from the body.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
      *
      * @return list<Finding> - one finding per test whose name implies an uncalled SUT; empty when all match or skip
      */
@@ -181,7 +182,7 @@ final readonly class SutNotCalledRule implements RuleInterface
                 message:     sprintf('%s name implies a SUT behavior, but no matching method call was detected.', $scope->symbol),
                 filePath:    $analysisUnit->file->displayPath,
                 line:        $scope->anchorLine(),
-                severity:    Severity::Error,
+                severity:    Severity::Advisory,
                 pillar:      Pillar::TestQuality,
                 tier:        RuleTier::V01,
                 confidence:  Confidence::Low,
@@ -197,15 +198,13 @@ final readonly class SutNotCalledRule implements RuleInterface
     /**
      * Reports whether the test calls a method matching one of the inferred SUT names.
      *
-     * @param TestQualityScope $scope - Test body whose calls are scanned for a SUT invocation.
+     * @param TestQualityScope $scope      - Test body whose calls are scanned for a SUT invocation.
      * @param list<string>     $candidates - Normalised SUT names any non-assertion call must match.
      *
      * @return bool - true when a non-assertion call resolves to a candidate name (SUT exercised); false keeps it open
      */
     private function hasNamedSutCall(TestQualityScope $scope, array $candidates): bool
     {
-        $candidateLookup = array_fill_keys($candidates, true);
-
         // Weigh every call the test makes.
         foreach (TestQualityNodeHelper::calls($scope) as $call) {
             // Assertions and mock plumbing are not SUT calls.
@@ -214,9 +213,14 @@ final readonly class SutNotCalledRule implements RuleInterface
             }
 
             $name = TestQualityNodeHelper::callName($call);
-            // A call whose name matches a candidate proves the SUT is exercised.
-            if ($name !== null && isset($candidateLookup[TestQualityNodeHelper::normalizedTestName($name)])) {
-                return true;
+            // Scenario and outcome words may extend either the test phrase or the called method name.
+            if ($name !== null) {
+                $normalized = TestQualityNodeHelper::normalizedTestName($name);
+                foreach ($candidates as $candidate) {
+                    if (str_starts_with($normalized, $candidate) || str_starts_with($candidate, $normalized)) {
+                        return true;
+                    }
+                }
             }
         }
 
@@ -309,12 +313,14 @@ final readonly class SutNotCalledRule implements RuleInterface
             return [];
         }
 
-        $candidates = [TestQualityNodeHelper::normalizedTestName(implode('', $methodTokens))];
-
-        // A multi-word phrase also yields the bare leading verb as a candidate.
-        if (count($methodTokens) > 1) {
-            $candidates[] = TestQualityNodeHelper::normalizedTestName($verb);
+        // A lone verb is too broad to imply a specific method, so leave it outside this heuristic.
+        if (count($methodTokens) < 2) {
+            return [];
         }
+
+        $methodTokens[0] = $verb;
+        $candidates      = [TestQualityNodeHelper::normalizedTestName(implode('', $methodTokens))];
+        $candidates[]    = TestQualityNodeHelper::normalizedTestName(implode('', array_slice($methodTokens, 0, 2)));
 
         return array_values(array_unique($candidates));
     }

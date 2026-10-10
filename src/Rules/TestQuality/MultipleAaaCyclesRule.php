@@ -38,18 +38,18 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
     {
         // Low confidence: cycle counting is heuristic, so default to advisory and only flag at three or more.
         return new RuleDefinition(
-            id:                 self::ID,
-            name:               'Multiple arrange-act-assert cycles',
-            pillar:             Pillar::TestQuality,
-            tier:               RuleTier::V01,
-            defaultSeverity:    Severity::Advisory,
-            confidence:         Confidence::Low,
-            defaultThresholds:  ['minCycles' => 3],
-            defaultOptions:     ['ignoredPathPatterns' => []],
-            isEnabledByDefault: true,
+            id:                  self::ID,
+            name:                'Multiple arrange-act-assert cycles',
+            pillar:              Pillar::TestQuality,
+            tier:                RuleTier::V01,
+            defaultSeverity:     Severity::Advisory,
+            confidence:          Confidence::Low,
+            defaultThresholds:   ['minCycles' => 3],
+            defaultOptions:      ['ignoredPathPatterns' => []],
+            isEnabledByDefault:  true,
             falsePositiveShapes: [
                 [
-                    'shape'      => 'One workflow test that must assert between steps, such as an end-to-end journey checking state after each transition.',
+                    'shape' => 'One workflow test that must assert between steps, such as an end-to-end journey checking state after each transition.',
                     'mitigation' => 'Act-then-assert transitions are counted without judging whether they form one workflow, so add the suite path to options.ignoredPathPatterns or raise minCycles.',
                 ],
             ],
@@ -60,7 +60,7 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
      * Reports tests that appear to repeat act/assert cycles in one method.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
      *
      * @return list<Finding> - Findings for repeated AAA cycles.
      */
@@ -88,7 +88,7 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
             $findings[] = new Finding(
                 ruleId:  self::ID,
                 message: sprintf(
-                    '%s contains %d act-then-assert cycles; consider splitting into focused tests.',
+                    '%s contains %d act-then-assert cycles; review whether they prove one workflow.',
                     $scope->symbol,
                     $cycles,
                 ),
@@ -99,7 +99,7 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
                 tier:        RuleTier::V01,
                 confidence:  Confidence::Low,
                 symbol:      $scope->symbol,
-                remediation: 'Each test should arrange once, act once, and assert once. Split this method into separate tests for each scenario. If a path legitimately uses sequential scenarios (e.g. end-to-end suites), add it to `rules.test-quality.multiple-aaa-cycles.options.ignoredPathPatterns` in `.gruff-php.yaml`.',
+                remediation: 'Each test should arrange, act and assert once. When the scenarios differ only in data, drive one test from #[DataProvider] with a row per scenario; when each step depends on the previous one, assert the observable outcome once at the end.',
                 metadata:    ['cycles' => $cycles, 'threshold' => $threshold],
             );
         }
@@ -171,7 +171,7 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
      * Reports whether a project-configured path exemption applies.
      *
      * @param string       $displayPath - Display path of the unit under test, matched after slash normalisation.
-     * @param list<string> $patterns - Glob patterns for accepted broad test shapes.
+     * @param list<string> $patterns    - Glob patterns for accepted broad test shapes.
      *
      * @return bool - True when the display path matches an ignored pattern.
      */

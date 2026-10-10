@@ -68,9 +68,13 @@ final class CodeLineCountingTest extends DocsRuleTestCase
      */
     public function testTestLongerThanSutComparesCodeLines(): void
     {
-        self::assertSame([], $this->analyseSourceRule($this->addressTest(6), TestLongerThanSutRule::ID));
+        $config = AnalysisConfig::fromRegistry(RuleRegistry::defaults())->withRuleSettings(
+            TestLongerThanSutRule::ID,
+            new RuleSettings(true, ['minTestLines' => self::MIN_SUT_TEST_LINES]),
+        );
+        self::assertSame([], $this->analyseSourceRule($this->addressTest(6), TestLongerThanSutRule::ID, $config));
 
-        $findings = $this->analyseSourceRule($this->addressTest(7), TestLongerThanSutRule::ID);
+        $findings = $this->analyseSourceRule($this->addressTest(7), TestLongerThanSutRule::ID, $config);
         self::assertCount(1, $findings);
         self::assertSame(self::MIN_SUT_TEST_LINES, $findings[0]->metadata['testLines'] ?? null);
     }

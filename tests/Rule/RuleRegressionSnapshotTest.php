@@ -22,7 +22,17 @@ use GruffPhp\Rules\Size\AverageMethodLengthRule;
 use GruffPhp\Rules\Size\ClassLengthRule;
 use GruffPhp\Rules\Size\FileLengthRule;
 use GruffPhp\Rules\Size\MethodLengthRule;
+use GruffPhp\Rules\TestQuality\ConditionalTestLogicRule;
+use GruffPhp\Rules\TestQuality\ExcessiveMockingRule;
+use GruffPhp\Rules\TestQuality\ExtendsProductionClassRule;
+use GruffPhp\Rules\TestQuality\LoopAssertionWithoutMessageRule;
+use GruffPhp\Rules\TestQuality\MockOnlyTestRule;
 use GruffPhp\Rules\TestQuality\MockingDomainObjectRule;
+use GruffPhp\Rules\TestQuality\NoAssertionsRule;
+use GruffPhp\Rules\TestQuality\SleepInTestRule;
+use GruffPhp\Rules\TestQuality\SutNotCalledRule;
+use GruffPhp\Rules\TestQuality\TestLongerThanSutRule;
+use GruffPhp\Rules\TestQuality\UnusedMockRule;
 use GruffPhp\Rules\TestQuality\PhpUnitCoverageSourceMissingRule;
 use GruffPhp\Rules\TestQuality\PhpUnitDeprecationsNotFatalRule;
 use GruffPhp\Rules\TestQuality\PhpUnitStrictFlagsMissingRule;
@@ -80,7 +90,11 @@ final class RuleRegressionSnapshotTest extends TestCase
         // Precision-floor M14's cognitive repair added two guard-clause methods to Complexity/cognitive.php: each adds a
         // docs.missing-phpdoc finding, and the class's 26 public methods now pass size.public-method-count's limit of 25.
         // The repair itself moves no finding or measured value in this corpus.
-        self::assertCount(2740, $findings);
+        // Precision-floor M15 clears four loop-context findings: one identifying expected value and three
+        // singleton loops. A repeated-loop control now uses a fixed expected literal, adding one magic-number finding.
+        // M15 default-off policy removes 42 findings from eight test-quality rules; explicit calibration still covers them.
+        // M15 additionally makes two insufficient-evidence rules opt-in, removing 11 fixture findings.
+        self::assertCount(2684, $findings);
         // M08 made sensitive-data markers carry the class the detector already knew: a classified finding now reads
         // `[redacted:aws-access-key]` where it read `[redacted]`. The finding count, the rule set, and every
         // line-free identity are unchanged; only the marker text inside those findings moved.
@@ -88,7 +102,7 @@ final class RuleRegressionSnapshotTest extends TestCase
         // advisory with do-not-add advice, every banded finding carries limitBand, and complexity advice asks for a
         // simpler path. The count and every identity are unchanged; severity, advice and metadata moved the hash.
         self::assertSame(
-            '5f1454e7dbfed821c677853f39613efc158f44fc921df01476d7e53b2f8b1221',
+            'c513be7f7695b792264e92761e47aee6ae27a9909ada22e51ceb433dbff45c74',
             hash('sha256', $json),
         );
     }
@@ -100,11 +114,11 @@ final class RuleRegressionSnapshotTest extends TestCase
      */
     public function testDefaultAndSupplementalCalibrationScenariosCoverEveryRegisteredRule(): void
     {
-        $registry = RuleRegistry::defaults();
+        $registry            = RuleRegistry::defaults();
         [, $defaultFindings] = $this->analysePaths(['tests/Fixtures']);
-        $registeredRuleIds = array_map(static fn($rule): string => $rule->definition()->id, $registry->all());
-        $defaultRuleIds    = $this->uniqueRuleIds($defaultFindings);
-        $defaultMissing    = array_values(array_diff($registeredRuleIds, $defaultRuleIds));
+        $registeredRuleIds   = array_map(static fn($rule): string => $rule->definition()->id, $registry->all());
+        $defaultRuleIds      = $this->uniqueRuleIds($defaultFindings);
+        $defaultMissing      = array_values(array_diff($registeredRuleIds, $defaultRuleIds));
 
         self::assertSame([
                              CyclomaticComplexityRule::ID,
@@ -118,10 +132,20 @@ final class RuleRegressionSnapshotTest extends TestCase
                              ClassLengthRule::ID,
                              FileLengthRule::ID,
                              MethodLengthRule::ID,
+                             ConditionalTestLogicRule::ID,
+                             ExcessiveMockingRule::ID,
+                             ExtendsProductionClassRule::ID,
+                             LoopAssertionWithoutMessageRule::ID,
+                             MockOnlyTestRule::ID,
                              MockingDomainObjectRule::ID,
+                             NoAssertionsRule::ID,
                              PhpUnitCoverageSourceMissingRule::ID,
                              PhpUnitDeprecationsNotFatalRule::ID,
                              PhpUnitStrictFlagsMissingRule::ID,
+                             SleepInTestRule::ID,
+                             SutNotCalledRule::ID,
+                             TestLongerThanSutRule::ID,
+                             UnusedMockRule::ID,
                          ], $defaultMissing);
 
         $supplementalRuleIds = $this->uniqueRuleIds($this->supplementalCalibrationFindings());
@@ -132,8 +156,8 @@ final class RuleRegressionSnapshotTest extends TestCase
     /**
      * Analyse fixture paths and return findings for assertions.
      *
-     * @param list<string>        $paths - Fixture paths to parse and analyse.
-     * @param AnalysisConfig|null $config - Optional config override, or null to use default-registry config.
+     * @param list<string>        $paths       - Fixture paths to parse and analyse.
+     * @param AnalysisConfig|null $config      - Optional config override, or null to use default-registry config.
      * @param string              $projectRoot - Project root used to resolve fixture paths and rule context.
      *
      * @return array{0: list<AnalysisUnit>, 1: list<Finding>, 2: string} - parsed units, raw findings, and canonical JSON for the analysed paths, in
@@ -151,12 +175,12 @@ final class RuleRegressionSnapshotTest extends TestCase
             static fn(SourceFile $file): AnalysisUnit => $phpFileParser->parse($file),
             $files,
         );
-        $findings      = $registry->analyse($units, new RuleContext(
+        $findings = $registry->analyse($units, new RuleContext(
             $projectRoot,
             $config ?? AnalysisConfig::fromRegistry($registry),
         ));
-        $payload       = $this->canonicalFindingPayload($findings);
-        $json          = json_encode($payload, JSON_THROW_ON_ERROR);
+        $payload = $this->canonicalFindingPayload($findings);
+        $json    = json_encode($payload, JSON_THROW_ON_ERROR);
 
         self::assertSame(count($files), count($units));
 
@@ -205,9 +229,9 @@ final class RuleRegressionSnapshotTest extends TestCase
             ['tests/Fixtures/TestQuality/testdox-readability.php'],
             (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/enable-testdox-readability.yaml', $registry),
         )[1],
-            // These three ship off by default, so the default corpus scan never reaches them; this scenario turns them on.
+            // Exercise opt-in rules explicitly, including M15's test-quality defaults.
             ...$this->analysePaths(
-            ['tests/Fixtures/Security/ComposerDependency', 'tests/Fixtures/SensitiveData'],
+            ['tests/Fixtures/Security/ComposerDependency', 'tests/Fixtures/SensitiveData', 'tests/Fixtures/TestQuality'],
             (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/enable-default-off-rules.yaml', $registry),
         )[1],
         );

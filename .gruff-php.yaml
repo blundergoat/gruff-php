@@ -515,7 +515,7 @@ rules:
     # Reason (2026-09-19, measured at the rule defaults with `analyse src tests --no-config`, fixtures excluded): exempts four test files. At the
     # defaults 14 findings report there (10 in tests/Rule, 3 in tests/Review, 1 in tests/Console). Accepted debt.
     test-quality.conditional-logic:
-        enabled: true
+        enabled: false
         options:
             ignoredPathPatterns:
                 - 'tests/Console/AnalyseCliTest.php'
@@ -540,18 +540,18 @@ rules:
         enabled: true
     # Excessive mocking
     test-quality.excessive-mocking:
-        enabled: true
+        enabled: false
         thresholds:
             maxMocks: 3
     # Test extends production class
     test-quality.extends-production-class:
-        enabled: true
+        enabled: false
     # Global state mutation in test
     test-quality.global-state-mutation:
         enabled: true
     # Assertion in loop without message
     test-quality.loop-assertion-without-message:
-        enabled: true
+        enabled: false
     # Magic number assertion
     test-quality.magic-number-assertion:
         enabled: true
@@ -582,7 +582,7 @@ rules:
                 - 504
     # Mock-only test
     test-quality.mock-only-test:
-        enabled: true
+        enabled: false
     # Mock without expectation
     test-quality.mock-without-expectation:
         enabled: true
@@ -620,7 +620,7 @@ rules:
                 - '/^test[A-Z][A-Za-z]*\d+$/'
     # Test without assertions
     test-quality.no-assertions:
-        enabled: true
+        enabled: false
     # PHPUnit coverage source missing
     test-quality.phpunit-coverage-source-missing:
         enabled: true
@@ -656,13 +656,13 @@ rules:
         enabled: true
     # Sleep or wall-clock read in test
     test-quality.sleep-in-test:
-        enabled: true
+        enabled: false
     # Flags tests whose main assertion appears to verify only a static source declaration.
     test-quality.static-analysis-redundant-test:
         enabled: true
     # Test name mentions SUT that is not called
     test-quality.sut-not-called:
-        enabled: true
+        enabled: false
     # Tautological type assertion
     test-quality.tautological-type-assertion:
         enabled: true
@@ -670,7 +670,7 @@ rules:
     # Reason (2026-09-19, measured at the rule defaults with `analyse src tests --no-config`, fixtures excluded): raised from 12 to 80
     # lines. At 12, 17 tests report (14 in tests/Rule). Accepted debt.
     test-quality.test-longer-than-sut:
-        enabled: true
+        enabled: false
         thresholds:
             minTestLines: 80
     # Test method too long
@@ -701,7 +701,7 @@ rules:
             maxLiteralLength: 5
     # Unused mock variable
     test-quality.unused-mock:
-        enabled: true
+        enabled: false
     # Commented-out code
     waste.commented-out-code:
         enabled: true

@@ -51,15 +51,15 @@ final readonly class TestMethodTooLongRule implements RuleInterface
      * Reports test methods whose meaningful line count exceeds the threshold.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
      *
      * @return list<Finding> - one Advisory finding per test scope exceeding its threshold; empty when every scope is within budget
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $definition  = $this->definition();
-        $settings    = $ruleContext->settingsFor($definition);
-        $threshold   = $this->thresholdForPath(
+        $definition = $this->definition();
+        $settings   = $ruleContext->settingsFor($definition);
+        $threshold  = $this->thresholdForPath(
             $analysisUnit->file->displayPath,
             (int)$settings->numericThreshold('maxMeaningfulLines'),
             $settings->option('pathOverrides'),
@@ -83,8 +83,8 @@ final readonly class TestMethodTooLongRule implements RuleInterface
             }
 
             $findings[] = new Finding(
-                ruleId:      self::ID,
-                message:     sprintf(
+                ruleId:  self::ID,
+                message: sprintf(
                                  '%s spans %d meaningful lines, above the threshold of %d.',
                                  $scope->symbol,
                                  $count,
@@ -98,7 +98,7 @@ final readonly class TestMethodTooLongRule implements RuleInterface
                 confidence:  Confidence::High,
                 endLine:     $scope->endLine,
                 symbol:      $scope->symbol,
-                remediation: 'Split the scenario into focused tests, extract setup helpers, or move shared arrangement into setUp(). If a path consistently needs a higher threshold (e.g. integration suites), add an entry to `rules.test-quality.test-method-too-long.options.pathOverrides` in `.gruff-php.yaml`.',
+                remediation: 'Move shared arrangement into setUp() or named builder helpers, drive data-only variations from #[DataProvider], or split the scenario into focused tests.',
                 metadata:    ['meaningfulLines' => $count, 'threshold' => $threshold],
             );
         }
@@ -110,8 +110,8 @@ final readonly class TestMethodTooLongRule implements RuleInterface
      * Counts the meaningful body lines of a test method: code lines other than a lone bracket or separator.
      *
      * @param list<string> $sourceLines - Comment- and attribute-masked source lines, indexed from zero (line N is index N-1).
-     * @param int          $startLine - First source line of the test scope, inclusive (1-based).
-     * @param int          $endLine - Last source line of the test scope, inclusive (1-based).
+     * @param int          $startLine   - First source line of the test scope, inclusive (1-based).
+     * @param int          $endLine     - Last source line of the test scope, inclusive (1-based).
      *
      * @return int - meaningful line tally compared against the threshold; blanks, comments, attributes and lone brackets are excluded
      */
@@ -148,11 +148,11 @@ final readonly class TestMethodTooLongRule implements RuleInterface
     /**
      * Resolves the effective line threshold for a path, honouring configured overrides.
      *
-     * @param string                                                        $displayPath - File path matched against each override glob;
+     * @param string                                                        $displayPath      - File path matched against each override glob;
      *                                                                                        backslashes normalised to slashes first.
      * @param int                                                           $defaultThreshold - Threshold applied when no override pattern matches this
      *                                                                                        path.
-     * @param int|float|bool|string|array<array-key, int|float|bool|string> $pathOverrides - Override map; else default.
+     * @param int|float|bool|string|array<array-key, int|float|bool|string> $pathOverrides    - Override map; else default.
      *
      * @return int - effective max-meaningful-lines budget: the first matching override (floored at 1) or the default when none match
      */

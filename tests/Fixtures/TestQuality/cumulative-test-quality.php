@@ -49,7 +49,7 @@ final class CumulativeQualityTest extends TestCase
     public function testLoopCalculateTotal(): void
     {
         foreach ([1, 2] as $amount) {
-            self::assertSame($amount, $this->service->calculateTotal());
+            self::assertSame(2, $this->service->calculateTotal($amount));
         }
     }
 
@@ -89,7 +89,7 @@ final class CumulativeQualityTest extends TestCase
     {
         $first = $this->createMock(DependencyOne::class);
         $second = $this->createMock(DependencyTwo::class);
-        $third = $this->createStub(DependencyThree::class);
+        $third = $this->createMock(DependencyThree::class);
         $fourth = $this->getMockBuilder(DependencyFour::class)->getMock();
 
         self::assertSame('ok', $this->service->run($first, $second, $third, $fourth));

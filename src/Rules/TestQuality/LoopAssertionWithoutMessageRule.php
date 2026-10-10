@@ -21,9 +21,9 @@ use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
 /**
- * Flags a PHPUnit/Pest assertion inside a loop that carries no message argument - when it fails on one
- * iteration the reader cannot tell which, so a message naming the row (`"row $i"`) is what makes the
- * failure diagnosable. Runs over every test. Advisory, medium confidence.
+ * Flags repeated PHPUnit/Pest loop assertions whose failures lack case context.
+ * A message or identifying expected value supplies that context; a singleton or a direct assertion
+ * followed by an exit needs none. Runs over every test. Advisory, medium confidence.
  */
 final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
 {
@@ -40,16 +40,17 @@ final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id:              self::ID,
-            name:            'Assertion in loop without message',
-            pillar:          Pillar::TestQuality,
-            tier:            RuleTier::V01,
-            defaultSeverity: Severity::Advisory,
-            confidence:      Confidence::Medium,
+            id:                  self::ID,
+            name:                'Assertion in loop without message',
+            pillar:              Pillar::TestQuality,
+            tier:                RuleTier::V01,
+            defaultSeverity:     Severity::Advisory,
+            confidence:          Confidence::Medium,
+            isEnabledByDefault:  false,
             falsePositiveShapes: [
                 [
-                    'shape'      => 'A loop assertion whose compared value already identifies the row, such as asserting on a keyed array whose diff names the failing entry.',
-                    'mitigation' => 'The check is for a message argument, not for whether the failure is already diagnosable, so add a short message naming the iteration.',
+                    'shape' => 'A loop assertion whose compared value already identifies the row, such as asserting on a keyed array whose diff names the failing entry.',
+                    'mitigation' => 'The rule recognizes exact expected loop bindings, literal singletons and direct exits. If another failure diagnostic already identifies the case, accept the finding in the baseline rather than add a redundant label.',
                 ],
             ],
         );
@@ -59,7 +60,7 @@ final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
      * Reports assertions inside loops that lack a context-bearing message.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
      *
      * @return list<Finding> - Findings for loop assertions without messages.
      */
@@ -102,8 +103,8 @@ final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
                         continue;
                     }
 
-                    // A message that names the iteration already makes failures diagnosable.
-                    if ($this->hasMessageArgument($assertion)) {
+                    // Already diagnosable or single-execution checks do not need an iteration message.
+                    if ($this->hasDiagnosableAssertion($assertion, $loop)) {
                         continue;
                     }
 
@@ -131,6 +132,79 @@ final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
         }
 
         return $findings;
+    }
+
+    /**
+     * Requires a context message only when neither PHPUnit's diagnostic nor a single execution identifies the case.
+     *
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Loop assertion being reviewed.
+     * @param Stmt\For_|Stmt\Foreach_|Stmt\While_|Stmt\Do_  $loop - Exact loop owning the case binding and exit.
+     * @return bool - True when a missing message cannot hide which assertion execution failed.
+     */
+    private function hasDiagnosableAssertion(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call, Stmt\For_|Stmt\Foreach_|Stmt\While_|Stmt\Do_ $loop): bool
+    {
+        return $this->hasMessageArgument($call) || $this->hasIdentifyingExpectedValue($call, $loop)
+            || $this->hasSingleIteration($loop) || $this->isTerminalLoopAssertion($call, $loop);
+    }
+
+    /**
+     * Accepts compared row values and array keys already printed in PHPUnit's failure diagnostic.
+     *
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Actual assertion in the loop.
+     * @param Stmt\For_|Stmt\Foreach_|Stmt\While_|Stmt\Do_  $loop - Exact loop whose row must be identifiable.
+     * @return bool - True when a supported expected operand is exactly a variable bound by this loop.
+     */
+    private function hasIdentifyingExpectedValue(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call, Stmt $loop): bool
+    {
+        if (!in_array(TestQualityNodeHelper::callName($call), ['assertsame', 'assertequals', 'assertarrayhaskey', 'assertarraynothaskey'], true)) {
+            return false;
+        }
+        $expected = TestQualityNodeHelper::firstArgValue($call);
+        if (!$expected instanceof Expr\Variable || !is_string($expected->name) || !$loop instanceof Stmt\Foreach_) {
+            return false;
+        }
+
+        // A keyed table's value can be repeated; only its key identifies the queried entry.
+        $bindings = (new NodeFinder())->findInstanceOf($loop->keyVar ?? $loop->valueVar, Expr\Variable::class);
+        foreach ($bindings as $binding) {
+            if ($binding->name === $expected->name) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * A literal singleton has no ambiguous failing iteration.
+     *
+     * @param Stmt $loop - Candidate loop; dynamic iterables retain their warning.
+     * @return bool - True only for one non-spread array element in a foreach.
+     */
+    private function hasSingleIteration(Stmt $loop): bool
+    {
+        return $loop instanceof Stmt\Foreach_ && $loop->expr instanceof Expr\Array_
+            && count($loop->expr->items) === 1
+            && !$loop->expr->items[0]->unpack;
+    }
+
+    /**
+     * A direct assertion followed by an unconditional loop exit can execute at most once.
+     *
+     * @param Expr                                         $call - Assertion call whose immediate statement position is inspected.
+     * @param Stmt\For_|Stmt\Foreach_|Stmt\While_|Stmt\Do_ $loop - Exact enclosing loop; an inner exit cannot clear it.
+     * @return bool - True when the assertion's next direct sibling exits this loop or the test.
+     */
+    private function isTerminalLoopAssertion(Expr $call, Stmt\For_|Stmt\Foreach_|Stmt\While_|Stmt\Do_ $loop): bool
+    {
+        $statement = $call->getAttribute('parent');
+        $position  = array_search($statement, $loop->stmts, true);
+        if (!is_int($position)) {
+            return false;
+        }
+        $next = $loop->stmts[$position + 1] ?? null;
+
+        return $next instanceof Stmt\Return_ || $next instanceof Stmt\Break_ && $next->num === null;
     }
 
     /**
