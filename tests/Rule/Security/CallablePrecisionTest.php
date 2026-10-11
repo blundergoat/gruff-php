@@ -108,6 +108,16 @@ final class CallablePrecisionTest extends TestCase
         yield 'unknown property receiver' => ['$handler = $unknown->callback; $handler();', 1];
         yield 'unproved bind target' => ['$handler = \Closure::bind($unknown, null); $handler();', 1];
         yield 'shadowed binder' => ['$handler = Closure::bind(static fn () => 1, null); $handler();', 1, 'class Closure {}'];
+        // A local holding one literal function name is judged as a direct call to that function (precision-floor M05).
+        yield 'literal function name runs as a direct call' => ['$format = \'strtoupper\'; $format(\'x\');', 0];
+        yield 'literal dangerous name still reports' => ['$run = \'system\'; $run($unknown);', 1];
+        yield 'literal name with a second write stays dynamic' => ['$format = \'strtoupper\'; if ($condition) { $format = $unknown; } $format(\'x\');', 1];
+        yield 'literal name assigned on one branch stays dynamic' => ['if ($condition) { $format = \'strtoupper\'; } $format(\'x\');', 1];
+        yield 'local closure list' => ['$steps = [static fn (string $v): string => $v, function (string $v): string { return $v; }]; foreach ($steps as $step) { $step(\'x\'); }', 0];
+        yield 'closure list holding an unknown callable' => ['$steps = [static fn (): int => 1, $unknown]; foreach ($steps as $step) { $step(); }', 1];
+        yield 'closure list appended later' => ['$steps = [static fn (): int => 1]; $steps[] = $unknown; foreach ($steps as $step) { $step(); }', 1];
+        yield 'fixed built-in command' => ['shell_exec(\'git rev-parse HEAD\');', 0];
+        yield 'built-in command with input' => ['shell_exec(\'git log \' . $unknown);', 1];
         yield 'captured alias remains unresolved' => ['$handler = $this->callback; $nested = function () use ($handler) { $handler(); };', 1];
         yield 'shadowed closure parameter' => ['$handler = $this->callback; $nested = function ($handler) { $handler(); };', 1];
         yield 'unknown call may write by reference' => ['$handler = $this->callback; change($handler); $handler();', 1];

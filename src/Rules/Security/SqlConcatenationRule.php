@@ -27,8 +27,10 @@ use PhpParser\NodeFinder;
  * SQL-injection shape - so the user moves the value to a bound parameter before it reaches the database.
  *
  * Runs per file over supported query methods and procedural database functions whose SQL argument splices in a
- * non-allowlisted dynamic part and whose literal fragments contain a SQL keyword. `prepare()` templates and
- * allowlisted identifier interpolation (`$wpdb->prefix`) are recognised. Warning, medium confidence.
+ * non-allowlisted dynamic part and whose literal fragments contain a SQL keyword. `prepare()` templates,
+ * allowlisted identifier interpolation (`$wpdb->prefix`) and escaped operands - an `(int)` cast, a
+ * `->quoteString()` call and a `Util::backquote()` call, phpMyAdmin's value and identifier escapers - are
+ * recognised. Warning, medium confidence.
  */
 final class SqlConcatenationRule implements RuleInterface
 {
@@ -94,6 +96,10 @@ final class SqlConcatenationRule implements RuleInterface
                                      [
                                          'shape'      => 'DDL/maintenance SQL interpolating only $wpdb->prefix-style identifiers ("ALTER TABLE {$wpdb->prefix}t ...").',
                                          'mitigation' => 'Allowlisted via options.safeInterpolationReceivers; set the option to [] to flag every interpolation.',
+                                     ],
+                                     [
+                                         'shape'      => 'A value escaped where it is spliced: an (int) cast, a ->quoteString() call or a Util::backquote() call.',
+                                         'mitigation' => 'These operands count as escaped and a concatenation inside their arguments is not weighed; any other escaping helper still flags, so bind the value instead.',
                                      ],
                                      [
                                          'shape'      => 'Non-SQL query() receivers such as DOMXPath::query(\'//item[@id=\' . $tag . \']\').',
@@ -411,8 +417,11 @@ final class SqlConcatenationRule implements RuleInterface
      */
     private function hasUnsafeDynamicPart(Expr $subject, array $safeReceivers, AnalysisUnit $analysisUnit): bool
     {
-        // Inspect every concatenation and interpolated string in the subtree.
-        foreach ((new NodeFinder())->find($subject, static fn(Node $candidate): bool => $candidate instanceof Expr\BinaryOp\Concat || $candidate instanceof Scalar\InterpolatedString) as $construction) {
+        $constructions = (new NodeFinder())->find($subject, fn (Node $candidate): bool =>
+            ($candidate instanceof Expr\BinaryOp\Concat || $candidate instanceof Scalar\InterpolatedString)
+            && !$this->isInsideEscapedOperand($candidate, $subject));
+        // Inspect every concatenation and interpolated string outside an escaped operand.
+        foreach ($constructions as $construction) {
             // Weigh each dynamic part directly spliced into this construction.
             foreach ($this->directDynamicParts($construction) as $part) {
                 // One non-allowlisted dynamic part makes the construction unsafe.
@@ -477,7 +486,12 @@ final class SqlConcatenationRule implements RuleInterface
      */
     private function isSafeInterpolationPart(Expr $part, array $safeReceivers, AnalysisUnit $analysisUnit): bool
     {
-        // Only a property fetch on an allowlisted receiver variable can be safe identifier interpolation.
+        // An escaped value or identifier is safe to splice whatever it was built from.
+        if ($this->isEscapedOperand($part)) {
+            return true;
+        }
+
+        // Otherwise only a property fetch on an allowlisted receiver variable can be safe identifier interpolation.
         if (!$part instanceof Expr\PropertyFetch
             || !$part->var instanceof Expr\Variable
             || !is_string($part->var->name)
@@ -487,6 +501,59 @@ final class SqlConcatenationRule implements RuleInterface
         }
 
         return !$this->isReceiverLocallyShadowed($part->var->name, $part, $analysisUnit);
+    }
+
+    /**
+     * Reports whether a node sits inside an escaped operand of the SQL expression.
+     *
+     * @param Node $node    - Concatenation or interpolation found under the SQL expression.
+     * @param Expr $subject - SQL expression that bounds the walk up the parents.
+     *
+     * @return bool - True when an escaped operand between the node and the subject contains it, so the escaper
+     *                receives that construction whole.
+     */
+    private function isInsideEscapedOperand(Node $node, Expr $subject): bool
+    {
+        $parent = $node->getAttribute('parent');
+        // Walk up to the SQL expression itself; anything above it belongs to the query call.
+        while ($parent instanceof Node && $node !== $subject) {
+            if ($this->isEscapedOperand($parent)) {
+                return true;
+            }
+            $node   = $parent;
+            $parent = $parent->getAttribute('parent');
+        }
+
+        return false;
+    }
+
+    /**
+     * Reports whether a spliced operand is escaped for SQL.
+     *
+     * The method and class names are matched exactly as phpMyAdmin spells them; DatabaseInterface::quoteString()
+     * quotes the connection-escaped string and Util::backquote() doubles every backquote inside the identifier.
+     *
+     * @param Node $operand - Operand of a SQL concatenation or interpolation.
+     *
+     * @return bool - True for an (int) cast, a ->quoteString() call, or a Util::backquote() call.
+     */
+    private function isEscapedOperand(Node $operand): bool
+    {
+        if ($operand instanceof Expr\Cast\Int_) {
+            return true;
+        }
+
+        // ->quoteString() returns a quoted, connection-escaped string literal.
+        if (($operand instanceof Expr\MethodCall || $operand instanceof Expr\NullsafeMethodCall)
+            && !$operand->isFirstClassCallable()
+            && $operand->name instanceof Identifier && $operand->name->toLowerString() === 'quotestring') {
+            return true;
+        }
+
+        // Util::backquote() returns a backquoted identifier with embedded backquotes doubled.
+        return $operand instanceof Expr\StaticCall && !$operand->isFirstClassCallable()
+            && $operand->class instanceof Node\Name && strtolower($operand->class->getLast()) === 'util'
+            && $operand->name instanceof Identifier && $operand->name->toLowerString() === 'backquote';
     }
 
     /**

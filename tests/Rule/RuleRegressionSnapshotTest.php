@@ -98,7 +98,10 @@ final class RuleRegressionSnapshotTest extends TestCase
         // M15 additionally makes two insufficient-evidence rules opt-in, removing 11 fixture findings.
         // Precision-floor M13-T23 leaves a wholly tags-only docblock to docs.bare-phpdoc-tags alone, so docs.return-comment
         // no longer reports it a second time; that removes 4 findings.
-        self::assertCount(2680, $findings);
+        // Precision-floor M05 adds 13, all on the new escapeSplicedSinkValues function in Security/procedural-sink-precision.php
+        // and none elsewhere: 6 dangerous-function-call on its non-literal shell_exec and exec lines, its 3 process-command and
+        // 2 SQL controls that still report, and 2 naming.abbreviation-allowlist on its signature.
+        self::assertCount(2693, $findings);
         // M08 made sensitive-data markers carry the class the detector already knew: a classified finding now reads
         // `[redacted:aws-access-key]` where it read `[redacted]`. The finding count, the rule set, and every
         // line-free identity are unchanged; only the marker text inside those findings moved.
@@ -107,8 +110,9 @@ final class RuleRegressionSnapshotTest extends TestCase
         // simpler path. The count and every identity are unchanged; severity, advice and metadata moved the hash.
         // Precision-floor M13-T26 builds the docs.missing-phpdoc message from the signature: it names each parameter, and asks for
         // the return value and the throw condition only where they exist. The count and every identity are unchanged; the messages moved the hash.
+        // Precision-floor M05's 13 new fixture findings move the hash; no existing finding's message or identity changes.
         self::assertSame(
-            '90ec0bdb7bb76e49408db3ca7840ae6ae4635c4ac4bb5185dbaa9f03e174c965',
+            'ec802ca13eea88b38c3f71915e29381e12cb4828c359889e8b4dc787260ca3ec',
             hash('sha256', $json),
         );
     }

@@ -26,8 +26,10 @@ use PhpParser\NodeFinder;
  * The rule treats `echo`, `print`, `printf`, and `vprintf` as output sinks and
  * uses an escaping-aware, same-function request-taint walk as the source. A
  * request value is considered safe once it passes through an HTML escaper
- * (`htmlspecialchars`, `htmlentities`, `e`), a URL encoder, or a numeric
- * cast - so escaped output never fires. Taint follows simple local assignments
+ * (`htmlspecialchars`, `htmlentities`, `e`, or WordPress's `esc_html`,
+ * `esc_attr` and `esc_url`), a URL encoder, or a numeric cast - so escaped
+ * output never fires. `esc_url_raw` is not an escaper: it does not encode for
+ * HTML output. Taint follows simple local assignments
  * within one function/file scope only; whole-program flow is out of scope.
  */
 final class ReflectedXssRule implements RuleInterface
@@ -40,7 +42,19 @@ final class ReflectedXssRule implements RuleInterface
      *
      * @var list<string>
      */
-    private const ESCAPER_FUNCTIONS = ['htmlspecialchars', 'htmlentities', 'e', 'urlencode', 'rawurlencode', 'intval', 'floatval', 'boolval'];
+    private const ESCAPER_FUNCTIONS = [
+        'htmlspecialchars',
+        'htmlentities',
+        'e',
+        'esc_html',
+        'esc_attr',
+        'esc_url',
+        'urlencode',
+        'rawurlencode',
+        'intval',
+        'floatval',
+        'boolval',
+    ];
 
     /**
      * Output functions that render their arguments to the response body.
@@ -67,7 +81,7 @@ final class ReflectedXssRule implements RuleInterface
             description:         'Request-derived data echoed/printed without HTML escaping (reflected XSS).',
             falsePositiveShapes: [
                                      [
-                                         'shape'      => 'Request value escaped or cast before output (htmlspecialchars/e()/(int)).',
+                                         'shape'      => 'Request value escaped or cast before output (htmlspecialchars, e(), WordPress esc_html/esc_attr/esc_url, or (int)).',
                                          'mitigation' => 'The rule treats escaper/encoder/numeric-cast wrappers as safe; wrap the value at the output site.',
                                      ],
                                  ],

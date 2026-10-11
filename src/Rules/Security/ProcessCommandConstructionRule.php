@@ -16,6 +16,9 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Node;
 use PhpParser\Node\Expr;
+use PhpParser\Node\InterpolatedStringPart;
+use PhpParser\Node\Scalar;
+use PhpParser\NodeFinder;
 
 /**
  * Flags process command strings built from dynamic data, including request-tainted backticks, Symfony Process
@@ -37,6 +40,14 @@ final class ProcessCommandConstructionRule implements RuleInterface
      * @var list<string>
      */
     private const PROCEDURAL_COMMAND_SINKS = ['exec', 'passthru', 'popen', 'proc_open', 'shell_exec', 'system'];
+
+    /**
+     * Functions whose result is one shell-escaped argument, so splicing it into a command adds no injection boundary.
+     * escapeshellcmd() is deliberately absent: it leaves argument separators in place.
+     *
+     * @var list<string>
+     */
+    private const SHELL_ARGUMENT_ESCAPERS = ['escapeshellarg'];
 
     /** Shell executables whose argv command flag restores shell-string parsing inside proc_open(). */
     private const SHELL_INTERPRETER_NAMES = ['bash', 'cmd', 'cmd.exe', 'dash', 'ksh', 'powershell', 'pwsh', 'sh', 'zsh'];
@@ -67,8 +78,8 @@ final class ProcessCommandConstructionRule implements RuleInterface
             confidence:      Confidence::Medium,
             falsePositiveShapes: [
                 [
-                    'shape'      => 'A procedural command whose interpolated value is properly escaped, such as exec(\'convert \' . escapeshellarg($file)).',
-                    'mitigation' => 'The procedural path triggers on concatenation or interpolation alone and models no escaping function, so keep the escaping and accept the finding, or pass a proc_open() argv array.',
+                    'shape'      => 'A procedural command whose spliced value is constrained by an earlier allow-list or validator rather than escaped where it is spliced.',
+                    'mitigation' => 'Only escapeshellarg() and (int) operands count as escaped at the concatenation itself, so escape the value there or pass a proc_open() argv array.',
                 ],
             ],
         );
@@ -154,13 +165,91 @@ final class ProcessCommandConstructionRule implements RuleInterface
                 $commandArgument = $this->shellCommandFromArgumentVector($commandArgument);
             }
 
-            // Literal commands are static; concatenation or interpolation creates the injection boundary.
-            if ($commandArgument !== null && SecurityNodeHelper::containsConcatOrInterpolation($commandArgument)) {
+            // Literal commands are static; splicing an unescaped dynamic value creates the injection boundary.
+            if ($commandArgument !== null && $this->hasUnescapedDynamicPart($commandArgument)) {
                 $findings[] = $this->dynamicCommandFinding($analysisUnit, $functionCall, $functionName);
             }
         }
 
         return $findings;
+    }
+
+    /**
+     * Reports whether a command splices in a dynamic value that is neither escaped nor an integer.
+     *
+     * An escapeshellarg() call or (int) cast is opaque: a concatenation inside escapeshellarg()'s own argument is
+     * escaped as a whole, so only constructions outside those operands are weighed.
+     *
+     * @param Expr $command - Command-string expression passed to a procedural command sink.
+     *
+     * @return bool - True when some concatenation or interpolation splices in an operand other than a literal
+     *                fragment, an escapeshellarg() result, or an (int) cast.
+     */
+    private function hasUnescapedDynamicPart(Expr $command): bool
+    {
+        $constructions = (new NodeFinder())->find($command, fn (Node $node): bool =>
+            ($node instanceof Expr\BinaryOp\Concat || $node instanceof Scalar\InterpolatedString)
+            && !$this->isInsideEscapedOperand($node, $command));
+
+        foreach ($constructions as $construction) {
+            $operands = match (true) {
+                $construction instanceof Expr\BinaryOp\Concat      => [$construction->left, $construction->right],
+                $construction instanceof Scalar\InterpolatedString => $construction->parts,
+                default                                           => [],
+            };
+            // Literal fragments are static and nested constructions are weighed on their own.
+            foreach ($operands as $operand) {
+                if ($operand instanceof InterpolatedStringPart || $operand instanceof Scalar\String_
+                    || $operand instanceof Expr\BinaryOp\Concat || $operand instanceof Scalar\InterpolatedString
+                    || $this->isEscapedOperand($operand)) {
+                    continue;
+                }
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Reports whether a node sits inside an escaped operand of the command expression.
+     *
+     * @param Node $node    - Concatenation or interpolation found under the command.
+     * @param Expr $command - Command expression that bounds the walk up the parents.
+     *
+     * @return bool - True when an escapeshellarg() call or (int) cast between the node and the command contains it.
+     */
+    private function isInsideEscapedOperand(Node $node, Expr $command): bool
+    {
+        $parent = $node->getAttribute('parent');
+        // Walk up to the command expression itself; anything above it belongs to the sink call.
+        while ($parent instanceof Node && $node !== $command) {
+            if ($this->isEscapedOperand($parent)) {
+                return true;
+            }
+            $node   = $parent;
+            $parent = $parent->getAttribute('parent');
+        }
+
+        return false;
+    }
+
+    /**
+     * Reports whether a spliced operand is shell-escaped or an integer.
+     *
+     * @param Node $operand - Operand of a command concatenation or interpolation.
+     *
+     * @return bool - True for an escapeshellarg() call or an (int) cast.
+     */
+    private function isEscapedOperand(Node $operand): bool
+    {
+        if ($operand instanceof Expr\Cast\Int_) {
+            return true;
+        }
+
+        return $operand instanceof Expr\FuncCall && !$operand->isFirstClassCallable()
+            && in_array(SecurityNodeHelper::globalFunctionName($operand), self::SHELL_ARGUMENT_ESCAPERS, true);
     }
 
     /**

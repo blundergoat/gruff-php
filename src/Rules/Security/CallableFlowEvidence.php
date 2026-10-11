@@ -69,6 +69,111 @@ final class CallableFlowEvidence
     }
 
     /**
+     * Resolves a local callee to the function a single string literal names, so the call can be judged like a direct one.
+     *
+     * @param Expr\FuncCall $call - Dynamic invocation through a plain local; other callee forms are not resolved.
+     * @return string|null - Lower-cased function name without its leading backslash when the local's only write is one
+     *                       plain string literal assigned before the call on the same branch; null otherwise.
+     */
+    public static function literalCalleeName(Expr\FuncCall $call): ?string
+    {
+        $scope = SecurityNodeHelper::enclosingFunctionLike($call);
+        // A computed callee, a missing body, or a runtime-created local leaves the value unknown.
+        if (!$call->name instanceof Expr\Variable || !is_string($call->name->name) || $scope === null
+            || $scope->getStmts() === null || self::hasUnboundedLocalWrites($scope)) {
+            return null;
+        }
+
+        $writes     = self::variableWrites($call->name->name, $scope);
+        $assignment = $writes[0] ?? null;
+        // Exactly one ordinary assignment of a plain literal, completed before the call on every path to it.
+        if (count($writes) !== 1 || !$assignment instanceof Expr\Assign || !$assignment->expr instanceof Node\Scalar\String_
+            || $assignment->getEndFilePos() >= $call->getStartFilePos()
+            || !self::isBeforeReadOnSameBranch($assignment, $call, $scope)) {
+            return null;
+        }
+
+        return strtolower(ltrim($assignment->expr->value, '\\'));
+    }
+
+    /**
+     * Proves a loop callback comes from a local list written as closure literals in the same function.
+     *
+     * @param Expr\FuncCall $call - Invocation of a foreach value; any other callee keeps its warning.
+     * @return bool - True when the loop iterates a local assigned once, before the loop, from an array literal whose
+     *                every item is a closure or arrow function, and only the loop writes the invoked value.
+     */
+    public static function hasLocalClosureListEvidence(Expr\FuncCall $call): bool
+    {
+        $scope = SecurityNodeHelper::enclosingFunctionLike($call);
+        // Only a named function or method body has the local sequence this proof relies on.
+        if ((!$scope instanceof Stmt\ClassMethod && !$scope instanceof Stmt\Function_)
+            || !$call->name instanceof Expr\Variable || !is_string($call->name->name)
+            || self::hasUnboundedLocalWrites($scope)) {
+            return false;
+        }
+
+        $loop = self::selectingLoop($call, $call->name->name);
+        // The invoked value must be written by its own by-value loop and nothing else.
+        if ($loop === null || $loop->byRef || SecurityNodeHelper::enclosingFunctionLike($loop) !== $scope
+            || self::variableWrites($call->name->name, $scope) !== [$loop]
+            || !$loop->expr instanceof Expr\Variable || !is_string($loop->expr->name)) {
+            return false;
+        }
+
+        $writes     = self::variableWrites($loop->expr->name, $scope);
+        $assignment = $writes[0] ?? null;
+        // The list is assigned once, from a closure-literal array, before the loop on the same branch.
+        return count($writes) === 1 && $assignment instanceof Expr\Assign && $assignment->var instanceof Expr\Variable
+            && $assignment->expr instanceof Expr\Array_ && self::isClosureLiteralList($assignment->expr)
+            && self::isBeforeReadOnSameBranch($assignment, $loop, $scope);
+    }
+
+    /**
+     * Finds the foreach in the call's own function whose value variable the call invokes.
+     *
+     * @param Expr\FuncCall $call - Invocation inside the loop body.
+     * @param string        $name - Invoked local's name.
+     * @return Stmt\Foreach_|null - The nearest enclosing loop assigning that name; null when none does.
+     */
+    private static function selectingLoop(Expr\FuncCall $call, string $name): ?Stmt\Foreach_
+    {
+        $parent = $call->getAttribute('parent');
+        // Stop at the function boundary so another function's loop never supplies the value.
+        while ($parent instanceof Node && !$parent instanceof FunctionLike) {
+            if ($parent instanceof Stmt\Foreach_ && $parent->valueVar instanceof Expr\Variable && $parent->valueVar->name === $name) {
+                return $parent;
+            }
+            $parent = $parent->getAttribute('parent');
+        }
+
+        return null;
+    }
+
+    /**
+     * Requires every item of an array literal to be a written closure or arrow function.
+     *
+     * @param Expr\Array_ $list - Array literal assigned to the iterated local.
+     * @return bool - True for a non-empty list of closure literals without references or unpacking.
+     */
+    private static function isClosureLiteralList(Expr\Array_ $list): bool
+    {
+        if ($list->items === []) {
+            return false;
+        }
+
+        foreach ($list->items as $item) {
+            // A reference, spread or any other value can carry a callable this function did not write.
+            if ($item->byRef || $item->unpack
+                || (!$item->value instanceof Expr\Closure && !$item->value instanceof Expr\ArrowFunction)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * Keeps registration evidence inside the loop that selected the current callback.
      *
      * @param Expr\FuncCall $call - Actual invocation inside the selected loop.

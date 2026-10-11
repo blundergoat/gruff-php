@@ -412,6 +412,21 @@ instead - interpolating a local into the template still flags, so
 keyword (SELECT/INSERT/UPDATE/DELETE/ALTER/DROP/CREATE/SHOW/FROM/WHERE)
 must appear in the literal fragments, which keeps non-SQL `query()`
 receivers such as `DOMXPath` quiet without receiver type resolution.
+An operand escaped where it is spliced also passes: an `(int)` cast, a
+`->quoteString()` call or a `Util::backquote()` call, phpMyAdmin's value
+and identifier escapers. A concatenation inside their arguments is not
+weighed, and any other escaping helper still flags.
+
+`security.process-command-construction` treats an `escapeshellarg()`
+operand and an `(int)` cast as escaped, including a concatenation inside
+`escapeshellarg()`'s own argument, so only a bare dynamic value spliced
+into the command reports. `escapeshellcmd()` is not an escaper here,
+because it leaves argument separators in place.
+
+`security.reflected-xss` counts WordPress's `esc_html()`, `esc_attr()`
+and `esc_url()` as HTML escapers alongside `htmlspecialchars()`, `e()`,
+URL encoders and numeric casts. `esc_url_raw()` still reports, because it
+does not encode for HTML output.
 
 `security.dangerous-function-call` trusts a dynamic call only through a
 proof PHP itself accepts: a closure, arrow function, `new` object of a
@@ -431,6 +446,16 @@ same function filled from one, always reports, unless that local was last
 bound to a closure literal.
 `Closure::fromCallable($x)()` is judged as `$x()`, and `$f(...)` only builds a
 Closure, so it never reports.
+
+A local whose only write is one plain string literal, assigned before the
+call on the same branch, is judged as a direct call to the function it
+names: `$f = 'strtoupper'; $f($s)` stays quiet and `$f = 'system'; $f($c)`
+reports as `system`. A loop over a local assigned once from an array whose
+every item is a closure or arrow function is trusted the same way. A
+built-in execution call (`exec`, `passthru`, `popen`, `proc_open`,
+`shell_exec`, `system`) whose command is one plain string literal no longer
+reports; any other command, and every `options.additionalFunctions` name,
+still does.
 
 Bounded local aliases now preserve callable evidence through ordinary assignments and resolved built-in `Closure::bind()` calls.
 New alias facts stop at ambiguous branches, reassignment, borrowed references, unknown receivers, runtime-created locals or eight alias steps.

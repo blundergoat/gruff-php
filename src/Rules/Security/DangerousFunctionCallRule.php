@@ -99,8 +99,8 @@ final class DangerousFunctionCallRule implements RuleInterface
             ],
             falsePositiveShapes: [
                 [
-                    'shape' => 'A constrained internal wrapper that runs a fixed literal command through exec(), system(), or shell_exec().',
-                    'mitigation' => 'The built-in execution list matches on function name alone and never inspects the argument, and options.additionalFunctions only adds names, so review the wrapper once and accept it.',
+                    'shape' => 'A constrained internal wrapper that runs a command assembled from validated values through exec(), system(), or shell_exec().',
+                    'mitigation' => 'Only a built-in execution call whose command is one plain string literal is skipped; any other command, and every options.additionalFunctions name, still reports, so review the wrapper once and accept it.',
                 ],
                 [
                     'shape' => 'A dynamic $callable() whose target is defined in another file, such as a container-resolved handler or an injected callable.',
@@ -136,7 +136,8 @@ final class DangerousFunctionCallRule implements RuleInterface
 
         // Weigh every function call for a dangerous or unresolved dynamic callee.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
-            $name = SecurityNodeHelper::globalFunctionName($call);
+            // A local holding one literal function name runs exactly that function, so judge it as a direct call.
+            $name = SecurityNodeHelper::globalFunctionName($call) ?? CallableFlowEvidence::literalCalleeName($call);
             // An unresolved callee name means this is a dynamic call worth scrutinising.
             if ($name === null) {
                 // `$f(...)` builds a Closure from its target and executes nothing, so there is no call to judge.
@@ -148,19 +149,20 @@ final class DangerousFunctionCallRule implements RuleInterface
                 if (!$call->name instanceof Node\Name && !$this->isKnownCallableInvocation($call, $trust)
                     && !CallableFlowEvidence::hasInvocationEvidence($call, fn (Expr $callbackValue): bool => $this->isProvenCallable($callbackValue, $call, $trust))
                     && !CallableCollectionEvidence::hasInvocationEvidence($call)
-                    && !CallableCollectionReturnEvidence::hasInvocationEvidence($call)) {
+                    && !CallableCollectionReturnEvidence::hasInvocationEvidence($call)
+                    && !CallableFlowEvidence::hasLocalClosureListEvidence($call)) {
                     $findings[] = $this->finding($analysisUnit, $call, 'dynamic function call');
                 }
 
                 continue;
             }
 
-            // A direct exec/shell family call is the clearest dangerous shape.
-            if (in_array($name, $dangerousFunctions, true)) {
+            $firstArg = SecurityNodeHelper::sinkArgumentValue($call, 0);
+            // A direct exec/shell family call is the clearest dangerous shape, unless it runs one fixed literal command.
+            if (in_array($name, $dangerousFunctions, true) && !$this->isFixedBuiltInCommand($name, $firstArg)) {
                 $findings[] = $this->finding($analysisUnit, $call, $name);
             }
 
-            $firstArg = SecurityNodeHelper::sinkArgumentValue($call, 0);
             // assert() on a string literal evaluates that string as code.
             if ($name === 'assert' && $firstArg !== null && SecurityNodeHelper::isStringLiteral($firstArg)) {
                 $findings[] = $this->finding($analysisUnit, $call, 'assert string evaluation');
@@ -174,6 +176,20 @@ final class DangerousFunctionCallRule implements RuleInterface
 
         // Order is by discovery, not severity: the reporter sorts; emitting here in AST order keeps results stable.
         return $findings;
+    }
+
+    /**
+     * Reports whether a built-in process call runs one fixed command.
+     *
+     * @param string    $name     - Lower-cased called function name.
+     * @param Expr|null $firstArg - Command argument; a missing argument proves nothing.
+     *
+     * @return bool - True when a built-in process function receives one plain string literal; configured additional
+     *                names are never exempt, because their argument contract is unknown.
+     */
+    private function isFixedBuiltInCommand(string $name, ?Expr $firstArg): bool
+    {
+        return in_array($name, self::DANGEROUS_FUNCTIONS, true) && $firstArg instanceof Node\Scalar\String_;
     }
 
     /**

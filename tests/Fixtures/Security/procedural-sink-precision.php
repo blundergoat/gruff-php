@@ -75,3 +75,18 @@ function exerciseProcOpenArgumentVectors(string $target): void
     proc_open(command: ['/bin/sh', '-c', 'ping -c 1 ' . $target], descriptor_spec: [], pipes: $shellPipes);
     proc_open(command: ['/bin/sh', '-lc', 'ping -c 1 ' . $target], descriptor_spec: [], pipes: $loginShellPipes);
 }
+
+function escapeSplicedSinkValues(mysqli $conn, object $dbi, string $file, string $flag, string $pid, string $id): void
+{
+    shell_exec('convert ' . escapeshellarg($file) . ' out.png');
+    shell_exec('convert ' . escapeshellarg($file) . ' ' . $flag);
+    shell_exec(sprintf('file %s', escapeshellarg(('-' === $file[0] ? './' : '') . $file)));
+    exec('kill ' . (int) $pid);
+    exec('kill ' . $pid);
+    shell_exec('convert ' . escapeshellcmd($file));
+    mysqli_query($conn, 'SELECT * FROM users WHERE id = ' . (int) $id);
+    mysqli_query($conn, 'SELECT * FROM ' . Util::backquote($id) . ' WHERE name = ' . $dbi->quoteString($id));
+    mysqli_query($conn, 'SELECT * FROM users WHERE name LIKE ' . $dbi->quoteString('%' . $id . '%'));
+    mysqli_query($conn, 'SELECT * FROM ' . Util::backquote($id) . ' WHERE id = ' . $id);
+    mysqli_query($conn, "SELECT * FROM users WHERE name = '" . $dbi->quote($id) . "'");
+}

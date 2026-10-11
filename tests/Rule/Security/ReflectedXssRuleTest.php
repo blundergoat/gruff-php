@@ -108,6 +108,28 @@ PHP);
     }
 
     /**
+     * Verify WordPress's HTML escapers count as escaping while esc_url_raw(), which does not encode for HTML, still fires.
+     *
+     * @return void
+     */
+    public function testWordPressEscapersCountAsHtmlEscaping(): void
+    {
+        $findings = $this->findingsForSource(<<<'PHP'
+<?php
+function renderWordPress(): void
+{
+    echo esc_html($_GET['name']);
+    echo '<a href="' . esc_url($_GET['next']) . '">';
+    echo '<input value="' . esc_attr($_GET['page']) . '">';
+    echo esc_url_raw($_GET['next']);
+}
+PHP);
+
+        self::assertCount(1, $findings);
+        self::assertSame(7, $findings[0]->line);
+    }
+
+    /**
      * Analyse a fixture and return only reflected-XSS findings.
      *
      * @param string $displayPath - Fixture display path.

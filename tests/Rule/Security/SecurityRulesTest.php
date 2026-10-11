@@ -140,7 +140,8 @@ final class SecurityRulesTest extends TestCase
         $findings  = $this->findingsForRule($this->localClosureUnit(), DangerousFunctionCallRule::ID);
         $functions = array_map(static fn(Finding $finding): mixed => $finding->metadata['function'] ?? null, $findings);
 
-        self::assertSame(['dynamic function call'], $functions);
+        // `$dynamic = 'system'` is the local's only write, so the call is judged as the direct system() call it is.
+        self::assertSame(['system'], $functions);
     }
 
     /**
@@ -182,11 +183,15 @@ final class SecurityRulesTest extends TestCase
         return [
             'variable include attack shapes' => ['variable-include-precision.php', VariableIncludeRule::ID, [9, 10, 13, 17, 19, 20, 32]],
             'sql concatenation attack shapes' => ['sql-concatenation-precision.php', SqlConcatenationRule::ID, [7, 8, 9, 10, 25]],
+            // From escapeSplicedSinkValues on (FAMILY-CONTRACT-free precision fix, precision-floor M05): an (int) cast,
+            // ->quoteString() and Util::backquote() operands are escaped SQL, so only the bare $id and ->quote() lines report.
             'procedural sql sinks follow one unambiguous local assignment' => [
-                'procedural-sink-precision.php', SqlConcatenationRule::ID, [8, 21, 22, 23, 24, 59, 60],
+                'procedural-sink-precision.php', SqlConcatenationRule::ID, [8, 21, 22, 23, 24, 59, 60, 90, 91],
             ],
+            // From escapeSplicedSinkValues on: escapeshellarg() and (int) operands are escaped, even around a concatenation
+            // inside escapeshellarg(); a bare $flag or $pid, and escapeshellcmd(), still report.
             'procedural command sinks flag dynamic command strings' => [
-                'procedural-sink-precision.php', ProcessCommandConstructionRule::ID, [13, 61, 75, 76],
+                'procedural-sink-precision.php', ProcessCommandConstructionRule::ID, [13, 61, 75, 76, 82, 85, 86],
             ],
             // 54/64/82: a conditional rebind never hides a real parser, including sibling-branch sinks,
             // and a conditional construction counts as possibly-XML; the rebind on the sink's own path stays silent.
