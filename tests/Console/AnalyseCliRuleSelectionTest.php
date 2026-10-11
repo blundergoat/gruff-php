@@ -98,11 +98,13 @@ final class AnalyseCliRuleSelectionTest extends CliTestCase
      */
     public function testAnalyseCommandSecurityProfileRunsSecurityRulesOnly(): void
     {
+        // Security rules skip `tests/` paths, so the fixture is scanned from a production path.
+        $project = $this->cumulativeSecurityProject();
         $process = new Process([
                                    PHP_BINARY,
-                                   __DIR__ . '/../../bin/gruff-php',
+                                   self::PROJECT_ROOT . '/bin/gruff-php',
                                    'analyse',
-                                   'tests/Fixtures/Security/cumulative-security.php',
+                                   'src/cumulative-security.php',
                                    '--no-config',
                                    '--profile',
                                    'security',
@@ -110,8 +112,13 @@ final class AnalyseCliRuleSelectionTest extends CliTestCase
                                    'json',
                                    '--fail-on',
                                    'none',
-                               ], __DIR__ . '/../..');
-        $process->run();
+                               ], $project);
+
+        try {
+            $process->run();
+        } finally {
+            $this->removeDir($project);
+        }
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
 
@@ -144,21 +151,28 @@ final class AnalyseCliRuleSelectionTest extends CliTestCase
      */
     public function testAnalyseCommandSecurityProfileOverridesConfiguredSelection(): void
     {
+        // Security rules skip `tests/` paths, so the fixture is scanned from a production path.
+        $project = $this->cumulativeSecurityProject();
         $process = new Process([
                                    PHP_BINARY,
-                                   __DIR__ . '/../../bin/gruff-php',
+                                   self::PROJECT_ROOT . '/bin/gruff-php',
                                    'analyse',
-                                   'tests/Fixtures/Security/cumulative-security.php',
+                                   'src/cumulative-security.php',
                                    '--config',
-                                   'tests/Fixtures/Config/only-size-rules.yaml',
+                                   self::PROJECT_ROOT . '/tests/Fixtures/Config/only-size-rules.yaml',
                                    '--profile',
                                    'security',
                                    '--format',
                                    'json',
                                    '--fail-on',
                                    'none',
-                               ], __DIR__ . '/../..');
-        $process->run();
+                               ], $project);
+
+        try {
+            $process->run();
+        } finally {
+            $this->removeDir($project);
+        }
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
 

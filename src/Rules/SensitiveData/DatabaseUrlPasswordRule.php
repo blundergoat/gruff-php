@@ -29,6 +29,24 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
     public const ID = 'sensitive-data.database-url-password';
 
     /**
+     * Stock development user names and passwords, compared case-insensitively and whole (FAMILY-CONTRACT.md section 5).
+     * They are documented defaults such as `postgres:postgres` or `scott:tiger`, not credentials, so they are held as plain text.
+     *
+     * @var list<string>
+     */
+    private const STOCK_DEVELOPMENT_WORDS = [
+        'admin', 'bar', 'dbpass', 'dbuser', 'default', 'demo', 'example', 'foo', 'guest', 'mysql', 'pass', 'passwd',
+        'password', 'postgres', 'root', 'sa', 'scott', 'secret', 'test', 'tiger', 'user', 'username',
+    ];
+
+    /**
+     * Loopback hosts on which a stock credential is a development default rather than a live weakness.
+     *
+     * @var list<string>
+     */
+    private const LOOPBACK_HOSTS = ['localhost', '127.0.0.1', '::1', '0.0.0.0'];
+
+    /**
      * Describes the database-URL-password sensitive-data rule for the registry and reports.
      *
      * @return RuleDefinition - warning severity, high confidence; ships off by default, so only a config can turn it on
@@ -93,6 +111,11 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
                 continue;
             }
 
+            // A stock pair such as `postgres:postgres` on a local or Compose host is a documented development default.
+            if (self::isStockDevelopmentUrl($matches['user'][$index][0], $password, $matches['host'][$index][0])) {
+                continue;
+            }
+
             // The scheme is the one part of a connection string the URL already publishes in plain text.
             $displayMarker = SecretScannerHelper::connectionStringMarker($matches['scheme'][$index][0]);
 
@@ -109,5 +132,32 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
         }
 
         return $findings;
+    }
+
+    /**
+     * Reports whether a URL's credential is a stock development pair on a host only a developer's machine reaches.
+     * The same pair on any other host still reports, because a default credential on a reachable host is a live weakness.
+     *
+     * @param string $user - User name between the scheme and the colon, e.g. `postgres`.
+     * @param string $password - Password between the colon and the `@`.
+     * @param string $hostAndRest - Everything after the `@` up to the closing quote, e.g. `localhost:5432/app`.
+     *
+     * @return bool - true when both words are stock and the host is loopback or a single-label service name such as `db`
+     */
+    private static function isStockDevelopmentUrl(string $user, string $password, string $hostAndRest): bool
+    {
+        // Both halves must be stock words; one real word keeps the finding.
+        if (!in_array(strtolower($user), self::STOCK_DEVELOPMENT_WORDS, true)
+            || !in_array(strtolower($password), self::STOCK_DEVELOPMENT_WORDS, true)) {
+            return false;
+        }
+
+        $authority = strtolower((string)preg_replace('#[/?\#].*$#s', '', $hostAndRest));
+        // A bracketed IPv6 host such as `[::1]:5432` keeps its colons inside the brackets.
+        $host = preg_match('#^\[(?<address>[^\]]+)\]#', $authority, $bracketed) === 1
+            ? $bracketed['address']
+            : explode(':', $authority, 2)[0];
+
+        return in_array($host, self::LOOPBACK_HOSTS, true) || ($host !== '' && !str_contains($host, '.') && !str_contains($host, ':'));
     }
 }

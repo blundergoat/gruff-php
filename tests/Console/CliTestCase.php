@@ -119,6 +119,21 @@ abstract class CliTestCase extends TestCase
     }
 
     /**
+     * Copies the cumulative-security fixture into a temporary project's `src/`, so security rules read it as production code.
+     * A test that needs security findings uses this, because every security rule skips `tests/` and `Fixtures/` paths.
+     *
+     * @return string - Root of the temporary project; the caller removes it with removeDir().
+     */
+    protected function cumulativeSecurityProject(): string
+    {
+        $project = $this->tempDir();
+        self::assertTrue(mkdir($project . '/src'));
+        self::assertTrue(copy(self::PROJECT_ROOT . '/tests/Fixtures/Security/cumulative-security.php', $project . '/src/cumulative-security.php'));
+
+        return $project;
+    }
+
+    /**
      * Remove a temporary directory tree.
      *
      * @param string $path - Filesystem path.

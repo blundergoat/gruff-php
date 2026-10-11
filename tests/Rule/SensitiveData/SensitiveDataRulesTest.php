@@ -144,6 +144,34 @@ final class SensitiveDataRulesTest extends TestCase
     }
 
     /**
+     * Models stock development credentials such as `postgres:postgres`, which FAMILY-CONTRACT.md section 5 reads as documented defaults.
+     * They stay silent on loopback and single-label service hosts, while the same pair on a reachable host and a real
+     * password on a local host still report.
+     *
+     * @return void
+     */
+    public function testStockDevelopmentCredentialsOnLocalHostsAreNotReported(): void
+    {
+        // Assembled here, so this file holds no whole credential-shaped URL; the stock words themselves are not secrets.
+        $realPassword = 'Vq7' . 'mZ2' . 'kP9';
+        $source       = implode("\n", [
+            '<?php',
+            "\$a = '" . 'postgresql://' . 'postgres:postgres' . "@localhost:5432/app';",
+            "\$b = '" . 'mysql://' . 'root:root' . "@127.0.0.1/app';",
+            "\$c = '" . 'postgres://' . 'user:pass' . "@[::1]:5432/app';",
+            "\$d = '" . 'redis://' . 'Guest:Secret' . "@db:6379';",
+            "\$e = '" . 'postgres://' . 'postgres:postgres' . "@db.example.com/app';",
+            "\$f = '" . 'postgres://' . 'postgres:' . $realPassword . "@localhost/app';",
+            '',
+        ]);
+        $unit     = new AnalysisUnit(new SourceFile(__FILE__, 'config.php', SourceFile::TYPE_TEXT), $source, [], [], []);
+        $context  = new RuleContext(self::PROJECT_ROOT, AnalysisConfig::fromRegistry(RuleRegistry::defaults()));
+        $findings = (new DatabaseUrlPasswordRule())->analyse($unit, $context);
+
+        self::assertSame([6, 7], array_map(static fn(Finding $finding): ?int => $finding->line, $findings));
+    }
+
+    /**
      * Models a config that shows where an AWS key goes with a run of X instead of the key.
      * FAMILY-CONTRACT.md section 5 reads a body that is entirely X as naming no credential, while a real key that
      * merely contains a run of X still reports, because hiding it would hide a live credential.

@@ -46,6 +46,48 @@ final class BuiltInTestPathSkipCliTest extends CliTestCase
     }
 
     /**
+     * Verifies a deliberate shell call in test and example files is skipped and counted with the security reason.
+     * The same call in production code still reports, which is the control that proves the rules still run.
+     *
+     * @return void
+     */
+    public function testTheTestPathClassSkipsSecurityFindingsAndCountsThem(): void
+    {
+        $project = sys_get_temp_dir() . '/gruff-test-path-security-' . bin2hex(random_bytes(6));
+        $source  = "<?php\n\nfunction run(string \$arg): string\n{\n    return (string)shell_exec('sh -c ' . \$arg);\n}\n";
+        $this->writeProjectFiles($project, [
+            'src/Runner.php'         => $source,
+            'tests/RunnerTest.php'   => $source,
+            'examples/run_demo.php'  => $source,
+        ]);
+
+        try {
+            $report           = $this->decodeJsonOutput($this->scan($project, 'json'));
+            $securityRulesFor = fn(string $filePath): array => array_values(array_filter(
+                $this->rulesFor($report, $filePath),
+                static fn(string $rule): bool => str_starts_with($rule, 'security.'),
+            ));
+
+            self::assertContains('security.dangerous-function-call', $this->rulesFor($report, 'src/Runner.php'));
+            self::assertSame([], $securityRulesFor('tests/RunnerTest.php'));
+            self::assertSame([], $securityRulesFor('examples/run_demo.php'));
+            // Every skipped security finding is counted in a built-in row that carries the security reason.
+            $securityRows = array_values(array_filter(
+                $this->builtInRows($report),
+                static fn(array $auditRow): bool => is_string($auditRow['rule'] ?? null) && str_starts_with($auditRow['rule'], 'security.'),
+            ));
+            self::assertNotSame([], $securityRows);
+
+            foreach ($securityRows as $auditRow) {
+                self::assertSame('Test, fixture and example files exercise insecure calls on purpose, so security rules skip them by path.', $auditRow['reason'] ?? null);
+                self::assertContains($auditRow['paths'] ?? null, [['examples/run_demo.php'], ['tests/RunnerTest.php']]);
+            }
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+
+    /**
      * Verifies both text surfaces print the skip's count, so a terminal reader sees what the built-in class hid.
      * Example: `analyse` on a project with a sample key in `examples/demo.json` prints a `builtInTestPath[examples/demo.json]` line.
      *

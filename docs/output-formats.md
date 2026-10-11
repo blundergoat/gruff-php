@@ -110,8 +110,8 @@ carries a finding message, preview, or matched value. See
 The family's built-in test-path skip also publishes rows, after the configured
 ones, numbered from `0` among themselves and marked `source: "built-in"`, which a
 configured row never carries. It adds one row per file and rule it removed,
-because every sensitive-data rule except `sensitive-data.pii-test-fixture` skips
-test, fixture and example files. Text output labels them
+because every security rule, and every sensitive-data rule except
+`sensitive-data.pii-test-fixture`, skips test, fixture and example files. Text output labels them
 `builtInTestPath[<path>]`. The lockfile skip was removed in 0.6.0 with the
 entropy rule it served (ADR-034).
 

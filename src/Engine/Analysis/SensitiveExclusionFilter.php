@@ -12,15 +12,20 @@ use GruffPhp\Results\Finding\Finding;
  * `analyse`, `summary` and a branch review's base scan run it after the rules and before scoring, the exit-code gate and any report.
  *
  * - A `sensitiveExclusions` entry the user wrote in config hides the findings matching its rule id, path and optional symbol.
- * - The built-in test-path skip hides sensitive-data findings in test, fixture and example files, e.g. a sample key in `tests/keys.php`.
+ * - The built-in test-path skip hides sensitive-data and security findings in test, fixture and example files, e.g. a sample key in `tests/keys.php`.
  * - Matching never reads a finding's message or matched value, so no entry can be written against the secret itself.
  */
 final readonly class SensitiveExclusionFilter
 {
     /**
-     * Reason a user reads on each `builtInTestPath[...]` audit row; every port publishes these exact words (FAMILY-CONTRACT.md section 13a).
+     * Reason a user reads on each sensitive-data `builtInTestPath[...]` audit row; every port publishes these exact words (FAMILY-CONTRACT.md section 13a).
      */
     public const BUILT_IN_TEST_PATH_REASON = 'Test, fixture and example files hold sample credentials, so sensitive-data rules skip them by path.';
+
+    /**
+     * Reason on each security `builtInTestPath[...]` audit row, since a test calls insecure APIs on purpose; every port publishes these exact words.
+     */
+    public const BUILT_IN_SECURITY_TEST_PATH_REASON = 'Test, fixture and example files exercise insecure calls on purpose, so security rules skip them by path.';
 
     /**
      * The one sensitive-data rule that still reads test paths, because finding realistic personal data in fixtures is its job.
@@ -71,9 +76,9 @@ final readonly class SensitiveExclusionFilter
     }
 
     /**
-     * Hides sensitive-data findings in test, fixture and example files, and publishes one audit row per hidden file and rule.
+     * Hides sensitive-data and security findings in test, fixture and example files, and publishes one audit row per hidden file and rule.
      *
-     * A user scanning a project with sample keys in `tests/fixtures/` sees `builtInTestPath[...]` rows instead of findings.
+     * A user scanning a project with sample keys or a deliberate `shell_exec` in `tests/fixtures/` sees `builtInTestPath[...]` rows instead of findings.
      * The skip is never silent, and the fixture-PII rule keeps reading these files (FAMILY-CONTRACT.md section 13a).
      *
      * @param SensitiveExclusionResult $result - Findings and audit rows left after the user's exclusions.
@@ -87,10 +92,8 @@ final readonly class SensitiveExclusionFilter
 
         // Each finding either stays in the report or is folded into its file's audit row.
         foreach ($result->findings as $finding) {
-            // Only the pillar's findings in a test, fixture or example file are skipped, and never the fixture-PII rule.
-            if (str_starts_with($finding->ruleId, 'sensitive-data.')
-                && $finding->ruleId !== self::BUILT_IN_TEST_PATH_EXEMPT_RULE
-                && self::isBuiltInTestPath($finding->filePath)) {
+            // Only the two pillars' findings in a test, fixture or example file are skipped, and never the fixture-PII rule.
+            if (self::isSkippedOnTestPaths($finding->ruleId) && self::isBuiltInTestPath($finding->filePath)) {
                 $fileAndRule                             = $finding->filePath . "\0" . $finding->ruleId;
                 $skippedCountByFileAndRule[$fileAndRule] = ($skippedCountByFileAndRule[$fileAndRule] ?? 0) + 1;
                 continue;
@@ -114,13 +117,30 @@ final readonly class SensitiveExclusionFilter
                 rule: $ruleId,
                 path: $filePath,
                 symbol: null,
-                reason: self::BUILT_IN_TEST_PATH_REASON,
+                reason: str_starts_with($ruleId, 'security.') ? self::BUILT_IN_SECURITY_TEST_PATH_REASON : self::BUILT_IN_TEST_PATH_REASON,
                 suppressed: $count,
                 source: 'built-in',
             );
         }
 
         return new SensitiveExclusionResult($survivors, $summaries);
+    }
+
+    /**
+     * Reports whether the test-path skip covers a rule: every sensitive-data rule but the fixture-PII rule, and every security rule.
+     *
+     * @param string $ruleId - Rule id of the finding, e.g. `security.dangerous-function-call`.
+     *
+     * @return bool - true when a finding of this rule on a test path is skipped and counted
+     */
+    private static function isSkippedOnTestPaths(string $ruleId): bool
+    {
+        // Security rules are skipped whole; a test exercises insecure calls on purpose.
+        if (str_starts_with($ruleId, 'security.')) {
+            return true;
+        }
+
+        return str_starts_with($ruleId, 'sensitive-data.') && $ruleId !== self::BUILT_IN_TEST_PATH_EXEMPT_RULE;
     }
 
     /**
