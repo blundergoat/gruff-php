@@ -133,7 +133,7 @@ rules:
     # Missing file PHPDoc
     docs.missing-file-phpdoc:
         enabled: true
-    # Missing @param tag
+    # Flags a documented method or function missing an @param tag for one of its parameters; with `everyCallable`, also closures and arrow functions bound to a name, read from the docblock above the assignment.
     docs.missing-param-tag:
         enabled: true
     # Requires declared properties to explain their purpose with PHPDoc; an opt-in toggle also accepts meaningful attached line comments.
@@ -141,7 +141,7 @@ rules:
         enabled: true
         options:
             acceptLineComments: false
-    # Missing method PHPDoc
+    # Flags a method declaration with no PHPDoc block; with `everyCallable`, also undocumented named functions.
     docs.missing-phpdoc:
         enabled: true
     # Missing README
@@ -161,7 +161,7 @@ rules:
         options:
             functionNames:
                 - preg_match
-    # A value-returning function or method must describe its result in its @return tag, not just restate the type, so a reviewer can diff the documented contract against the body. Fires only when an @return tag is present but carries no description; missing docblocks and missing @return tags are owned by docs.missing-phpdoc and docs.missing-return-tag, and a wholly tags-only docblock by docs.bare-phpdoc-tags. Void/never returns and constructors/destructors are exempt. Advisory by default; opt in to stricter enforcement via .gruff-php.yaml.
+    # A value-returning function or method must describe its result in its @return tag, not just restate the type, so a reviewer can diff the documented contract against the body. Fires only when an @return tag is present but carries no description; missing docblocks and missing @return tags are owned by docs.missing-phpdoc and docs.missing-return-tag, and a function or method docblock made only of bare @param and @return tags, with no summary or other tag, by docs.bare-phpdoc-tags. With `everyCallable`, also closures and arrow functions bound to a name, read from the docblock above the assignment, bare-tags-only blocks included. Void/never returns and constructors/destructors are exempt. Advisory by default; opt in to stricter enforcement via .gruff-php.yaml.
     docs.return-comment:
         enabled: true
     # Stale @param tag

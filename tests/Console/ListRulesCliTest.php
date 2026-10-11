@@ -184,7 +184,7 @@ final class ListRulesCliTest extends CliTestCase
 
         self::assertSame(0, $exitCode, $process->getErrorOutput());
         // Precision-floor M19 (2026-10-04) retired nine rules, six of them medium or low confidence (ADR-034).
-        self::assertCount(119, $rules);
+        self::assertCount(120, $rules);
         self::assertCount(64, $mediumOrLowRules);
         self::assertSame([], $withoutGuidance);
         self::assertSame([], $blankGuidance);

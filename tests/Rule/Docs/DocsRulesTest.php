@@ -4,13 +4,18 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\Docs;
 
+use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Config\RuleSettings;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Severity;
+use GruffPhp\Rules\Docs\BarePhpdocTagsRule;
 use GruffPhp\Rules\Docs\MissingParamTagRule;
 use GruffPhp\Rules\Docs\MissingPhpdocRule;
 use GruffPhp\Rules\Docs\MissingReturnTagRule;
+use GruffPhp\Rules\Docs\ParamCommentRule;
 use GruffPhp\Rules\Docs\PhpdocTagText;
 use GruffPhp\Rules\Docs\ReturnCommentRule;
+use GruffPhp\Rules\RuleRegistry;
 
 /**
  * Covers documentation rule enforcement: missing PHPDoc on public/accessor/private/magic/interface-contract methods, and missing param and return
@@ -31,12 +36,12 @@ final class DocsRulesTest extends DocsRuleTestCase
             ...$this->analyseRule('inherited-contract-tags.php', MissingReturnTagRule::ID),
             ...$this->analyseRule('inherited-contract-namespaces.php', MissingReturnTagRule::ID),
         ];
-        $paramFindings  = [
+        $paramFindings = [
             ...$this->analyseRule('inherited-contract-tags.php', MissingParamTagRule::ID),
             ...$this->analyseRule('inherited-contract-namespaces.php', MissingParamTagRule::ID),
         ];
-        $returnSymbols  = array_map(static fn(Finding $finding): string => (string) $finding->symbol, $returnFindings);
-        $paramSymbols   = array_map(
+        $returnSymbols = array_map(static fn(Finding $finding): string => (string) $finding->symbol, $returnFindings);
+        $paramSymbols  = array_map(
             static fn(Finding $finding): string => $finding->symbol . ' $' . (is_string($finding->metadata['parameter'] ?? null) ? $finding->metadata['parameter'] : ''),
             $paramFindings,
         );
@@ -115,6 +120,50 @@ final class DocsRulesTest extends DocsRuleTestCase
 
         $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
         self::assertNotContains('MissingPhpdocFixture::documented()', $symbols);
+    }
+
+    /**
+     * Verify the missing-PHPDoc message names every parameter of an undocumented private method and never calls it public.
+     *
+     * @return void
+     */
+    public function testMissingPhpdocMessageNamesEachParameter(): void
+    {
+        $message = $this->missingPhpdocMessages()['SignatureMessages::add()'];
+
+        self::assertStringEndsWith('signature). Also describe parameters $a, $b and $rest.', $message);
+        self::assertStringNotContainsStringIgnoringCase('public', $message);
+    }
+
+    /**
+     * Verify the message asks for the return value only when the declaration yields one, and that a method with no
+     * parameters, no value and no throw keeps the exact message it had before this change.
+     *
+     * @return void
+     */
+    public function testMissingPhpdocMessageAsksForReturnValueOnlyWhenOneExists(): void
+    {
+        $messages = $this->missingPhpdocMessages();
+
+        self::assertStringEndsWith('signature). Also describe the return value.', $messages['SignatureMessages::value()']);
+        self::assertStringEndsWith('signature). Also describe the return value.', $messages['SignatureMessages::untyped()']);
+        self::assertSame(
+            'Method SignatureMessages::nothing() needs a brief intent description above its declaration (one plain-English line; not a restatement of the method signature).',
+            $messages['SignatureMessages::nothing()'],
+        );
+    }
+
+    /**
+     * Verify the message asks when the callable throws only for a throw in its own body, not one inside a nested closure.
+     *
+     * @return void
+     */
+    public function testMissingPhpdocMessageAsksForThrowsOnlyWhenTheBodyThrows(): void
+    {
+        $messages = $this->missingPhpdocMessages();
+
+        self::assertStringEndsWith('signature). Also describe parameter $reason and when it throws.', $messages['SignatureMessages::fail()']);
+        self::assertStringEndsWith('not a restatement of the method signature).', $messages['SignatureMessages::nestedThrow()']);
     }
 
     /**
@@ -462,6 +511,60 @@ final class DocsRulesTest extends DocsRuleTestCase
     }
 
     /**
+     * Verify a wholly tags-only docblock is reported once, by docs.bare-phpdoc-tags, while a summary over a bare
+     * `@return` still reports under docs.return-comment (M13-T23).
+     *
+     * @return void
+     */
+    public function testReturnDescriptionLeavesTagsOnlyBlocksToBarePhpdocTags(): void
+    {
+        $source = <<<'PHP'
+<?php
+
+/**
+ * @param int $value
+ *
+ * @return int
+ */
+function tagsOnly(int $value): int
+{
+    return $value;
+}
+
+/**
+ * Doubles the value.
+ *
+ * @param int $value - number to double
+ *
+ * @return int
+ */
+function summaryWithBareReturn(int $value): int
+{
+    return $value * 2;
+}
+
+final class TagsOnlyHolder
+{
+    /**
+     * @param int $value
+     *
+     * @return int
+     */
+    public function tagsOnlyMethod(int $value): int
+    {
+        return $value;
+    }
+}
+PHP;
+        $returnSymbols = array_map(static fn(Finding $finding): ?string => $finding->symbol, $this->analyseSourceRule($source, ReturnCommentRule::ID));
+        $bareSymbols   = array_map(static fn(Finding $finding): ?string => $finding->symbol, $this->analyseSourceRule($source, BarePhpdocTagsRule::ID));
+        sort($bareSymbols);
+
+        self::assertSame(['summaryWithBareReturn()'], $returnSymbols);
+        self::assertSame(['TagsOnlyHolder::tagsOnlyMethod()', 'tagsOnly()'], $bareSymbols);
+    }
+
+    /**
      * Verify multiline array-shape return tags are scanned through their closing type line.
      *
      * @return void
@@ -478,7 +581,7 @@ final class DocsRulesTest extends DocsRuleTestCase
  * } - payload keyed by id with rows in display order
  */
 PHPDOC;
-        $bare      = <<<'PHPDOC'
+        $bare = <<<'PHPDOC'
 /**
  * Build payload.
  *
@@ -509,16 +612,214 @@ PHPDOC;
         $symbols  = array_map(static fn($finding): ?string => $finding->symbol, $findings);
         sort($symbols);
 
+        // M13-T23: arrayShapeDoc() and uselessDoc() are wholly tags-only docblocks, which docs.bare-phpdoc-tags
+        // reports, so docs.return-comment no longer reports them a second time.
         self::assertSame([
-                             'PhpdocTagsFixture::arrayShapeDoc()',
                              'PhpdocTagsFixture::missingArrayParam()',
                              'PhpdocTagsFixture::missingParam()',
                              'PhpdocTagsFixture::staleParam()',
-                             'PhpdocTagsFixture::uselessDoc()',
                          ], $symbols);
 
         self::assertNotContains('PhpdocTagsFixture::complete()', $symbols);
         self::assertNotContains('PhpdocTagsFixture::describedReturnTagDoc()', $symbols);
         self::assertNotContains('PhpdocTagsFixture::voidWithDocblock()', $symbols);
+    }
+
+    /**
+     * Verify docs.param-comment, once enabled, reports one finding per declaration naming every bare `@param`, reads
+     * past callable and multiline array-shape types, and leaves described tags alone (M13-T24).
+     *
+     * @return void
+     */
+    public function testParamCommentNamesEveryBareParamOncePerDeclaration(): void
+    {
+        $messages = array_map(
+            static fn(Finding $finding): string => $finding->message,
+            $this->analyseSourceRule($this->paramCommentSource(), ParamCommentRule::ID, $this->paramCommentEnabled()),
+        );
+        sort($messages);
+
+        self::assertSame([
+                             'BareParamHolder::store() has a bare @param tag for $value; describe what the parameter means, not just its type.',
+                             'bareCallableParam() has a bare @param tag for $callback; describe what the parameter means, not just its type.',
+                             'twoBareParams() has bare @param tags for $alpha, $gamma; describe what each parameter means, not just its type.',
+                         ], $messages);
+    }
+
+    /**
+     * Verify docs.param-comment shares the tags-only predicate, so a wholly tags-only docblock is reported once, by
+     * docs.bare-phpdoc-tags (M13-T24).
+     *
+     * @return void
+     */
+    public function testParamCommentLeavesTagsOnlyBlocksToBarePhpdocTags(): void
+    {
+        $paramSymbols = array_map(
+            static fn(Finding $finding): ?string => $finding->symbol,
+            $this->analyseSourceRule($this->paramCommentSource(), ParamCommentRule::ID, $this->paramCommentEnabled()),
+        );
+        $bareSymbols = array_map(
+            static fn(Finding $finding): ?string => $finding->symbol,
+            $this->analyseSourceRule($this->paramCommentSource(), BarePhpdocTagsRule::ID, $this->paramCommentEnabled()),
+        );
+
+        self::assertNotContains('tagsOnly()', $paramSymbols);
+        self::assertSame(['tagsOnly()'], $bareSymbols);
+    }
+
+    /**
+     * Verify docs.param-comment is off by default, so default settings report nothing new (M13-T24).
+     *
+     * @return void
+     */
+    public function testParamCommentIsOffByDefault(): void
+    {
+        self::assertSame([], $this->analyseSourceRule($this->paramCommentSource(), ParamCommentRule::ID));
+    }
+
+    /**
+     * Builds a config with docs.param-comment switched on and every other rule at its default.
+     *
+     * @return AnalysisConfig - registry defaults plus the enabled docs.param-comment rule
+     */
+    private function paramCommentEnabled(): AnalysisConfig
+    {
+        $config = AnalysisConfig::fromRegistry(RuleRegistry::defaults());
+
+        return $config->withRuleSettings(
+            ParamCommentRule::ID,
+            new RuleSettings(true, $config->ruleSettings(ParamCommentRule::ID)->thresholds),
+        );
+    }
+
+    /**
+     * Returns inline source covering bare, described, callable-typed, array-shaped and tags-only `@param` tags.
+     *
+     * @return string - PHP source for the docs.param-comment tests
+     */
+    private function paramCommentSource(): string
+    {
+        return <<<'PHP'
+<?php
+
+/**
+ * Sums three values.
+ *
+ * @param int $alpha
+ * @param int $beta - second addend
+ * @param $gamma
+ *
+ * @return int - the sum
+ */
+function twoBareParams(int $alpha, int $beta, $gamma): int
+{
+    return $alpha + $beta + $gamma;
+}
+
+/**
+ * Applies a callback to every row.
+ *
+ * @param callable(int $row): void $callback
+ * @param array{
+ *     id: int,
+ *     name: string,
+ * } $rows - rows to walk
+ *
+ * @return void
+ */
+function bareCallableParam(callable $callback, array $rows): void
+{
+}
+
+/**
+ * @param int $value
+ *
+ * @return int
+ */
+function tagsOnly(int $value): int
+{
+    return $value;
+}
+
+/**
+ * Doubles the value.
+ *
+ * @param int $value - number to double
+ *
+ * @return int - the doubled number
+ */
+function describedParam(int $value): int
+{
+    return $value * 2;
+}
+
+final class BareParamHolder
+{
+    /**
+     * Stores the value.
+     *
+     * @param int $value
+     *
+     * @return void
+     */
+    private function store(int $value): void
+    {
+    }
+}
+PHP;
+    }
+
+    /**
+     * Runs docs.missing-phpdoc over one class of undocumented methods that differ only in signature and body.
+     *
+     * @return array<string, string> - Finding message keyed by symbol.
+     */
+    private function missingPhpdocMessages(): array
+    {
+        $source = <<<'PHP'
+            <?php
+
+            final class SignatureMessages
+            {
+                private function add(int $a, int &$b, int ...$rest): void
+                {
+                }
+
+                public function value(): int
+                {
+                    return 1;
+                }
+
+                public function untyped()
+                {
+                    return 2;
+                }
+
+                public function nothing(): void
+                {
+                }
+
+                public function fail(string $reason): never
+                {
+                    throw new \RuntimeException($reason);
+                }
+
+                public function nestedThrow(): void
+                {
+                    $callback = static function (): void {
+                        throw new \RuntimeException('later');
+                    };
+                }
+            }
+            PHP;
+
+        $messages = [];
+
+        // Key each message by its method symbol so a test reads the one it pins.
+        foreach ($this->analyseSourceRule($source, MissingPhpdocRule::ID) as $finding) {
+            $messages[(string) $finding->symbol] = $finding->message;
+        }
+
+        return $messages;
     }
 }

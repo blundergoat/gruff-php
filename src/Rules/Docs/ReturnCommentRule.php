@@ -10,11 +10,11 @@ use GruffPhp\Results\Finding\Pillar;
 use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
-use GruffPhp\Rules\Complexity\CyclomaticComplexityRule;
-use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
+use PhpParser\Node\Expr\ArrowFunction;
+use PhpParser\Node\Expr\Closure;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
@@ -28,8 +28,9 @@ use PhpParser\NodeFinder;
  * it and where it is the verification surface a reviewer diffs against the body. This rule fills the
  * gap its sibling docs rules leave: a value-returner with a summary plus a bare `@return Type` trips
  * neither docs.missing-return-tag (presence is satisfied) nor docs.bare-phpdoc-tags (the docblock is
- * not tags-only). It stays silent when there is no docblock or no `@return` tag, and exempts void or
- * never returns and constructors/destructors, which have no result to describe. Advisory.
+ * not tags-only). It stays silent when there is no docblock or no `@return` tag, and on a wholly
+ * tags-only docblock, which docs.bare-phpdoc-tags already reports; it exempts void or never returns
+ * and constructors/destructors, which have no result to describe. Advisory.
  */
 final readonly class ReturnCommentRule implements RuleInterface
 {
@@ -48,13 +49,15 @@ final readonly class ReturnCommentRule implements RuleInterface
     {
         // High confidence: an @return tag with no prose after the type is unambiguous; advisory so teams opt in.
         return new RuleDefinition(
-            id:              self::ID,
-            name:            'Described return tag',
-            pillar:          Pillar::Documentation,
-            tier:            RuleTier::V01,
-            defaultSeverity: Severity::Advisory,
-            confidence:      Confidence::High,
-            description:     'A value-returning function or method must describe its result in its @return tag, not just restate the type, so a reviewer can diff the documented contract against the body. Fires only when an @return tag is present but carries no description; missing docblocks and missing @return tags are owned by docs.missing-phpdoc and docs.missing-return-tag, and a wholly tags-only docblock by docs.bare-phpdoc-tags. Void/never returns and constructors/destructors are exempt. Advisory by default; opt in to stricter enforcement via .gruff-php.yaml.',
+            id:                 self::ID,
+            name:               'Described return tag',
+            pillar:             Pillar::Documentation,
+            tier:               RuleTier::V01,
+            defaultSeverity:    Severity::Advisory,
+            confidence:         Confidence::High,
+            defaultOptions:     [DocumentedCallables::EVERY_CALLABLE => false],
+            optionDescriptions: [DocumentedCallables::EVERY_CALLABLE => DocumentedCallables::EVERY_CALLABLE_DESCRIPTION],
+            description:        'A value-returning function or method must describe its result in its @return tag, not just restate the type, so a reviewer can diff the documented contract against the body. Fires only when an @return tag is present but carries no description; missing docblocks and missing @return tags are owned by docs.missing-phpdoc and docs.missing-return-tag, and a function or method docblock made only of bare @param and @return tags, with no summary or other tag, by docs.bare-phpdoc-tags. With `everyCallable`, also closures and arrow functions bound to a name, read from the docblock above the assignment, bare-tags-only blocks included. Void/never returns and constructors/destructors are exempt. Advisory by default; opt in to stricter enforcement via .gruff-php.yaml.',
         );
     }
 
@@ -69,21 +72,23 @@ final readonly class ReturnCommentRule implements RuleInterface
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $nodes      = NodeIndex::nodesOfAny($unit, [ClassMethod::class, Function_::class]);
         $findings   = [];
 
-        // Check every method and function in the file.
-        foreach ($nodes as $node) {
-            /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
+        // Check every method and function in the file, plus bound closures when everyCallable is on.
+        foreach (DocumentedCallables::inUnit($unit, $context, $definition) as ['node' => $node, 'doc' => $docComment, 'symbol' => $symbol]) {
             // Only a value-returning callable has a result whose contract needs describing.
             if (!$this->isValueReturning($node)) {
                 continue;
             }
 
-            $docComment = $node->getDocComment();
-
             if ($docComment === null) {
                 // No docblock: docs.missing-phpdoc owns the gap, so stay silent to avoid double-reporting.
+                continue;
+            }
+
+            // docs.bare-phpdoc-tags reports a wholly tags-only docblock on a function or method, so stay silent there and
+            // report it once. It never reads bound closures, so their tags-only blocks stay with this rule.
+            if (!($node instanceof Closure || $node instanceof ArrowFunction) && PhpdocTagText::isBareTagsOnly($docComment->getText())) {
                 continue;
             }
 
@@ -98,8 +103,6 @@ final readonly class ReturnCommentRule implements RuleInterface
             if (PhpdocTagText::hasReturnTagDescription($returnBody)) {
                 continue;
             }
-
-            $symbol = CyclomaticComplexityRule::resolveSymbol($node);
 
             $findings[] = new Finding(
                 ruleId:      $definition->id,
@@ -123,13 +126,13 @@ final readonly class ReturnCommentRule implements RuleInterface
      *
      * A declared return type other than void/never counts; constructors and destructors never do
      * (mirroring MissingReturnTagRule). When no return type is declared, fall back to whether the
-     * body actually returns an expression.
+     * body actually returns an expression. Public so docs.missing-phpdoc asks for a return value by the same test.
      *
-     * @param ClassMethod|Function_ $node - function-like declaration to classify
+     * @param ClassMethod|Function_|Closure|ArrowFunction $node - function-like declaration to classify
      *
      * @return bool - true when the declaration yields a value an @return tag should describe
      */
-    private function isValueReturning(ClassMethod|Function_ $node): bool
+    public function isValueReturning(ClassMethod|Function_|Closure|ArrowFunction $node): bool
     {
         if ($node instanceof ClassMethod && in_array($node->name->toString(), ['__construct', '__destruct'], true)) {
             // Constructors and destructors have no return contract to describe.
@@ -158,16 +161,16 @@ final readonly class ReturnCommentRule implements RuleInterface
     /**
      * Reports whether a function-like body has at least one `return <expr>;` statement.
      *
-     * @param ClassMethod|Function_ $node - function-like declaration whose body is scanned
+     * @param ClassMethod|Function_|Closure|ArrowFunction $node - function-like declaration whose body is scanned
      *
      * @return bool - true when any return statement carries an expression
      */
-    private function hasReturnWithValue(ClassMethod|Function_ $node): bool
+    private function hasReturnWithValue(ClassMethod|Function_|Closure|ArrowFunction $node): bool
     {
         $finder = new NodeFinder();
 
         // Look for any return statement that carries a value.
-        foreach ($finder->findInstanceOf((array)$node->stmts, Return_::class) as $return) {
+        foreach ($finder->findInstanceOf((array)$node->getStmts(), Return_::class) as $return) {
             /** @var Return_ $return Finder predicate restricts results to return statements. */
             // A `return <expr>;` proves the body yields a value.
             if ($return->expr !== null) {

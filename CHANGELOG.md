@@ -4,6 +4,11 @@ Notable user-facing changes to `gruff-php` are listed here.
 
 ## 0.6.0 - 2026-09-27
 
+- **`docs.param-comment` asks each `@param` tag for a description, off by default** - A docblock with a summary and a `@param` tag that gives only a type reports once per declaration, naming every bare parameter. A wholly tags-only block stays with `docs.bare-phpdoc-tags`. Enable it with `rules.docs.param-comment.enabled: true`.
+- **A tags-only docblock reports once** - `docs.return-comment` no longer reports a docblock made only of bare `@param` and `@return` tags, which `docs.bare-phpdoc-tags` already reports.
+- **`everyCallable` widens four documentation rules, off by default** - With `rules.<id>.options.everyCallable: true`, `docs.missing-param-tag`, `docs.return-comment` and `docs.param-comment` also check closures and arrow functions bound to a name, and `docs.missing-phpdoc` also reports undocumented named functions. Nothing changes until a configuration turns it on.
+- **Missing-PHPDoc messages say what the block should cover** - `docs.missing-phpdoc` adds "Also describe ..." naming the parameters, the return value and the exceptions its signature has, and asks for nothing the signature lacks.
+
 - **BREAKING: two more test-quality checks are opt-in** - `test-quality.sut-not-called` and `test-quality.test-longer-than-sut` have insufficient precision evidence, with 28/50 and 50/50 unresolved cards. Enable either with `rules.<id>.enabled: true`; existing explicit settings remain effective. This policy decision makes no new floor-failure or deletion claim.
 
 - **BREAKING: eight test-quality rules are off by default** - Calibration left `test-quality.conditional-logic`, `test-quality.excessive-mocking`, `test-quality.extends-production-class`, `test-quality.loop-assertion-without-message`, `test-quality.mock-only-test`, `test-quality.no-assertions`, `test-quality.sleep-in-test` and `test-quality.unused-mock` below the 70% precision floor. Set `rules.<rule-id>.enabled: true` to keep a chosen rule on; existing explicit settings still apply. Excessive-mocking's before version failed both audit rounds, so its off-by-default decision carries that caveat.

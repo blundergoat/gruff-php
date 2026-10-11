@@ -29,6 +29,7 @@ use GruffPhp\Rules\Docs\MissingPhpdocRule;
 use GruffPhp\Rules\Docs\MissingReadmeRule;
 use GruffPhp\Rules\Docs\MissingReturnTagRule;
 use GruffPhp\Rules\Docs\MissingThrowsTagRule;
+use GruffPhp\Rules\Docs\ParamCommentRule;
 use GruffPhp\Rules\Docs\RegexCommentRule;
 use GruffPhp\Rules\Docs\ReturnCommentRule;
 use GruffPhp\Rules\Docs\StaleParamTagRule;
@@ -340,6 +341,7 @@ final class RuleRegistry
                             new MissingReadmeRule(),
                             new MissingReturnTagRule(),
                             new MissingThrowsTagRule(),
+                            new ParamCommentRule(),
                             new RegexCommentRule(),
                             new ReturnCommentRule(),
                             new StaleParamTagRule(),

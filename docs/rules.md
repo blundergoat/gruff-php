@@ -12,11 +12,11 @@ to three near-match suggestions and exits with code 2.
 This rule catalogue is generated from `php bin/gruff-php list-rules --format json`.
 Use that command for the full machine-readable metadata, including thresholds and options.
 
-Total rules: 119
+Total rules: 120
 
 ## False-positive guidance
 
-68 of the 119 rules publish `falsePositiveShapes`: a list of shapes the detector is
+68 of the 120 rules publish `falsePositiveShapes`: a list of shapes the detector is
 known to misfire on, each paired with the mitigation that answers it. Every rule at
 `medium` or `low` confidence carries at least one, because a heuristic rule owes the
 reader the cases where its heuristic is wrong. A rule that catalogues nothing omits
@@ -56,7 +56,7 @@ existing finding presentation in 0.5.2.
 | --- | ---: |
 | `complexity` | 4 |
 | `dead-code` | 10 |
-| `documentation` | 15 |
+| `documentation` | 16 |
 | `maintainability` | 2 |
 | `modernisation` | 9 |
 | `naming` | 11 |
@@ -98,7 +98,7 @@ first-class callable syntax such as `self::method(...)`. Dynamic
 callable names remain conservative and do not mark every private method
 as used.
 
-### `documentation` (15)
+### `documentation` (16)
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
 | --- | --- | --- | --- | --- |
@@ -112,6 +112,7 @@ as used.
 | `docs.missing-readme` | Missing README | `warning` | `high` | yes |
 | `docs.missing-return-tag` | Missing @return tag | `advisory` | `high` | yes |
 | `docs.missing-throws-tag` | Missing @throws tag | `advisory` | `medium` | yes |
+| `docs.param-comment` | Described param tag | `advisory` | `high` | no |
 | `docs.regex-comment` | Regex comment | `advisory` | `medium` | yes |
 | `docs.return-comment` | Described return tag | `advisory` | `high` | yes |
 | `docs.stale-param-tag` | Stale @param tag | `warning` | `high` | yes |

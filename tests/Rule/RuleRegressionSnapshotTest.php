@@ -6,6 +6,7 @@ namespace GruffPhp\Tests\Rule;
 
 use GruffPhp\Engine\Config\AnalysisConfig;
 use GruffPhp\Engine\Config\ConfigLoader;
+use GruffPhp\Engine\Config\RuleSettings;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Engine\Parser\PhpFileParser;
@@ -13,6 +14,7 @@ use GruffPhp\Rules\Complexity\CyclomaticComplexityRule;
 use GruffPhp\Rules\Complexity\HalsteadVolumeRule;
 use GruffPhp\Rules\Complexity\MaintainabilityIndexRule;
 use GruffPhp\Rules\Docs\MissingReadmeRule;
+use GruffPhp\Rules\Docs\ParamCommentRule;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\RuleRegistry;
 use GruffPhp\Rules\Security\DependencyComposerPathRule;
@@ -94,15 +96,19 @@ final class RuleRegressionSnapshotTest extends TestCase
         // singleton loops. A repeated-loop control now uses a fixed expected literal, adding one magic-number finding.
         // M15 default-off policy removes 42 findings from eight test-quality rules; explicit calibration still covers them.
         // M15 additionally makes two insufficient-evidence rules opt-in, removing 11 fixture findings.
-        self::assertCount(2684, $findings);
+        // Precision-floor M13-T23 leaves a wholly tags-only docblock to docs.bare-phpdoc-tags alone, so docs.return-comment
+        // no longer reports it a second time; that removes 4 findings.
+        self::assertCount(2680, $findings);
         // M08 made sensitive-data markers carry the class the detector already knew: a classified finding now reads
         // `[redacted:aws-access-key]` where it read `[redacted]`. The finding count, the rule set, and every
         // line-free identity are unchanged; only the marker text inside those findings moved.
         // Precision-floor M14 banded the size and complexity rules: a finding under one and a half times its limit is
         // advisory with do-not-add advice, every banded finding carries limitBand, and complexity advice asks for a
         // simpler path. The count and every identity are unchanged; severity, advice and metadata moved the hash.
+        // Precision-floor M13-T26 builds the docs.missing-phpdoc message from the signature: it names each parameter, and asks for
+        // the return value and the throw condition only where they exist. The count and every identity are unchanged; the messages moved the hash.
         self::assertSame(
-            'c513be7f7695b792264e92761e47aee6ae27a9909ada22e51ceb433dbff45c74',
+            '90ec0bdb7bb76e49408db3ca7840ae6ae4635c4ac4bb5185dbaa9f03e174c965',
             hash('sha256', $json),
         );
     }
@@ -125,6 +131,7 @@ final class RuleRegressionSnapshotTest extends TestCase
                              HalsteadVolumeRule::ID,
                              MaintainabilityIndexRule::ID,
                              MissingReadmeRule::ID,
+                             ParamCommentRule::ID,
                              DependencyComposerPathRule::ID,
                              DependencyComposerVcsRule::ID,
                              DatabaseUrlPasswordRule::ID,
@@ -216,6 +223,7 @@ final class RuleRegressionSnapshotTest extends TestCase
         array_push(
                $findings,
             ...$this->missingReadmeFindings(),
+            ...$this->paramCommentFindings(),
             ...$this->phpUnitConfigCalibrationFindings(),
             ...$this->analysePaths(
             ['tests/Fixtures/TestQuality/mocking-domain-object.php'],
@@ -237,6 +245,33 @@ final class RuleRegressionSnapshotTest extends TestCase
         );
 
         return $findings;
+    }
+
+    /**
+     * Build docs.param-comment findings from a synthetic file, because the rule is off by default and every docs fixture's
+     * bare @param tag sits in a tags-only block that docs.bare-phpdoc-tags owns.
+     *
+     * @return list<Finding> - findings from one summarised function whose @param tag names only a type, with the rule on
+     */
+    private function paramCommentFindings(): array
+    {
+        $root = $this->tempDir();
+
+        try {
+            self::assertTrue(mkdir($root . '/src', 0777, true));
+            file_put_contents(
+                $root . '/src/Example.php',
+                "<?php\n\n/**\n * Example of a summarised function with a bare parameter tag.\n */\n\n"
+                . "/**\n * Doubles a value.\n *\n * @param int \$value\n *\n * @return int The doubled value.\n */\n"
+                . "function doubled(int \$value): int\n{\n    return \$value * 2;\n}\n",
+            );
+            $config = AnalysisConfig::fromRegistry(RuleRegistry::defaults())
+                ->withRuleSettings(ParamCommentRule::ID, new RuleSettings(true, []));
+
+            return $this->analysePaths(['src/Example.php'], $config, $root)[1];
+        } finally {
+            $this->removeDir($root);
+        }
     }
 
     /**

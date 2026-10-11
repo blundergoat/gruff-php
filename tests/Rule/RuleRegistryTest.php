@@ -375,14 +375,16 @@ final class RuleRegistryTest extends TestCase
         usort($definitions, static fn(array $left, array $right): int => $left['id'] <=> $right['id']);
         $json = json_encode($definitions, JSON_THROW_ON_ERROR);
 
-        self::assertCount(119, $definitions);
+        self::assertCount(120, $definitions);
         // M10 D35 (2026-09-26) renamed docs.missing-public-phpdoc to docs.missing-phpdoc, and docs.return-comment's description names it.
         // Precision-floor M19 (2026-10-04) retired nine rules and turned three off by default (ADR-034).
         // The constant and property PHPDoc descriptions name run coverage (CHANGELOG: `One comment documents a run of constants`).
         // Precision-floor M14 turned complexity.halstead-volume off by default (CHANGELOG 0.6.0).
         // Precision-floor M15 makes the low-confidence SUT-name heuristic advisory.
+        // Precision-floor M13 adds docs.param-comment, off by default.
+        // Precision-floor M13 gives the docs rules an everyCallable option, off by default.
         self::assertSame(
-            '3e6a03c76267085f9327aea633aa1401cdc9753eaff56bb777b620efabdfe5ae',
+            '8e4634b9dcb0706b80ed9a395b222961ae3420c8bc62f708c0204628e4bb62c7',
             hash('sha256', $json),
         );
     }

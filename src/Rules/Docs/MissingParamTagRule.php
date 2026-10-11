@@ -10,12 +10,12 @@ use GruffPhp\Results\Finding\Pillar;
 use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
-use GruffPhp\Rules\Complexity\CyclomaticComplexityRule;
-use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Node;
+use PhpParser\Node\Expr\ArrowFunction;
+use PhpParser\Node\Expr\Closure;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
@@ -50,10 +50,13 @@ final readonly class MissingParamTagRule implements RuleInterface
         return new RuleDefinition(
             id:              self::ID,
             name:            'Missing @param tag',
+            description:     'Flags a documented method or function missing an @param tag for one of its parameters; with `everyCallable`, also closures and arrow functions bound to a name, read from the docblock above the assignment.',
             pillar:          Pillar::Documentation,
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
             confidence:      Confidence::High,
+            defaultOptions:     [DocumentedCallables::EVERY_CALLABLE => false],
+            optionDescriptions: [DocumentedCallables::EVERY_CALLABLE => DocumentedCallables::EVERY_CALLABLE_DESCRIPTION],
         );
     }
 
@@ -68,16 +71,13 @@ final readonly class MissingParamTagRule implements RuleInterface
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
-        $nodes      = NodeIndex::nodesOfAny($analysisUnit, [ClassMethod::class, Function_::class]);
         $nodeFinder        = new NodeFinder();
         $inheritanceHelper = new DocsInheritanceHelper();
 
         $findings = [];
 
-        // Check every method and function in the file.
-        foreach ($nodes as $node) {
-            /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
-            $docComment = $node->getDocComment();
+        // Check every method and function in the file, plus bound closures when everyCallable is on.
+        foreach (DocumentedCallables::inUnit($analysisUnit, $ruleContext, $definition) as ['node' => $node, 'doc' => $docComment, 'symbol' => $symbol]) {
 
             // Skip a callable with no docblock or no parameters to document.
             if ($docComment === null || $node->params === []) {
@@ -100,7 +100,6 @@ final readonly class MissingParamTagRule implements RuleInterface
                 nodeFinder:        $nodeFinder,
                 inheritanceHelper: $inheritanceHelper,
             );
-            $symbol      = CyclomaticComplexityRule::resolveSymbol($node);
 
             // Report each signature parameter that owes its own tag.
             foreach ($owingParams as $paramName => $param) {
@@ -243,7 +242,7 @@ final readonly class MissingParamTagRule implements RuleInterface
     /**
      * Returns the parameters that owe an `@param` tag of their own.
      *
-     * @param ClassMethod|Function_ $node              - Documented function-like being checked.
+     * @param ClassMethod|Function_|Closure|ArrowFunction $node              - Documented function-like being checked.
      * @param bool                  $hasContractDoc    - Whether its docblock carries a contract rather than a skeleton.
      * @param list<string>          $documentedParams  - Parameter names its own docblock already documents.
      * @param list<Node\Stmt>       $statements        - The unit's statements, searched for the overridden method.
@@ -254,7 +253,7 @@ final readonly class MissingParamTagRule implements RuleInterface
      *   promoted parameters, and a parameter its own docblock or an inherited contract documents owes nothing
      */
     private function paramsOwingTags(
-        ClassMethod|Function_ $node,
+        ClassMethod|Function_|Closure|ArrowFunction $node,
         bool $hasContractDoc,
         array $documentedParams,
         array $statements,
@@ -279,7 +278,7 @@ final readonly class MissingParamTagRule implements RuleInterface
     /**
      * Returns the parameters of a method that an inherited contract already documents.
      *
-     * @param ClassMethod|Function_ $node              - Documented function-like with at least one undocumented parameter.
+     * @param ClassMethod|Function_|Closure|ArrowFunction $node              - Documented function-like with at least one undocumented parameter.
      * @param list<Node\Stmt>       $statements        - The unit's statements, searched for the overridden method.
      * @param NodeFinder            $nodeFinder        - Shared finder reused across nodes.
      * @param DocsInheritanceHelper $inheritanceHelper - Resolves same-file ancestors and inheritance markers.
@@ -290,7 +289,7 @@ final readonly class MissingParamTagRule implements RuleInterface
      *   property only this class can document), or a method with no inherited contract
      */
     private function inheritedParamNames(
-        ClassMethod|Function_ $node,
+        ClassMethod|Function_|Closure|ArrowFunction $node,
         array $statements,
         NodeFinder $nodeFinder,
         DocsInheritanceHelper $inheritanceHelper,
@@ -340,11 +339,11 @@ final readonly class MissingParamTagRule implements RuleInterface
     /**
      * Reports whether a constructor promotes at least one parameter into a property.
      *
-     * @param ClassMethod|Function_ $node - Documented function-like whose skeleton may need narrow enforcement.
+     * @param ClassMethod|Function_|Closure|ArrowFunction $node - Documented function-like whose skeleton may need narrow enforcement.
      *
      * @return bool - True for a constructor with at least one promoted parameter.
      */
-    private function hasPromotedConstructorParameter(ClassMethod|Function_ $node): bool
+    private function hasPromotedConstructorParameter(ClassMethod|Function_|Closure|ArrowFunction $node): bool
     {
         if (!$node instanceof ClassMethod || strtolower($node->name->toString()) !== '__construct') {
             return false;

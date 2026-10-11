@@ -45,6 +45,8 @@ time, so a project using more than one of them moves once. This port's recorded 
 
 19. **three rules are off by default** — `security.dependency-composer-path`, `security.dependency-composer-vcs` and `sensitive-data.database-url-password` each scored below half on fewer than ten findings. A project that wants one sets `rules.<id>.enabled: true`; a config written by an earlier `init` lists it as `enabled: true` and keeps it on. The decision is ADR-034.
 
+20. **a tags-only docblock reports once, and four documentation rules can widen** — `docs.return-comment` no longer reports a docblock made only of bare `@param` and `@return` tags, which `docs.bare-phpdoc-tags` already reports. On the 0.6.0 precision measurement's twelve PHP repositories that removed 32,787 findings at the defaults. `docs.missing-phpdoc` messages now say what the block should cover. The new `docs.param-comment` rule and the `everyCallable` option are off by default; turning them all on there added 34,082 `docs.param-comment`, 342 `docs.missing-phpdoc` and 2 `docs.return-comment` findings, taking the total from 404,198 to 438,624. The rest of this entry is in `CHANGELOG.md`.
+
 ## Upgrade workflow (`0.5.x` → `0.6.0`)
 
 1. Read the list above and decide which breaks touch your project. A project with no committed
