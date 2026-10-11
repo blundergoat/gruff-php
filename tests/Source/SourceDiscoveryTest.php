@@ -59,6 +59,29 @@ final class SourceDiscoveryTest extends TestCase
     }
 
     /**
+     * Verify a walked minified file is listed only when gruff-php would scan it, and vendored code is skipped as one
+     * directory even under a .gitignore (FAMILY-CONTRACT.md section 7, precision-floor M04).
+     *
+     * @return void
+     */
+    public function testWalkListsEligibleMinifiedFilesAndSkipsVendorUnderAGitignore(): void
+    {
+        $root = $this->tempDir();
+        $this->writeFile($root, '.gitignore', "*.log\n");
+        $this->writeFile($root, 'alpha.php', "<?php\n");
+        $this->writeFile($root, 'Vendor/acme/Copied.php', "<?php\n");
+        $this->writeFile($root, 'config/settings.min.json', "{}\n");
+        $this->writeFile($root, 'public/jquery.min.js', "var a=1;\n");
+
+        $result = (new SourceDiscovery($root))->discover(['.']);
+
+        // gruff-php scans .gitignore as text, so it is listed beside the one PHP file.
+        self::assertSame(['.gitignore', 'alpha.php'], array_map(static fn($file): string => $file->displayPath, $result->files));
+        // gruff-php never scans .js, so the minified script is unsupported rather than listed as ignored.
+        self::assertSame(['Vendor', 'config/settings.min.json'], $result->ignoredPaths);
+    }
+
+    /**
      * Verify Git worktree discovery follows Git visibility and nested ignore files.
      *
      * @return void

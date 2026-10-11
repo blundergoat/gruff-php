@@ -36,8 +36,9 @@ final class AnalyseCliTest extends CliTestCase
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         self::assertStringContainsString('gruff-php ' . Application::VERSION, $process->getOutput());
-        self::assertStringContainsString('Discovered: 7', $process->getOutput());
-        self::assertStringContainsString('Ignored: 0', $process->getOutput());
+        // vendor/ignored.php is skipped despite the repository .gitignore, because vendor never defers to a .gitignore (section 7).
+        self::assertStringContainsString('Discovered: 6', $process->getOutput());
+        self::assertStringContainsString('Ignored: 1', $process->getOutput());
         self::assertStringContainsString('tests/Fixtures/Source/mixed/vendor/ignored.php', $process->getOutput());
     }
 
@@ -331,8 +332,9 @@ final class AnalyseCliTest extends CliTestCase
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-        self::assertStringContainsString('Discovered: 6', $process->getOutput());
-        self::assertStringContainsString('Ignored: 1', $process->getOutput());
+        // alpha.php is config-ignored and vendor/ignored.php is a skipped vendor copy (section 7).
+        self::assertStringContainsString('Discovered: 5', $process->getOutput());
+        self::assertStringContainsString('Ignored: 2', $process->getOutput());
         self::assertStringContainsString('tests/Fixtures/Source/mixed/alpha.php', $process->getOutput());
     }
 

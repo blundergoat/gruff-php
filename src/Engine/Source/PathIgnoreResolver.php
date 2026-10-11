@@ -50,11 +50,24 @@ final readonly class PathIgnoreResolver
         '.vscode',
         'build',
         'coverage',
-        'dist',
         'node_modules',
         'var/cache',
-        'vendor',
     ];
+
+    /**
+     * Directories holding third-party copies, and `dist`, the one build-output name section 7 adds; `build` and
+     * `coverage` stay fallback-only. Like the fallback directories they match at any depth, but they are skipped even
+     * under a governing .gitignore and compared over ASCII case, because a committed copy is still someone else's
+     * code (FAMILY-CONTRACT.md section 7, amended by precision-floor M04).
+     *
+     * @var list<string>
+     */
+    private const THIRD_PARTY_DIRECTORIES = ['bower_components', 'dist', 'third-party', 'third_party', 'vendor', 'vendors'];
+
+    /**
+     * Pattern recorded for a minified file such as `jquery.min.js`, which section 7 skips as generated.
+     */
+    public const MINIFIED_FILE_PATTERN = '*.min.*';
 
     /**
      * Wraps the project root the resolver evaluates Git ignore rules against.
@@ -69,14 +82,16 @@ final readonly class PathIgnoreResolver
      * Decides whether a path is ignored and why, applying config, VCS, and fallback exclusions in
      * priority order - the one place discovery and check-ignore agree on what gets skipped.
      *
-     * Configured paths.ignore and VCS internals are authoritative. Explicit files
-     * and include-ignored bypass only Git/default fallback policy.
+     * Configured paths.ignore and VCS internals are authoritative. Explicit files and include-ignored bypass the
+     * third-party, build-output and minified classes, which never defer to a .gitignore, and the Git/default fallback.
      *
      * @param string       $displayPath - Project-relative display path used for glob and directory matching.
      * @param string       $absolutePath - Absolute path used for filename matching.
      * @param list<string> $configuredPatterns - Configured paths.ignore glob patterns.
      * @param bool         $shouldIncludeIgnored - When true, non-VCS fallback ignores are bypassed for this run.
      * @param bool         $isExplicitFile - When true, the caller requested this existing file directly.
+     * @param bool|null    $isDirectory - Whether the path is a directory; null asks the filesystem, which a caller
+     *                                    classifying a path that is not on disk should not rely on.
      *
      * @return IgnoreDecision - Whether the path is ignored and, if so, the source and pattern behind it.
      */
@@ -86,6 +101,7 @@ final readonly class PathIgnoreResolver
         array $configuredPatterns,
         bool $shouldIncludeIgnored,
         bool $isExplicitFile = false,
+        ?bool $isDirectory = null,
     ): IgnoreDecision {
         $configuredPattern = $this->matchedConfiguredPattern($displayPath, $configuredPatterns);
         // The user's own paths.ignore wins first and always, even when they asked to include ignored files.
@@ -101,6 +117,17 @@ final readonly class PathIgnoreResolver
 
         if ($shouldIncludeIgnored || $isExplicitFile) {
             return IgnoreDecision::notIgnored();
+        }
+
+        $isDirectory ??= is_dir($absolutePath);
+        $thirdPartyDirectory = self::matchedThirdPartyDirectory($displayPath, $isDirectory);
+        // A committed copy is still someone else's code, so these classes skip whatever the .gitignore says.
+        if ($thirdPartyDirectory !== null) {
+            return IgnoreDecision::ignored(self::SOURCE_DEFAULT, $thirdPartyDirectory);
+        }
+
+        if (!$isDirectory && self::isMinifiedName(basename(str_replace('\\', '/', $displayPath)))) {
+            return IgnoreDecision::ignored(self::SOURCE_DEFAULT, self::MINIFIED_FILE_PATTERN);
         }
 
         $defaultDirectory = $this->matchedDefaultDirectory($displayPath);
@@ -184,6 +211,49 @@ final readonly class PathIgnoreResolver
         }
 
         return null;
+    }
+
+    /**
+     * Finds the outermost third-party or build-output directory on a path, lowercased over ASCII.
+     * A file's own name is not a directory, so `a/Vendor/X.php` gives `vendor` while a file named `dist` matches nothing.
+     *
+     * @param string $displayPath - Project-relative display path being tested.
+     * @param bool   $isDirectory - Whether the path itself is a directory, which makes its own name eligible.
+     *
+     * @return string|null - The matched directory name in lowercase; null when no directory on the path is in the class.
+     */
+    private static function matchedThirdPartyDirectory(string $displayPath, bool $isDirectory): ?string
+    {
+        $segments = explode('/', trim(str_replace('\\', '/', $displayPath), '/'));
+        // A file's last segment is its own name, never a directory.
+        if (!$isDirectory) {
+            array_pop($segments);
+        }
+
+        // The outermost matching directory names the reason, as it does in every port.
+        foreach ($segments as $segment) {
+            $lowered = strtr($segment, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz');
+            if (in_array($lowered, self::THIRD_PARTY_DIRECTORIES, true)) {
+                return $lowered;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Reports a base name with `.min.` directly before its final extension, such as `jquery.min.js`;
+     * `app.min.js.map` and `admin.mini.php` do not match. The name is compared after lowercasing A-Z only, so
+     * `JQUERY.MIN.JS` matches while a non-ASCII look-alike does not, as in every port.
+     *
+     * @param string $fileName - Base name of the candidate file.
+     *
+     * @return bool - True when the name marks a minified file.
+     */
+    public static function isMinifiedName(string $fileName): bool
+    {
+        // `.min.` followed by one final extension that holds no further dot, checked after A-Z lowercasing.
+        return preg_match('/\\.min\\.[^.]+$/D', strtr($fileName, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz')) === 1;
     }
 
     /**

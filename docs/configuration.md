@@ -166,6 +166,14 @@ reads only v2.
 Use `paths.ignore` for project-specific ignore patterns. The CLI also honours
 Git/default ignores unless `--include-ignored` is passed.
 
+The default ignores include third-party copies, build output and minified
+files at any depth and in any letter case, even when Git tracks them:
+directories named `vendor`, `vendors`, `third_party`, `third-party` or
+`bower_components` (reason `dependency`) or `dist` (reason `build-output`), and
+files with `.min.` directly before the final extension, such as
+`settings.min.json` (reason `generated`). An explicit file operand or
+`--include-ignored` scans them.
+
 ```yaml
 paths:
   ignore:

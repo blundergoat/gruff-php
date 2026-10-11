@@ -216,7 +216,7 @@ final readonly class SourceDiscovery
                 $path        = $file->getPathname();
                 $isDir       = $file->isDir();
                 $displayPath = $this->displayPath($path);
-                $decision    = $this->ignoreResolver->decide($displayPath, $path, $configuredIgnorePatterns, $shouldIncludeIgnored);
+                $decision    = $this->ignoreResolver->decide($displayPath, $path, $configuredIgnorePatterns, $shouldIncludeIgnored, false, $isDir);
 
                 // A node that is not ignored is kept so the iterator can descend and yield its files.
                 if (!$decision->ignored) {
@@ -224,9 +224,9 @@ final readonly class SourceDiscovery
                     return true;
                 }
 
-                // Configured ignores are recorded for files and directories alike;
-                // built-in default/generated ignores are only surfaced for directories.
-                if ($decision->source === PathIgnoreResolver::SOURCE_CONFIG || $isDir) {
+                // Configured ignores are recorded for files and directories alike; built-in default/generated
+                // ignores are surfaced for directories, and for a minified file only when gruff-php would scan it.
+                if ($decision->source === PathIgnoreResolver::SOURCE_CONFIG || $isDir || $this->isListedMinifiedFile($decision, $path)) {
                     $ignoredDetails[] = IgnoredPath::from($displayPath, $decision);
                 }
 
@@ -286,6 +286,20 @@ final readonly class SourceDiscovery
     {
         // A path outside the project root has no relative form, so fall back to its canonical absolute path.
         return PathHelper::relativeToRoot($path, $this->projectRoot) ?? PathHelper::canonical($path);
+    }
+
+    /**
+     * Reports whether a walked file skipped as minified is listed, which section 7 asks for only when gruff-php would
+     * otherwise scan it: `settings.min.json` is listed, `jquery.min.js` is unsupported and stays out of the list.
+     *
+     * @param IgnoreDecision $decision - The ignore verdict for the walked file.
+     * @param string         $path - Absolute path of the walked file.
+     *
+     * @return bool - True when the verdict is the minified class and the file is a type gruff-php scans.
+     */
+    private function isListedMinifiedFile(IgnoreDecision $decision, string $path): bool
+    {
+        return $decision->pattern === PathIgnoreResolver::MINIFIED_FILE_PATTERN && $this->sourceType($path) !== null;
     }
 
     /**
@@ -589,7 +603,13 @@ final readonly class SourceDiscovery
             $configuredIgnorePatterns,
             false,
             $isExplicitFile,
+            false,
         );
+        // A minified file gruff-php would not scan anyway, such as `jquery.min.js`, stays unsupported rather than ignored.
+        if ($decision->ignored && $decision->pattern === PathIgnoreResolver::MINIFIED_FILE_PATTERN && $this->sourceType($absolutePath) === null) {
+            return;
+        }
+
         if ($decision->ignored) {
             $ignoredDisplayPath = $decision->source === PathIgnoreResolver::SOURCE_CONFIG
                 ? $this->configuredIgnoredDisplayPath($absolutePath, $configuredIgnorePatterns)

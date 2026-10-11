@@ -17,8 +17,11 @@ use Symfony\Component\Process\Process;
  */
 final class GruffCliSummaryTest extends CliTestCase
 {
-    /** Number of source files in the mixed-language summary fixture. */
-    private const MIXED_FIXTURE_FILES = 7;
+    /**
+     * Number of source files gruff-php discovers in the mixed-language summary fixture; its tracked
+     * `vendor/ignored.php` is skipped as a third-party copy (FAMILY-CONTRACT.md section 7, precision-floor M04).
+     */
+    private const MIXED_FIXTURE_FILES = 6;
 
     /**
      * Verify summary runs and shows digest sections.

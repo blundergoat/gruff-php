@@ -479,8 +479,9 @@ final readonly class AnalysisReport
 
         return match ($ignoredPath->pattern) {
             '.git', '.hg', '.svn' => 'vcs',
-            'node_modules', 'vendor' => 'dependency',
+            'node_modules', 'vendor', 'vendors', 'third_party', 'third-party', 'bower_components' => 'dependency',
             'build', 'coverage', 'dist' => 'build-output',
+            PathIgnoreResolver::MINIFIED_FILE_PATTERN => 'generated',
             '.fleet', '.idea', '.vscode' => 'local-tooling',
             '.gruff-cache', '.phpunit.cache', 'var/cache' => 'tool-cache',
             default => throw new LogicException(sprintf('Unknown default ignored-path pattern "%s".', $ignoredPath->pattern ?? '')),

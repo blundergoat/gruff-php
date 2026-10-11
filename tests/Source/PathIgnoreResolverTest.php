@@ -126,24 +126,96 @@ final class PathIgnoreResolverTest extends TestCase
     }
 
     /**
-     * Verify any governing .gitignore disables non-VCS fallback names for its subtree.
+     * Verify any governing .gitignore disables non-VCS fallback names such as node_modules for its subtree; vendor and dist
+     * never defer (FAMILY-CONTRACT.md section 7, precision-floor M04).
      *
      * @return void
      */
     public function testFallbackDefersToGitignoreInAncestorChain(): void
     {
         $root = $this->tempDir();
-        self::assertTrue(mkdir($root . '/packages/app/vendor', 0777, true));
+        self::assertTrue(mkdir($root . '/packages/app/node_modules', 0777, true));
         file_put_contents($root . '/packages/app/.gitignore', "*.log\n");
 
         $decision = (new PathIgnoreResolver($root))->decide(
-            'packages/app/vendor/acme.php',
-            $root . '/packages/app/vendor/acme.php',
+            'packages/app/node_modules/acme.php',
+            $root . '/packages/app/node_modules/acme.php',
             [],
             false,
         );
 
         self::assertFalse($decision->ignored);
+    }
+
+    /**
+     * Verify section 7's third-party, build-output and minified classes skip at any depth and in any ASCII case even
+     * under a governing .gitignore, naming the outermost directory (FAMILY-CONTRACT.md section 7, precision-floor M04).
+     *
+     * @return void
+     */
+    public function testThirdPartyClassesIgnoreAGoverningGitignore(): void
+    {
+        $root = $this->tempDir();
+        file_put_contents($root . '/.gitignore', "*.log\n");
+        $resolver = new PathIgnoreResolver($root);
+        $decide   = static fn(string $path, bool $isDirectory): array => [
+            $resolver->decide($path, $root . '/' . $path, [], false, false, $isDirectory)->ignored,
+            $resolver->decide($path, $root . '/' . $path, [], false, false, $isDirectory)->pattern,
+        ];
+
+        self::assertSame([true, 'vendors'], $decide('pkg/Vendors', true));
+        self::assertSame([true, 'third_party'], $decide('pkg/THIRD_PARTY/Copied.php', false));
+        self::assertSame([true, 'third-party'], $decide('pkg/third-party/Copied.php', false));
+        self::assertSame([true, 'bower_components'], $decide('web/bower_components', true));
+        self::assertSame([true, 'dist'], $decide('app/Dist/Built.php', false));
+        self::assertSame([true, 'vendor'], $decide('vendor/lib/dist/Copied.php', false));
+        self::assertSame([true, PathIgnoreResolver::MINIFIED_FILE_PATTERN], $decide('config/settings.min.json', false));
+        // A file's own name is not a directory, and a directory with `.min.` in its name is not a minified file.
+        self::assertSame([false, null], $decide('src/dist', false));
+        self::assertSame([false, null], $decide('assets/theme.min.d', true));
+    }
+
+    /**
+     * Verify --include-ignored and an explicitly requested file bring the section 7 classes back.
+     *
+     * @return void
+     */
+    public function testIncludeIgnoredAndExplicitFilesBypassThirdPartyClasses(): void
+    {
+        $resolver = new PathIgnoreResolver('/project');
+
+        self::assertFalse($resolver->decide('vendor/acme/V.php', '/project/vendor/acme/V.php', [], true, false, false)->ignored);
+        self::assertFalse($resolver->decide('vendor/acme/V.php', '/project/vendor/acme/V.php', [], false, true, false)->ignored);
+        self::assertFalse($resolver->decide('public/app.min.php', '/project/public/app.min.php', [], false, true, false)->ignored);
+    }
+
+    /**
+     * Verify first-party names that only resemble the classes, and the external and lib directories, stay in scope.
+     *
+     * @return void
+     */
+    public function testFirstPartyNamesResemblingThirdPartyClassesStayInScope(): void
+    {
+        $root = $this->tempDir();
+        file_put_contents($root . '/.gitignore', "*.log\n");
+        $resolver = new PathIgnoreResolver($root);
+
+        $paths = [
+            'src/Vendor.php',
+            'src/VendorRepository.php',
+            'src/Distributor.php',
+            'vendoring/Copied.php',
+            'distro/Built.php',
+            'external/Typings.php',
+            'lib/Helpers.php',
+            'src/admin.mini.php',
+            'app.min.js.map',
+        ];
+
+        // Each candidate stays in scope, so the decisions are all false.
+        foreach ($paths as $path) {
+            self::assertFalse($resolver->decide($path, $root . '/' . $path, [], false, false, false)->ignored, $path);
+        }
     }
 
     /**
