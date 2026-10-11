@@ -11,8 +11,9 @@ namespace GruffPhp\Rules\Docs;
  *
  * BarePhpdocTagsRule (tags-only docblock detection) and ReturnCommentRule (described-`@return`
  * enforcement) both need the same generics-tolerant "is there prose after the type" check and the
- * same tags-only definition, so they live here once: the tags-only block is reported by
- * docs.bare-phpdoc-tags alone, and the other docs rules skip it rather than report it twice.
+ * same tags-only definition, so they live here once: a function or method's tags-only block is reported by
+ * docs.bare-phpdoc-tags alone, and the other docs rules skip it rather than report it twice; a bound closure's
+ * tags-only block, which docs.bare-phpdoc-tags never reads, stays with the describing rules.
  */
 final readonly class PhpdocTagText
 {

@@ -27,13 +27,15 @@ use PhpParser\Node\Stmt\Function_;
 final class DocumentedCallables
 {
     /**
-     * Per-rule option that widens a docs rule from methods and named functions to closures and arrow functions bound
-     * to a name. Off by default, so default findings are unchanged.
+     * Per-rule option key that widens a docs rule's callable set: the rules that list through inUnit() add closures and
+     * arrow functions bound to a name, and docs.missing-phpdoc adds named functions to its methods. Off by default, so
+     * default findings are unchanged.
      */
     public const EVERY_CALLABLE = 'everyCallable';
 
     /**
-     * Option description shared by every docs rule that accepts the `everyCallable` switch.
+     * Option description shared by the docs rules that list callables through inUnit(); docs.missing-phpdoc accepts the
+     * same switch but widens to named functions, so it carries its own description.
      */
     public const EVERY_CALLABLE_DESCRIPTION = 'When true, the rule also checks closures and arrow functions assigned to a name, documented by the docblock above the assignment.';
 
@@ -44,8 +46,8 @@ final class DocumentedCallables
      * @param RuleContext    $context    - rule context carrying the rule's configured options
      * @param RuleDefinition $definition - definition of the rule whose options decide whether bound closures are listed
      *
-     * @return list<array{node: ClassMethod|Function_|Closure|ArrowFunction, doc: ?Doc, symbol: string}> - methods
-     *         and functions in source order, then bound closures and arrow functions when the option is on
+     * @return list<array{node: ClassMethod|Function_|Closure|ArrowFunction, doc: ?Doc, symbol: string}> - methods,
+     *         then named functions, each in source order, then bound closures and arrow functions when the option is on
      */
     public static function inUnit(AnalysisUnit $unit, RuleContext $context, RuleDefinition $definition): array
     {

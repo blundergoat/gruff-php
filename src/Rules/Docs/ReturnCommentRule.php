@@ -29,8 +29,9 @@ use PhpParser\NodeFinder;
  * gap its sibling docs rules leave: a value-returner with a summary plus a bare `@return Type` trips
  * neither docs.missing-return-tag (presence is satisfied) nor docs.bare-phpdoc-tags (the docblock is
  * not tags-only). It stays silent when there is no docblock or no `@return` tag, and on a wholly
- * tags-only docblock, which docs.bare-phpdoc-tags already reports; it exempts void or never returns
- * and constructors/destructors, which have no result to describe. Advisory.
+ * tags-only function or method docblock, which docs.bare-phpdoc-tags already reports; with `everyCallable`
+ * on, a bound closure's tags-only block is still checked because docs.bare-phpdoc-tags never reads closures.
+ * It exempts void or never returns and constructors/destructors, which have no result to describe. Advisory.
  */
 final readonly class ReturnCommentRule implements RuleInterface
 {

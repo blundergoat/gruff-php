@@ -23,8 +23,9 @@ use PhpParser\Node\Expr\Closure;
  * The parameter sibling of docs.return-comment: a docblock with a summary or a described tag over a bare
  * `@param Type $name` trips neither docs.missing-param-tag (presence is satisfied) nor docs.bare-phpdoc-tags
  * (the docblock is not tags-only). It stays silent when there is no docblock, and on a wholly tags-only
- * docblock, which docs.bare-phpdoc-tags already reports, so one docblock is never reported by both. Off by
- * default; advisory when enabled.
+ * function or method docblock, which docs.bare-phpdoc-tags already reports, so one docblock is never reported
+ * by both; with `everyCallable` on, a bound closure's tags-only block is still checked because
+ * docs.bare-phpdoc-tags never reads closures. Off by default; advisory when enabled.
  */
 final readonly class ParamCommentRule implements RuleInterface
 {
