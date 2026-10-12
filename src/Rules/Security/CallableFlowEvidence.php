@@ -294,7 +294,8 @@ final class CallableFlowEvidence
             }
             $function = strtolower($node->name->getLast());
 
-            // extract() and one-argument parse_str() create locals from data (parse_str's one-argument form did until PHP 8).
+            // extract() and one-argument parse_str() or mb_parse_str() create locals from data; code written for PHP before 8
+            // can still use the one-argument form.
             return $function === 'extract' || (in_array($function, ['parse_str', 'mb_parse_str'], true) && count($node->getArgs()) === 1);
         }) !== null;
     }

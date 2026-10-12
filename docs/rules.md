@@ -412,10 +412,10 @@ instead - interpolating a local into the template still flags, so
 keyword (SELECT/INSERT/UPDATE/DELETE/ALTER/DROP/CREATE/SHOW/FROM/WHERE)
 must appear in the literal fragments, which keeps non-SQL `query()`
 receivers such as `DOMXPath` quiet without receiver type resolution.
-An operand escaped where it is spliced also passes: an `(int)` cast, a
-`->quoteString()` call or a `Util::backquote()` call, phpMyAdmin's value
-and identifier escapers, matched by name. A concatenation inside their
-arguments is not weighed. `quoteString()` and `backquote()` count only
+An operand escaped where it is spliced also passes: an `(int)` cast, or
+phpMyAdmin's `->quoteString()` value escaper or `Util::backquote()`
+identifier escaper, both matched by name. A concatenation inside their
+arguments is not checked. `quoteString()` and `backquote()` count only
 outside an already open quote, because they supply their own, and none of
 the three counts in a construction passed through another call such as
 `sprintf()`, which can splice other values around it. Any other escaping
@@ -426,7 +426,7 @@ operand and an `(int)` cast as escaped, including a concatenation inside
 `escapeshellarg()`'s own argument, so only a bare dynamic value spliced
 into the command reports. `escapeshellarg()` counts only outside an open
 shell quote, and a construction passed through another call such as
-`sprintf()` reports as before. `escapeshellcmd()` is not an escaper here,
+`sprintf()` always reports. `escapeshellcmd()` is not an escaper here,
 because it leaves argument separators in place.
 
 `security.reflected-xss` counts WordPress's `esc_html()`, `esc_attr()`
@@ -456,10 +456,11 @@ Closure, so it never reports.
 A local whose only write is one plain string literal, assigned before the
 call on the same branch, is judged as a direct call to the function it
 names: `$f = 'strtoupper'; $f($s)` stays quiet and `$f = 'system'; $f($c)`
-reports as `system`. A by-reference closure capture or a one-argument
-`parse_str()` in the function leaves the call dynamic. A loop over a local
-assigned once, before the loop, from an array whose every item is a closure
-or arrow function is trusted the same way, in a named function or method. A
+reports as `system`. A by-reference closure capture, or an `extract()`,
+one-argument `parse_str()`, `eval`, `include` or `goto` in the function,
+leaves the call dynamic. A loop over a local assigned once, before the
+loop, from an array whose every item is a closure or arrow function also
+keeps a call to the loop value quiet, in a named function or method. A
 built-in execution call (`exec`, `passthru`, `popen`, `proc_open`,
 `shell_exec`, `system`) whose command is one plain string literal no longer
 reports; any other command, and every `options.additionalFunctions` name,

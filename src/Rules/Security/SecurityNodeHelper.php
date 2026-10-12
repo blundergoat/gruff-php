@@ -739,7 +739,8 @@ final class SecurityNodeHelper
         $length = strlen($text);
         for ($index = 0; $index < $length; $index++) {
             $character = $text[$index];
-            // A backslash escapes the next character, except inside a shell's single quotes.
+            // A backslash escapes the next character, except inside single quotes when $isBackslashEscapeInSingle is
+            // false, as in a shell.
             if ($character === '\\' && ($open !== "'" || $isBackslashEscapeInSingle)) {
                 $index++;
                 continue;

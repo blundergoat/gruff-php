@@ -28,9 +28,9 @@ use PhpParser\NodeFinder;
  *
  * Runs per file over supported query methods and procedural database functions whose SQL argument splices in a
  * non-allowlisted dynamic part and whose literal fragments contain a SQL keyword. `prepare()` templates,
- * allowlisted identifier interpolation (`$wpdb->prefix`) and escaped operands - an `(int)` cast, a
- * `->quoteString()` call and a `Util::backquote()` call, phpMyAdmin's value and identifier escapers - are
- * recognised. Warning, medium confidence.
+ * allowlisted identifier interpolation (`$wpdb->prefix`) and escaped operands - an `(int)` cast, and phpMyAdmin's
+ * `->quoteString()` value escaper and `Util::backquote()` identifier escaper - are recognised. Warning, medium
+ * confidence.
  */
 final class SqlConcatenationRule implements RuleInterface
 {
@@ -99,7 +99,7 @@ final class SqlConcatenationRule implements RuleInterface
                                      ],
                                      [
                                          'shape'      => 'A value escaped where it is spliced: an (int) cast, a ->quoteString() call or a Util::backquote() call.',
-                                         'mitigation' => 'These operands count as escaped and a concatenation inside their arguments is not weighed; any other escaping helper still flags, so bind the value instead.',
+                                         'mitigation' => 'These count as escaped, without checking a concatenation inside their arguments, unless ->quoteString() or Util::backquote() sits inside an already open quote or the construction passes through another call such as sprintf(); any other escaping helper still flags, so bind the value instead.',
                                      ],
                                      [
                                          'shape'      => 'Non-SQL query() receivers such as DOMXPath::query(\'//item[@id=\' . $tag . \']\').',
@@ -410,7 +410,8 @@ final class SqlConcatenationRule implements RuleInterface
      * Reports whether any string construction splices in a non-allowlisted dynamic part.
      *
      * An escaped operand counts only in a construction that reaches the SQL argument without passing through another
-     * call, such as sprintf(), which can splice other values around it; there the construction is weighed as before.
+     * call, such as sprintf(), which can splice other values around it; inside such a call only literal fragments and
+     * allowlisted receivers pass.
      *
      * @param Expr         $subject - Expression under inspection.
      * @param list<string> $safeReceivers - Variable names whose property fetches are safe identifier interpolation.
@@ -448,7 +449,7 @@ final class SqlConcatenationRule implements RuleInterface
      * @param string $literalText - Literal text spliced before it in the same construction.
      *
      * @return bool - True for an (int) cast anywhere, and for quoteString() or backquote() outside an open quote, because
-     *                each supplies its own quotes, which an already open quote would close.
+     *                each supplies its own quotes, and the first of them would close an already open quote.
      */
     private function isEscapedAt(Node $part, string $literalText): bool
     {

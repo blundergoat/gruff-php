@@ -177,14 +177,14 @@ final class ProcessCommandConstructionRule implements RuleInterface
      * Reports whether a command splices in a dynamic value that is neither escaped nor an integer.
      *
      * An escapeshellarg() call or (int) cast is opaque: a concatenation inside escapeshellarg()'s own argument is
-     * escaped as a whole. A construction handed to another call, such as sprintf() or str_replace(), reports as before,
-     * because that call can splice other values around it, and escapeshellarg() counts only outside an open shell quote,
-     * where its own quotes still delimit the value.
+     * escaped as a whole. Any other construction handed to another call, such as sprintf() or str_replace(), always
+     * reports, because that call can splice other values around it. escapeshellarg() counts only outside an open shell
+     * quote, where its own quotes still delimit the value.
      *
      * @param Expr $command - Command-string expression passed to a procedural command sink.
      *
-     * @return bool - True when some concatenation or interpolation splices in an operand other than a literal
-     *                fragment, an (int) cast, or an escapeshellarg() result outside an open quote.
+     * @return bool - True when a concatenation or interpolation sits inside another call, or splices in an operand other
+     *                than a literal fragment, an (int) cast, or an escapeshellarg() result outside an open quote.
      */
     private function hasUnescapedDynamicPart(Expr $command): bool
     {
