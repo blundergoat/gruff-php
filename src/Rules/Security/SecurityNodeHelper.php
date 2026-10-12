@@ -664,6 +664,107 @@ final class SecurityNodeHelper
     }
 
     /**
+     * Lists the outermost concatenations and interpolated strings under a root, skipping any inside an opaque operand.
+     *
+     * @param Node                 $root     - Expression whose string constructions are wanted.
+     * @param callable(Node): bool $isOpaque - Reports an operand that escapes its whole argument, which is never weighed.
+     *
+     * @return list<Node> - Constructions whose parent is not itself a construction and that sit inside no opaque operand.
+     */
+    public static function outermostStringConstructions(Node $root, callable $isOpaque): array
+    {
+        return array_values((new NodeFinder())->find($root, static function (Node $candidate) use ($root, $isOpaque): bool {
+            if (!self::isStringConstruction($candidate) || self::isStringConstruction($candidate->getAttribute('parent'))) {
+                return false;
+            }
+            $node = $candidate;
+            // An escaper receives everything under it as one value, so nothing inside it is a construction of the root.
+            while ($node !== $root && ($node = $node->getAttribute('parent')) instanceof Node) {
+                if ($isOpaque($node)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }));
+    }
+
+    /**
+     * Lists a construction's operands in source order, descending into nested concatenations and interpolations.
+     *
+     * @param Node $construction - Concatenation or interpolated string.
+     *
+     * @return list<Node> - Literal strings and interpolated-string parts, and every other operand expression whole.
+     */
+    public static function flattenedOperands(Node $construction): array
+    {
+        if ($construction instanceof Expr\BinaryOp\Concat) {
+            return [...self::flattenedOperands($construction->left), ...self::flattenedOperands($construction->right)];
+        }
+
+        return $construction instanceof Scalar\InterpolatedString ? array_values($construction->parts) : [$construction];
+    }
+
+    /**
+     * Reports whether a call sits between a node and its root expression, so the call can splice other values around it.
+     *
+     * @param Node $node - Node under the root.
+     * @param Node $root - Sink argument the walk stops at, itself included.
+     *
+     * @return bool - True when a function, method, static or constructor call is the node's ancestor up to the root.
+     */
+    public static function hasCallBetween(Node $node, Node $root): bool
+    {
+        while ($node !== $root && ($node = $node->getAttribute('parent')) instanceof Node) {
+            if ($node instanceof Expr\CallLike) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Reports whether literal text leaves a quote open, so the next spliced value lands inside that quote.
+     *
+     * @param string $text                        - Literal text spliced before the value.
+     * @param string $quotes                      - Quote characters to track, such as single and double quotes.
+     * @param bool   $isBackslashEscapeInSingle   - Whether a backslash escapes inside single quotes, as in SQL but not in a shell.
+     *
+     * @return bool - True when one of the quotes is still open at the end of the text.
+     */
+    public static function hasOpenQuote(string $text, string $quotes, bool $isBackslashEscapeInSingle): bool
+    {
+        $open   = null;
+        $length = strlen($text);
+        for ($index = 0; $index < $length; $index++) {
+            $character = $text[$index];
+            // A backslash escapes the next character, except inside a shell's single quotes.
+            if ($character === '\\' && ($open !== "'" || $isBackslashEscapeInSingle)) {
+                $index++;
+                continue;
+            }
+            if (str_contains($quotes, $character) && ($open === null || $open === $character)) {
+                $open = $open === null ? $character : null;
+            }
+        }
+
+        return $open !== null;
+    }
+
+    /**
+     * Reports whether a node is a concatenation or an interpolated string.
+     *
+     * @param mixed $node - Candidate node or parent attribute.
+     *
+     * @return bool - True for a `.` concatenation or a double-quoted string with interpolation.
+     */
+    private static function isStringConstruction(mixed $node): bool
+    {
+        return $node instanceof Expr\BinaryOp\Concat || $node instanceof Scalar\InterpolatedString;
+    }
+
+    /**
      * Reports whether a node is a literal string, for security-rule exemptions.
      *
      * @param Node $node - Node to inspect.

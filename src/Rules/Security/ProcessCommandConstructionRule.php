@@ -18,7 +18,6 @@ use PhpParser\Node;
 use PhpParser\Node\Expr;
 use PhpParser\Node\InterpolatedStringPart;
 use PhpParser\Node\Scalar;
-use PhpParser\NodeFinder;
 
 /**
  * Flags process command strings built from dynamic data, including request-tainted backticks, Symfony Process
@@ -178,58 +177,35 @@ final class ProcessCommandConstructionRule implements RuleInterface
      * Reports whether a command splices in a dynamic value that is neither escaped nor an integer.
      *
      * An escapeshellarg() call or (int) cast is opaque: a concatenation inside escapeshellarg()'s own argument is
-     * escaped as a whole, so only constructions outside those operands are weighed.
+     * escaped as a whole. A construction handed to another call, such as sprintf() or str_replace(), reports as before,
+     * because that call can splice other values around it, and escapeshellarg() counts only outside an open shell quote,
+     * where its own quotes still delimit the value.
      *
      * @param Expr $command - Command-string expression passed to a procedural command sink.
      *
      * @return bool - True when some concatenation or interpolation splices in an operand other than a literal
-     *                fragment, an escapeshellarg() result, or an (int) cast.
+     *                fragment, an (int) cast, or an escapeshellarg() result outside an open quote.
      */
     private function hasUnescapedDynamicPart(Expr $command): bool
     {
-        $constructions = (new NodeFinder())->find($command, fn (Node $node): bool =>
-            ($node instanceof Expr\BinaryOp\Concat || $node instanceof Scalar\InterpolatedString)
-            && !$this->isInsideEscapedOperand($node, $command));
-
-        foreach ($constructions as $construction) {
-            $operands = match (true) {
-                $construction instanceof Expr\BinaryOp\Concat      => [$construction->left, $construction->right],
-                $construction instanceof Scalar\InterpolatedString => $construction->parts,
-                default                                           => [],
-            };
-            // Literal fragments are static and nested constructions are weighed on their own.
-            foreach ($operands as $operand) {
-                if ($operand instanceof InterpolatedStringPart || $operand instanceof Scalar\String_
-                    || $operand instanceof Expr\BinaryOp\Concat || $operand instanceof Scalar\InterpolatedString
-                    || $this->isEscapedOperand($operand)) {
+        $isEscaped = fn (Node $node): bool => $this->isEscapedOperand($node);
+        foreach (SecurityNodeHelper::outermostStringConstructions($command, $isEscaped) as $construction) {
+            if (SecurityNodeHelper::hasCallBetween($construction, $command)) {
+                return true;
+            }
+            $literalText = '';
+            foreach (SecurityNodeHelper::flattenedOperands($construction) as $operand) {
+                if ($operand instanceof Scalar\String_ || $operand instanceof InterpolatedStringPart) {
+                    $literalText .= $operand->value;
+                    continue;
+                }
+                if ($operand instanceof Expr\Cast\Int_
+                    || ($this->isEscapedOperand($operand) && !SecurityNodeHelper::hasOpenQuote($literalText, '\'"', false))) {
                     continue;
                 }
 
                 return true;
             }
-        }
-
-        return false;
-    }
-
-    /**
-     * Reports whether a node sits inside an escaped operand of the command expression.
-     *
-     * @param Node $node    - Concatenation or interpolation found under the command.
-     * @param Expr $command - Command expression that bounds the walk up the parents.
-     *
-     * @return bool - True when an escapeshellarg() call or (int) cast between the node and the command contains it.
-     */
-    private function isInsideEscapedOperand(Node $node, Expr $command): bool
-    {
-        $parent = $node->getAttribute('parent');
-        // Walk up to the command expression itself; anything above it belongs to the sink call.
-        while ($parent instanceof Node && $node !== $command) {
-            if ($this->isEscapedOperand($parent)) {
-                return true;
-            }
-            $node   = $parent;
-            $parent = $parent->getAttribute('parent');
         }
 
         return false;

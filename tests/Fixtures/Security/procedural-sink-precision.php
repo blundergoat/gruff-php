@@ -89,4 +89,8 @@ function escapeSplicedSinkValues(mysqli $conn, object $dbi, string $file, string
     mysqli_query($conn, 'SELECT * FROM users WHERE name LIKE ' . $dbi->quoteString('%' . $id . '%'));
     mysqli_query($conn, 'SELECT * FROM ' . Util::backquote($id) . ' WHERE id = ' . $id);
     mysqli_query($conn, "SELECT * FROM users WHERE name = '" . $dbi->quote($id) . "'");
+    exec(sprintf('convert ' . escapeshellarg($file) . ' -resize %s out.png', $flag));
+    exec('convert "' . escapeshellarg($file) . '" out.png');
+    mysqli_query($conn, sprintf('SELECT * FROM ' . Util::backquote($id) . " WHERE name = '%s'", $id));
+    mysqli_query($conn, "SELECT * FROM users WHERE name = '" . $dbi->quoteString($id) . "'");
 }

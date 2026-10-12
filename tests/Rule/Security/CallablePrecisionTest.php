@@ -116,6 +116,9 @@ final class CallablePrecisionTest extends TestCase
         yield 'local closure list' => ['$steps = [static fn (string $v): string => $v, function (string $v): string { return $v; }]; foreach ($steps as $step) { $step(\'x\'); }', 0];
         yield 'closure list holding an unknown callable' => ['$steps = [static fn (): int => 1, $unknown]; foreach ($steps as $step) { $step(); }', 1];
         yield 'closure list appended later' => ['$steps = [static fn (): int => 1]; $steps[] = $unknown; foreach ($steps as $step) { $step(); }', 1];
+        yield 'closure list assigned after its loop stays dynamic' => ['foreach ($unknown as $step) { $step(); } $unknown = [static fn (): int => 1];', 1];
+        yield 'one-argument parse_str can replace a literal callee' => ['$format = \'strtoupper\'; parse_str($unknown); $format(\'x\');', 1];
+        yield 'by-reference capture can replace a literal callee' => ['$run = function () use (&$format): void { $format = \'strtoupper\'; $format(\'x\'); };', 1];
         yield 'fixed built-in command' => ['shell_exec(\'git rev-parse HEAD\');', 0];
         yield 'built-in command with input' => ['shell_exec(\'git log \' . $unknown);', 1];
         yield 'captured alias remains unresolved' => ['$handler = $this->callback; $nested = function () use ($handler) { $handler(); };', 1];

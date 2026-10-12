@@ -78,9 +78,10 @@ final class CallableFlowEvidence
     public static function literalCalleeName(Expr\FuncCall $call): ?string
     {
         $scope = SecurityNodeHelper::enclosingFunctionLike($call);
-        // A computed callee, a missing body, or a runtime-created local leaves the value unknown.
+        // A computed callee, a missing body, a runtime-created local, or a reference another scope holds leaves the value unknown.
         if (!$call->name instanceof Expr\Variable || !is_string($call->name->name) || $scope === null
-            || $scope->getStmts() === null || self::hasUnboundedLocalWrites($scope)) {
+            || $scope->getStmts() === null || self::hasUnboundedLocalWrites($scope)
+            || self::isCapturedByReference($scope, $call->name->name)) {
             return null;
         }
 
@@ -106,7 +107,7 @@ final class CallableFlowEvidence
     public static function hasLocalClosureListEvidence(Expr\FuncCall $call): bool
     {
         $scope = SecurityNodeHelper::enclosingFunctionLike($call);
-        // Only a named function or method body has the local sequence this proof relies on.
+        // A closure is left out: a by-reference `use` would let the enclosing function rewrite the list mid-body.
         if ((!$scope instanceof Stmt\ClassMethod && !$scope instanceof Stmt\Function_)
             || !$call->name instanceof Expr\Variable || !is_string($call->name->name)
             || self::hasUnboundedLocalWrites($scope)) {
@@ -115,18 +116,39 @@ final class CallableFlowEvidence
 
         $loop = self::selectingLoop($call, $call->name->name);
         // The invoked value must be written by its own by-value loop and nothing else.
-        if ($loop === null || $loop->byRef || SecurityNodeHelper::enclosingFunctionLike($loop) !== $scope
-            || self::variableWrites($call->name->name, $scope) !== [$loop]
+        if ($loop === null || $loop->byRef || self::variableWrites($call->name->name, $scope) !== [$loop]
             || !$loop->expr instanceof Expr\Variable || !is_string($loop->expr->name)) {
             return false;
         }
 
         $writes     = self::variableWrites($loop->expr->name, $scope);
         $assignment = $writes[0] ?? null;
-        // The list is assigned once, from a closure-literal array, before the loop on the same branch.
+        // The list is assigned once, from a closure-literal array, completed before the loop on the same branch.
         return count($writes) === 1 && $assignment instanceof Expr\Assign && $assignment->var instanceof Expr\Variable
             && $assignment->expr instanceof Expr\Array_ && self::isClosureLiteralList($assignment->expr)
+            && $assignment->getEndFilePos() < $loop->getStartFilePos()
             && self::isBeforeReadOnSameBranch($assignment, $loop, $scope);
+    }
+
+    /**
+     * Reports whether a closure captures a local by reference, so the enclosing function can rewrite it at any call.
+     *
+     * @param FunctionLike $scope - Function whose local is read; only a closure has a `use` list.
+     * @param string       $name  - Local name without `$`.
+     * @return bool - True when the closure imports that name by reference.
+     */
+    private static function isCapturedByReference(FunctionLike $scope, string $name): bool
+    {
+        if (!$scope instanceof Expr\Closure) {
+            return false;
+        }
+        foreach ($scope->uses as $capture) {
+            if ($capture->byRef && $capture->var->name === $name) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -267,8 +289,13 @@ final class CallableFlowEvidence
                 return true;
             }
 
-            return $node instanceof Expr\FuncCall && $node->name instanceof Name
-                && strtolower($node->name->getLast()) === 'extract' && !$node->isFirstClassCallable();
+            if (!$node instanceof Expr\FuncCall || !$node->name instanceof Name || $node->isFirstClassCallable()) {
+                return false;
+            }
+            $function = strtolower($node->name->getLast());
+
+            // extract() and one-argument parse_str() create locals from data (parse_str's one-argument form did until PHP 8).
+            return $function === 'extract' || (in_array($function, ['parse_str', 'mb_parse_str'], true) && count($node->getArgs()) === 1);
         }) !== null;
     }
 
