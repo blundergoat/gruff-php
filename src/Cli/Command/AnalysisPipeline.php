@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Cli\Command;
 
+use GruffPhp\Engine\Analysis\InlineSuppressionFilter;
 use GruffPhp\Engine\Analysis\RunDiagnostic;
 use GruffPhp\Engine\Analysis\SensitiveExclusionFilter;
 use GruffPhp\Engine\Analysis\SensitiveExclusionSummary;
@@ -79,10 +80,12 @@ final class AnalysisPipeline
      *     discoverParseNs: int,
      *     analyseNs: int,
      *     projectContextUnits: list<AnalysisUnit>,
-     *     suppressions: list<SensitiveExclusionSummary>
+     *     suppressions: list<SensitiveExclusionSummary>,
+     *     suppressedFindings: list<array{finding: Finding, justification: string}>
      * } - analysis result for the run: discovered sources, findings left after the configured sensitive
-     *     exclusions ran, discover/parse and analyse timings in nanoseconds, the resolved project-context
-     *     units (empty under the streaming path), and one audit row per configured exclusion
+     *     exclusions, the test-path skip and section 13c's filter ran, discover/parse and analyse timings in
+     *     nanoseconds, the resolved project-context units (empty under the streaming path), one audit row per
+     *     configured exclusion and per skipped or suppressed file and rule, and the findings section 13c removed
      */
     public function runAnalysis(
         string                $projectRoot,
@@ -105,9 +108,13 @@ final class AnalysisPipeline
             ruleRunnerObserver: $ruleRunnerObserver,
         );
 
-        // Reviewed sensitive-data exclusions apply here, before scoring, the exit gate, or any reporter sees
-        // the findings, and every configured entry publishes a count so nothing is hidden silently.
-        $exclusionResult = (new SensitiveExclusionFilter())->apply($analysisRun['findings'], $config->sensitiveExclusions());
+        // Reviewed exclusions, the test-path skip and section 13c apply before scoring, the exit gate or reporting.
+        // Every configured entry and every removal publishes a count so nothing is hidden silently.
+        $exclusionResult = (new SensitiveExclusionFilter())->apply(
+            $analysisRun['findings'],
+            $config->sensitiveExclusions(),
+            InlineSuppressionFilter::forFiles($analysisRun['sources']->discovery->files),
+        );
 
         return [
             'sources' => $analysisRun['sources'],
@@ -116,6 +123,7 @@ final class AnalysisPipeline
             'analyseNs' => $analysisRun['analyseNs'],
             'projectContextUnits' => $analysisRun['projectContextUnits'],
             'suppressions' => $exclusionResult->summaries,
+            'suppressedFindings' => $exclusionResult->suppressedFindings,
         ];
     }
 
@@ -295,7 +303,7 @@ final class AnalysisPipeline
         $fingerprint = $cacheable ? AnalysisFingerprint::forRun($this->registry, $config, Application::VERSION) : null;
 
         $this->registry->beginStreaming($ruleContext);
-        $findings     = [];
+        $findings       = [];
         $parsedCount    = 0;
         $evaluatedCount = 0;
         $analyseStart   = hrtime(true);

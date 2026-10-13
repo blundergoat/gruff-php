@@ -48,12 +48,13 @@ final readonly class SensitiveExclusionFilter
      * Hides one run's accepted findings and returns the rest with the audit rows a reviewer reads in the report.
      * The user's own entries claim findings first, then the built-in test-path skip takes what is left.
      *
-     * @param list<Finding>            $findings - Findings produced by the run, in report order.
-     * @param list<SensitiveExclusion> $exclusions - Validated exclusions in configuration order, so a position is its audit index.
+     * @param list<Finding>                $findings   - Findings produced by the run, in report order.
+     * @param list<SensitiveExclusion>     $exclusions - Validated exclusions in configuration order, so a position is its audit index.
+     * @param InlineSuppressionFilter|null $inline     - Section 13c's comment and repeated-claim filter, applied last; null applies only the exclusions and the test-path skip.
      *
-     * @return SensitiveExclusionResult - findings still reported, then audit rows; no rows means nothing is configured and no test file had one
+     * @return SensitiveExclusionResult - surviving findings, audit rows, and the findings section 13c removed; no rows means no configured entry or built-in or section 13c removal
      */
-    public function apply(array $findings, array $exclusions): SensitiveExclusionResult
+    public function apply(array $findings, array $exclusions, ?InlineSuppressionFilter $inline = null): SensitiveExclusionResult
     {
         $counts    = array_fill(0, count($exclusions), 0);
         $survivors = [];
@@ -72,7 +73,10 @@ final readonly class SensitiveExclusionFilter
         }
 
         // A configured entry claims its findings first, so its count stays what the user wrote it for.
-        return $this->applyBuiltInTestPathSkip(new SensitiveExclusionResult($survivors, $this->summaries($exclusions, $counts)));
+        $result = $this->applyBuiltInTestPathSkip(new SensitiveExclusionResult($survivors, $this->summaries($exclusions, $counts)));
+
+        // Another tool's comment and a repeated claim are judged last, so their rows follow the built-in ones.
+        return $inline?->apply($result) ?? $result;
     }
 
     /**
@@ -113,13 +117,13 @@ final readonly class SensitiveExclusionFilter
         foreach ($skippedCountByFileAndRule as $fileAndRule => $count) {
             [$filePath, $ruleId] = explode("\0", (string)$fileAndRule, 2);
             $summaries[]         = new SensitiveExclusionSummary(
-                index: $nextIndex++,
-                rule: $ruleId,
-                path: $filePath,
-                symbol: null,
-                reason: str_starts_with($ruleId, 'security.') ? self::BUILT_IN_SECURITY_TEST_PATH_REASON : self::BUILT_IN_TEST_PATH_REASON,
+                index:      $nextIndex++,
+                rule:       $ruleId,
+                path:       $filePath,
+                symbol:     null,
+                reason:     str_starts_with($ruleId, 'security.') ? self::BUILT_IN_SECURITY_TEST_PATH_REASON : self::BUILT_IN_TEST_PATH_REASON,
                 suppressed: $count,
-                source: 'built-in',
+                source:     'built-in',
             );
         }
 
@@ -169,7 +173,7 @@ final readonly class SensitiveExclusionFilter
     /**
      * Finds the first configured entry whose declared scope covers a finding.
      *
-     * @param Finding                  $finding - Finding to place.
+     * @param Finding                  $finding    - Finding to place.
      * @param list<SensitiveExclusion> $exclusions - Validated exclusions in configuration order.
      *
      * @return int|null - index of the owning entry, or null when the finding falls outside every declared scope and must keep reporting.
@@ -190,7 +194,7 @@ final readonly class SensitiveExclusionFilter
      * Builds the audit rows, one per configured entry, whether or not the entry matched anything.
      *
      * @param list<SensitiveExclusion> $exclusions - Validated exclusions in configuration order.
-     * @param array<int, int>          $counts - Per-entry suppressed counts, keyed by the entry's position.
+     * @param array<int, int>          $counts     - Per-entry suppressed counts, keyed by the entry's position.
      *
      * @return list<SensitiveExclusionSummary> - one row per configured entry, so an entry that matched nothing still reports `suppressed: 0`.
      */

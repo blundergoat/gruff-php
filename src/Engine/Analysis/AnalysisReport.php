@@ -82,6 +82,7 @@ final readonly class AnalysisReport
      * @param int|null                    $newFindingsCount - Size of the new-findings set; null when no new-findings gate is active.
      * @param list<SensitiveExclusionSummary> $sensitiveExclusions - One audit row per configured sensitive-data exclusion; empty when the run configured none.
      * @param MachineReportContext        $machineContext - Serializer-only paths, run flags, root, and pre-display finding data.
+     * @param list<array{finding: Finding, justification: string}> $suppressedFindings - Findings another tool's comment or a repeated claim removed; never in the JSON envelope, which counts them in `suppressions`, but kept by SARIF as suppressed results (FAMILY-CONTRACT.md section 13c).
      */
     public function __construct(
         public string                  $toolVersion,
@@ -114,6 +115,7 @@ final readonly class AnalysisReport
             'projectRoot' => '.',
             'unfilteredFindings' => null,
         ],
+        public array                   $suppressedFindings = [],
     ) {
     }
 

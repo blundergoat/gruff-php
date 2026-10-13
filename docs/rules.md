@@ -465,6 +465,9 @@ built-in execution call (`exec`, `passthru`, `popen`, `proc_open`,
 `shell_exec`, `system`) whose command is one plain string literal no longer
 reports; any other command, and every `options.additionalFunctions` name,
 still does.
+When `security.process-command-construction` also reports the same
+exec-family call, the call reports once, under that rule, and the merge is
+counted as a `duplicate` row in `suppressions` (FAMILY-CONTRACT.md section 13c).
 
 Bounded local aliases now preserve callable evidence through ordinary assignments and resolved built-in `Closure::bind()` calls.
 New alias facts stop at ambiguous branches, reassignment, borrowed references, unknown receivers, runtime-created locals or eight alias steps.

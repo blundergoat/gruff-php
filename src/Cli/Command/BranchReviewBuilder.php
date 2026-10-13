@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Cli\Command;
 
+use GruffPhp\Engine\Analysis\InlineSuppressionFilter;
 use GruffPhp\Engine\Analysis\RunDiagnostic;
 use GruffPhp\Engine\Analysis\SensitiveExclusionFilter;
 use GruffPhp\Results\Baseline\BaselineApplication;
@@ -95,6 +96,7 @@ final readonly class BranchReviewBuilder
             $baseRoot     = $gitArchiveSnapshot->create($projectRoot, $options->changeScope->diffVs, $baseSnapshotPaths);
             $basePaths    = (new AnalysisFindingSupport())->existingSnapshotPaths($baseRoot, $baseAnalysisPaths);
             $baseFindings = [];
+            $baseFiles    = [];
 
             // Only analyse the base snapshot when it actually holds files; an empty set means nothing survived from the base ref to score.
             if ($basePaths !== []) {
@@ -115,11 +117,16 @@ final readonly class BranchReviewBuilder
                     $baseRegistry->enabledProjectRuleIds($config),
                     $baseSources->displayPaths(),
                 );
+                $baseFiles = $baseSources->discovery->files;
             }
 
-            // Reviewed sensitive exclusions hide their findings on the base side too, keeping the comparison
-            // symmetric; otherwise an accepted synthetic credential present in both trees reads as removed.
-            $baseFindings = (new SensitiveExclusionFilter())->apply($baseFindings, $config->sensitiveExclusions())->findings;
+            // Reviewed exclusions and section 13c apply on the base side too, keeping the comparison symmetric;
+            // otherwise a covered finding present in both trees reads as removed.
+            $baseFindings = (new SensitiveExclusionFilter())->apply(
+                $baseFindings,
+                $config->sensitiveExclusions(),
+                InlineSuppressionFilter::forFiles($baseFiles),
+            )->findings;
 
             // In changed-only mode the user only cares about files this branch touched, so trim the base findings to those same files.
             if ($options->changeScope->isChangedOnly) {

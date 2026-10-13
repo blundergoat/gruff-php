@@ -68,7 +68,8 @@ final class BuiltInTestPathSkipCliTest extends CliTestCase
                 static fn(string $rule): bool => str_starts_with($rule, 'security.'),
             ));
 
-            self::assertContains('security.dangerous-function-call', $this->rulesFor($report, 'src/Runner.php'));
+            // The call reports once, under the narrower process-command rule (FAMILY-CONTRACT.md section 13c).
+            self::assertContains('security.process-command-construction', $this->rulesFor($report, 'src/Runner.php'));
             self::assertSame([], $securityRulesFor('tests/RunnerTest.php'));
             self::assertSame([], $securityRulesFor('examples/run_demo.php'));
             // Every skipped security finding is counted in a built-in row that carries the security reason.

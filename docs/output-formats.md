@@ -115,6 +115,29 @@ because every security rule, and every sensitive-data rule except
 `builtInTestPath[<path>]`. The lockfile skip was removed in 0.6.0 with the
 entropy rule it served (ADR-034).
 
+Another tool's suppression comment that names the same check as a gruff-php
+rule suppresses that finding where it was written (FAMILY-CONTRACT.md section
+13c): phpcs `WordPress.PHP.NoSilencedErrors` for `security.error-suppression`,
+phpcs `WordPress.DB.PreparedSQL` for `security.sql-concatenation`, psalm
+`ForbiddenCode` for `security.dangerous-function-call` and
+`security.process-command-construction`, and a `phpcs:ignore` naming no sniff
+for both phpcs rows. A sniff category or error code covers the sniff it
+contains or belongs to, so `WordPress.DB.PreparedSQL.InterpolatedNotPrepared`
+counts. The comment must be on the reported line or alone on the line above it.
+Type-checker comments such as `@phpstan-ignore` and region forms such as
+`phpcs:disable` are never honoured. An `exec`-family call that both
+`security.dangerous-function-call` and `security.process-command-construction`
+report is reported once, under `security.process-command-construction`.
+
+Suppressed findings are counted in one row per file and rule after the built-in rows,
+numbered on from them, with `source: "inline"` and the reason "Another tool's
+suppression comment names this check, so the finding is suppressed where it was
+written." Each merge adds a row with `source: "duplicate"` and the reason
+"Another rule reports the same claim on this line, so the line reports it
+once." Text output labels them `inline[<path>]` and `duplicate[<path>]`, and
+SARIF keeps each removed finding as a result carrying
+`"suppressions": [{"kind": "inSource", "justification": <reason>}]`.
+
 ### Baseline, trend, and changed-region data
 
 When a PHP baseline is generated or applied, the canonical `baseline`

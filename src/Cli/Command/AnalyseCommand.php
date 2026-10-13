@@ -351,6 +351,7 @@ final class AnalyseCommand extends Command
                 'projectRoot' => $projectRoot,
                 'unfilteredFindings' => $findings,
             ],
+            suppressedFindings:       $analysisRun['suppressedFindings'],
         );
 
         $reportStart = hrtime(true);

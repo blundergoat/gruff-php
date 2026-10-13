@@ -48,7 +48,7 @@ final readonly class SarifReporter
 
         // Backfill a minimal rule entry for any finding whose rule isn't built-in - the `??=` leaves the
         // richer definitions from the first loop untouched, so no result points at a rule we never list.
-        foreach ($report->findings as $finding) {
+        foreach ([...$report->findings, ...array_column($report->suppressedFindings, 'finding')] as $finding) {
             $rules[$finding->ruleId] ??= [
                 'id' => $finding->ruleId,
                 'name' => $finding->ruleId,
@@ -85,7 +85,18 @@ final readonly class SarifReporter
                     'rules' => array_values($rules),
                 ],
             ],
-            'results' => array_map(fn(Finding $finding): array => $this->result($finding, (int)$ruleIndexes[$finding->ruleId]), $report->findings),
+            'results' => [
+                ...array_map(fn(Finding $finding): array => $this->result($finding, (int)$ruleIndexes[$finding->ruleId]), $report->findings),
+                // A finding another tool's comment or a repeated claim removed stays a result marked suppressed, so a
+                // code-scanning tool shows it as suppressed rather than fixed (FAMILY-CONTRACT.md section 13c).
+                ...array_map(
+                    fn(array $item): array => [
+                        ...$this->result($item['finding'], (int)$ruleIndexes[$item['finding']->ruleId]),
+                        'suppressions' => [['kind' => 'inSource', 'justification' => $item['justification']]],
+                    ],
+                    $report->suppressedFindings,
+                ),
+            ],
             'properties' => $properties,
         ];
         if ($report->diagnostics !== []) {

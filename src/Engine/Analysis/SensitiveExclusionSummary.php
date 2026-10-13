@@ -11,8 +11,9 @@ namespace GruffPhp\Engine\Analysis;
  * anything, so a suppression is never silently invisible: a reviewer reading the report sees the
  * scope, the rationale its author wrote, and the number of findings it removed. An entry that
  * matched nothing reports `suppressed: 0` rather than failing, so fixing the underlying problem
- * never breaks a build. Nothing here is derived from a matched value - the rule id, path, symbol,
- * and reason all come from configuration.
+ * never breaks a build. Configured rows take their rule id, path, symbol and reason from configuration;
+ * built-in and section 13c rows take the rule id and path from a finding and the reason from the contract,
+ * never from a matched value.
  *
  * @phpstan-type SensitiveExclusionSummaryArray array{index: int, rule: string, paths: list<string>, symbol: string|null, source?: string, reason: string,
  *               suppressed: int}
@@ -22,13 +23,13 @@ final readonly class SensitiveExclusionSummary
     /**
      * Holds one entry's declared scope alongside the count it suppressed on this run.
      *
-     * @param int         $index - Entry position in the configured list, matching the `sensitiveExclusions[N]` used by config diagnostics.
-     * @param string      $rule - Exact rule id the entry suppresses.
-     * @param string      $path - Project-relative path the entry is scoped to.
-     * @param string|null $symbol - Symbol narrowing the scope; null when the entry covers the whole file.
-     * @param string      $reason - Rationale supplied by whoever accepted the finding.
+     * @param int         $index      - Entry position in the configured list, matching the `sensitiveExclusions[N]` used by config diagnostics.
+     * @param string      $rule       - Exact rule id the entry suppresses.
+     * @param string      $path       - Project-relative path the entry is scoped to.
+     * @param string|null $symbol     - Symbol narrowing the scope; null when the entry covers the whole file.
+     * @param string      $reason     - Rationale supplied by whoever accepted the finding, or the contract's fixed reason on a built-in or section 13c row.
      * @param int         $suppressed - Findings this entry removed from the run; zero is a valid, non-failing result.
-     * @param string|null $source - `built-in` on a row the test-path skip produced; null on a row for an entry the user configured.
+     * @param string|null $source     - `built-in` on a row the test-path skip produced, `inline` or `duplicate` on a section 13c row; null on a row for an entry the user configured.
      */
     public function __construct(
         public int     $index,
@@ -51,15 +52,15 @@ final readonly class SensitiveExclusionSummary
     public function toArray(): array
     {
         $auditRow = [
-            'index'      => $this->index,
-            'rule'       => $this->rule,
-            'paths'      => [$this->path],
-            'symbol'     => $this->symbol,
-            'reason'     => $this->reason,
+            'index' => $this->index,
+            'rule' => $this->rule,
+            'paths' => [$this->path],
+            'symbol' => $this->symbol,
+            'reason' => $this->reason,
             'suppressed' => $this->suppressed,
         ];
 
-        // Only a built-in row names its source; a configured row is recognised by carrying none.
+        // Only a built-in or section 13c row names its source; a configured row is recognised by carrying none.
         if ($this->source !== null) {
             $auditRow['source'] = $this->source;
         }
@@ -75,10 +76,13 @@ final readonly class SensitiveExclusionSummary
      */
     public function describe(): string
     {
-        // A built-in row names the file it skipped, since no config entry exists to point at.
+        // A built-in or section 13c row names the file it covers, since no config entry exists to point at.
         // The test-path skip is the only built-in class, e.g. `builtInTestPath[tests/keys.php] sensitive-data.aws-access-key: 2`.
         if ($this->source !== null) {
-            return sprintf('builtInTestPath[%s] %s: %d (%s)', $this->path, $this->rule, $this->suppressed, $this->reason);
+            // An inline or duplicate row names its class the same way, e.g. `inline[src/db.php] security.sql-concatenation: 1`.
+            $label = in_array($this->source, ['inline', 'duplicate'], true) ? $this->source : 'builtInTestPath';
+
+            return sprintf('%s[%s] %s: %d (%s)', $label, $this->path, $this->rule, $this->suppressed, $this->reason);
         }
 
         return sprintf('sensitiveExclusions[%d] %s: %d (%s)', $this->index, $this->rule, $this->suppressed, $this->reason);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Cli\Command;
 
+use GruffPhp\Engine\Analysis\InlineSuppressionFilter;
 use GruffPhp\Engine\Analysis\SensitiveExclusionFilter;
 use GruffPhp\Engine\Analysis\SensitiveExclusionSummary;
 use GruffPhp\Engine\Analysis\AnalysisReport;
@@ -237,7 +238,7 @@ final class SummaryCommand extends Command
      * Reads one non-empty string option without coercing other input shapes.
      *
      * @param InputInterface $input - Parsed console input for this run.
-     * @param string $name - Option name to read, such as `config`.
+     * @param string         $name  - Option name to read, such as `config`.
      *
      * @return string|null - The option's text; null when it was omitted or left blank.
      */
@@ -373,30 +374,30 @@ final class SummaryCommand extends Command
             shouldReleaseUnitsAfterAnalysis: true,
         );
 
-        // The configured sensitive-data exclusions apply here, exactly as they do on `analyse`, before scoring
+        // Configured exclusions and section 13c apply here, exactly as they do on `analyse`, before scoring
         // and before any total is counted - otherwise the digest would grade findings the fuller report has
         // already accepted. The audit rows travel with the data so the text render can state what went.
-        $exclusionResult = (new SensitiveExclusionFilter())->apply($findings, $config->sensitiveExclusions());
+        $exclusionResult = (new SensitiveExclusionFilter())->apply($findings, $config->sensitiveExclusions(), InlineSuppressionFilter::forFiles($sources->discovery->files));
         $findings        = $exclusionResult->findings;
 
         $score           = (new ScoreCalculator())->calculate($findings, $sources->evaluatedFileCount(), null, DiffResult::inactive(), $topLimit, analysisConfig: $config);
         $filesDiscovered = count($sources->discovery->files);
         $analysisReport  = new AnalysisReport(
-            toolVersion:      Application::VERSION,
-            requestedPaths:   $paths,
-            format:           $format,
-            failOn:           'none',
-            filesDiscovered:  $filesDiscovered,
-            filesParsed:      $sources->parsedFileCount(),
-            ignoredPaths:     $sources->discovery->ignoredPaths,
-            missingPaths:     $sources->discovery->missingPaths,
-            diagnostics:      $sources->diagnostics,
-            findings:         $findings,
-            exitCode:         $this->summaryExitCode($sources->diagnostics),
-            configPath:       $effectiveConfigPath,
-            score:            $filesDiscovered === 0 ? null : $score,
+            toolVersion:         Application::VERSION,
+            requestedPaths:      $paths,
+            format:              $format,
+            failOn:              'none',
+            filesDiscovered:     $filesDiscovered,
+            filesParsed:         $sources->parsedFileCount(),
+            ignoredPaths:        $sources->discovery->ignoredPaths,
+            missingPaths:        $sources->discovery->missingPaths,
+            diagnostics:         $sources->diagnostics,
+            findings:            $findings,
+            exitCode:            $this->summaryExitCode($sources->diagnostics),
+            configPath:          $effectiveConfigPath,
+            score:               $filesDiscovered === 0 ? null : $score,
             sensitiveExclusions: $exclusionResult->summaries,
-            machineContext:    [
+            machineContext:      [
                 'ignoredPathDetails' => $sources->discovery->ignoredPathDetails,
                 'shouldIncludeIgnored' => $shouldIncludeIgnored,
                 'projectRoot' => $projectRoot,
