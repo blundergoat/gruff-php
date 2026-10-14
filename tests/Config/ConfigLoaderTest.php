@@ -18,8 +18,8 @@ use GruffPhp\Output\Reporter\FailThreshold;
 use GruffPhp\Output\Reporter\FailThresholds;
 use GruffPhp\Rules\Docs\MissingPhpdocRule;
 use GruffPhp\Rules\RuleRegistry;
+use GruffPhp\Rules\Security\DangerousFunctionCallRule;
 use GruffPhp\Rules\Size\FileLengthRule;
-use GruffPhp\Rules\TestQuality\TestMethodTooLongRule;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
@@ -201,21 +201,21 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Verify loads compact path override list options.
+     * Verify loads a YAML block-list rule option as a string list.
      *
      * @return void
      */
-    public function testLoadsCompactPathOverrideListOptions(): void
+    public function testLoadsYamlBlockListRuleOptions(): void
     {
         $path = $this->writeTempConfig(
-            "rules:\n    test-quality.test-method-too-long:\n        options:\n            pathOverrides:\n                - 'tests/Console/**=40'\n",
+            "rules:\n    security.dangerous-function-call:\n        options:\n            additionalFunctions:\n                - 'custom_runner'\n",
             '.yaml',
         );
 
         $config   = (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
-        $settings = $config->ruleSettings(TestMethodTooLongRule::ID);
+        $settings = $config->ruleSettings(DangerousFunctionCallRule::ID);
 
-        self::assertSame(['tests/Console/**=40'], $settings->option('pathOverrides'));
+        self::assertSame(['custom_runner'], $settings->stringListOption('additionalFunctions'));
     }
 
     /**

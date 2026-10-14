@@ -92,6 +92,9 @@ final class DangerousFunctionCallRule implements RuleInterface
             tier:               RuleTier::V01,
             defaultSeverity:    Severity::Warning,
             confidence:         Confidence::Medium,
+            // Off unless a project sets `enabled: true`: precision-floor M02 found it right on 3 of 6 judged findings, too few
+            // to establish its precision floor, so it is off by default rather than deleted (ADR-034).
+            isEnabledByDefault: false,
             defaultOptions:     ['additionalFunctions' => []],
             description:        'Flags dynamic execution, built-in shell and evaluation patterns, and configured additive global function names.',
             optionDescriptions: [

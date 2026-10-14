@@ -12,7 +12,6 @@ use GruffPhp\Engine\Parser\PhpFileParser;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\RuleRegistry;
 use GruffPhp\Rules\SensitiveData\GcpServiceAccountKeyRule;
-use GruffPhp\Rules\SensitiveData\PhiPatternRule;
 use GruffPhp\Rules\SensitiveData\PiiTestFixtureRule;
 use GruffPhp\Rules\SensitiveData\PrivateKeyRule;
 use GruffPhp\Engine\Source\SourceFile;
@@ -24,7 +23,7 @@ use Symfony\Component\Process\Process;
  *
  * - A real key reports once with a redacted marker, a placeholder key stays quiet, and the private-key rule reports its own line.
  * - No report format (text, JSON, SARIF, GitHub, Markdown or HTML) prints the raw key body.
- * - Schema field names and placeholder identifiers do not fire the PHI or PII rules.
+ * - Schema field names and placeholder identifiers do not fire the PII rule.
  */
 final class SensitiveDataExpansionRulesTest extends TestCase
 {
@@ -94,7 +93,7 @@ final class SensitiveDataExpansionRulesTest extends TestCase
         $rawSecrets = ['MIIBVgIBADANBgkqhkiG'];
 
         foreach (['text', 'json', 'sarif', 'github', 'markdown', 'html'] as $format) {
-            $output = $this->runGruff(['analyse', self::GCP_FIXTURE, '--format', $format, '--fail-on', 'none', '--no-config']);
+            $output = $this->runGruff(['analyse', self::GCP_FIXTURE, '--format', $format, '--fail-on', 'none', '--config', 'tests/Fixtures/Config/enable-default-off-rules.yaml']);
 
             foreach ($rawSecrets as $secret) {
                 self::assertStringNotContainsString($secret, $output, sprintf('%s report leaked a raw secret.', $format));
@@ -105,13 +104,12 @@ final class SensitiveDataExpansionRulesTest extends TestCase
     }
 
     /**
-     * Verify schema field names and placeholder identifiers do not fire PHI/PII rules.
+     * Verify schema field names and placeholder identifiers do not fire PII rules.
      *
      * @return void
      */
     public function testSchemaAndPlaceholderValuesDoNotFirePhiOrPii(): void
     {
-        self::assertSame([], $this->findingsForRule(self::PHI_GUARD_FIXTURE, PhiPatternRule::ID));
         self::assertSame([], $this->findingsForRule(self::PHI_GUARD_FIXTURE, PiiTestFixtureRule::ID));
     }
 

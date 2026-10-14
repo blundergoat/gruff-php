@@ -11,12 +11,8 @@ use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\RuleRegistry;
-use GruffPhp\Rules\TestQuality\ConditionalTestLogicRule;
-use GruffPhp\Rules\TestQuality\ExtendsProductionClassRule;
 use GruffPhp\Rules\TestQuality\LoopAssertionWithoutMessageRule;
-use GruffPhp\Rules\TestQuality\MockWithoutExpectationRule;
 use GruffPhp\Rules\TestQuality\NoAssertionsRule;
-use GruffPhp\Rules\TestQuality\SleepInTestRule;
 use GruffPhp\Rules\TestQuality\SutNotCalledRule;
 use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitor\NameResolver;
@@ -28,68 +24,6 @@ use PHPUnit\Framework\TestCase;
 /** Proves test-role, fixture-control and SUT-prefix boundaries through the real parsed rules. */
 final class TestQualityPrecisionTest extends TestCase
 {
-    /**
-     * Keeps fixture branches and terminating skips distinct from test-owned policy.
-     *
-     * @param string $body     - Inert test body parsed without running any fixture action.
-     * @param int    $expected - Number of test-owned conditional findings.
-     * @return void
-     */
-    #[DataProvider('controlFlowCases')]
-    public function testControlFlowOwnership(string $body, int $expected): void
-    {
-        $unit     = $this->unit('class ExampleTest extends \PHPUnit\Framework\TestCase { public function testEntry(): void { ' . $body . ' } }');
-        $findings = (new ConditionalTestLogicRule())->analyse($unit, $this->context());
-
-        self::assertCount($expected, $findings);
-    }
-
-    /**
-     * Supplies the report's skip and callback shapes beside unsafe branch controls.
-     *
-     * @return iterable<string, array{string, int}> - Complete test bodies and expected warning counts.
-     */
-    public static function controlFlowCases(): iterable
-    {
-        yield 'terminating class skip' => ['if ($missing) { self::markTestSkipped("host unavailable"); } self::assertTrue($ready);', 0];
-        yield 'terminating instance skip' => ['if ($missing) { $this->markTestSkipped("host unavailable"); return; } self::assertTrue($ready);', 0];
-        yield 'callback owns its branch' => ['$fake = function () { if ($first) { return "retry"; } return "ok"; }; self::assertSame("ok", run($fake));', 0];
-        yield 'skip cannot hide branch assertion' => ['if ($missing) { self::assertTrue($ready); self::markTestSkipped("host unavailable"); }', 1];
-        yield 'foreign skip is not PHPUnit' => ['if ($missing) { $other->markTestSkipped("host unavailable"); }', 1];
-        yield 'skip with else remains policy' => ['if ($missing) { self::markTestSkipped("host unavailable"); } else { self::assertTrue($ready); }', 1];
-        yield 'test-owned branch remains policy' => ['if ($first) { self::assertSame("retry", run()); }', 1];
-        yield 'return cannot prove an unreachable skip' => ['if ($missing) { return; self::markTestSkipped("host unavailable"); }', 1];
-    }
-
-    /**
-     * Requires independent test evidence before judging a domain class named Test.
-     *
-     * @param string $path     - Display path used by the detector's directory boundary.
-     * @param string $members  - Inert declarations inside a production-derived Test-named class.
-     * @param int    $expected - Number of inheritance findings.
-     * @return void
-     */
-    #[DataProvider('roleCases')]
-    public function testIndependentTestRole(string $path, string $members, int $expected): void
-    {
-        $unit = $this->unit('class OrderTest extends BaseEntity { ' . $members . ' }', $path);
-        self::assertCount($expected, (new ExtendsProductionClassRule())->analyse($unit, $this->context()));
-    }
-
-    /**
-     * Pins production basename, directory and explicit method evidence separately.
-     *
-     * @return iterable<string, array{string, string, int}> - Class paths, members and warning counts.
-     */
-    public static function roleCases(): iterable
-    {
-        yield 'production Test noun' => ['src/Entity/OrderTest.php', 'public function getTestCode(): string { return "blood"; }', 0];
-        yield 'test directory' => ['tests/OrderTest.php', '', 1];
-        yield 'singular test directory' => ['test/OrderTest.php', '', 1];
-        yield 'test-prefixed method' => ['src/OrderTest.php', 'public function testOutcome(): void {}', 1];
-        yield 'test attribute' => ['src/OrderTest.php', '#[\PHPUnit\Framework\Attributes\Test] public function outcome(): void {}', 1];
-    }
-
     /**
      * Accepts method prefixes without promoting a low-confidence mismatch to an error.
      *
@@ -119,31 +53,6 @@ final class TestQualityPrecisionTest extends TestCase
         yield 'one-word prose is insufficient' => ['testFindsWhenTheFilledWindowClears', '$value = $limiter->getRateLimitedUntil("id"); self::assertNull($value);', []];
         yield 'inflected verb resolves' => ['testCalculatesTotalReturnsExpected', '$value = $calculator->calculateTotal(); self::assertSame(6, $value);', []];
         yield 'missing subject remains advisory' => ['testCalculateTotalReturnsExpected', '$value = $rates->lookupRates(); self::assertSame(6, $value);', [Severity::Advisory]];
-    }
-
-    /**
-     * Stubs need no interaction expectation; a real mock passed without one still reports.
-     *
-     * @param string $factory  - PHPUnit factory name under test.
-     * @param int    $expected - Number of missing mock-expectation findings.
-     * @return void
-     */
-    #[DataProvider('doubleCases')]
-    public function testStubAndMockDistinction(string $factory, int $expected): void
-    {
-        $unit = $this->unit('class ExampleTest extends \PHPUnit\Framework\TestCase { public function testEntry(): void { $double = $this->' . $factory . '(Gateway::class); run($double); self::assertTrue($ready); } }');
-        self::assertCount($expected, (new MockWithoutExpectationRule())->analyse($unit, $this->context()));
-    }
-
-    /**
-     * Keeps the nearest mock mutation beside the reported createStub false positive.
-     *
-     * @return iterable<string, array{string, int}> - Factories and warning counts.
-     */
-    public static function doubleCases(): iterable
-    {
-        yield 'stub supplies values' => ['createStub', 0];
-        yield 'mock lacks an expectation' => ['createMock', 1];
     }
 
     /**
@@ -209,37 +118,6 @@ final class TestQualityPrecisionTest extends TestCase
         yield 'repeated Boolean failure lacks context' => ['foreach ($rows as $row) { self::assertTrue($row); }', 1];
         yield 'conditional exit does not limit assertion count' => ['foreach ($rows as $row) { self::assertTrue($row); if ($stop) { break; } }', 1];
         yield 'inner exit cannot clear outer loop' => ['foreach ($rows as $row) { foreach ($values as $value) { self::assertTrue($ready); break; } }', 1];
-    }
-
-    /**
-     * Distinguishes incidental clock uses from sleeps and timing-dependent expectations.
-     *
-     * @param string $body     - Inert test statements containing a clock or pause.
-     * @param int    $expected - Number of real-time coupling findings.
-     * @return void
-     */
-    #[DataProvider('clockPurposeCases')]
-    public function testBoundedClockPurpose(string $body, int $expected): void
-    {
-        $unit = $this->unit('class ExampleTest extends \PHPUnit\Framework\TestCase { public function testEntry(): void { ' . $body . ' } }');
-        self::assertCount($expected, (new SleepInTestRule())->analyse($unit, $this->context()));
-    }
-
-    /**
-     * Supplies the observed entropy and polling shapes with their nearest unsafe mutations.
-     *
-     * @return iterable<string, array{string, int}> - Clock-purpose bodies and finding counts.
-     */
-    public static function clockPurposeCases(): iterable
-    {
-        yield 'clock is a unique filename seed' => ['$path = uniqid((string) microtime(true), true); self::assertTrue(route($path));', 0];
-        yield 'failure-only event pump deadline' => ['$deadline = microtime(true) + 5; while (!$done) { $handler->tick(); if (microtime(true) >= $deadline) { self::fail("timed out"); } } self::assertTrue($done);', 0];
-        yield 'deadline cannot be rebound' => ['$deadline = microtime(true) + 5; $deadline = $foreign; while (!$done) { $handler->tick(); if (microtime(true) >= $deadline) { self::fail("timed out"); } }', 2];
-        yield 'ordinary timing loop remains visible' => ['$deadline = microtime(true) + 5; while (!$done) { if (microtime(true) >= $deadline) { self::fail("timed out"); } }', 2];
-        yield 'unused callback cannot prove event pump' => ['$deadline = microtime(true) + 5; while (!$done) { $callback = function () { $handler->tick(); }; if (microtime(true) >= $deadline) { self::fail("timed out"); } }', 2];
-        yield 'foreign failure is not terminal' => ['$deadline = microtime(true) + 5; while (!$done) { $handler->tick(); if (microtime(true) >= $deadline) { $other->fail("timed out"); } }', 2];
-        yield 'clock determines success' => ['self::assertGreaterThan(0, time());', 1];
-        yield 'blocking pause remains visible' => ['usleep(1000); self::assertTrue($ready);', 1];
     }
 
     /**

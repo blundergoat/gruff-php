@@ -66,6 +66,9 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::High,
+            // Off unless a project sets `enabled: true`: precision-floor M02 found it right on 4 of 38 judged findings, too few
+            // to establish its precision floor, so it is off by default rather than deleted (ADR-034).
+            isEnabledByDefault: false,
         );
     }
 

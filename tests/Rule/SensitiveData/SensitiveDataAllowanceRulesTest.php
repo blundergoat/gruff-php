@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\SensitiveData;
 
-use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Config\ConfigLoader;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Engine\Parser\PhpFileParser;
 use GruffPhp\Rules\Contracts\RuleContext;
@@ -45,7 +45,9 @@ final class SensitiveDataAllowanceRulesTest extends TestCase
         return [
             'JWT literal flags under the dedicated JWT rule'                         => [self::SECRET_FIXTURE, JwtTokenRule::ID, [9]],
             'AWS key id flags under the dedicated AWS rule'                          => [self::SECRET_FIXTURE, AwsAccessKeyRule::ID, [8]],
-            'realistic email, address, and phone PII flags'                          => [self::PII_REALISTIC_FIXTURE, PiiTestFixtureRule::ID, [5, 6, 7]],
+            // 8-12: a mailto link, an email after a realm, one in a URL path, a near mirror and a subdomain mirror are mailboxes.
+            'realistic email, address, and phone PII flags'                          => [self::PII_REALISTIC_FIXTURE, PiiTestFixtureRule::ID, [5, 6, 7, 8, 9, 10, 11, 12]],
+            // 9-13: realm values (plain and escaped), URL userinfo and a local part that repeats its domain are not mailboxes.
             'reserved-domain emails and marker addresses pass the PII gate'          => [self::PII_SYNTHETIC_FIXTURE, PiiTestFixtureRule::ID, []],
         ];
     }
@@ -77,7 +79,9 @@ final class SensitiveDataAllowanceRulesTest extends TestCase
     {
         $unit     = (new PhpFileParser())->parse(new SourceFile(self::PROJECT_ROOT . '/' . $displayPath, $displayPath));
         $registry = RuleRegistry::defaults();
-        $findings = $registry->analyse([$unit], new RuleContext(self::PROJECT_ROOT, AnalysisConfig::fromRegistry($registry)));
+        // pii-test-fixture is opt-in, so the test config turns it on.
+        $config   = (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/enable-default-off-rules.yaml', $registry);
+        $findings = $registry->analyse([$unit], new RuleContext(self::PROJECT_ROOT, $config));
 
         $flaggedLines = array_values(array_map(
             static fn(Finding $finding): int => (int) $finding->line,

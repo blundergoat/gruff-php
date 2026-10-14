@@ -245,7 +245,7 @@
             "secondaryPillars": [],
             "tier": "v0.1",
             "confidence": "high",
-            "remediation": "Rename the file to Alpha.php or the class to alpha.",
+            "remediation": "Rename the file to Alpha.php so it matches the class it declares.",
             "fingerprint": "3b9c556468b6bc15",
             "stableIdentity": "106e7b2df944f9fd",
             "metadata": {
@@ -281,7 +281,7 @@
             "secondaryPillars": [],
             "tier": "v0.1",
             "confidence": "medium",
-            "remediation": "Rename the identifier to describe its domain role or action. If the placeholder or generic token is intentional, add it to `rules.naming.identifier-quality.options.placeholderNames`, `genericTokens`, or `ignoredNames` in `.gruff-php.yaml`.",
+            "remediation": "Rename the identifier to describe its domain role or action. If the name is intentional, add it to `rules.naming.identifier-quality.options.ignoredNames` in `.gruff-php.yaml`, or remove the token from `placeholderNames` or `genericTokens` when your project does not treat it as a placeholder.",
             "fingerprint": "25633f1c266ca38f",
             "stableIdentity": "f726935116318593",
             "metadata": {

@@ -16,7 +16,6 @@ use GruffPhp\Rules\SensitiveData\ApiKeyPatternRule;
 use GruffPhp\Rules\SensitiveData\AwsAccessKeyRule;
 use GruffPhp\Rules\SensitiveData\DatabaseUrlPasswordRule;
 use GruffPhp\Rules\SensitiveData\JwtTokenRule;
-use GruffPhp\Rules\SensitiveData\PhiPatternRule;
 use GruffPhp\Rules\SensitiveData\PiiTestFixtureRule;
 use GruffPhp\Rules\SensitiveData\PrivateKeyRule;
 use GruffPhp\Rules\SensitiveData\SecretScannerHelper;
@@ -30,7 +29,7 @@ use Symfony\Component\Process\Process;
 /**
  * Covers the safe sensitive-data findings users receive from source, config, fixtures, and CLI reports.
  *
- * Scenarios protect fixed markers, PHI/PII context, placeholders, comments, occurrence counts, and renderer containment.
+ * Scenarios protect fixed markers, PII context, placeholders, comments, occurrence counts, and renderer containment.
  * Users exercise these paths when source analysis or a rendered report encounters credential-like content.
  */
 final class SensitiveDataRulesTest extends TestCase
@@ -114,7 +113,7 @@ final class SensitiveDataRulesTest extends TestCase
     }
 
     /**
-     * Verify PHI and PII profiles are detected in fixture data.
+     * Verify PII profiles are detected in fixture data.
      *
      * @return void
      */
@@ -122,7 +121,6 @@ final class SensitiveDataRulesTest extends TestCase
     {
         $findings = $this->analysePath('tests/Fixtures/SensitiveData/profile-data.json');
 
-        self::assertRuleCount(PhiPatternRule::ID, 5, $findings);
         self::assertRuleCount(PiiTestFixtureRule::ID, 3, $findings);
     }
 
@@ -204,7 +202,6 @@ final class SensitiveDataRulesTest extends TestCase
         self::assertRuleCount(AwsAccessKeyRule::ID, 0, $findings);
         self::assertRuleCount(JwtTokenRule::ID, 0, $findings);
         self::assertRuleCount(DatabaseUrlPasswordRule::ID, 0, $findings);
-        self::assertRuleCount(PhiPatternRule::ID, 0, $findings);
         self::assertRuleCount(PiiTestFixtureRule::ID, 0, $findings);
         self::assertRuleCount(PrivateKeyRule::ID, 1, $findings);
     }
@@ -243,40 +240,6 @@ final class SensitiveDataRulesTest extends TestCase
             ));
 
             self::assertSame([[AwsAccessKeyRule::ID, 4]], array_map(static fn(Finding $finding): array => [$finding->ruleId, $finding->line], $findings));
-        } finally {
-            self::assertTrue(unlink($path));
-        }
-    }
-
-    /**
-     * Verify placeholder PHI examples are suppressed without muting real-looking values.
-     *
-     * @return void
-     */
-    public function testPhiPlaceholderExamplesAreNotFlagged(): void
-    {
-        $path = tempnam(sys_get_temp_dir(), 'gruff-phi-placeholder-');
-        self::assertIsString($path);
-        $path                .= '.md';
-        $placeholderMedicare = '2345 ' . '67890 ' . '1';
-        $realMedicare        = '2123 ' . '45678 ' . '1';
-        $source              = implode("\n", [
-            sprintf('"medicare_number": { "value": "%s", "confidence": "high", "source_snippet": "Medicare: %s" },', $placeholderMedicare, $placeholderMedicare),
-            '$VOUCHER->set(\'PatientFundMembershipNum\', \'123456789\');',
-            sprintf('"patient_medicare": "%s"', $realMedicare),
-            '',
-        ]);
-        self::assertNotFalse(file_put_contents($path, $source));
-
-        try {
-            $unit     = (new PhpFileParser())->parse(new SourceFile($path, 'docs/examples/inline-phi-placeholder.md', SourceFile::TYPE_TEXT));
-            $findings = array_values(array_filter(
-                                         $this->analyseUnits([$unit]),
-                                         static fn(Finding $finding): bool => $finding->ruleId === PhiPatternRule::ID,
-                                     ));
-
-            self::assertCount(1, $findings);
-            self::assertSame(3, $findings[0]->line);
         } finally {
             self::assertTrue(unlink($path));
         }
@@ -417,30 +380,34 @@ final class SensitiveDataRulesTest extends TestCase
 
         return $registry->analyse(
             $units,
-            new RuleContext(self::PROJECT_ROOT, $config ?? self::configWithDatabaseUrlRule($registry)),
+            new RuleContext(self::PROJECT_ROOT, $config ?? self::configWithOptInSensitiveRules($registry)),
         );
     }
 
     /**
-     * Builds the default config with the database-URL rule switched on, since it ships off by default.
+     * Builds the default config with the opt-in sensitive-data rules switched on, as a project that enables them would.
      *
      * @param RuleRegistry $registry - Default registry the config is seeded from.
      *
      * @return AnalysisConfig - registry defaults with `sensitive-data.database-url-password` enabled
      */
-    private static function configWithDatabaseUrlRule(RuleRegistry $registry): AnalysisConfig
+    private static function configWithOptInSensitiveRules(RuleRegistry $registry): AnalysisConfig
     {
-        $config   = AnalysisConfig::fromRegistry($registry);
-        $settings = $config->ruleSettings(DatabaseUrlPasswordRule::ID);
+        $config = AnalysisConfig::fromRegistry($registry);
 
-        // It ships off by default; enabling it here mirrors a project that sets `enabled: true` for it.
-        return $config->withRuleSettings(DatabaseUrlPasswordRule::ID, new RuleSettings(
-            true,
-            $settings->thresholds,
-            $settings->options,
-            $settings->severityThreshold,
-            $settings->excludeFromScore,
-        ));
+        // Both ship off by default; enabling them here mirrors a project that sets `enabled: true` for each.
+        foreach ([DatabaseUrlPasswordRule::ID, PiiTestFixtureRule::ID] as $ruleId) {
+            $settings = $config->ruleSettings($ruleId);
+            $config   = $config->withRuleSettings($ruleId, new RuleSettings(
+                true,
+                $settings->thresholds,
+                $settings->options,
+                $settings->severityThreshold,
+                $settings->excludeFromScore,
+            ));
+        }
+
+        return $config;
     }
 
     /**
@@ -467,14 +434,16 @@ final class SensitiveDataRulesTest extends TestCase
      */
     private function secretLeakReports(): array
     {
+        // The realistic-PII fixture supplies findings whose matches must render redacted; the URL credentials in the other two are userinfo, not PII.
         $paths = [
             'tests/Fixtures/SensitiveData/synthetic-secrets.php',
             'tests/Fixtures/SensitiveData/config-secrets.json',
+            'tests/Fixtures/SensitiveData/pii-realistic.php',
         ];
 
         return [
-            $this->runGruff(['analyse', ...$paths, '--fail-on', 'none', '--no-config']),
-            $this->runGruff(['analyse', ...$paths, '--format', 'json', '--fail-on', 'none', '--no-config']),
+            $this->runGruff(['analyse', ...$paths, '--fail-on', 'none', '--config', 'tests/Fixtures/Config/enable-default-off-rules.yaml']),
+            $this->runGruff(['analyse', ...$paths, '--format', 'json', '--fail-on', 'none', '--config', 'tests/Fixtures/Config/enable-default-off-rules.yaml']),
         ];
     }
 

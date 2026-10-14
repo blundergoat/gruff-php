@@ -64,18 +64,8 @@
           "invocations": 7
         },
         {
-          "ruleId": "waste.one-line-method",
-          "totalNs": 1387383,
-          "invocations": 7
-        },
-        {
           "ruleId": "naming.class-file-mismatch",
           "totalNs": 1214010,
-          "invocations": 7
-        },
-        {
-          "ruleId": "waste.unused-parameter",
-          "totalNs": 1009232,
           "invocations": 7
         },
         {
@@ -122,11 +112,6 @@
           "invocations": 280
         },
         {
-          "ruleId": "waste.one-line-method",
-          "totalNs": 81856800,
-          "invocations": 280
-        },
-        {
           "ruleId": "naming.identifier-quality",
           "totalNs": 77178714,
           "invocations": 280
@@ -134,11 +119,6 @@
         {
           "ruleId": "docs.var-annotation-description",
           "totalNs": 59469718,
-          "invocations": 280
-        },
-        {
-          "ruleId": "waste.unused-parameter",
-          "totalNs": 55392693,
           "invocations": 280
         },
         {
@@ -175,11 +155,6 @@
           "invocations": 393
         },
         {
-          "ruleId": "waste.one-line-method",
-          "totalNs": 165745812,
-          "invocations": 393
-        },
-        {
           "ruleId": "naming.class-file-mismatch",
           "totalNs": 165708289,
           "invocations": 393
@@ -197,11 +172,6 @@
         {
           "ruleId": "docs.var-annotation-description",
           "totalNs": 84988712,
-          "invocations": 393
-        },
-        {
-          "ruleId": "waste.unused-parameter",
-          "totalNs": 73007534,
           "invocations": 393
         }
       ]

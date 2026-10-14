@@ -6,7 +6,6 @@ namespace GruffPhp\Tests\Console;
 
 use GruffPhp\Engine\Config\ConfigLoader;
 use GruffPhp\Rules\Docs\MissingPropertyPhpdocRule;
-use GruffPhp\Rules\Naming\GenericMethodNameRule;
 use GruffPhp\Rules\Security\DangerousFunctionCallRule;
 use Symfony\Component\Process\Process;
 use Symfony\Component\Yaml\Yaml;
@@ -485,31 +484,11 @@ final class InitCliTest extends CliTestCase
         $rules = $this->stringKeyedArray($decoded['rules'] ?? null);
 
         self::assertSame(
-            [
-                'enabled' => true,
-                'options' => [
-                    'genericNames' => [
-                        'process',
-                        'handle',
-                        'execute',
-                        'run',
-                        'manage',
-                        'doIt',
-                        'do',
-                        'perform',
-                        'make',
-                        'compute',
-                    ],
-                ],
-            ],
-            $rules[GenericMethodNameRule::ID] ?? null,
-        );
-        self::assertSame(
             ['enabled' => true, 'options' => ['acceptLineComments' => false]],
             $rules[MissingPropertyPhpdocRule::ID] ?? null,
         );
         self::assertSame(
-            ['enabled' => true, 'options' => ['additionalFunctions' => []]],
+            ['enabled' => false, 'options' => ['additionalFunctions' => []]],
             $rules[DangerousFunctionCallRule::ID] ?? null,
         );
     }

@@ -10,7 +10,6 @@ use GruffPhp\Rules\RuleRegistry;
 use GruffPhp\Rules\Size\ClassLengthRule;
 use GruffPhp\Rules\TestQuality\SetupBloatRule;
 use GruffPhp\Rules\TestQuality\TestLongerThanSutRule;
-use GruffPhp\Rules\TestQuality\TestMethodTooLongRule;
 use GruffPhp\Rules\Waste\UnreachableCodeRule;
 use GruffPhp\Tests\Rule\Docs\DocsRuleTestCase;
 
@@ -26,9 +25,6 @@ final class CodeLineCountingTest extends DocsRuleTestCase
 
     /** test-longer-than-sut's default minTestLines: a test this long in code lines reports. */
     private const MIN_SUT_TEST_LINES = 12;
-
-    /** test-method-too-long's default maxMeaningfulLines: one line more reports. */
-    private const MAX_MEANINGFUL_LINES = 25;
 
     /**
      * Verify attribute lines do not count toward a class's length, while code lines still do.
@@ -77,20 +73,6 @@ final class CodeLineCountingTest extends DocsRuleTestCase
         $findings = $this->analyseSourceRule($this->addressTest(7), TestLongerThanSutRule::ID, $config);
         self::assertCount(1, $findings);
         self::assertSame(self::MIN_SUT_TEST_LINES, $findings[0]->metadata['testLines'] ?? null);
-    }
-
-    /**
-     * Verify test-method-too-long leaves the prose lines of a block comment out, and still reports a long test.
-     *
-     * @return void
-     */
-    public function testTestMethodTooLongReadsTheSharedMask(): void
-    {
-        self::assertSame([], $this->analyseSourceRule($this->longTest(24), TestMethodTooLongRule::ID));
-
-        $findings = $this->analyseSourceRule($this->longTest(25), TestMethodTooLongRule::ID);
-        self::assertCount(1, $findings);
-        self::assertSame(self::MAX_MEANINGFUL_LINES + 1, $findings[0]->metadata['meaningfulLines'] ?? null);
     }
 
     /**
@@ -172,24 +154,5 @@ PHP, UnreachableCodeRule::ID);
         }
 
         return $source . "        \$formatted = formatAddress(\$part0);\n        self::assertSame('line-0', \$formatted);\n    }\n}\n";
-    }
-
-    /**
-     * Build a test with `statements + 1` meaningful lines and a block comment whose prose lines have no leading `*`.
-     *
-     * @param int $statements - Statement lines in the test body.
-     *
-     * @return string - PHP source for one PHPUnit test class.
-     */
-    private function longTest(int $statements): string
-    {
-        $source = "<?php\nfinal class LedgerTest extends \\PHPUnit\\Framework\\TestCase\n{\n"
-            . "    #[\\PHPUnit\\Framework\\Attributes\\Group('slow')]\n    public function testBalances(): void\n    {\n"
-            . "        /*\n        Context: the ledger replays every entry\n        before it compares the balance\n        */\n";
-        for ($index = 0; $index < $statements - 1; ++$index) {
-            $source .= sprintf("        \$entry%d = %d;\n", $index, $index);
-        }
-
-        return $source . "        self::assertSame(0, \$entry0);\n    }\n}\n";
     }
 }

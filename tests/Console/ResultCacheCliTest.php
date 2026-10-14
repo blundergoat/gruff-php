@@ -112,7 +112,7 @@ final class ResultCacheCliTest extends CliTestCase
         // No --profile: since the project rules were retired the default rule set has no
         // ProjectRuleInterface implementor, so the cache guard passes and entries are written.
         $process = new Process(
-            [PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'analyse', 'src', '--no-config', '--fail-on', 'none', '--format', 'json'],
+            [PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'analyse', 'src', '--config', self::PROJECT_ROOT . '/tests/Fixtures/Config/enable-default-off-rules.yaml', '--fail-on', 'none', '--format', 'json'],
             $this->project,
         );
         $process->run();
@@ -141,7 +141,7 @@ final class ResultCacheCliTest extends CliTestCase
                 PHP_BINARY,
                 self::PROJECT_ROOT . '/bin/gruff-php',
                 'analyse',
-                '--no-config',
+                '--config', self::PROJECT_ROOT . '/tests/Fixtures/Config/enable-default-off-rules.yaml',
                 '--profile',
                 'security',
                 '--format',
@@ -170,7 +170,7 @@ final class ResultCacheCliTest extends CliTestCase
                 PHP_BINARY,
                 self::PROJECT_ROOT . '/bin/gruff-php',
                 'analyse',
-                '--no-config',
+                '--config', self::PROJECT_ROOT . '/tests/Fixtures/Config/enable-default-off-rules.yaml',
                 '--profile',
                 'security',
                 '--format',
@@ -238,7 +238,7 @@ final class ResultCacheCliTest extends CliTestCase
     {
         $process = new Process(
             array_merge(
-                [PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'analyse', 'src', '--no-config', '--profile', 'security', '--fail-on', 'none', '--format', 'json'],
+                [PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'analyse', 'src', '--config', self::PROJECT_ROOT . '/tests/Fixtures/Config/enable-default-off-rules.yaml', '--profile', 'security', '--fail-on', 'none', '--format', 'json'],
                 $extraArgs,
             ),
             $this->project,

@@ -184,7 +184,7 @@ final class AnalyseCliRuleSelectionTest extends CliTestCase
             $findings,
         );
 
-        self::assertContains('security.dangerous-function-call', $ruleIds);
+        self::assertContains('security.unsafe-xml-loading', $ruleIds);
         self::assertNotContains('docs.missing-file-phpdoc', $ruleIds);
     }
 

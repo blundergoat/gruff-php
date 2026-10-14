@@ -94,3 +94,25 @@ function escapeSplicedSinkValues(mysqli $conn, object $dbi, string $file, string
     mysqli_query($conn, sprintf('SELECT * FROM ' . Util::backquote($id) . " WHERE name = '%s'", $id));
     mysqli_query($conn, "SELECT * FROM users WHERE name = '" . $dbi->quoteString($id) . "'");
 }
+
+function codeChosenWords(string $link, string $target, bool $isDirectory, string $raw): void
+{
+    $mode = $isDirectory ? 'J' : 'H';
+    exec("mklink /{$mode} " . escapeshellarg($link) . ' ' . escapeshellarg($target));
+    $listing = '-la';
+    exec('ls ' . $listing);
+    $spaced = $isDirectory ? '-a -b' : '-c';
+    exec('ls ' . $spaced);
+    $quote = "'";
+    exec('echo ' . $quote . escapeshellarg($raw));
+    $mixed = $isDirectory ? 'J' : $raw;
+    exec('mklink /' . $mixed);
+    $short = $raw ?: 'J';
+    exec('mklink /' . $short);
+    $matched = 'J';
+    preg_match('/(J|H)/', $raw, $matched);
+    exec('mklink /' . $matched);
+    $later = 'J';
+    exec('mklink /' . $later);
+    $later = $raw;
+}

@@ -6,26 +6,17 @@ namespace GruffPhp\Tests\Rule\TestQuality;
 
 use GruffPhp\Engine\Config\AnalysisConfig;
 use GruffPhp\Engine\Config\ConfigLoader;
-use GruffPhp\Engine\Config\RuleSettings;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Engine\Parser\PhpFileParser;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\RuleRegistry;
-use GruffPhp\Rules\TestQuality\ConditionalTestLogicRule;
 use GruffPhp\Rules\TestQuality\DataProviderAnnotationRule;
-use GruffPhp\Rules\TestQuality\EagerTestRule;
 use GruffPhp\Rules\TestQuality\EmptyDataProviderRule;
 use GruffPhp\Rules\TestQuality\ExceptionTypeOnlyRule;
-use GruffPhp\Rules\TestQuality\ExcessiveMockingRule;
-use GruffPhp\Rules\TestQuality\ExtendsProductionClassRule;
 use GruffPhp\Rules\TestQuality\GlobalStateMutationRule;
 use GruffPhp\Rules\TestQuality\LoopAssertionWithoutMessageRule;
-use GruffPhp\Rules\TestQuality\MagicNumberAssertionRule;
 use GruffPhp\Rules\TestQuality\MockingDomainObjectRule;
-use GruffPhp\Rules\TestQuality\MockOnlyTestRule;
-use GruffPhp\Rules\TestQuality\MockWithoutExpectationRule;
-use GruffPhp\Rules\TestQuality\MysteryGuestRule;
 use GruffPhp\Rules\TestQuality\NoAssertionsRule;
 use GruffPhp\Rules\TestQuality\PhpUnitCoverageSourceMissingRule;
 use GruffPhp\Rules\TestQuality\PhpUnitDeprecationsNotFatalRule;
@@ -33,16 +24,10 @@ use GruffPhp\Rules\TestQuality\PhpUnitStrictFlagsMissingRule;
 use GruffPhp\Rules\TestQuality\PrivateReflectionRule;
 use GruffPhp\Rules\TestQuality\RepeatedStructureMissingDataProviderRule;
 use GruffPhp\Rules\TestQuality\SetupBloatRule;
-use GruffPhp\Rules\TestQuality\SkippedWithoutReasonRule;
-use GruffPhp\Rules\TestQuality\SleepInTestRule;
 use GruffPhp\Rules\TestQuality\SutNotCalledRule;
-use GruffPhp\Rules\TestQuality\TautologicalTypeAssertionRule;
 use GruffPhp\Rules\TestQuality\TestLongerThanSutRule;
-use GruffPhp\Rules\TestQuality\TestMethodTooLongRule;
 use GruffPhp\Rules\TestQuality\TestNamingConsistencyRule;
-use GruffPhp\Rules\TestQuality\TrivialAssertionRule;
 use GruffPhp\Rules\TestQuality\TrivialSnapshotRule;
-use GruffPhp\Rules\TestQuality\UnusedMockRule;
 use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
@@ -172,30 +157,6 @@ final class TestQualityConfigurationRulesTest extends TestCase
         );
 
         self::assertRuleCount(NoAssertionsRule::ID, 0, $findings);
-        self::assertRuleCount(TrivialAssertionRule::ID, 1, $findings);
-    }
-
-    /**
-     * Verify additionalTestBaseClasses accepts an exact base name that matches neither *TestCase shape.
-     *
-     * @return void
-     */
-    public function testExtendsProductionClassHonoursAdditionalTestBaseClasses(): void
-    {
-        $registry = RuleRegistry::defaults();
-        $settings = AnalysisConfig::fromRegistry($registry)->ruleSettings(ExtendsProductionClassRule::ID);
-        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
-            ExtendsProductionClassRule::ID,
-            new RuleSettings(true, $settings->thresholds, array_merge($settings->options, ['additionalTestBaseClasses' => ['IntegrationTestBase']])),
-        );
-
-        $findings = array_values(array_filter(
-                                     $this->analysePaths(['tests/Fixtures/TestQuality/extends-production.php'], $config),
-                                     static fn(Finding $finding): bool => $finding->ruleId === ExtendsProductionClassRule::ID,
-                                 ));
-
-        self::assertCount(1, $findings);
-        self::assertSame('OrderServiceTest', $findings[0]->symbol);
     }
 
     /**
@@ -291,31 +252,17 @@ final class TestQualityConfigurationRulesTest extends TestCase
     {
         return [
             NoAssertionsRule::ID,
-            TrivialAssertionRule::ID,
-            ConditionalTestLogicRule::ID,
             TestLongerThanSutRule::ID,
-            EagerTestRule::ID,
-            MysteryGuestRule::ID,
-            ExcessiveMockingRule::ID,
-            MockOnlyTestRule::ID,
-            SleepInTestRule::ID,
             TestNamingConsistencyRule::ID,
-            MagicNumberAssertionRule::ID,
             PrivateReflectionRule::ID,
             DataProviderAnnotationRule::ID,
             TrivialSnapshotRule::ID,
             SutNotCalledRule::ID,
             SetupBloatRule::ID,
-            SkippedWithoutReasonRule::ID,
-            ExtendsProductionClassRule::ID,
-            TestMethodTooLongRule::ID,
             EmptyDataProviderRule::ID,
             LoopAssertionWithoutMessageRule::ID,
-            UnusedMockRule::ID,
             ExceptionTypeOnlyRule::ID,
-            TautologicalTypeAssertionRule::ID,
             GlobalStateMutationRule::ID,
-            MockWithoutExpectationRule::ID,
             RepeatedStructureMissingDataProviderRule::ID,
         ];
     }

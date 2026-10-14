@@ -46,6 +46,9 @@ final class UnsafeUnserializeRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::Medium,
+            // Off unless a project sets `enabled: true`: precision-floor M02 found it right on 2 of 8 judged findings, too few
+            // to establish its precision floor, so it is off by default rather than deleted (ADR-034).
+            isEnabledByDefault: false,
             falsePositiveShapes: [
                 [
                     'shape'      => 'An unserialize() of trusted internal data, such as a value the application wrote to its own cache or database.',

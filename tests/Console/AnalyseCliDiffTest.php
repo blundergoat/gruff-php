@@ -297,7 +297,7 @@ PATCH
             $report = $this->runChangedScopeAnalyse($tempDir, '30-30', 'symbol');
 
             $ruleIds            = $this->ruleIdsFromJsonFindings($this->findingRows($report));
-            $expectedSuppressed = 5;
+            $expectedSuppressed = 4;
 
             self::assertSame(['size.method-length', 'size.parameter-count'], $ruleIds);
             self::assertSame($expectedSuppressed, $this->suppressedCount($report));
@@ -326,7 +326,6 @@ PATCH
             $classAnchorReport = $this->runChangedScopeAnalyse($tempDir, '7-7', 'symbol');
             self::assertSame(
                 [
-                    'size.average-method-length',
                     'size.class-length',
                     'size.property-count',
                     'size.public-method-count',
@@ -356,7 +355,6 @@ PATCH
             self::assertSame(
                 [
                     'size.file-length',
-                    'size.average-method-length',
                     'size.class-length',
                     'size.property-count',
                     'size.public-method-count',
@@ -625,7 +623,6 @@ schemaVersion: gruff-php.config.v0.1
 selection:
     rules:
         - size.file-length
-        - size.average-method-length
         - size.class-length
         - size.property-count
         - size.public-method-count
@@ -649,9 +646,6 @@ rules:
         severity:  warning
     size.property-count:
         threshold: 3
-        severity:  warning
-    size.average-method-length:
-        threshold: 2
         severity:  warning
 YAML);
     }

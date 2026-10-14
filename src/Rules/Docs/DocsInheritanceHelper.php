@@ -18,7 +18,7 @@ use PhpParser\NodeFinder;
  * Resolves whether a method inherits its documentation contract from a parent or interface, so the docs
  * rules can exempt an override that legitimately relies on the ancestor's documented contract.
  *
- * Used by the missing-throws, missing-param and missing-return rules and by waste.one-line-method: an
+ * Used by the missing-throws, missing-param and missing-return rules: an
  * `@inheritdoc` marker, an `#[Override]` attribute, or a documented same-file ancestor method all count as an
  * inherited contract. Only ancestors declared in the same parsed unit are resolved; cross-file inheritance is
  * out of scope, so a marker stands in for an ancestor this file cannot see.

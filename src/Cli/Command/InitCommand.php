@@ -418,7 +418,7 @@ final class InitCommand extends Command
     /**
      * Reports whether the existing config carries a top-level `failOn:` key worth
      * preserving. Split from {@see readMinimumSeverityBlock} so the pair never returns a nullable
-     * mixed-array shape from one helper, which would trip `modernisation.phpdoc-mixed-overuse`.
+     * mixed-array shape from one helper.
      *
      * @param string $targetPath - Path of the existing config file to probe; a missing or unparseable file counts as absent.
      *

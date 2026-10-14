@@ -6,8 +6,6 @@ namespace GruffPhp\Tests\Console;
 
 use GruffPhp\Cli\Application;
 use GruffPhp\Rules\Docs\MissingPropertyPhpdocRule;
-use GruffPhp\Rules\Naming\GenericMethodNameRule;
-use GruffPhp\Rules\Naming\BooleanPrefixRule;
 use GruffPhp\Rules\Security\DangerousFunctionCallRule;
 use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
@@ -117,7 +115,7 @@ final class ListRulesCliTest extends CliTestCase
             PHP_BINARY,
             self::PROJECT_ROOT . '/bin/gruff-php',
             'list-rules',
-            'waste.one-line-method',
+            'waste.commented-out-code',
             '--format',
             'json',
         ]);
@@ -127,7 +125,7 @@ final class ListRulesCliTest extends CliTestCase
         $payload = json_decode($process->getOutput(), associative: true, flags: JSON_THROW_ON_ERROR);
 
         self::assertIsArray($payload);
-        self::assertSame('waste.one-line-method', $payload['id'] ?? null);
+        self::assertSame('waste.commented-out-code', $payload['id'] ?? null);
         self::assertArrayHasKey('escapeHatches', $payload);
         self::assertArrayHasKey('falsePositiveShapes', $payload);
         self::assertIsArray($payload['escapeHatches']);
@@ -184,8 +182,8 @@ final class ListRulesCliTest extends CliTestCase
 
         self::assertSame(0, $exitCode, $process->getErrorOutput());
         // Precision-floor M19 (2026-10-04) retired nine rules, six of them medium or low confidence (ADR-034).
-        self::assertCount(120, $rules);
-        self::assertCount(64, $mediumOrLowRules);
+        self::assertCount(84, $rules);
+        self::assertCount(41, $mediumOrLowRules);
         self::assertSame([], $withoutGuidance);
         self::assertSame([], $blankGuidance);
         self::assertNotEmpty($shapelessRules);
@@ -205,7 +203,7 @@ final class ListRulesCliTest extends CliTestCase
             PHP_BINARY,
             self::PROJECT_ROOT . '/bin/gruff-php',
             'list-rules',
-            'waste.one-line-method',
+            'waste.commented-out-code',
             '--format',
             'json',
         ]);
@@ -219,7 +217,7 @@ final class ListRulesCliTest extends CliTestCase
             static fn(array $rule): array => $rule['falsePositiveShapes'] ?? [],
             array_values(array_filter(
                 $catalogueRules,
-                static fn(array $rule): bool => $rule['id'] === 'waste.one-line-method',
+                static fn(array $rule): bool => $rule['id'] === 'waste.commented-out-code',
             )),
         ));
         $detailShapes = (array)(is_array($detailPayload) ? ($detailPayload['falsePositiveShapes'] ?? []) : []);
@@ -232,67 +230,13 @@ final class ListRulesCliTest extends CliTestCase
     }
 
     /**
-     * Verify Boolean detail JSON preserves the documented option semantics added for configuration users.
-     *
-     * @return void
-     */
-    public function testBooleanRuleDetailJsonKeepsDocumentedOptionSemantics(): void
-    {
-        $process = new Process([
-            PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff-php',
-            'list-rules',
-            BooleanPrefixRule::ID,
-            '--format',
-            'json',
-        ]);
-        $process->run();
-
-        $payload = json_decode($process->getOutput(), associative: true, flags: JSON_THROW_ON_ERROR);
-
-        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-        self::assertIsArray($payload);
-        self::assertSame(BooleanPrefixRule::ID, $payload['id'] ?? null);
-        self::assertSame(
-            [
-                'allowedPrefixes' => 'Leading predicate words accepted at camelCase or snake_case word boundaries.',
-                'stateAdjectiveAllowlist' => 'Exact whole Boolean names accepted for typed properties and parameters only.',
-                'stateSuffixAllowlist' => 'Final whole tokens accepted on Boolean names containing at least two tokens across methods, functions, properties, and parameters.',
-                'propositionVerbAllowlist' => 'Internal whole verbs accepted only with a subject token before and a context token after.',
-                'acceptedBooleanNames' => 'Exact case-insensitive Boolean names accepted across receivers for compatibility.',
-                'includePublicApi' => 'Whether to inspect public/protected methods, properties, named functions, and their caller-visible parameters; false limits findings to private/local declarations.',
-            ],
-            $payload['optionDescriptions'] ?? null,
-        );
-    }
-
-    /**
-     * Verify requested rule detail JSON preserves replacement, toggle, and additive option contracts.
+     * Verify requested rule detail JSON preserves toggle and additive option contracts.
      *
      * @return void
      */
     public function testRequestedRuleDetailsExposeDocumentedOptionContracts(): void
     {
         $expectedByRule = [
-            GenericMethodNameRule::ID => [
-                'options' => [
-                    'genericNames' => [
-                        'process',
-                        'handle',
-                        'execute',
-                        'run',
-                        'manage',
-                        'doIt',
-                        'do',
-                        'perform',
-                        'make',
-                        'compute',
-                    ],
-                ],
-                'optionDescriptions' => [
-                    'genericNames' => 'Replacement list of function and method names treated as generic; matching is case-insensitive.',
-                ],
-            ],
             MissingPropertyPhpdocRule::ID => [
                 'options' => ['acceptLineComments' => false],
                 'optionDescriptions' => [

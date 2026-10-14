@@ -12,11 +12,8 @@ use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Engine\Parser\PhpFileParser;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\RuleRegistry;
-use GruffPhp\Rules\TestQuality\ConditionalTestLogicRule;
-use GruffPhp\Rules\TestQuality\MysteryGuestRule;
 use GruffPhp\Rules\TestQuality\RepeatedStructureMissingDataProviderRule;
 use GruffPhp\Rules\TestQuality\TestLongerThanSutRule;
-use GruffPhp\Rules\TestQuality\TestMethodTooLongRule;
 use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
@@ -29,18 +26,6 @@ final class TestQualityCalibrationRulesTest extends TestCase
     private const PROJECT_ROOT = __DIR__ . '/../../..';
 
     /**
-     * Verify mystery guest ignores files created by the test or written by the SUT.
-     *
-     * @return void
-     */
-    public function testMysteryGuestIgnoresPreparedAndSutOwnedPaths(): void
-    {
-        $findings = $this->analysePath('tests/Fixtures/TestQuality/integration-harness-exemptions.php');
-
-        self::assertRuleCount(MysteryGuestRule::ID, 1, $findings);
-    }
-
-    /**
      * Verify test-longer-than-SUT ignores command and process integration harness calls.
      *
      * @return void
@@ -50,51 +35,6 @@ final class TestQualityCalibrationRulesTest extends TestCase
         $findings = $this->analysePath('tests/Fixtures/TestQuality/integration-harness-exemptions.php');
 
         self::assertRuleCount(TestLongerThanSutRule::ID, 1, $findings);
-    }
-
-    /**
-     * Verify path overrides can raise the long-test threshold for integration-heavy folders.
-     *
-     * @return void
-     */
-    public function testTestMethodTooLongSupportsPathOverrides(): void
-    {
-        $registry = RuleRegistry::defaults();
-        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
-            TestMethodTooLongRule::ID,
-            new RuleSettings(
-                true,
-                ['maxMeaningfulLines' => 25],
-                ['pathOverrides' => ['tests/Fixtures/TestQuality/**' => 40]],
-            ),
-        );
-        $findings = $this->analysePath('tests/Fixtures/TestQuality/test-method-too-long.php', $config);
-
-        self::assertRuleCount(TestMethodTooLongRule::ID, 0, $findings);
-    }
-
-    /**
-     * Verify conditional logic rubric supports project-specific path exemptions.
-     *
-     * @return void
-     */
-    public function testConditionalLogicRuleSupportsIgnoredPathPatterns(): void
-    {
-        $registry = RuleRegistry::defaults();
-        $fixture  = 'tests/Fixtures/TestQuality/phpunit-core-smells.php';
-        $baseline = $this->analysePath($fixture);
-
-        self::assertRuleCount(ConditionalTestLogicRule::ID, 1, $baseline);
-
-        $config = AnalysisConfig::fromRegistry($registry)
-                                ->withRuleSettings(
-                                    ConditionalTestLogicRule::ID,
-                                    new RuleSettings(true, [], ['ignoredPathPatterns' => ['tests/Fixtures/TestQuality/**']]),
-                                );
-
-        $findings = $this->analysePath($fixture, $config);
-
-        self::assertRuleCount(ConditionalTestLogicRule::ID, 0, $findings);
     }
 
     /**

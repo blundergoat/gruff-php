@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\DeadCode;
 
-use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Config\ConfigLoader;
 use GruffPhp\Engine\Parser\PhpFileParser;
 use GruffPhp\Rules\DeadCode\UnusedPrivateConstantRule;
 use GruffPhp\Rules\DeadCode\UnusedPrivateMethodRule;
-use GruffPhp\Rules\DeadCode\UnusedPrivatePropertyRule;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\RuleRegistry;
 use GruffPhp\Engine\Source\SourceFile;
@@ -121,98 +120,6 @@ final class DeadCodeRulesTest extends TestCase
     }
 
     /**
-     * Verify unused private property detected.
-     *
-     * @return void
-     */
-    public function testUnusedPrivatePropertyDetected(): void
-    {
-        $findings = $this->analyseRule('unused-private-property.php', UnusedPrivatePropertyRule::ID);
-
-        self::assertGreaterThanOrEqual(2, count($findings));
-
-        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
-        self::assertContains('UnusedPrivatePropertyFixture::$totallyUnused', $symbols);
-        self::assertContains('UnusedPrivatePropertyFixture::$neverRead', $symbols);
-    }
-
-    /**
-     * Verify used property not flagged.
-     *
-     * @return void
-     */
-    public function testUsedPropertyNotFlagged(): void
-    {
-        $findings = $this->analyseRule('unused-private-property.php', UnusedPrivatePropertyRule::ID);
-
-        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
-        self::assertNotContains('UnusedPrivatePropertyFixture::$usedProp', $symbols);
-    }
-
-    /**
-     * Verify public property not checked.
-     *
-     * @return void
-     */
-    public function testPublicPropertyNotChecked(): void
-    {
-        $findings = $this->analyseRule('unused-private-property.php', UnusedPrivatePropertyRule::ID);
-
-        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
-        self::assertNotContains('UnusedPrivatePropertyFixture::$publicProp', $symbols);
-    }
-
-    /**
-     * Verify never read property distinguished.
-     *
-     * @return void
-     */
-    public function testNeverReadPropertyDistinguished(): void
-    {
-        $findings = $this->analyseRule('unused-private-property.php', UnusedPrivatePropertyRule::ID);
-
-        $neverRead = array_values(array_filter(
-                                      $findings,
-                                      static fn($finding) => $finding->symbol === 'UnusedPrivatePropertyFixture::$neverRead',
-                                  ));
-
-        self::assertCount(1, $neverRead);
-        self::assertStringContainsString('written but never read', $neverRead[0]->message);
-    }
-
-    /**
-     * Verify promoted private property detected when never read.
-     *
-     * @return void
-     */
-    public function testPromotedPrivatePropertyDetectedWhenNeverRead(): void
-    {
-        $findings = $this->analyseRule('unused-private-property.php', UnusedPrivatePropertyRule::ID);
-
-        $neverRead = array_values(array_filter(
-                                      $findings,
-                                      static fn($finding) => $finding->symbol === 'PromotedPrivatePropertyFixture::$neverReadPromoted',
-                                  ));
-
-        self::assertCount(1, $neverRead);
-        self::assertStringContainsString('written but never read', $neverRead[0]->message);
-    }
-
-    /**
-     * Verify used promoted private property not flagged.
-     *
-     * @return void
-     */
-    public function testUsedPromotedPrivatePropertyNotFlagged(): void
-    {
-        $findings = $this->analyseRule('unused-private-property.php', UnusedPrivatePropertyRule::ID);
-
-        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
-        self::assertNotContains('PromotedPrivatePropertyFixture::$usedPromoted', $symbols);
-        self::assertNotContains('PromotedPrivatePropertyFixture::$publicPromoted', $symbols);
-    }
-
-    /**
      * Verify unused private constants detected across class, trait, and enum scopes.
      *
      * @return void
@@ -275,7 +182,6 @@ final class DeadCodeRulesTest extends TestCase
     {
         $findings = array_merge(
             $this->analyseRule('clean.php', UnusedPrivateMethodRule::ID),
-            $this->analyseRule('clean.php', UnusedPrivatePropertyRule::ID),
             $this->analyseRule('clean.php', UnusedPrivateConstantRule::ID),
         );
 
@@ -295,7 +201,8 @@ final class DeadCodeRulesTest extends TestCase
     {
         $unit     = $this->parseFixture($fixture);
         $registry = RuleRegistry::defaults();
-        $config   = AnalysisConfig::fromRegistry($registry);
+        // dead-code.unused-private-method ships off by default (ADR-034); its tests enable it as a project would.
+        $config   = (new ConfigLoader(__DIR__ . '/../../..'))->load('tests/Fixtures/Config/enable-default-off-rules.yaml', $registry);
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
         return array_values(array_filter($findings, static fn($finding) => $finding->ruleId === $ruleId));

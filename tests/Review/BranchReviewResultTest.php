@@ -31,7 +31,7 @@ final class BranchReviewResultTest extends TestCase
             introduced:    [
                 $this->finding('docs.missing-phpdoc'),
                 $this->finding('docs.missing-phpdoc'),
-                $this->finding('modernisation.phpdoc-mixed-overuse'),
+                $this->finding('modernisation.public-property'),
             ],
             removed:       [
                 $this->finding('size.method-length'),
@@ -49,7 +49,7 @@ final class BranchReviewResultTest extends TestCase
             [
                 ['ruleId' => 'size.method-length', 'introduced' => 0, 'removed' => 3, 'net' => -3],
                 ['ruleId' => 'docs.missing-phpdoc', 'introduced' => 2, 'removed' => 1, 'net' => 1],
-                ['ruleId' => 'modernisation.phpdoc-mixed-overuse', 'introduced' => 1, 'removed' => 0, 'net' => 1],
+                ['ruleId' => 'modernisation.public-property', 'introduced' => 1, 'removed' => 0, 'net' => 1],
             ],
             $delta,
         );

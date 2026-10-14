@@ -327,45 +327,6 @@ rules:
 Run `vendor/bin/gruff-php list-rules --format json` to inspect rule IDs and
 available defaults.
 
-### Boolean naming options
-
-`naming.boolean-prefix` separates whole-name state adjectives, multi-token
-suffixes, subject-first propositions, and exact compatibility names:
-
-| Option | Default | Matching semantics |
-| --- | --- | --- |
-| `stateAdjectiveAllowlist` | `active`, `enabled`, `disabled`, `applicable`, `generated`, `interactive`, `emitted`, `visible`, `available`, `valid`, `strict`, `silent`, `resolved`, `limited`, `printable` | Exact whole-name property and parameter matching. Shipped values are single-token adjectives; it does not exempt methods or functions. |
-| `stateSuffixAllowlist` | `requested`, `present`, `enabled`, `allowed` | Final whole token on names with at least two tokens, across methods, functions, parameters, promoted properties, and declared properties. |
-| `propositionVerbAllowlist` | `requires` | Internal whole token with at least one subject token before it and one context token after it. Verb-first names remain the `allowedPrefixes` mechanism. |
-| `acceptedBooleanNames` | empty | Exact whole-name, case-insensitive compatibility hatch across receivers. |
-| `includePublicApi` | `true` | When false, skips public/protected methods and properties, named functions, and their parameters; private methods/properties and closure/arrow parameters remain checked. |
-
-Override the options under the rule's `options` block:
-
-```yaml
-rules:
-  naming.boolean-prefix:
-    options:
-      stateSuffixAllowlist: [requested, present, enabled, allowed]
-      propositionVerbAllowlist: [requires]
-      acceptedBooleanNames: [legacyReady]
-      includePublicApi: false
-```
-
-Each configured list replaces that option's default list; options omitted from
-the block keep their defaults. Matching uses identifier word boundaries, so a
-configured token never accepts an unrelated substring. Use
-`php bin/gruff-php list-rules naming.boolean-prefix --format json` to inspect
-the complete effective default surface, including `allowedPrefixes`.
-
-`includePublicApi: false` is the compatibility-safe library mode: it avoids
-asking for caller-visible renames while retaining findings on private/local
-implementation details. Public constructor parameters are caller-visible named-
-argument API even when they promote a private property, so this mode skips them.
-Parameter findings retained in private methods, closures, and arrow functions
-still use `CONSIDER`, because those callables can also be invoked with named
-arguments.
-
 ### Finding action metadata
 
 Classified findings keep their existing messages, severities, scoring, and
@@ -374,8 +335,7 @@ metadata keys:
 
 - `remediationAction` is `APPLY`, `CONSIDER`, or the reserved `CONFIGURE` value.
 - `configurationKey` is the full config path when the rule offers a deliberate
-  hatch, for example `allowlists.acceptedAbbreviations` or
-  `rules.naming.boolean-prefix.options.acceptedBooleanNames`.
+  hatch, for example `allowlists.acceptedAbbreviations`.
 
 `CONFIGURE` is not emitted unconditionally by any 0.5.2 rule. Abbreviation,
 every Boolean parameter, and other caller-visible Boolean findings use

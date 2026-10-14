@@ -17,7 +17,6 @@ use GruffPhp\Rules\Docs\MissingPropertyPhpdocRule;
 use GruffPhp\Rules\Docs\MissingPhpdocRule;
 use GruffPhp\Rules\Docs\MissingThrowsTagRule;
 use GruffPhp\Rules\Docs\RegexCommentRule;
-use GruffPhp\Rules\Docs\StaleParamTagRule;
 use GruffPhp\Rules\Docs\TodoDensityRule;
 use GruffPhp\Rules\Docs\VarAnnotationDescriptionRule;
 use GruffPhp\Rules\RuleRegistry;
@@ -28,19 +27,6 @@ use GruffPhp\Rules\Shared\PhysicalCommentAttachment;
  */
 final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
 {
-    /**
-     * Verify stale param tag detected.
-     *
-     * @return void
-     */
-    public function testStaleParamTagDetected(): void
-    {
-        $findings = $this->analyseRule('phpdoc-tags.php', StaleParamTagRule::ID);
-
-        self::assertCount(1, $findings);
-        self::assertSame('oldParam', $findings[0]->metadata['parameter']);
-    }
-
     /**
      * Verify missing throws tag detected.
      *
