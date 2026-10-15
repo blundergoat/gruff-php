@@ -1,6 +1,6 @@
 ---
 category: rules
-last_reviewed: 2026-10-03
+last_reviewed: 2026-10-15
 ---
 
 # Rule Footguns
@@ -19,7 +19,7 @@ Four rules (`NestingDepthRule`, `CognitiveComplexityRule`, `RedundantVariableRul
 
 **Status:** active | **Created:** 2026-05-11 | **Evidence:** OBSERVED
 
-Rule heuristics that search a whole docblock or AST subtree can attribute nested syntax to the wrong owner. `src/Rules/Docs/MissingParamTagRule.php` (search: `extractParamNames`) must parse the parameter variable from the whole `@param` line because generic PHPDoc types can contain spaces, and descriptive docblocks without tags still need to count as method-contract docs. `src/Rules/TestQuality/MockWithoutExpectationRule.php` (search: `isMockCreationExpression`) must decide whether the assigned expression itself creates a mock, not whether any nested constructor argument or helper call creates one.
+Rule heuristics that search a whole docblock or AST subtree can attribute nested syntax to the wrong owner. `src/Rules/Docs/MissingParamTagRule.php` (search: `extractParamNames`) must parse the parameter variable from the whole `@param` line because generic PHPDoc types can contain spaces, and descriptive docblocks without tags still need to count as method-contract docs. Before its retirement under [ADR-034](../decisions/ADR-034-rules-wrong-more-often-than-right-are-retired.md), `test-quality.mock-without-expectation` (`~~src/Rules/TestQuality/MockWithoutExpectationRule.php~~`) hit the same AST-subtree trap when deciding whether the assigned expression itself created a mock rather than a nested constructor argument.
 
 **Prevention:** Add regression fixtures for the exact syntax shape that caused the false positive or false negative. For PHPDoc rules, include generics or array shapes with spaces before the parameter variable, plus one-line descriptive docblocks that should require full contract tags. For AST ownership rules, include a fake or value object whose constructor receives a mock/stub so nested mock creation does not get assigned to the outer variable.
 
@@ -31,29 +31,13 @@ Rule heuristics that search a whole docblock or AST subtree can attribute nested
 
 **Prevention:** When changing rule semantics, update `RuleDefinition` names, config comments, docs, tests, and golden fixtures together while preserving rule IDs only when output compatibility requires it. Regression tests should assert representative methods across all visibilities so the compatibility name cannot silently narrow behavior again.
 
-## Footgun: Conservative member scopes can hide concrete public waste
-
-**Status:** active | **Created:** 2026-05-11 | **Evidence:** OBSERVED
-
-`src/Rules/Waste/UnusedParameterRule.php` (search: `analysableNodes`) originally checked standalone functions and private methods only, so a concrete public method like an external healthcare target's `VoiceTraceLogger::trace()` could carry an ignored `$detailed` parameter without any `waste.unused-parameter` finding. The same rule also counted direct `unset($detailed)` as a parameter use even though it is only a placeholder/silencer, not a read of the argument.
-
-**Prevention:** For waste/dead-code rules, make the conservative boundary explicit in tests and include at least one locally owned public method fixture plus one contract/override fixture. Treat direct `unset($param)` as non-use when the rule's question is "does the method actually consume this argument?" and use finding columns or metadata when multiple same-line findings can otherwise share a fingerprint.
-
 ## Footgun: Constructor-promoted properties bypass property-node scans
 
 **Status:** active | **Created:** 2026-05-11 | **Evidence:** OBSERVED
 
-Constructor-promoted properties are represented as `Node\Param` entries with visibility flags, not as `Stmt\Property` declarations. `src/Rules/DeadCode/UnusedPrivatePropertyRule.php` (search: `privateProperties`) originally collected only `Stmt\Property`, so promoted private readonly fields such as an external healthcare target's `VoiceTraceLogger::$appConfigHelper` and `VoiceTraceLogger::$twilioParams` were invisible to the "written but never read" check.
+Constructor-promoted properties are represented as `Node\Param` entries with visibility flags on `__construct`, not as `Stmt\Property` declarations. Rules that inspect class properties must check both: `src/Rules/Modernisation/PublicPropertyRule.php` (search: `promotedPropertyFindings`) and `src/Rules/Size/PropertyCountRule.php` (search: `countProperties`) walk `__construct` parameters alongside `Stmt\Property` nodes. Before its retirement under [ADR-034](../decisions/ADR-034-rules-wrong-more-often-than-right-are-retired.md), `dead-code.unused-private-property` (`~~src/Rules/DeadCode/UnusedPrivatePropertyRule.php~~`) originally collected only `Stmt\Property`, leaving promoted private readonly fields invisible to the "written but never read" check.
 
-**Prevention:** Any rule that scans properties must include promoted constructor parameters in fixtures and treat private promoted params as property declarations with an initial write. Also include a used promoted private property and a public promoted property fixture so the rule proves both detection and visibility boundaries.
-
-## Footgun: naming.boolean-prefix requires the prefix at the start of the identifier
-
-**Status:** active | **Created:** 2026-05-24 | **Evidence:** OBSERVED
-
-`src/Rules/Naming/BooleanPrefixRule.php` (search: `allowedPrefixes`) checks that bool-returning methods, bool parameters, and bool properties *begin* with one of the configured prefixes (default `is`, `has`, `can`, `should`, `will`). Names that merely contain a prefix later in the identifier still fail. `ConfigLoader::projectHasConfig()` was flagged on its first cut because `has` appeared in the middle of the name; renaming to `hasProjectConfig()` cleared the rule. The same trap fires for parameters: `$shouldForce` passes, `$force` and `$forceShould` both fail.
-
-**Prevention:** When adding any bool-returning method, bool parameter, or bool property, put the prefix first. For names that read naturally with the subject before the verb (`projectHasConfig`, `userIsActive`), rephrase as prefix-first (`hasProjectConfig`, `isActiveUser`) or rename the subject out (`hasConfig` on a class already scoped to a project). The rule does not parse English — "name contains a prefix" is not enough; the leading token must be a configured prefix.
+**Prevention:** Any rule that scans properties must include promoted constructor parameters in fixtures and treat promoted params as property declarations with an initial write. Also include both declared and promoted property fixtures across visibility boundaries so the rule proves both detection and scope.
 
 ## Footgun: Retiring a rule leaves stale count references in five doc artefacts
 
@@ -81,16 +65,6 @@ grep -rn 'exposes [0-9]* rule\|Rule catalogue\|^|`naming`\|^### `naming` (' \
 ```
 
 Update every hit before claiming retirement done; do not rely on a single PR review to surface all of them — outside-diff coverage is bounded by which files the PR touches.
-
-## Footgun: PHPStan/Psalm array-shape exemptions need a "concrete sibling" gate, not "any nested mixed"
-
-**Status:** active | **Created:** 2026-05-27 | **Evidence:** OBSERVED
-
-`src/Rules/Modernisation/PhpDocMixedOveruseRule.php` (search: `isPreciseArrayShape`) exempts `array{...}` shapes that name at least one sibling field with a non-mixed type, on the basis that the nested `mixed` describes a heterogeneous leaf inside a typed envelope. The naive form of this rule — "any nested mixed inside any parametric type is fine" — silently exempts `array<string|int, mixed>` (mixed-keyed bag), `Collection<mixed>` (single-leaf generic), and `array{value: mixed}` (single-mixed-field shape), all of which are genuine type sloppiness the rule should keep flagging. The discriminator is "is there at least one CONCRETE sibling field?"; without it the exemption swallows real signal.
-
-**Evidence:** External reviewer report section 7 (`.goat-flow/scratchpad/gruff-php-improvement-feedback.md`). The reviewer's original phrasing was "nested mixed inside any parametric type should be fine"; applied literally that exempts `Collection<mixed>` which is clearly not a precise envelope. The implemented rule reads the array-shape body, splits on top-level commas (depth-aware via `splitTopLevelComma`), finds the first top-level colon per pair (depth-aware via `topLevelColonIndex`), and returns true only when at least one pair's value type is NOT exactly `mixed` (case-insensitive). Fixtures at `tests/Fixtures/Modernisation/phpdoc-mixed-overuse.php` `preciseArrayShape*` cover both directions.
-
-**Prevention:** When extending a type-shape exemption beyond a single canonical form, write the counter-fixture first. Every "loose" shape (mixed-keyed bag, single-mixed-field shape, mixed-only generic) gets a `*StillFires` fixture method that asserts the exemption did NOT swallow it. Only after the counter-fixtures are in place add the positive `*IsAllowed` cases. The shape-detector must use a depth-aware splitter (commas inside `<>{}()[]` belong to the inner shape, not the outer one); a naive `explode(',', ...)` would split `array{entries: list<array<string, mixed>>, total: int}` mid-list and corrupt the parse.
 
 ## Footgun: PHPStan rejects prose attached to multiline array-shape tags
 
@@ -173,6 +147,38 @@ The size rules treat immutable value objects gently: `src/Rules/Size/PropertyCou
 **Prevention:** Before adding a caller that reuses `$sources->analysisUnits` after `RuleRegistry::analyse()`, confirm whether that call released them. Never pass units through a second size-rule pass without re-parsing. If a future caller genuinely needs post-release counting, make the counter fail loudly on a released unit rather than returning `0`; a zero here is indistinguishable from a genuinely empty file.
 
 ## Resolved Entries
+
+## Footgun: Conservative member scopes can hide concrete public waste
+
+**Status:** resolved | **Created:** 2026-05-11 | **Resolved:** 2026-10-14 | **Evidence:** OBSERVED
+
+`waste.unused-parameter` (`~~src/Rules/Waste/UnusedParameterRule.php~~`) originally checked standalone functions and private methods only, so a concrete public method could carry an ignored parameter without any finding. The same rule also counted direct `unset($detailed)` as a parameter use even though it is only a placeholder/silencer, not a read of the argument.
+
+**Resolution:**
+
+- [ADR-034](../decisions/ADR-034-rules-wrong-more-often-than-right-are-retired.md) retired `waste.unused-parameter` after the 0.7.0 precision measurement found it right on 6 of 25 judged findings (external interface/event/hook signatures look identical to owned public methods without cross-file symbol resolution).
+- Kept as a design record: for waste/dead-code rules, make the conservative boundary explicit in tests, treat direct `unset($param)` as non-use when the question is whether the method consumes the argument, and use finding columns or metadata when multiple same-line findings can share a fingerprint.
+
+## Footgun: naming.boolean-prefix requires the prefix at the start of the identifier
+
+**Status:** resolved | **Created:** 2026-05-24 | **Resolved:** 2026-10-14 | **Evidence:** OBSERVED
+
+`naming.boolean-prefix` (`~~src/Rules/Naming/BooleanPrefixRule.php~~`) checked that bool-returning methods, bool parameters, and bool properties *begin* with one of the configured prefixes (`is`, `has`, `can`, `should`, `will`). Names that merely contained a prefix later in the identifier (`projectHasConfig`, `$forceShould`) still failed.
+
+**Resolution:**
+
+- [ADR-034](../decisions/ADR-034-rules-wrong-more-often-than-right-are-retired.md) retired `naming.boolean-prefix` after the 0.7.0 precision measurement found it right on 8 of 25 judged findings.
+
+## Footgun: PHPStan/Psalm array-shape exemptions need a "concrete sibling" gate, not "any nested mixed"
+
+**Status:** resolved | **Created:** 2026-05-27 | **Resolved:** 2026-10-14 | **Evidence:** OBSERVED
+
+`modernisation.phpdoc-mixed-overuse` (`~~src/Rules/Modernisation/PhpDocMixedOveruseRule.php~~`) exempted `array{...}` shapes that named at least one sibling field with a non-mixed type. The naive form — "any nested mixed inside any parametric type is fine" — silently exempted `array<string|int, mixed>`, `Collection<mixed>`, and `array{value: mixed}`.
+
+**Resolution:**
+
+- [ADR-034](../decisions/ADR-034-rules-wrong-more-often-than-right-are-retired.md) retired `modernisation.phpdoc-mixed-overuse` after the 0.7.0 precision measurement found it right on 6 of 25 judged findings.
+- Kept as a design record: when extending a type-shape exemption beyond a single canonical form, write the counter-fixture first for every loose shape and split nested type strings with a depth-aware delimiter walker rather than `explode(',', ...)`.
 
 ## Footgun: Vendored code under `src/Vendor/` evades the vendor filter
 

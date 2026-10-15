@@ -7,6 +7,10 @@
 **Ticket/Context:** precision-floor M19 under family lock M82. The operator ruled on 2026-10-04 that a rule right less than
 half the time is deleted, and accepted the gruff-php table with "Accept all (Recommended)".
 
+## Context
+
+The 0.6.0 and 0.7.0 precision measurements evaluated rule findings across real-world PHP repositories. Several rules produced more false positives than true positives (precision below 50%) because their underlying signals require framework-specific or project-wide semantic context that file-local AST inspection cannot reliably infer. Tuning heuristic exemptions on sub-50%-precision rules added complexity without lifting precision above the coin-flip floor.
+
 ## Decision
 
 gruff-php retires nine rules the 0.6.0 precision measurement found right less than half the time:
