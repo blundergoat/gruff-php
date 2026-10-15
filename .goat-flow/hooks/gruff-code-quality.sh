@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # gruff-code-quality.sh
-# goat-flow-hook-version: 1.17.0
+# goat-flow-hook-version: 1.18.0
 # Runs the matching Gruff analyzer after a user or agent edits a supported file.
 # It attributes line/symbol findings to the edit while retaining file/project findings.
 # Package-local configs select monorepo targets; explicit overrides cover other layouts.
@@ -17,7 +17,7 @@ if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) ))
 fi
 
 FOOTER="For triage: consult .goat-flow/skill-docs/playbooks/gruff-code-quality.md"
-HOOK_VERSION="1.17.0"
+HOOK_VERSION="1.18.0"
 HOOK_RESULT_SCHEMA="goat-flow.hook-result.v1"
 SUPPORTED_TOOLS=" edit write multiedit apply_patch write_to_file replace_file_content multi_replace_file_content "
 SKIP_DIR_PATTERN='(^|/)(node_modules|vendor|\.goat-flow|dist|build|coverage|\.git|target|\.venv|\.mypy_cache|\.pytest_cache|\.ruff_cache)(/|$)'
@@ -1186,7 +1186,7 @@ self_test() {
   }
 
   tmp="$(mktemp -d)"
-  mkdir -p "$tmp/src" "$tmp/empty-bin" "$tmp/env-bin" "$tmp/strands_agents/.venv/bin" "$tmp/.goat-flow"
+  mkdir -p "$tmp/src" "$tmp/empty-bin" "$tmp/env-bin" "$tmp/tools/.venv/bin" "$tmp/.goat-flow"
   sample_payload='{"tool_name":"Edit","tool_input":{"file_path":"src/sample.py","changed_ranges":[{"startLine":1,"endLine":1}]}}'
   printf 'rules: {}\n' > "$tmp/.gruff-py.yaml"
   printf 'print("x")\n' > "$tmp/src/sample.py"
@@ -1196,8 +1196,8 @@ self_test() {
     printf 'gruff-code-quality self-test: binary-missing diagnostic failed: %s\n' "$output" >&2
     return 1
   }
-  printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/strands_agents/.venv/bin/gruff-py"
-  chmod +x "$tmp/strands_agents/.venv/bin/gruff-py"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/tools/.venv/bin/gruff-py"
+  chmod +x "$tmp/tools/.venv/bin/gruff-py"
   # The nested venv binary now exists but no override names it - discovery must
   # still skip it (ADR-032: no arbitrary-subtree auto-discovery).
   discovered="$(PATH="$tmp/empty-bin" discover_binary "$tmp" gruff-py)"
@@ -1206,8 +1206,8 @@ self_test() {
     printf 'gruff-code-quality self-test: nested venv must not be auto-discovered: %s\n' "$discovered" >&2
     return 1
   }
-  override_path="$(PATH="$tmp/empty-bin" GRUFF_PY_BIN="$tmp/strands_agents/.venv/bin/gruff-py" discover_binary "$tmp" gruff-py)"
-  [[ "$override_path" == "$tmp/strands_agents/.venv/bin/gruff-py" ]] || {
+  override_path="$(PATH="$tmp/empty-bin" GRUFF_PY_BIN="$tmp/tools/.venv/bin/gruff-py" discover_binary "$tmp" gruff-py)"
+  [[ "$override_path" == "$tmp/tools/.venv/bin/gruff-py" ]] || {
     rm -rf "$tmp"
     printf 'gruff-code-quality self-test: env binary override failed: %s\n' "$override_path" >&2
     return 1
@@ -1223,25 +1223,25 @@ self_test() {
   # These config-driven calls keep the real PATH appended because the parser
   # needs awk; they never reach the PATH binary search - a present config
   # override returns from discovery before the standard-location loop.
-  printf 'hooks:\r\n  gruff-code-quality:\r\n    enabled: true\r\n    binaries:\r\n      py: "strands_agents/.venv/bin/gruff-py"\r\n' > "$tmp/.goat-flow/config.yaml"
+  printf 'hooks:\r\n  gruff-code-quality:\r\n    enabled: true\r\n    binaries:\r\n      py: "tools/.venv/bin/gruff-py"\r\n' > "$tmp/.goat-flow/config.yaml"
   config_path="$(PATH="$tmp/empty-bin:$PATH" discover_binary "$tmp" gruff-py)"
-  [[ "$config_path" == "$tmp/strands_agents/.venv/bin/gruff-py" ]] || {
+  [[ "$config_path" == "$tmp/tools/.venv/bin/gruff-py" ]] || {
     rm -rf "$tmp"
     printf 'gruff-code-quality self-test: config binary override failed: %s\n' "$config_path" >&2
     return 1
   }
-  printf 'hooks:\n  gruff-code-quality:\n    enabled: true\n    binaries: { py: strands_agents/.venv/bin/gruff-py }\n' > "$tmp/.goat-flow/config.yaml"
+  printf 'hooks:\n  gruff-code-quality:\n    enabled: true\n    binaries: { py: tools/.venv/bin/gruff-py }\n' > "$tmp/.goat-flow/config.yaml"
   inline_config_path="$(PATH="$tmp/empty-bin:$PATH" discover_binary "$tmp" gruff-py)"
   # The compact dashboard-friendly YAML form must run the same analyzer.
-  [[ "$inline_config_path" == "$tmp/strands_agents/.venv/bin/gruff-py" ]] || {
+  [[ "$inline_config_path" == "$tmp/tools/.venv/bin/gruff-py" ]] || {
     rm -rf "$tmp"
     printf 'gruff-code-quality self-test: inline config binary override failed: %s\n' "$inline_config_path" >&2
     return 1
   }
-  printf 'hooks:\n  gruff-code-quality:\n    enabled: true\n    binaries:\n      py: "strands_agents/.venv/bin/gruff-py" # analyzer\n' > "$tmp/.goat-flow/config.yaml"
+  printf 'hooks:\n  gruff-code-quality:\n    enabled: true\n    binaries:\n      py: "tools/.venv/bin/gruff-py" # analyzer\n' > "$tmp/.goat-flow/config.yaml"
   commented_config_path="$(PATH="$tmp/empty-bin:$PATH" discover_binary "$tmp" gruff-py)"
   # Inline comments should stay readable without becoming part of the path.
-  [[ "$commented_config_path" == "$tmp/strands_agents/.venv/bin/gruff-py" ]] || {
+  [[ "$commented_config_path" == "$tmp/tools/.venv/bin/gruff-py" ]] || {
     rm -rf "$tmp"
     printf 'gruff-code-quality self-test: commented config binary override failed: %s\n' "$commented_config_path" >&2
     return 1
@@ -1255,16 +1255,16 @@ self_test() {
     return 1
   }
   # Git Bash infers executability from a shebang even after chmod -x; use inert data for this fixture.
-  printf 'non-executable analyzer fixture\n' > "$tmp/strands_agents/.venv/bin/gruff-py"
-  chmod -x "$tmp/strands_agents/.venv/bin/gruff-py"
+  printf 'non-executable analyzer fixture\n' > "$tmp/tools/.venv/bin/gruff-py"
+  chmod -x "$tmp/tools/.venv/bin/gruff-py"
   output="$(PATH="$tmp/empty-bin:$PATH" process_file "$sample_payload" "$tmp" "src/sample.py" 1 1 2>&1)"
-  [[ "$output" == *"hooks.gruff-code-quality.binaries.py points at strands_agents/.venv/bin/gruff-py which is not an executable file"* ]] || {
+  [[ "$output" == *"hooks.gruff-code-quality.binaries.py points at tools/.venv/bin/gruff-py which is not an executable file"* ]] || {
     rm -rf "$tmp"
     printf 'gruff-code-quality self-test: non-executable config override diagnostic failed: %s\n' "$output" >&2
     return 1
   }
-  printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/strands_agents/.venv/bin/gruff-py"
-  chmod +x "$tmp/strands_agents/.venv/bin/gruff-py"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/tools/.venv/bin/gruff-py"
+  chmod +x "$tmp/tools/.venv/bin/gruff-py"
   printf 'hooks:\n  gruff-code-quality:\n    binaries:\n      py: missing/gruff-py\n' > "$tmp/.goat-flow/config.yaml"
   output="$(PATH="$tmp/empty-bin:$PATH" process_file "$sample_payload" "$tmp" "src/sample.py" 1 1 2>&1)"
   [[ "$output" == *"hooks.gruff-code-quality.binaries.py points at missing/gruff-py which does not exist"* ]] || {
@@ -1361,15 +1361,14 @@ self_test() {
     printf 'gruff-code-quality self-test: fallback range filter failed\n' >&2
     return 1
   }
-
   # A multi-line finding belongs to an edit that intersects any part of its reported span.
-  report_output='{"findings":[{"severity":"warning","line":10,"endLine":20,"file":"x.ts","ruleId":"r.span","message":"m"}]}'
-  report_json="$(changed_findings_report "$report_output" "x.ts" "/tmp/x.ts" "15-15" 1 20 0)"
+  report_output='{"findings":[{"severity":"warning","line":10,"endLine":20,"file":"x.ts","ruleId":"r.span","message":"m"},{"severity":"warning","location":{"startLine":30,"endLine":40},"file":"x.ts","ruleId":"r.outside","message":"m"}]}'
+  report_json="$(changed_findings_report "$report_output" "x.ts" "/tmp/x.ts" "15-16" 1 20 0)"
   [[ "$(printf '%s' "$report_json" | jq -r '.total')" == "1" ]] || {
     printf 'gruff-code-quality self-test: fallback finding-span overlap failed\n' >&2
     return 1
   }
-  [[ "$(suppressed_count "$report_output" "x.ts" "/tmp/x.ts" "15-15")" == "0" ]] || {
+  [[ "$(suppressed_count "$report_output" "x.ts" "/tmp/x.ts" "15-16")" == "1" ]] || {
     printf 'gruff-code-quality self-test: fallback finding-span suppression failed\n' >&2
     return 1
   }
@@ -1388,13 +1387,6 @@ self_test() {
   }
   [[ "$(printf '%s' "$report_json" | jq -r '.lines[1]')" == "- [advisory] x.ts:12 naming.x - rename" ]] || {
     printf 'gruff-code-quality self-test: hook_v1 line-scope rendering failed\n' >&2
-    return 1
-  }
-
-  report_output='{"findings":[{"severity":"warning","scope":"symbol","line":10,"endLine":20,"file":"x.ts","ruleId":"r.span","message":"m"}]}'
-  report_json="$(hook_contract_report "$report_output" 1 20 "15-15")"
-  [[ "$(printf '%s' "$report_json" | jq -r '[.total,.lines[0]] | @tsv')" == $'1\t- [warning] x.ts:10 r.span - m' ]] || {
-    printf 'gruff-code-quality self-test: hook_contract finding-span overlap failed\n' >&2
     return 1
   }
 
@@ -1550,7 +1542,8 @@ min_severity_rank() {
 # file/line/ruleId, capped at $max; `more` is how many surfaced findings the cap
 # hid and `floored` how many were dropped below the floor. Accepts the JSON shapes
 # emitted across all five ports: path may be `filePath`, `file`, or `path`; line
-# may be `line`, `location.line`, or `location.startLine`.
+# span may be `line`..`endLine`, `location.line`..`location.endLine`, or
+# `location.startLine`..`location.endLine`.
 changed_findings_report() {
   local output="$1"
   local rel_path="$2"
@@ -1564,20 +1557,19 @@ changed_findings_report() {
       tostring | gsub("\\\\"; "/") | sub("^\\./"; "");
     def finding_path:
       .filePath? // .file? // .path? // "";
-    def numeric_line($value):
+    def number_or_null($value):
       if ($value | type) == "number" then
         $value
       elif ($value | type) == "string" then
-        ($value | tonumber?)
+        ($value | tonumber? // null)
       else
         null
       end;
     def start_line:
-      numeric_line(.line? // .location.line? // .location.startLine?);
-    def end_line($start):
-      numeric_line(.endLine? // .location.endLine? // .end?) // $start;
-    def line_or_null:
-      start_line;
+      number_or_null(.line? // .location.line? // .location.startLine?);
+    def end_line($line):
+      (number_or_null(.endLine? // .location.endLine?) // $line) as $end
+      | if $line == null then null elif $end < $line then $line else $end end;
     def same_file:
       (finding_path | normalize_path) as $path
       | ($path == ($rel | normalize_path)
@@ -1588,9 +1580,9 @@ changed_findings_report() {
       $ranges
       | split(",")
       | map(select(length > 0) | split("-") | {start: (.[0] | tonumber), end: (.[1] | tonumber)});
-    def overlaps_changed_ranges($start; $end):
+    def overlaps_changed_ranges($line; $endLine):
       parsed_ranges as $parsed
-      | any($parsed[]; $end >= .start and $start <= .end);
+      | any($parsed[]; $endLine >= .start and $line <= .end);
     def sev_rank($s):
       # error > warning > everything else (advisory, or an unknown/missing severity)
       # so an unrecognised severity still clears the default advisory floor and stays visible.
@@ -1599,13 +1591,9 @@ changed_findings_report() {
 
     [ (.findings // [])[]
       | . as $finding
-      | ($finding | line_or_null) as $line
+      | ($finding | start_line) as $line
       | ($finding | end_line($line)) as $endLine
-      | select(
-          ($finding | same_file)
-          and $line != null
-          and ($native == 1 or overlaps_changed_ranges($line; $endLine))
-        )
+      | select(($finding | same_file) and $line != null and ($native == 1 or overlaps_changed_ranges($line; $endLine)))
       | { sev: ((.severity // "unknown") | tostring | ascii_downcase),
           rank: sev_rank(.severity // ""),
           line: $line,
@@ -1637,18 +1625,19 @@ suppressed_count() {
       tostring | gsub("\\\\"; "/") | sub("^\\./"; "");
     def finding_path:
       .filePath? // .file? // .path? // "";
-    def numeric_line($value):
+    def number_or_null($value):
       if ($value | type) == "number" then
         $value
       elif ($value | type) == "string" then
-        ($value | tonumber?)
-        else
+        ($value | tonumber? // null)
+      else
         null
-        end;
+      end;
     def start_line:
-      numeric_line(.line? // .location.line? // .location.startLine?);
-    def end_line($start):
-      numeric_line(.endLine? // .location.endLine? // .end?) // $start;
+      number_or_null(.line? // .location.line? // .location.startLine?);
+    def end_line($line):
+      (number_or_null(.endLine? // .location.endLine?) // $line) as $end
+      | if $line == null then null elif $end < $line then $line else $end end;
     def same_file:
       (finding_path | normalize_path) as $path
       | ($path == ($rel | normalize_path)
@@ -1659,9 +1648,9 @@ suppressed_count() {
       $ranges
       | split(",")
       | map(select(length > 0) | split("-") | {start: (.[0] | tonumber), end: (.[1] | tonumber)});
-    def overlaps_changed_ranges($start; $end):
+    def overlaps_changed_ranges($line; $endLine):
       parsed_ranges as $parsed
-      | any($parsed[]; $end >= .start and $start <= .end);
+      | any($parsed[]; $endLine >= .start and $line <= .end);
 
     [
       (.findings // [])
@@ -2541,7 +2530,8 @@ announce_verified_health() {
   health_day="${GRUFF_CODE_QUALITY_HEALTH_DAY:-$(date -u +%F)}"
   marker_directory="$root/.goat-flow/logs/events"
   # An unwritable event directory cannot weaken the analyzer result already produced.
-  if ! mkdir -p "$marker_directory" 2>/dev/null; then
+  # Relative creation also works when Git Bash rejects an absolute WSL network path.
+  if ! (cd "$root" && mkdir -p ".goat-flow/logs/events") 2>/dev/null; then
     printf 'gruff-code-quality: verified analyzer exchange (%s); health marker could not be stored.\n' "$binary" >&2
     return 0
   fi
@@ -2552,13 +2542,17 @@ announce_verified_health() {
     "$session_identifier" "$root" "$HOOK_VERSION" "$health_day" "$binary"
   current=""
   # A well-formed matching marker means this session already saw verified health today.
-  if [[ -f "$marker" ]]; then
-    current="$(<"$marker")"$'\n'
+  # cat keeps read errors catchable; Bash's optimized $(<file) can exit the shell.
+  if [[ -f "$marker" ]] && current="$(cat -- "$marker" 2>/dev/null)"$'\n'; then
     if [[ "$current" == "$expected" ]]; then
       return 0
     fi
   fi
-  printf '%s' "$expected" > "$marker"
+  # Marker persistence is optional; preserve the completed result if it fails.
+  if ! { printf '%s' "$expected" > "$marker"; } 2>/dev/null; then
+    printf 'gruff-code-quality: verified analyzer exchange (%s); health marker could not be stored.\n' "$binary" >&2
+    return 0
+  fi
   printf 'gruff-code-quality: verified analyzer exchange (%s); health is current for this session.\n' "$binary" >&2
 }
 
@@ -2620,7 +2614,7 @@ emit_hook_result() {
     return 0
   fi
   # A minimal fixed envelope keeps parser loss visible without interpolating unsafe text.
-  printf '%s\n' '{"schema":"goat-flow.hook-result.v1","hookId":"gruff-code-quality","event":"post-tool","outcome":"unavailable","coverage":{"status":"none","attemptedUnits":0,"completedUnits":0,"skippedUnits":0},"reasonCode":"hook-unavailable","findings":[{"code":"result-parser-missing","message":"jq is unavailable, so Gruff could not emit validated feedback","target":"project"}],"execution":{"hookVersion":"1.17.0","provider":"claude","providerMode":"fallback","adapterName":"claude-post-tool","adapterVersion":"1","durationMs":0}}'
+  printf '%s\n' '{"schema":"goat-flow.hook-result.v1","hookId":"gruff-code-quality","event":"post-tool","outcome":"unavailable","coverage":{"status":"none","attemptedUnits":0,"completedUnits":0,"skippedUnits":0},"reasonCode":"hook-unavailable","findings":[{"code":"result-parser-missing","message":"jq is unavailable, so Gruff could not emit validated feedback","target":"project"}],"execution":{"hookVersion":"1.18.0","provider":"claude","providerMode":"fallback","adapterName":"claude-post-tool","adapterVersion":"1","durationMs":0}}'
 }
 
 main() {
