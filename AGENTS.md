@@ -1,4 +1,4 @@
-# AGENTS.md - instructions v1.5.3 / goat-flow 1.17.0 (2026-10-03)
+# AGENTS.md - instructions v1.5.3 / goat-flow 1.18.0 (2026-10-15)
 gruff-php is an opinionated PHP code-quality analyzer; its mission is to govern AI-generated code so a human can verify, trust, and sign off on it (legible, secure, genuinely tested). Current invariant: keep app claims and commands grounded in real source/config files.
 
 ## Truth Order
