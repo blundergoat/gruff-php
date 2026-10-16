@@ -88,7 +88,7 @@ final class DocsRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify missing public phpdoc detected.
+     * Verify undocumented methods of every supported kind report, while a documented method stays quiet.
      *
      * @return void
      */
@@ -96,30 +96,27 @@ final class DocsRulesTest extends DocsRuleTestCase
     {
         $findings = $this->analyseRule('missing-phpdoc.php', MissingPhpdocRule::ID);
 
-        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
-        self::assertContains('MissingPhpdocFixture::undocumented()', $symbols);
-        self::assertContains('MissingPhpdocFixture::trivialUndocumented()', $symbols);
-        self::assertContains('MissingPhpdocFixture::privateMethod()', $symbols);
-        self::assertContains('MissingPhpdocFixture::protectedMethod()', $symbols);
-        self::assertContains('MissingPhpdocFixture::__toString()', $symbols);
-        self::assertContains('AbstractFixture::inheritedHook()', $symbols);
+        $symbols = array_map(static fn(Finding $finding): ?string => $finding->symbol, $findings);
+        sort($symbols);
+        self::assertSame([
+            'AbstractFixture::inheritedHook()',
+            'InternalHelper::complexUtility()',
+            'MissingPhpdocFixture::__toString()',
+            'MissingPhpdocFixture::getTitle()',
+            'MissingPhpdocFixture::isActive()',
+            'MissingPhpdocFixture::privateMethod()',
+            'MissingPhpdocFixture::protectedMethod()',
+            'MissingPhpdocFixture::setTitle()',
+            'MissingPhpdocFixture::trivialUndocumented()',
+            'MissingPhpdocFixture::undocumented()',
+            'RuleContractFixture::analyse()',
+            'RuleContractFixture::definition()',
+            'TextReporter::render()',
+        ], $symbols);
 
         $severityValues = array_values(array_unique(array_map(static fn($finding): string => $finding->severity->value, $findings)));
 
         self::assertSame([\GruffPhp\Results\Finding\Severity::Error->value], $severityValues);
-    }
-
-    /**
-     * Verify documented method not flagged.
-     *
-     * @return void
-     */
-    public function testDocumentedMethodNotFlagged(): void
-    {
-        $findings = $this->analyseRule('missing-phpdoc.php', MissingPhpdocRule::ID);
-
-        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
-        self::assertNotContains('MissingPhpdocFixture::documented()', $symbols);
     }
 
     /**
@@ -164,89 +161,6 @@ final class DocsRulesTest extends DocsRuleTestCase
 
         self::assertStringEndsWith('signature). Also describe parameter $reason and when it throws.', $messages['SignatureMessages::fail()']);
         self::assertStringEndsWith('not a restatement of the method signature).', $messages['SignatureMessages::nestedThrow()']);
-    }
-
-    /**
-     * Verify accessors require phpdoc.
-     *
-     * @return void
-     */
-    public function testAccessorsRequirePhpdoc(): void
-    {
-        $findings = $this->analyseRule('missing-phpdoc.php', MissingPhpdocRule::ID);
-
-        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
-        self::assertContains('MissingPhpdocFixture::getTitle()', $symbols);
-        self::assertContains('MissingPhpdocFixture::setTitle()', $symbols);
-        self::assertContains('MissingPhpdocFixture::isActive()', $symbols);
-    }
-
-    /**
-     * Verify private and protected methods require phpdoc.
-     *
-     * @return void
-     */
-    public function testPrivateAndProtectedMethodsRequirePhpdoc(): void
-    {
-        $findings = $this->analyseRule('missing-phpdoc.php', MissingPhpdocRule::ID);
-
-        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
-        self::assertContains('MissingPhpdocFixture::privateMethod()', $symbols);
-        self::assertContains('MissingPhpdocFixture::protectedMethod()', $symbols);
-    }
-
-    /**
-     * Verify trivial typed public method requires phpdoc.
-     *
-     * @return void
-     */
-    public function testTrivialTypedPublicMethodRequiresPhpdoc(): void
-    {
-        $findings = $this->analyseRule('missing-phpdoc.php', MissingPhpdocRule::ID);
-
-        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
-        self::assertContains('MissingPhpdocFixture::trivialUndocumented()', $symbols);
-    }
-
-    /**
-     * Verify magic method requires phpdoc.
-     *
-     * @return void
-     */
-    public function testMagicMethodRequiresPhpdoc(): void
-    {
-        $findings = $this->analyseRule('missing-phpdoc.php', MissingPhpdocRule::ID);
-
-        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
-        self::assertContains('MissingPhpdocFixture::__toString()', $symbols);
-    }
-
-    /**
-     * Verify rule interface contract methods require local phpdoc.
-     *
-     * @return void
-     */
-    public function testRuleInterfaceContractMethodsRequireLocalPhpdoc(): void
-    {
-        $findings = $this->analyseRule('missing-phpdoc.php', MissingPhpdocRule::ID);
-
-        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
-        self::assertContains('RuleContractFixture::definition()', $symbols);
-        self::assertContains('RuleContractFixture::analyse()', $symbols);
-    }
-
-    /**
-     * Verify internal helpers and conventional reporters require phpdoc.
-     *
-     * @return void
-     */
-    public function testInternalHelpersAndConventionalReportersRequirePhpdoc(): void
-    {
-        $findings = $this->analyseRule('missing-phpdoc.php', MissingPhpdocRule::ID);
-
-        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
-        self::assertContains('InternalHelper::complexUtility()', $symbols);
-        self::assertContains('TextReporter::render()', $symbols);
     }
 
     /**

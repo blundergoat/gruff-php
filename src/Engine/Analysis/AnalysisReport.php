@@ -34,7 +34,8 @@ use LogicException;
  *     ignoredPathDetails: list<IgnoredPath>,
  *     shouldIncludeIgnored: bool,
  *     projectRoot: string,
- *     unfilteredFindings: list<Finding>|null
+ *     unfilteredFindings: list<Finding>|null,
+ *     suppressedFindings?: list<array{finding: Finding, justification: string}>
  * }
  */
 final readonly class AnalysisReport
@@ -81,8 +82,7 @@ final readonly class AnalysisReport
      * @param ThresholdTrip|null          $failureReason - Gate threshold that tripped; null when the run did not fail a count threshold.
      * @param int|null                    $newFindingsCount - Size of the new-findings set; null when no new-findings gate is active.
      * @param list<SensitiveExclusionSummary> $sensitiveExclusions - One audit row per configured sensitive-data exclusion; empty when the run configured none.
-     * @param MachineReportContext        $machineContext - Serializer-only paths, run flags, root, and pre-display finding data.
-     * @param list<array{finding: Finding, justification: string}> $suppressedFindings - Findings another tool's comment or a repeated claim removed; never in the JSON envelope, which counts them in `suppressions`, but kept by SARIF as suppressed results (FAMILY-CONTRACT.md section 13c).
+     * @param MachineReportContext        $machineContext - Serializer paths, flags, root, pre-display findings and optional suppressed SARIF results.
      */
     public function __construct(
         public string                  $toolVersion,
@@ -115,8 +115,17 @@ final readonly class AnalysisReport
             'projectRoot' => '.',
             'unfilteredFindings' => null,
         ],
-        public array                   $suppressedFindings = [],
     ) {
+    }
+
+    /**
+     * Returns findings hidden by inline comments or duplicate claims for suppressed SARIF results.
+     *
+     * @return list<array{finding: Finding, justification: string}> - Findings with audit reasons; empty when none were suppressed.
+     */
+    public function suppressedFindings(): array
+    {
+        return $this->machineContext['suppressedFindings'] ?? [];
     }
 
     /**

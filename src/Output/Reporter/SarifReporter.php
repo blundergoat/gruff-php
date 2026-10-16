@@ -48,7 +48,7 @@ final readonly class SarifReporter
 
         // Backfill a minimal rule entry for any finding whose rule isn't built-in - the `??=` leaves the
         // richer definitions from the first loop untouched, so no result points at a rule we never list.
-        foreach ([...$report->findings, ...array_column($report->suppressedFindings, 'finding')] as $finding) {
+        foreach ([...$report->findings, ...array_column($report->suppressedFindings(), 'finding')] as $finding) {
             $rules[$finding->ruleId] ??= [
                 'id' => $finding->ruleId,
                 'name' => $finding->ruleId,
@@ -94,7 +94,7 @@ final readonly class SarifReporter
                         ...$this->result($item['finding'], (int)$ruleIndexes[$item['finding']->ruleId]),
                         'suppressions' => [['kind' => 'inSource', 'justification' => $item['justification']]],
                     ],
-                    $report->suppressedFindings,
+                    $report->suppressedFindings(),
                 ),
             ],
             'properties' => $properties,

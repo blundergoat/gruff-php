@@ -350,8 +350,8 @@ final class AnalyseCommand extends Command
                 'shouldIncludeIgnored' => $options->shouldIncludeIgnored,
                 'projectRoot' => $projectRoot,
                 'unfilteredFindings' => $findings,
+                'suppressedFindings' => $analysisRun['suppressedFindings'],
             ],
-            suppressedFindings:       $analysisRun['suppressedFindings'],
         );
 
         $reportStart = hrtime(true);

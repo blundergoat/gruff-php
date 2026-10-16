@@ -577,9 +577,8 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     /**
      * Reports whether any options argument at or after the given slot passes LIBXML_NONET.
      *
-     * @param array<int|string, Node\Arg|Node\VariadicPlaceholder> $args       - Call args, positional and named.
-     * @param int                                                  $startIndex - First positional index the options flags can appear at; varies by
-     *                                                                         loader signature.
+     * @param array<int|string, Node\Arg|Node\ArgPlaceholder|Node\VariadicPlaceholder> $args       - Positional and named call arguments.
+     * @param int                                                                      $startIndex - First options slot for this loader.
      *
      * @return bool - True when an argument at or after that slot contains LIBXML_NONET.
      */

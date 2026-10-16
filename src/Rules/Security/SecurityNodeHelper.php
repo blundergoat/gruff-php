@@ -157,14 +157,11 @@ final class SecurityNodeHelper
     /**
      * Returns one call argument by its accepted parameter names or positional index.
      *
-     * @param array<int|string, Node\Arg|Node\VariadicPlaceholder> $args - Call arguments; an empty list means the
-     *                                                                    caller omitted every parameter.
-     * @param int                                                  $index - Zero-based position among unnamed
-     *                                                                    arguments.
-     * @param list<string>                                         $parameterNames - Accepted named-argument labels;
-     *                                                                    empty keeps positional-only matching.
+     * @param array<int|string, Node\Arg|Node\ArgPlaceholder|Node\VariadicPlaceholder> $args           - Call arguments; empty omits all parameters.
+     * @param int                                                                      $index          - Zero-based position among unnamed arguments.
+     * @param list<string>                                                             $parameterNames - Accepted names; empty uses positions only.
      *
-     * @return Expr|null - Argument value, or null when the parameter is absent or represented by a variadic placeholder.
+     * @return Expr|null - Argument value, or null when the parameter is absent or represented by a placeholder.
      */
     public static function argumentValue(array $args, int $index, array $parameterNames = []): ?Expr
     {

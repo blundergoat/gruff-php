@@ -77,8 +77,10 @@ final class SubstantiveLineCounterTest extends TestCase
         $unit                   = $this->parseInline($source);
         $expectedWholeFileCount = 5;
 
-        self::assertSame($expectedWholeFileCount, SubstantiveLineCounter::countAll($unit));
-        self::assertSame($expectedWholeFileCount, SubstantiveLineCounter::countAll($unit));
+        self::assertSame(
+            [$expectedWholeFileCount, $expectedWholeFileCount],
+            [SubstantiveLineCounter::countAll($unit), SubstantiveLineCounter::countAll($unit)],
+        );
 
         foreach ([[-2, 0], [0, 0], [0, 2], [1, 1], [1, 999], [4, 3], [999, 1000]] as [$startLine, $endLine]) {
             $expected = $this->referenceCountRange($unit, $startLine, $endLine);
