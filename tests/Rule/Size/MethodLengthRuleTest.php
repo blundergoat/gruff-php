@@ -54,7 +54,8 @@ final class MethodLengthRuleTest extends TestCase
      */
     public function testWarningForMethodAboveWarningThreshold(): void
     {
-        $findings = $this->analyse('long-method.php', ['warning' => 30, 'error' => 60]);
+        // A warning tier of 20 puts the 31-line method at one and a half times its limit, so it keeps warning severity.
+        $findings = $this->analyse('long-method.php', ['warning' => 20, 'error' => 60]);
 
         self::assertCount(1, $findings);
         self::assertSame(MethodLengthRule::ID, $findings[0]->ruleId);

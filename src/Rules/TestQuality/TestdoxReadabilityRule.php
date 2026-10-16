@@ -44,6 +44,12 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
             confidence:         Confidence::Low,
             defaultThresholds:  ['minWords' => 2],
             isEnabledByDefault: true,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A short test name that is already precise because its class supplies the subject, such as testInvoke on a single-action class.',
+                    'mitigation' => 'Only the method name is tokenised, never the class it sits in, so lengthen the name or raise this rule\'s minWords threshold.',
+                ],
+            ],
         );
     }
 
@@ -86,7 +92,7 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
                                  $threshold,
                              ),
                 filePath:    $analysisUnit->file->displayPath,
-                line:        $scope->line,
+                line:        $scope->anchorLine(),
                 severity:    Severity::Advisory,
                 pillar:      Pillar::TestQuality,
                 tier:        RuleTier::V01,

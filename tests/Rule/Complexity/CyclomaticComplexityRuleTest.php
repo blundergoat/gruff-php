@@ -87,6 +87,31 @@ final class CyclomaticComplexityRuleTest extends TestCase
     }
 
     /**
+     * Verify the rule reports each switch and each match as one decision, while the shared count keeps every case.
+     *
+     * @return void
+     */
+    public function testRuleCountsEachDispatchOnce(): void
+    {
+        $findings = $this->analyse('cyclomatic.php', ['warning' => 1, 'error' => 20]);
+        $reported = [];
+
+        foreach ($findings as $finding) {
+            $reported[(string) $finding->symbol] = $finding->metadata;
+        }
+
+        $byMethod = static fn (string $method): array => array_values(array_filter(
+            $reported,
+            static fn (string $symbol): bool => str_contains($symbol, '::' . $method . '('),
+            ARRAY_FILTER_USE_KEY,
+        ))[0] ?? [];
+
+        self::assertSame(2, $byMethod('switchBlock')['complexity'] ?? null, 'three cases and a default are one decision');
+        self::assertSame(2, $byMethod('matchBlock')['complexity'] ?? null, 'three arm conditions are one decision');
+        self::assertSame(3, $byMethod('ifElseIf')['complexity'] ?? null, 'an if/elseif chain keeps one point per branch');
+    }
+
+    /**
      * Verify no findings for simple methods.
      *
      * @return void

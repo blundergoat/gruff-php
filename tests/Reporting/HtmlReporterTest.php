@@ -35,7 +35,7 @@ final class HtmlReporterTest extends TestCase
     {
         $findings       = [
             new Finding(
-                ruleId:     'docs.missing-public-phpdoc',
+                ruleId:     'docs.missing-phpdoc',
                 message:    '<script>alert("x")</script>',
                 filePath:   'src/<bad>.php',
                 line:       4,
@@ -45,7 +45,7 @@ final class HtmlReporterTest extends TestCase
                 confidence: Confidence::High,
             ),
         ];
-        $score          = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive());
+        $score          = (new ScoreCalculator())->calculate($findings, 10, null, DiffResult::inactive());
         $analysisReport = new AnalysisReport(
             toolVersion:     '0.1.0-test',
             requestedPaths:  ['src/<bad>.php'],
@@ -69,7 +69,7 @@ final class HtmlReporterTest extends TestCase
         self::assertStringContainsString('top offenders', $html);
         self::assertStringContainsString('<h2 class="section-head">pillars <span class="aside">weighted composite</span></h2>', $html);
         self::assertStringContainsString('<table class="pillar-list">', $html);
-        self::assertStringContainsString('<h3 class="rule">docs.missing-public-phpdoc</h3>', $html);
+        self::assertStringContainsString('<h3 class="rule">docs.missing-phpdoc</h3>', $html);
         self::assertStringContainsString('&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;', $html);
         self::assertStringContainsString('src/&lt;bad&gt;.php', $html);
         self::assertStringNotContainsString('<script>alert("x")</script>', $html);
@@ -86,7 +86,7 @@ final class HtmlReporterTest extends TestCase
      */
     public function testHtmlReporterOmitsMutationVisualization(): void
     {
-        $score          = (new ScoreCalculator())->calculate([], null, DiffResult::inactive());
+        $score          = (new ScoreCalculator())->calculate([], 10, null, DiffResult::inactive());
         $analysisReport = new AnalysisReport(
             toolVersion:     '0.1.0-test',
             requestedPaths:  ['src'],
@@ -135,7 +135,7 @@ final class HtmlReporterTest extends TestCase
         self::assertStringContainsString('<th scope="col">file</th>', $html);
         self::assertStringContainsString('<th scope="col" class="num">cyclo</th>', $html);
         self::assertStringContainsString('<h2 class="section-head">flagged findings', $html);
-        self::assertStringContainsString('<h3 class="rule">docs.missing-public-phpdoc</h3>', $html);
+        self::assertStringContainsString('<h3 class="rule">docs.missing-phpdoc</h3>', $html);
         self::assertStringContainsString('2 findings at warning or error severity across 2 pillars.', $html);
         self::assertStringContainsString('1 method exceeds CC 10 (1 in 11-15, 0 in 16-20, 0 at 21+).', $html);
         self::assertStringContainsString('<span class="loc-link" tabindex="0" data-path="src/Example.php:9">src/Example.php:9</span>', $html);
@@ -172,7 +172,7 @@ final class HtmlReporterTest extends TestCase
     public function testHtmlReporterUsesCelebrationSubtitleWhenNoWarningOrErrorFindingsExist(): void
     {
         $finding = new Finding(
-            ruleId:     'docs.missing-public-phpdoc',
+            ruleId:     'docs.missing-phpdoc',
             message:    'Public method has no PHPDoc.',
             filePath:   'src/Example.php',
             line:       9,
@@ -215,7 +215,7 @@ final class HtmlReporterTest extends TestCase
     public function testHtmlReporterRendersWindowsVscodeEditorLinks(): void
     {
         $finding = new Finding(
-            ruleId:     'docs.missing-public-phpdoc',
+            ruleId:     'docs.missing-phpdoc',
             message:    'Public method has no PHPDoc.',
             filePath:   'C:/repo/Foo Bar.php',
             line:       12,
@@ -375,6 +375,10 @@ final class HtmlReporterTest extends TestCase
     public function testHtmlReporterRendersCustomScoreReportEdgeCases(): void
     {
         $scoreReport = new ScoreReport(
+            clusters:               [],
+            ruleAttribution:        [],
+            evaluatedFiles:         10,
+            scoredPillars:          [],
             composite:              new Grade(88.25, 'B'),
             pillars:                [
                                         new PillarScore('Mutation', true, new Grade(99.0, 'A'), 1, 0, 0, 1, 1.0),
@@ -406,6 +410,10 @@ final class HtmlReporterTest extends TestCase
     public function testHtmlReporterRendersOffenderMetricColumnsInOrder(): void
     {
         $scoreReport = new ScoreReport(
+            clusters:               [],
+            ruleAttribution:        [],
+            evaluatedFiles:         10,
+            scoredPillars:          [],
             composite:              new Grade(72.0, 'C'),
             pillars:                [],
             topOffenders:           [
@@ -435,7 +443,7 @@ final class HtmlReporterTest extends TestCase
     public function testHtmlReporterInteractivePillarSelectSizeIsBounded(): void
     {
         $finding     = new Finding(
-            ruleId:     'docs.missing-public-phpdoc',
+            ruleId:     'docs.missing-phpdoc',
             message:    'Public method has no PHPDoc.',
             filePath:   'src/Example.php',
             line:       9,
@@ -470,7 +478,7 @@ final class HtmlReporterTest extends TestCase
     {
         return $this->report([
                                  new Finding(
-                                     ruleId:     'docs.missing-public-phpdoc',
+                                     ruleId:     'docs.missing-phpdoc',
                                      message:    'Public method has no PHPDoc.',
                                      filePath:   'src/Example.php',
                                      line:       9,
@@ -512,7 +520,7 @@ final class HtmlReporterTest extends TestCase
      */
     private function report(array $findings, array $diagnostics = [], ?ScoreReport $score = null): AnalysisReport
     {
-        $score ??= (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive());
+        $score ??= (new ScoreCalculator())->calculate($findings, 10, null, DiffResult::inactive());
 
         return new AnalysisReport(
             toolVersion:     '0.1.0-test',

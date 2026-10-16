@@ -8,10 +8,7 @@ use GruffPhp\Engine\Config\AnalysisConfig;
 use GruffPhp\Engine\Config\RuleSettings;
 use GruffPhp\Results\Finding\RemediationAction;
 use GruffPhp\Rules\Naming\AbbreviationAllowlistRule;
-use GruffPhp\Rules\Naming\BooleanPrefixRule;
-use GruffPhp\Rules\Naming\HungarianNotationRule;
 use GruffPhp\Rules\Naming\IdentifierQualityRule;
-use GruffPhp\Rules\Naming\NegativeBooleanRule;
 use GruffPhp\Rules\Naming\ShortVariableRule;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\RuleRegistry;
@@ -116,15 +113,24 @@ PHP, AbbreviationAllowlistRule::ID);
     }
 
     /**
-     * Verify universal DTO and UTC vocabulary stays quiet while domain and out-of-band names retain their contracts.
+     * Verify the shipped seed is exactly the ratified sixteen, so domain vocabulary stays a project decision.
+     *
+     * `dto` and `utc` were seeded here until 2026-09-06. FAMILY-CONTRACT.md section 8 ratifies sixteen entries and
+     * replace-not-merge loading, so two extra defaults meant a gruff-php project silently accepted two names no
+     * other port did, and a user who listed their own vocabulary lost them without being told.
      *
      * @return void
      */
-    public function testAbbreviationAllowlistShipsUniversalDtoAndUtcDefaults(): void
+    public function testAbbreviationAllowlistSeedsExactlyTheRatifiedSixteen(): void
     {
+        self::assertSame(
+            ['age', 'app', 'db', 'fs', 'id', 'io', 'key', 'log', 'max', 'min', 'now', 'raw', 'rx', 'tx', 'ui', 'url'],
+            AnalysisConfig::DEFAULT_ACCEPTED_ABBREVIATIONS,
+        );
+
         $findings = $this->analyseSourceRule(<<<'PHP'
 <?php
-function mapDomainValues(string $dto, string $utc, string $dob, string $uuid): void
+function mapDomainValues(string $dto, string $utc, string $dob, string $id): void
 {
 }
 PHP, AbbreviationAllowlistRule::ID);
@@ -134,330 +140,8 @@ PHP, AbbreviationAllowlistRule::ID);
         );
         sort($names);
 
-        self::assertSame(['dob'], $names);
-    }
-
-    /**
-     * Verify projects can opt in additional boolean prefixes.
-     *
-     * @return void
-     */
-    public function testBooleanPrefixAllowedPrefixesCanBeConfigured(): void
-    {
-        $unit       = $this->parseFixture('boolean-prefix.php');
-        $registry   = RuleRegistry::defaults();
-        $settings   = AnalysisConfig::fromRegistry($registry)->ruleSettings(BooleanPrefixRule::ID);
-        $prefixes   = $settings->stringListOption('allowedPrefixes');
-        $prefixes[] = 'did';
-        $config     = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
-            BooleanPrefixRule::ID,
-            new RuleSettings(true, $settings->thresholds, ['allowedPrefixes' => $prefixes]),
-        );
-        $findings   = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
-        $symbols    = array_map(static fn($finding): ?string => $finding->symbol, array_filter(
-                                                                                      $findings,
-                                                                                      static fn($finding): bool => $finding->ruleId === BooleanPrefixRule::ID,
-                                                                                  ));
-
-        self::assertNotContains('BooleanPrefixFixture::didRun()', $symbols);
-        self::assertContains('BooleanPrefixFixture::active()', $symbols);
-    }
-
-    /**
-     * Verify typed bool properties and parameters need boolean-style names.
-     *
-     * @return void
-     */
-    public function testBooleanPrefixDetectsPropertiesAndParameters(): void
-    {
-        $findings = $this->booleanPrefixPropertyFindings();
-        $names    = array_map(static fn($finding): mixed => $finding->metadata['identifierName'] ?? null, $findings);
-
-        self::assertContains('changedOnly', $names);
-        self::assertContains('infectionRun', $names);
-        self::assertContains('infectionRunCtor', $names);
-        // A prefix that does not lead the name is no predicate, with or without a trailing word.
-        self::assertContains('force', $names);
-        self::assertContains('forceShould', $names);
-        self::assertNotContains('isPest', $names);
-        // snake_case prefixes read as predicates: the underscore is a word boundary.
-        self::assertNotContains('is_valid', $names);
-        self::assertNotContains('active', $names);
-        self::assertNotContains('emitted', $names);
-        self::assertNotContains('valid', $names);
-        self::assertNotContains('silent', $names);
-        self::assertNotContains('interactive', $names);
-        self::assertNotContains('flag', $names);
-        self::assertContains('data', $names);
-        self::assertContains('result', $names);
-        self::assertContains('mode', $names);
-        self::assertContains('required', $names);
-        self::assertNotContains('focusModePayloadPresent', $names);
-        self::assertNotContains('printableTodayScheduleRequested', $names);
-        self::assertNotContains('bookingRequiresConfirmation', $names);
-        self::assertNotContains('limited', $names);
-        self::assertNotContains('printable', $names);
-        self::assertNotContains('paymentRequested', $names);
-        self::assertNotContains('assistantIntentRequiresContext', $names);
-        self::assertNotContains('resolved', $names);
-        self::assertNotContains('declineCodeExplanationRequested', $names);
-
-        $privatePromotion = array_values(array_filter(
-            $findings,
-            static fn($finding): bool => $finding->metadata['identifierName'] === 'infectionRunCtor',
-        ))[0] ?? null;
-        $publicProperty = array_values(array_filter(
-            $findings,
-            static fn($finding): bool => $finding->symbol === '$changedOnly',
-        ))[0] ?? null;
-        $publicParameter = array_values(array_filter(
-            $findings,
-            static fn($finding): bool => $finding->symbol === 'BooleanPrefixPropertiesFixture::configure()'
-                && $finding->metadata['identifierName'] === 'changedOnly',
-        ))[0] ?? null;
-        $localClosure = $this->analyseRule('closure-coverage.php', BooleanPrefixRule::ID)[0] ?? null;
-
-        self::assertNotNull($privatePromotion);
-        self::assertNotNull($publicProperty);
-        self::assertNotNull($publicParameter);
-        self::assertNotNull($localClosure);
-        self::assertSame(RemediationAction::Consider->value, $privatePromotion->metadata['remediationAction'] ?? null);
-        self::assertSame(RemediationAction::Consider->value, $publicProperty->metadata['remediationAction'] ?? null);
-        self::assertSame(RemediationAction::Consider->value, $publicParameter->metadata['remediationAction'] ?? null);
-        self::assertSame(RemediationAction::Consider->value, $localClosure->metadata['remediationAction'] ?? null);
-
-        $expectedConfigurationKey = 'rules.naming.boolean-prefix.options.acceptedBooleanNames';
-        self::assertSame($expectedConfigurationKey, $privatePromotion->metadata['configurationKey'] ?? null);
-        self::assertSame($expectedConfigurationKey, $publicProperty->metadata['configurationKey'] ?? null);
-        self::assertSame($expectedConfigurationKey, $publicParameter->metadata['configurationKey'] ?? null);
-        self::assertSame($expectedConfigurationKey, $localClosure->metadata['configurationKey'] ?? null);
-    }
-
-    /**
-     * Verify the state adjective allowlist controls bool property and parameter exemptions.
-     *
-     * @return void
-     */
-    public function testBooleanPrefixStateAdjectiveAllowlistCanBeConfigured(): void
-    {
-        $findings = $this->booleanPrefixPropertyFindings(['stateAdjectiveAllowlist' => ['active']]);
-        $names    = array_map(static fn($finding): mixed => $finding->metadata['identifierName'] ?? null, $findings);
-
-        self::assertContains('emitted', $names);
-        self::assertContains('interactive', $names);
-        self::assertNotContains('active', $names);
-        self::assertNotContains('isPest', $names);
-    }
-
-    /**
-     * Verify acceptedBooleanNames clears exact boolean names without a rename (P3).
-     *
-     * A boolean-returning method named `active()` is normally flagged, and the
-     * only in-code fix is the caller-breaking rename to `isActive()`. Listing the
-     * exact name in acceptedBooleanNames clears the finding while leaving the
-     * public name intact, the non-breaking resolution P3 requires; an unlisted
-     * name such as `enabled()` still fires.
-     *
-     * @return void
-     */
-    public function testBooleanPrefixAcceptedBooleanNamesCanBeConfigured(): void
-    {
-        $unit     = $this->parseFixture('boolean-prefix.php');
-        $registry = RuleRegistry::defaults();
-        $settings = AnalysisConfig::fromRegistry($registry)->ruleSettings(BooleanPrefixRule::ID);
-        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
-            BooleanPrefixRule::ID,
-            new RuleSettings(true, $settings->thresholds, array_merge($settings->options, ['acceptedBooleanNames' => ['ACTIVE', 'CHECK']])),
-        );
-        $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
-        $symbols  = array_map(static fn($finding): ?string => $finding->symbol, array_filter(
-                                                                                    $findings,
-                                                                                    static fn($finding): bool => $finding->ruleId === BooleanPrefixRule::ID,
-                                                                                ));
-
-        self::assertNotContains('BooleanPrefixFixture::active()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::check()', $symbols);
-        self::assertContains('BooleanPrefixFixture::enabled()', $symbols);
-        self::assertContains('BooleanPrefixFixture::didRun()', $symbols);
-    }
-
-    /**
-     * Verify projects can limit Boolean naming checks to private and local declarations.
-     *
-     * @return void
-     */
-    public function testBooleanPrefixCanSkipCallerVisibleApi(): void
-    {
-        $registry = RuleRegistry::defaults();
-        $settings = AnalysisConfig::fromRegistry($registry)->ruleSettings(BooleanPrefixRule::ID);
-        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
-            BooleanPrefixRule::ID,
-            new RuleSettings(true, $settings->thresholds, array_merge($settings->options, ['includePublicApi' => false])),
-        );
-        $findings = $this->analyseSourceRule(<<<'PHP'
-<?php
-final class ApiFlags
-{
-    public bool $publicState = false;
-    private bool $privateState = false;
-
-    public function publicStatus(bool $publicFlag): bool
-    {
-        return $publicFlag;
-    }
-
-    private function privateStatus(bool $privateFlag): bool
-    {
-        return $privateFlag;
-    }
-
-    public function registerCallback(): void
-    {
-        $callback = static fn (bool $closureFlag): bool => $closureFlag;
-    }
-}
-
-function publicFunctionStatus(bool $functionFlag): bool
-{
-    return $functionFlag;
-}
-PHP, BooleanPrefixRule::ID, config: $config);
-        $symbols = array_map(static fn($finding): ?string => $finding->symbol, $findings);
-        $names   = array_map(static fn($finding): mixed => $finding->metadata['identifierName'] ?? null, $findings);
-
-        self::assertNotContains('$publicState', $symbols);
-        self::assertNotContains('ApiFlags::publicStatus()', $symbols);
-        self::assertNotContains('publicFunctionStatus()', $symbols);
-        self::assertNotContains('publicFlag', $names);
-        self::assertNotContains('functionFlag', $names);
-        self::assertContains('$privateState', $symbols);
-        self::assertContains('ApiFlags::privateStatus()', $symbols);
-        self::assertContains('privateFlag', $names);
-        self::assertContains('closureFlag', $names);
-
-        $privateProperty = array_values(array_filter(
-            $findings,
-            static fn($finding): bool => $finding->symbol === '$privateState',
-        ))[0] ?? null;
-        $privateCallable = array_values(array_filter(
-            $findings,
-            static fn($finding): bool => $finding->symbol === 'ApiFlags::privateStatus()'
-                && !isset($finding->metadata['identifierKind']),
-        ))[0] ?? null;
-        $privateParameter = array_values(array_filter(
-            $findings,
-            static fn($finding): bool => ($finding->metadata['identifierName'] ?? null) === 'privateFlag',
-        ))[0] ?? null;
-        $closureParameter = array_values(array_filter(
-            $findings,
-            static fn($finding): bool => ($finding->metadata['identifierName'] ?? null) === 'closureFlag',
-        ))[0] ?? null;
-
-        self::assertNotNull($privateProperty);
-        self::assertNotNull($privateCallable);
-        self::assertNotNull($privateParameter);
-        self::assertNotNull($closureParameter);
-        self::assertSame(RemediationAction::Apply->value, $privateProperty->metadata['remediationAction'] ?? null);
-        self::assertSame(RemediationAction::Apply->value, $privateCallable->metadata['remediationAction'] ?? null);
-        self::assertSame(RemediationAction::Consider->value, $privateParameter->metadata['remediationAction'] ?? null);
-        self::assertSame(RemediationAction::Consider->value, $closureParameter->metadata['remediationAction'] ?? null);
-    }
-
-    /**
-     * Verify suffix, proposition, adjective, and exact-name configuration stay independent.
-     *
-     * @return void
-     */
-    public function testBooleanPrefixStateAndPropositionAllowlistsCanBeConfigured(): void
-    {
-        $registry = RuleRegistry::defaults();
-        $settings = AnalysisConfig::fromRegistry($registry)->ruleSettings(BooleanPrefixRule::ID);
-        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
-            BooleanPrefixRule::ID,
-            new RuleSettings(true, $settings->thresholds, array_merge($settings->options, [
-                'stateSuffixAllowlist' => ['requested'],
-                'stateAdjectiveAllowlist' => ['active', 'required'],
-                'propositionVerbAllowlist' => ['requires'],
-                'acceptedBooleanNames' => ['status'],
-            ])),
-        );
-        $units = [
-            $this->parseFixture('boolean-prefix.php'),
-            $this->parseFixture('boolean-prefix-properties.php'),
-        ];
-        $findings        = $registry->analyse($units, new RuleContext(__DIR__ . '/../../..', $config));
-        $booleanFindings = array_values(array_filter(
-            $findings,
-            static fn($finding): bool => $finding->ruleId === BooleanPrefixRule::ID,
-        ));
-        $symbols = array_map(static fn($finding): ?string => $finding->symbol, $booleanFindings);
-        $names   = array_map(static fn($finding): mixed => $finding->metadata['identifierName'] ?? null, $booleanFindings);
-
-        self::assertNotContains('BooleanStateVocabularyFixture::paymentRequested()', $symbols);
-        self::assertNotContains('BooleanStateVocabularyFixture::assistantIntentRequiresContext()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::status()', $symbols);
-        self::assertContains('BooleanStateVocabularyFixture::valid()', $symbols);
-        self::assertContains('focusModePayloadPresent', $names);
-        self::assertNotContains('required', $names);
-        self::assertContains('resolved', $names);
-        self::assertNotContains('assistantIntentRequiresContext', $names);
-    }
-
-    /**
-     * Verify Hungarian notation type prefixes can be limited to structural types.
-     *
-     * @return void
-     */
-    public function testHungarianNotationTypePrefixesCanBeConfigured(): void
-    {
-        $findings = $this->hungarianFindings(['arr', 'obj']);
-        $names    = array_map(static fn($finding): mixed => $finding->metadata['variable'] ?? null, $findings);
-
-        self::assertContains('arrItems', $names);
-        self::assertContains('objUser', $names);
-        self::assertNotContains('strName', $names);
-        self::assertNotContains('intCount', $names);
-        self::assertNotContains('boolReady', $names);
-    }
-
-    /**
-     * Verify negative boolean flags are reported and CLI mirror keys can exempt them.
-     *
-     * @return void
-     */
-    public function testNegativeBooleanDetectsFlagsAndHonoursCliMirrorAllowlist(): void
-    {
-        $findings = $this->negativeBooleanFindings();
-        $names    = array_map(static fn($finding): mixed => $finding->metadata['identifierName'] ?? null, $findings);
-        $keys     = array_map(static fn($finding): mixed => $finding->metadata['allowlistKey'] ?? null, $findings);
-
-        self::assertContains('noConfig', $names);
-        self::assertContains('disableCache', $names);
-        self::assertContains('skipValidation', $names);
-        self::assertNotContains('nonNull', $names);
-        self::assertNotContains('notFound', $names);
-        // Snake_case negative prefixes report at underscore boundaries; word-internal "no"/"non" never match.
-        self::assertContains('no_cache', $names);
-        self::assertContains('not_ready', $names);
-        self::assertNotContains('normalised_output', $names);
-        self::assertContains('Fixtures\\Naming\\NegativeBooleanFixture::noConfig', $keys);
-        self::assertContains('Fixtures\\Naming\\NegativeBooleanFixture::configure::disableCache', $keys);
-        self::assertContains('Fixtures\\Naming\\NegativeBooleanFixture::configure::skipValidation', $keys);
-        self::assertContains('Fixtures\\Naming\\CliMirrorOptions::noConfig', $keys);
-        self::assertContains('Fixtures\\Naming\\SnakeCaseSyncOptions::no_cache', $keys);
-        self::assertContains('Fixtures\\Naming\\SnakeCaseSyncOptions::synchronise::not_ready', $keys);
-        self::assertContains('Fixtures\\Naming\\SnakeCliMirrorOptions::no_color', $keys);
-
-        $allowlistedFindings = $this->negativeBooleanFindings([
-                                                                  'Fixtures\\Naming\\CliMirrorOptions::noConfig',
-                                                                  'Fixtures\\Naming\\SnakeCliMirrorOptions::no_color',
-                                                              ]);
-        $allowlistedKeys     = array_map(static fn($finding): mixed => $finding->metadata['allowlistKey'] ?? null, $allowlistedFindings);
-
-        self::assertContains('Fixtures\\Naming\\NegativeBooleanFixture::noConfig', $allowlistedKeys);
-        self::assertNotContains('Fixtures\\Naming\\CliMirrorOptions::noConfig', $allowlistedKeys);
-        self::assertContains('Fixtures\\Naming\\SnakeCaseSyncOptions::no_cache', $allowlistedKeys);
-        self::assertNotContains('Fixtures\\Naming\\SnakeCliMirrorOptions::no_color', $allowlistedKeys);
+        // `id` is one of the sixteen and stays quiet; the three that are not are reported until a project lists them.
+        self::assertSame(['dob', 'dto', 'utc'], $names);
     }
 
     /**
@@ -482,19 +166,7 @@ PHP, BooleanPrefixRule::ID, config: $config);
         self::assertContains(IdentifierQualityRule::ID, $rules['cb'] ?? []);
         self::assertNotContains(AbbreviationAllowlistRule::ID, $rules['cb'] ?? []);
 
-        self::assertContains(NegativeBooleanRule::ID, $rules['disableCache'] ?? []);
-        self::assertNotContains(BooleanPrefixRule::ID, $rules['disableCache'] ?? []);
-
         self::assertContains(IdentifierQualityRule::ID, $rules['strX'] ?? []);
-        self::assertNotContains(HungarianNotationRule::ID, $rules['strX'] ?? []);
-
-        // Snake_case negatives get exactly one owner too: negative-boolean wins, boolean-prefix defers.
-        $snakeUnit     = $this->parseFixture('negative-boolean.php');
-        $snakeFindings = $registry->analyse([$snakeUnit], new RuleContext(__DIR__ . '/../../..', AnalysisConfig::fromRegistry($registry)));
-        $snakeRules    = $this->rulesByIdentifierName($snakeFindings);
-
-        self::assertContains(NegativeBooleanRule::ID, $snakeRules['no_cache'] ?? []);
-        self::assertNotContains(BooleanPrefixRule::ID, $snakeRules['no_cache'] ?? []);
     }
 
     /**
@@ -520,89 +192,6 @@ PHP, BooleanPrefixRule::ID, config: $config);
         return array_values(array_filter(
                                 $findings,
                                 static fn($finding): bool => $finding->ruleId === AbbreviationAllowlistRule::ID,
-                            ));
-    }
-
-    /**
-     * Build hungarian findings for the naming rule.
-     *
-     * @param list<string> $typePrefixes - Hungarian prefixes treated as type markers for this assertion.
-     *
-     * @return list<\GruffPhp\Results\Finding\Finding> - Hungarian-notation findings produced under the supplied type prefixes; empty when no prefixed
-     *                                         variable matches
-     */
-    private function hungarianFindings(array $typePrefixes): array
-    {
-        $unit     = $this->parseFixture('hungarian.php');
-        $registry = RuleRegistry::defaults();
-        $settings = AnalysisConfig::fromRegistry($registry)->ruleSettings(HungarianNotationRule::ID);
-        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
-            HungarianNotationRule::ID,
-            new RuleSettings(true, $settings->thresholds, array_merge($settings->options, ['typePrefixes' => $typePrefixes])),
-        );
-        $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
-
-        return array_values(array_filter(
-                                $findings,
-                                static fn($finding): bool => $finding->ruleId === HungarianNotationRule::ID,
-                            ));
-    }
-
-    /**
-     * Build boolean prefix property findings for the naming rule.
-     *
-     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options - Boolean-prefix rule option overrides.
-     *
-     * @return list<\GruffPhp\Results\Finding\Finding> - boolean-prefix findings for the fixture's properties and parameters under the supplied options;
-     *                                         empty when every bool name is exempt
-     */
-    private function booleanPrefixPropertyFindings(array $options = []): array
-    {
-        $unit     = $this->parseFixture('boolean-prefix-properties.php');
-        $registry = RuleRegistry::defaults();
-        $settings = AnalysisConfig::fromRegistry($registry)->ruleSettings(BooleanPrefixRule::ID);
-        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
-            BooleanPrefixRule::ID,
-            new RuleSettings(true, $settings->thresholds, array_merge($settings->options, $options)),
-        );
-        $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
-
-        return array_values(array_filter(
-                                $findings,
-                                static fn($finding): bool => $finding->ruleId === BooleanPrefixRule::ID,
-                            ));
-    }
-
-    /**
-     * Build negative boolean findings for the naming rule.
-     *
-     * @param list<string> $cliMirrorAllowlist - Negated boolean names exempted as CLI mirror flags.
-     *
-     * @return list<\GruffPhp\Results\Finding\Finding> - negative-boolean findings with BooleanPrefixRule disabled so each negated name is counted once;
-     *                                         empty when the allowlist exempts them all
-     */
-    private function negativeBooleanFindings(array $cliMirrorAllowlist = []): array
-    {
-        $unit            = $this->parseFixture('negative-boolean.php');
-        $registry        = RuleRegistry::defaults();
-        $config          = AnalysisConfig::fromRegistry($registry);
-        $settings        = $config->ruleSettings(NegativeBooleanRule::ID);
-        $config          = $config->withRuleSettings(
-            NegativeBooleanRule::ID,
-            new RuleSettings(true, $settings->thresholds, array_merge($settings->options, ['cliMirrorAllowlist' => $cliMirrorAllowlist])),
-        );
-        $booleanSettings = $config->ruleSettings(BooleanPrefixRule::ID);
-        $config          = $config->withRuleSettings(
-            BooleanPrefixRule::ID,
-            new RuleSettings(false, $booleanSettings->thresholds, $booleanSettings->options),
-        );
-        $findings        = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
-
-        // Keeps only NegativeBooleanRule findings; this config disables BooleanPrefixRule so the two
-        // rules cannot both flag the same negated boolean name and inflate the result.
-        return array_values(array_filter(
-                                $findings,
-                                static fn($finding): bool => $finding->ruleId === NegativeBooleanRule::ID,
                             ));
     }
 

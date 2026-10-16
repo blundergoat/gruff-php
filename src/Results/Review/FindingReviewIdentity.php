@@ -4,40 +4,29 @@ declare(strict_types=1);
 
 namespace GruffPhp\Results\Review;
 
-use GruffPhp\Results\Baseline\BaselineEntry;
 use GruffPhp\Results\Finding\Finding;
 
 /**
- * Builds the stable identity key that lets a branch review tell one finding from another across two
- * runs, without being fooled by unrelated line shifts.
+ * Builds the key a branch review matches findings on, so a finding that merely moved lines stays recognised as the same one.
  *
- * When a user compares their branch against a base (`gruff-php analyse --diff-vs origin/main`), gruff
- * needs to know which findings are genuinely new, which went away, and which are the same issue as
- * before. Matching on line number would be brittle - editing code above a finding would make it look
- * new. This class produces a line-insensitive key so a finding that merely moved stays recognised as
- * the same one, keeping the review's "introduced / removed / unchanged" verdict honest.
+ * When a user runs `gruff-php analyse --diff-vs origin/main`, gruff needs to know which findings are new, which went away, and which
+ * are the same issue as before. Matching on line number would make every edit above a finding look like churn, so this key never reads one.
+ * It is a review-time key only; the committed baseline stores the separate line-free identity ratified for the family.
  */
 final readonly class FindingReviewIdentity
 {
     /**
-     * Builds the comparison key a branch review matches findings on, so a finding is judged by what
-     * and where it is - never by the line it happens to sit on this time.
-     *
-     * When the user runs `gruff-php analyse --diff-vs origin/main`, this key decides whether a finding
-     * reads as introduced, removed, or unchanged. Lines never participate, so a finding that merely
-     * moved does not show up as churn: findings with a symbol key on (file, ruleId, symbol, message);
-     * symbol-less ones reuse the baseline group key so review and baselines share one identity.
+     * Builds the comparison key for one finding: (file, ruleId, symbol, message) with a symbol, or (file, ruleId, message) without one.
      *
      * @param Finding $finding - Finding to identify for branch-review comparison.
      *
-     * @return string - NUL-delimited identity key that survives unrelated edits shifting line numbers.
+     * @return string - NUL-delimited key that survives unrelated edits shifting line numbers.
      */
     public function key(Finding $finding): string
     {
-        // No symbol to anchor on: fall back to the shared (file, ruleId, message) baseline key so a
-        // symbol-less finding still lines up with its counterpart across runs.
+        // No symbol to anchor on: file, rule, and message are all a symbol-less finding has, so they are the whole key.
         if ($finding->symbol === null || $finding->symbol === '') {
-            return BaselineEntry::groupKeyForFinding($finding);
+            return self::groupKeyForFinding($finding);
         }
 
         // NUL joins fields so a path or message containing a colon cannot collide with another finding's key.
@@ -47,5 +36,17 @@ final readonly class FindingReviewIdentity
             $finding->symbol,
             $finding->message,
         ]);
+    }
+
+    /**
+     * Builds the symbol-less review key, (file, ruleId, message), shared by every finding of one rule on one path with one message.
+     *
+     * @param Finding $finding - Finding to reduce to its symbol-less key.
+     *
+     * @return string - NUL-delimited (file, ruleId, message) key.
+     */
+    public static function groupKeyForFinding(Finding $finding): string
+    {
+        return implode("\0", [$finding->filePath, $finding->ruleId, $finding->message]);
     }
 }

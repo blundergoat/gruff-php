@@ -10,7 +10,7 @@ use Symfony\Component\Process\Process;
 
 /**
  * Covers the shared ignore engine: configured globs stay authoritative under
- * include-ignored, built-in directory and generated-file sources, and git rules.
+ * include-ignored, VCS and fallback directories, and git rules.
  */
 final class PathIgnoreResolverTest extends TestCase
 {
@@ -40,7 +40,10 @@ final class PathIgnoreResolverTest extends TestCase
         return [
             'configured file glob' => ['legacy/Bad.php', '/project/legacy/Bad.php', ['legacy/**'], 'config', 'legacy/**'],
             'configured directory glob' => ['legacy', '/project/legacy', ['legacy/**'], 'config', 'legacy/**'],
-            'generated lockfile' => ['composer.lock', '/project/composer.lock', [], 'generated', 'composer.lock'],
+            'vcs internals' => ['nested/.git/config', '/project/nested/.git/config', [], 'default', '.git'],
+            'php cache' => ['.gruff-cache/cache.php', '/project/.gruff-cache/cache.php', [], 'default', '.gruff-cache'],
+            'phpunit cache' => ['.phpunit.cache/result.php', '/project/.phpunit.cache/result.php', [], 'default', '.phpunit.cache'],
+            'framework cache' => ['var/cache/result.php', '/project/var/cache/result.php', [], 'default', 'var/cache'],
         ];
     }
 
@@ -84,21 +87,135 @@ final class PathIgnoreResolverTest extends TestCase
     }
 
     /**
-     * Verify a built-in directory is reported as the default source and is bypassed by include-ignored.
+     * Verify a built-in directory is reported as ignored by the default source, naming the matched entry.
      *
      * @return void
      */
-    public function testDefaultDirectorySourceAndIncludeIgnoredBypass(): void
+    public function testDefaultDirectoryIsReportedAsTheDefaultSource(): void
+    {
+        $decision = (new PathIgnoreResolver('/project'))->decide('vendor/acme/V.php', '/project/vendor/acme/V.php', [], false);
+
+        self::assertTrue($decision->ignored);
+        self::assertSame('default', $decision->source);
+        self::assertSame('vendor', $decision->pattern);
+    }
+
+    /**
+     * Verify include-ignored scans a built-in directory that would otherwise be skipped.
+     *
+     * @return void
+     */
+    public function testIncludeIgnoredBypassesADefaultDirectory(): void
+    {
+        $decision = (new PathIgnoreResolver('/project'))->decide('vendor/acme/V.php', '/project/vendor/acme/V.php', [], true);
+
+        self::assertFalse($decision->ignored);
+    }
+
+    /**
+     * Verify VCS internals stay blocked even under include-ignored, which never reaches them.
+     *
+     * @return void
+     */
+    public function testVcsInternalsStayBlockedUnderIncludeIgnored(): void
+    {
+        $decision = (new PathIgnoreResolver('/project'))->decide('.git/config', '/project/.git/config', [], true, true);
+
+        self::assertTrue($decision->ignored);
+        self::assertSame('.git', $decision->pattern);
+    }
+
+    /**
+     * Verify any governing .gitignore disables non-VCS fallback names such as node_modules for its subtree; vendor and dist
+     * never defer (FAMILY-CONTRACT.md section 7, precision-floor M04).
+     *
+     * @return void
+     */
+    public function testFallbackDefersToGitignoreInAncestorChain(): void
+    {
+        $root = $this->tempDir();
+        self::assertTrue(mkdir($root . '/packages/app/node_modules', 0777, true));
+        file_put_contents($root . '/packages/app/.gitignore', "*.log\n");
+
+        $decision = (new PathIgnoreResolver($root))->decide(
+            'packages/app/node_modules/acme.php',
+            $root . '/packages/app/node_modules/acme.php',
+            [],
+            false,
+        );
+
+        self::assertFalse($decision->ignored);
+    }
+
+    /**
+     * Verify section 7's third-party, build-output and minified classes skip at any depth and in any ASCII case even
+     * under a governing .gitignore, naming the outermost directory (FAMILY-CONTRACT.md section 7, precision-floor M04).
+     *
+     * @return void
+     */
+    public function testThirdPartyClassesIgnoreAGoverningGitignore(): void
+    {
+        $root = $this->tempDir();
+        file_put_contents($root . '/.gitignore', "*.log\n");
+        $resolver = new PathIgnoreResolver($root);
+        $decide   = static fn(string $path, bool $isDirectory): array => [
+            $resolver->decide($path, $root . '/' . $path, [], false, false, $isDirectory)->ignored,
+            $resolver->decide($path, $root . '/' . $path, [], false, false, $isDirectory)->pattern,
+        ];
+
+        self::assertSame([true, 'vendors'], $decide('pkg/Vendors', true));
+        self::assertSame([true, 'third_party'], $decide('pkg/THIRD_PARTY/Copied.php', false));
+        self::assertSame([true, 'third-party'], $decide('pkg/third-party/Copied.php', false));
+        self::assertSame([true, 'bower_components'], $decide('web/bower_components', true));
+        self::assertSame([true, 'dist'], $decide('app/Dist/Built.php', false));
+        self::assertSame([true, 'vendor'], $decide('vendor/lib/dist/Copied.php', false));
+        self::assertSame([true, PathIgnoreResolver::MINIFIED_FILE_PATTERN], $decide('config/settings.min.json', false));
+        // A file's own name is not a directory, and a directory with `.min.` in its name is not a minified file.
+        self::assertSame([false, null], $decide('src/dist', false));
+        self::assertSame([false, null], $decide('assets/theme.min.d', true));
+    }
+
+    /**
+     * Verify --include-ignored and an explicitly requested file bring the section 7 classes back.
+     *
+     * @return void
+     */
+    public function testIncludeIgnoredAndExplicitFilesBypassThirdPartyClasses(): void
     {
         $resolver = new PathIgnoreResolver('/project');
 
-        $ignored = $resolver->decide('vendor/acme/V.php', '/project/vendor/acme/V.php', [], false);
-        self::assertTrue($ignored->ignored);
-        self::assertSame('default', $ignored->source);
-        self::assertSame('vendor', $ignored->pattern);
+        self::assertFalse($resolver->decide('vendor/acme/V.php', '/project/vendor/acme/V.php', [], true, false, false)->ignored);
+        self::assertFalse($resolver->decide('vendor/acme/V.php', '/project/vendor/acme/V.php', [], false, true, false)->ignored);
+        self::assertFalse($resolver->decide('public/app.min.php', '/project/public/app.min.php', [], false, true, false)->ignored);
+    }
 
-        $included = $resolver->decide('vendor/acme/V.php', '/project/vendor/acme/V.php', [], true);
-        self::assertFalse($included->ignored);
+    /**
+     * Verify first-party names that only resemble the classes, and the external and lib directories, stay in scope.
+     *
+     * @return void
+     */
+    public function testFirstPartyNamesResemblingThirdPartyClassesStayInScope(): void
+    {
+        $root = $this->tempDir();
+        file_put_contents($root . '/.gitignore', "*.log\n");
+        $resolver = new PathIgnoreResolver($root);
+
+        $paths = [
+            'src/Vendor.php',
+            'src/VendorRepository.php',
+            'src/Distributor.php',
+            'vendoring/Copied.php',
+            'distro/Built.php',
+            'external/Typings.php',
+            'lib/Helpers.php',
+            'src/admin.mini.php',
+            'app.min.js.map',
+        ];
+
+        // Each candidate stays in scope, so the decisions are all false.
+        foreach ($paths as $path) {
+            self::assertFalse($resolver->decide($path, $root . '/' . $path, [], false, false, false)->ignored, $path);
+        }
     }
 
     /**

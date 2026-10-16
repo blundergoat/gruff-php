@@ -16,6 +16,13 @@ namespace GruffPhp\Engine\Analysis;
 final readonly class RunDiagnostic
 {
     /**
+     * The one type every surface publishes when it cannot read the changed-region scope it was asked to analyse,
+     * whatever flag asked for it (FAMILY-CONTRACT.md section 6). Analyse and the hook share it so one failure
+     * cannot carry two names.
+     */
+    public const string CHANGED_REGION_TYPE = 'changed-region';
+
+    /**
      * Captures one non-finding diagnostic - its category, message, and whatever location context exists.
      *
      * @param string      $type - Diagnostic category the report serializers switch on (for example 'parse-error' or 'usage-error').

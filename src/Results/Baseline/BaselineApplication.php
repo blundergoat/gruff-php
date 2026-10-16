@@ -9,25 +9,27 @@ use GruffPhp\Results\Diff\DiffResult;
 use GruffPhp\Results\Finding\Finding;
 
 /**
- * Decides how one analysis run meets the project baseline - the recorded set of findings a user has
- * already reviewed and accepted as known debt. When someone runs `gruff-php analyse`, this step
- * branches three ways: write a fresh baseline (`--generate-baseline`), skip baselining so every
- * finding is reported, or apply an existing `gruff-baseline.json` and suppress the already-accepted
- * findings so only new or changed problems surface. Hiding signed-off findings keeps the run focused
- * on what actually moved; the generate and apply paths return a `BaselineReport` describing what was written or suppressed, while skipping (or a read/write failure) returns null.
+ * Decides how one `gruff-php analyse` run meets the project baseline, the recorded set of findings a user already reviewed.
+ *
+ * The run branches four ways:
+ * - `--generate-baseline` writes a fresh baseline from the current findings;
+ * - `--migrate-baseline` with `--generate-baseline` carries a 0.5 baseline's reviews into a new file, leaving the original untouched;
+ * - `--baseline` (or a discovered `gruff-baseline.json`) hides reviewed findings so only new problems surface;
+ * - no baseline, or `--no-baseline`, reports every finding.
+ *
+ * Generate, migrate, and apply return a `BaselineReport` describing what was written or hidden; skipping, or a read/write failure, returns null.
  */
 final readonly class BaselineApplication
 {
     /**
-     * Reads a baseline and hands back only the findings it does not already cover - the shortcut
-     * callers use when they want the accepted findings dropped but none of the report accounting.
+     * Reads a baseline and hands back only the findings it does not already cover, with none of the report accounting.
      *
      * @param string        $projectRoot - Project root used to resolve the baseline path.
      * @param string        $baselinePath - Baseline path to read, relative to the project root when not absolute.
      * @param list<Finding> $findings - Live findings to test against the baseline before reporting.
-     * @throws BaselineException When the baseline cannot be read or validated, so the caller can surface a config error.
      *
-     * @return list<Finding> - The findings not already accepted; empty when the baseline covered every one of them.
+     * @return list<Finding> - The gated findings; empty when the baseline covered every one of them.
+     * @throws BaselineException When the baseline cannot be read, validated, or was written by another port.
      */
     public function filterExisting(string $projectRoot, string $baselinePath, array $findings): array
     {
@@ -37,17 +39,16 @@ final readonly class BaselineApplication
     }
 
     /**
-     * The entry point every analyse run funnels through: pick the one baseline action the user's flags
-     * asked for - generate, skip, or apply - and reshape the findings list to match before reporting.
+     * Picks the one baseline action the user's flags asked for and reshapes the findings list to match before reporting.
      *
      * @param string                     $projectRoot - Project root used to resolve baseline paths.
-     * @param BaselineApplicationOptions $options - Baseline flags for this run: generate, apply, or skip, plus the path.
-     * @param list<Finding>              $findings - Findings for this run; filtered in place when an existing baseline is applied.
-     * @param DiffResult|null            $diff - An active diff limits the run to changed lines, so accepted debt is not marked resolved; null means no diff scope, though whether absent entries get resolved still depends on `$hasPartialScope`.
-     * @param list<RunDiagnostic>        $diagnostics - Accumulator; a read or write failure appends a baseline-error entry the user sees.
-     * @param bool                       $hasPartialScope - Whether the run scanned only part of the project, so absent baseline entries are not evaluated.
+     * @param BaselineApplicationOptions $options - Baseline flags for this run: generate, migrate, apply, or skip, plus the paths.
+     * @param list<Finding>              $findings - Findings for this run; replaced with the gated set when an existing baseline is applied.
+     * @param DiffResult|null            $diff - An active diff limits the run to changed lines, so reviewed debt is not marked resolved; null means no diff scope.
+     * @param list<RunDiagnostic>        $diagnostics - Accumulator; a read or write failure appends a baseline-error entry, and each collision appends a warning.
+     * @param bool                       $hasPartialScope - Whether the run scanned only part of the project, so absent rows are not evaluated.
      *
-     * @return BaselineReport|null - Report describing the generated or applied baseline; null when no baseline was configured, or when a generate/apply hit a read or write failure (a baseline-error diagnostic is recorded).
+     * @return BaselineReport|null - Report for the generated, migrated, or applied baseline; null when none was configured or the action failed and a diagnostic was recorded.
      */
     public function apply(
         string $projectRoot,
@@ -59,87 +60,91 @@ final readonly class BaselineApplication
     ): ?BaselineReport {
         $baselineStore = new BaselineStore($projectRoot);
 
-        // The user asked to capture the current state (`gruff-php analyse --generate-baseline`), so
-        // write a fresh baseline instead of comparing against one - generation always wins.
+        // The user asked to capture the current state, so write a fresh baseline instead of comparing against one; generation always wins.
         if ($options->generateBaselinePath !== null) {
-            return $this->generate($baselineStore, $options->generateBaselinePath, $findings, $diagnostics);
+            return $this->generate($baselineStore, $options, $findings, $diagnostics);
         }
 
-        // No baseline in play (none configured, or the user passed `--no-baseline`), so every finding
-        // stands and the run carries no baseline section at all.
+        // No baseline in play, so every finding stands and the run carries no baseline section at all.
         if ($options->baselinePath === null) {
             return null;
         }
 
-        // A baseline is configured (e.g. `gruff-php analyse --baseline gruff-baseline.json`), so apply
-        // it and drop the findings the user already accepted from this run's failing set.
         return $this->applyExistingBaseline(
-            store:       $baselineStore,
-            options:     $options,
-            findings:    $findings,
-            diff:        $diff,
-            diagnostics: $diagnostics,
+            store:           $baselineStore,
+            options:         $options,
+            findings:        $findings,
+            diff:            $diff,
+            diagnostics:     $diagnostics,
             hasPartialScope: $hasPartialScope,
         );
     }
 
     /**
-     * Snapshots the current findings to a new baseline file so the user can accept today's results as
-     * the agreed starting point - the `--generate-baseline` path, where nothing is suppressed yet.
+     * Writes a new baseline, from the current findings alone or carried across from a 0.5 file the user is migrating.
      *
-     * @param BaselineStore       $store - Store that writes and locates the baseline file.
-     * @param string              $generateBaselinePath - Destination path to write the new baseline to.
-     * @param list<Finding>       $findings - Findings to record as the new baseline snapshot.
-     * @param list<RunDiagnostic> $diagnostics - Accumulator; a write failure appends a baseline-error entry the user sees.
+     * @param BaselineStore              $store - Store that writes and locates the baseline file.
+     * @param BaselineApplicationOptions $options - Carries the output path and, for a migration, the 0.5 input path.
+     * @param list<Finding>              $findings - Findings to record; on a migration only those the 0.5 rows covered are kept.
+     * @param list<RunDiagnostic>        $diagnostics - Accumulator; a write or migration failure appends a baseline-error entry the user sees.
      *
      * @return BaselineReport|null - Report for the freshly written baseline; null when the write failed and a diagnostic was logged instead.
      */
     private function generate(
         BaselineStore $store,
-        string $generateBaselinePath,
+        BaselineApplicationOptions $options,
         array $findings,
         array &$diagnostics,
     ): ?BaselineReport {
+        $outputPath = $options->generateBaselinePath ?? BaselineStore::DEFAULT_FILENAME;
+
         try {
-            $baseline = $store->write($generateBaselinePath, $findings);
+            // A generate at the shared default path never destroys a 0.5 baseline by accident; --force is the way to mean it.
+            $store->requireOverwritableDefaultPath($outputPath, $options->shouldForceBaselineOverwrite);
+
+            // A migration re-identifies the 0.5 reviews from this scan and writes them beside the original, which stays byte-identical.
+            if ($options->migrateBaselinePath !== null) {
+                $migration       = $store->migrate($options->migrateBaselinePath, $outputPath, $findings);
+                $baseline        = $migration->writtenBaseline;
+                $staleEvaluation = 'migrated';
+            } else {
+                $baseline        = $store->write($outputPath, $findings);
+                $staleEvaluation = 'generated';
+            }
         } catch (BaselineException $exception) {
+            // Writing failed (permissions, a bad path, or a migration target that was the input); the reason is now a diagnostic the user reads.
             $diagnostics[] = new RunDiagnostic(
                 type:    'baseline-error',
                 message: $exception->getMessage(),
-                path:    $generateBaselinePath,
+                path:    $outputPath,
             );
 
-            // Writing the file failed (permissions, a bad path); the reason is now a diagnostic the
-            // user will read, so report no baseline rather than a half-written one.
             return null;
         }
 
-        // Tag the new baseline's source by its path: the conventional `gruff-baseline.json` counts as
-        // the default, anything else as an explicit destination the user typed.
+        // The conventional `gruff-baseline.json` counts as the default source, anything else as an explicit destination the user typed.
         return new BaselineReport(
             path:               $baseline->path,
             generated:          true,
             totalEntries:       count($baseline->entries),
             suppressedFindings: 0,
-            staleEvaluation:    'generated',
-            source:             $generateBaselinePath === BaselineStore::DEFAULT_FILENAME
-                ? BaselineReport::SOURCE_DEFAULT
-                : BaselineReport::SOURCE_EXPLICIT,
+            staleEvaluation:    $staleEvaluation,
+            source:             $outputPath === BaselineStore::DEFAULT_FILENAME ? BaselineReport::SOURCE_DEFAULT : BaselineReport::SOURCE_EXPLICIT,
+            sensitiveCounted:   $baseline->sensitiveTotal(),
         );
     }
 
     /**
-     * Applies an already-recorded baseline: reads it, drops the findings the user previously accepted,
-     * and reports what stayed new, unchanged, or resolved since the baseline was captured.
+     * Applies an already-recorded baseline: reads it, hides the findings the user previously reviewed, and reports what moved.
      *
      * @param BaselineStore              $store - Store that reads the baseline file from disk.
      * @param BaselineApplicationOptions $options - Baseline path plus whether it was explicitly set or defaulted.
-     * @param list<Finding>              $findings - Filtered in place; replaced with the surviving (still-failing) set the user must act on.
-     * @param DiffResult|null            $diff - When active, its diff scope stops resolved debt from being counted; null disables diff scope, though full-project resolution still hinges on `$hasPartialScope`.
-     * @param list<RunDiagnostic>        $diagnostics - Accumulator; a read failure appends a baseline-error entry the user sees.
-     * @param bool                       $hasPartialScope - Whether files outside the scan scope cannot be marked absent/resolved.
+     * @param list<Finding>              $findings - Replaced with the gated set the user must act on.
+     * @param DiffResult|null            $diff - When active, its diff scope stops resolved debt from being counted; null disables diff scope.
+     * @param list<RunDiagnostic>        $diagnostics - Accumulator; a read failure appends a baseline-error entry, and each collision a warning.
+     * @param bool                       $hasPartialScope - Whether files outside the scan scope cannot be marked resolved.
      *
-     * @return BaselineReport|null - Report for the applied baseline; null when the file could not be read and a diagnostic was logged instead.
+     * @return BaselineReport|null - Report for the applied baseline; null when the file could not be read or applied and a diagnostic was logged instead.
      */
     private function applyExistingBaseline(
         BaselineStore $store,
@@ -153,15 +158,28 @@ final readonly class BaselineApplication
             $baseline    = $store->read($options->baselinePath ?? '');
             $application = (new BaselineFilter())->apply($baseline, $findings, $hasPartialScope || ($diff instanceof DiffResult && $diff->active));
         } catch (BaselineException $exception) {
+            // The file could not be read, validated, or applied (missing, malformed, 0.5 layout, written by another port); the reason is now a diagnostic.
             $diagnostics[] = new RunDiagnostic(
                 type:    'baseline-error',
                 message: $exception->getMessage(),
                 path:    $options->baselinePath,
             );
 
-            // The baseline file could not be read or validated (missing, malformed, wrong schema); the
-            // reason is now a diagnostic, so report no baseline rather than silently suppressing nothing.
             return null;
+        }
+
+        // Every collision is reported by name so the user can see which identity could not separate two declarations; none is hidden.
+        foreach ($application['collisions'] as $collision) {
+            $declarationCount = count($collision['subjects']);
+            $collidingSubjects      = implode(', ', $collision['subjects']);
+
+            $diagnostics[] = new RunDiagnostic(
+                type:     'baseline-collision',
+                message:  "collision: identity {$collision['identity']} covers {$declarationCount} declarations of {$collidingSubjects}"
+                    . " for rule {$collision['ruleId']} in {$collision['path']}; none is suppressed",
+                filePath: $collision['path'],
+                isFatal:  false,
+            );
         }
 
         $findings = $application['findings'];
@@ -179,6 +197,8 @@ final readonly class BaselineApplication
             newCount:           $report->newCount,
             unchangedCount:     $report->unchangedCount,
             absentCount:        $report->absentCount,
+            collisionCount:     $report->collisionCount,
+            notEligibleCount:   $report->notEligibleCount,
         );
     }
 }

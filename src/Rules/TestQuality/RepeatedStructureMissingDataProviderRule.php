@@ -14,6 +14,7 @@ use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
+use GruffPhp\Support\DeclarationLine;
 use PhpParser\Node;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Name;
@@ -52,6 +53,12 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
             defaultSeverity: Severity::Advisory,
             confidence:      Confidence::Low,
             defaultOptions:  ['ignoredPathPatterns' => []],
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'Three or more tests that share a call shape while testing genuinely different behaviours, where one parametrised test would hide what each case proves.',
+                    'mitigation' => 'Only the call and control-flow shape is compared, never the intent, so add the path to options.ignoredPathPatterns or keep the separate tests.',
+                ],
+            ],
         );
     }
 
@@ -128,7 +135,7 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
                         implode(', ', $names),
                     ),
                     filePath:    $analysisUnit->file->displayPath,
-                    line:        $first->getStartLine(),
+                    line:        DeclarationLine::of($first),
                     severity:    Severity::Advisory,
                     pillar:      Pillar::TestQuality,
                     tier:        RuleTier::V01,

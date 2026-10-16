@@ -21,11 +21,13 @@ use PhpParser\Node\Stmt\Trait_;
 use PhpParser\NodeFinder;
 
 /**
- * Flags a single-type file whose one class, interface, trait, or enum has a name that does not match the
- * file name, which breaks PSR-4 autoloading and leaves the reader hunting for where the type is declared.
+ * Reports a file whose one class, interface, trait or enum is named differently from the file, which breaks PSR-4 autoloading.
  *
- * Only fires when exactly one named declaration owns the file and the file name is itself a valid class
- * identifier, so scripts, entrypoints, and multi-class files are left alone. Warning, high confidence.
+ * A user who renamed `UserRepository` to `AccountRepository` but kept `UserRepository.php` gets one warning on the declaration.
+ * Scripts, hyphenated entry points and files declaring several types stay quiet.
+ *
+ * The advice always offers the file rename, and offers the class rename only when the file name is already a StudlyCaps
+ * class name, so `widgets.php` never suggests a class called `widgets`.
  */
 final readonly class ClassFileMismatchRule implements RuleInterface
 {
@@ -35,7 +37,7 @@ final readonly class ClassFileMismatchRule implements RuleInterface
     public const ID = 'naming.class-file-mismatch';
 
     /**
-     * Describes the class-file mismatch rule for the registry and reports.
+     * Describes the rule for `list-rules` and for each finding it reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -53,66 +55,68 @@ final readonly class ClassFileMismatchRule implements RuleInterface
     }
 
     /**
-     * Reports a lone class-like whose name disagrees with its file name.
+     * Reports the file's lone type declaration when its name disagrees with the file name.
      *
-     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param AnalysisUnit $analysisUnit - Parsed file the user asked to analyse.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> - Findings for class and file name mismatches.
+     * @return list<Finding> - One finding for a mismatched declaration; empty when the names agree or the file is out of scope.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $definition = $this->definition();
-        $nodeFinder = new NodeFinder();
-        $classLikes = $nodeFinder->find($analysisUnit->statements, static function (Node $node): bool {
-            // Anonymous classes have no name to compare against the file, so they never qualify as the declaration.
+        $definition   = $this->definition();
+        $declarations = (new NodeFinder())->find($analysisUnit->statements, static function (Node $node): bool {
+            // An anonymous class has no name to compare with the file, so it never counts as the file's declaration.
             return ($node instanceof Class_ && !$node->isAnonymous())
                 || $node instanceof Interface_
                 || $node instanceof Trait_
                 || $node instanceof Enum_;
         });
 
-        if (count($classLikes) !== 1) {
-            // The one-file-one-class convention only has meaning when exactly one declaration owns the file.
+        // One file, one type is the convention; a file with no type or several types has no single name to match.
+        if (count($declarations) !== 1) {
             return [];
         }
 
-        /** @var Class_|Interface_|Trait_|Enum_ $classLike Finder predicate restricts results to named class-like declarations. */
-        $classLike = $classLikes[0];
-        $className = $classLike->name?->toString();
+        /** @var Class_|Interface_|Trait_|Enum_ $declaration Finder predicate restricts results to named class-like declarations. */
+        $declaration = $declarations[0];
+        $typeName    = $declaration->name?->toString();
 
-        if ($className === null) {
-            // A null name means the finder matched an unnamed declaration; nothing to compare to the file name.
+        // An unnamed declaration has nothing to compare with the file name.
+        if ($typeName === null) {
             return [];
         }
 
         $filePath = $analysisUnit->file->displayPath;
-        $fileName = pathinfo($filePath, PATHINFO_FILENAME);
+        $fileStem = pathinfo($filePath, PATHINFO_FILENAME);
 
-        // Compare only filenames that are valid PHP class identifiers.
-        if (preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $fileName) !== 1) {
-            // Non-identifier file names (scripts, hyphenated entrypoints) can never equal a class name, so skip them.
+        // A file name that could never be a class name, such as `run-migrations.php`, is a script, not a mismatch.
+        if (preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $fileStem) !== 1) {
             return [];
         }
 
-        if ($fileName === $className) {
-            // Names already agree, the expected case; emitting nothing keeps the rule silent on conforming files.
+        // Matching names are the expected case, so the user sees nothing.
+        if ($fileStem === $typeName) {
             return [];
         }
 
-        // Surface the disagreement so the reviewer can rename either side back into PSR-4 alignment.
+        // A StudlyCaps file name such as `Widget.php` is a usable class name; a lowercase one such as `widgets.php` is not.
+        $remediation = preg_match('/^[A-Z][A-Za-z0-9]*$/', $fileStem) === 1
+            ? sprintf('Rename the file to %s.php or the class to %s.', $typeName, $fileStem)
+            : sprintf('Rename the file to %s.php so it matches the class it declares.', $typeName);
+
         return [
             new Finding(
                 ruleId:      $definition->id,
-                message:     sprintf('Class %s does not match file name %s.php.', $className, $fileName),
+                message:     sprintf('Class %s does not match file name %s.php.', $typeName, $fileStem),
                 filePath:    $filePath,
-                line:        $classLike->getStartLine(),
+                line:        $declaration->getStartLine(),
                 severity:    $definition->defaultSeverity,
                 pillar:      $definition->pillar,
                 tier:        $definition->tier,
                 confidence:  $definition->confidence,
-                symbol:      $className,
-                remediation: sprintf('Rename the file to %s.php or the class to %s.', $className, $fileName),
+                symbol:      $typeName,
+                remediation: $remediation,
             ),
         ];
     }
