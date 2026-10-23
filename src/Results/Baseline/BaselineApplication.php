@@ -6,6 +6,7 @@ namespace GruffPhp\Results\Baseline;
 
 use GruffPhp\Engine\Analysis\RunDiagnostic;
 use GruffPhp\Results\Diff\DiffResult;
+use GruffPhp\Results\Finding\DeclarationInventory;
 use GruffPhp\Results\Finding\Finding;
 
 /**
@@ -27,15 +28,16 @@ final readonly class BaselineApplication
      * @param string        $projectRoot - Project root used to resolve the baseline path.
      * @param string        $baselinePath - Baseline path to read, relative to the project root when not absolute.
      * @param list<Finding> $findings - Live findings to test against the baseline before reporting.
+     * @param DeclarationInventory|null $inventory - Scanned variable occurrences per file, so a variable's ordinal counts every occurrence; null ranks among findings alone.
      *
      * @return list<Finding> - The gated findings; empty when the baseline covered every one of them.
      * @throws BaselineException When the baseline cannot be read, validated, or was written by another port.
      */
-    public function filterExisting(string $projectRoot, string $baselinePath, array $findings): array
+    public function filterExisting(string $projectRoot, string $baselinePath, array $findings, ?DeclarationInventory $inventory = null): array
     {
         $baseline = (new BaselineStore($projectRoot))->read($baselinePath);
 
-        return (new BaselineFilter())->apply($baseline, $findings, false)['findings'];
+        return (new BaselineFilter())->apply($baseline, $findings, false, $inventory)['findings'];
     }
 
     /**
@@ -62,7 +64,7 @@ final readonly class BaselineApplication
 
         // The user asked to capture the current state, so write a fresh baseline instead of comparing against one; generation always wins.
         if ($options->generateBaselinePath !== null) {
-            return $this->generate($baselineStore, $options, $findings, $diagnostics);
+            return $this->generate($baselineStore, $options, $findings, $diagnostics, DeclarationInventory::forFindings($projectRoot, $findings));
         }
 
         // No baseline in play, so every finding stands and the run carries no baseline section at all.
@@ -77,6 +79,7 @@ final readonly class BaselineApplication
             diff:            $diff,
             diagnostics:     $diagnostics,
             hasPartialScope: $hasPartialScope,
+            inventory:       DeclarationInventory::forFindings($projectRoot, $findings),
         );
     }
 
@@ -87,6 +90,7 @@ final readonly class BaselineApplication
      * @param BaselineApplicationOptions $options - Carries the output path and, for a migration, the 0.5 input path.
      * @param list<Finding>              $findings - Findings to record; on a migration only those the 0.5 rows covered are kept.
      * @param list<RunDiagnostic>        $diagnostics - Accumulator; a write or migration failure appends a baseline-error entry the user sees.
+     * @param DeclarationInventory|null  $inventory - Scanned variable occurrences per file, so a variable's ordinal counts every occurrence; null ranks among findings alone.
      *
      * @return BaselineReport|null - Report for the freshly written baseline; null when the write failed and a diagnostic was logged instead.
      */
@@ -95,6 +99,7 @@ final readonly class BaselineApplication
         BaselineApplicationOptions $options,
         array $findings,
         array &$diagnostics,
+        ?DeclarationInventory $inventory,
     ): ?BaselineReport {
         $outputPath = $options->generateBaselinePath ?? BaselineStore::DEFAULT_FILENAME;
 
@@ -104,11 +109,11 @@ final readonly class BaselineApplication
 
             // A migration re-identifies the 0.5 reviews from this scan and writes them beside the original, which stays byte-identical.
             if ($options->migrateBaselinePath !== null) {
-                $migration       = $store->migrate($options->migrateBaselinePath, $outputPath, $findings);
+                $migration       = $store->migrate($options->migrateBaselinePath, $outputPath, $findings, $inventory);
                 $baseline        = $migration->writtenBaseline;
                 $staleEvaluation = 'migrated';
             } else {
-                $baseline        = $store->write($outputPath, $findings);
+                $baseline        = $store->write($outputPath, $findings, $inventory);
                 $staleEvaluation = 'generated';
             }
         } catch (BaselineException $exception) {
@@ -143,6 +148,7 @@ final readonly class BaselineApplication
      * @param DiffResult|null            $diff - When active, its diff scope stops resolved debt from being counted; null disables diff scope.
      * @param list<RunDiagnostic>        $diagnostics - Accumulator; a read failure appends a baseline-error entry, and each collision a warning.
      * @param bool                       $hasPartialScope - Whether files outside the scan scope cannot be marked resolved.
+     * @param DeclarationInventory|null  $inventory - Scanned variable occurrences per file, so a variable's ordinal counts every occurrence; null ranks among findings alone.
      *
      * @return BaselineReport|null - Report for the applied baseline; null when the file could not be read or applied and a diagnostic was logged instead.
      */
@@ -153,10 +159,11 @@ final readonly class BaselineApplication
         ?DiffResult $diff,
         array &$diagnostics,
         bool $hasPartialScope,
+        ?DeclarationInventory $inventory,
     ): ?BaselineReport {
         try {
             $baseline    = $store->read($options->baselinePath ?? '');
-            $application = (new BaselineFilter())->apply($baseline, $findings, $hasPartialScope || ($diff instanceof DiffResult && $diff->active));
+            $application = (new BaselineFilter())->apply($baseline, $findings, $hasPartialScope || ($diff instanceof DiffResult && $diff->active), $inventory);
         } catch (BaselineException $exception) {
             // The file could not be read, validated, or applied (missing, malformed, 0.5 layout, written by another port); the reason is now a diagnostic.
             $diagnostics[] = new RunDiagnostic(

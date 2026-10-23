@@ -7,6 +7,7 @@ namespace GruffPhp\Output\Reporter;
 use GruffPhp\Engine\Analysis\AnalysisReport;
 use GruffPhp\Engine\Analysis\RunDiagnostic;
 use GruffPhp\Results\Finding\BaselineIdentity;
+use GruffPhp\Results\Finding\DeclarationInventory;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Pillar;
 use GruffPhp\Results\Finding\Severity;
@@ -26,6 +27,15 @@ use JsonException;
  */
 final readonly class SarifReporter
 {
+    /**
+     * Keeps the root the findings' paths resolve against, so a variable's fingerprint is ranked against the scanned source as the baseline ranks it.
+     *
+     * @param string|null $projectRoot - Project root of the run; null ranks a variable among this document's findings alone.
+     */
+    public function __construct(private ?string $projectRoot = null)
+    {
+    }
+
     /**
      * Turns the whole finished run into the single SARIF string `analyse --format sarif` prints, so a
      * code-scanning upload receives every rule and finding - with line locations and fingerprints - in
@@ -48,7 +58,14 @@ final readonly class SarifReporter
 
         // Backfill a minimal rule entry for any finding whose rule isn't built-in - the `??=` leaves the
         // richer definitions from the first loop untouched, so no result points at a rule we never list.
-        foreach ([...$report->findings, ...array_column($report->suppressedFindings(), 'finding')] as $finding) {
+        $rendered = [...$report->findings, ...array_column($report->suppressedFindings(), 'finding')];
+        // Rank once over every finding this document carries, as the baseline ranks its run; ranking one finding
+        // at a time would give every occurrence of a variable symbol ordinal 1 and merge their code-scanning alerts.
+        $ordinals = BaselineIdentity::assignOrdinals(
+            $rendered,
+            $this->projectRoot === null ? null : DeclarationInventory::forFindings($this->projectRoot, $rendered),
+        );
+        foreach ($rendered as $finding) {
             $rules[$finding->ruleId] ??= [
                 'id' => $finding->ruleId,
                 'name' => $finding->ruleId,
@@ -86,12 +103,12 @@ final readonly class SarifReporter
                 ],
             ],
             'results' => [
-                ...array_map(fn(Finding $finding): array => $this->result($finding, (int)$ruleIndexes[$finding->ruleId]), $report->findings),
+                ...array_map(fn(Finding $finding): array => $this->result($finding, (int)$ruleIndexes[$finding->ruleId], $ordinals), $report->findings),
                 // A finding another tool's comment or a repeated claim removed stays a result marked suppressed, so a
                 // code-scanning tool shows it as suppressed rather than fixed (FAMILY-CONTRACT.md section 13c).
                 ...array_map(
                     fn(array $item): array => [
-                        ...$this->result($item['finding'], (int)$ruleIndexes[$item['finding']->ruleId]),
+                        ...$this->result($item['finding'], (int)$ruleIndexes[$item['finding']->ruleId], $ordinals),
                         'suppressions' => [['kind' => 'inSource', 'justification' => $item['justification']]],
                     ],
                     $report->suppressedFindings(),
@@ -229,12 +246,13 @@ final readonly class SarifReporter
      * @param Finding $finding   - Finding to serialize into a single SARIF result entry.
      * @param int     $ruleIndex - Zero-based offset of this finding's rule in the driver `rules` array, so the
      *                           result can reference its rule by index rather than repeating the descriptor.
+     * @param array<int, int> $ordinals - Declaration ordinals `BaselineIdentity::assignOrdinals()` ranked over the whole document.
      *
-     * @return array<string, mixed> - one SARIF `result` entry with `region` keys only when the finding has line/column data, plus two
-     *                       `partialFingerprints`: the precise `gruffFingerprint` and the line-insensitive `gruffStableIdentity`, so a
-     *                       Code Scanning alert stays open across line drift instead of closing and reopening on the user
+     * @return array<string, mixed> - one SARIF `result` entry with `region` keys only when the finding has line/column data, plus a
+     *                       `partialFingerprints.gruffFingerprint` holding the line-free baseline identity, so a Code Scanning
+     *                       alert stays open across line drift instead of closing and reopening; a sensitive finding carries none
      */
-    private function result(Finding $finding, int $ruleIndex): array
+    private function result(Finding $finding, int $ruleIndex, array $ordinals): array
     {
         // SARIF wants forward-slash, repo-relative paths, so flip Windows separators and strip any
         // leading `./` - otherwise Code Scanning would annotate the wrong path, or none at all.
@@ -305,7 +323,7 @@ final readonly class SarifReporter
                                           'physicalLocation' => $physicalLocation,
                                       ]],
             'properties' => $properties,
-        ] + $this->partialFingerprints($finding);
+        ] + $this->partialFingerprints($finding, $ordinals);
     }
 
     /**
@@ -317,19 +335,18 @@ final readonly class SarifReporter
      * not control.
      *
      * @param Finding $finding - Finding being rendered as a SARIF result.
+     * @param array<int, int> $ordinals - Declaration ordinals ranked over the whole document, keyed by `spl_object_id`.
      *
      * @return array{partialFingerprints?: array{gruffFingerprint: string}} - The key to merge into the result, or an
      *                                                                       empty array for a sensitive finding.
      */
-    private function partialFingerprints(Finding $finding): array
+    private function partialFingerprints(Finding $finding, array $ordinals): array
     {
         // A secret is never given a durable name, in this port or in the external system reading its report.
         // A symbol carrying the ordinal separator has no identity either, so it publishes no fingerprint.
         if (!BaselineIdentity::hasIdentity($finding)) {
             return [];
         }
-
-        $ordinals = BaselineIdentity::assignOrdinals([$finding]);
 
         return ['partialFingerprints' => ['gruffFingerprint' => BaselineIdentity::identityOf($finding, $ordinals[spl_object_id($finding)] ?? 1)]];
     }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GruffPhp\Results\Baseline;
 
 use GruffPhp\Results\Finding\BaselineIdentity;
+use GruffPhp\Results\Finding\DeclarationInventory;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Rules\RuleRegistry;
 use GruffPhp\Support\PathHelper;
@@ -273,13 +274,14 @@ final readonly class BaselineStore
      *
      * @param string        $path - Baseline path to write, relative to the project root when needed.
      * @param list<Finding> $findings - Findings to record; ordinary ones become identity rows with counts, sensitive ones become counts only.
+     * @param DeclarationInventory|null $inventory - Scanned variable occurrences per file, so a variable's ordinal counts every occurrence; null ranks among findings alone.
      *
      * @return BaselineData - The baseline exactly as persisted, so callers can report what was written without re-reading the file.
      * @throws BaselineException When a finding cannot be identified or the file cannot be encoded or written.
      */
-    public function write(string $path, array $findings): BaselineData
+    public function write(string $path, array $findings, ?DeclarationInventory $inventory = null): BaselineData
     {
-        $document        = $this->documentFromFindings($findings);
+        $document        = $this->documentFromFindings($findings, $inventory);
         $writtenBaseline = new BaselineData($path, BaselineIdentity::TOOL_LANGUAGE, $document['entries'], $document['sensitiveByRule']);
 
         $this->persist($path, $writtenBaseline);
@@ -296,11 +298,12 @@ final readonly class BaselineStore
      * @param string        $legacyPath - 0.5 baseline to read; never written to, renamed, or deleted.
      * @param string        $outputPath - Where the v3 file goes; refused when it is the input by spelling, link, or inode.
      * @param list<Finding> $findings - The current scan; a finding is carried across when a 0.5 row matches its file, rule, and message.
+     * @param DeclarationInventory|null $inventory - Scanned variable occurrences per file, so a variable's ordinal counts every occurrence; null ranks among findings alone.
      *
      * @return BaselineMigration - The written baseline plus how many findings were carried and how many were sensitive.
      * @throws BaselineException When the paths are not distinct, the input is not a 0.5 file, or the input changed during the migration.
      */
-    public function migrate(string $legacyPath, string $outputPath, array $findings): BaselineMigration
+    public function migrate(string $legacyPath, string $outputPath, array $findings, ?DeclarationInventory $inventory = null): BaselineMigration
     {
         $legacyAbsolute = $this->absolutePath($legacyPath);
         $outputAbsolute = $this->absolutePath($outputPath);
@@ -327,7 +330,7 @@ final readonly class BaselineStore
             }
         }
 
-        $writtenBaseline = $this->write($outputPath, $accepted);
+        $writtenBaseline = $this->write($outputPath, $accepted, $inventory);
 
         // Prove the retreat path survived rather than assume it.
         if (file_get_contents($legacyAbsolute) !== $before) {
@@ -480,13 +483,14 @@ final readonly class BaselineStore
      * Turns the current findings into identity rows plus sensitive counts.
      *
      * @param list<Finding> $findings - The scan being recorded.
+     * @param DeclarationInventory|null $inventory - Scanned variable occurrences per file, so a variable's ordinal counts every occurrence; null ranks among findings alone.
      *
      * @return array{entries: list<BaselineEntry>, sensitiveByRule: array<string, int>} - Rows ascending by identity, and sensitive counts by rule.
      * @throws BaselineException When an ordinary finding cannot be identified.
      */
-    private function documentFromFindings(array $findings): array
+    private function documentFromFindings(array $findings, ?DeclarationInventory $inventory): array
     {
-        $ordinals        = BaselineIdentity::assignOrdinals($findings);
+        $ordinals        = BaselineIdentity::assignOrdinals($findings, $inventory);
         $rowsByIdentity  = [];
         $sensitiveByRule = [];
 

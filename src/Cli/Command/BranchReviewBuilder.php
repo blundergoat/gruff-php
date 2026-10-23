@@ -12,6 +12,7 @@ use GruffPhp\Results\Baseline\BaselineException;
 use GruffPhp\Engine\Config\AnalysisConfig;
 use GruffPhp\Results\Diff\DiffException;
 use GruffPhp\Results\Diff\DiffResult;
+use GruffPhp\Results\Finding\DeclarationInventory;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Results\Review\BranchReviewComparator;
@@ -136,7 +137,12 @@ final readonly class BranchReviewBuilder
             // An existing baseline hides accepted debt from the base side too, keeping the user's comparison symmetric.
             if ($options->baseline->baselinePath !== null && $options->baseline->generateBaselinePath === null) {
                 try {
-                    $baseFindings = (new BaselineApplication())->filterExisting($projectRoot, $options->baseline->baselinePath, $baseFindings);
+                    $baseFindings = (new BaselineApplication())->filterExisting(
+                        $projectRoot,
+                        $options->baseline->baselinePath,
+                        $baseFindings,
+                        DeclarationInventory::forFindings($baseRoot, $baseFindings),
+                    );
                 } catch (BaselineException $exception) {
                     // A malformed or outdated baseline should not sink review mode; report it and continue with unfiltered base findings.
                     $diagnostics[] = new RunDiagnostic(

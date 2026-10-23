@@ -153,12 +153,15 @@ final readonly class BaselineIdentity
      * PHP refuses to declare a class, method, function, property, or constant twice in one file, so every finding on such a symbol is ordinal 1:
      * two findings on `Widget::process()` at different lines are one declaration, and inserting code above it moves nothing.
      * Only a variable symbol such as `$value` can be declared in several places, so those are ranked by the line of each occurrence.
+     * The inventory gives every scanned occurrence of a variable its slot, so a clean earlier `@var $value` keeps its place and
+     * a review stays on the occurrence it was given to.
      *
-     * @param list<Finding> $findings - One run's findings.
+     * @param list<Finding>             $findings - One run's findings.
+     * @param DeclarationInventory|null $inventory - Scanned variable occurrences per file; null ranks variables among their findings alone.
      *
      * @return array<int, int> - `spl_object_id` of each finding to its 1-based ordinal; a symbol-less finding maps to 0.
      */
-    public static function assignOrdinals(array $findings): array
+    public static function assignOrdinals(array $findings, ?DeclarationInventory $inventory = null): array
     {
         $positionsBySymbol = [];
         $positionByFinding = [];
@@ -176,6 +179,13 @@ final readonly class BaselineIdentity
 
             $positionByFinding[spl_object_id($finding)] = $position;
             $positionsBySymbol[$key][$position]         = true;
+
+            // Every scanned occurrence of a variable takes a slot, whether or not it warned this run.
+            if ($inventory instanceof DeclarationInventory && self::isVariableSymbol($symbol)) {
+                foreach ($inventory->positionsFor($finding->filePath, $symbol) as $declared) {
+                    $positionsBySymbol[$key][$declared] = true;
+                }
+            }
         }
 
         $ordinals = [];

@@ -29,6 +29,7 @@ use GruffPhp\Output\Hook\HookFindingIdentity;
 use GruffPhp\Output\Hook\HookFindingPresenter;
 use GruffPhp\Output\Hook\HookRunAudit;
 use GruffPhp\Results\Finding\BaselineIdentity;
+use GruffPhp\Results\Finding\DeclarationInventory;
 use GruffPhp\Results\Mutation\MutationAnalysisOptions;
 use GruffPhp\Results\Review\GitArchiveSnapshot;
 use GruffPhp\Rules\Contracts\RuleContext;
@@ -182,7 +183,8 @@ final class HookCommand extends Command
             );
             $hasNewOnlySource = $baseStableIdentities !== null;
             $filterResult     = (new HookFindingFilter())->apply($findings, $diff, $baseStableIdentities ?? [], $hasNewOnlySource);
-            $baselineResult   = $this->applyBaseline($input, $projectRoot, $filterResult->findings);
+            $inventory        = DeclarationInventory::forFindings($projectRoot, $filterResult->findings);
+            $baselineResult   = $this->applyBaseline($input, $projectRoot, $filterResult->findings, $inventory);
 
             $payload = $this->report(
                 findings:         $baselineResult['findings'],
@@ -199,6 +201,7 @@ final class HookCommand extends Command
                                   ),
                 exclusions:       $analysis['suppressions'],
                 baselineStatuses: $baselineResult['statuses'],
+                inventory:        $inventory,
             );
             $this->writeJson($output, $payload);
 
@@ -361,11 +364,12 @@ final class HookCommand extends Command
      * @param InputInterface $input       - Flags carrying `--baseline`.
      * @param string         $projectRoot - Project root the baseline path resolves against.
      * @param list<Finding>  $findings    - Findings the changed-region filter left; the returned set is what the baseline gates.
+     * @param DeclarationInventory $inventory - Scanned variable occurrences, so the hook ranks a variable's ordinal as `analyse` does.
      *
      * @return array{findings: list<Finding>, statuses: array<int, string>, path: string|null} - Gated findings, the status per finding, and the applied baseline path.
      * @throws BaselineException When the named file is missing, malformed, in another schema, or written by another port.
      */
-    private function applyBaseline(InputInterface $input, string $projectRoot, array $findings): array
+    private function applyBaseline(InputInterface $input, string $projectRoot, array $findings, DeclarationInventory $inventory): array
     {
         $baselinePath = $this->stringOption($input, 'baseline');
 
@@ -375,7 +379,7 @@ final class HookCommand extends Command
         }
 
         $baseline = (new BaselineStore($projectRoot))->read($baselinePath);
-        $applied  = (new BaselineFilter())->apply($baseline, $findings, false);
+        $applied  = (new BaselineFilter())->apply($baseline, $findings, false, $inventory);
 
         return ['findings' => $applied['findings'], 'statuses' => $applied['statuses'], 'path' => $baselinePath];
     }
@@ -867,6 +871,7 @@ final class HookCommand extends Command
      * @param HookRunAudit                    $runAudit         - What this run did: mode, scope, operands, file count and baseline.
      * @param list<SensitiveExclusionSummary> $exclusions       - One section 13a audit row per configured exclusion, zero matches included.
      * @param array<int, string>              $baselineStatuses - Baseline status per finding, keyed by spl_object_id($finding); empty when none applied.
+     * @param DeclarationInventory            $inventory        - Scanned variable occurrences, so each reported ordinal matches the baseline's.
      *
      * @return array<string, mixed> - The full JSON-ready hook report.
      */
@@ -878,9 +883,10 @@ final class HookCommand extends Command
         HookRunAudit $runAudit,
         array $exclusions,
         array $baselineStatuses,
+        DeclarationInventory $inventory,
     ): array {
         $presenter = new HookFindingPresenter();
-        $ordinals  = BaselineIdentity::assignOrdinals($findings);
+        $ordinals  = BaselineIdentity::assignOrdinals($findings, $inventory);
         $presented = [];
         foreach ($findings as $finding) {
             $ordinal     = $ordinals[spl_object_id($finding)] ?? 0;

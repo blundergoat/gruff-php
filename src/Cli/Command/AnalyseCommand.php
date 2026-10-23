@@ -998,7 +998,7 @@ final class AnalyseCommand extends Command
             OutputFormat::Markdown => new MarkdownReporter(),
             OutputFormat::Github => new GithubAnnotationsReporter(),
             OutputFormat::Hotspot => new HotspotReporter(),
-            OutputFormat::Sarif => new SarifReporter(),
+            OutputFormat::Sarif => new SarifReporter($projectRoot),
             OutputFormat::Text => new TextReporter(),
         };
         // OUTPUT_RAW skips Symfony's OutputFormatter tag scan, which would otherwise

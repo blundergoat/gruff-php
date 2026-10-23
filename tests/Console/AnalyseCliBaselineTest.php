@@ -684,6 +684,72 @@ final class AnalyseCliBaselineTest extends CliTestCase
     }
 
     /**
+     * Verify a review stays on its `@var` assertion when an earlier assertion of the same variable starts warning.
+     *
+     * @throws JsonException
+     *
+     * @return void
+     */
+    public function testEarlierVarAssertionThatStartsWarningDoesNotInheritTheReview(): void
+    {
+        $project = $this->tempDir();
+        self::assertTrue(mkdir($project . '/src', 0777, true));
+        file_put_contents($project . '/README.md', "Baseline ordinal fixture.\n");
+        $source = <<<'PHP'
+            <?php
+
+            declare(strict_types=1);
+
+            /**
+             * Two @var assertions of one variable.
+             */
+            final class Pair
+            {
+                /**
+                 * Reads two values.
+                 *
+                 * @param array<string, int> $input - raw input
+                 *
+                 * @return int - the sum
+                 */
+                public function read(array $input): int
+                {
+                    /** @var int $value the caller validated this key */
+                    $value = $input['a'];
+                    $total = $value;
+                    /** @var int $value */
+                    $value = $input['b'];
+
+                    return $total + $value;
+                }
+            }
+
+            PHP;
+        file_put_contents($project . '/src/Pair.php', $source);
+
+        try {
+            // Only the second assertion lacks a description, so it is the one the user reviews.
+            $this->runInProject($project, ['analyse', 'src', '--format', 'json', '--fail-on', 'none', '--no-config', '--generate-baseline']);
+
+            // Dropping the first assertion's description makes it warn for the first time.
+            file_put_contents($project . '/src/Pair.php', str_replace(' the caller validated this key', '', $source));
+
+            $report   = $this->decodeJsonOutput($this->runInProject($project, ['analyse', 'src', '--format', 'json', '--fail-on', 'none', '--no-config']));
+            $buckets  = $this->decodedJsonObjectAt($report, 'baseline', 'extensions', 'php', 'baseline', 'buckets');
+            $findings = $report['findings'] ?? null;
+            self::assertIsArray($findings);
+            self::assertCount(1, $findings);
+            $finding = $this->decodedJsonObject($findings[0] ?? null);
+            self::assertSame('docs.var-annotation-description', $finding['ruleId'] ?? null);
+            self::assertSame(19, $finding['line'] ?? null);
+            self::assertSame(1, $buckets['new'] ?? null);
+            self::assertSame(0, $buckets['absent'] ?? null);
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+
+    /**
      * Verify --fail-on-new trips on instances beyond a group's accepted count and passes within it.
      *
      * @throws JsonException

@@ -231,6 +231,79 @@ final class SarifReporterTest extends TestCase
     }
 
     /**
+     * Verify two occurrences of one variable symbol in a file get the two ordinals the baseline gives them.
+     *
+     * The reporter ranked each finding on its own, so both `$value` findings took ordinal 1 and shared one
+     * code-scanning alert while the baseline kept them apart as `$value#1` and `$value#2`.
+     *
+     * @return void
+     * @throws JsonException
+     */
+    public function testSarifRanksVariableSymbolsAcrossTheReport(): void
+    {
+        $first   = $this->variableFinding(line: 10);
+        $second  = $this->variableFinding(line: 20);
+        $payload = $this->decode((new SarifReporter())->render($this->report([$first, $second])));
+        $results = $this->listValue($this->sarifRun($payload), 'results');
+        $ranked  = BaselineIdentity::assignOrdinals([$first, $second]);
+
+        $firstPrint  = $this->stringValue($this->stringKeyedArray($this->stringKeyedArray($results[0] ?? null), 'partialFingerprints'), 'gruffFingerprint');
+        $secondPrint = $this->stringValue($this->stringKeyedArray($this->stringKeyedArray($results[1] ?? null), 'partialFingerprints'), 'gruffFingerprint');
+
+        self::assertSame(BaselineIdentity::identityOf($first, $ranked[spl_object_id($first)]), $firstPrint);
+        self::assertSame(BaselineIdentity::identityOf($second, $ranked[spl_object_id($second)]), $secondPrint);
+        self::assertNotSame($firstPrint, $secondPrint);
+    }
+
+    /**
+     * Verify a lone warning on a later `@var` takes the ordinal its place in the source gives it, the one the baseline stores.
+     *
+     * @return void
+     * @throws JsonException
+     */
+    public function testSarifRanksAVariableAgainstTheScannedSource(): void
+    {
+        $root = sys_get_temp_dir() . '/gruff-sarif-' . bin2hex(random_bytes(4));
+        self::assertTrue(mkdir($root . '/src', 0777, true));
+        file_put_contents($root . '/src/app.php', "<?php\n/** @var int \$value the caller checked it */\n\$value = 1;\n/** @var int \$value */\n\$value = 2;\n");
+
+        try {
+            $later   = $this->variableFinding(line: 4);
+            $payload = $this->decode((new SarifReporter($root))->render($this->report([$later])));
+            $results = $this->listValue($this->sarifRun($payload), 'results');
+            $print   = $this->stringValue($this->stringKeyedArray($this->stringKeyedArray($results[0] ?? null), 'partialFingerprints'), 'gruffFingerprint');
+
+            self::assertSame(BaselineIdentity::identityOf($later, 2), $print);
+        } finally {
+            unlink($root . '/src/app.php');
+            rmdir($root . '/src');
+            rmdir($root);
+        }
+    }
+
+    /**
+     * Build a variable-symbol finding, the one kind PHP lets a file carry at several declarations.
+     *
+     * @param int $line - Line of the occurrence; it decides the variable's ordinal.
+     *
+     * @return Finding - A documentation finding on `$value`.
+     */
+    private function variableFinding(int $line): Finding
+    {
+        return new Finding(
+            ruleId:     'docs.var-annotation-description',
+            message:    'Finding message.',
+            filePath:   'src/app.php',
+            line:       $line,
+            severity:   Severity::Advisory,
+            pillar:     Pillar::Documentation,
+            tier:       RuleTier::V01,
+            confidence: Confidence::High,
+            symbol:     '$value',
+        );
+    }
+
+    /**
      * Verify a sensitive finding carries no fingerprints at all, so no secret gets a durable name in code scanning.
      *
      * @return void

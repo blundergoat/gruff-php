@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GruffPhp\Results\Baseline;
 
 use GruffPhp\Results\Finding\BaselineIdentity;
+use GruffPhp\Results\Finding\DeclarationInventory;
 use GruffPhp\Results\Finding\Finding;
 
 /**
@@ -31,12 +32,13 @@ final readonly class BaselineFilter
      * @param BaselineData  $baseline - The debt the user previously reviewed, one row per identity.
      * @param list<Finding> $findings - This run's live findings; empty means nothing to match, so every reviewed row resolves on a full scan.
      * @param bool          $hasDiffScope - True when the scan covered only changed files, which turns off resolved-debt detection because unscanned files would look falsely resolved.
+     * @param DeclarationInventory|null $inventory - Scanned variable occurrences per file, so a variable's ordinal counts every occurrence; null ranks among findings alone.
      *
      * @return array{findings: list<Finding>, new: list<Finding>, unchanged: list<Finding>, statuses: array<int, string>, collisions: list<Collision>, report: BaselineReport} - "findings" is the gated set
      *                         the user must still act on (new, collision, and not-eligible findings in scan order), "unchanged" the hidden ones, and "report" the movement summary.
      * @throws BaselineException When the baseline was written by another port, or a finding cannot be identified.
      */
-    public function apply(BaselineData $baseline, array $findings, bool $hasDiffScope): array
+    public function apply(BaselineData $baseline, array $findings, bool $hasDiffScope, ?DeclarationInventory $inventory = null): array
     {
         // A baseline written by another port is refused before matching: applying it would report every row resolved and invite a destructive regenerate.
         if ($baseline->toolLanguage !== BaselineIdentity::TOOL_LANGUAGE) {
@@ -47,7 +49,7 @@ final readonly class BaselineFilter
         }
 
         $reviewedByIdentity = $baseline->byIdentity();
-        $classification     = $this->classify($findings, $reviewedByIdentity);
+        $classification     = $this->classify($findings, $reviewedByIdentity, $inventory);
         $partition          = $this->partition($findings, $classification['statuses']);
         // Only a full-project scan can prove reviewed debt was fixed; a diff-scoped run never opened the unchanged files, so it records the check as skipped.
         $resolved = $hasDiffScope ? ['entries' => [], 'occurrences' => 0] : $this->resolvedSurplus($reviewedByIdentity, $classification);
@@ -80,17 +82,18 @@ final readonly class BaselineFilter
      *
      * @param list<Finding>                $findings - This run's live findings.
      * @param array<string, BaselineEntry> $reviewedByIdentity - The baseline's rows indexed by identity.
+     * @param DeclarationInventory|null $inventory - Scanned variable occurrences per file, so a variable's ordinal counts every occurrence; null ranks among findings alone.
      *
      * @return Classification - Status per `spl_object_id`, the identity groups, every collision, and the collided identities.
      * @throws BaselineException When a finding cannot be identified.
      */
-    private function classify(array $findings, array $reviewedByIdentity): array
+    private function classify(array $findings, array $reviewedByIdentity, ?DeclarationInventory $inventory): array
     {
         $groups   = [];
         $statuses = [];
 
         // Sensitive findings are labelled before any lookup, so no reviewed row can reach a secret; everything else is bucketed by identity.
-        foreach ($this->groupEligibleFindings($findings) as $identity => $group) {
+        foreach ($this->groupEligibleFindings($findings, $inventory) as $identity => $group) {
             $groups[$identity] = $group;
         }
 
@@ -132,13 +135,14 @@ final readonly class BaselineFilter
      * Buckets every eligible finding by its identity, remembering the declarations and subjects each identity covers.
      *
      * @param list<Finding> $findings - This run's live findings.
+     * @param DeclarationInventory|null $inventory - Scanned variable occurrences per file, so a variable's ordinal counts every occurrence; null ranks among findings alone.
      *
      * @return array<string, IdentityGroup> - Identity to its occurrences; a sensitive finding appears in no group.
      * @throws BaselineException When a finding cannot be identified.
      */
-    private function groupEligibleFindings(array $findings): array
+    private function groupEligibleFindings(array $findings, ?DeclarationInventory $inventory): array
     {
-        $ordinals = BaselineIdentity::assignOrdinals($findings);
+        $ordinals = BaselineIdentity::assignOrdinals($findings, $inventory);
         $groups   = [];
 
         foreach ($findings as $finding) {

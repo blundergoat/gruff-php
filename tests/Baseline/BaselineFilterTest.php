@@ -10,6 +10,7 @@ use GruffPhp\Results\Baseline\BaselineException;
 use GruffPhp\Results\Baseline\BaselineFilter;
 use GruffPhp\Results\Finding\BaselineIdentity;
 use GruffPhp\Results\Finding\Confidence;
+use GruffPhp\Results\Finding\DeclarationInventory;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Pillar;
 use GruffPhp\Results\Finding\RuleTier;
@@ -200,6 +201,23 @@ final class BaselineFilterTest extends TestCase
     }
 
     /**
+     * Verify a clean earlier occurrence of a variable keeps its ordinal slot, so the review stays on the occurrence it was given to.
+     *
+     * @return void
+     */
+    public function testAnEarlierCleanVariableOccurrenceKeepsItsOrdinalSlot(): void
+    {
+        $inventory = new DeclarationInventory(['src/App.php' => ['$value' => [10, 90]]]);
+        $reviewed  = $this->finding(ruleId: 'docs.var-annotation-description', symbol: '$value', line: 90);
+        $earlier   = $this->finding(ruleId: 'docs.var-annotation-description', symbol: '$value', line: 10);
+
+        $application = (new BaselineFilter())->apply($this->baseline([$reviewed], $inventory), [$earlier, $reviewed], false, $inventory);
+
+        self::assertSame([$reviewed], $application['unchanged']);
+        self::assertSame([$earlier], $application['new']);
+    }
+
+    /**
      * Verify a message rewording expires only a file-level finding, which has nothing but its message to name it.
      *
      * @return void
@@ -305,12 +323,13 @@ final class BaselineFilterTest extends TestCase
      * Build the baseline a generate run would write for the reviewed findings.
      *
      * @param list<Finding> $reviewed - Findings the user reviewed.
+     * @param DeclarationInventory|null $inventory - Scanned variable occurrences the generate run ranked with; null ranks among findings alone.
      *
      * @return BaselineData - One row per identity with its count.
      */
-    private function baseline(array $reviewed): BaselineData
+    private function baseline(array $reviewed, ?DeclarationInventory $inventory = null): BaselineData
     {
-        $ordinals = BaselineIdentity::assignOrdinals($reviewed);
+        $ordinals = BaselineIdentity::assignOrdinals($reviewed, $inventory);
         $rows     = [];
 
         foreach ($reviewed as $finding) {
