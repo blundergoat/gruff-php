@@ -69,6 +69,8 @@ final readonly class FileLengthRule implements RuleInterface
             return [];
         }
 
+        $band = LimitBand::of($lineCount, $settings->lowestHighValueThreshold());
+
         return [
             new Finding(
                 ruleId:  $definition->id,
@@ -80,17 +82,18 @@ final readonly class FileLengthRule implements RuleInterface
                 ),
                 filePath:         $analysisUnit->file->displayPath,
                 line:             1,
-                severity:         $thresholdMatch->severity,
+                severity:         LimitBand::severity($band, $thresholdMatch->severity),
                 pillar:           $definition->pillar,
                 tier:             $definition->tier,
                 confidence:       $definition->confidence,
                 endLine:          $analysisUnit->lineCount(),
-                remediation:      'Split oversized files or move responsibilities into smaller units.',
+                remediation:      LimitBand::advice($band, LimitBand::LOWER_FILE, LimitBand::SPLIT_FILE),
                 secondaryPillars: $definition->secondaryPillars,
                 metadata:         [
                     'lines' => $lineCount,
                     'threshold' => $thresholdMatch->threshold,
                     'thresholdType' => $thresholdMatch->severity->value,
+                    LimitBand::KEY => $band,
                 ],
             ),
         ];

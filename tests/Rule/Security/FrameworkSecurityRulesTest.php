@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\Security;
 
-use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Config\ConfigLoader;
 use GruffPhp\Results\Finding\Confidence;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Pillar;
@@ -28,6 +28,9 @@ final class FrameworkSecurityRulesTest extends TestCase
 
     /** Fixture with unsafe CORS and debug-mode toggles. */
     private const MISCONFIG_FIXTURE = 'tests/Fixtures/Security/framework-misconfig.php';
+
+    /** Fixture with guarded display toggles and their look-alikes. */
+    private const DEBUG_GUARDS_FIXTURE = 'tests/Fixtures/Security/debug-mode-guards.php';
 
     /** Fixture with only safe CORS postures. */
     private const CORS_SAFE_FIXTURE = 'tests/Fixtures/Security/framework-cors-safe.php';
@@ -74,6 +77,23 @@ final class FrameworkSecurityRulesTest extends TestCase
     }
 
     /**
+     * Verify a CLI-only branch (lines 25, 39) or a deployment's opt-in constant (107, 120) quiets the toggle.
+     *
+     * Every other toggle in the fixture is a look-alike that must still report, such as a web branch or a constant the file sets itself.
+     *
+     * @return void
+     */
+    public function testGuardedErrorDisplayStaysQuiet(): void
+    {
+        $findings = $this->findingsForRule(self::DEBUG_GUARDS_FIXTURE, DebugModeEnabledRule::ID);
+
+        self::assertSame(
+            [51, 65, 79, 93, 133, 147, 159, 171, 184, 199, 211],
+            array_map(static fn(Finding $finding): ?int => $finding->line, $findings),
+        );
+    }
+
+    /**
      * Analyse a fixture and return findings for one rule.
      *
      * @param string $displayPath - Fixture display path.
@@ -89,7 +109,9 @@ final class FrameworkSecurityRulesTest extends TestCase
                                                      SourceFile::TYPE_PHP,
                                                  ));
         $registry = RuleRegistry::defaults();
-        $findings = $registry->analyse([$unit], new RuleContext(self::PROJECT_ROOT, AnalysisConfig::fromRegistry($registry)));
+        // debug-mode-enabled is opt-in, so the test config turns it on.
+        $config   = (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/enable-default-off-rules.yaml', $registry);
+        $findings = $registry->analyse([$unit], new RuleContext(self::PROJECT_ROOT, $config));
 
         return array_values(array_filter($findings, static fn(Finding $finding): bool => $finding->ruleId === $ruleId));
     }

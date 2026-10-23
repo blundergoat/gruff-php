@@ -499,12 +499,12 @@ PATCH,
      * @param string $filePath - Finding file path.
      * @param int    $line - Finding line number.
      *
-     * @return Finding - an advisory missing-public-phpdoc finding fixed at the given path and line for filter assertions
+     * @return Finding - an advisory missing-phpdoc finding fixed at the given path and line for filter assertions
      */
     private function finding(string $filePath, int $line): Finding
     {
         return new Finding(
-            ruleId:     'docs.missing-public-phpdoc',
+            ruleId:     'docs.missing-phpdoc',
             message:    'Example finding.',
             filePath:   $filePath,
             line:       $line,

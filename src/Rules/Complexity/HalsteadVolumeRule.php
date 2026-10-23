@@ -55,6 +55,16 @@ final readonly class HalsteadVolumeRule implements RuleInterface
             defaultSeverity:   Severity::Advisory,
             confidence:        Confidence::Medium,
             severityThreshold: new SeverityThreshold(8000, Severity::Advisory),
+            // Off unless a project sets `enabled: true`: precision-floor M14 judged 10 of 18 findings worth acting on, under
+            // the 0.60 floor, and its not-worth findings are straight-line arithmetic, registration tables and option wiring,
+            // whose volume no bounded repair removes.
+            isEnabledByDefault: false,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A declarative builder whose bulk is one long literal array, configuration table, or dispatch map, with almost no branching.',
+                    'mitigation' => 'Every literal occurrence counts toward program length, so extract the table to a constant or configuration, or raise this rule\'s threshold and severity.',
+                ],
+            ],
         );
     }
 

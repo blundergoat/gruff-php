@@ -259,6 +259,7 @@ final class TestQualityNodeHelper
             'expectdeprecation',
             'expectdeprecationmessage',
             'expectdeprecationmessagematches',
+            'expectuserdeprecationmessage',
             'expectnottoperformassertions',
         ],           true)) {
             // PHPUnit expect*() methods declare an expectation, which the rules treat as an assertion.
@@ -324,67 +325,6 @@ final class TestQualityNodeHelper
     }
 
     /**
-     * Reports whether the assertion is trivially true (e.g. assertTrue(true), assertSame($x, $x)).
-     *
-     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Assertion call to inspect.
-     *
-     * @return bool - true when the assertion's literal arguments make it tautological
-     */
-    public static function isTrivialAssertion(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
-    {
-        $name = self::callName($call);
-        if ($name === null) {
-            // A dynamic call target cannot be matched to a known tautological assertion shape.
-            return false;
-        }
-
-        // Only these specific assertions can be statically proven tautological; every other call is non-trivial.
-        return match ($name) {
-            'asserttrue' => self::literalValue(self::firstArgValue($call)) === true,
-            'assertfalse' => self::literalValue(self::firstArgValue($call)) === false,
-            'tobetrue' => $call instanceof Expr\MethodCall
-                          && self::literalValue(self::pestExpectationValue($call)) === true,
-            'tobefalse' => $call instanceof Expr\MethodCall
-                           && self::literalValue(self::pestExpectationValue($call)) === false,
-            'assertequals', 'assertsame' => self::hasSameLiteralArguments($call),
-            'tobe', 'toequal' => $call instanceof Expr\MethodCall && self::hasSamePestLiteralArguments($call),
-            default => false,
-        };
-    }
-
-    /**
-     * Reports whether the call's first two arguments are the same literal value.
-     *
-     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - assertSame/assertEquals call to compare.
-     *
-     * @return bool - true when both arguments resolve to the same scalar literal (non-literals never match)
-     */
-    private static function hasSameLiteralArguments(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
-    {
-        $expected = self::literalValue(self::firstArgValue($call));
-
-        // literalValue() returns null for non-literals; the null guard excludes those so two
-        // non-literals (both null) cannot count as matching arguments.
-        return $expected !== null && $expected === self::literalValue(self::argValue($call, 1));
-    }
-
-    /**
-     * Reports whether a Pest expectation's literal argument matches the expected value.
-     *
-     * @param Expr\MethodCall $call - toBe/toEqual matcher; its argument is compared with the expect()'d value.
-     *
-     * @return bool - true when expect($x)->toBe($x) has equal literal arguments (non-literals never match)
-     */
-    private static function hasSamePestLiteralArguments(Expr\MethodCall $call): bool
-    {
-        $expected = self::literalValue(self::firstArgValue($call));
-
-        // literalValue() returns null for non-literals; the null guard excludes those so a
-        // non-literal matcher and a non-literal expectation (both null) cannot count as matching.
-        return $expected !== null && $expected === self::literalValue(self::pestExpectationValue($call));
-    }
-
-    /**
      * Returns the lowercase short name of the call (method, function, or static), or null when the name is dynamic.
      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Call node whose name should be normalized.
@@ -426,20 +366,19 @@ final class TestQualityNodeHelper
     }
 
     /**
-     * Reports whether the call creates a mock, stub, or spy via a recognised factory name.
+     * Reports whether the call creates a mock or spy via a recognised factory name.
      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Call node to classify.
      *
-     * @return bool - true when the call name is one of createMock / createStub / getMockBuilder / mock / partialMock / spy / prophesize
+     * @return bool - true for a recognised mock or spy factory; createStub needs no interaction expectation
      */
     public static function isMockCreationCall(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
     {
         $name = self::callName($call);
 
-        // True only for the recognised mock/stub/spy factory names; a dynamic call (null name) never matches.
+        // Stubs supply values without interaction expectations, so only mock and spy factories count here.
         return $name !== null && in_array($name, [
                 'createmock',
-                'createstub',
                 'getmockbuilder',
                 'mock',
                 'partialmock',
@@ -457,6 +396,10 @@ final class TestQualityNodeHelper
      */
     public static function isMockVerificationCall(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
     {
+        // A stored callable has not registered the teardown expectation yet.
+        if ($call->isFirstClassCallable()) {
+            return false;
+        }
         $name = self::callName($call);
 
         // True only for the recognised expectation-wiring idioms; a dynamic call (null name) never matches.
@@ -464,6 +407,11 @@ final class TestQualityNodeHelper
                 'expects',
                 'shouldreceive',
                 'shouldhavebeencalled',
+                'shouldbecalled',
+                'shouldbecalledonce',
+                'shouldbecalledtimes',
+                'shouldnotbecalled',
+                'shouldnothavebeencalled',
                 'once',
                 'never',
                 'with',
@@ -486,7 +434,7 @@ final class TestQualityNodeHelper
     /**
      * Returns the value of the call's argument at the given index, or null when missing or spread.
      *
-     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Call node to inspect.
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call  - Call node to inspect.
      * @param int                                           $index - Zero-based argument index.
      *
      * @return Expr|null - the argument's expression at that index, or null when it is missing or a spread placeholder
@@ -573,7 +521,7 @@ final class TestQualityNodeHelper
     /**
      * Reports whether the method carries an attribute matching the given short name (case-insensitive).
      *
-     * @param Stmt\ClassMethod $node - Method node whose attributes should be inspected.
+     * @param Stmt\ClassMethod $node      - Method node whose attributes should be inspected.
      * @param string           $shortName - Attribute short name to match case-insensitively.
      *
      * @return bool - True when at least one #[...] attribute group has an attribute whose last name segment matches.
@@ -623,31 +571,6 @@ final class TestQualityNodeHelper
         $name = preg_replace('/^test[_]?/i', '', $name) ?? $name;
 
         return strtolower((string)preg_replace('/[^a-z0-9]+/i', '', $name));
-    }
-
-    /**
-     * Returns a non-trivial integer literal used as the assertion's expected value, or null when none.
-     *
-     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Assertion call to inspect.
-     *
-     * @return int|null - the magic expected value, or null when the expected value is absent, non-integer, or one of -1 / 0 / 1
-     */
-    public static function isAssertionMagicNumber(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): ?int
-    {
-        $name = self::callName($call);
-        if ($name === null || !self::isAssertionCall($call)) {
-            // Only an actual assertion can carry a magic expected value; a dynamic name disqualifies it too.
-            return null;
-        }
-
-        $candidate = $call instanceof Expr\MethodCall && in_array($name, ['tobe', 'toequal', 'tohavecount'], true)
-            ? self::firstArgValue($call)
-            : self::argValue($call, 0);
-
-        $literalValue = self::literalValue($candidate);
-
-        // -1/0/1 are too common to be "magic"; report any other integer literal, else null for non-int expecteds.
-        return is_int($literalValue) && !in_array($literalValue, [-1, 0, 1], true) ? $literalValue : null;
     }
 
 }

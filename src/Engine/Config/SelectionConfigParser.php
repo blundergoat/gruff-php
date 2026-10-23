@@ -140,7 +140,7 @@ final readonly class SelectionConfigParser
      * @param string       $key - Which selection sub-list to read, 'rules' (include) or 'excludeRules'.
      * @param RuleRegistry $registry - Source of truth for valid rule ids; unknown ids are rejected.
      *
-     * @return list<string> - configured rule ids for this include/exclude side, each recognised by the registry; empty when the key is absent.
+     * @return list<string> - this side's rule ids, each known to the registry, a retired id replaced by its current one; empty when the key is absent
      */
     private function ruleIds(array $selection, string $key, RuleRegistry $registry): array
     {
@@ -159,7 +159,8 @@ final readonly class SelectionConfigParser
             }
         }
 
-        return $ruleIds;
+        // A 0.5 config may still list a retired id; the selection stores its replacement so it filters today's findings.
+        return array_map(RuleRegistry::canonicalRuleId(...), $ruleIds);
     }
 
     /**

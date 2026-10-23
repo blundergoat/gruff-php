@@ -144,7 +144,8 @@ final class DashboardCliTest extends CliTestCase
             '30',
             '--fail-on',
             'none',
-            '--no-config',
+            '--config',
+            'tests/Fixtures/Config/enable-default-off-rules.yaml',
         ], self::PROJECT_ROOT);
         $process->setTimeout(null);
         $process->start();

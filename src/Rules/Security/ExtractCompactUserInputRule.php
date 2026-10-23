@@ -45,6 +45,12 @@ final class ExtractCompactUserInputRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A compact() call naming fixed local variables, one of which was assigned from request data earlier in the same scope.',
+                    'mitigation' => 'compact() and extract() share one taint check although compact() exports names the code chose; keep the explicit name list and accept the finding.',
+                ],
+            ],
         );
     }
 

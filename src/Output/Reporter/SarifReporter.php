@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace GruffPhp\Output\Reporter;
 
 use GruffPhp\Engine\Analysis\AnalysisReport;
+use GruffPhp\Engine\Analysis\RunDiagnostic;
+use GruffPhp\Results\Finding\BaselineIdentity;
+use GruffPhp\Results\Finding\DeclarationInventory;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Pillar;
 use GruffPhp\Results\Finding\Severity;
@@ -24,6 +27,15 @@ use JsonException;
  */
 final readonly class SarifReporter
 {
+    /**
+     * Keeps the root the findings' paths resolve against, so a variable's fingerprint is ranked against the scanned source as the baseline ranks it.
+     *
+     * @param string|null $projectRoot - Project root of the run; null ranks a variable among this document's findings alone.
+     */
+    public function __construct(private ?string $projectRoot = null)
+    {
+    }
+
     /**
      * Turns the whole finished run into the single SARIF string `analyse --format sarif` prints, so a
      * code-scanning upload receives every rule and finding - with line locations and fingerprints - in
@@ -46,18 +58,25 @@ final readonly class SarifReporter
 
         // Backfill a minimal rule entry for any finding whose rule isn't built-in - the `??=` leaves the
         // richer definitions from the first loop untouched, so no result points at a rule we never list.
-        foreach ($report->findings as $finding) {
+        $rendered = [...$report->findings, ...array_column($report->suppressedFindings(), 'finding')];
+        // Rank once over every finding this document carries, as the baseline ranks its run; ranking one finding
+        // at a time would give every occurrence of a variable symbol ordinal 1 and merge their code-scanning alerts.
+        $ordinals = BaselineIdentity::assignOrdinals(
+            $rendered,
+            $this->projectRoot === null ? null : DeclarationInventory::forFindings($this->projectRoot, $rendered),
+        );
+        foreach ($rendered as $finding) {
             $rules[$finding->ruleId] ??= [
-                'id'               => $finding->ruleId,
-                'name'             => $finding->ruleId,
+                'id' => $finding->ruleId,
+                'name' => $finding->ruleId,
                 'shortDescription' => [
                     'text' => $finding->ruleId,
                 ],
-                'properties'       => [
-                    'pillar'     => $finding->pillar->value,
-                    'severity'   => $finding->severity->value,
+                'properties' => [
+                    'pillar' => $finding->pillar->value,
+                    'severity' => $finding->severity->value,
                     'confidence' => $finding->confidence->value,
-                    'tier'       => $finding->tier->value,
+                    'tier' => $finding->tier->value,
                 ],
             ];
         }
@@ -70,25 +89,51 @@ final readonly class SarifReporter
         ];
         // Publish the composite score and grade only when the run produced them; a null score means
         // scoring was skipped, so we omit the fields rather than show a misleading zero.
-        if ($report->score !== null) {
+        if ($report->score?->composite !== null) {
             $properties['score'] = $report->score->composite->score;
             $properties['grade'] = $report->score->composite->letter;
+        }
+
+        $sarifRun = [
+            'tool' => [
+                'driver' => [
+                    'name' => AnalysisReport::TOOL_NAME,
+                    'semanticVersion' => $report->toolVersion,
+                    'rules' => array_values($rules),
+                ],
+            ],
+            'results' => [
+                ...array_map(fn(Finding $finding): array => $this->result($finding, (int)$ruleIndexes[$finding->ruleId], $ordinals), $report->findings),
+                // A finding another tool's comment or a repeated claim removed stays a result marked suppressed, so a
+                // code-scanning tool shows it as suppressed rather than fixed (FAMILY-CONTRACT.md section 13c).
+                ...array_map(
+                    fn(array $item): array => [
+                        ...$this->result($item['finding'], (int)$ruleIndexes[$item['finding']->ruleId], $ordinals),
+                        'suppressions' => [['kind' => 'inSource', 'justification' => $item['justification']]],
+                    ],
+                    $report->suppressedFindings(),
+                ),
+            ],
+            'properties' => $properties,
+        ];
+        if ($report->diagnostics !== []) {
+            $sarifRun['invocations'] = [[
+                'executionSuccessful' => !array_reduce(
+                    $report->diagnostics,
+                    static fn (bool $isFatalSoFar, RunDiagnostic $diagnostic): bool => $isFatalSoFar || $diagnostic->isFatal,
+                    false,
+                ),
+                'toolExecutionNotifications' => array_map(
+                    fn (RunDiagnostic $diagnostic): array => $this->notification($diagnostic),
+                    $report->diagnostics,
+                ),
+            ]];
         }
 
         $payload = [
             '$schema' => 'https://json.schemastore.org/sarif-2.1.0.json',
             'version' => '2.1.0',
-            'runs'    => [[
-                              'tool'       => [
-                                  'driver' => [
-                                      'name'            => AnalysisReport::TOOL_NAME,
-                                      'semanticVersion' => $report->toolVersion,
-                                      'rules'           => array_values($rules),
-                                  ],
-                              ],
-                              'results'    => array_map(fn(Finding $finding): array => $this->result($finding, (int)$ruleIndexes[$finding->ruleId]), $report->findings),
-                              'properties' => $properties,
-                          ]],
+            'runs' => [$sarifRun],
         ];
 
         try {
@@ -99,6 +144,32 @@ final readonly class SarifReporter
             // Encoding failure still emits parseable JSON so a SARIF consumer reports an error instead of choking.
             return sprintf('{"error":"Unable to encode SARIF: %s"}%s', addslashes($exception->getMessage()), PHP_EOL);
         }
+    }
+
+    /**
+     * Serialises one run diagnostic as a SARIF tool-execution notification.
+     *
+     * @param RunDiagnostic $diagnostic - Run-level note to serialise; a fatal one raises the notification level.
+     *
+     * @return array<string, mixed> - SARIF notification with an optional physical location.
+     */
+    private function notification(RunDiagnostic $diagnostic): array
+    {
+        $notification = [
+            'descriptor' => ['id' => $diagnostic->type],
+            'level' => $diagnostic->isFatal ? 'error' : 'note',
+            'message' => ['text' => $diagnostic->message],
+        ];
+        $filePath = $diagnostic->filePath ?? $diagnostic->path;
+        if ($filePath !== null) {
+            $physicalLocation = ['artifactLocation' => ['uri' => str_replace('\\', '/', $filePath)]];
+            if ($diagnostic->line !== null) {
+                $physicalLocation['region'] = ['startLine' => $diagnostic->line];
+            }
+            $notification['locations'] = [['physicalLocation' => $physicalLocation]];
+        }
+
+        return $notification;
     }
 
     /**
@@ -121,11 +192,11 @@ final readonly class SarifReporter
     private function rule(RuleDefinition $definition): array
     {
         $properties = [
-            'pillar'          => $definition->pillar->value,
-            'tier'            => $definition->tier->value,
+            'pillar' => $definition->pillar->value,
+            'tier' => $definition->tier->value,
             'defaultSeverity' => $definition->defaultSeverity->value,
-            'confidence'      => $definition->confidence->value,
-            'defaultEnabled'  => $definition->isEnabledByDefault,
+            'confidence' => $definition->confidence->value,
+            'defaultEnabled' => $definition->isEnabledByDefault,
         ];
         // Some rules also feed secondary pillars; list them when present so a consumer sees every
         // quality area the rule touches. The common empty case maps to a single pillar and omits the key.
@@ -153,18 +224,18 @@ final readonly class SarifReporter
 
         // Help and full description reuse the one-line rule description; gruff has no separate long-form help text.
         return [
-            'id'               => $definition->id,
-            'name'             => $definition->name,
+            'id' => $definition->id,
+            'name' => $definition->name,
             'shortDescription' => [
                 'text' => $definition->name,
             ],
-            'fullDescription'  => [
+            'fullDescription' => [
                 'text' => $definition->description(),
             ],
-            'help'             => [
+            'help' => [
                 'text' => $definition->description(),
             ],
-            'properties'       => $properties,
+            'properties' => $properties,
         ];
     }
 
@@ -172,15 +243,16 @@ final readonly class SarifReporter
      * Turns one finding into a single SARIF result - the object that becomes an annotation on a pull
      * request line. Called once per finding while `render()` assembles the run's results list.
      *
-     * @param Finding $finding - Finding to serialize into a single SARIF result entry.
+     * @param Finding $finding   - Finding to serialize into a single SARIF result entry.
      * @param int     $ruleIndex - Zero-based offset of this finding's rule in the driver `rules` array, so the
      *                           result can reference its rule by index rather than repeating the descriptor.
+     * @param array<int, int> $ordinals - Declaration ordinals `BaselineIdentity::assignOrdinals()` ranked over the whole document.
      *
-     * @return array<string, mixed> - one SARIF `result` entry with `region` keys only when the finding has line/column data, plus two
-     *                       `partialFingerprints`: the precise `gruffFingerprint` and the line-insensitive `gruffStableIdentity`, so a
-     *                       Code Scanning alert stays open across line drift instead of closing and reopening on the user
+     * @return array<string, mixed> - one SARIF `result` entry with `region` keys only when the finding has line/column data, plus a
+     *                       `partialFingerprints.gruffFingerprint` holding the line-free baseline identity, so a Code Scanning
+     *                       alert stays open across line drift instead of closing and reopening; a sensitive finding carries none
      */
-    private function result(Finding $finding, int $ruleIndex): array
+    private function result(Finding $finding, int $ruleIndex, array $ordinals): array
     {
         // SARIF wants forward-slash, repo-relative paths, so flip Windows separators and strip any
         // leading `./` - otherwise Code Scanning would annotate the wrong path, or none at all.
@@ -211,9 +283,9 @@ final readonly class SarifReporter
         }
 
         $properties = [
-            'severity'   => $finding->severity->value,
-            'pillar'     => $finding->pillar->value,
-            'tier'       => $finding->tier->value,
+            'severity' => $finding->severity->value,
+            'pillar' => $finding->pillar->value,
+            'tier' => $finding->tier->value,
             'confidence' => $finding->confidence->value,
         ];
         // Carry any extra pillars this finding touches, so a Code Scanning reader sees every quality
@@ -240,23 +312,43 @@ final readonly class SarifReporter
             $properties['metadata'] = $finding->metadata;
         }
 
-        // Two fingerprints: the precise one moves with the line, the stable one survives line drift.
         return [
-            'ruleId'              => $finding->ruleId,
-            'ruleIndex'           => $ruleIndex,
-            'level'               => $this->level($finding->severity),
-            'message'             => [
+            'ruleId' => $finding->ruleId,
+            'ruleIndex' => $ruleIndex,
+            'level' => $this->level($finding->severity),
+            'message' => [
                 'text' => $finding->message,
             ],
-            'locations'           => [[
+            'locations' => [[
                                           'physicalLocation' => $physicalLocation,
                                       ]],
-            'partialFingerprints' => [
-                'gruffFingerprint'    => $finding->fingerprint(),
-                'gruffStableIdentity' => $finding->stableIdentity(),
-            ],
-            'properties'          => $properties,
-        ];
+            'properties' => $properties,
+        ] + $this->partialFingerprints($finding, $ordinals);
+    }
+
+    /**
+     * Projects one finding into the fingerprints GitHub code scanning groups its alerts by.
+     *
+     * `gruffFingerprint` is the ratified durable identity and nothing else, so an alert survives a line move while a
+     * second declaration of one name opens its own alert. A sensitive finding has no identity at all and therefore
+     * carries no `partialFingerprints` key: publishing one would give a secret a stable name in a system gruff does
+     * not control.
+     *
+     * @param Finding $finding - Finding being rendered as a SARIF result.
+     * @param array<int, int> $ordinals - Declaration ordinals ranked over the whole document, keyed by `spl_object_id`.
+     *
+     * @return array{partialFingerprints?: array{gruffFingerprint: string}} - The key to merge into the result, or an
+     *                                                                       empty array for a sensitive finding.
+     */
+    private function partialFingerprints(Finding $finding, array $ordinals): array
+    {
+        // A secret is never given a durable name, in this port or in the external system reading its report.
+        // A symbol carrying the ordinal separator has no identity either, so it publishes no fingerprint.
+        if (!BaselineIdentity::hasIdentity($finding)) {
+            return [];
+        }
+
+        return ['partialFingerprints' => ['gruffFingerprint' => BaselineIdentity::identityOf($finding, $ordinals[spl_object_id($finding)] ?? 1)]];
     }
 
     /**

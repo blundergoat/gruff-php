@@ -142,6 +142,25 @@ final class MaintainabilityIndexRuleTest extends TestCase
     }
 
     /**
+     * Verify a file in the family's test-path class reports no maintainability finding.
+     *
+     * @return void
+     */
+    public function testTestPathFilesReportNothing(): void
+    {
+        $config = AnalysisConfig::fromRegistry(\GruffPhp\Rules\RuleRegistry::defaults())->withRuleSettings(
+            MaintainabilityIndexRule::ID,
+            new RuleSettings(true, ['warning' => 200, 'error' => 35]),
+        );
+        $context = new RuleContext(__DIR__ . '/../../..', $config);
+
+        self::assertNotSame([], $this->rule->analyse($this->parseFixture(), $context));
+        foreach (['tests/Unit/CognitiveTest.php', 'src/Fixtures/cognitive.php', 'app/CognitiveTest.php'] as $displayPath) {
+            self::assertSame([], $this->rule->analyse($this->parseFixture($displayPath), $context), $displayPath);
+        }
+    }
+
+    /**
      * Return a named method from the cognitive fixture.
      *
      * @param AnalysisUnit $analysisUnit - Parsed fixture.
@@ -166,12 +185,14 @@ final class MaintainabilityIndexRuleTest extends TestCase
     /**
      * Parse the cognitive fixture into an analysis unit.
      *
-     * @return AnalysisUnit - parsed cognitive fixture carrying its repo-relative display path, ready for rule analysis
+     * @param string $displayPath - Path the unit reports; a source path by default, since test paths report nothing.
+     *
+     * @return AnalysisUnit - parsed cognitive fixture carrying the given display path, ready for rule analysis
      */
-    private function parseFixture(): AnalysisUnit
+    private function parseFixture(string $displayPath = 'src/Complexity/cognitive.php'): AnalysisUnit
     {
         $path = __DIR__ . '/../../Fixtures/Complexity/cognitive.php';
 
-        return $this->parser->parse(new SourceFile($path, 'tests/Fixtures/Complexity/cognitive.php'));
+        return $this->parser->parse(new SourceFile($path, $displayPath));
     }
 }

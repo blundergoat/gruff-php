@@ -1,5 +1,5 @@
 gruff-php 0.5.2 analyse
-Composite: A (96.10 / 100)
+Composite: B (85.68 / 100)
 Findings: 4 total · 0 error · 2 warning · 2 advisory
 Format: text
 Fail threshold: error
@@ -13,32 +13,24 @@ Files
 
 Score
   Scope: full-project
-  Score drivers: Per-pillar scores start at 100 and subtract weighted finding penalties; correlated size and complexity findings on one symbol share a single penalty; the composite is the average of applicable pillar scores. Mutation is omitted when no Infection report is supplied.
+  Score drivers: Each pillar scores on the density of its weighted findings per evaluated file, on a curve from 50 to 100, so a larger project is not penalised for its size; correlated size and complexity findings on one symbol share a single weight; the composite is the average of applicable pillar scores. Mutation is omitted when no Infection report is supplied.
   Pillars:
-    size: B (84.00) findings=1
+    size: F (51.22) findings=1
     complexity: A (100.00) findings=0
     maintainability: A (100.00) findings=0
     dead-code: A (100.00) findings=0
-    naming: B (81.00) findings=2
-    documentation: A (96.00) findings=1
+    naming: F (51.03) findings=2
+    documentation: F (54.55) findings=1
     modernisation: A (100.00) findings=0
     security: A (100.00) findings=0
     sensitive-data: A (100.00) findings=0
     test-quality: A (100.00) findings=0
 
 Findings
-  [warning] size.file-length
-    tests/Fixtures/Source/mixed/alpha.php:1
-    File has 11 substantive lines, above the warning threshold of 3.
-  [warning] naming.class-file-mismatch
-    tests/Fixtures/Source/mixed/alpha.php:12
-    Class Alpha does not match file name alpha.php.
-  [advisory] docs.return-comment
-    tests/Fixtures/Source/mixed/alpha.php:19
-    Alpha::value() has a bare @return tag; describe what the returned value represents, not just its type.
-  [advisory] naming.identifier-quality
-    tests/Fixtures/Source/mixed/alpha.php:19
-    Method name "value" is generic and does not communicate clear intent.
+- [warning] tests/Fixtures/Source/mixed/alpha.php:1 size.file-length - File has 11 substantive lines, above the warning threshold of 3.
+- [warning] tests/Fixtures/Source/mixed/alpha.php:12 naming.class-file-mismatch - Class Alpha does not match file name alpha.php.
+- [advisory] tests/Fixtures/Source/mixed/alpha.php:19 docs.return-comment - Alpha::value() has a bare @return tag; describe what the returned value represents, not just its type.
+- [advisory] tests/Fixtures/Source/mixed/alpha.php:19 naming.identifier-quality - Method name "value" is generic and does not communicate clear intent.
 
 Summary
   Exit code: 0
