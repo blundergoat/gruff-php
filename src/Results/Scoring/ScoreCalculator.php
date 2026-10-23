@@ -468,7 +468,7 @@ final readonly class ScoreCalculator
      * Weighs every finding for scoring, then clusters correlated complexity/size findings so one root
      * cause is billed once (P5 / ADR-024).
      *
-     * Findings that share a `(file, symbol, line)` and whose rule is in
+     * Findings that share a `(file, symbol)` and whose rule is in
      * {@see self::CORRELATED_COMPLEXITY_RULES} describe one over-large method
      * from different angles. Each such cluster of two or more contributes a
      * single shared weight - the largest member penalty divided by the member
@@ -491,16 +491,13 @@ final readonly class ScoreCalculator
             $penalties[spl_object_id($finding)] = $this->penaltyFor($finding);
         }
 
-        /** @var array<string, list<Finding>> $clusters Correlated findings grouped by file|symbol|line key. */
+        /** @var array<string, list<Finding>> $clusters Correlated findings grouped by the ratified file|symbol key. */
         $clusters = [];
         // Now group the correlated size/complexity findings that sit on the same method.
         foreach ($findings as $finding) {
-            // Only correlated-rule findings that name a symbol and a line can cluster; skip everything else.
-            if (
-                !in_array($finding->ruleId, self::CORRELATED_COMPLEXITY_RULES, true)
-                || $finding->symbol === null
-                || $finding->line === null
-            ) {
+            // Only correlated-rule findings that name a symbol can cluster; a finding without a line still names its
+            // method, so it shares the penalty the cluster report already counts it in.
+            if (!in_array($finding->ruleId, self::CORRELATED_COMPLEXITY_RULES, true) || $finding->symbol === null) {
                 continue;
             }
 

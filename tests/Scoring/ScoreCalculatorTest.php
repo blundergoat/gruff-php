@@ -159,9 +159,9 @@ final class ScoreCalculatorTest extends TestCase
      * Verify a cluster contributes max(member penalty) / member count, not the sum.
      *
      * An Error (base 12), a Warning (base 4), and an Advisory (base 1) on one
-     * method share max(12, 4, 1) / 3 = 4.0 each. Three findings × 4.0 × the 4.0
-     * pillar multiplier = 48.0, proving the largest symptom sets the bill and the
-     * weaker overlapping symptoms do not stack on top of it.
+     * method share max(12, 4, 1) / 3 = 4.0 each. Three findings × 4.0 = a 12.0
+     * pillar penalty, proving the largest symptom sets the bill and the weaker
+     * overlapping symptoms do not stack on top of it.
      *
      * @return void
      */
@@ -176,6 +176,27 @@ final class ScoreCalculatorTest extends TestCase
         $complexity = $this->pillarMap($score->pillars)['complexity'];
         self::assertEqualsWithDelta(12.0, $complexity->penalty, 0.0001);
         self::assertSame(3, $complexity->findings);
+    }
+
+    /**
+     * Verify correlated findings without a line still share one penalty, and the published cluster carries that weight.
+     *
+     * Two warnings (base 4 each) on one method with no line share max(4, 4) / 2 = 2.0 each, so the pillar is
+     * charged 4.0 and the one cluster row reports 4.0. Charging them in full billed 8.0 while the cluster row
+     * claimed they were one root cause.
+     *
+     * @return void
+     */
+    public function testCorrelatedFindingsWithoutALineShareOnePenalty(): void
+    {
+        $score = (new ScoreCalculator())->calculate([
+            $this->finding('complexity.cyclomatic', Pillar::Complexity, Severity::Warning, filePath: 'src/Big.php', line: null, symbol: 'Big::run()'),
+            $this->finding('complexity.cognitive', Pillar::Complexity, Severity::Warning, filePath: 'src/Big.php', line: null, symbol: 'Big::run()'),
+        ], 10, null, DiffResult::inactive());
+
+        self::assertEqualsWithDelta(4.0, $this->pillarMap($score->pillars)['complexity']->penalty, 0.0001);
+        self::assertCount(1, $score->clusters);
+        self::assertSame(4.0, $score->clusters[0]['weight'] ?? null);
     }
 
     /**
@@ -386,7 +407,7 @@ final class ScoreCalculatorTest extends TestCase
      * @param Pillar                                                                                 $pillar - Pillar assigned to the finding fixture.
      * @param Severity                                                                               $severity - Severity assigned to the finding fixture.
      * @param string                                                                                 $filePath - Finding file path.
-     * @param int                                                                                    $line - Finding line number.
+     * @param int|null                                                                               $line - Finding line number; null builds a finding the calculator receives without a location.
      * @param int|null                                                                               $endLine - End line of the finding span; null
      *                                                                                                         means the finding spans a single line.
      * @param string|null                                                                            $symbol - Optional reported symbol for grouping and display assertions.
@@ -399,7 +420,7 @@ final class ScoreCalculatorTest extends TestCase
         Pillar   $pillar,
         Severity $severity,
         string   $filePath = 'src/Example.php',
-        int      $line = 1,
+        ?int     $line = 1,
         ?int     $endLine = null,
         ?string  $symbol = null,
         array    $metadata = [],
