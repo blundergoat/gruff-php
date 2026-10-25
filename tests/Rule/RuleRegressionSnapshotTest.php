@@ -72,7 +72,8 @@ final class RuleRegressionSnapshotTest extends TestCase
         // to Config/disable-jwt-token.yaml, and added Config/enable-default-off-rules.yaml.
         // Precision-floor M02 (2026-10-14) removed 27 fixtures that served only the 36 rules it retired (ADR-034).
         // Its repairs then added four precision fixtures: debug-mode guards, header values, silent catches and commented-out code.
-        self::assertCount(161, $units);
+        // The repeated-structure group controls add one fixture file.
+        self::assertCount(162, $units);
         // M19 (2026-09-19) removed confirmed false positives and nothing else: an immediately invoked closure, a
         // statically written first-class callable, `#[\Override]` and `{@inheritdoc}` methods, and pure-hex digests.
         // AWS's documented example key now reports, as the operator decided, and so does one sibling-scope `$x()`.
@@ -111,7 +112,8 @@ final class RuleRegressionSnapshotTest extends TestCase
         // and 5 on pii-realistic.php's new mailbox controls, less the 2 database-URL passwords pii-test-fixture now reads as URL userinfo.
         // Making security.debug-mode-enabled and security.header-injection opt-in then removes their 15 and 30 fixture findings,
         // and turning security.silent-catch and sensitive-data.pii-test-fixture off after their re-measures failed removes 16 and 13.
-        self::assertCount(1558, $findings);
+        // The group controls add 225 default-mode findings; the prior 1,558 findings stay identical.
+        self::assertCount(1783, $findings);
         // M08 made sensitive-data markers carry the class the detector already knew: a classified finding now reads
         // `[redacted:aws-access-key]` where it read `[redacted]`. The finding count, the rule set, and every
         // line-free identity are unchanged; only the marker text inside those findings moved.
@@ -123,7 +125,7 @@ final class RuleRegressionSnapshotTest extends TestCase
         // Precision-floor M05's 19 new fixture findings move the hash; no existing finding's message or identity changes.
         // Precision-floor M02's retirements, default-off changes, repair fixtures and four repaired rules going opt-in move the hash.
         self::assertSame(
-            '38302d1c6221980e644d5e4427433c9a4a28f99f69daf0a9bb94fe04c8a9d854',
+            '81b5af007146b129f3e7be2e9fdc750fd01384fc00a9915ce72a73bf363dbe82',
             hash('sha256', $json),
         );
     }
