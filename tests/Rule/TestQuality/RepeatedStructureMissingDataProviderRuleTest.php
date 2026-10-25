@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GruffPhp\Tests\Rule\TestQuality;
 
 use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Config\RuleSettings;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Engine\Parser\PhpFileParser;
@@ -75,17 +76,103 @@ final class RepeatedStructureMissingDataProviderRuleTest extends TestCase
     }
 
     /**
+     * Verifies the complete-syntax mode preserves the accepted positive groups and rejects the distinct controls.
+     *
+     * @return void
+     */
+    public function testGroupModeKeepsOnlyEligibleClasses(): void
+    {
+        $findings = $this->analyse('repeated-structure-groups.php', true);
+
+        self::assertSame([
+            'LiteralGroupTest::testAlpha()',
+            'MatchingAttributesTest::testAlpha()',
+            'MatchingAnnotationsTest::testAlpha()',
+            'MatchingPayloadTest::testAlpha()',
+            'MatchingArrayKeysTest::testAlpha()',
+            'ReassignedIterableTest::testAlpha()',
+            'AnnotationArgumentTest::testAlpha()',
+        ], array_map(static fn (Finding $finding): ?string => $finding->symbol, $findings));
+    }
+
+    /**
+     * Verifies one finding lists every member of a larger group and asks for labelled provider rows.
+     *
+     * @return void
+     */
+    public function testGroupModeListsEveryMemberAndItsDeclarationLine(): void
+    {
+        $finding = $this->analyse('repeated-structure-groups.php', true)[0];
+
+        self::assertSame(4, $finding->metadata['groupSize']);
+        self::assertSame([
+            'LiteralGroupTest::testAlpha()' => 14,
+            'LiteralGroupTest::testBeta()' => 15,
+            'LiteralGroupTest::testGamma()' => 16,
+            'LiteralGroupTest::testDelta()' => 17,
+        ], $finding->metadata['members']);
+        self::assertSame(14, $finding->line);
+        self::assertStringContainsString('LiteralGroupTest::testDelta() (line 17)', $finding->message);
+        self::assertStringContainsString('descriptive label per case', $finding->message);
+        self::assertStringNotContainsString('ignoredPathPatterns', $finding->remediation ?? '');
+    }
+
+    /**
+     * Verifies attribute lines do not replace the method declaration as the finding anchor.
+     *
+     * @return void
+     */
+    public function testGroupModeAnchorsAfterAttributes(): void
+    {
+        $finding = $this->analyse('repeated-structure-groups.php', true)[1];
+
+        $members = $finding->metadata['members'];
+        self::assertIsArray($members);
+        self::assertSame(23, $finding->line);
+        self::assertSame(23, $members['MatchingAttributesTest::testAlpha()']);
+    }
+
+    /**
+     * Verifies the group option keeps data-provider exclusions and traversal past non-candidates.
+     *
+     * @return void
+     */
+    public function testGroupModePreservesExistingProviderControls(): void
+    {
+        $findings = $this->analyse('repeated-structure-mutation-cases.php', true);
+
+        self::assertSame([
+            'ContinuePastNonTestMethodTest::testAlpha()',
+            'ContinuePastShortMethodTest::testAlpha()',
+            'ContinuePastProviderTest::testShapeAlpha()',
+            'ContinuePastSmallGroupTest::testRealAlpha()',
+            'NonProviderAttributeStillAnalysedTest::testDecoratedAlpha()',
+        ], array_map(static fn (Finding $finding): ?string => $finding->symbol, $findings));
+    }
+
+    /**
      * Parse and analyse a repeated-structure fixture.
      *
-     * @param string $fixture - Fixture filename.
+     * @param string $fixture       - Fixture filename.
+     * @param bool   $groupFindings - Whether to enable the complete-syntax group mode.
      *
      * @return list<Finding> - rule findings for the fixture, ordered as the rule emits them, empty when none match
      */
-    private function analyse(string $fixture): array
+    private function analyse(string $fixture, bool $groupFindings = false): array
     {
-        $unit        = $this->parseFixture($fixture);
-        $registry    = RuleRegistry::defaults();
-        $config      = AnalysisConfig::fromRegistry($registry);
+        $unit     = $this->parseFixture($fixture);
+        $registry = RuleRegistry::defaults();
+        $config   = AnalysisConfig::fromRegistry($registry);
+        if ($groupFindings) {
+            $settings = $config->ruleSettings(RepeatedStructureMissingDataProviderRule::ID);
+            $config   = $config->withRuleSettings(RepeatedStructureMissingDataProviderRule::ID, new RuleSettings(
+                enabled:           $settings->enabled,
+                thresholds:        $settings->thresholds,
+                options:           array_replace($settings->options, ['groupFindings' => true]),
+                severityThreshold: $settings->severityThreshold,
+                excludeFromScore:  $settings->excludeFromScore,
+            ));
+        }
         $ruleContext = new RuleContext(__DIR__ . '/../../..', $config);
 
         return $this->rule->analyse($unit, $ruleContext);

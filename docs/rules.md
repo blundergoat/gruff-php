@@ -523,6 +523,8 @@ measure `.php` source; configuration and data files never reach them.
 
 These two rules are off by default after calibration left them below the 70% test-quality precision floor: `test-quality.loop-assertion-without-message` and `test-quality.no-assertions`. Set the chosen rule's `rules.<rule-id>.enabled` to `true` to opt in.
 
+`test-quality.repeated-structure-missing-data-provider` keeps its existing behavior unless `rules.test-quality.repeated-structure-missing-data-provider.options.groupFindings` is `true` (default: `false`). Group mode reports one finding for at least three tests in the same class, each with at least two top-level statements. It compares complete bodies and requires matching attributes and annotation tags. Identifiers, calls, operators and statement order remain significant. Literal values are compared by kind, except strings containing ASCII whitespace and literal array keys or indices, which must match exactly. Tests already driven by a PHPUnit provider, inline case attribute or literal table loop are excluded. Each finding lists every member and declaration line, with a qualified-method-name-to-line mapping in `metadata.members`, and recommends a provider with descriptive case labels. This mode remains off while its precision is measured separately.
+
 `test-quality.sut-not-called` and `test-quality.test-longer-than-sut` are also opt-in because their frozen cards leave precision insufficient (28 and 50 unresolved cards out of 50). This is an operator policy decision, not a measured floor failure. Enable either with `rules.<rule-id>.enabled: true`.
 
 `test-quality.no-assertions` follows invoked methods on the same class, up to eight method bodies; unused helpers and callback references do not count.

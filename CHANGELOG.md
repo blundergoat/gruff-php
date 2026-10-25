@@ -2,6 +2,10 @@
 
 Notable user-facing changes to `gruff-php` are listed here.
 
+## Unreleased
+
+- **Optional grouped duplicate-test findings** - Set `test-quality.repeated-structure-missing-data-provider.options.groupFindings: true` to receive one finding per eligible group, listing every method and line; the option defaults to false.
+
 ## 0.6.0 - 2026-09-27
 
 - **Correlated findings without a line share one penalty** - `ScoreCalculator` now bills two or more correlated size or complexity findings on one method as one shared penalty even when they carry no line, as the score's `clusters` list already reported them. Before, it charged each in full, so two warnings cost 8 while their cluster row claimed one root cause. Every correlated rule `analyse` runs reports a line, so this changes scores only for callers that pass line-less findings to the calculator directly.
