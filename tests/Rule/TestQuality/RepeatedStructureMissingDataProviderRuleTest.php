@@ -13,6 +13,7 @@ use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\RuleRegistry;
 use GruffPhp\Rules\TestQuality\RepeatedStructureMissingDataProviderRule;
 use GruffPhp\Engine\Source\SourceFile;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -148,6 +149,44 @@ final class RepeatedStructureMissingDataProviderRuleTest extends TestCase
             'ContinuePastSmallGroupTest::testRealAlpha()',
             'NonProviderAttributeStillAnalysedTest::testDecoratedAlpha()',
         ], array_map(static fn (Finding $finding): ?string => $finding->symbol, $findings));
+    }
+
+    /**
+     * Differing declarations cannot become provider rows; identical declarations and closure values can.
+     *
+     * @param string $className - Fixture class whose group is checked.
+     * @param bool   $expected  - Whether the class should report one complete group.
+     * @return void
+     */
+    #[DataProvider('declarationCases')]
+    public function testGroupModeKeepsDeclarationsExact(string $className, bool $expected): void
+    {
+        $findings = $this->analyse('repeated-structure-declarations.php', true);
+        $symbols  = array_values(array_filter(
+            array_map(static fn (Finding $finding): ?string => $finding->symbol, $findings),
+            static fn (?string $symbol): bool => str_starts_with($symbol ?? '', $className . '::'),
+        ));
+
+        self::assertSame($expected ? [$className . '::testAlpha()'] : [], $symbols);
+    }
+
+    /**
+     * Lists the declaration boundaries and the two eligible value controls.
+     *
+     * @return array<string, array{string, bool}> - Named fixture classes and expected grouping.
+     */
+    public static function declarationCases(): array
+    {
+        return [
+            'named function' => ['NestedFunctionTest', false],
+            'function in block' => ['NestedFunctionInBlockTest', false],
+            'anonymous class' => ['AnonymousClassTest', false],
+            'class in closure' => ['NestedClassInClosureTest', false],
+            'declaration documentation' => ['DeclarationDocumentationTest', false],
+            'body attribute' => ['BodyAttributeTest', false],
+            'closure values' => ['ClosureValuesTest', true],
+            'identical declaration' => ['IdenticalDeclarationTest', true],
+        ];
     }
 
     /**

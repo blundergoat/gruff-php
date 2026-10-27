@@ -58,7 +58,8 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
             optionDescriptions: [
                 'groupFindings' => 'When true, compare complete test bodies within one class, with matching attributes and annotation tags, '
                     . 'at least two top-level statements and three members. Keep ASCII-whitespace strings and literal keys or indices exact; '
-                    . 'normalize other literal values by kind. Report every member and its location. Off by default until measured.',
+                    . 'keep declarations, their PHPDoc and all body attribute arguments exact; normalize other literal values by kind. '
+                    . 'Report every member and its location. Off by default until approved for activation.',
             ],
             falsePositiveShapes: [
                 [
@@ -317,25 +318,30 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
     }
 
     /**
-     * Serializes syntax while retaining payload strings and selector literals.
+     * Serializes syntax while retaining declarations, payload strings and selector literals.
      *
      * getSubNodeNames excludes comments, source positions and parent links, so this visits only the body.
      *
-     * @param mixed $node         - Syntax node, node list or scalar field value.
-     * @param bool  $keepLiterals - Retain every literal inside attributes, keys or indices.
+     * @param mixed $node              - Syntax node, node list or scalar field value.
+     * @param bool  $keepLiterals      - Retain every literal inside declarations, attributes, keys or indices.
+     * @param bool  $keepDocumentation - Retain PHPDoc throughout a declaration subtree.
      * @return string - Structural comparison key; local names, calls and statement order stay significant.
      */
-    private function groupShape(mixed $node, bool $keepLiterals = false): string
+    private function groupShape(mixed $node, bool $keepLiterals = false, bool $keepDocumentation = false): string
     {
         if ($node instanceof Node) {
-            return $this->literalShape($node, $keepLiterals) ?? $this->nodeShape($node, $keepLiterals);
+            // A declaration cannot become case data; a closure remains an expression, but its attributes stay exact.
+            $keepDocumentation = $keepDocumentation || $node instanceof Stmt\Function_ || $node instanceof Stmt\ClassLike;
+            $keepLiterals      = $keepLiterals || $keepDocumentation || $node instanceof Node\Attribute;
+
+            return $this->literalShape($node, $keepLiterals) ?? $this->nodeShape($node, $keepLiterals, $keepDocumentation);
         }
 
         if (is_array($node)) {
             $parts = [];
             foreach ($node as $item) {
                 if (!$item instanceof Stmt\Nop) {
-                    $parts[] = $this->groupShape($item, $keepLiterals);
+                    $parts[] = $this->groupShape($item, $keepLiterals, $keepDocumentation);
                 }
             }
 
@@ -372,18 +378,19 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
     }
 
     /**
-     * Compares only syntax fields, preserving literal values below a key or index.
+     * Compares syntax fields and declaration PHPDoc, preserving literals below declarations, keys or indices.
      *
-     * @param Node $node         - Non-literal syntax node.
-     * @param bool $keepLiterals - Whether an enclosing field retains literal values.
+     * @param Node $node              - Non-literal syntax node.
+     * @param bool $keepLiterals      - Whether an enclosing field retains literal values.
+     * @param bool $keepDocumentation - Whether an enclosing declaration retains PHPDoc.
      * @return string - Node type and ordered field shapes.
      */
-    private function nodeShape(Node $node, bool $keepLiterals): string
+    private function nodeShape(Node $node, bool $keepLiterals, bool $keepDocumentation): string
     {
-        $fields = [];
+        $fields = $keepDocumentation ? ['documentation=' . serialize($node->getDocComment()?->getText())] : [];
         foreach ($node->getSubNodeNames() as $name) {
             $selector = $node instanceof Node\ArrayItem && $name === 'key' || $node instanceof Expr\ArrayDimFetch && $name === 'dim';
-            $fields[] = $name . '=' . $this->groupShape($node->{$name}, $keepLiterals || $selector);
+            $fields[] = $name . '=' . $this->groupShape($node->{$name}, $keepLiterals || $selector, $keepDocumentation);
         }
 
         return $node->getType() . '(' . implode(',', $fields) . ')';

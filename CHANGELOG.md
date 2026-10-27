@@ -4,7 +4,7 @@ Notable user-facing changes to `gruff-php` are listed here.
 
 ## Unreleased
 
-- **Optional grouped duplicate-test findings** - Set `test-quality.repeated-structure-missing-data-provider.options.groupFindings: true` to receive one finding per eligible group, listing every method and line; the option defaults to false.
+- **Optional grouped duplicate-test findings** - Set `test-quality.repeated-structure-missing-data-provider.options.groupFindings: true` to receive one finding per eligible group, listing every method and line; the option defaults to false. Nested declarations now retain their literals and PHPDoc, and body attribute arguments stay exact.
 
 ## 0.6.0 - 2026-09-27
 
