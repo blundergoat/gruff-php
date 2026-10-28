@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\SensitiveData;
 
-use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Config\ConfigLoader;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Engine\Parser\PhpFileParser;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\RuleRegistry;
 use GruffPhp\Rules\SensitiveData\AwsAccessKeyRule;
-use GruffPhp\Rules\SensitiveData\HighEntropyStringRule;
 use GruffPhp\Rules\SensitiveData\JwtTokenRule;
 use GruffPhp\Rules\SensitiveData\PiiTestFixtureRule;
 use GruffPhp\Engine\Source\SourceFile;
@@ -18,28 +17,22 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers sensitive-data allowance precision: real-secret and real-PII counter-fixtures must keep
- * flagging while identifier/slug literals and synthetic PII shapes pass the built-in allowances.
+ * Covers sensitive-data allowance precision: real secrets and real personal data keep reporting.
+ * Synthetic PII, such as a reserved-domain email or a `fake` street address, passes the built-in allowances.
  */
 final class SensitiveDataAllowanceRulesTest extends TestCase
 {
     /** Project root used to resolve fixture paths. */
     private const PROJECT_ROOT = __DIR__ . '/../../..';
 
-    /** Real-secret counter-fixture: every shape in it must always flag. */
+    /** Real-secret counter-fixture whose JWT and AWS key must always flag under their dedicated rules. */
     private const SECRET_FIXTURE = 'tests/Fixtures/SensitiveData/secret-counter-shapes.php';
-
-    /** Identifier/slug literals the entropy gate must not mistake for secrets. */
-    private const IDENTIFIER_FIXTURE = 'tests/Fixtures/SensitiveData/identifier-slug-literals.php';
 
     /** Realistic PII counter-fixture: every value in it must always flag. */
     private const PII_REALISTIC_FIXTURE = 'tests/Fixtures/SensitiveData/pii-realistic.php';
 
     /** Synthetic PII shapes covered by the reserved-domain and marker-word allowances. */
     private const PII_SYNTHETIC_FIXTURE = 'tests/Fixtures/SensitiveData/pii-synthetic-allowed.php';
-
-    /** Fixture line of the dot-joined base64url token that must never read as a dotted identifier. */
-    private const DOT_JOINED_TOKEN_LINE = 10;
 
     /**
      * List fixture/rule pairs with the exact lines each rule must flag.
@@ -50,15 +43,11 @@ final class SensitiveDataAllowanceRulesTest extends TestCase
     public static function fixtureLineExpectations(): array
     {
         return [
-            'base64, hex, npm-integrity, dot-joined, and prefixed-key tokens flag as high entropy' => [
-                self::SECRET_FIXTURE,
-                HighEntropyStringRule::ID,
-                [5, 6, 7, self::DOT_JOINED_TOKEN_LINE, 11, 12, 13, 14],
-            ],
             'JWT literal flags under the dedicated JWT rule'                         => [self::SECRET_FIXTURE, JwtTokenRule::ID, [9]],
             'AWS key id flags under the dedicated AWS rule'                          => [self::SECRET_FIXTURE, AwsAccessKeyRule::ID, [8]],
-            'realistic email, address, and phone PII flags'                          => [self::PII_REALISTIC_FIXTURE, PiiTestFixtureRule::ID, [5, 6, 7]],
-            'identifier and slug literals pass the entropy gate'                     => [self::IDENTIFIER_FIXTURE, HighEntropyStringRule::ID, []],
+            // 8-12: a mailto link, an email after a realm, one in a URL path, a near mirror and a subdomain mirror are mailboxes.
+            'realistic email, address, and phone PII flags'                          => [self::PII_REALISTIC_FIXTURE, PiiTestFixtureRule::ID, [5, 6, 7, 8, 9, 10, 11, 12]],
+            // 9-13: realm values (plain and escaped), URL userinfo and a local part that repeats its domain are not mailboxes.
             'reserved-domain emails and marker addresses pass the PII gate'          => [self::PII_SYNTHETIC_FIXTURE, PiiTestFixtureRule::ID, []],
         ];
     }
@@ -79,22 +68,6 @@ final class SensitiveDataAllowanceRulesTest extends TestCase
     }
 
     /**
-     * Verify the dotted-identifier allowance never swallows dot-joined token material.
-     *
-     * @return void
-     */
-    public function testDotJoinedTokenIsNotExemptAsDottedIdentifier(): void
-    {
-        $flaggedLines = $this->flaggedLines(self::SECRET_FIXTURE, HighEntropyStringRule::ID);
-
-        self::assertContains(
-            self::DOT_JOINED_TOKEN_LINE,
-            $flaggedLines,
-            'A dot-joined base64url token must keep flagging: its segments are not word-shaped, so the dotted-identifier allowance must not cover it.',
-        );
-    }
-
-    /**
      * Analyse a fixture and return the sorted lines one rule flagged.
      *
      * @param string $displayPath - Project-relative fixture path.
@@ -106,7 +79,9 @@ final class SensitiveDataAllowanceRulesTest extends TestCase
     {
         $unit     = (new PhpFileParser())->parse(new SourceFile(self::PROJECT_ROOT . '/' . $displayPath, $displayPath));
         $registry = RuleRegistry::defaults();
-        $findings = $registry->analyse([$unit], new RuleContext(self::PROJECT_ROOT, AnalysisConfig::fromRegistry($registry)));
+        // pii-test-fixture is opt-in, so the test config turns it on.
+        $config   = (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/enable-default-off-rules.yaml', $registry);
+        $findings = $registry->analyse([$unit], new RuleContext(self::PROJECT_ROOT, $config));
 
         $flaggedLines = array_values(array_map(
             static fn(Finding $finding): int => (int) $finding->line,

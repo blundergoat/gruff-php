@@ -45,7 +45,13 @@ final readonly class HtmlReporter
     {
         $score        = $report->score;
         $grade        = $score?->composite->letter ?? 'n/a';
-        $numericScore = $score === null ? 'n/a' : sprintf('%.2f / 100', $score->composite->score);
+        // Two different absences: scoring never ran at all, or it ran and found nothing to evaluate.
+        // The second must not render a number, because that is how an empty scan used to read as perfect.
+        $numericScore = match (true) {
+            $score === null            => 'n/a',
+            $score->composite === null => 'not evaluated',
+            default                    => sprintf('%.2f / 100', $score->composite->score),
+        };
         $counts       = $report->findingCounts();
         $title        = sprintf('gruff-php inspection report - %s', $grade);
         $script       = $this->interactive
@@ -386,7 +392,7 @@ final readonly class HtmlReporter
                . sprintf('<td class="num">%s</td>', $this->escape($this->optionalInt($file->maxCognitive)))
                . sprintf('<td class="num">%s</td>', $this->escape($this->optionalInt($file->maxLines)))
                . sprintf('<td class="num">%d</td>', $file->findings)
-               . sprintf('<td class="num"><span class="grade-pill %s">%s</span></td>', strtolower($file->grade->letter), $this->escape($file->grade->letter))
+               . sprintf('<td class="num"><span class="grade-pill %s">%s</span></td>', strtolower($file->grade->letter ?? 'na'), $this->escape($file->grade->letter ?? 'n/a'))
                . '</tr>';
     }
 
@@ -499,9 +505,9 @@ final readonly class HtmlReporter
                     $items[] = sprintf(
                         'Resolved: %s %s (resolved %d): %s',
                         $resolvedEntry->ruleId,
-                        $resolvedEntry->filePath,
+                        $resolvedEntry->path,
                         $resolvedEntry->count,
-                        $resolvedEntry->message,
+                        $resolvedEntry->subject,
                     );
                 }
             }

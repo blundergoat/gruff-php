@@ -41,6 +41,14 @@ final readonly class TrendRecorder
      */
     public function record(string $projectRoot, string $path, ScoreReport $score, int $findingCount): TrendReport
     {
+        $composite = $score->composite;
+
+        // A run that evaluated nothing has no score to record. The caller already filters these out;
+        // refusing here as well keeps a scoreless row out of the history every later delta reads from.
+        if ($composite === null) {
+            throw new RuntimeException('A run that evaluated nothing has no score to record in the trend history.');
+        }
+
         $resolvedPath  = PathHelper::resolveAgainst($projectRoot, $path);
         $entries       = $this->readEntries($resolvedPath);
         // The user's trend delta compares like-for-like only: a diff-scoped score is never measured
@@ -49,8 +57,8 @@ final readonly class TrendRecorder
         $trendEntry    = [
             'schemaVersion' => AnalysisReport::SCHEMA_VERSION,
             'timestamp' => gmdate(DATE_ATOM),
-            'score' => $score->composite->score,
-            'grade' => $score->composite->letter,
+            'score' => $composite->score,
+            'grade' => $composite->letter,
             'scope' => $score->scope,
             'findings' => $findingCount,
         ];
@@ -74,10 +82,10 @@ final readonly class TrendRecorder
             // Show the history path relative to the project when possible, falling back to its canonical form.
             path:          PathHelper::relativeToRoot($resolvedPath, $projectRoot) ?? PathHelper::canonical($resolvedPath),
             scope:         $score->scope,
-            currentScore:  $score->composite->score,
+            currentScore:  $composite->score,
             previousScore: $previousScore,
             // No previous same-scope run means there is no movement to report.
-            delta:         $previousScore === null ? null : round($score->composite->score - $previousScore, 2),
+            delta:         $previousScore === null ? null : round($composite->score - $previousScore, 2),
             entries:       $entries,
         );
     }

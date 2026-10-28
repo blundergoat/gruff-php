@@ -16,9 +16,10 @@ use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Node\Stmt\ClassMethod;
 
 /**
- * Flags a test that runs without a single observable check - no PHPUnit/Pest assertion, no mock
- * verification, no expectException, no explicit assertion-count marker - so it proves nothing and passes
- * as long as the code does not throw. Runs over every test in the file. Error severity, medium confidence.
+ * Reports tests without detected checks so developers can add evidence of the behavior they expect.
+ *
+ * Direct assertions, invoked same-class helpers and the supported Doctrine expectation count as checks.
+ * Unknown external helpers remain reviewable findings at error severity and medium confidence.
  */
 final readonly class NoAssertionsRule implements RuleInterface
 {
@@ -34,14 +35,21 @@ final readonly class NoAssertionsRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Error severity: a test that asserts nothing proves nothing, so it should fail the gate by default.
+        // Error severity applies when enabled; calibration leaves this rule opt-in.
         return new RuleDefinition(
-            id:              self::ID,
-            name:            'Test without assertions',
-            pillar:          Pillar::TestQuality,
-            tier:            RuleTier::V01,
-            defaultSeverity: Severity::Error,
-            confidence:      Confidence::Medium,
+            id:                  self::ID,
+            name:                'Test without assertions',
+            pillar:              Pillar::TestQuality,
+            tier:                RuleTier::V01,
+            defaultSeverity:     Severity::Error,
+            confidence:          Confidence::Medium,
+            isEnabledByDefault:  false,
+            falsePositiveShapes: [
+                [
+                    'shape' => 'A test whose checks run inside a project helper with a domain name, such as seeInDatabase() or verifyRendered(), rather than an assert-prefixed call.',
+                    'mitigation' => 'Direct supported expectations and invoked same-class helpers are recognized within eight method bodies. External or unresolved helpers still need a visible assertion; helper names alone do not establish a check.',
+                ],
+            ],
         );
     }
 
@@ -49,7 +57,7 @@ final readonly class NoAssertionsRule implements RuleInterface
      * Reports tests that do not contain an observable assertion or expectation.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
      *
      * @return list<Finding> - Findings for assertion-free tests.
      */
@@ -60,7 +68,9 @@ final readonly class NoAssertionsRule implements RuleInterface
         // Weigh every test scope in the file.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             // A test with any observable expectation is already proving something.
-            if ($this->hasObservableExpectation($scope)) {
+            if ($this->hasObservableExpectation($scope)
+                || InvokedTestMethodEvidence::hasExpectation($scope, $analysisUnit)
+                || FluentJsonAssertionEvidence::hasExpectation($scope, $analysisUnit)) {
                 continue;
             }
 
@@ -68,13 +78,13 @@ final readonly class NoAssertionsRule implements RuleInterface
                 ruleId:      self::ID,
                 message:     sprintf('%s has no detected PHPUnit or Pest assertions.', $scope->symbol),
                 filePath:    $analysisUnit->file->displayPath,
-                line:        $scope->line,
+                line:        $scope->anchorLine(),
                 severity:    Severity::Error,
                 pillar:      Pillar::TestQuality,
                 tier:        RuleTier::V01,
                 confidence:  Confidence::Medium,
                 symbol:      $scope->symbol,
-                remediation: 'Add an assertion or expectation that proves observable behavior, or disable this rule for custom assertion wrappers.',
+                remediation: 'Add an assertion or expectation that proves the observable behaviour this test names.',
                 metadata:    ['framework' => $scope->isPest ? 'pest' : 'phpunit'],
             );
         }

@@ -158,7 +158,7 @@ final class CheckIgnoreCommand extends Command
         }
 
         try {
-            $configLoader = new ConfigLoader($projectRoot, ConfigLoader::packageRoot());
+            $configLoader = new ConfigLoader($projectRoot, ConfigLoader::packageRoot(), shouldResolveFromLaunchDir: true);
 
             // Load through the same `ConfigLoader` that `analyse` uses, so both commands agree on
             // which paths a given config excludes.
@@ -188,10 +188,17 @@ final class CheckIgnoreCommand extends Command
         $absolutePath = PathHelper::resolveAgainst($projectRoot, $path);
         $displayPath  = PathHelper::relativeToRoot($absolutePath, $projectRoot) ?? PathHelper::normalizeSeparators($path);
 
-        $decision = $resolver->decide($displayPath, $absolutePath, $patterns, false);
+        $isExplicitFile = is_file($absolutePath);
+        $decision = $resolver->decide($displayPath, $absolutePath, $patterns, false, $isExplicitFile);
         // gruff's own config or built-in rules already exclude the path; keep their verdict so the
         // reported source and pattern are the gruff ones, and skip the slower Git lookup entirely.
         if ($decision->ignored) {
+            return $decision;
+        }
+
+        // An existing file operand is the same explicit request analyse receives, so Git/default
+        // exclusions cannot turn this check into a different answer.
+        if ($isExplicitFile) {
             return $decision;
         }
 

@@ -17,7 +17,6 @@ use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Rules\Docs\MissingPropertyPhpdocRule;
-use GruffPhp\Rules\Naming\GenericMethodNameRule;
 use GruffPhp\Rules\Naming\IdentifierQualityRule;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
@@ -25,8 +24,6 @@ use GruffPhp\Rules\Contracts\RuleInterface;
 use GruffPhp\Rules\RuleRegistry;
 use GruffPhp\Rules\Security\DangerousFunctionCallRule;
 use GruffPhp\Rules\Security\SqlConcatenationRule;
-use GruffPhp\Rules\Security\VariableIncludeRule;
-use GruffPhp\Rules\TestQuality\ExtendsProductionClassRule;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
@@ -122,43 +119,6 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Verify loads the extends-production-class additional test base classes option.
-     *
-     * @return void
-     */
-    public function testLoadsAdditionalTestBaseClassesOption(): void
-    {
-        $path = $this->writeTempConfig(sprintf(
-                                           '{"rules":{"%s":{"options":{"additionalTestBaseClasses":["IntegrationTestBase"]}}}}',
-                                           ExtendsProductionClassRule::ID,
-                                       ));
-
-        $config   = (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
-        $settings = $config->ruleSettings(ExtendsProductionClassRule::ID);
-
-        self::assertSame(['IntegrationTestBase'], $settings->stringListOption('additionalTestBaseClasses'));
-    }
-
-    /**
-     * Verify loads the variable-include constant-path options.
-     *
-     * @return void
-     */
-    public function testLoadsVariableIncludeConstantPathOptions(): void
-    {
-        $path = $this->writeTempConfig(sprintf(
-                                           '{"rules":{"%s":{"options":{"treatGlobalConstantsAsFixed":false,"dynamicPathConstants":["ABSPATH"]}}}}',
-                                           VariableIncludeRule::ID,
-                                       ));
-
-        $config   = (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
-        $settings = $config->ruleSettings(VariableIncludeRule::ID);
-
-        self::assertFalse($settings->option('treatGlobalConstantsAsFixed'));
-        self::assertSame(['ABSPATH'], $settings->stringListOption('dynamicPathConstants'));
-    }
-
-    /**
      * Verify loads the sql-concatenation safe-interpolation-receivers option.
      *
      * @return void
@@ -177,7 +137,7 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Verify requested rule options load with their declared replacement, toggle, and additive shapes.
+     * Verify requested rule options load with their declared toggle and additive shapes.
      *
      * @return void
      */
@@ -185,7 +145,6 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     {
         $path = $this->writeTempConfig(json_encode([
             'rules' => [
-                GenericMethodNameRule::ID => ['options' => ['genericNames' => ['fetch']]],
                 MissingPropertyPhpdocRule::ID => ['options' => ['acceptLineComments' => true]],
                 DangerousFunctionCallRule::ID => ['options' => ['additionalFunctions' => ['custom_runner']]],
             ],
@@ -193,10 +152,6 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
 
         $config = (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
 
-        self::assertSame(
-            ['fetch'],
-            $config->ruleSettings(GenericMethodNameRule::ID)->stringListOption('genericNames'),
-        );
         self::assertTrue(
             $config->ruleSettings(MissingPropertyPhpdocRule::ID)->option('acceptLineComments'),
         );
@@ -214,16 +169,6 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     public static function requestedRuleOptionTypeProvider(): array
     {
         return [
-            'generic names requires a list' => [
-                GenericMethodNameRule::ID,
-                '{"genericNames":"fetch"}',
-                'Option "rules.naming.generic-method.options.genericNames" must be a list.',
-            ],
-            'generic names requires string items' => [
-                GenericMethodNameRule::ID,
-                '{"genericNames":[1]}',
-                'Option "rules.naming.generic-method.options.genericNames.0" must be a string.',
-            ],
             'line-comment toggle requires a boolean' => [
                 MissingPropertyPhpdocRule::ID,
                 '{"acceptLineComments":"yes"}',

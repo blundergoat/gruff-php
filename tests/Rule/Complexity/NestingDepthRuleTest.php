@@ -105,7 +105,8 @@ final class NestingDepthRuleTest extends TestCase
      */
     public function testWarningForDeeplyNestedMethod(): void
     {
-        $findings = $this->analyse('nesting.php', ['warning' => 3, 'error' => 6]);
+        // A warning tier of 2 puts the four-level method at twice its limit, in the upper band, so it keeps warning severity.
+        $findings = $this->analyse('nesting.php', ['warning' => 2, 'error' => 6]);
 
         self::assertNotSame([], $findings);
         self::assertSame(NestingDepthRule::ID, $findings[0]->ruleId);

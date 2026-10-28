@@ -1,5 +1,5 @@
 schemaVersion: gruff-php.config.v0.1
-minimumSeverity:
+failOn:
     analyse: error
 rules:
     size.file-length:

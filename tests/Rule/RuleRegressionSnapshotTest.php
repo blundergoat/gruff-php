@@ -6,29 +6,49 @@ namespace GruffPhp\Tests\Rule;
 
 use GruffPhp\Engine\Config\AnalysisConfig;
 use GruffPhp\Engine\Config\ConfigLoader;
-use GruffPhp\Results\Finding\Finding;
+use GruffPhp\Engine\Config\RuleSettings;
 use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Engine\Parser\PhpFileParser;
+use GruffPhp\Engine\Source\SourceDiscovery;
+use GruffPhp\Engine\Source\SourceFile;
+use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Rules\Complexity\CyclomaticComplexityRule;
 use GruffPhp\Rules\Complexity\HalsteadVolumeRule;
 use GruffPhp\Rules\Complexity\MaintainabilityIndexRule;
-use GruffPhp\Rules\Docs\MissingReadmeRule;
 use GruffPhp\Rules\Contracts\RuleContext;
+use GruffPhp\Rules\DeadCode\UnusedPrivateMethodRule;
+use GruffPhp\Rules\Docs\MissingReadmeRule;
+use GruffPhp\Rules\Docs\ParamCommentRule;
 use GruffPhp\Rules\RuleRegistry;
-use GruffPhp\Rules\Size\AverageMethodLengthRule;
+use GruffPhp\Rules\Security\DangerousFunctionCallRule;
+use GruffPhp\Rules\Security\DebugModeEnabledRule;
+use GruffPhp\Rules\Security\DependencyComposerPathRule;
+use GruffPhp\Rules\Security\DependencyComposerVcsRule;
+use GruffPhp\Rules\Security\DisabledSslVerificationRule;
+use GruffPhp\Rules\Security\HeaderInjectionRule;
+use GruffPhp\Rules\Security\SilentCatchRule;
+use GruffPhp\Rules\Security\SqlConcatenationRule;
+use GruffPhp\Rules\Security\UnsafeUnserializeRule;
+use GruffPhp\Rules\SensitiveData\DatabaseUrlPasswordRule;
+use GruffPhp\Rules\SensitiveData\PiiTestFixtureRule;
 use GruffPhp\Rules\Size\ClassLengthRule;
 use GruffPhp\Rules\Size\FileLengthRule;
 use GruffPhp\Rules\Size\MethodLengthRule;
+use GruffPhp\Rules\TestQuality\LoopAssertionWithoutMessageRule;
 use GruffPhp\Rules\TestQuality\MockingDomainObjectRule;
+use GruffPhp\Rules\TestQuality\NoAssertionsRule;
 use GruffPhp\Rules\TestQuality\PhpUnitCoverageSourceMissingRule;
 use GruffPhp\Rules\TestQuality\PhpUnitDeprecationsNotFatalRule;
 use GruffPhp\Rules\TestQuality\PhpUnitStrictFlagsMissingRule;
-use GruffPhp\Engine\Source\SourceDiscovery;
-use GruffPhp\Engine\Source\SourceFile;
+use GruffPhp\Rules\TestQuality\SutNotCalledRule;
+use GruffPhp\Rules\TestQuality\TestLongerThanSutRule;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers cross-rule regression behaviour over the fixture corpus.
+ * Covers cross-rule report stability over the full fixture corpus users depend on for release confidence.
+ *
+ * Snapshot hashes and catalogue coverage expose any change to finding counts, content, identity, or calibration signal.
+ * Maintainers use this suite before release so users do not receive unexplained report or scoring drift.
  *
  * @phpstan-import-type FindingArray from Finding
  * @phpstan-import-type FindingMetadata from Finding
@@ -47,10 +67,67 @@ final class RuleRegressionSnapshotTest extends TestCase
     {
         [$units, $findings, $json] = $this->analysePaths(['tests/Fixtures']);
 
-        self::assertCount(178, $units);
-        self::assertCount(2670, $findings);
+        // M07 added tests/Fixtures/Baseline/gruff-baseline-v3.json to the corpus, and M19 ten precision fixtures.
+        // Precision-floor M19 (2026-10-04) removed ten fixtures that served only retired rules, renamed the detector-selection config
+        // to Config/disable-jwt-token.yaml, and added Config/enable-default-off-rules.yaml.
+        // Precision-floor M02 (2026-10-14) removed 27 fixtures that served only the 36 rules it retired (ADR-034).
+        // Its repairs then added four precision fixtures: debug-mode guards, header values, silent catches and commented-out code.
+        // The repeated-structure and declaration controls add two fixture files.
+        self::assertCount(163, $units);
+        // M19 (2026-09-19) removed confirmed false positives and nothing else: an immediately invoked closure, a
+        // statically written first-class callable, `#[\Override]` and `{@inheritdoc}` methods, and pure-hex digests.
+        // AWS's documented example key now reports, as the operator decided, and so does one sibling-scope `$x()`.
+        // Its review fixes then added 38 findings, every one on a new fixture line: ten laundering and shadowing
+        // `$x()` shapes, two one-line wrappers, a namespaced `sprintf()`, a concatenated secret, and 24 findings
+        // other rules raise on that new fixture code. The operator-requested double-check added 39 more: 3 on the
+        // dynamic-call fixture's two new pins, 33 on the two inherited-contract fixtures (21 docs tags the narrowed
+        // exemption owes, 12 from other rules), and 3 docs tags on older fixtures that exemption no longer hides.
+        // M10 D23 (2026-09-25) removed one: synthetic-secrets.php's digit-free mixed-case alphabet run, since a
+        // qualifying high-entropy literal now holds a letter and a digit.
+        // M10 D33 (2026-09-26) removed one: safe-dummy-values.php line 11, AWS's documented example key, now a documented sample.
+        // M10 D35 renamed docs.missing-public-phpdoc to docs.missing-phpdoc, which moves the hash and no count.
+        // M55 removes the bound local-closure call at phpunit-mechanics-smells.php:74; its test-quality findings remain.
+        // Precision-floor M19 (2026-10-04) removed 47: 40 from the nine retired rules (ADR-034), 5 from the three rules
+        // now off by default, and the two docs.missing-file-phpdoc findings on the deleted entropy fixtures.
+        // The run-coverage and code-line CHANGELOG entries removed 6 and added 1: docs.missing-constant-phpdoc now covers an unbroken
+        // run by structure, which clears four constants in missing-constant-phpdoc-line-comment.php and reports
+        // RESET_GROUP_BETA_PATTERN, whose run has another commented constant; waste.unreachable-code no longer reports
+        // the trailing `// reported` comment in dynamic-call-precision.php; and test-longer-than-sut counts code
+        // lines, which cleared testHasLotsOfWhitespaceAndComments in a since-deleted fixture.
+        // Precision-floor M14's cognitive repair added two guard-clause methods to Complexity/cognitive.php: each adds a
+        // docs.missing-phpdoc finding, and the class's 26 public methods now pass size.public-method-count's limit of 25.
+        // The repair itself moves no finding or measured value in this corpus.
+        // Precision-floor M15 clears four loop-context findings: one identifying expected value and three
+        // singleton loops. A repeated-loop control now uses a fixed expected literal, adding one magic-number finding.
+        // M15 default-off policy removes 42 findings from eight test-quality rules; explicit calibration still covers them.
+        // M15 additionally makes two insufficient-evidence rules opt-in, removing 11 fixture findings.
+        // Precision-floor M13-T23 leaves a wholly tags-only docblock to docs.bare-phpdoc-tags alone, so docs.return-comment
+        // no longer reports it a second time; that removes 4 findings.
+        // Precision-floor M05 adds 19, all on the new escapeSplicedSinkValues function in Security/procedural-sink-precision.php
+        // and none elsewhere: 8 dangerous-function-call on its non-literal shell_exec and exec lines, its 5 process-command and
+        // 4 SQL controls that still report, and 2 naming.abbreviation-allowlist on its signature.
+        // Precision-floor M02 (2026-10-14) retired 36 rules (ADR-034) and deleted the 27 fixtures that served only them: net 1075 fewer.
+        // Precision-floor M02 then turned five rules off by default (ADR-034): net 80 fewer.
+        // Its repairs add 88: 78 on the four new precision fixtures, 7 on procedural-sink-precision.php's new plain-word controls,
+        // and 5 on pii-realistic.php's new mailbox controls, less the 2 database-URL passwords pii-test-fixture now reads as URL userinfo.
+        // Making security.debug-mode-enabled and security.header-injection opt-in then removes their 15 and 30 fixture findings,
+        // and turning security.silent-catch and sensitive-data.pii-test-fixture off after their re-measures failed removes 16 and 13.
+        // The group controls add 225 default-mode findings; the prior 1,558 findings stay identical.
+        // M138 adds 116 findings on its new declaration fixture; every prior fixture finding is unchanged.
+        // M145 enables groups by default: this rule emits 17 groups in place of 40 legacy findings.
+        self::assertCount(1876, $findings);
+        // M08 made sensitive-data markers carry the class the detector already knew: a classified finding now reads
+        // `[redacted:aws-access-key]` where it read `[redacted]`. The finding count, the rule set, and every
+        // line-free identity are unchanged; only the marker text inside those findings moved.
+        // Precision-floor M14 banded the size and complexity rules: a finding under one and a half times its limit is
+        // advisory with do-not-add advice, every banded finding carries limitBand, and complexity advice asks for a
+        // simpler path. The count and every identity are unchanged; severity, advice and metadata moved the hash.
+        // Precision-floor M13-T26 builds the docs.missing-phpdoc message from the signature: it names each parameter, and asks for
+        // the return value and the throw condition only where they exist. The count and every identity are unchanged; the messages moved the hash.
+        // Precision-floor M05's 19 new fixture findings move the hash; no existing finding's message or identity changes.
+        // Precision-floor M02's retirements, default-off changes, repair fixtures and four repaired rules going opt-in move the hash.
         self::assertSame(
-            '2a6dcb6385de754dc238058357640680a337af3ab5138855e0b54671b40a9683',
+            'a289348fddab08358c6ef99857365090ccd52856e69658a364e33bfc9ad0fac4',
             hash('sha256', $json),
         );
     }
@@ -62,25 +139,41 @@ final class RuleRegressionSnapshotTest extends TestCase
      */
     public function testDefaultAndSupplementalCalibrationScenariosCoverEveryRegisteredRule(): void
     {
-        $registry = RuleRegistry::defaults();
+        $registry            = RuleRegistry::defaults();
         [, $defaultFindings] = $this->analysePaths(['tests/Fixtures']);
-        $registeredRuleIds = array_map(static fn($rule): string => $rule->definition()->id, $registry->all());
-        $defaultRuleIds    = $this->uniqueRuleIds($defaultFindings);
-        $defaultMissing    = array_values(array_diff($registeredRuleIds, $defaultRuleIds));
+        $registeredRuleIds   = array_map(static fn($rule): string => $rule->definition()->id, $registry->all());
+        $defaultRuleIds      = $this->uniqueRuleIds($defaultFindings);
+        $defaultMissing      = array_values(array_diff($registeredRuleIds, $defaultRuleIds));
 
         self::assertSame([
                              CyclomaticComplexityRule::ID,
                              HalsteadVolumeRule::ID,
                              MaintainabilityIndexRule::ID,
+                             UnusedPrivateMethodRule::ID,
                              MissingReadmeRule::ID,
-                             AverageMethodLengthRule::ID,
+                             ParamCommentRule::ID,
+                             DangerousFunctionCallRule::ID,
+                             DebugModeEnabledRule::ID,
+                             DependencyComposerPathRule::ID,
+                             DependencyComposerVcsRule::ID,
+                             DisabledSslVerificationRule::ID,
+                             HeaderInjectionRule::ID,
+                             SilentCatchRule::ID,
+                             SqlConcatenationRule::ID,
+                             UnsafeUnserializeRule::ID,
+                             DatabaseUrlPasswordRule::ID,
+                             PiiTestFixtureRule::ID,
                              ClassLengthRule::ID,
                              FileLengthRule::ID,
                              MethodLengthRule::ID,
+                             LoopAssertionWithoutMessageRule::ID,
                              MockingDomainObjectRule::ID,
+                             NoAssertionsRule::ID,
                              PhpUnitCoverageSourceMissingRule::ID,
                              PhpUnitDeprecationsNotFatalRule::ID,
                              PhpUnitStrictFlagsMissingRule::ID,
+                             SutNotCalledRule::ID,
+                             TestLongerThanSutRule::ID,
                          ], $defaultMissing);
 
         $supplementalRuleIds = $this->uniqueRuleIds($this->supplementalCalibrationFindings());
@@ -91,8 +184,8 @@ final class RuleRegressionSnapshotTest extends TestCase
     /**
      * Analyse fixture paths and return findings for assertions.
      *
-     * @param list<string>        $paths - Fixture paths to parse and analyse.
-     * @param AnalysisConfig|null $config - Optional config override, or null to use default-registry config.
+     * @param list<string>        $paths       - Fixture paths to parse and analyse.
+     * @param AnalysisConfig|null $config      - Optional config override, or null to use default-registry config.
      * @param string              $projectRoot - Project root used to resolve fixture paths and rule context.
      *
      * @return array{0: list<AnalysisUnit>, 1: list<Finding>, 2: string} - parsed units, raw findings, and canonical JSON for the analysed paths, in
@@ -110,12 +203,12 @@ final class RuleRegressionSnapshotTest extends TestCase
             static fn(SourceFile $file): AnalysisUnit => $phpFileParser->parse($file),
             $files,
         );
-        $findings      = $registry->analyse($units, new RuleContext(
+        $findings = $registry->analyse($units, new RuleContext(
             $projectRoot,
             $config ?? AnalysisConfig::fromRegistry($registry),
         ));
-        $payload       = $this->canonicalFindingPayload($findings);
-        $json          = json_encode($payload, JSON_THROW_ON_ERROR);
+        $payload = $this->canonicalFindingPayload($findings);
+        $json    = json_encode($payload, JSON_THROW_ON_ERROR);
 
         self::assertSame(count($files), count($units));
 
@@ -134,9 +227,11 @@ final class RuleRegressionSnapshotTest extends TestCase
 
         array_push(
                $findings,
+            // Rooted at tests/Fixtures, so the maintainability index, which skips test paths, reads these as source files.
             ...$this->analysePaths(
-            ['tests/Fixtures/Complexity'],
+            ['Complexity'],
             (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/complexity-low-thresholds.yaml', $registry),
+            self::PROJECT_ROOT . '/tests/Fixtures',
         )[1],
         );
         array_push(
@@ -149,22 +244,51 @@ final class RuleRegressionSnapshotTest extends TestCase
         array_push(
                $findings,
             ...$this->missingReadmeFindings(),
+            ...$this->paramCommentFindings(),
             ...$this->phpUnitConfigCalibrationFindings(),
             ...$this->analysePaths(
             ['tests/Fixtures/TestQuality/mocking-domain-object.php'],
             (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/enable-mocking-domain-object.yaml', $registry),
         )[1],
             ...$this->analysePaths(
-            ['tests/Fixtures/TestQuality/multiple-aaa-cycles.php'],
-            (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/enable-multiple-aaa-cycles.yaml', $registry),
-        )[1],
-            ...$this->analysePaths(
             ['tests/Fixtures/TestQuality/testdox-readability.php'],
             (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/enable-testdox-readability.yaml', $registry),
+        )[1],
+            // Exercise opt-in rules explicitly, including M15's test-quality defaults and M02's security and dead-code ones.
+            ...$this->analysePaths(
+            ['tests/Fixtures/Security', 'tests/Fixtures/DeadCode', 'tests/Fixtures/SensitiveData', 'tests/Fixtures/TestQuality'],
+            (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/enable-default-off-rules.yaml', $registry),
         )[1],
         );
 
         return $findings;
+    }
+
+    /**
+     * Build docs.param-comment findings from a synthetic file, because the rule is off by default and every docs fixture's
+     * bare @param tag sits in a tags-only block that docs.bare-phpdoc-tags owns.
+     *
+     * @return list<Finding> - findings from one summarised function whose @param tag names only a type, with the rule on
+     */
+    private function paramCommentFindings(): array
+    {
+        $root = $this->tempDir();
+
+        try {
+            self::assertTrue(mkdir($root . '/src', 0777, true));
+            file_put_contents(
+                $root . '/src/Example.php',
+                "<?php\n\n/**\n * Example of a summarised function with a bare parameter tag.\n */\n\n"
+                . "/**\n * Doubles a value.\n *\n * @param int \$value\n *\n * @return int The doubled value.\n */\n"
+                . "function doubled(int \$value): int\n{\n    return \$value * 2;\n}\n",
+            );
+            $config = AnalysisConfig::fromRegistry(RuleRegistry::defaults())
+                ->withRuleSettings(ParamCommentRule::ID, new RuleSettings(true, []));
+
+            return $this->analysePaths(['src/Example.php'], $config, $root)[1];
+        } finally {
+            $this->removeDir($root);
+        }
     }
 
     /**
@@ -266,6 +390,8 @@ final class RuleRegressionSnapshotTest extends TestCase
     }
 
     /**
+     * Sorts nested finding metadata so the user-visible regression snapshot stays stable across equivalent map ordering.
+     *
      * @param FindingMetadata $metadata - Finding metadata payload.
      *
      * @return FindingMetadata - the metadata with both nested maps and the top level key-sorted for a stable snapshot hash

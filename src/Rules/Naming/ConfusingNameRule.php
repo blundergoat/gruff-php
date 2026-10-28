@@ -53,6 +53,12 @@ final readonly class ConfusingNameRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A deliberately short class name whose enclosing namespace supplies the missing context, such as App\\Billing\\Service.',
+                    'mitigation' => 'Only the standalone class name is read, never the namespace, so rename with domain context or disable the rule for this project.',
+                ],
+            ],
         );
     }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Rules\Complexity;
 
+use GruffPhp\Engine\Analysis\SensitiveExclusionFilter;
 use GruffPhp\Engine\Config\SeverityThreshold;
 use GruffPhp\Results\Finding\Confidence;
 use GruffPhp\Results\Finding\Finding;
@@ -23,7 +24,7 @@ use PhpParser\Node\Stmt\Function_;
  * Scores each function or method with a maintainability index - a blend of cyclomatic complexity,
  * Halstead volume, and length - and flags the ones that fall below the configured floor.
  *
- * Runs per file over every function-like node. A low index (default advisory below 35) marks a refactor
+ * Runs over function-like nodes outside the built-in test-path class. A low index (default advisory below 35) marks a refactor
  * candidate for the user to weigh, not a confirmed defect, so it ships at the lowest severity. The
  * finding names the computed score and the threshold it missed.
  */
@@ -52,6 +53,12 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
             defaultSeverity:   Severity::Advisory,
             confidence:        Confidence::Medium,
             severityThreshold: new SeverityThreshold(35, Severity::Advisory),
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A long but linear method - wiring, data setup, or generated code - that branches very little.',
+                    'mitigation' => 'The logical-line term dominates the index, so a low score here means length rather than complexity; split the method or tune this rule\'s threshold and severity.',
+                ],
+            ],
         );
     }
 
@@ -65,6 +72,12 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
+        // A test, fixture or example file is long by design: its sequential setup and assertions lower the index without
+        // making it harder to follow, so the family's test-path class reports nothing.
+        if (SensitiveExclusionFilter::isBuiltInTestPath($analysisUnit->file->displayPath)) {
+            return [];
+        }
+
         $definition = $this->definition();
         $settings   = $ruleContext->settingsFor($definition);
 

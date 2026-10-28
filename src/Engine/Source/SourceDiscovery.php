@@ -145,8 +145,15 @@ final readonly class SourceDiscovery
             return;
         }
 
-        $displayPath = $this->displayPath($absolutePath);
-        $decision    = $this->ignoreResolver->decide($displayPath, $absolutePath, $configuredIgnorePatterns, $shouldIncludeIgnored);
+        $displayPath    = $this->displayPath($absolutePath);
+        $isExplicitFile = is_file($absolutePath);
+        $decision       = $this->ignoreResolver->decide(
+            $displayPath,
+            $absolutePath,
+            $configuredIgnorePatterns,
+            $shouldIncludeIgnored,
+            $isExplicitFile,
+        );
         // An ignored path is recorded (with why) rather than analysed.
         if ($decision->ignored) {
             $ignoredDetails[] = IgnoredPath::from($displayPath, $decision);
@@ -209,7 +216,7 @@ final readonly class SourceDiscovery
                 $path        = $file->getPathname();
                 $isDir       = $file->isDir();
                 $displayPath = $this->displayPath($path);
-                $decision    = $this->ignoreResolver->decide($displayPath, $path, $configuredIgnorePatterns, $shouldIncludeIgnored);
+                $decision    = $this->ignoreResolver->decide($displayPath, $path, $configuredIgnorePatterns, $shouldIncludeIgnored, false, $isDir);
 
                 // A node that is not ignored is kept so the iterator can descend and yield its files.
                 if (!$decision->ignored) {
@@ -217,9 +224,9 @@ final readonly class SourceDiscovery
                     return true;
                 }
 
-                // Configured ignores are recorded for files and directories alike;
-                // built-in default/generated ignores are only surfaced for directories.
-                if ($decision->source === PathIgnoreResolver::SOURCE_CONFIG || $isDir) {
+                // Configured ignores are recorded for files and directories alike; built-in default/generated
+                // ignores are surfaced for directories, and for a minified file only when gruff-php would scan it.
+                if ($decision->source === PathIgnoreResolver::SOURCE_CONFIG || $isDir || $this->isListedMinifiedFile($decision, $path)) {
                     $ignoredDetails[] = IgnoredPath::from($displayPath, $decision);
                 }
 
@@ -279,6 +286,20 @@ final readonly class SourceDiscovery
     {
         // A path outside the project root has no relative form, so fall back to its canonical absolute path.
         return PathHelper::relativeToRoot($path, $this->projectRoot) ?? PathHelper::canonical($path);
+    }
+
+    /**
+     * Reports whether a walked file skipped as minified is listed, which section 7 asks for only when gruff-php would
+     * otherwise scan it: `settings.min.json` is listed, `jquery.min.js` is unsupported and stays out of the list.
+     *
+     * @param IgnoreDecision $decision - The ignore verdict for the walked file.
+     * @param string         $path - Absolute path of the walked file.
+     *
+     * @return bool - True when the verdict is the minified class and the file is a type gruff-php scans.
+     */
+    private function isListedMinifiedFile(IgnoreDecision $decision, string $path): bool
+    {
+        return $decision->pattern === PathIgnoreResolver::MINIFIED_FILE_PATTERN && $this->sourceType($path) !== null;
     }
 
     /**
@@ -364,11 +385,21 @@ final readonly class SourceDiscovery
             return null;
         }
 
+        $explicitFilePathspecs = array_values(array_map(
+            static fn(array $requestedPath): string => $requestedPath['pathspec'],
+            array_filter(
+                $request['requestedExistingPaths'],
+                static fn(array $requestedPath): bool => $requestedPath['isFile'],
+            ),
+        ));
+        $visiblePaths = array_values(array_unique(array_merge($visiblePaths, $explicitFilePathspecs)));
+        sort($visiblePaths, SORT_STRING);
+
         $ignoredDetails = array_merge(
             $request['ignoredDetails'],
             $this->ignoredRequestedGitPaths($request['requestedExistingPaths'], $visiblePaths),
         );
-        $sourceResult   = $this->sourceFilesFromGitVisiblePaths($visiblePaths, $configuredIgnorePatterns);
+        $sourceResult   = $this->sourceFilesFromGitVisiblePaths($visiblePaths, $configuredIgnorePatterns, $explicitFilePathspecs);
         $files          = $sourceResult['files'];
         $ignoredDetails = array_merge($ignoredDetails, $sourceResult['ignoredDetails']);
         $missingPaths   = $request['missingPaths'];
@@ -415,8 +446,15 @@ final readonly class SourceDiscovery
                 continue;
             }
 
-            $displayPath = $this->displayPath($absolutePath);
-            $decision    = $this->ignoreResolver->decide($displayPath, $absolutePath, $configuredIgnorePatterns, false);
+            $displayPath    = $this->displayPath($absolutePath);
+            $isExplicitFile = is_file($absolutePath);
+            $decision       = $this->ignoreResolver->decide(
+                $displayPath,
+                $absolutePath,
+                $configuredIgnorePatterns,
+                false,
+                $isExplicitFile,
+            );
             // An ignored path is recorded here so Git never even sees it.
             if ($decision->ignored) {
                 $ignoredDetails[] = IgnoredPath::from($displayPath, $decision);
@@ -464,14 +502,12 @@ final readonly class SourceDiscovery
     }
 
     /**
-     * Explains why each explicitly-requested path that Git withheld was left out - a .gitignore rule or
-     * generated-file protection - so the user is not left wondering.
+     * Explains why each explicitly-requested directory that Git withheld was left out.
      *
      * @param list<array{absolutePath: string, pathspec: string, isFile: bool}> $requestedExistingPaths - Existing requested paths expressed as Git pathspecs.
      * @param list<string>                                                      $visiblePaths - Root-relative paths returned by `git ls-files`.
      *
-     * @return list<IgnoredPath> - one record per explicitly-requested existing path that Git's view or generated-file protection withheld,
-     *                           explaining each omission.
+     * @return list<IgnoredPath> - one record per explicitly-requested directory that Git's view withheld.
      */
     private function ignoredRequestedGitPaths(array $requestedExistingPaths, array $visiblePaths): array
     {
@@ -489,13 +525,6 @@ final readonly class SourceDiscovery
             // Git's own ignore rule withheld it, so record that as the reason.
             if ($gitRule !== null) {
                 $ignoredDetails[] = new IgnoredPath($displayPath, PathIgnoreResolver::SOURCE_GITIGNORE, $gitRule);
-                continue;
-            }
-
-            $generatedFilename = $this->ignoreResolver->matchedGeneratedFilename($requestedPath['absolutePath']);
-            // Otherwise a generated-file protection (a lockfile, etc.) held it back.
-            if ($generatedFilename !== null) {
-                $ignoredDetails[] = new IgnoredPath($displayPath, PathIgnoreResolver::SOURCE_GENERATED, $generatedFilename);
             }
         }
 
@@ -508,18 +537,29 @@ final readonly class SourceDiscovery
      *
      * @param list<string> $visiblePaths - Root-relative paths returned by `git ls-files`.
      * @param list<string> $configuredIgnorePatterns - Project config ignore patterns applied before creating SourceFile objects.
+     * @param list<string> $explicitFilePathspecs - Existing file operands that bypass Git and fallback exclusions.
      *
      * @return array{files: array<string, SourceFile>, ignoredDetails: list<IgnoredPath>} - the Git-visible set split into accepted source files
      *                      keyed by canonical path and the records for entries held back by config/default/generated ignores.
      */
-    private function sourceFilesFromGitVisiblePaths(array $visiblePaths, array $configuredIgnorePatterns): array
+    private function sourceFilesFromGitVisiblePaths(
+        array $visiblePaths,
+        array $configuredIgnorePatterns,
+        array $explicitFilePathspecs,
+    ): array
     {
         $files          = [];
         $ignoredDetails = [];
 
         // Classify each Git-visible path into an accepted file or an ignore record.
         foreach ($visiblePaths as $displayPath) {
-            $this->appendGitVisibleSourceFile($displayPath, $configuredIgnorePatterns, $files, $ignoredDetails);
+            $this->appendGitVisibleSourceFile(
+                $displayPath,
+                $configuredIgnorePatterns,
+                in_array($displayPath, $explicitFilePathspecs, true),
+                $files,
+                $ignoredDetails,
+            );
         }
 
         return [
@@ -534,6 +574,7 @@ final readonly class SourceDiscovery
      *
      * @param string                    $displayPath - Root-relative path emitted by `git ls-files` to classify.
      * @param list<string>              $configuredIgnorePatterns - Additional ignore patterns from config.
+     * @param bool                      $isExplicitFile - Whether this path was supplied as an existing file operand.
      * @param array<string, SourceFile> $files - Accepted files keyed by canonical path; appended in place.
      * @param list<IgnoredPath>         $ignoredDetails - Ignore records for paths held back; appended in place.
      *
@@ -542,6 +583,7 @@ final readonly class SourceDiscovery
     private function appendGitVisibleSourceFile(
         string $displayPath,
         array  $configuredIgnorePatterns,
+        bool   $isExplicitFile,
         array  &$files,
         array  &$ignoredDetails,
     ): void {
@@ -555,34 +597,29 @@ final readonly class SourceDiscovery
 
         $relativeDisplayPath = $this->displayPath($absolutePath);
 
-        $configuredPattern = $this->ignoreResolver->matchedConfiguredPattern($relativeDisplayPath, $configuredIgnorePatterns);
-        // The user's config ignores this file, which overrides Git visibility - record it, do not add it.
-        if ($configuredPattern !== null) {
+        $decision = $this->ignoreResolver->decide(
+            $relativeDisplayPath,
+            $absolutePath,
+            $configuredIgnorePatterns,
+            false,
+            $isExplicitFile,
+            false,
+        );
+        // A minified file gruff-php would not scan anyway, such as `jquery.min.js`, stays unsupported rather than ignored.
+        if ($decision->ignored && $decision->pattern === PathIgnoreResolver::MINIFIED_FILE_PATTERN && $this->sourceType($absolutePath) === null) {
+            return;
+        }
+
+        if ($decision->ignored) {
+            $ignoredDisplayPath = $decision->source === PathIgnoreResolver::SOURCE_CONFIG
+                ? $this->configuredIgnoredDisplayPath($absolutePath, $configuredIgnorePatterns)
+                : $relativeDisplayPath;
             $ignoredDetails[] = new IgnoredPath(
-                $this->configuredIgnoredDisplayPath($absolutePath, $configuredIgnorePatterns),
-                PathIgnoreResolver::SOURCE_CONFIG,
-                $configuredPattern,
+                $ignoredDisplayPath,
+                (string) $decision->source,
+                (string) $decision->pattern,
             );
 
-            // Config ignores override Git visibility: record the ignore and never add the file.
-            return;
-        }
-
-        $defaultDirectory = $this->ignoreResolver->matchedDefaultDirectory($relativeDisplayPath);
-        // A built-in directory ignore (vendor, node_modules, ...) also overrides Git visibility.
-        if ($defaultDirectory !== null) {
-            $ignoredDetails[] = new IgnoredPath($relativeDisplayPath, PathIgnoreResolver::SOURCE_DEFAULT, $defaultDirectory);
-
-            // Built-in default-directory ignores (vendor, node_modules, ...) likewise win over Git visibility.
-            return;
-        }
-
-        $generatedFilename = $this->ignoreResolver->matchedGeneratedFilename($absolutePath);
-        // A tracked generated file (a lockfile, etc.) is recorded as ignored rather than analysed.
-        if ($generatedFilename !== null) {
-            $ignoredDetails[] = new IgnoredPath($relativeDisplayPath, PathIgnoreResolver::SOURCE_GENERATED, $generatedFilename);
-
-            // Tracked generated files (lockfiles, etc.) are recorded as ignored rather than analysed.
             return;
         }
 

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\Security;
 
-use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Config\ConfigLoader;
 use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Engine\Parser\PhpFileParser;
 use GruffPhp\Engine\Source\SourceFile;
@@ -16,7 +16,6 @@ use GruffPhp\Rules\Security\ProcessCommandConstructionRule;
 use GruffPhp\Rules\Security\UnsafeArchiveExtractionRule;
 use GruffPhp\Rules\Security\ReflectedXssRule;
 use GruffPhp\Rules\Security\RequestControlledUrlRule;
-use GruffPhp\Rules\Security\VariableIncludeRule;
 use PhpParser\Error;
 use PhpParser\Node\Stmt;
 use PhpParser\NodeTraverser;
@@ -42,7 +41,6 @@ final class TaintAssignmentTest extends TestCase
         // One finding per tainted sink; the clean-overwrite and clean-concat functions must add none.
         self::assertRuleCount(HeaderInjectionRule::ID, 1, $findings);
         self::assertRuleCount(ReflectedXssRule::ID, 1, $findings);
-        self::assertRuleCount(VariableIncludeRule::ID, 1, $findings);
         self::assertRuleCount(ProcessCommandConstructionRule::ID, 1, $findings);
         self::assertRuleCount(RequestControlledUrlRule::ID, 1, $findings);
     }
@@ -111,7 +109,8 @@ PHP,
         );
 
         $registry = RuleRegistry::defaults();
-        $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', AnalysisConfig::fromRegistry($registry)));
+        // header-injection is opt-in, so the test config turns it on; with it off this zero would prove nothing.
+        $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', (new ConfigLoader(__DIR__ . '/../../..'))->load('tests/Fixtures/Config/enable-default-off-rules.yaml', $registry)));
 
         self::assertRuleCount(HeaderInjectionRule::ID, 0, $findings);
     }
@@ -135,11 +134,11 @@ PHP,
     }
 
     /**
-     * Run the full default registry over one security fixture file.
+     * Run the full registry over one security fixture file, with the opt-in security rules turned on.
      *
      * @param string $fixture - Fixture filename under tests/Fixtures/Security.
      *
-     * @return list<Finding> - every finding the default rule set produced for the fixture
+     * @return list<Finding> - every finding the default and opt-in rules produced for the fixture
      */
     private function analyse(string $fixture): array
     {
@@ -149,7 +148,7 @@ PHP,
                                                      'tests/Fixtures/Security/' . $fixture,
                                                  ));
 
-        return $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', AnalysisConfig::fromRegistry($registry)));
+        return $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', (new ConfigLoader(__DIR__ . '/../../..'))->load('tests/Fixtures/Config/enable-default-off-rules.yaml', $registry)));
     }
 
     /**

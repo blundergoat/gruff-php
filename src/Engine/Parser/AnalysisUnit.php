@@ -22,10 +22,10 @@ final class AnalysisUnit
     /**
      * Bundles a parsed file's source, statements, comment tokens, and any parse diagnostics.
      *
-     * @param SourceFile            $file - Source file that produced this analysis unit.
-     * @param string                $source - Raw source text.
-     * @param list<Stmt>            $statements - Parsed top-level statements.
-     * @param list<Token>           $tokens - Comment tokens emitted by the parser.
+     * @param SourceFile            $file        - Source file that produced this analysis unit.
+     * @param string                $source      - Raw source text.
+     * @param list<Stmt>            $statements  - Parsed top-level statements.
+     * @param list<Token>           $tokens      - Comment tokens emitted by the parser.
      * @param list<ParseDiagnostic> $diagnostics - Parse diagnostics collected for the file; empty when it parsed cleanly.
      */
     public function __construct(
@@ -38,14 +38,35 @@ final class AnalysisUnit
     }
 
     /**
-     * Reports whether this file hit any parse trouble, which is what marks it as unanalysed in reports.
+     * Reports whether this file hit fatal parse trouble, which is what marks it as unanalysed in reports.
      *
      * @return bool - True when the unit has at least one parse diagnostic.
      */
     public function hasParseErrors(): bool
     {
-        // A non-empty diagnostics list is the recorded signal that parsing failed for this file.
-        return $this->diagnostics !== [];
+        foreach ($this->diagnostics as $diagnostic) {
+            if ($diagnostic->isFatal) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Reports whether structural work was bounded while raw-text analysis remained available.
+     *
+     * @return bool - True once a bounded-deep-scan diagnostic was recorded against this unit.
+     */
+    public function isDeepScanBounded(): bool
+    {
+        foreach ($this->diagnostics as $diagnostic) {
+            if ($diagnostic->type === 'bounded-deep-scan') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -95,7 +116,7 @@ final class AnalysisUnit
      * AST stops being a reference cycle and PHP can free it promptly.
      *
      * @param Node $node - Subtree root to descend; its `parent` back-edge and every descendant's are nulled in
-     * place.
+     *                   place.
      *
      * @return void
      */

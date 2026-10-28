@@ -51,7 +51,7 @@ final class AnalyseCliMissingConfigGuardTest extends CliTestCase
             self::assertFileDoesNotExist($project . '/.gruff-php.yaml');
             self::assertStringNotContainsString(MissingConfigPrompt::PROMPT_TEXT, $process->getErrorOutput());
             $report = $this->decodeJsonOutput($process);
-            self::assertSame('gruff.analysis.v2', $report['schemaVersion']);
+            self::assertSame('gruff.analysis.v3', $report['schemaVersion']);
         } finally {
             $this->removeDir($project);
         }

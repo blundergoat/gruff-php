@@ -200,7 +200,7 @@ final class TrendRecorderTest extends TestCase
             $firstPersisted = $persisted[0] ?? null;
             self::assertIsArray($firstPersisted);
             self::assertCount(1, $persisted);
-            self::assertSame('gruff.analysis.v2', $firstPersisted['schemaVersion'] ?? null);
+            self::assertSame('gruff.analysis.v3', $firstPersisted['schemaVersion'] ?? null);
             self::assertSame(91, $firstPersisted['score'] ?? null);
             self::assertSame('A', $firstPersisted['grade'] ?? null);
             self::assertSame('full-project', $firstPersisted['scope'] ?? null);
@@ -372,6 +372,10 @@ final class TrendRecorderTest extends TestCase
     private function score(float $score, string $scope = 'full-project'): ScoreReport
     {
         return new ScoreReport(
+            clusters:               [],
+            ruleAttribution:        [],
+            evaluatedFiles:         10,
+            scoredPillars:          [],
             composite:              Grade::fromScore($score),
             pillars:                [],
             topOffenders:           [],

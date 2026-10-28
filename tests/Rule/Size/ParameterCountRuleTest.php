@@ -10,6 +10,7 @@ use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\PhpFileParser;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\RuleRegistry;
+use GruffPhp\Rules\Size\LimitBand;
 use GruffPhp\Rules\Size\ParameterCountRule;
 use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -50,19 +51,21 @@ final class ParameterCountRuleTest extends TestCase
     }
 
     /**
-     * Verify warning for six parameters.
+     * Verify six parameters against a warning tier of 5 are lower-band advisory notices and nine are still an error.
      *
      * @return void
      */
-    public function testWarningForSixParameters(): void
+    public function testSixParametersAreLowerBandNoticesAndNineAnError(): void
     {
         $findings = $this->analyse('many-params.php', ['warning' => 5, 'error' => 8]);
 
-        $warnings = array_values(array_filter($findings, static fn($finding) => $finding->severity === Severity::Warning));
-        $errors   = array_values(array_filter($findings, static fn($finding) => $finding->severity === Severity::Error));
+        $notices = array_values(array_filter($findings, static fn($finding) => $finding->severity === Severity::Advisory));
+        $errors  = array_values(array_filter($findings, static fn($finding) => $finding->severity === Severity::Error));
 
-        self::assertCount(2, $warnings);
+        self::assertCount(2, $notices);
+        self::assertSame([LimitBand::LOWER, LimitBand::LOWER], array_map(static fn($finding) => $finding->metadata[LimitBand::KEY], $notices));
         self::assertCount(1, $errors);
+        self::assertSame(LimitBand::UPPER, $errors[0]->metadata[LimitBand::KEY]);
 
         $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
         self::assertContains('ManyParamsFixture::sixParams()', $symbols);
@@ -186,8 +189,10 @@ final class ParameterCountRuleTest extends TestCase
                                                 static fn($finding) => $finding->symbol === 'ManyParamsFixture::__construct()',
                                             ));
 
+        // Six parameters against a constructor cap of 5 sit under one and a half times it, so the finding is a notice.
         self::assertCount(1, $constructorFindings);
-        self::assertSame(Severity::Warning, $constructorFindings[0]->severity);
+        self::assertSame(Severity::Advisory, $constructorFindings[0]->severity);
+        self::assertSame(LimitBand::LOWER, $constructorFindings[0]->metadata[LimitBand::KEY]);
         self::assertSame($constructorParamCount, $constructorFindings[0]->metadata['parameters']);
         self::assertSame($constructorMax, $constructorFindings[0]->metadata['threshold']);
         self::assertSame($constructorMax, $constructorFindings[0]->metadata['constructorMaxParameters']);
@@ -205,7 +210,8 @@ final class ParameterCountRuleTest extends TestCase
      */
     public function testConfiguredConstructorThresholdUsesDefaultSeverityThreshold(): void
     {
-        $constructorMax = 5;
+        // A cap of 4 puts the six-parameter constructor at one and a half times it, where the default severity applies.
+        $constructorMax = 4;
         $findings       = $this->analyseWithDefaultSettings(
             'many-params.php',
             ['constructorMaxParameters' => $constructorMax],
@@ -222,18 +228,21 @@ final class ParameterCountRuleTest extends TestCase
     }
 
     /**
-     * Verify service constructors with many dependencies keep the severe default threshold.
+     * Verify service constructors with many dependencies are judged by the default threshold, not exempt as value objects.
      *
      * @return void
      */
-    public function testServiceConstructorWithManyDependenciesKeepsDefaultErrorSeverity(): void
+    public function testServiceConstructorWithManyDependenciesIsNotExemptAsAValueObject(): void
     {
         $findings = $this->analyseWithDefaultSettings('service-dependencies.php', []);
 
+        // Twelve parameters against the default limit of 10 sit under one and a half times it, so the finding is a notice.
         self::assertCount(1, $findings);
         self::assertSame('ServiceWithTooManyDependencies::__construct()', $findings[0]->symbol);
         self::assertSame(12, $findings[0]->metadata['parameters']);
-        self::assertSame(Severity::Error, $findings[0]->severity);
+        self::assertArrayNotHasKey('findingKind', $findings[0]->metadata);
+        self::assertSame(LimitBand::LOWER, $findings[0]->metadata[LimitBand::KEY]);
+        self::assertSame(Severity::Advisory, $findings[0]->severity);
     }
 
     /**
@@ -241,7 +250,7 @@ final class ParameterCountRuleTest extends TestCase
      *
      * @return void
      */
-    public function testReadonlyServiceConstructorWithBehaviourKeepsDefaultErrorSeverity(): void
+    public function testReadonlyServiceConstructorWithBehaviourIsNotExemptAsAValueObject(): void
     {
         $findings = $this->analyseWithDefaultSettings('readonly-service-constructor.php', []);
 
@@ -250,8 +259,11 @@ final class ParameterCountRuleTest extends TestCase
                                                 static fn($finding) => $finding->symbol === 'ReadonlyServiceConstructorFixture::__construct()',
                                             ));
 
+        // Eleven parameters against the default limit of 10 sit under one and a half times it, so the finding is a notice.
         self::assertCount(1, $constructorFindings);
-        self::assertSame(Severity::Error, $constructorFindings[0]->severity);
+        self::assertArrayNotHasKey('findingKind', $constructorFindings[0]->metadata);
+        self::assertSame(LimitBand::LOWER, $constructorFindings[0]->metadata[LimitBand::KEY]);
+        self::assertSame(Severity::Advisory, $constructorFindings[0]->severity);
         self::assertSame(11, $constructorFindings[0]->metadata['parameters']);
     }
 
