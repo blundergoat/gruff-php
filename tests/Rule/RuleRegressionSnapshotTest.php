@@ -114,7 +114,8 @@ final class RuleRegressionSnapshotTest extends TestCase
         // and turning security.silent-catch and sensitive-data.pii-test-fixture off after their re-measures failed removes 16 and 13.
         // The group controls add 225 default-mode findings; the prior 1,558 findings stay identical.
         // M138 adds 116 findings on its new declaration fixture; every prior fixture finding is unchanged.
-        self::assertCount(1899, $findings);
+        // M145 enables groups by default: this rule emits 17 groups in place of 40 legacy findings.
+        self::assertCount(1876, $findings);
         // M08 made sensitive-data markers carry the class the detector already knew: a classified finding now reads
         // `[redacted:aws-access-key]` where it read `[redacted]`. The finding count, the rule set, and every
         // line-free identity are unchanged; only the marker text inside those findings moved.
@@ -126,7 +127,7 @@ final class RuleRegressionSnapshotTest extends TestCase
         // Precision-floor M05's 19 new fixture findings move the hash; no existing finding's message or identity changes.
         // Precision-floor M02's retirements, default-off changes, repair fixtures and four repaired rules going opt-in move the hash.
         self::assertSame(
-            '884735582ed00e2084d8cc9400346465d2eb0d74797ad3696756c4aea1d9b720',
+            'a289348fddab08358c6ef99857365090ccd52856e69658a364e33bfc9ad0fac4',
             hash('sha256', $json),
         );
     }

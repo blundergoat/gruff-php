@@ -25,7 +25,7 @@ use PhpParser\NodeFinder;
 /**
  * Flags three or more test methods in a class whose bodies share the same call and control-flow shape but
  * carry no data provider - a sign the same scenario is copy-pasted with different literals and would read
- * better as one parametrised test. The default-off groupFindings mode compares full syntax under family
+ * better as one parametrised test. The default groupFindings mode compares full syntax under family
  * contract section 16. Both modes run per class and honour path exemptions. Advisory, low confidence.
  */
 final readonly class RepeatedStructureMissingDataProviderRule implements RuleInterface
@@ -54,12 +54,12 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
             tier:               RuleTier::V01,
             defaultSeverity:    Severity::Advisory,
             confidence:         Confidence::Low,
-            defaultOptions:     ['ignoredPathPatterns' => [], 'groupFindings' => false],
+            defaultOptions:     ['ignoredPathPatterns' => [], 'groupFindings' => true],
             optionDescriptions: [
                 'groupFindings' => 'When true, compare complete test bodies within one class, with matching attributes and annotation tags, '
                     . 'at least two top-level statements and three members. Keep ASCII-whitespace strings and literal keys or indices exact; '
                     . 'keep declarations, their PHPDoc and all body attribute arguments exact; normalize other literal values by kind. '
-                    . 'Report every member and its location. Off by default until approved for activation.',
+                    . 'Report every member and its location. Enabled by default; set groupFindings to false for legacy shape-group findings.',
             ],
             falsePositiveShapes: [
                 [

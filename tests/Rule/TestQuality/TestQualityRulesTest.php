@@ -6,6 +6,7 @@ namespace GruffPhp\Tests\Rule\TestQuality;
 
 use GruffPhp\Engine\Config\AnalysisConfig;
 use GruffPhp\Engine\Config\ConfigLoader;
+use GruffPhp\Engine\Config\RuleSettings;
 use GruffPhp\Results\Finding\Confidence;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Severity;
@@ -220,8 +221,18 @@ final class TestQualityRulesTest extends TestCase
      */
     public function testRepeatedStructureMissingDataProviderDetectedAndDataProviderUsersIgnored(): void
     {
+        $registry = RuleRegistry::defaults();
+        $config = (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/enable-default-off-rules.yaml', $registry);
+        $settings = $config->ruleSettings(RepeatedStructureMissingDataProviderRule::ID);
+        $config = $config->withRuleSettings(RepeatedStructureMissingDataProviderRule::ID, new RuleSettings(
+            enabled: $settings->enabled,
+            thresholds: $settings->thresholds,
+            options: array_replace($settings->options, ['groupFindings' => false]),
+            severityThreshold: $settings->severityThreshold,
+            excludeFromScore: $settings->excludeFromScore,
+        ));
         $findings = array_values(array_filter(
-                                     $this->analysePath('tests/Fixtures/TestQuality/repeated-structure-missing-data-provider.php'),
+                                     $this->analysePath('tests/Fixtures/TestQuality/repeated-structure-missing-data-provider.php', $config),
                                      static fn(Finding $finding): bool => $finding->ruleId === RepeatedStructureMissingDataProviderRule::ID,
                                  ));
 

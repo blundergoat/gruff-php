@@ -353,9 +353,9 @@ final class RuleRegistryTest extends TestCase
         // Precision-floor M02 (2026-10-14) retired 36 rules on the operator's php table (ADR-034) and turned five more off by default.
         // Its repairs then left security.debug-mode-enabled and security.header-injection with under ten corpus findings, so both are opt-in,
         // and security.silent-catch and sensitive-data.pii-test-fixture still failed their re-measures, so the operator turned both off.
-        // The repeated-structure rule adds groupFindings with a false default.
+        // The calibrated repeated-structure rule enables groupFindings by default.
         self::assertSame(
-            '769efde9b6a5c4f8e7661106732f45ae72586c342c5f32f7f144b0fd6ac05044',
+            '4a1ce3781a19f91c694eac46d03c6ca706b1703d0c4ba764f026988b5a758c68',
             hash('sha256', $json),
         );
     }

@@ -103,7 +103,7 @@ final class RepeatedStructureMissingDataProviderRuleTest extends TestCase
      */
     public function testGroupModeListsEveryMemberAndItsDeclarationLine(): void
     {
-        $finding = $this->analyse('repeated-structure-groups.php', true)[0];
+        $finding = $this->analyse('repeated-structure-groups.php', null)[0];
 
         self::assertSame(4, $finding->metadata['groupSize']);
         self::assertSame([
@@ -193,21 +193,21 @@ final class RepeatedStructureMissingDataProviderRuleTest extends TestCase
      * Parse and analyse a repeated-structure fixture.
      *
      * @param string $fixture       - Fixture filename.
-     * @param bool   $groupFindings - Whether to enable the complete-syntax group mode.
+     * @param bool|null $groupFindings - Explicit mode, or null to use the configured default.
      *
      * @return list<Finding> - rule findings for the fixture, ordered as the rule emits them, empty when none match
      */
-    private function analyse(string $fixture, bool $groupFindings = false): array
+    private function analyse(string $fixture, ?bool $groupFindings = false): array
     {
         $unit     = $this->parseFixture($fixture);
         $registry = RuleRegistry::defaults();
         $config   = AnalysisConfig::fromRegistry($registry);
-        if ($groupFindings) {
+        if ($groupFindings !== null) {
             $settings = $config->ruleSettings(RepeatedStructureMissingDataProviderRule::ID);
             $config   = $config->withRuleSettings(RepeatedStructureMissingDataProviderRule::ID, new RuleSettings(
                 enabled:           $settings->enabled,
                 thresholds:        $settings->thresholds,
-                options:           array_replace($settings->options, ['groupFindings' => true]),
+                options:           array_replace($settings->options, ['groupFindings' => $groupFindings]),
                 severityThreshold: $settings->severityThreshold,
                 excludeFromScore:  $settings->excludeFromScore,
             ));

@@ -393,7 +393,7 @@ rules:
     test-quality.repeated-structure-missing-data-provider:
         enabled: true
         options:
-            groupFindings: false
+            groupFindings: true
             ignoredPathPatterns:
                 - 'tests/Console/AnalyseCliTest.php'
                 - 'tests/Rule/DeadCode/DeadCodeRulesTest.php'
