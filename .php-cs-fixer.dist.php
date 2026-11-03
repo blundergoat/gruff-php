@@ -146,8 +146,8 @@ final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
     /**
      * Align one consecutive block of multiline named arguments.
      *
-     * @param list<string> $lines
-     * @param list<int>    $group
+     * @param list<string> $lines - lines being fixed, in place: if every group row parses, each value is padded to the longest name and right-trimmed
+     * @param list<int>    $group - indexes into $lines of one run of named-argument lines; a run shorter than two changes nothing
      * @return void
      */
     private function alignGroup(array &$lines, array $group): void
