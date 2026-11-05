@@ -1,4 +1,0 @@
-schemaVersion: gruff-php.config.v0.1
-rules:
-    test-quality.multiple-aaa-cycles:
-        enabled: true

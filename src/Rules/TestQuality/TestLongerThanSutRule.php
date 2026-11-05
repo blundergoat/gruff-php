@@ -13,6 +13,7 @@ use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
+use GruffPhp\Rules\Size\SubstantiveLineCounter;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Name;
 
@@ -36,13 +37,20 @@ final readonly class TestLongerThanSutRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id:                self::ID,
-            name:              'Test longer than apparent SUT',
-            pillar:            Pillar::TestQuality,
-            tier:              RuleTier::V01,
-            defaultSeverity:   Severity::Advisory,
-            confidence:        Confidence::Low,
-            defaultThresholds: ['minTestLines' => 12],
+            id:                  self::ID,
+            name:                'Test longer than apparent SUT',
+            pillar:              Pillar::TestQuality,
+            tier:                RuleTier::V01,
+            defaultSeverity:     Severity::Advisory,
+            confidence:          Confidence::Low,
+            defaultThresholds:   ['minTestLines' => 12],
+            isEnabledByDefault:  false,
+            falsePositiveShapes: [
+                [
+                    'shape' => 'A long test around a single call whose length is real table-driven coverage, such as one call checked against many expected fields.',
+                    'mitigation' => 'The real system under test is never measured, only the test\'s own length and call count, so raise this rule\'s minTestLines threshold.',
+                ],
+            ],
         );
     }
 
@@ -50,7 +58,7 @@ final readonly class TestLongerThanSutRule implements RuleInterface
      * Reports long tests that appear to exercise only one SUT call.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
      *
      * @return list<Finding> - Findings for tests with disproportionate setup/assertion size.
      */
@@ -63,8 +71,10 @@ final readonly class TestLongerThanSutRule implements RuleInterface
         // Weigh every test scope in the file.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             $sutCalls = $this->sutCalls($scope);
+            // Code lines only (FAMILY-CONTRACT section 12): comments, attributes and blank lines are free.
+            $testLines = max(1, SubstantiveLineCounter::countRange($analysisUnit, $scope->line, $scope->endLine ?? $scope->line));
             // Only long tests with a single SUT call and at least one assertion qualify.
-            if ($scope->lineCount() < $minTestLines || count($sutCalls) > 1 || TestQualityNodeHelper::assertionCalls($scope) === []) {
+            if ($testLines < $minTestLines || count($sutCalls) > 1 || TestQualityNodeHelper::assertionCalls($scope) === []) {
                 continue;
             }
 
@@ -77,14 +87,14 @@ final readonly class TestLongerThanSutRule implements RuleInterface
                 ruleId:      self::ID,
                 message:     sprintf('%s is long while exercising only %d apparent SUT call.', $scope->symbol, count($sutCalls)),
                 filePath:    $analysisUnit->file->displayPath,
-                line:        $scope->line,
+                line:        $scope->anchorLine(),
                 severity:    Severity::Advisory,
                 pillar:      Pillar::TestQuality,
                 tier:        RuleTier::V01,
                 confidence:  Confidence::Low,
                 symbol:      $scope->symbol,
                 remediation: 'Review whether setup and assertions can be simplified or split; this static rule cannot measure the SUT directly.',
-                metadata:    ['testLines' => $scope->lineCount(), 'sutCalls' => count($sutCalls)],
+                metadata:    ['testLines' => $testLines, 'sutCalls' => count($sutCalls)],
             );
         }
 
@@ -151,7 +161,7 @@ final readonly class TestLongerThanSutRule implements RuleInterface
     /**
      * Reports whether a receiver looks like a test harness (by variable name or inline new).
      *
-     * @param Expr         $receiver - Method-call receiver, matched as a named variable or an inline `new`.
+     * @param Expr         $receiver       - Method-call receiver, matched as a named variable or an inline `new`.
      * @param list<string> $variableTokens - Lowercase variable-name fragments accepted as harnesses.
      *
      * @return bool - True when the receiver looks like a test harness.

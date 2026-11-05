@@ -6,17 +6,12 @@ namespace GruffPhp\Tests\Rule\Naming;
 
 use GruffPhp\Engine\Config\AnalysisConfig;
 use GruffPhp\Engine\Config\RuleSettings;
-use GruffPhp\Results\Finding\RemediationAction;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\PhpFileParser;
-use GruffPhp\Rules\Naming\BooleanPrefixRule;
 use GruffPhp\Rules\Naming\ClassFileMismatchRule;
 use GruffPhp\Rules\Naming\ConfusingNameRule;
-use GruffPhp\Rules\Naming\GenericMethodNameRule;
-use GruffPhp\Rules\Naming\HungarianNotationRule;
 use GruffPhp\Rules\Naming\IdentifierQualityRule;
 use GruffPhp\Rules\Naming\ShortVariableRule;
-use GruffPhp\Rules\Naming\SuffixHungarianRule;
 use GruffPhp\Rules\Naming\TestNamingConsistencyRule;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\RuleRegistry;
@@ -28,51 +23,6 @@ use GruffPhp\Engine\Source\SourceFile;
  */
 final class NamingRulesTest extends NamingRuleTestCase
 {
-    /**
-     * Verify generic method names detected.
-     *
-     * @return void
-     */
-    public function testGenericMethodNamesDetected(): void
-    {
-        $findings = $this->analyseRule('generic-method.php', GenericMethodNameRule::ID);
-
-        self::assertCount(6, $findings);
-
-        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
-        self::assertContains('GenericMethodFixture::process()', $symbols);
-        self::assertContains('GenericMethodFixture::handle()', $symbols);
-        self::assertContains('GenericMethodFixture::execute()', $symbols);
-    }
-
-    /**
-     * Verify qualified method names not flagged.
-     *
-     * @return void
-     */
-    public function testQualifiedMethodNamesNotFlagged(): void
-    {
-        $findings = $this->analyseRule('generic-method.php', GenericMethodNameRule::ID);
-
-        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
-        self::assertNotContains('GenericMethodFixture::processPayment()', $symbols);
-        self::assertNotContains('GenericMethodFixture::handleRequest()', $symbols);
-        self::assertNotContains('GenericMethodFixture::calculateTotal()', $symbols);
-    }
-
-    /**
-     * Verify symfony console execute override not flagged.
-     *
-     * @return void
-     */
-    public function testSymfonyConsoleExecuteOverrideNotFlagged(): void
-    {
-        $findings = $this->analyseRule('generic-method.php', GenericMethodNameRule::ID);
-
-        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
-        self::assertNotContains('FrameworkOverrideFixture::execute()', $symbols);
-    }
-
     /**
      * Verify single char variables detected.
      *
@@ -112,142 +62,6 @@ final class NamingRulesTest extends NamingRuleTestCase
 
         $vars = array_map(static fn($finding) => $finding->metadata['variable'] ?? null, $findings);
         self::assertNotContains('e', $vars);
-    }
-
-    /**
-     * Verify boolean prefix missing.
-     *
-     * @return void
-     */
-    public function testBooleanPrefixMissing(): void
-    {
-        $findings = $this->analyseRule('boolean-prefix.php', BooleanPrefixRule::ID);
-        $symbols  = array_map(static fn($finding) => $finding->symbol, $findings);
-        $actions  = array_values(array_unique(array_map(
-            static fn($finding): string => is_string($finding->metadata['remediationAction'] ?? null)
-                ? $finding->metadata['remediationAction']
-                : '',
-            $findings,
-        )));
-        $configurationKeys = array_values(array_unique(array_map(
-            static fn($finding): string => is_string($finding->metadata['configurationKey'] ?? null)
-                ? $finding->metadata['configurationKey']
-                : '',
-            $findings,
-        )));
-
-        self::assertNotSame([], $findings);
-        self::assertContains('BooleanPrefixFixture::active()', $symbols);
-        self::assertContains('BooleanPrefixFixture::enabled()', $symbols);
-        self::assertContains('BooleanPrefixFixture::status()', $symbols);
-        self::assertContains('BooleanPrefixFixture::check()', $symbols);
-        self::assertContains('BooleanPrefixFixture::didRun()', $symbols);
-        // A prefix followed by a lowercase letter is no word boundary, so these still flag.
-        self::assertContains('BooleanPrefixFixture::hasty()', $symbols);
-        self::assertContains('BooleanPrefixFixture::isolate()', $symbols);
-        self::assertContains('BooleanStateVocabularyFixture::valid()', $symbols);
-        self::assertContains('BooleanStateVocabularyFixture::available()', $symbols);
-        self::assertContains('BooleanStateVocabularyFixture::resolved()', $symbols);
-        self::assertContains('BooleanStateVocabularyFixture::printable()', $symbols);
-        self::assertContains('BooleanStateVocabularyFixture::unrequested()', $symbols);
-        self::assertContains('BooleanStateVocabularyFixture::assistantRequirementsContext()', $symbols);
-        self::assertContains('BooleanStateVocabularyFixture::assistantIntentRequires()', $symbols);
-        self::assertContains('printable()', $symbols);
-
-        self::assertSame([RemediationAction::Consider->value], $actions);
-        self::assertSame(
-            ['rules.naming.boolean-prefix.options.acceptedBooleanNames'],
-            $configurationKeys,
-        );
-    }
-
-    /**
-     * Verify good boolean prefix not flagged.
-     *
-     * @return void
-     */
-    public function testGoodBooleanPrefixNotFlagged(): void
-    {
-        $findings = $this->analyseRule('boolean-prefix.php', BooleanPrefixRule::ID);
-
-        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
-        self::assertNotContains('BooleanPrefixFixture::isActive()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::hasPermission()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::canEdit()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::wasReady()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::containsValue()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::looksLikeTestFile()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::matchesPattern()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::supportsFeature()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::allowsGuestAccess()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::requiresReview()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::usesCache()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::acceptsPayload()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::permitsRetry()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::includesArchivedRows()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::excludesInactivePatients()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::enablesPracticeAssistant()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::disablesLegacyFallback()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::supportsSelectedAnswerScope()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::requiresCreditPurchaseAccess()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::usesCodeOwnedAnswer()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::matchesPrompt()', $symbols);
-        // An underscore after the prefix is a snake_case word boundary, so these read as predicates.
-        self::assertNotContains('BooleanPrefixFixture::has_note_been_actioned()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::is_valid_state()', $symbols);
-        self::assertNotContains('BooleanStateVocabularyFixture::paymentRequested()', $symbols);
-        self::assertNotContains('BooleanStateVocabularyFixture::printableTodayScheduleRequested()', $symbols);
-        self::assertNotContains('BooleanStateVocabularyFixture::scheduleLinkEnabled()', $symbols);
-        self::assertNotContains('BooleanStateVocabularyFixture::readOnlyScheduleAllowed()', $symbols);
-        self::assertNotContains('BooleanStateVocabularyFixture::declineCodeExplanationRequested()', $symbols);
-        self::assertNotContains('BooleanStateVocabularyFixture::assistantIntentRequiresContext()', $symbols);
-        self::assertNotContains('report_requested()', $symbols);
-        self::assertNotContains('assistant_intent_requires_context()', $symbols);
-    }
-
-    /**
-     * Verify non bool method not flagged.
-     *
-     * @return void
-     */
-    public function testNonBoolMethodNotFlagged(): void
-    {
-        $findings = $this->analyseRule('boolean-prefix.php', BooleanPrefixRule::ID);
-
-        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
-        self::assertNotContains('BooleanPrefixFixture::getName()', $symbols);
-    }
-
-    /**
-     * Verify hungarian notation detected.
-     *
-     * @return void
-     */
-    public function testHungarianNotationDetected(): void
-    {
-        $findings = $this->analyseRule('hungarian.php', HungarianNotationRule::ID);
-
-        $vars = array_map(static fn($finding) => $finding->metadata['variable'] ?? null, $findings);
-        self::assertContains('strName', $vars);
-        self::assertContains('arrItems', $vars);
-        self::assertContains('intCount', $vars);
-        self::assertContains('boolReady', $vars);
-        self::assertContains('objUser', $vars);
-    }
-
-    /**
-     * Verify clean variables not flagged as hungarian.
-     *
-     * @return void
-     */
-    public function testCleanVariablesNotFlaggedAsHungarian(): void
-    {
-        $findings = $this->analyseRule('hungarian.php', HungarianNotationRule::ID);
-
-        $vars = array_map(static fn($finding) => $finding->metadata['variable'] ?? null, $findings);
-        self::assertNotContains('name', $vars);
-        self::assertNotContains('items', $vars);
-        self::assertNotContains('strategy', $vars);
     }
 
     /**
@@ -315,6 +129,26 @@ final class NamingRulesTest extends NamingRuleTestCase
 
         self::assertCount(1, $findings);
         self::assertSame('CleanNamingFixture', $findings[0]->symbol);
+        // A lowercase stem is not a class name, so only the file rename is offered.
+        self::assertSame('Rename the file to CleanNamingFixture.php so it matches the class it declares.', $findings[0]->remediation);
+    }
+
+    /**
+     * Verify class file mismatch offers the class rename only when the file stem is already a StudlyCaps class name.
+     *
+     * @return void
+     */
+    public function testClassFileMismatchOffersClassRenameOnlyForStudlyCapsStem(): void
+    {
+        $source = "<?php\n\nfinal class Gadget\n{\n}\n";
+
+        $studly = $this->analyseSourceRule($source, ClassFileMismatchRule::ID, 'src/Widget.php');
+        $snake  = $this->analyseSourceRule($source, ClassFileMismatchRule::ID, 'src/gadget_widget.php');
+
+        self::assertCount(1, $studly);
+        self::assertSame('Rename the file to Gadget.php or the class to Widget.', $studly[0]->remediation);
+        self::assertCount(1, $snake);
+        self::assertSame('Rename the file to Gadget.php so it matches the class it declares.', $snake[0]->remediation);
     }
 
     /**
@@ -374,6 +208,11 @@ final class NamingRulesTest extends NamingRuleTestCase
         self::assertSame('placeholder', $reported['function:bar'] ?? null);
         self::assertSame('placeholder', $reported['parameter:obj'] ?? null);
         self::assertSame('placeholder', $reported['variable:tmp'] ?? null);
+        // placeholderNames and genericTokens list what the rule reports, so the advice points an intentional name at ignoredNames.
+        self::assertSame(
+            ['Rename the identifier to describe its domain role or action. If the name is intentional, add it to `rules.naming.identifier-quality.options.ignoredNames` in `.gruff-php.yaml`, or remove the token from `placeholderNames` or `genericTokens` when your project does not treat it as a placeholder.'],
+            array_values(array_unique(array_map(static fn($finding): ?string => $finding->remediation, $findings))),
+        );
     }
 
     /**
@@ -489,27 +328,9 @@ final class NamingRulesTest extends NamingRuleTestCase
         self::assertTrue($this->hasFinding(findings: $findings, ruleId: ShortVariableRule::ID, metadataKey: 'variable', metadataValue: 'x', symbolPrefix: 'arrow@'));
         self::assertTrue($this->hasFinding(findings: $findings, ruleId: IdentifierQualityRule::ID, metadataKey: 'identifierName', metadataValue: 'foo', symbolPrefix: 'closure@'));
         self::assertTrue($this->hasFinding(findings: $findings, ruleId: IdentifierQualityRule::ID, metadataKey: 'identifierName', metadataValue: 'tmp', symbolPrefix: 'closure@'));
-        self::assertTrue($this->hasFinding(findings: $findings, ruleId: HungarianNotationRule::ID, metadataKey: 'variable', metadataValue: 'strName', symbolPrefix: 'closure@'));
-        self::assertTrue($this->hasFinding(findings: $findings, ruleId: BooleanPrefixRule::ID, metadataKey: 'identifierName', metadataValue: 'changedOnly', symbolPrefix: 'closure@'));
 
         self::assertFalse($this->hasFinding(findings: $findings, ruleId: IdentifierQualityRule::ID, metadataKey: 'identifierName', metadataValue: 'foo', symbolPrefix: 'ClosureCoverageFixture::run()'));
         self::assertFalse($this->hasFinding(findings: $findings, ruleId: ShortVariableRule::ID, metadataKey: 'variable', metadataValue: 'x', symbolPrefix: 'ClosureCoverageFixture::run()'));
-    }
-
-    /**
-     * Verify suffix-Hungarian notation is detected while conversion idioms stay clear.
-     *
-     * @return void
-     */
-    public function testSuffixHungarianDetectsTrailingTypeTokens(): void
-    {
-        $findings = $this->analyseRule('suffix-hungarian.php', SuffixHungarianRule::ID);
-        $names    = array_map(static fn($finding): mixed => $finding->metadata['identifierName'] ?? null, $findings);
-
-        self::assertContains('rawString', $names);
-        self::assertContains('useMap', $names);
-        self::assertNotContains('cache', $names);
-        self::assertNotContains('nameAsString', $names);
     }
 
     /**

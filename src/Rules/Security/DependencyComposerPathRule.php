@@ -31,18 +31,27 @@ final class DependencyComposerPathRule implements SourceTextRuleInterface
     /**
      * Describes the Composer path-repository rule for the registry and reports.
      *
-     * @return RuleDefinition - Rule metadata and defaults.
+     * @return RuleDefinition - metadata `list-rules` publishes; the rule ships off by default, so only a config can turn it on
      */
     public function definition(): RuleDefinition
     {
         // Medium confidence by default: a path repo is a smell to review, not proof of a vulnerability.
         return new RuleDefinition(
-            id:              self::ID,
-            name:            'Composer path repository',
-            pillar:          Pillar::Security,
-            tier:            RuleTier::V01,
-            defaultSeverity: Severity::Warning,
-            confidence:      Confidence::Medium,
+            id:                 self::ID,
+            name:               'Composer path repository',
+            pillar:             Pillar::Security,
+            tier:               RuleTier::V01,
+            defaultSeverity:    Severity::Warning,
+            confidence:         Confidence::Medium,
+            // Off unless a project sets `enabled: true`: the 0.6.0 precision measurement found both judged findings wrong (ADR-034).
+            // Two findings are too few to delete the rule on, so it stays available for projects that want it.
+            isEnabledByDefault: false,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A monorepo that develops its own first-party packages through path repositories pointing inside the same reviewed checkout.',
+                    'mitigation' => 'Every path repository is reported because the linked target is not resolved, so confirm the path is first-party and accept the finding.',
+                ],
+            ],
         );
     }
 

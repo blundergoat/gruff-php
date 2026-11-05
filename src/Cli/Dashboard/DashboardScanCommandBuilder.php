@@ -78,7 +78,7 @@ final readonly class DashboardScanCommandBuilder
      * @param array<string, string> $state - Sanitised dashboard form state used to build analyse flags.
      *
      * @phpstan-param array{project: string, paths: string, scanScope: string, failOn: string, config: string, baseline: string, noBaseline: string,
-     *                noConfig: string, includeIgnored: string, reportInteractive: string} $state
+     *                noConfig: string, deepScanBudget: string, includeIgnored: string, reportInteractive: string} $state
      *
      * @return list<string> - full argv for the analyse run: PHP binary, gruff binary, flags, then path operands after the -- separator
      */
@@ -92,6 +92,11 @@ final readonly class DashboardScanCommandBuilder
         } elseif ($state['config'] !== '' && $state['config'] !== ConfigLoader::DEFAULT_CONFIG_FILE) {
             $command[] = '--config';
             $command[] = $state['config'];
+        }
+
+        if ($state['deepScanBudget'] !== '') {
+            $command[] = '--deep-scan-budget';
+            $command[] = $state['deepScanBudget'];
         }
 
         // Baseline choice: skip the baseline entirely, or point the scan at the baseline file the user named.

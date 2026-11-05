@@ -1,6 +1,6 @@
 ---
 category: tests
-last_reviewed: 2026-07-03
+last_reviewed: 2026-09-27
 ---
 
 # Test Patterns
@@ -18,4 +18,4 @@ last_reviewed: 2026-07-03
 
 The test then asserts `$consoleOutput->fetch()` returns `''` (no main-stream leakage) and that the supplied error buffer contains the expected prompt text plus any dispatched sub-command output.
 
-**Verification:** `composer test` covers the routing assertion. `scripts/preflight-checks.sh` (search: `gruff_php_check`) is the second gate — it runs gruff with `--fail-on advisory`, so the fake's shape must satisfy `docs.missing-public-phpdoc`, `naming.parameter-type-name`, `waste.empty-method`, and `waste.one-line-method`. See `.goat-flow/learning-loop/footguns/tests.md` "Anonymous-class test fakes are scored by gruff's production rules" for why these rules apply to test code at all.
+**Verification:** `composer test` covers the routing assertion. `scripts/preflight-checks.sh` (search: `gruff_php_check`) is the second gate: it runs the configured full self-scan with `--fail-on advisory`, so the fake's shape must satisfy `docs.missing-phpdoc`, `waste.empty-method`, and `waste.one-line-method`. The security scan in `composer check` omits tests. See `.goat-flow/learning-loop/footguns/tests.md` "Anonymous-class test fakes are scored by gruff's production rules" for why these rules apply to test code.

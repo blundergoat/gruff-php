@@ -1,7 +1,10 @@
 # Releasing
 
-This page captures the gruff-php release checks that protect the user-facing CLI
-and report contracts.
+**Maintainer-only.** This page is for whoever cuts a `gruff-php` release; nothing
+here is needed to use the tool. Start at the [documentation index](README.md).
+
+It captures the gruff-php release checks that protect the user-facing CLI and
+report contracts.
 
 ## Version Bump
 

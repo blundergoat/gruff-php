@@ -8,7 +8,7 @@ use JsonException;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers gruff.hook.v1 rule-selection and new-only identity edge cases.
+ * Covers gruff.hook.v2 rule-selection and new-only identity edge cases.
  */
 final class HookCliFilteringTest extends CliTestCase
 {
@@ -88,7 +88,7 @@ YAML);
                 self::assertFalse($config['schemaOk'] ?? true, sprintf('Expected schema failure for %s.', $option));
                 self::assertSame(
                     sprintf('Unknown rule id "docs.missing-public-phpdox" for %s.', $option),
-                    $config['error'] ?? null,
+                    is_array($config['error'] ?? null) ? ($config['error']['message'] ?? null) : null,
                     sprintf('Expected unknown-rule message for %s.', $option),
                 );
                 self::assertSame([], $this->findingRows($report), sprintf('Expected no findings for %s.', $option));
@@ -121,7 +121,7 @@ selection:
 YAML);
             file_put_contents($tempDir . '/E.php', $this->singleSuppressionSource());
 
-            [$baselineProcess, $baselineReport] = $this->runHook($tempDir, [
+            [, $baselineReport] = $this->runHook($tempDir, [
                 'hook',
                 'E.php',
                 '--config',
@@ -129,7 +129,7 @@ YAML);
                 '--format',
                 'json',
             ]);
-            file_put_contents($tempDir . '/baseline.json', $baselineProcess->getOutput());
+            $this->generateBaseline($tempDir, 'gruff-test.yaml', 'baseline.json');
             self::assertCount(1, $this->findingRows($baselineReport));
 
             file_put_contents($tempDir . '/E.php', $this->doubleSuppressionSource());
@@ -143,7 +143,9 @@ YAML);
             ]);
             $fullRows = $this->findingRows($fullReport);
             self::assertCount(2, $fullRows);
-            self::assertNotSame($fullRows[0]['stableIdentity'] ?? null, $fullRows[1]['stableIdentity'] ?? null);
+            // Baseline v3 matches duplicates by count rather than by naming each one separately: two findings on one
+            // declaration share an identity, and a baseline recording one occurrence leaves exactly one of them new.
+            self::assertSame($fullRows[0]['stableIdentity'] ?? null, $fullRows[1]['stableIdentity'] ?? null);
 
             [, $filteredReport] = $this->runHook($tempDir, [
                 'hook',
@@ -156,10 +158,29 @@ YAML);
                 'json',
             ]);
             self::assertCount(1, $this->findingRows($filteredReport));
-            self::assertSame(1, $this->suppressedCount($filteredReport));
+            // A baseline match is reviewed debt, not a changed-region drop, so the run block is what records it.
+            self::assertTrue($this->runBaselineBlock($filteredReport)['applied'] ?? false);
         } finally {
             $this->removeDir($tempDir);
         }
+    }
+
+    /**
+     * Read the applied-baseline block a v2 hook payload reports, so a test can assert what classified the run.
+     *
+     * @param array<string, mixed> $report - Decoded hook report.
+     *
+     * @return array<string, mixed> - The run block's baseline map: applied, schemaVersion, and path.
+     */
+    private function runBaselineBlock(array $report): array
+    {
+        $runAudit = $report['run'] ?? null;
+        self::assertIsArray($runAudit);
+        $baseline = $runAudit['baseline'] ?? null;
+        self::assertIsArray($baseline);
+
+        /** @var array<string, mixed> $baseline Decoded JSON object, asserted as an array above. */
+        return $baseline;
     }
 
     /**
@@ -211,19 +232,30 @@ YAML);
     }
 
     /**
-     * Read the hook suppressed count.
+     * Write a ratified baseline v3 file the hook can apply, the same file `analyse --generate-baseline` gives a user.
      *
-     * @param array<string, mixed> $report - Decoded hook report.
+     * @param string $cwd          - Project directory the baseline is generated in.
+     * @param string $configFile   - Config the generating scan runs under, so the baseline covers the same rules.
+     * @param string $baselineFile - Project-relative destination for the generated baseline.
      *
-     * @return int - Suppressed count.
+     * @return void
      */
-    private function suppressedCount(array $report): int
+    private function generateBaseline(string $cwd, string $configFile, string $baselineFile): void
     {
-        $suppressed = $report['suppressed'] ?? null;
-        self::assertIsArray($suppressed);
-        self::assertIsInt($suppressed['count'] ?? null);
+        $process = new Process([
+            PHP_BINARY,
+            self::PROJECT_ROOT . '/bin/gruff-php',
+            'analyse',
+            '.',
+            '--config',
+            $configFile,
+            '--generate-baseline',
+            $baselineFile,
+        ], $cwd);
+        $process->run();
 
-        return $suppressed['count'];
+        // A generating scan still reports its findings, so its exit code says nothing about whether the file was written.
+        self::assertFileExists($cwd . '/' . $baselineFile, $process->getErrorOutput());
     }
 
     /**

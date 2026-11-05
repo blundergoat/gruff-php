@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GruffPhp\Tests\Rule\Security;
 
 use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Config\RuleSettings;
 use GruffPhp\Results\Finding\Confidence;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Pillar;
@@ -14,14 +15,15 @@ use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\RuleRegistry;
 use GruffPhp\Rules\Security\DependencyComposerPathRule;
 use GruffPhp\Rules\Security\DependencyComposerScriptRule;
-use GruffPhp\Rules\Security\DependencyComposerUnpinnedRule;
 use GruffPhp\Rules\Security\DependencyComposerVcsRule;
 use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers the Composer dependency-posture security rules: VCS/path repositories,
- * unpinned constraints, and install-time shell scripts scanned from a manifest.
+ * Covers the Composer dependency warnings users see when Gruff PHP scans a project manifest.
+ *
+ * It verifies repository sources and install scripts.
+ * The path and VCS rules ship off by default, so these tests enable them to prove what each reports once a project turns it on.
  */
 final class DependencyComposerRulesTest extends TestCase
 {
@@ -64,27 +66,6 @@ final class DependencyComposerRulesTest extends TestCase
     }
 
     /**
-     * Verify only unbounded constraints fire and pinned/ranged ones do not.
-     *
-     * @return void
-     */
-    public function testUnpinnedConstraintsDetectedAndPinnedConstraintsIgnored(): void
-    {
-        $findings = $this->findingsForRule(self::RISKY_FIXTURE, DependencyComposerUnpinnedRule::ID);
-
-        self::assertCount(5, $findings);
-
-        $packages = array_map(static fn(Finding $finding): mixed => $finding->metadata['package'] ?? null, $findings);
-        self::assertContains('acme/wildcard-lib', $packages);
-        self::assertContains('acme/partial-wildcard-lib', $packages);
-        self::assertContains('acme/branch-lib', $packages);
-        self::assertContains('acme/unbounded-helper', $packages);
-        self::assertContains('acme/mixed-range-lib', $packages);
-        self::assertNotContains('acme/pinned-lib', $packages);
-        self::assertNotContains('php', $packages);
-    }
-
-    /**
      * Verify a shell/remote install-time script is flagged and a safe one is not.
      *
      * @return void
@@ -111,7 +92,6 @@ final class DependencyComposerRulesTest extends TestCase
         foreach ([
                      DependencyComposerVcsRule::ID,
                      DependencyComposerPathRule::ID,
-                     DependencyComposerUnpinnedRule::ID,
                      DependencyComposerScriptRule::ID,
                  ] as $ruleId) {
             self::assertSame([], $this->findingsForRule(self::CLEAN_FIXTURE, $ruleId), $ruleId);
@@ -131,11 +111,14 @@ final class DependencyComposerRulesTest extends TestCase
                                                      SourceFile::TYPE_TEXT,
                                                  ));
         $registry = RuleRegistry::defaults();
-        $findings = $registry->analyse([$unit], new RuleContext(self::PROJECT_ROOT, AnalysisConfig::fromRegistry($registry)));
+        $findings = $registry->analyse([$unit], new RuleContext(self::PROJECT_ROOT, $this->configWithEveryDependencyRule($registry)));
 
         $dependencyFindings = array_values(array_filter(
                                                $findings,
-                                               static fn(Finding $finding): bool => str_starts_with($finding->ruleId, 'security.dependency-composer-'),
+                                               static fn(Finding $finding): bool => str_starts_with(
+                                                   $finding->ruleId,
+                                                   'security.dependency-composer-',
+                                               ),
                                            ));
 
         self::assertSame([], $dependencyFindings);
@@ -157,8 +140,34 @@ final class DependencyComposerRulesTest extends TestCase
                                                      SourceFile::TYPE_TEXT,
                                                  ));
         $registry = RuleRegistry::defaults();
-        $findings = $registry->analyse([$unit], new RuleContext(self::PROJECT_ROOT, AnalysisConfig::fromRegistry($registry)));
+        $findings = $registry->analyse([$unit], new RuleContext(self::PROJECT_ROOT, $this->configWithEveryDependencyRule($registry)));
 
         return array_values(array_filter($findings, static fn(Finding $finding): bool => $finding->ruleId === $ruleId));
+    }
+
+    /**
+     * Builds the default config with the path and VCS repository rules switched on, since both ship off by default.
+     *
+     * @param RuleRegistry $registry - Default registry the config is seeded from.
+     *
+     * @return AnalysisConfig - registry defaults with every Composer dependency rule enabled
+     */
+    private function configWithEveryDependencyRule(RuleRegistry $registry): AnalysisConfig
+    {
+        $config = AnalysisConfig::fromRegistry($registry);
+
+        // Both ship off by default; enabling them here mirrors a project that sets `enabled: true` for each.
+        foreach ([DependencyComposerPathRule::ID, DependencyComposerVcsRule::ID] as $ruleId) {
+            $settings = $config->ruleSettings($ruleId);
+            $config   = $config->withRuleSettings($ruleId, new RuleSettings(
+                true,
+                $settings->thresholds,
+                $settings->options,
+                $settings->severityThreshold,
+                $settings->excludeFromScore,
+            ));
+        }
+
+        return $config;
     }
 }

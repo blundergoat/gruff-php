@@ -157,14 +157,11 @@ final class SecurityNodeHelper
     /**
      * Returns one call argument by its accepted parameter names or positional index.
      *
-     * @param array<int|string, Node\Arg|Node\VariadicPlaceholder> $args - Call arguments; an empty list means the
-     *                                                                    caller omitted every parameter.
-     * @param int                                                  $index - Zero-based position among unnamed
-     *                                                                    arguments.
-     * @param list<string>                                         $parameterNames - Accepted named-argument labels;
-     *                                                                    empty keeps positional-only matching.
+     * @param array<int|string, Node\Arg|Node\ArgPlaceholder|Node\VariadicPlaceholder> $args           - Call arguments; empty omits all parameters.
+     * @param int                                                                      $index          - Zero-based position among unnamed arguments.
+     * @param list<string>                                                             $parameterNames - Accepted names; empty uses positions only.
      *
-     * @return Expr|null - Argument value, or null when the parameter is absent or represented by a variadic placeholder.
+     * @return Expr|null - Argument value, or null when the parameter is absent or represented by a placeholder.
      */
     public static function argumentValue(array $args, int $index, array $parameterNames = []): ?Expr
     {
@@ -664,6 +661,108 @@ final class SecurityNodeHelper
     }
 
     /**
+     * Lists the outermost concatenations and interpolated strings under a root, skipping any inside an opaque operand.
+     *
+     * @param Node                 $root     - Expression whose string constructions are wanted.
+     * @param callable(Node): bool $isOpaque - Reports an operand that escapes its whole argument, which is never weighed.
+     *
+     * @return list<Node> - Constructions whose parent is not itself a construction and that sit inside no opaque operand.
+     */
+    public static function outermostStringConstructions(Node $root, callable $isOpaque): array
+    {
+        return array_values((new NodeFinder())->find($root, static function (Node $candidate) use ($root, $isOpaque): bool {
+            if (!self::isStringConstruction($candidate) || self::isStringConstruction($candidate->getAttribute('parent'))) {
+                return false;
+            }
+            $node = $candidate;
+            // An escaper receives everything under it as one value, so nothing inside it is a construction of the root.
+            while ($node !== $root && ($node = $node->getAttribute('parent')) instanceof Node) {
+                if ($isOpaque($node)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }));
+    }
+
+    /**
+     * Lists a construction's operands in source order, descending into nested concatenations and interpolations.
+     *
+     * @param Node $construction - Concatenation or interpolated string.
+     *
+     * @return list<Node> - Literal strings and interpolated-string parts, and every other operand expression whole.
+     */
+    public static function flattenedOperands(Node $construction): array
+    {
+        if ($construction instanceof Expr\BinaryOp\Concat) {
+            return [...self::flattenedOperands($construction->left), ...self::flattenedOperands($construction->right)];
+        }
+
+        return $construction instanceof Scalar\InterpolatedString ? array_values($construction->parts) : [$construction];
+    }
+
+    /**
+     * Reports whether a call sits between a node and its root expression, so the call can splice other values around it.
+     *
+     * @param Node $node - Node under the root.
+     * @param Node $root - Sink argument the walk stops at, itself included.
+     *
+     * @return bool - True when a function, method, static or constructor call is the node's ancestor up to the root.
+     */
+    public static function hasCallBetween(Node $node, Node $root): bool
+    {
+        while ($node !== $root && ($node = $node->getAttribute('parent')) instanceof Node) {
+            if ($node instanceof Expr\CallLike) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Reports whether literal text leaves a quote open, so the next spliced value lands inside that quote.
+     *
+     * @param string $text                        - Literal text spliced before the value.
+     * @param string $quotes                      - Quote characters to track, such as single and double quotes.
+     * @param bool   $isBackslashEscapeInSingle   - Whether a backslash escapes inside single quotes, as in SQL but not in a shell.
+     *
+     * @return bool - True when one of the quotes is still open at the end of the text.
+     */
+    public static function hasOpenQuote(string $text, string $quotes, bool $isBackslashEscapeInSingle): bool
+    {
+        $open   = null;
+        $length = strlen($text);
+        for ($index = 0; $index < $length; $index++) {
+            $character = $text[$index];
+            // A backslash escapes the next character, except inside single quotes when $isBackslashEscapeInSingle is
+            // false, as in a shell.
+            if ($character === '\\' && ($open !== "'" || $isBackslashEscapeInSingle)) {
+                $index++;
+                continue;
+            }
+            if (str_contains($quotes, $character) && ($open === null || $open === $character)) {
+                $open = $open === null ? $character : null;
+            }
+        }
+
+        return $open !== null;
+    }
+
+    /**
+     * Reports whether a node is a concatenation or an interpolated string.
+     *
+     * @param mixed $node - Candidate node or parent attribute.
+     *
+     * @return bool - True for a `.` concatenation or a double-quoted string with interpolation.
+     */
+    private static function isStringConstruction(mixed $node): bool
+    {
+        return $node instanceof Expr\BinaryOp\Concat || $node instanceof Scalar\InterpolatedString;
+    }
+
+    /**
      * Reports whether a node is a literal string, for security-rule exemptions.
      *
      * @param Node $node - Node to inspect.
@@ -786,84 +885,5 @@ final class SecurityNodeHelper
                 // Match literal outbound URL strings for URL-only sinks.
                 return preg_match('/^https?:\/\//i', $candidate->value) === 1;
             }) instanceof Node;
-    }
-
-    /**
-     * Reports whether an expression references likely sensitive data.
-     *
-     * @param Node $node - Node tree to inspect.
-     *
-     * @return bool - true when a variable name, property, array key, string literal, or env read in the tree names a secret
-     */
-    public static function containsSensitiveReference(Node $node): bool
-    {
-        $nodeFinder = new NodeFinder();
-
-        return $nodeFinder->findFirst($node, static function (Node $candidate): bool {
-                if ($candidate instanceof Expr\Variable && is_string($candidate->name)) {
-                    // A variable name like $apiKey signals secret context.
-                    return self::hasSensitiveContext($candidate->name);
-                }
-
-                if ($candidate instanceof Expr\PropertyFetch && $candidate->name instanceof Identifier) {
-                    // A property access like $config->secret signals secret context.
-                    return self::hasSensitiveContext($candidate->name->toString());
-                }
-
-                if ($candidate instanceof Expr\ArrayDimFetch && $candidate->dim instanceof Scalar\String_) {
-                    // A literal array key like $env['password'] signals secret context.
-                    return self::hasSensitiveContext($candidate->dim->value);
-                }
-
-                if ($candidate instanceof Scalar\String_) {
-                    // A bare string literal whose text itself names a secret signals secret context.
-                    return self::hasSensitiveContext($candidate->value);
-                }
-
-                if ($candidate instanceof Expr\FuncCall) {
-                    // A call may be an env reader pulling a secret-named key; defer to that check.
-                    return self::isSensitiveEnvironmentRead($candidate);
-                }
-
-                // Node kinds we do not classify carry no secret context.
-                return false;
-            }) instanceof Node;
-    }
-
-    /**
-     * Reports whether a call is an env reader requesting a sensitive key.
-     *
-     * @param FuncCall $call - Call node to inspect; only env readers (getenv/env/apache_getenv) are considered.
-     *
-     * @return bool - true when an env reader requests a secret-like key, or reads the whole environment via no argument
-     */
-    private static function isSensitiveEnvironmentRead(FuncCall $call): bool
-    {
-        $name = self::globalFunctionName($call);
-        if ($name === null || !in_array($name, ['apache_getenv', 'env', 'getenv'], true)) {
-            // Not one of the recognised env readers, so it cannot be a sensitive environment lookup.
-            return false;
-        }
-
-        $firstArg = self::sinkArgumentValue($call, 0);
-        if ($firstArg === null) {
-            // A no-argument getenv() returns the whole environment, which is treated as sensitive wholesale.
-            return true;
-        }
-
-        // A literal key argument is sensitive only when its text matches the secret-name pattern.
-        return $firstArg instanceof Scalar\String_ && self::hasSensitiveContext($firstArg->value);
-    }
-
-    /**
-     * Reports whether text contains a secret-like word (identifier or string key).
-     *
-     * @param string $contextText - Identifier or string-key text to scan; the value itself, never a read secret.
-     *
-     * @return bool - true when the text matches the secret-name pattern (api key, token, password, secret, etc.)
-     */
-    private static function hasSensitiveContext(string $contextText): bool
-    {
-        return preg_match('/(?:api[_-]?key|auth(?:orization)?|cookie|pass(?:word|wd)?|private[_-]?key|secret|token)/i', $contextText) === 1;
     }
 }

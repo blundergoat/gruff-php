@@ -27,8 +27,10 @@ use PhpParser\NodeFinder;
  * SQL-injection shape - so the user moves the value to a bound parameter before it reaches the database.
  *
  * Runs per file over supported query methods and procedural database functions whose SQL argument splices in a
- * non-allowlisted dynamic part and whose literal fragments contain a SQL keyword. `prepare()` templates and
- * allowlisted identifier interpolation (`$wpdb->prefix`) are recognised. Warning, medium confidence.
+ * non-allowlisted dynamic part and whose literal fragments contain a SQL keyword. `prepare()` templates,
+ * allowlisted identifier interpolation (`$wpdb->prefix`) and escaped operands - an `(int)` cast, and phpMyAdmin's
+ * `->quoteString()` value escaper and `Util::backquote()` identifier escaper - are recognised. Warning, medium
+ * confidence.
  */
 final class SqlConcatenationRule implements RuleInterface
 {
@@ -80,6 +82,9 @@ final class SqlConcatenationRule implements RuleInterface
             tier:                RuleTier::V01,
             defaultSeverity:     Severity::Warning,
             confidence:          Confidence::Medium,
+            // Off unless a project sets `enabled: true`: precision-floor M02 found it right on 4 of 11 judged findings, too few
+            // to establish its precision floor, so it is off by default rather than deleted (ADR-034).
+            isEnabledByDefault: false,
             defaultOptions:      [
                                      'safeInterpolationReceivers' => ['wpdb'],
                                  ],
@@ -94,6 +99,10 @@ final class SqlConcatenationRule implements RuleInterface
                                      [
                                          'shape'      => 'DDL/maintenance SQL interpolating only $wpdb->prefix-style identifiers ("ALTER TABLE {$wpdb->prefix}t ...").',
                                          'mitigation' => 'Allowlisted via options.safeInterpolationReceivers; set the option to [] to flag every interpolation.',
+                                     ],
+                                     [
+                                         'shape'      => 'A value escaped where it is spliced: an (int) cast, a ->quoteString() call or a Util::backquote() call.',
+                                         'mitigation' => 'These count as escaped, without checking a concatenation inside their arguments, unless ->quoteString() or Util::backquote() sits inside an already open quote or the construction passes through another call such as sprintf(); any other escaping helper still flags, so bind the value instead.',
                                      ],
                                      [
                                          'shape'      => 'Non-SQL query() receivers such as DOMXPath::query(\'//item[@id=\' . $tag . \']\').',
@@ -403,6 +412,10 @@ final class SqlConcatenationRule implements RuleInterface
     /**
      * Reports whether any string construction splices in a non-allowlisted dynamic part.
      *
+     * An escaped operand counts only in a construction that reaches the SQL argument without passing through another
+     * call, such as sprintf(), which can splice other values around it; inside such a call only literal fragments and
+     * allowlisted receivers pass.
+     *
      * @param Expr         $subject - Expression under inspection.
      * @param list<string> $safeReceivers - Variable names whose property fetches are safe identifier interpolation.
      * @param AnalysisUnit $analysisUnit - Unit owning the expression, used to reject local receiver shadows.
@@ -411,12 +424,19 @@ final class SqlConcatenationRule implements RuleInterface
      */
     private function hasUnsafeDynamicPart(Expr $subject, array $safeReceivers, AnalysisUnit $analysisUnit): bool
     {
-        // Inspect every concatenation and interpolated string in the subtree.
-        foreach ((new NodeFinder())->find($subject, static fn(Node $candidate): bool => $candidate instanceof Expr\BinaryOp\Concat || $candidate instanceof Scalar\InterpolatedString) as $construction) {
-            // Weigh each dynamic part directly spliced into this construction.
-            foreach ($this->directDynamicParts($construction) as $part) {
-                // One non-allowlisted dynamic part makes the construction unsafe.
-                if (!$this->isSafeInterpolationPart($part, $safeReceivers, $analysisUnit)) {
+        $isEscaped = fn (Node $node): bool => $this->isEscapedOperand($node);
+        // Inspect every outermost concatenation and interpolated string outside an escaped operand.
+        foreach (SecurityNodeHelper::outermostStringConstructions($subject, $isEscaped) as $construction) {
+            $isDirect    = !SecurityNodeHelper::hasCallBetween($construction, $subject);
+            $literalText = '';
+            foreach (SecurityNodeHelper::flattenedOperands($construction) as $part) {
+                if ($part instanceof Scalar\String_ || $part instanceof InterpolatedStringPart) {
+                    $literalText .= $part->value;
+                    continue;
+                }
+                // One dynamic part that is neither escaped where it stands nor allowlisted makes the construction unsafe.
+                if (!($isDirect && $this->isEscapedAt($part, $literalText))
+                    && !($part instanceof Expr && $this->isSafeInterpolationPart($part, $safeReceivers, $analysisUnit))) {
                     return true;
                 }
             }
@@ -426,44 +446,18 @@ final class SqlConcatenationRule implements RuleInterface
     }
 
     /**
-     * Lists the direct dynamic parts of one string construction node.
+     * Reports whether a spliced operand is escaped for the position it is spliced at.
      *
-     * Literal fragments and nested constructions are skipped: nested Concat/InterpolatedString nodes are
-     * visited as constructions of their own by the caller, so each dynamic leaf is judged exactly once.
+     * @param Node   $part        - Operand of the construction.
+     * @param string $literalText - Literal text spliced before it in the same construction.
      *
-     * @param Node $construction - Concat or interpolated-string node.
-     *
-     * @return list<Expr> - dynamic (non-literal, non-construction) parts spliced into the string.
+     * @return bool - True for an (int) cast anywhere, and for quoteString() or backquote() outside an open quote, because
+     *                each supplies its own quotes, and the first of them would close an already open quote.
      */
-    private function directDynamicParts(Node $construction): array
+    private function isEscapedAt(Node $part, string $literalText): bool
     {
-        $candidates = [];
-        // A concatenation has a left and right operand.
-        if ($construction instanceof Expr\BinaryOp\Concat) {
-            $candidates = [$construction->left, $construction->right];
-        }
-
-        // An interpolated string has its embedded parts.
-        if ($construction instanceof Scalar\InterpolatedString) {
-            $candidates = $construction->parts;
-        }
-
-        $dynamicParts = [];
-        // Keep only the dynamic (non-literal, non-nested) parts.
-        foreach ($candidates as $candidate) {
-            // Literal fragments and nested constructions are handled by the caller.
-            if ($candidate instanceof InterpolatedStringPart
-                || $candidate instanceof Scalar\String_
-                || $candidate instanceof Expr\BinaryOp\Concat
-                || $candidate instanceof Scalar\InterpolatedString
-            ) {
-                continue;
-            }
-
-            $dynamicParts[] = $candidate;
-        }
-
-        return $dynamicParts;
+        return $part instanceof Expr\Cast\Int_
+            || ($this->isEscapedOperand($part) && !SecurityNodeHelper::hasOpenQuote($literalText, '\'"`', true));
     }
 
     /**
@@ -487,6 +481,37 @@ final class SqlConcatenationRule implements RuleInterface
         }
 
         return !$this->isReceiverLocallyShadowed($part->var->name, $part, $analysisUnit);
+    }
+
+    /**
+     * Reports whether a spliced operand is escaped for SQL.
+     *
+     * Matching is by name only and case-insensitive: ->quoteString() on any receiver and Util::backquote() from any
+     * namespace. They are trusted because phpMyAdmin's DatabaseInterface::quoteString() quotes the connection-escaped
+     * string and its Util::backquote() doubles every backquote inside the identifier; a same-named helper elsewhere
+     * is trusted too.
+     *
+     * @param Node $operand - Operand of a SQL concatenation or interpolation.
+     *
+     * @return bool - True for an (int) cast, a ->quoteString() call, or a Util::backquote() call.
+     */
+    private function isEscapedOperand(Node $operand): bool
+    {
+        if ($operand instanceof Expr\Cast\Int_) {
+            return true;
+        }
+
+        // ->quoteString() returns a quoted, connection-escaped string literal.
+        if (($operand instanceof Expr\MethodCall || $operand instanceof Expr\NullsafeMethodCall)
+            && !$operand->isFirstClassCallable()
+            && $operand->name instanceof Identifier && $operand->name->toLowerString() === 'quotestring') {
+            return true;
+        }
+
+        // Util::backquote() returns a backquoted identifier with embedded backquotes doubled.
+        return $operand instanceof Expr\StaticCall && !$operand->isFirstClassCallable()
+            && $operand->class instanceof Node\Name && strtolower($operand->class->getLast()) === 'util'
+            && $operand->name instanceof Identifier && $operand->name->toLowerString() === 'backquote';
     }
 
     /**

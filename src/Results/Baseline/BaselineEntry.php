@@ -4,160 +4,110 @@ declare(strict_types=1);
 
 namespace GruffPhp\Results\Baseline;
 
-use GruffPhp\Results\Finding\Finding;
-
 /**
- * One row of the user's committed `gruff-baseline.json`: an accepted-debt group built from a finding's
- * identity (its file, rule, and message) plus how many instances the team signed off on. Rows like this
- * are written by `analyse --generate-baseline` and read back on every later `analyse --baseline`.
+ * One reviewed row of the user's committed `gruff-baseline.json`: a line-free identity plus how many occurrences of it the team signed off.
  *
- * Their job is to keep a scan green on debt the team already reviewed while still failing the moment
- * something genuinely new turns up. The identity deliberately ignores line and column numbers, so
- * everyday reformatting doesn't break a baseline the team already signed off (see `groupKeyFor`).
+ * Rows are written by `analyse --generate-baseline` and read back on every later `analyse --baseline`.
+ * Matching reads the identity and the count and nothing else; the rule, path, and subject are kept so a reviewer can read the file.
+ * Because no line, column, message, or severity is stored, everyday reformatting never re-flags debt the team already accepted.
  */
 final readonly class BaselineEntry
 {
     /**
-     * Holds one accepted-debt group exactly as it sits in the user's baseline file, keyed by the file,
-     * rule, and message a live finding must match before `analyse --baseline` will suppress it.
+     * Keys a v3 row may never carry; each one is a way a stored baseline could expire or leak.
+     */
+    private const FORBIDDEN_KEYS = ['line', 'endLine', 'column', 'message', 'severity', 'confidence'];
+
+    /**
+     * Holds one reviewed identity exactly as it sits in the baseline file.
      *
-     * @param string $filePath - Display path shared by every instance in the group.
-     * @param string $ruleId - Rule identifier that produced the accepted findings.
-     * @param string $message - Exact finding message shared by every instance in the group.
-     * @param int    $count - Instances the team accepted; at least one. The filter suppresses only this many, so an extra instance beyond the count surfaces as new.
+     * @param string $identity - 16 lowercase hex characters from `BaselineIdentity`; the only field matching reads.
+     * @param int    $count - Occurrences the team accepted, at least one; an extra occurrence beyond it surfaces as new.
+     * @param string $ruleId - Descriptive rule id for readers; empty when the row was hand-written without one.
+     * @param string $path - Descriptive project-relative path; empty when absent from the row.
+     * @param string $subject - Descriptive identity subject, so a reviewer sees what was reviewed; empty when absent.
      */
     public function __construct(
-        public string $filePath,
-        public string $ruleId,
-        public string $message,
+        public string $identity,
         public int    $count,
+        public string $ruleId = '',
+        public string $path = '',
+        public string $subject = '',
     ) {
     }
 
     /**
-     * Turns a finding from the current scan into the same group key its accepted-debt row would carry,
-     * which is how `analyse --baseline` tells whether the user already signed this finding off.
+     * Rebuilds one reviewed row from a decoded `gruff-baseline.json` occurrence, refusing anything that could expire or leak.
      *
-     * @param Finding $finding - Live analysis finding from the current scan to reduce to its group key.
+     * @param array<string, bool|float|int|string|null> $occurrenceRow - Decoded occurrence object; a hand-edited file may carry anything.
+     * @param int                                       $index - Zero-based position, named in the error so the user can find the row.
      *
-     * @return string - the same (file, ruleId, message) key groupKey() builds for persisted rows, so equal keys mean accepted debt
+     * @return self - Validated row ready to match against live findings.
+     * @throws BaselineException When the identity is not 16 hex characters, the count is below one, or a forbidden key is present.
      */
-    public static function groupKeyForFinding(Finding $finding): string
+    public static function fromArray(array $occurrenceRow, int $index): self
     {
-        return self::groupKeyFor($finding->filePath, $finding->ruleId, $finding->message);
-    }
+        $identity = $occurrenceRow['identity'] ?? null;
 
-    /**
-     * Builds the group key shared by persisted rows and live findings alike from three raw identity fields.
-     *
-     * Lines and columns are deliberately left out, so the user can reformat a file or insert code above
-     * accepted debt without their committed baseline breaking and re-flagging findings they already accepted.
-     *
-     * @param string $filePath - Display path for the group.
-     * @param string $ruleId - Rule identifier for the group.
-     * @param string $message - Finding message for the group.
-     *
-     * @return string - NUL-joined (file, ruleId, message) key with every part UTF-8-substituted, so on-disk rows and
-     *                raw in-memory findings produce identical keys
-     */
-    public static function groupKeyFor(string $filePath, string $ruleId, string $message): string
-    {
-        return self::utf8Substituted($filePath) . "\0" . self::utf8Substituted($ruleId) . "\0" . self::utf8Substituted($message);
-    }
-
-    /**
-     * Hands back this stored entry's own group key, the value `analyse --baseline` indexes it under so
-     * findings from the current scan can be looked up against the team's accepted debt.
-     *
-     * @return string - the (file, ruleId, message) key used to index this accepted-debt group against live findings
-     */
-    public function groupKey(): string
-    {
-        return self::groupKeyFor($this->filePath, $this->ruleId, $this->message);
-    }
-
-    /**
-     * Cleans invalid UTF-8 bytes out of an identity field exactly the way the JSON write path does.
-     *
-     * The baseline on disk only ever holds substituted text, so a live finding whose message carries a
-     * stray non-UTF-8 byte has to be run through the same substitution here; otherwise that one odd byte
-     * would make it miss the user's accepted-debt row and get re-flagged as new.
-     *
-     * @param string $identityText - Raw identity field text (file path, rule id, or message).
-     *
-     * @return string - the text unchanged when already valid UTF-8, else with invalid byte sequences replaced by U+FFFD
-     */
-    private static function utf8Substituted(string $identityText): string
-    {
-        // The empty `//u` pattern is the canonical fast probe: it matches only when the subject is
-        // already valid UTF-8, which is the common case where the user's text needs no cleaning at all.
-        if (preg_match('//u', $identityText) === 1) {
-            return $identityText;
+        // An identity that is not the ratified digest shape cannot have come from a generator, so the row is refused rather than guessed at.
+        if (!is_string($identity) || preg_match('/^[0-9a-f]{16}$/', $identity) !== 1) {
+            throw new BaselineException(sprintf('Baseline occurrences[%d].identity must be 16 lowercase hex characters.', $index));
         }
 
-        $encoded = json_encode($identityText, JSON_INVALID_UTF8_SUBSTITUTE);
-        // With substitution on, `json_encode` replaces invalid bytes rather than failing, so this false is rare; keep the raw text if it happens so the user still gets a usable key.
-        if ($encoded === false) {
-            return $identityText;
+        $count = $occurrenceRow['count'] ?? null;
+
+        // A count below one would mean a reviewed identity that suppresses nothing, which is a hand edit gone wrong.
+        if (!is_int($count) || $count < 1) {
+            throw new BaselineException(sprintf('Baseline occurrences[%d].count must be a positive integer.', $index));
         }
 
-        $decoded = json_decode($encoded);
-
-        // Use the cleaned string only when the round-trip really handed one back; on anything else keep the raw text.
-        return is_string($decoded) ? $decoded : $identityText;
-    }
-
-    /**
-     * Rebuilds one accepted-debt group from a decoded `gruff-baseline.json` row, validating every identity
-     * field first so a hand-edited or corrupt baseline fails loudly instead of quietly suppressing the wrong
-     * findings on the next `analyse --baseline`.
-     *
-     * @param array<string, bool|float|int|string|null> $baselineRow - Serialized baseline group row decoded from JSON.
-     * @param int                                       $index - Zero-based baseline row position for error messages.
-     *
-     * @return self - baseline group rebuilt from a validated on-disk row, ready to match against live findings
-     * @throws BaselineException When required fields are missing or malformed.
-     */
-    public static function fromArray(array $baselineRow, int $index): self
-    {
-        // Validate the identity fields in order so a hand-edited baseline names the first bad field on load, rather than half-building a dead row.
-        foreach (['file', 'ruleId', 'message'] as $key) {
-            // A field that is missing, non-string, or empty can never line up with a real finding, so name it and stop rather than load a dead row.
-            if (!isset($baselineRow[$key]) || !is_string($baselineRow[$key]) || $baselineRow[$key] === '') {
-                throw new BaselineException(sprintf('Baseline group %d must include non-empty "%s".', $index, $key));
+        // A positional or re-classifiable field in a row is how a 0.5 baseline expired on every edit, so its presence fails the file.
+        foreach (self::FORBIDDEN_KEYS as $forbiddenKey) {
+            if (array_key_exists($forbiddenKey, $occurrenceRow)) {
+                throw new BaselineException(sprintf('Baseline occurrences[%d] carries forbidden key "%s".', $index, $forbiddenKey));
             }
         }
 
-        $count = $baselineRow['count'] ?? null;
-        // A count someone hand-edited to zero or a negative could never suppress anything, so treat the row as malformed and say which one.
-        if (!is_int($count) || $count < 1) {
-            throw new BaselineException(sprintf('Baseline group %d field "count" must be an integer of at least 1.', $index));
-        }
-
-        // Every field guard above has passed, so build the group from values we can now trust.
         return new self(
-            filePath: $baselineRow['file'],
-            ruleId:   $baselineRow['ruleId'],
-            message:  $baselineRow['message'],
+            identity: $identity,
             count:    $count,
+            ruleId:   self::optionalText($occurrenceRow, 'ruleId'),
+            path:     self::optionalText($occurrenceRow, 'path'),
+            subject:  self::optionalText($occurrenceRow, 'subject'),
         );
     }
 
     /**
-     * Flattens this entry back into the array shape written to `gruff-baseline.json` and echoed in reports,
-     * the inverse of `fromArray()` so a row can round-trip from disk and back unchanged.
+     * Flattens the row into the JSON object `analyse --generate-baseline` writes, omitting empty descriptive fields.
      *
-     * @return array{file: string, ruleId: string, message: string, count: int} - JSON-ready baseline group row; "file" holds the display path, and
-     *                            in absent/resolved report rows "count" carries the resolved instance count instead of the accepted count
+     * @return array{identity: string, count: int, ruleId?: string, path?: string, subject?: string} - Identity and count first, then whatever descriptive fields exist.
      */
     public function toArray(): array
     {
-        // Emit the on-disk JSON keys, including "file" for the display path, exactly as `fromArray()` reads them back.
-        return [
-            'file'    => $this->filePath,
-            'ruleId'  => $this->ruleId,
-            'message' => $this->message,
-            'count'   => $this->count,
-        ];
+        $occurrenceRow = ['identity' => $this->identity, 'count' => $this->count];
+
+        // Descriptive fields are for readers only, so an absent one is left out rather than written as an empty string.
+        foreach (['ruleId' => $this->ruleId, 'path' => $this->path, 'subject' => $this->subject] as $key => $fieldText) {
+            if ($fieldText !== '') {
+                $occurrenceRow[$key] = $fieldText;
+            }
+        }
+
+        return $occurrenceRow;
+    }
+
+    /**
+     * Reads one optional descriptive string from a decoded row.
+     *
+     * @param array<string, bool|float|int|string|null> $occurrenceRow - Decoded occurrence object.
+     * @param string                                    $key - Field to read.
+     *
+     * @return string - The text, or an empty string when the field is absent or not a string.
+     */
+    private static function optionalText(array $occurrenceRow, string $key): string
+    {
+        $fieldText = $occurrenceRow[$key] ?? null;
+
+        return is_string($fieldText) ? $fieldText : '';
     }
 }

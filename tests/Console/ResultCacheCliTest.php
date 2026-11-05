@@ -112,13 +112,90 @@ final class ResultCacheCliTest extends CliTestCase
         // No --profile: since the project rules were retired the default rule set has no
         // ProjectRuleInterface implementor, so the cache guard passes and entries are written.
         $process = new Process(
-            [PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'analyse', 'src', '--no-config', '--fail-on', 'none', '--format', 'json'],
+            [PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'analyse', 'src', '--config', self::PROJECT_ROOT . '/tests/Fixtures/Config/enable-default-off-rules.yaml', '--fail-on', 'none', '--format', 'json'],
             $this->project,
         );
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         self::assertDirectoryExists($this->project . '/.gruff-cache');
+    }
+
+    /**
+     * Verify warm runs replay the note and a budget change cannot reuse bounded findings.
+     *
+     * @return void
+     */
+    public function testDeepScanBudgetParticipatesInCacheIdentity(): void
+    {
+        $project = self::PROJECT_ROOT . '/tests/runtime-gruff-cache-' . bin2hex(random_bytes(6));
+        self::assertTrue(mkdir($project . '/src', 0777, true));
+        self::assertNotFalse(file_put_contents($project . '/README.md', "Cache budget fixture.\n"));
+        self::assertNotFalse(file_put_contents(
+            $project . '/src/Danger.php',
+            "<?php\n\$key = 'AKIAQ7R2M8N4P6T9V1X3';\neval(\$_GET['code']);\n",
+        ));
+
+        try {
+            $boundedArguments = [
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff-php',
+                'analyse',
+                '--config', self::PROJECT_ROOT . '/tests/Fixtures/Config/enable-default-off-rules.yaml',
+                '--profile',
+                'security',
+                '--format',
+                'json',
+                '--fail-on',
+                'none',
+                '--deep-scan-budget',
+                '1:1',
+                'src/Danger.php',
+            ];
+            $cold = new Process($boundedArguments, $project);
+            $cold->run();
+            $warm = new Process($boundedArguments, $project);
+            $warm->run();
+
+            self::assertSame(0, $cold->getExitCode(), $cold->getErrorOutput());
+            self::assertSame($cold->getOutput(), $warm->getOutput());
+            $boundedReport      = $this->decodeJsonOutput($warm);
+            $boundedDiagnostics = $boundedReport['diagnostics'] ?? null;
+            self::assertIsArray($boundedDiagnostics);
+            $boundedDiagnostic = $boundedDiagnostics[0] ?? null;
+            self::assertIsArray($boundedDiagnostic);
+            self::assertSame('bounded-deep-scan', $boundedDiagnostic['type'] ?? null);
+
+            $unbounded = new Process([
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff-php',
+                'analyse',
+                '--config', self::PROJECT_ROOT . '/tests/Fixtures/Config/enable-default-off-rules.yaml',
+                '--profile',
+                'security',
+                '--format',
+                'json',
+                '--fail-on',
+                'none',
+                '--deep-scan-budget',
+                'off',
+                'src/Danger.php',
+            ], $project);
+            $unbounded->run();
+            $unboundedReport   = $this->decodeJsonOutput($unbounded);
+            $unboundedFindings = $unboundedReport['findings'] ?? null;
+            self::assertIsArray($unboundedFindings);
+            $ruleIds = [];
+            foreach ($unboundedFindings as $index => $finding) {
+                self::assertIsArray($finding, sprintf('unbounded finding %s is not an array', (string)$index));
+                $ruleIds[] = $finding['ruleId'] ?? null;
+            }
+
+            self::assertSame([], $unboundedReport['diagnostics'] ?? null);
+            self::assertContains('security.dangerous-function-call', $ruleIds);
+        } finally {
+            $this->removeDir($project);
+        }
     }
 
     /**
@@ -161,7 +238,7 @@ final class ResultCacheCliTest extends CliTestCase
     {
         $process = new Process(
             array_merge(
-                [PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'analyse', 'src', '--no-config', '--profile', 'security', '--fail-on', 'none', '--format', 'json'],
+                [PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'analyse', 'src', '--config', self::PROJECT_ROOT . '/tests/Fixtures/Config/enable-default-off-rules.yaml', '--profile', 'security', '--fail-on', 'none', '--format', 'json'],
                 $extraArgs,
             ),
             $this->project,
@@ -217,7 +294,7 @@ final class ResultCacheCliTest extends CliTestCase
     /**
      * Write a fixture file, creating parent directories as needed.
      *
-     * @param string $path - Project-relative file path.
+     * @param string $path     - Project-relative file path.
      * @param string $contents - File contents.
      *
      * @return void

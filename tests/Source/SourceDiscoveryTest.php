@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers source discovery: deterministic non-git scanning, git-aware visibility, ignore overrides, lockfile exclusion, glob patterns, missing-path
+ * Covers source discovery: deterministic non-git scanning, git-aware visibility, ignore overrides, lockfile eligibility, glob patterns, missing-path
  * reporting, and canonical deduplication.
  */
 final class SourceDiscoveryTest extends TestCase
@@ -48,14 +48,37 @@ final class SourceDiscoveryTest extends TestCase
 
         self::assertSame([
                              'alpha.php',
+                             'cache/ignored.php',
+                             'generated/ignored.php',
                              'nested/beta.php',
                          ], array_map(static fn($file): string => $file->displayPath, $result->files));
 
         self::assertContains('vendor', $result->ignoredPaths);
-        self::assertContains('cache', $result->ignoredPaths);
         self::assertContains('build', $result->ignoredPaths);
-        self::assertContains('generated', $result->ignoredPaths);
         self::assertSame([], $result->missingPaths);
+    }
+
+    /**
+     * Verify a walked minified file is listed only when gruff-php would scan it, and vendored code is skipped as one
+     * directory even under a .gitignore (FAMILY-CONTRACT.md section 7, precision-floor M04).
+     *
+     * @return void
+     */
+    public function testWalkListsEligibleMinifiedFilesAndSkipsVendorUnderAGitignore(): void
+    {
+        $root = $this->tempDir();
+        $this->writeFile($root, '.gitignore', "*.log\n");
+        $this->writeFile($root, 'alpha.php', "<?php\n");
+        $this->writeFile($root, 'Vendor/acme/Copied.php', "<?php\n");
+        $this->writeFile($root, 'config/settings.min.json', "{}\n");
+        $this->writeFile($root, 'public/jquery.min.js', "var a=1;\n");
+
+        $result = (new SourceDiscovery($root))->discover(['.']);
+
+        // gruff-php scans .gitignore as text, so it is listed beside the one PHP file.
+        self::assertSame(['.gitignore', 'alpha.php'], array_map(static fn($file): string => $file->displayPath, $result->files));
+        // gruff-php never scans .js, so the minified script is unsupported rather than listed as ignored.
+        self::assertSame(['Vendor', 'config/settings.min.json'], $result->ignoredPaths);
     }
 
     /**
@@ -105,23 +128,23 @@ final class SourceDiscoveryTest extends TestCase
                              '.codex/config.toml',
                              '.github/workflows/ci.yml',
                              '.gitignore',
+                             '.goat-flow/tasks/.gitignore',
+                             '.goat-flow/tasks/README.md',
                              'src/Tracked.php',
                              'src/Untracked.php',
                          ], $paths);
         self::assertNotContains('.claude/settings.local.json', $paths);
         self::assertNotContains('.goat-flow/dashboard-state.json', $paths);
-        self::assertNotContains('.goat-flow/tasks/.gitignore', $paths);
-        self::assertNotContains('.goat-flow/tasks/README.md', $paths);
         self::assertNotContains('.goat-flow/tasks/M41.md', $paths);
         self::assertSame([], $result->missingPaths);
     }
 
     /**
-     * Verify include-ignored opts Git worktrees back into filesystem traversal.
+     * Verify an explicit supported file bypasses Git ignore rules.
      *
      * @return void
      */
-    public function testIncludeIgnoredScansGitIgnoredFilesThroughFilesystem(): void
+    public function testExplicitSupportedFileBypassesGitIgnoreRules(): void
     {
         $this->requireGit();
 
@@ -132,8 +155,8 @@ final class SourceDiscoveryTest extends TestCase
         $this->writeFile($root, 'secret.local.json', "{}\n");
 
         $default = (new SourceDiscovery($root))->discover(['secret.local.json']);
-        self::assertSame([], $default->files);
-        self::assertContains('secret.local.json', $default->ignoredPaths);
+        self::assertSame(['secret.local.json'], array_map(static fn($file): string => $file->displayPath, $default->files));
+        self::assertSame([], $default->ignoredPaths);
 
         $included = (new SourceDiscovery($root))->discover(['secret.local.json'], shouldIncludeIgnored: true);
         self::assertSame(['secret.local.json'], array_map(static fn($file): string => $file->displayPath, $included->files));
@@ -161,32 +184,32 @@ final class SourceDiscoveryTest extends TestCase
     }
 
     /**
-     * Verify default ignores well known lockfile names.
+     * Verify lockfile names do not override ordinary extension eligibility.
      *
      * @return void
      */
-    public function testDefaultIgnoresWellKnownLockfileNames(): void
+    public function testLockfilesFollowOrdinaryExtensionEligibility(): void
     {
         $root   = $this->fixtureRoot('mixed');
         $result = (new SourceDiscovery($root))->discover(['.']);
 
         $paths = array_map(static fn($file): string => $file->displayPath, $result->files);
-        self::assertNotContains('package-lock.json', $paths, 'package-lock.json must be ignored by default.');
-        self::assertNotContains('composer.lock', $paths, 'composer.lock must be ignored by default.');
+        self::assertContains('package-lock.json', $paths, 'Eligible JSON lockfiles must be scanned.');
+        self::assertNotContains('composer.lock', $paths, 'Unsupported .lock files remain extension-ineligible.');
     }
 
     /**
-     * Verify explicit lockfile path is still ignored without include flag.
+     * Verify an explicit eligible lockfile is scanned without an include flag.
      *
      * @return void
      */
-    public function testExplicitLockfilePathIsStillIgnoredWithoutIncludeFlag(): void
+    public function testExplicitEligibleLockfileIsScannedWithoutIncludeFlag(): void
     {
         $root   = $this->fixtureRoot('mixed');
         $result = (new SourceDiscovery($root))->discover(['package-lock.json']);
 
-        self::assertSame([], $result->files);
-        self::assertContains('package-lock.json', $result->ignoredPaths);
+        self::assertSame(['package-lock.json'], array_map(static fn($file): string => $file->displayPath, $result->files));
+        self::assertSame([], $result->ignoredPaths);
     }
 
     /**
@@ -284,11 +307,11 @@ final class SourceDiscoveryTest extends TestCase
     }
 
     /**
-     * Verify default ignores nested root paths and configured question-mark globs.
+     * Verify control metadata stays scannable while configured question-mark globs remain authoritative.
      *
      * @return void
      */
-    public function testDefaultAndConfiguredIgnorePatternsAreAppliedToNestedPaths(): void
+    public function testControlMetadataAndConfiguredIgnorePatternsAtNestedPaths(): void
     {
         $root = $this->tempDir();
         self::assertTrue(mkdir($root . '/src', 0777, true));
@@ -299,8 +322,7 @@ final class SourceDiscoveryTest extends TestCase
 
         $result = (new SourceDiscovery($root))->discover(['.'], configuredIgnorePatterns: ['src/?.php']);
 
-        self::assertSame([], $result->files);
-        self::assertContains('.goat-flow/logs', $result->ignoredPaths);
+        self::assertSame(['.goat-flow/logs/ignored.php'], array_map(static fn($file): string => $file->displayPath, $result->files));
         self::assertContains('src/A.php', $result->ignoredPaths);
         self::assertContains('src/B.php', $result->ignoredPaths);
     }

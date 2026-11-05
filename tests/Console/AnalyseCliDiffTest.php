@@ -37,8 +37,95 @@ final class AnalyseCliDiffTest extends CliTestCase
             $process->run();
 
             self::assertSame(2, $process->getExitCode());
-            self::assertStringContainsString('[DIFF-MODE-ERROR]', $process->getOutput());
+            // One family type names every scope the run could not read, and a run that could not apply its
+            // scope publishes no findings beside the failure.
+            self::assertStringContainsString('[CHANGED-REGION]', $process->getOutput());
             self::assertStringContainsString('Diff mode requires a git working tree.', $process->getOutput());
+            self::assertStringContainsString('Findings: 0 total', $process->getOutput());
+        } finally {
+            $this->removeDir($tempDir);
+        }
+    }
+
+    /**
+     * Verify the hook names an unreadable changed-region scope with the same family type analyse uses.
+     *
+     * The hook called it `usage-error` until M46 while analyse called it `changed-region`, so one failure had two
+     * names depending on which surface saw it and a consumer matching the family type missed half of them.
+     *
+     * @return void
+     */
+    public function testHookNamesAnUnreadableChangedRangeWithTheFamilyType(): void
+    {
+        $tempDir = $this->tempDir();
+
+        try {
+            file_put_contents($tempDir . '/Example.php', "<?php\n\nfinal class Example\n{\n    public function run(): void {}\n}\n");
+
+            // An empty value is unreadable for the same reason a garbled one is: the caller asked for a scoped
+            // run and named no range, so reading it as "no filter" would widen the hook to the whole tree.
+            foreach (['=abc', ''] as $ranges) {
+                $process = new Process([
+                                           PHP_BINARY,
+                                           self::PROJECT_ROOT . '/bin/gruff-php',
+                                           'hook',
+                                           'Example.php',
+                                           '--no-config',
+                                           '--changed-ranges',
+                                           $ranges,
+                                       ], $tempDir);
+                $process->run();
+
+                self::assertSame(2, $process->getExitCode(), $process->getErrorOutput());
+                $payload = $this->decodeJsonOutput($process);
+                self::assertIsArray($payload['diagnostics'], $ranges);
+                self::assertSame(['changed-region'], array_column($payload['diagnostics'], 'type'), $ranges);
+                self::assertSame(['fatal'], array_column($payload['diagnostics'], 'severity'), $ranges);
+                self::assertSame([], $payload['findings'], $ranges);
+            }
+        } finally {
+            $this->removeDir($tempDir);
+        }
+    }
+
+    /**
+     * Verify a `--changed-ranges` value the run cannot scope to ends the run instead of widening it.
+     *
+     * An empty value is malformed for the same reason a garbled one is: the caller asked for a scoped run and
+     * named no range, and reading that as "no filter" scans the whole tree without saying so.
+     *
+     * @return void
+     */
+    public function testAnalyseCommandRefusesChangedRangesItCannotScope(): void
+    {
+        $tempDir = $this->tempDir();
+
+        try {
+            file_put_contents($tempDir . '/Example.php', "<?php\n\nfinal class Example\n{\n    public function run(): void {}\n}\n");
+
+            foreach (['=abc', ''] as $ranges) {
+                $process = new Process([
+                                           PHP_BINARY,
+                                           self::PROJECT_ROOT . '/bin/gruff-php',
+                                           'analyse',
+                                           'Example.php',
+                                           '--no-config',
+                                           '--no-baseline',
+                                           '--changed-ranges',
+                                           $ranges,
+                                           '--format',
+                                           'json',
+                                           '--fail-on',
+                                           'none',
+                                       ], $tempDir);
+                $process->run();
+
+                self::assertSame(2, $process->getExitCode(), $process->getErrorOutput());
+                $report = $this->decodeJsonOutput($process);
+                self::assertIsArray($report['diagnostics'], $ranges);
+                self::assertSame(['changed-region'], array_column($report['diagnostics'], 'type'), $ranges);
+                self::assertSame([], $report['findings'], $ranges);
+            }
         } finally {
             $this->removeDir($tempDir);
         }
@@ -79,7 +166,7 @@ final class AnalyseCliDiffTest extends CliTestCase
 
             self::assertIsArray($findings);
             /** @var list<array{symbol?: string|null}> $findings decoded finding rows used for symbol extraction */
-            self::assertGreaterThanOrEqual(1, $report['suppressedCount'] ?? null);
+            self::assertGreaterThanOrEqual(1, $this->suppressedCount($report));
             self::assertContains('Example::changed()', $this->symbolsFromJsonFindings($findings));
             self::assertNotContains('Example::unchanged()', $this->symbolsFromJsonFindings($findings));
         } finally {
@@ -130,7 +217,7 @@ PATCH
 
             self::assertIsArray($diff);
             self::assertSame('stdin', $diff['mode'] ?? null);
-            self::assertGreaterThanOrEqual(1, $report['suppressedCount'] ?? null);
+            self::assertGreaterThanOrEqual(1, $this->suppressedCount($report));
         } finally {
             $this->removeDir($tempDir);
         }
@@ -210,7 +297,7 @@ PATCH
             $report = $this->runChangedScopeAnalyse($tempDir, '30-30', 'symbol');
 
             $ruleIds            = $this->ruleIdsFromJsonFindings($this->findingRows($report));
-            $expectedSuppressed = 5;
+            $expectedSuppressed = 4;
 
             self::assertSame(['size.method-length', 'size.parameter-count'], $ruleIds);
             self::assertSame($expectedSuppressed, $this->suppressedCount($report));
@@ -239,7 +326,6 @@ PATCH
             $classAnchorReport = $this->runChangedScopeAnalyse($tempDir, '7-7', 'symbol');
             self::assertSame(
                 [
-                    'size.average-method-length',
                     'size.class-length',
                     'size.property-count',
                     'size.public-method-count',
@@ -269,7 +355,6 @@ PATCH
             self::assertSame(
                 [
                     'size.file-length',
-                    'size.average-method-length',
                     'size.class-length',
                     'size.property-count',
                     'size.public-method-count',
@@ -415,15 +500,18 @@ PATCH
     }
 
     /**
-     * Return the top-level changed-region suppression count from a decoded report.
+     * Return the canonical summary changed-region suppression count from a decoded report.
      *
      * @param array<string, mixed> $report - Decoded JSON report.
      *
-     * @return int - Top-level suppressedCount value.
+     * @return int - summary.suppressedFindings value.
      */
     private function suppressedCount(array $report): int
     {
-        $suppressedCount = $report['suppressedCount'] ?? null;
+        $summary = $report['summary'] ?? null;
+        self::assertIsArray($summary);
+
+        $suppressedCount = $summary['suppressedFindings'] ?? null;
         self::assertIsInt($suppressedCount);
 
         return $suppressedCount;
@@ -434,14 +522,14 @@ PATCH
      *
      * @param array<string, mixed> $report - Decoded JSON report.
      *
-     * @return int - diff.suppressedCount value.
+     * @return int - diff.filteredFindings value.
      */
     private function diffSuppressedCount(array $report): int
     {
         $diff = $report['diff'] ?? null;
         self::assertIsArray($diff);
 
-        $suppressedCount = $diff['suppressedCount'] ?? null;
+        $suppressedCount = $diff['filteredFindings'] ?? null;
         self::assertIsInt($suppressedCount);
 
         return $suppressedCount;
@@ -451,7 +539,7 @@ PATCH
      * Run gruff in a fixture project and decode its JSON report.
      *
      * @param string       $workingDirectory - Project root to run the command in.
-     * @param list<string> $arguments - CLI arguments after the PHP binary and bin path.
+     * @param list<string> $arguments        - CLI arguments after the PHP binary and bin path.
      *
      * @return array<string, mixed> - Decoded JSON report.
      * @throws JsonException
@@ -535,7 +623,6 @@ schemaVersion: gruff-php.config.v0.1
 selection:
     rules:
         - size.file-length
-        - size.average-method-length
         - size.class-length
         - size.property-count
         - size.public-method-count
@@ -544,25 +631,22 @@ selection:
 rules:
     size.file-length:
         threshold: 5
-        severity: warning
+        severity:  warning
     size.method-length:
         threshold: 3
-        severity: warning
+        severity:  warning
     size.class-length:
         threshold: 5
-        severity: warning
+        severity:  warning
     size.parameter-count:
         threshold: 2
-        severity: warning
+        severity:  warning
     size.public-method-count:
         threshold: 3
-        severity: warning
+        severity:  warning
     size.property-count:
         threshold: 3
-        severity: warning
-    size.average-method-length:
-        threshold: 2
-        severity: warning
+        severity:  warning
 YAML);
     }
 
@@ -587,7 +671,7 @@ selection:
 rules:
     size.file-length:
         threshold: 5
-        severity: warning
+        severity:  warning
 YAML);
     }
 

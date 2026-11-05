@@ -57,6 +57,12 @@ final readonly class ExceptionTypeOnlyRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A test for an exception type that carries no message or code of its own, where the type is the entire contract.',
+                    'mitigation' => 'A bare type check is reported without inspecting the exception class, so accept the advisory when the type alone is what the caller distinguishes.',
+                ],
+            ],
         );
     }
 

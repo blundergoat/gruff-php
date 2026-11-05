@@ -10,6 +10,7 @@ use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Pillar;
 use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
+use GruffPhp\Rules\Size\LimitBand;
 use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Contracts\RuleContext;
@@ -30,8 +31,8 @@ use PhpParser\Node\Stmt\Function_;
  *
  * Runs per file over every function-like node with a body. It measures the deepest level of nested ifs,
  * loops, switches, and closures (try/finally bodies do not add a level), and reports anything past the
- * configured maximum (default error above 4). The finding names the depth and suggests early returns or
- * extraction.
+ * configured maximum (default error above 4). The finding names the depth and, by band (LimitBand),
+ * advises not adding to the method or simplifying its execution path.
  */
 final readonly class NestingDepthRule implements RuleInterface
 {
@@ -93,6 +94,8 @@ final readonly class NestingDepthRule implements RuleInterface
 
             $symbol = CyclomaticComplexityRule::resolveSymbol($node);
 
+            $band = LimitBand::of($maxDepth, $settings->lowestHighValueThreshold());
+
             $findings[] = new Finding(
                 ruleId:  $definition->id,
                 message: sprintf(
@@ -104,18 +107,19 @@ final readonly class NestingDepthRule implements RuleInterface
                 ),
                 filePath:         $analysisUnit->file->displayPath,
                 line:             $node->getStartLine(),
-                severity:         $thresholdMatch->severity,
+                severity:         LimitBand::severity($band, $thresholdMatch->severity),
                 pillar:           $definition->pillar,
                 tier:             $definition->tier,
                 confidence:       $definition->confidence,
                 endLine:          $node->getEndLine() > 0 ? $node->getEndLine() : null,
                 symbol:           $symbol,
-                remediation:      'Reduce nesting by using early returns, guard clauses, or extracting nested logic.',
+                remediation:      LimitBand::advice($band, LimitBand::LOWER_METHOD, LimitBand::SIMPLIFY_PATH),
                 secondaryPillars: $definition->secondaryPillars,
                 metadata:         [
                     'depth' => $maxDepth,
                     'threshold' => $thresholdMatch->threshold,
                     'thresholdType' => $thresholdMatch->severity->value,
+                    LimitBand::KEY => $band,
                 ],
             );
         }

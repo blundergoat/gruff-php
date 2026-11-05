@@ -8,7 +8,8 @@ Treat analyzer output as sensitive when scanning private code.
 
 | Version | Supported |
 | --- | --- |
-| Current `0.3.x` release line | Supported. |
+| Current `0.6.x` release line | Supported. |
+| `0.5.x` and earlier | No fixes. |
 | Older development snapshots | Best effort only. |
 
 ## Reporting A Vulnerability
@@ -55,4 +56,4 @@ If gruff reports a real secret:
 2. Remove it from source history if required by your incident process.
 3. Add a baseline or allowlist only after confirming the value is not live.
 
-Do not use `allowlists.secretPreviews` to hide active credentials.
+Nothing in the configuration hides a sensitive-data finding except a reviewed, reason-bearing `sensitiveExclusions` entry; the 0.5 `allowlists.secretPreviews` key is refused on sight.

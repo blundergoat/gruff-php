@@ -1,0 +1,34 @@
+schemaVersion: gruff-php.config.v0.1
+rules:
+    dead-code.unused-private-method:
+        enabled: true
+    security.dangerous-function-call:
+        enabled: true
+    security.debug-mode-enabled:
+        enabled: true
+    security.dependency-composer-path:
+        enabled: true
+    security.dependency-composer-vcs:
+        enabled: true
+    security.disabled-ssl-verification:
+        enabled: true
+    security.header-injection:
+        enabled: true
+    security.silent-catch:
+        enabled: true
+    security.sql-concatenation:
+        enabled: true
+    security.unsafe-unserialize:
+        enabled: true
+    sensitive-data.database-url-password:
+        enabled: true
+    sensitive-data.pii-test-fixture:
+        enabled: true
+    test-quality.loop-assertion-without-message:
+        enabled: true
+    test-quality.no-assertions:
+        enabled: true
+    test-quality.sut-not-called:
+        enabled: true
+    test-quality.test-longer-than-sut:
+        enabled: true

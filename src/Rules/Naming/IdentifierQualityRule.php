@@ -652,7 +652,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
             tier:        $identifierFindingContext->definition->tier,
             confidence:  $identifierFindingContext->definition->confidence,
             symbol:      $symbol,
-            remediation: 'Rename the identifier to describe its domain role or action. If the placeholder or generic token is intentional, add it to `rules.naming.identifier-quality.options.placeholderNames`, `genericTokens`, or `ignoredNames` in `.gruff-php.yaml`.',
+            remediation: 'Rename the identifier to describe its domain role or action. If the name is intentional, add it to `rules.naming.identifier-quality.options.ignoredNames` in `.gruff-php.yaml`, or remove the token from `placeholderNames` or `genericTokens` when your project does not treat it as a placeholder.',
             metadata:    [
                 'identifierKind' => $kind,
                 'identifierName' => $name,

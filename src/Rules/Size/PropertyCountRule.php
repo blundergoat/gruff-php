@@ -84,9 +84,10 @@ final readonly class PropertyCountRule implements RuleInterface
             }
 
             $symbol = $this->resolveSymbol($classLike);
-            $severity = $this->isReadonlyDataCarrier($classLike)
+            $band     = LimitBand::of($propertyCount, $settings->lowestHighValueThreshold());
+            $severity = LimitBand::severity($band, $this->isReadonlyDataCarrier($classLike)
                 ? Severity::Advisory
-                : $thresholdMatch->severity;
+                : $thresholdMatch->severity);
             $findingKind = $this->isReadonlyDataCarrier($classLike)
                 ? 'readonly-data-carrier'
                 : 'property-count';
@@ -116,7 +117,7 @@ final readonly class PropertyCountRule implements RuleInterface
                 confidence:       $definition->confidence,
                 endLine:          $classLike->getEndLine() > 0 ? $classLike->getEndLine() : null,
                 symbol:           $symbol,
-                remediation:      'Group related properties into value objects or extract sub-components.',
+                remediation:      LimitBand::advice($band, LimitBand::LOWER_PROPERTY, LimitBand::SPLIT_CLASS),
                 secondaryPillars: $definition->secondaryPillars,
                 metadata:         [
                     'properties' => $propertyCount,
@@ -124,6 +125,7 @@ final readonly class PropertyCountRule implements RuleInterface
                     'thresholdType' => $severity->value,
                     'rawThresholdType' => $thresholdMatch->severity->value,
                     'findingKind' => $findingKind,
+                    LimitBand::KEY => $band,
                 ],
             );
         }

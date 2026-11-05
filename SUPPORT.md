@@ -1,6 +1,6 @@
 # Support
 
-Support for the current `0.3.x` release line is best effort and focused on local
+Support for the current `0.6.x` release line is best effort and focused on local
 CLI, CI, reporting, and rule-calibration workflows.
 
 ## Getting Help
@@ -41,7 +41,7 @@ Review generated JSON before attaching it to public issues.
 
 ## Supported Use Cases
 
-Best-effort support for the current `0.3.x` release line:
+Best-effort support for the current `0.6.x` release line:
 
 - Local CLI scans.
 - CI scans.

@@ -8,7 +8,6 @@ use PhpParser\Node;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Name;
 use PhpParser\Node\Stmt\Class_;
-use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Enum_;
 use PhpParser\Node\Stmt\Trait_;
 
@@ -21,115 +20,6 @@ final class CallableReferenceResolver
 {
     /** Number of runtime slots in PHP's callable-array form. */
     private const CALLABLE_PART_COUNT = 2;
-
-    /**
-     * Build the exact identity for a declared method.
-     *
-     * @param ClassMethod $classMethod - Declaration whose named class-like owner anchors the identity.
-     *
-     * @return string|null - Lowercase class-and-method key, or null when the owner cannot be proven.
-     */
-    public static function declarationKey(ClassMethod $classMethod): ?string
-    {
-        $classLike = self::enclosingClassLike($classMethod);
-
-        // An exact callback identity needs a named class, trait, or enum declaration owner.
-        if ($classLike === null) {
-            return null;
-        }
-
-        $className = self::declaringClassName($classLike);
-
-        // Anonymous or unresolved owners cannot be compared safely with a callback target.
-        if ($className === null) {
-            return null;
-        }
-
-        return self::methodKey($className, $classMethod->name->toString());
-    }
-
-    /**
-     * Resolve an exact same-class first-class callable reference.
-     *
-     * @param Node $node - Candidate AST node; ordinary calls and dynamic targets return null.
-     *
-     * @return string|null - Lowercase class-and-method key, or null when the reference is not statically exact.
-     */
-    public static function firstClassReferenceKey(Node $node): ?string
-    {
-        // Only method and static calls can spell a method first-class callable.
-        if (!$node instanceof Expr\MethodCall && !$node instanceof Expr\StaticCall) {
-            return null;
-        }
-
-        // Ordinary calls and computed method names do not establish a named callback boundary.
-        if (!$node->isFirstClassCallable() || !$node->name instanceof Node\Identifier) {
-            return null;
-        }
-
-        $classLike = self::enclosingClassLike($node);
-
-        // A callback outside a named class-like scope cannot identify a same-class declaration.
-        if ($classLike === null) {
-            return null;
-        }
-
-        $declaringClass = self::declaringClassName($classLike);
-
-        // Missing declaration identity makes an exact class comparison impossible.
-        if ($declaringClass === null) {
-            return null;
-        }
-
-        $targetClass = self::firstClassTargetName($node, $declaringClass);
-
-        // Dynamic, foreign, parent, or unresolved targets are deliberately left for explicit allowlists.
-        if ($targetClass === null || strtolower($targetClass) !== strtolower($declaringClass)) {
-            return null;
-        }
-
-        return self::methodKey($declaringClass, $node->name->toString());
-    }
-
-    /**
-     * Resolve a vetted two-element callable array to an exact same-class method identity.
-     *
-     * @param Node $node - Candidate array node; computed slots and foreign targets return null.
-     *
-     * @return string|null - Lowercase class-and-method key, or null when the callback is not statically exact.
-     */
-    public static function callableArrayReferenceKey(Node $node): ?string
-    {
-        $parts = self::callableArrayParts($node);
-
-        // Only a literal two-element array with a literal method slot can name an exact callback.
-        if ($parts === null) {
-            return null;
-        }
-
-        $classLike = self::enclosingClassLike($node);
-
-        // An array outside a named class-like scope cannot establish a same-class declaration.
-        if ($classLike === null) {
-            return null;
-        }
-
-        $declaringClass = self::declaringClassName($classLike);
-
-        // Unresolved declaration names are never safe identity anchors for the waste-rule exemption.
-        if ($declaringClass === null) {
-            return null;
-        }
-
-        $targetClass = self::callableTargetName($parts['target'], $classLike, false);
-
-        // Foreign, unresolved, or computed receivers stay visible for explicit allowlist decisions.
-        if ($targetClass === null || strtolower($targetClass) !== strtolower($declaringClass)) {
-            return null;
-        }
-
-        return self::methodKey($declaringClass, $parts['method']);
-    }
 
     /**
      * Read a literal method name from a same-class callable array for dead-code analysis.
@@ -218,43 +108,6 @@ final class CallableReferenceResolver
         $targetClass = self::callableTargetName($target, $classLike, true);
 
         return $targetClass !== null && strtolower($targetClass) === strtolower($declaringClass);
-    }
-
-    /**
-     * Resolve the class targeted by a first-class method reference.
-     *
-     * @param Expr\MethodCall|Expr\StaticCall $call - First-class call with a literal method name.
-     * @param string $declaringClass - Fully resolved class-like name for the surrounding scope.
-     *
-     * @return string|null - Resolved target class, or null when runtime dispatch prevents proof.
-     */
-    private static function firstClassTargetName(Expr\MethodCall|Expr\StaticCall $call, string $declaringClass): ?string
-    {
-        // A first-class callback on the current object stays local; every other object receiver is dynamic.
-        if ($call instanceof Expr\MethodCall) {
-            return $call->var instanceof Expr\Variable && $call->var->name === 'this'
-                ? $declaringClass
-                : null;
-        }
-
-        // A computed static target cannot be tied to one declaration.
-        if (!$call->class instanceof Name) {
-            return null;
-        }
-
-        $writtenName = strtolower($call->class->toString());
-
-        // `self` and `static` are the supported same-class static callback targets.
-        if ($writtenName === 'self' || $writtenName === 'static') {
-            return $declaringClass;
-        }
-
-        // `parent` names a different declaration owner and must stay conservative.
-        if ($writtenName === 'parent') {
-            return null;
-        }
-
-        return self::resolvedReferenceName($call->class);
     }
 
     /**
@@ -386,30 +239,6 @@ final class CallableReferenceResolver
     }
 
     /**
-     * Find the nearest class-like owner attached by the parser's parent visitor.
-     *
-     * @param Node $node - Declaration or callback node whose lexical owner is required.
-     *
-     * @return Class_|Trait_|Enum_|null - Nearest supported owner, or null outside those scopes.
-     */
-    private static function enclosingClassLike(Node $node): Class_|Trait_|Enum_|null
-    {
-        $parent = $node->getAttribute('parent');
-
-        // Walk outward until the first class-like boundary establishes the lexical callback scope.
-        while ($parent instanceof Node) {
-            // The nearest class, trait, or enum is the declaration owner used in the exact key.
-            if ($parent instanceof Class_ || $parent instanceof Trait_ || $parent instanceof Enum_) {
-                return $parent;
-            }
-
-            $parent = $parent->getAttribute('parent');
-        }
-
-        return null;
-    }
-
-    /**
      * Read the fully resolved name attached to a class-like declaration.
      *
      * @param Class_|Trait_|Enum_ $classLike - Named declaration that owns a method or callback.
@@ -460,18 +289,5 @@ final class CallableReferenceResolver
         }
 
         return $isWrittenFallbackAllowed ? $name->toString() : null;
-    }
-
-    /**
-     * Normalize a class and method pair for case-insensitive PHP method matching.
-     *
-     * @param string $className - Fully resolved declaration name.
-     * @param string $methodName - Literal declared or referenced method name.
-     *
-     * @return string - Lowercase exact identity used only for in-unit callback matching.
-     */
-    private static function methodKey(string $className, string $methodName): string
-    {
-        return strtolower($className . '::' . $methodName);
     }
 }

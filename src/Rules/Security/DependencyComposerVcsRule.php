@@ -38,18 +38,27 @@ final class DependencyComposerVcsRule implements SourceTextRuleInterface
     /**
      * Describes the Composer VCS-repository rule for the registry and reports.
      *
-     * @return RuleDefinition - Rule metadata and defaults.
+     * @return RuleDefinition - metadata `list-rules` publishes; the rule ships off by default, so only a config can turn it on
      */
     public function definition(): RuleDefinition
     {
         // Medium confidence by default: a VCS repository is a supply-chain smell to review, not proof of harm.
         return new RuleDefinition(
-            id:              self::ID,
-            name:            'Composer VCS repository',
-            pillar:          Pillar::Security,
-            tier:            RuleTier::V01,
-            defaultSeverity: Severity::Warning,
-            confidence:      Confidence::Medium,
+            id:                 self::ID,
+            name:               'Composer VCS repository',
+            pillar:             Pillar::Security,
+            tier:               RuleTier::V01,
+            defaultSeverity:    Severity::Warning,
+            confidence:         Confidence::Medium,
+            // Off unless a project sets `enabled: true`: neither judged finding was worth acting on in the 0.6.0 measurement (ADR-034).
+            // Two findings are too few to delete the rule on, so it stays available for projects that want it.
+            isEnabledByDefault: false,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A private VCS repository whose package is already required at an immutable commit.',
+                    'mitigation' => 'The repository type alone is matched and the resolving constraint is never read, so confirm the pinning and accept the finding, or publish through a private registry.',
+                ],
+            ],
         );
     }
 

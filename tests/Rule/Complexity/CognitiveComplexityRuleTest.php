@@ -57,17 +57,19 @@ final class CognitiveComplexityRuleTest extends TestCase
             'deeply nested'                   => ['deeplyNested', 11],
             'while boolean condition'         => ['whileWithBooleanCondition', 2],
             'do while boolean condition'      => ['doWhileWithBooleanCondition', 2],
-            'try catch finally branches'      => ['tryCatchFinallyBranches', 5],
-            'jumps and goto'                  => ['jumpsAndGoto', 12],
+            'try catch finally branches'      => ['tryCatchFinallyBranches', 4],
+            'jumps and goto'                  => ['jumpsAndGoto', 8],
             'logical keyword chain'           => ['logicalKeywordChain', 3],
             'expression and return ternaries' => ['expressionAndReturnTernaries', 4],
-            'closure and arrow function'      => ['closureAndArrowFunction', 4],
-            'elseif and nested branches'      => ['elseifAndNestedBranches', 8],
-            'switch with nested cases'        => ['switchWithNestedCases', 8],
+            'closure and arrow function'      => ['closureAndArrowFunction', 3],
+            'elseif and nested branches'      => ['elseifAndNestedBranches', 7],
+            'switch with nested cases'        => ['switchWithNestedCases', 4],
+            'non-guard still nests'           => ['nonGuardStillNests', 6],
+            'guard needs no else'             => ['guardNeedsNoElse', 5],
             'short ternary'                   => ['shortTernary', 3],
             'plain return'                    => ['plainReturn', 1],
             // Match mirrors cognitive switch: one increment for the construct plus recursive arm scoring,
-            // with no per-arm cost. Cyclomatic complexity intentionally differs: it charges every arm.
+            // with no per-arm cost. The shared cyclomatic count used by the maintainability index charges each arm condition.
             'match with two arms'             => ['matchTwoArms', 1],
             'match with six arms'             => ['matchSixArms', 1],
             'nested match'                    => ['matchNested', 3],
@@ -237,7 +239,8 @@ final class CognitiveComplexityRuleTest extends TestCase
      */
     public function testFlatFallThroughBranchesAreNotDowngradedToAdvisory(): void
     {
-        $findings = $this->analyse('guard-clauses.php', ['warning' => 4, 'error' => 14]);
+        // A warning tier of 3 puts telemetryBuilder's complexity of 5 in the upper band, where the shape alone decides severity.
+        $findings = $this->analyse('guard-clauses.php', ['warning' => 3, 'error' => 14]);
 
         $bySymbol = [];
         foreach ($findings as $finding) {

@@ -75,22 +75,42 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
             }
 
             // An obvious placeholder or dummy value is not a real credential.
-            if (SecretScannerHelper::isLikelyDummyValue($candidateSecret)) {
+            if (SecretScannerHelper::isLikelyDummyValue($candidateSecret, shouldSplitIdentifierWords: false)) {
+                continue;
+            }
+
+            // A body that is entirely X shows where a key goes and names no credential (FAMILY-CONTRACT.md section 5).
+            if (self::isMaskedKey($candidateSecret)) {
                 continue;
             }
 
             $findings[] = SecretScannerHelper::finding(
                 analysisUnit: $analysisUnit,
                 ruleId:       self::ID,
-                message:      sprintf('Potential AWS access key detected: %s.', SecretScannerHelper::redactedPreview($candidateSecret)),
+                message:      sprintf('Potential AWS access key detected: %s.', SecretScannerHelper::categoryMarker('aws-access-key')),
                 line:         SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
                 confidence:   Confidence::High,
                 detector:     'aws-access-key',
-                preview:      SecretScannerHelper::redactedPreview($candidateSecret),
+                displayMarker: SecretScannerHelper::categoryMarker('aws-access-key'),
                 remediation:  'Remove the key from source and rotate it if it was real.',
             );
         }
 
         return $findings;
+    }
+
+    /**
+     * Reports whether a key-shaped match is a masked value: the prefix followed by a body that is entirely X.
+     *
+     * Only the whole body counts, because a real key may contain a run of X and hiding it would hide a live credential.
+     *
+     * @param string $candidateSecret - The matched key-shaped literal.
+     *
+     * @return bool - true when the sixteen-character body is all X
+     */
+    private static function isMaskedKey(string $candidateSecret): bool
+    {
+        // Matches an AKIA or ASIA key id whose sixteen-character body is all X, the documented masking.
+        return preg_match('/^(?:AKIA|ASIA)X{16}$/', $candidateSecret) === 1;
     }
 }

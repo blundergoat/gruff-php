@@ -130,42 +130,6 @@ final class TestQualityNodeHelperTest extends TestCase
     }
 
     /**
-     * Verify trivial assertion detection covers PHPUnit and Pest literal idioms.
-     *
-     * @return void
-     */
-    public function testTrivialAssertionDetectionCoversPhpUnitAndPestLiterals(): void
-    {
-        $scope   = $this->scopesByName()['testTrivialAssertions'];
-        $results = [];
-
-        foreach (TestQualityNodeHelper::assertionCalls($scope) as $call) {
-            $name = TestQualityNodeHelper::callName($call);
-            if ($name === 'expect') {
-                continue;
-            }
-
-            self::assertIsString($name, 'every iterated assertion call should resolve to a string name');
-            $results[] = [$name, TestQualityNodeHelper::isTrivialAssertion($call)];
-        }
-
-        self::assertSame([
-                             ['asserttrue', true],
-                             ['assertfalse', true],
-                             ['assertequals', true],
-                             ['assertsame', true],
-                             ['assertsame', false],
-                             ['tobetrue', true],
-                             ['tobefalse', true],
-                             ['tobe', true],
-                             ['toequal', true],
-                             ['tobe', false],
-                             ['tobetrue', false],
-                             ['tobefalse', false],
-                         ], $results);
-    }
-
-    /**
      * Verify the assertion detector recognises the expanded Pest expectation API.
      *
      * @return void
@@ -208,21 +172,21 @@ final class TestQualityNodeHelperTest extends TestCase
     }
 
     /**
-     * Verify argument, literal, Pest-chain, and magic-number helpers.
+     * Verify argument, literal, and Pest-chain helpers.
      *
      * @return void
      */
     public function testArgumentLiteralPestAndMagicNumberHelpers(): void
     {
-        $scope               = $this->scopesByName()['testLiteralAndMagicNumbers'];
-        $calls               = TestQualityNodeHelper::calls($scope);
-        $helperCall          = $this->firstNamedCall($calls, 'helper');
-        $dynamicCall         = array_values(array_filter(
+        $scope       = $this->scopesByName()['testLiteralAndMagicNumbers'];
+        $calls       = TestQualityNodeHelper::calls($scope);
+        $helperCall  = $this->firstNamedCall($calls, 'helper');
+        $dynamicCall = array_values(array_filter(
                                                 $calls,
                                                 static fn(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool => $call instanceof Expr\FuncCall
                                                                                                                         && TestQualityNodeHelper::functionName($call) === null,
                                             ))[0] ?? null;
-        $integerHelperCall   = array_values(array_filter(
+        $integerHelperCall = array_values(array_filter(
                                                 $calls,
                                                 static fn(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool => TestQualityNodeHelper::callName($call) === 'helper'
                                                                                                                         && TestQualityNodeHelper::literalValue(TestQualityNodeHelper::firstArgValue($call)) === 2,
@@ -253,14 +217,6 @@ final class TestQualityNodeHelperTest extends TestCase
         self::assertSame('dynamic', TestQualityNodeHelper::literalValue(TestQualityNodeHelper::firstArgValue($dynamicCall)));
         self::assertFalse(TestQualityNodeHelper::isAssertionCall($dynamicCall));
         self::assertNull(TestQualityNodeHelper::literalValue(TestQualityNodeHelper::firstArgValue($unknownConstantCall)));
-        self::assertNull(TestQualityNodeHelper::isAssertionMagicNumber($integerHelperCall));
-
-        $magicNumbers = array_values(array_filter(array_map(
-                                                      static fn(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): ?int => TestQualityNodeHelper::isAssertionMagicNumber($call),
-                                                      TestQualityNodeHelper::assertionCalls($scope),
-                                                  ), static fn(?int $magicNumber): bool => $magicNumber !== null));
-
-        self::assertSame([2, 4, 3], $magicNumbers);
 
         $pestTerminal = array_values(array_filter(
                                          $calls,
@@ -302,7 +258,6 @@ final class TestQualityNodeHelperTest extends TestCase
 
         self::assertSame([
                              'createmock',
-                             'createstub',
                              'getmockbuilder',
                              'mock',
                              'partialmock',
@@ -380,7 +335,7 @@ final class TestQualityNodeHelperTest extends TestCase
      * Return the first call with the requested normalised name.
      *
      * @param list<Expr\FuncCall|Expr\MethodCall|Expr\StaticCall> $calls - Calls to inspect.
-     * @param string                                              $name - Normalised call name.
+     * @param string                                              $name  - Normalised call name.
      *
      * @return Expr\FuncCall|Expr\MethodCall|Expr\StaticCall - the first call matching the name; the test fails if none matches
      */

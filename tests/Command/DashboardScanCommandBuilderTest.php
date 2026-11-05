@@ -75,10 +75,29 @@ final class DashboardScanCommandBuilderTest extends TestCase
     }
 
     /**
+     * Verify dashboard scans forward the atomic deep-scan override before path operands.
+     *
+     * @return void
+     */
+    public function testAnalyseCommandForwardsDeepScanBudget(): void
+    {
+        $state                   = $this->state();
+        $state['deepScanBudget'] = 'off';
+        $command                 = (new DashboardScanCommandBuilder('/tmp/gruff'))->analyseCommand(['src'], $state);
+        $optionIndex             = array_search('--deep-scan-budget', $command, true);
+        $separatorIndex          = array_search('--', $command, true);
+
+        self::assertIsInt($optionIndex);
+        self::assertIsInt($separatorIndex);
+        self::assertSame('off', $command[$optionIndex + 1]);
+        self::assertLessThan($separatorIndex, $optionIndex);
+    }
+
+    /**
      * Build the dashboard scan state used by command-builder tests.
      *
      * @return array{project: string, paths: string, scanScope: string, failOn: string, config: string, baseline: string, noBaseline: string,
-     *                        noConfig: string, includeIgnored: string, reportInteractive: string} - a fully-populated valid scan state fixture; flag
+     *                        noConfig: string, deepScanBudget: string, includeIgnored: string, reportInteractive: string} - a fully-populated valid scan state fixture; flag
      *                        fields ('noBaseline', 'noConfig', 'includeIgnored', 'reportInteractive') use '0'/'1' string toggles and 'baseline' is
      *                        empty when no baseline applies
      */
@@ -86,15 +105,16 @@ final class DashboardScanCommandBuilderTest extends TestCase
     {
         // Canonical valid scan state the builder turns into a command line.
         return [
-            'project'           => __DIR__,
-            'paths'             => '.',
-            'scanScope'         => 'full',
-            'failOn'            => 'none',
-            'config'            => '.gruff-php.yaml',
-            'baseline'          => '',
-            'noBaseline'        => '0',
-            'noConfig'          => '0',
-            'includeIgnored'    => '0',
+            'project' => __DIR__,
+            'paths' => '.',
+            'scanScope' => 'full',
+            'failOn' => 'none',
+            'config' => '.gruff-php.yaml',
+            'baseline' => '',
+            'noBaseline' => '0',
+            'noConfig' => '0',
+            'deepScanBudget' => '',
+            'includeIgnored' => '0',
             'reportInteractive' => '0',
         ];
     }

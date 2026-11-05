@@ -42,7 +42,9 @@ final class PropertyCommentFixture
     public string $detached = '';
 
     /** Already documented. */
-    public string $documented = ''; // Follows from the previous declaration.
+    public string $documented = '';
+
+    public bool $plainOwner = false; // Follows from the previous declaration.
     public string $trailingFollower = '';
 
     /* Cache key shared across workers. */
@@ -73,6 +75,7 @@ PHP;
             'PropertyCommentFixture::$first',
             'PropertyCommentFixture::$generic',
             'PropertyCommentFixture::$hashAttached',
+            'PropertyCommentFixture::$plainOwner',
             'PropertyCommentFixture::$restatedProperty',
             'PropertyCommentFixture::$second',
             'PropertyCommentFixture::$singleWord',
@@ -101,6 +104,7 @@ PHP;
             'PropertyCommentFixture::$detached',
             'PropertyCommentFixture::$fillerName',
             'PropertyCommentFixture::$generic',
+            'PropertyCommentFixture::$plainOwner',
             'PropertyCommentFixture::$restatedProperty',
             'PropertyCommentFixture::$singleWord',
             'PropertyCommentFixture::$trailingFollower',

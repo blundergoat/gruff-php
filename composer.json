@@ -72,6 +72,7 @@
             "composer validate --strict",
             "@audit:dependencies",
             "@security:scan",
+            "php bin/gruff-php analyse . --fail-on=advisory",
             "bash -n scripts/preflight-checks.sh",
             "bash -n scripts/dependency-install.sh",
             "bash -n scripts/dependency-update.sh",

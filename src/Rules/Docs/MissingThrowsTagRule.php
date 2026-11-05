@@ -47,12 +47,18 @@ final readonly class MissingThrowsTagRule implements RuleInterface
     {
         // Advisory because an undocumented throw is a contract gap, not a defect; callers tune severity in config.
         return new RuleDefinition(
-            id:              self::ID,
-            name:            'Missing @throws tag',
-            pillar:          Pillar::Documentation,
-            tier:            RuleTier::V01,
-            defaultSeverity: Severity::Advisory,
-            confidence:      Confidence::Medium,
+            id:                  self::ID,
+            name:                'Missing @throws tag',
+            pillar:              Pillar::Documentation,
+            tier:                RuleTier::V01,
+            defaultSeverity:     Severity::Advisory,
+            confidence:          Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape' => 'A guard clause that throws for a state the author treats as unreachable, such as a LogicException behind an already-validated invariant.',
+                    'mitigation' => 'Any throw in the method\'s own scope requires the tag, so document the guard as an internal invariant or restructure so the impossible state cannot throw.',
+                ],
+            ],
         );
     }
 
@@ -60,7 +66,7 @@ final readonly class MissingThrowsTagRule implements RuleInterface
      * Reports each documented public function-like that throws without an `@throws` tag.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
      *
      * @return list<Finding> - Findings for missing @throws documentation.
      */
@@ -124,12 +130,14 @@ final readonly class MissingThrowsTagRule implements RuleInterface
     /**
      * Reports whether a statement list throws in its own lexical scope.
      *
+     * Public so docs.missing-phpdoc asks when a callable throws by the same test.
+     *
      * @param array<Node> $statements - Function-like body statements to search.
      *
      * @return bool - true when a `throw` sits directly in this scope; throws inside nested closures, arrow
      *              functions, anonymous classes, or nested functions belong to those scopes' own contracts
      */
-    private function hasDirectThrow(array $statements): bool
+    public function hasDirectThrow(array $statements): bool
     {
         // One direct throw anywhere in the body is enough to require an @throws tag on the docblock.
         foreach ($statements as $statement) {

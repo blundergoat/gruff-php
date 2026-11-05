@@ -82,7 +82,7 @@ final class TextReporterTest extends TestCase
         $findings = [];
         for ($index = 0; $index < $findingCount; $index++) {
             $findings[] = new Finding(
-                ruleId:     'docs.missing-public-phpdoc',
+                ruleId:     'docs.missing-phpdoc',
                 message:    'Example finding.',
                 filePath:   'src/Example.php',
                 line:       $index + 1,

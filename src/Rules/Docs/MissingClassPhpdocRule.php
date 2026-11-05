@@ -14,6 +14,7 @@ use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
+use GruffPhp\Support\DeclarationLine;
 use PhpParser\Node;
 use PhpParser\Node\Stmt\Class_;
 use PhpParser\Node\Stmt\ClassLike;
@@ -90,7 +91,7 @@ final readonly class MissingClassPhpdocRule implements RuleInterface
                 ruleId:      $definition->id,
                 message:     sprintf('%s %s needs a brief intent description above its declaration (one plain-English line; not a restatement of the class name).', ucfirst($kind), $name),
                 filePath:    $analysisUnit->file->displayPath,
-                line:        $node->getStartLine(),
+                line:        DeclarationLine::of($node),
                 severity:    $definition->defaultSeverity,
                 pillar:      $definition->pillar,
                 tier:        $definition->tier,

@@ -34,7 +34,7 @@ final class MechanicsSmellTest extends TestCase
     {
         $first = $this->createMock(DependencyOne::class);
         $second = $this->createMock(DependencyTwo::class);
-        $third = $this->createStub(DependencyThree::class);
+        $third = $this->createMock(DependencyThree::class);
         $fourth = $this->getMockBuilder(DependencyFour::class)->getMock();
 
         self::assertSame('ok', $this->service->run($first, $second, $third, $fourth));

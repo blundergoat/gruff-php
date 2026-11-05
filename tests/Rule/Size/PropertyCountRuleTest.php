@@ -54,7 +54,8 @@ final class PropertyCountRuleTest extends TestCase
      */
     public function testWarningForTooManyDeclaredProperties(): void
     {
-        $findings = $this->analyse('many-properties.php', ['warning' => 15, 'error' => 25]);
+        // A warning tier of 10 puts the 16 properties at one and a half times the limit, so the finding keeps warning severity.
+        $findings = $this->analyse('many-properties.php', ['warning' => 10, 'error' => 25]);
 
         self::assertCount(1, $findings);
         self::assertSame(PropertyCountRule::ID, $findings[0]->ruleId);
@@ -115,7 +116,8 @@ final class PropertyCountRuleTest extends TestCase
      */
     public function testReadonlyClassWithBehaviourMethodKeepsConfiguredSeverity(): void
     {
-        $findings = $this->analyse('readonly-carrier-with-behaviour.php', ['warning' => 15, 'error' => 25]);
+        // A warning tier of 10 puts the 16 properties in the upper band, where the configured severity applies.
+        $findings = $this->analyse('readonly-carrier-with-behaviour.php', ['warning' => 10, 'error' => 25]);
 
         self::assertCount(1, $findings);
         self::assertSame('ReadonlyCarrierWithBehaviourFixture', $findings[0]->symbol);

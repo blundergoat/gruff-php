@@ -91,6 +91,7 @@ final readonly class ParameterCountRule implements RuleInterface
                 }
 
                 $symbol = $this->resolveSymbol($node);
+                $band   = LimitBand::of($paramCount, $promotedCeiling);
 
                 $findings[] = new Finding(
                     ruleId:  $definition->id,
@@ -108,13 +109,14 @@ final readonly class ParameterCountRule implements RuleInterface
                     confidence:       $definition->confidence,
                     endLine:          $node->getEndLine() > 0 ? $node->getEndLine() : null,
                     symbol:           $symbol,
-                    remediation:      'Split the value object, or group related parameters into nested value objects.',
+                    remediation:      LimitBand::advice($band, LimitBand::LOWER_PARAMETER, 'Split the value object, or group related parameters into nested value objects.'),
                     secondaryPillars: $definition->secondaryPillars,
                     metadata:         [
                         'parameters' => $paramCount,
                         'promotedConstructorMaxParameters' => $promotedCeiling,
                         'findingKind' => 'promoted-ctor-ceiling',
                         'thresholdType' => Severity::Advisory->value,
+                        LimitBand::KEY => $band,
                     ],
                 );
 
@@ -142,6 +144,9 @@ final readonly class ParameterCountRule implements RuleInterface
                 $metadata['findingKind']              = 'constructor-threshold';
             }
 
+            $band                     = LimitBand::of($paramCount, $constructorThreshold ? $constructorMax : $settings->lowestHighValueThreshold());
+            $metadata[LimitBand::KEY] = $band;
+
             $findings[] = new Finding(
                 ruleId:  $definition->id,
                 message: $constructorThreshold
@@ -160,13 +165,13 @@ final readonly class ParameterCountRule implements RuleInterface
                     ),
                 filePath:         $analysisUnit->file->displayPath,
                 line:             $node->getStartLine(),
-                severity:         $thresholdMatch->severity,
+                severity:         LimitBand::severity($band, $thresholdMatch->severity),
                 pillar:           $definition->pillar,
                 tier:             $definition->tier,
                 confidence:       $definition->confidence,
                 endLine:          $node->getEndLine() > 0 ? $node->getEndLine() : null,
                 symbol:           $symbol,
-                remediation:      'Group related parameters into a value object or configuration class.',
+                remediation:      LimitBand::advice($band, LimitBand::LOWER_PARAMETER, LimitBand::GROUP_PARAMETERS),
                 secondaryPillars: $definition->secondaryPillars,
                 metadata:         $metadata,
             );

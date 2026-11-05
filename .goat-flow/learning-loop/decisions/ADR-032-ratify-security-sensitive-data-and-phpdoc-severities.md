@@ -2,6 +2,7 @@
 
 **Status:** Proposed
 **Date:** 2026-08-11
+**Updated:** 2026-10-03 (baseline-identity note reconciled with ADR-033)
 **Target:** Family ratification for 0.5.2; any runtime change belongs in a future minor release
 **Readiness:** Ready for an operator decision on the constrained deferral proposed here
 **Relates to:** [ADR-017 mission](ADR-017-mission-govern-ai-generated-code.md), [ADR-022 test-quality gate parity](ADR-022-test-quality-gate-parity.md), [ADR-029 baseline matching](ADR-029-baseline-v2-group-count-matching.md)
@@ -143,7 +144,7 @@ Severity is absent from the v2 baseline group key, so accepted findings keep mat
 | Score | Severity weight changes and can move pillar or composite scores. |
 | Stable identity | Remains stable only if rule id, file, symbol, and message remain unchanged. |
 
-Keep finding messages unchanged during any severity migration. `Finding::stableIdentity()` includes the message but not severity. ADR-029 baseline groups also include the message but not severity. A message edit would turn a tier migration into an identity and baseline migration.
+Keep finding messages unchanged during any severity migration. `Finding::stableIdentity()` includes the message but not severity. ADR-029 baseline groups also include the message but not severity. A message edit would turn a tier migration into an identity and baseline migration. (Updated 2026-10-03: ADR-033's v3 baseline identity uses the symbol as its subject, so a message edit now reaches baselines only for findings without a symbol; `stableIdentity()` still includes the message.)
 
 ## Controls before any future severity change
 

@@ -125,7 +125,9 @@ final readonly class RuleConfigApplier
             throw new ConfigException(sprintf('Config key "rules.%s.severity" requires "threshold".', $ruleId));
         }
 
-        $settings         = $config->ruleSettings($ruleId);
+        // A block keyed by a retired id, e.g. `docs.missing-public-phpdoc:` in a 0.5 `.gruff-php.yaml`, configures the rule that replaced it.
+        // Error messages keep the key the user wrote, so they can find it in their file.
+        $settings         = $config->ruleSettings(RuleRegistry::canonicalRuleId($ruleId));
         $definitionSingle = $registry->get($ruleId)->definition()->severityThreshold;
 
         // A single-threshold rule cannot take a tiered `thresholds` map, so reject that combination.
@@ -140,7 +142,7 @@ final readonly class RuleConfigApplier
         $severityThreshold = $this->severityThreshold($ruleId, $ruleConfig, $registry)
                              ?? $settings->severityThreshold;
 
-        return $config->withRuleSettings($ruleId, new RuleSettings(
+        return $config->withRuleSettings(RuleRegistry::canonicalRuleId($ruleId), new RuleSettings(
             enabled:           $this->isEnabled($ruleId, $ruleConfig, $settings->enabled),
             thresholds:        $severityThreshold instanceof SeverityThreshold
                                    ? $settings->thresholds

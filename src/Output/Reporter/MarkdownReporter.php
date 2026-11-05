@@ -32,6 +32,7 @@ final readonly class MarkdownReporter
         $lines = [];
 
         $this->appendSummary($lines, $report);
+        $this->appendDiagnostics($lines, $report);
         $this->appendBranchReviewSection($lines, $report);
         $this->appendPillarSection($lines, $report);
         $this->appendFindingsSection($lines, $report);
@@ -40,12 +41,41 @@ final readonly class MarkdownReporter
     }
 
     /**
+     * Adds every run diagnostic to the shareable document, including nonfatal bounded-scan notes.
+     *
+     * @param list<string> $lines - Markdown lines being built.
+     * @param AnalysisReport $report - Completed report whose run diagnostics are appended.
+     *
+     * @return void
+     */
+    private function appendDiagnostics(array &$lines, AnalysisReport $report): void
+    {
+        if ($report->diagnostics === []) {
+            return;
+        }
+
+        $lines[] = '';
+        $lines[] = '## Diagnostics';
+        $lines[] = '';
+        foreach ($report->diagnostics as $diagnostic) {
+            $location = $diagnostic->filePath ?? $diagnostic->path;
+            if ($location !== null && $diagnostic->filePath !== null && $diagnostic->line !== null) {
+                $location .= ':' . $diagnostic->line;
+            }
+
+            $lines[] = $location === null
+                ? sprintf('- `%s` %s', $diagnostic->type, $diagnostic->message)
+                : sprintf('- `%s` `%s` %s', $diagnostic->type, $location, $diagnostic->message);
+        }
+    }
+
+    /**
      * Writes the headline block the user reads first: overall grade, scope, and finding totals, then
      * whichever optional notes this run produced - failure reason, new-findings count, baseline,
      * mutation, branch review, score drivers, diff scope, and display filters among them. Each note is
      * emitted only when the run actually generated it.
      *
-     * @param list<string>   $lines - Markdown lines being built.
+     * @param list<string>   $lines  - Markdown lines being built.
      * @param AnalysisReport $report - Analysis report to render.
      *
      * @return void
@@ -59,7 +89,7 @@ final readonly class MarkdownReporter
             $lines,
             '# gruff-php report',
             '',
-            sprintf('**Grade:** %s (%s/100)', $score === null ? 'n/a' : $score->composite->letter, $score === null ? 'n/a' : sprintf('%.2f', $score->composite->score)),
+            sprintf('**Grade:** %s (%s/100)', $score?->composite->letter ?? 'n/a', $score?->composite === null ? 'n/a' : sprintf('%.2f', $score->composite->score)),
             sprintf('**Scope:** %s', $score === null ? 'full-project' : $score->scope),
             sprintf('**Findings:** %d total, %d error, %d warning, %d advisory', $counts['total'], $counts['error'], $counts['warning'], $counts['advisory']),
         );
@@ -112,9 +142,9 @@ final readonly class MarkdownReporter
                     $lines[] = sprintf(
                         '- `%s` %s (resolved %d): %s',
                         $resolvedEntry->ruleId,
-                        $resolvedEntry->filePath,
+                        $resolvedEntry->path,
                         $resolvedEntry->count,
-                        $resolvedEntry->message,
+                        $resolvedEntry->subject,
                     );
                 }
                 $lines[] = '';
@@ -145,7 +175,7 @@ final readonly class MarkdownReporter
      * the base branch and the user's branch. Placed just before the pillar scores so a rule-level
      * swing stays visible even when the composite grade barely moves and hides the churn.
      *
-     * @param list<string>   $lines - Markdown lines being built.
+     * @param list<string>   $lines  - Markdown lines being built.
      * @param AnalysisReport $report - Analysis report to render.
      *
      * @return void
@@ -199,7 +229,7 @@ final readonly class MarkdownReporter
      * Adds the mutation-testing block - MSI percentages, the per-status tally, and a note about
      * context-only statuses - so the user can see how thoroughly their tests killed injected mutants.
      *
-     * @param list<string>   $lines - Markdown lines being built.
+     * @param list<string>   $lines  - Markdown lines being built.
      * @param AnalysisReport $report - Analysis report to render.
      *
      * @return void
@@ -220,7 +250,7 @@ final readonly class MarkdownReporter
             $mutation->survivedCount(),
             $mutation->report->totalMutants(),
         );
-        $lines[]  = sprintf('**Mutation statuses:** %s.', $this->mutationStatusSummary($mutation->report->statusCounts()));
+        $lines[] = sprintf('**Mutation statuses:** %s.', $this->mutationStatusSummary($mutation->report->statusCounts()));
 
         $contextStatuses = $this->mutationContextSummary($mutation->report->statusCounts());
         // Some mutants landed in context-only statuses, so add the note explaining they are not survived findings.
@@ -236,7 +266,7 @@ final readonly class MarkdownReporter
      * Renders the "Branch Review" heading and, when a review ran, the introduced/removed/unchanged
      * finding groups - the section a user opens to see exactly what their branch changed.
      *
-     * @param list<string>   $lines - Markdown lines being built.
+     * @param list<string>   $lines  - Markdown lines being built.
      * @param AnalysisReport $report - Analysis report to render.
      *
      * @return void
@@ -265,7 +295,7 @@ final readonly class MarkdownReporter
      * findings, and per-severity counts, ordered by findings then pillar name. Counts and scores are
      * read straight from the existing {@see PillarScore} entries, never recomputed here.
      *
-     * @param list<string>   $lines - Markdown lines being built.
+     * @param list<string>   $lines  - Markdown lines being built.
      * @param AnalysisReport $report - Analysis report to render.
      *
      * @return void
@@ -344,7 +374,7 @@ final readonly class MarkdownReporter
      * Renders the "Findings" section the user scrolls to for specifics: either the grouped list of
      * every current finding, or a plain "No findings." line when the scan came back clean.
      *
-     * @param list<string>   $lines - Markdown lines being built.
+     * @param list<string>   $lines  - Markdown lines being built.
      * @param AnalysisReport $report - Analysis report to render.
      *
      * @return void
@@ -377,7 +407,7 @@ final readonly class MarkdownReporter
         // With no line number, the location the user sees is just the file path; otherwise it gains a `:line` suffix.
         $location = $finding->line === null ? $finding->filePath : $finding->filePath . ':' . $finding->line;
         // A symbol (the offending function, method, or class name) is tacked on only when the finding actually names one.
-        $symbol   = $finding->symbol === null ? '' : sprintf(' `%s`', $finding->symbol);
+        $symbol = $finding->symbol === null ? '' : sprintf(' `%s`', $finding->symbol);
 
         return sprintf(
             '- **%s** `%s` %s%s - %s',
@@ -394,9 +424,9 @@ final readonly class MarkdownReporter
      * lists and the main findings section. Sorts findings into error/warning/advisory `<details>`
      * blocks and then by file, so the user can expand just the severity they care about.
      *
-     * @param list<string>  $lines - Markdown lines being built; mutated in place with the rendered group.
-     * @param string        $title - Section heading text, emitted only when $hasHeading is true.
-     * @param list<Finding> $findings - Findings to group by severity then file path; an empty list renders "None.".
+     * @param list<string>  $lines      - Markdown lines being built; mutated in place with the rendered group.
+     * @param string        $title      - Section heading text, emitted only when $hasHeading is true.
+     * @param list<Finding> $findings   - Findings to group by severity then file path; an empty list renders "None.".
      * @param bool          $hasHeading - Whether to print the section heading; false for the inline current-findings.
      *
      * @return void

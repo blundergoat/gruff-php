@@ -19,105 +19,71 @@ use GruffPhp\Rules\Complexity\MaintainabilityIndexRule;
 use GruffPhp\Rules\Complexity\NestingDepthRule;
 use GruffPhp\Rules\DeadCode\UnusedPrivateConstantRule;
 use GruffPhp\Rules\DeadCode\UnusedPrivateMethodRule;
-use GruffPhp\Rules\DeadCode\UnusedPrivatePropertyRule;
 use GruffPhp\Rules\Docs\MissingClassPhpdocRule;
 use GruffPhp\Rules\Docs\MissingConstantPhpdocRule;
 use GruffPhp\Rules\Docs\MissingFilePhpdocRule;
 use GruffPhp\Rules\Docs\MissingParamTagRule;
 use GruffPhp\Rules\Docs\MissingPropertyPhpdocRule;
-use GruffPhp\Rules\Docs\MissingPublicPhpdocRule;
+use GruffPhp\Rules\Docs\MissingPhpdocRule;
 use GruffPhp\Rules\Docs\MissingReadmeRule;
 use GruffPhp\Rules\Docs\MissingReturnTagRule;
 use GruffPhp\Rules\Docs\MissingThrowsTagRule;
+use GruffPhp\Rules\Docs\ParamCommentRule;
 use GruffPhp\Rules\Docs\RegexCommentRule;
 use GruffPhp\Rules\Docs\ReturnCommentRule;
-use GruffPhp\Rules\Docs\StaleParamTagRule;
 use GruffPhp\Rules\Docs\TodoDensityRule;
 use GruffPhp\Rules\Docs\BarePhpdocTagsRule;
 use GruffPhp\Rules\Docs\VarAnnotationDescriptionRule;
-use GruffPhp\Rules\Modernisation\ConstructorPromotionCandidateRule;
-use GruffPhp\Rules\Modernisation\FirstClassCallableCandidateRule;
-use GruffPhp\Rules\Modernisation\ForbiddenGlobalAccessRule;
-use GruffPhp\Rules\Modernisation\MatchExpressionCandidateRule;
-use GruffPhp\Rules\Modernisation\MixedTypeOveruseRule;
-use GruffPhp\Rules\Modernisation\NamedArgumentOpportunityRule;
-use GruffPhp\Rules\Modernisation\PhpDocMixedOveruseRule;
 use GruffPhp\Rules\Modernisation\PublicPropertyRule;
 use GruffPhp\Rules\Modernisation\ReadonlyPropertyCandidateRule;
 use GruffPhp\Rules\Naming\AbbreviationAllowlistRule;
-use GruffPhp\Rules\Naming\BooleanPrefixRule;
 use GruffPhp\Rules\Naming\ClassFileMismatchRule;
 use GruffPhp\Rules\Naming\ConfusingNameRule;
-use GruffPhp\Rules\Naming\GenericMethodNameRule;
-use GruffPhp\Rules\Naming\HungarianNotationRule;
 use GruffPhp\Rules\Naming\IdentifierQualityRule;
-use GruffPhp\Rules\Naming\NegativeBooleanRule;
 use GruffPhp\Rules\Naming\ShortVariableRule;
-use GruffPhp\Rules\Naming\SuffixHungarianRule;
 use GruffPhp\Rules\Naming\TestNamingConsistencyRule;
 use GruffPhp\Rules\Security\DangerousFunctionCallRule;
 use GruffPhp\Rules\Security\DebugModeEnabledRule;
 use GruffPhp\Rules\Security\DependencyComposerPathRule;
 use GruffPhp\Rules\Security\DependencyComposerScriptRule;
-use GruffPhp\Rules\Security\DependencyComposerUnpinnedRule;
 use GruffPhp\Rules\Security\DependencyComposerVcsRule;
 use GruffPhp\Rules\Security\DisabledSslVerificationRule;
 use GruffPhp\Rules\Security\ErrorSuppressionRule;
 use GruffPhp\Rules\Security\ExtractCompactUserInputRule;
-use GruffPhp\Rules\Security\GithubActionsRiskyWorkflowRule;
 use GruffPhp\Rules\Security\HeaderInjectionRule;
-use GruffPhp\Rules\Security\InsecureRandomRule;
-use GruffPhp\Rules\Security\PathTraversalFileAccessRule;
 use GruffPhp\Rules\Security\PermissiveCorsRule;
 use GruffPhp\Rules\Security\ProcessCommandConstructionRule;
 use GruffPhp\Rules\Security\ReflectedXssRule;
 use GruffPhp\Rules\Security\RequestControlledUrlRule;
-use GruffPhp\Rules\Security\SensitiveDataLoggingRule;
 use GruffPhp\Rules\Security\SilentCatchRule;
 use GruffPhp\Rules\Security\SqlConcatenationRule;
 use GruffPhp\Rules\Security\UnsafeArchiveExtractionRule;
 use GruffPhp\Rules\Security\UnsafeXmlLoadingRule;
 use GruffPhp\Rules\Security\UnsafeUnserializeRule;
-use GruffPhp\Rules\Security\VariableIncludeRule;
-use GruffPhp\Rules\Security\WeakCryptoRule;
 use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Size\SubstantiveLineCounter;
 use GruffPhp\Rules\SensitiveData\ApiKeyPatternRule;
 use GruffPhp\Rules\SensitiveData\AwsAccessKeyRule;
 use GruffPhp\Rules\SensitiveData\DatabaseUrlPasswordRule;
 use GruffPhp\Rules\SensitiveData\GcpServiceAccountKeyRule;
-use GruffPhp\Rules\SensitiveData\HardcodedEnvValueRule;
-use GruffPhp\Rules\SensitiveData\HighEntropyStringRule;
 use GruffPhp\Rules\SensitiveData\JwtTokenRule;
-use GruffPhp\Rules\SensitiveData\PhiPatternRule;
 use GruffPhp\Rules\SensitiveData\PiiTestFixtureRule;
 use GruffPhp\Rules\SensitiveData\PrivateKeyRule;
-use GruffPhp\Rules\SensitiveData\UrlEmbeddedCredentialsRule;
 use GruffPhp\Rules\Shared\ProjectRuleAccumulator;
 use GruffPhp\Rules\Shared\ProjectSourceTextRuleAccumulator;
 use GruffPhp\Rules\Shared\RuleRunnerObserver;
-use GruffPhp\Rules\Size\AverageMethodLengthRule;
 use GruffPhp\Rules\Size\ClassLengthRule;
 use GruffPhp\Rules\Size\FileLengthRule;
 use GruffPhp\Rules\Size\MethodLengthRule;
 use GruffPhp\Rules\Size\ParameterCountRule;
 use GruffPhp\Rules\Size\PropertyCountRule;
 use GruffPhp\Rules\Size\PublicMethodCountRule;
-use GruffPhp\Rules\TestQuality\ConditionalTestLogicRule;
 use GruffPhp\Rules\TestQuality\DataProviderAnnotationRule;
-use GruffPhp\Rules\TestQuality\EagerTestRule;
 use GruffPhp\Rules\TestQuality\EmptyDataProviderRule;
 use GruffPhp\Rules\TestQuality\ExceptionTypeOnlyRule;
-use GruffPhp\Rules\TestQuality\ExcessiveMockingRule;
-use GruffPhp\Rules\TestQuality\ExtendsProductionClassRule;
 use GruffPhp\Rules\TestQuality\GlobalStateMutationRule;
 use GruffPhp\Rules\TestQuality\LoopAssertionWithoutMessageRule;
-use GruffPhp\Rules\TestQuality\MagicNumberAssertionRule;
 use GruffPhp\Rules\TestQuality\MockingDomainObjectRule;
-use GruffPhp\Rules\TestQuality\MockOnlyTestRule;
-use GruffPhp\Rules\TestQuality\MockWithoutExpectationRule;
-use GruffPhp\Rules\TestQuality\MultipleAaaCyclesRule;
-use GruffPhp\Rules\TestQuality\MysteryGuestRule;
 use GruffPhp\Rules\TestQuality\NoAssertionsRule;
 use GruffPhp\Rules\TestQuality\PhpUnitCoverageSourceMissingRule;
 use GruffPhp\Rules\TestQuality\PhpUnitDeprecationsNotFatalRule;
@@ -125,26 +91,16 @@ use GruffPhp\Rules\TestQuality\PhpUnitStrictFlagsMissingRule;
 use GruffPhp\Rules\TestQuality\PrivateReflectionRule;
 use GruffPhp\Rules\TestQuality\RepeatedStructureMissingDataProviderRule;
 use GruffPhp\Rules\TestQuality\SetupBloatRule;
-use GruffPhp\Rules\TestQuality\SkippedWithoutReasonRule;
-use GruffPhp\Rules\TestQuality\SleepInTestRule;
 use GruffPhp\Rules\TestQuality\StaticAnalysisRedundantTestRule;
 use GruffPhp\Rules\TestQuality\SutNotCalledRule;
-use GruffPhp\Rules\TestQuality\TautologicalTypeAssertionRule;
 use GruffPhp\Rules\TestQuality\TestdoxReadabilityRule;
 use GruffPhp\Rules\TestQuality\TestLongerThanSutRule;
-use GruffPhp\Rules\TestQuality\TestMethodTooLongRule;
 use GruffPhp\Rules\TestQuality\TestNamingConsistencyRule as TestQualityNamingConsistencyRule;
-use GruffPhp\Rules\TestQuality\TrivialAssertionRule;
 use GruffPhp\Rules\TestQuality\TrivialSnapshotRule;
-use GruffPhp\Rules\TestQuality\UnusedMockRule;
 use GruffPhp\Rules\Waste\CommentedOutCodeRule;
-use GruffPhp\Rules\Waste\EmptyClassRule;
 use GruffPhp\Rules\Waste\EmptyMethodRule;
-use GruffPhp\Rules\Waste\OneLineMethodRule;
-use GruffPhp\Rules\Waste\RedundantVariableRule;
 use GruffPhp\Rules\Waste\UnreachableCodeRule;
 use GruffPhp\Rules\Waste\UnusedImportRule;
-use GruffPhp\Rules\Waste\UnusedParameterRule;
 use InvalidArgumentException;
 use WeakMap;
 
@@ -162,15 +118,18 @@ final class RuleRegistry
      * Lower numbers win. The order encodes the documented deferral contract for overlapping naming rules.
      */
     private const NAMING_RULE_PRIORITY = [
-        'naming.class-file-mismatch'    => 0,
-        'naming.confusing-name'         => 1,
-        'naming.negative-boolean'       => 2,
-        'naming.boolean-prefix'         => 3,
-        'naming.identifier-quality'     => 4,
-        'naming.hungarian-notation'     => 5,
-        'naming.suffix-hungarian'       => 6,
-        'naming.short-variable'         => 7,
+        'naming.class-file-mismatch' => 0,
+        'naming.confusing-name' => 1,
+        'naming.identifier-quality' => 4,
+        'naming.short-variable' => 7,
         'naming.abbreviation-allowlist' => 8,
+    ];
+
+    /**
+     * Retired rule ids and the ids that replaced them, so a config, flag or 0.5 baseline written before a rename keeps working.
+     */
+    private const RULE_ID_ALIASES = [
+        MissingPhpdocRule::LEGACY_ID => MissingPhpdocRule::ID,
     ];
 
     /** @var array<string, RuleInterface|ProjectRuleInterface> */
@@ -243,86 +202,49 @@ final class RuleRegistry
                             new NestingDepthRule(),
                             new UnusedPrivateConstantRule(),
                             new UnusedPrivateMethodRule(),
-                            new UnusedPrivatePropertyRule(),
                             new CommentedOutCodeRule(),
-                            new EmptyClassRule(),
                             new EmptyMethodRule(),
-                            new OneLineMethodRule(),
-                            new RedundantVariableRule(),
                             new UnreachableCodeRule(),
                             new UnusedImportRule(),
-                            new UnusedParameterRule(),
                             new AbbreviationAllowlistRule(),
-                            new BooleanPrefixRule(),
                             new ClassFileMismatchRule(),
                             new ConfusingNameRule(),
-                            new GenericMethodNameRule(),
-                            new HungarianNotationRule(),
                             new IdentifierQualityRule(),
-                            new NegativeBooleanRule(),
                             new ShortVariableRule(),
-                            new SuffixHungarianRule(),
                             new TestNamingConsistencyRule(),
-                            new ConstructorPromotionCandidateRule(),
-                            new FirstClassCallableCandidateRule(),
-                            new ForbiddenGlobalAccessRule(),
-                            new MatchExpressionCandidateRule(),
-                            new MixedTypeOveruseRule(),
-                            new NamedArgumentOpportunityRule(),
-                            new PhpDocMixedOveruseRule(),
                             new PublicPropertyRule(),
                             new ReadonlyPropertyCandidateRule(),
                             new ApiKeyPatternRule(),
                             new AwsAccessKeyRule(),
                             new DatabaseUrlPasswordRule(),
                             new GcpServiceAccountKeyRule(),
-                            new HardcodedEnvValueRule(),
-                            new HighEntropyStringRule(),
                             new JwtTokenRule(),
-                            new PhiPatternRule(),
                             new PiiTestFixtureRule(),
                             new PrivateKeyRule(),
-                            new UrlEmbeddedCredentialsRule(),
                             new DangerousFunctionCallRule(),
                             new DebugModeEnabledRule(),
                             new DependencyComposerPathRule(),
                             new DependencyComposerScriptRule(),
-                            new DependencyComposerUnpinnedRule(),
                             new DependencyComposerVcsRule(),
                             new DisabledSslVerificationRule(),
                             new ErrorSuppressionRule(),
                             new ExtractCompactUserInputRule(),
-                            new GithubActionsRiskyWorkflowRule(),
                             new HeaderInjectionRule(),
-                            new InsecureRandomRule(),
-                            new PathTraversalFileAccessRule(),
                             new PermissiveCorsRule(),
                             new ProcessCommandConstructionRule(),
                             new ReflectedXssRule(),
                             new RequestControlledUrlRule(),
-                            new SensitiveDataLoggingRule(),
                             new SilentCatchRule(),
                             new SqlConcatenationRule(),
                             new UnsafeArchiveExtractionRule(),
                             new UnsafeXmlLoadingRule(),
                             new UnsafeUnserializeRule(),
-                            new VariableIncludeRule(),
-                            new WeakCryptoRule(),
-                            new ConditionalTestLogicRule(),
                             new DataProviderAnnotationRule(),
-                            new EagerTestRule(),
                             new EmptyDataProviderRule(),
                             new ExceptionTypeOnlyRule(),
-                            new ExcessiveMockingRule(),
-                            new ExtendsProductionClassRule(),
                             new GlobalStateMutationRule(),
                             new LoopAssertionWithoutMessageRule(),
-                            new MagicNumberAssertionRule(),
-                            new MockOnlyTestRule(),
-                            new MockWithoutExpectationRule(),
                             new MockingDomainObjectRule(),
-                            new MultipleAaaCyclesRule(),
-                            new MysteryGuestRule(),
                             new NoAssertionsRule(),
                             new PhpUnitCoverageSourceMissingRule(),
                             new PhpUnitDeprecationsNotFatalRule(),
@@ -330,34 +252,27 @@ final class RuleRegistry
                             new PrivateReflectionRule(),
                             new RepeatedStructureMissingDataProviderRule(),
                             new SetupBloatRule(),
-                            new SkippedWithoutReasonRule(),
-                            new SleepInTestRule(),
                             new StaticAnalysisRedundantTestRule(),
                             new SutNotCalledRule(),
-                            new TautologicalTypeAssertionRule(),
                             new TestLongerThanSutRule(),
-                            new TestMethodTooLongRule(),
                             new TestQualityNamingConsistencyRule(),
                             new TestdoxReadabilityRule(),
-                            new TrivialAssertionRule(),
                             new TrivialSnapshotRule(),
-                            new UnusedMockRule(),
                             new MissingClassPhpdocRule(),
                             new MissingConstantPhpdocRule(),
                             new MissingFilePhpdocRule(),
                             new MissingParamTagRule(),
                             new MissingPropertyPhpdocRule(),
-                            new MissingPublicPhpdocRule(),
+                            new MissingPhpdocRule(),
                             new MissingReadmeRule(),
                             new MissingReturnTagRule(),
                             new MissingThrowsTagRule(),
+                            new ParamCommentRule(),
                             new RegexCommentRule(),
                             new ReturnCommentRule(),
-                            new StaleParamTagRule(),
                             new TodoDensityRule(),
                             new BarePhpdocTagsRule(),
                             new VarAnnotationDescriptionRule(),
-                            new AverageMethodLengthRule(),
                             new ClassLengthRule(),
                             new FileLengthRule(),
                             new MethodLengthRule(),
@@ -378,15 +293,28 @@ final class RuleRegistry
     }
 
     /**
-     * Reports whether a rule id is registered.
+     * Maps a retired rule id to the id that replaced it, so every caller compares against the current name.
+     * For example, `--exclude-rule docs.missing-public-phpdoc` excludes `docs.missing-phpdoc`.
+     *
+     * @param string $ruleId - Rule identifier as the user typed it or a stored file recorded it.
+     *
+     * @return string - the replacing id for a retired alias; the input unchanged for every other id, including a typo
+     */
+    public static function canonicalRuleId(string $ruleId): string
+    {
+        return self::RULE_ID_ALIASES[$ruleId] ?? $ruleId;
+    }
+
+    /**
+     * Reports whether a rule id is registered, counting a retired alias as its replacement.
      *
      * @param string $ruleId - Rule identifier to check.
      *
-     * @return bool - true when a rule with this id is registered; false for unknown or misspelled ids
+     * @return bool - true when a rule with this id, or the id this alias names, is registered; false for unknown or misspelled ids
      */
     public function has(string $ruleId): bool
     {
-        return isset($this->rules[$ruleId]);
+        return isset($this->rules[self::canonicalRuleId($ruleId)]);
     }
 
     /**
@@ -411,7 +339,7 @@ final class RuleRegistry
     }
 
     /**
-     * Returns a registered rule by id.
+     * Returns a registered rule by id, resolving a retired alias to its replacement.
      *
      * @param string $ruleId - Rule identifier to look up.
      *
@@ -420,7 +348,7 @@ final class RuleRegistry
      */
     public function get(string $ruleId): RuleInterface|ProjectRuleInterface
     {
-        return $this->rules[$ruleId]
+        return $this->rules[self::canonicalRuleId($ruleId)]
                ?? throw new InvalidArgumentException(sprintf('Unknown rule id "%s".', $ruleId));
     }
 
@@ -542,8 +470,8 @@ final class RuleRegistry
      * parse → analyse → release pipeline that keeps peak memory close to
      * one unit's worth on large codebases.
      *
-     * @param AnalysisUnit            $analysisUnit - Parsed unit to analyse.
-     * @param RuleContext             $ruleContext - Rule execution context.
+     * @param AnalysisUnit            $analysisUnit       - Parsed unit to analyse.
+     * @param RuleContext             $ruleContext        - Rule execution context.
      * @param RuleRunnerObserver|null $ruleRunnerObserver - Optional per-rule timing hook.
      *
      * @return list<Finding> - file-scoped findings for this unit only; accumulator output is deferred to endStreaming()
@@ -562,8 +490,8 @@ final class RuleRegistry
     /**
      * Runs only the per-unit (file-scoped) rules against a single unit.
      *
-     * @param AnalysisUnit            $analysisUnit - Parsed unit to analyse.
-     * @param RuleContext             $ruleContext - Rule execution context.
+     * @param AnalysisUnit            $analysisUnit       - Parsed unit to analyse.
+     * @param RuleContext             $ruleContext        - Rule execution context.
      * @param RuleRunnerObserver|null $ruleRunnerObserver - Optional per-rule timing hook.
      *
      * @return list<Finding> - findings from per-unit rules in rule-execution order, not yet deduped or final-sorted
@@ -589,6 +517,12 @@ final class RuleRegistry
             if (!$isPhp && !$rule instanceof SourceTextRuleInterface) {
                 continue;
             }
+            if ($analysisUnit->isDeepScanBounded()
+                && !$rule instanceof SourceTextRuleInterface
+                && !$rule instanceof FileLengthRule
+            ) {
+                continue;
+            }
 
             if ($ruleRunnerObserver === null) {
                 array_push($findings, ...$rule->analyse($analysisUnit, $ruleContext));
@@ -608,8 +542,8 @@ final class RuleRegistry
     /**
      * Pushes one unit through every enabled streaming project rule.
      *
-     * @param AnalysisUnit            $analysisUnit - Parsed unit to accumulate.
-     * @param RuleContext             $ruleContext - Rule execution context.
+     * @param AnalysisUnit            $analysisUnit       - Parsed unit to accumulate.
+     * @param RuleContext             $ruleContext        - Rule execution context.
      * @param RuleRunnerObserver|null $ruleRunnerObserver - Optional per-rule timing hook.
      *
      * @return void
@@ -633,6 +567,9 @@ final class RuleRegistry
             if (!$isPhp && !$rule instanceof ProjectSourceTextRuleAccumulator) {
                 continue;
             }
+            if ($analysisUnit->isDeepScanBounded() && !$rule instanceof ProjectSourceTextRuleAccumulator) {
+                continue;
+            }
 
             if ($ruleRunnerObserver === null) {
                 $rule->accumulate($analysisUnit, $ruleContext);
@@ -649,7 +586,7 @@ final class RuleRegistry
     /**
      * Finalises the project-rule accumulators and returns their findings after streaming completes.
      *
-     * @param RuleContext             $ruleContext - Rule execution context.
+     * @param RuleContext             $ruleContext        - Rule execution context.
      * @param RuleRunnerObserver|null $ruleRunnerObserver - Optional per-rule timing hook.
      *
      * @return list<Finding> - project-level findings flushed from accumulator state; empty when no accumulators ran or matched
@@ -716,10 +653,10 @@ final class RuleRegistry
     /**
      * Runs all enabled file and project rules against parsed units.
      *
-     * @param list<AnalysisUnit>      $units - Parsed units to analyse with file-scoped rules.
-     * @param RuleContext             $ruleContext - Rule execution context.
-     * @param list<AnalysisUnit>|null $projectUnits - Parsed units available to project-level rules.
-     * @param RuleRunnerObserver|null $ruleRunnerObserver - Optional per-rule timing hook; default analyse runs leave this null.
+     * @param list<AnalysisUnit>      $units                           - Parsed units to analyse with file-scoped rules.
+     * @param RuleContext             $ruleContext                     - Rule execution context.
+     * @param list<AnalysisUnit>|null $projectUnits                    - Parsed units available to project-level rules.
+     * @param RuleRunnerObserver|null $ruleRunnerObserver              - Optional per-rule timing hook; default analyse runs leave this null.
      * @param bool                    $shouldReleaseUnitsAfterAnalysis - Whether units can release AST contents after analysis.
      *
      * @return list<Finding> - all per-unit, accumulator, and legacy project findings, deduped and in canonical report order
@@ -795,9 +732,9 @@ final class RuleRegistry
     /**
      * Runs the project-level rules that need the full analysis context.
      *
-     * @param list<ProjectRuleInterface> $rules - Project rules to run.
-     * @param list<AnalysisUnit>         $contextUnits - Candidate units available to project rules.
-     * @param RuleContext                $ruleContext - Rule execution context.
+     * @param list<ProjectRuleInterface> $rules              - Project rules to run.
+     * @param list<AnalysisUnit>         $contextUnits       - Candidate units available to project rules.
+     * @param RuleContext                $ruleContext        - Rule execution context.
      * @param RuleRunnerObserver|null    $ruleRunnerObserver - Optional per-rule timing hook.
      *
      * @return list<Finding> - findings from the supplied legacy project rules; empty when no parse-clean PHP units remain to analyse
@@ -810,7 +747,9 @@ final class RuleRegistry
     ): array {
         $analyseableUnits = array_values(array_filter(
                                              $contextUnits,
-                                             static fn(AnalysisUnit $analysisUnit): bool => !$analysisUnit->hasParseErrors() && $analysisUnit->file->isPhp(),
+                                             static fn(AnalysisUnit $analysisUnit): bool => !$analysisUnit->hasParseErrors()
+                                                 && !$analysisUnit->isDeepScanBounded()
+                                                 && $analysisUnit->file->isPhp(),
                                          ));
 
         // No parse-clean PHP units means the project rules have nothing to inspect.

@@ -55,7 +55,6 @@ final readonly class DiffFindingFilter
      */
     private const ANCHOR_ONLY_AGGREGATE_RULE_IDS = [
         'docs.todo-density'           => true,
-        'size.average-method-length'  => true,
         'size.class-length'           => true,
         'size.file-length'            => true,
         'size.property-count'         => true,

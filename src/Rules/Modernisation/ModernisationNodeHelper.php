@@ -13,7 +13,7 @@ use PhpParser\Node\Stmt;
 
 /**
  * Shared AST helpers the modernisation rules lean on - target-version checks, type-name normalisation,
- * `$this->prop` detection, class-name and DTO classification, and parent-node lookup.
+ * `$this->prop` detection, and class-name and DTO classification.
  *
  * Centralising these keeps every modernisation rule reading the AST the same way, so a `mixed` check or a
  * DTO exemption behaves identically wherever it fires. Pure static utility that holds no state.
@@ -127,20 +127,5 @@ final class ModernisationNodeHelper
         }
 
         return false;
-    }
-
-    /**
-     * Reads the parent node wired up by PhpParser's parent visitor.
-     *
-     * @param Node $node - Node whose parent attribute should be read.
-     *
-     * @return Node|null - Parent node, or null when the visitor never ran or this is a root node.
-     */
-    public static function parent(Node $node): ?Node
-    {
-        $parent = $node->getAttribute('parent');
-
-        // Null means the parent visitor never ran or this is a root node, not that a parent was checked and absent.
-        return $parent instanceof Node ? $parent : null;
     }
 }

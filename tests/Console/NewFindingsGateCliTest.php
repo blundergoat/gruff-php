@@ -56,8 +56,8 @@ final class NewFindingsGateCliTest extends CliTestCase
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         $report = $this->decodeJsonOutput($process);
-        self::assertSame(0, $report['newFindingsCount'] ?? null);
-        self::assertArrayNotHasKey('failureReason', $report);
+        self::assertSame(0, $this->newFindingsCount($report));
+        self::assertNull($this->failureReason($report));
     }
 
     /**
@@ -78,8 +78,8 @@ final class NewFindingsGateCliTest extends CliTestCase
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         $report = $this->decodeJsonOutput($process);
-        self::assertSame(0, $report['newFindingsCount'] ?? null);
-        self::assertArrayNotHasKey('failureReason', $report);
+        self::assertSame(0, $this->newFindingsCount($report));
+        self::assertNull($this->failureReason($report));
     }
 
     /**
@@ -115,7 +115,7 @@ final class NewFindingsGateCliTest extends CliTestCase
         $process = $this->runGruff(['analyse', 'src', '--no-config', '--baseline', 'gruff-baseline.json', '--fail-on-new', '--format', 'json']);
 
         self::assertSame(1, $process->getExitCode());
-        $failureReason = $this->decodeJsonOutput($process)['failureReason'] ?? null;
+        $failureReason = $this->failureReason($this->decodeJsonOutput($process));
         self::assertIsArray($failureReason);
         self::assertSame('new', $failureReason['scope'] ?? null);
         self::assertSame('error', $failureReason['thresholdKind'] ?? null);
@@ -138,7 +138,7 @@ final class NewFindingsGateCliTest extends CliTestCase
         $process = $this->runGruff(['analyse', 'src', '--no-config', '--no-baseline', '--diff-vs', 'HEAD', '--fail-on-new', '--format', 'json']);
 
         self::assertSame(1, $process->getExitCode());
-        $failureReason = $this->decodeJsonOutput($process)['failureReason'] ?? null;
+        $failureReason = $this->failureReason($this->decodeJsonOutput($process));
         self::assertIsArray($failureReason);
         self::assertSame('new', $failureReason['scope'] ?? null);
     }
@@ -176,6 +176,52 @@ final class NewFindingsGateCliTest extends CliTestCase
     }
 
     /**
+     * Reads the canonical new-finding total from a report used by the gate scenarios.
+     *
+     * @param array<string, mixed> $report - Decoded analysis report containing a baseline section.
+     *
+     * @return int - Number of findings considered new by the configured gate.
+     */
+    private function newFindingsCount(array $report): int
+    {
+        $baseline = $report['baseline'] ?? null;
+        self::assertIsArray($baseline);
+        $count = $baseline['newFindings'] ?? null;
+        self::assertIsInt($count);
+
+        return $count;
+    }
+
+    /**
+     * Reads PHP's named failure-reason extension when a new-findings gate trips.
+     *
+     * @param array<string, mixed> $report - Decoded v3 analysis document.
+     *
+     * @return array<string, mixed>|null - Failure reason when the report contains one, otherwise null.
+     */
+    private function failureReason(array $report): ?array
+    {
+        $extensions = $report['extensions'] ?? null;
+        if (!is_array($extensions)) {
+            return null;
+        }
+
+        $phpExtensions = $extensions['php'] ?? null;
+        if (!is_array($phpExtensions)) {
+            return null;
+        }
+
+        $topLevel = $phpExtensions['topLevel'] ?? null;
+        if (!is_array($topLevel)) {
+            return null;
+        }
+
+        $failureReason = $topLevel['failureReason'] ?? null;
+
+        return is_array($failureReason) ? $this->decodedJsonObject($failureReason) : null;
+    }
+
+    /**
      * Run a gruff-php subprocess rooted at the fixture project and return it completed.
      *
      * @param list<string> $args - CLI arguments passed after the binary.
@@ -208,7 +254,7 @@ final class NewFindingsGateCliTest extends CliTestCase
     /**
      * Write a fixture file, creating parent directories as needed.
      *
-     * @param string $path - Project-relative file path.
+     * @param string $path     - Project-relative file path.
      * @param string $contents - File contents.
      *
      * @return void

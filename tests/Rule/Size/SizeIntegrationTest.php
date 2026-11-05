@@ -9,7 +9,6 @@ use GruffPhp\Engine\Config\RuleSettings;
 use GruffPhp\Engine\Parser\PhpFileParser;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\RuleRegistry;
-use GruffPhp\Rules\Size\AverageMethodLengthRule;
 use GruffPhp\Rules\Size\ClassLengthRule;
 use GruffPhp\Rules\Size\FileLengthRule;
 use GruffPhp\Rules\Size\MethodLengthRule;
@@ -44,8 +43,7 @@ final class SizeIntegrationTest extends TestCase
             ->withRuleSettings(ClassLengthRule::ID, new RuleSettings(true, ['warning' => 10, 'error' => 500]))
             ->withRuleSettings(ParameterCountRule::ID, new RuleSettings(true, ['warning' => 5, 'error' => 8]))
             ->withRuleSettings(PublicMethodCountRule::ID, new RuleSettings(true, ['warning' => 5, 'error' => 25]))
-            ->withRuleSettings(PropertyCountRule::ID, new RuleSettings(true, ['warning' => 5, 'error' => 25]))
-            ->withRuleSettings(AverageMethodLengthRule::ID, new RuleSettings(true, ['warning' => 2, 'error' => 40]));
+            ->withRuleSettings(PropertyCountRule::ID, new RuleSettings(true, ['warning' => 5, 'error' => 25]));
 
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
@@ -58,7 +56,6 @@ final class SizeIntegrationTest extends TestCase
         self::assertContains(ParameterCountRule::ID, $ruleIds);
         self::assertContains(PublicMethodCountRule::ID, $ruleIds);
         self::assertContains(PropertyCountRule::ID, $ruleIds);
-        self::assertContains(AverageMethodLengthRule::ID, $ruleIds);
 
         self::assertGreaterThanOrEqual(7, count($findings));
 
@@ -90,8 +87,7 @@ final class SizeIntegrationTest extends TestCase
             ->withRuleSettings(ClassLengthRule::ID, new RuleSettings(true, ['warning' => 10, 'error' => 500]))
             ->withRuleSettings(ParameterCountRule::ID, new RuleSettings(true, ['warning' => 2, 'error' => 5]))
             ->withRuleSettings(PublicMethodCountRule::ID, new RuleSettings(true, ['warning' => 3, 'error' => 10]))
-            ->withRuleSettings(PropertyCountRule::ID, new RuleSettings(true, ['warning' => 3, 'error' => 10]))
-            ->withRuleSettings(AverageMethodLengthRule::ID, new RuleSettings(true, ['warning' => 2, 'error' => 10]));
+            ->withRuleSettings(PropertyCountRule::ID, new RuleSettings(true, ['warning' => 3, 'error' => 10]));
 
         $tightFindings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $tightConfig));
 
