@@ -23,7 +23,7 @@ final class CallableCollectionReturnEvidence
      * Checks the returned collection behind the current, unchanged callback loop.
      *
      * @param Expr\FuncCall $call - Dynamic invocation; no selecting loop means no return evidence.
-     * @return bool - True only when the call, local assignment, return and all property uses are proved.
+     * @return bool - True only when the call, assignment, return, and property uses match the supported bounded shapes.
      */
     public static function hasInvocationEvidence(Expr\FuncCall $call): bool
     {
@@ -44,18 +44,18 @@ final class CallableCollectionReturnEvidence
      * Resolves one local assignment and one method in the same written declaration.
      *
      * @param Stmt\Foreach_ $loop - Iteration over a local result; other expressions keep their warning.
-     * @return bool - True when either supported return form comes from a proved callback property.
+     * @return bool - True when either supported return form is sourced from a property with bounded registration evidence.
      */
     private static function hasReturnedCollectionEvidence(Stmt\Foreach_ $loop): bool
     {
         $scope       = SecurityNodeHelper::enclosingFunctionLike($loop);
         $declaration = self::owningDeclaration($loop);
-        // A local list must belong to a visible method and one unchanged assignment.
+        // Without a visible class method and declaration, the collection source cannot be bounded.
         if (!$scope instanceof Stmt\ClassMethod || $declaration === null) {
             return false;
         }
         $assignment = self::uniqueCollectionAssignment($loop, $scope);
-        // No proved assignment means the returned collection may have another source.
+        // Without a supported assignment shape, the returned collection may have another source.
         if ($assignment === null) {
             return false;
         }
@@ -94,7 +94,6 @@ final class CallableCollectionReturnEvidence
      */
     private static function uniqueCollectionAssignment(Stmt\Foreach_ $loop, Stmt\ClassMethod $scope): ?Expr\Assign
     {
-        // The developer must iterate a written local in this method.
         if (!$loop->expr instanceof Expr\Variable || !is_string($loop->expr->name) || $scope->stmts === null) {
             return null;
         }
@@ -111,22 +110,22 @@ final class CallableCollectionReturnEvidence
     }
 
     /**
-     * Finds the exact method written on this class or trait.
+     * Finds the exact method written on this declaration.
      *
      * @param Stmt\ClassLike $declaration - Owner of the invocation; inherited implementations are unavailable.
      * @param string         $methodName  - Called name; PHP compares method names without case.
-     * @return Stmt\ClassMethod|null - One visible body, or null for missing and duplicate declarations.
+     * @return Stmt\ClassMethod|null - Unique body, or null for missing, duplicate, bodyless or by-reference declarations.
      */
     private static function declaredMethod(Stmt\ClassLike $declaration, string $methodName): ?Stmt\ClassMethod
     {
         $match = null;
         // Only methods written on this declaration can justify suppressing the user's warning.
         foreach ($declaration->getMethods() as $method) {
-            // A different method does not describe this call's return.
+
             if (strcasecmp($method->name->toString(), $methodName) !== 0) {
                 continue;
             }
-            // Duplicate spellings or a reference return can expose a bucket outside this proof.
+            // Reference returns can expose mutable storage; duplicate or bodyless declarations provide no unique implementation.
             if ($match !== null || $method->stmts === null || $method->byRef) {
                 return null;
             }
@@ -140,20 +139,20 @@ final class CallableCollectionReturnEvidence
      * Binds each written parameter to one ordinary call argument.
      *
      * @param Expr\MethodCall  $call   - Exact call whose arguments the developer supplied.
-     * @param Stmt\ClassMethod $method - Visible implementation; defaults, references and spreads grant no evidence.
+     * @param Stmt\ClassMethod $method - Visible implementation; every parameter must receive one ordinary positional argument.
      * @return bool - True when every parameter has one complete positional value.
      */
     private static function hasPositionalArguments(Expr\MethodCall $call, Stmt\ClassMethod $method): bool
     {
         $arguments = $call->getRawArgs();
-        // Partial applications and missing values cannot identify the property argument.
+
         if (count($arguments) !== count($method->params)) {
             return false;
         }
-        // A named, unpacked or reference argument can change which parameter receives the list.
+        // Names and unpacking obscure positional binding; references can expose the collection to mutation.
         foreach ($arguments as $index => $argument) {
             $parameter = $method->params[$index];
-            // Only ordinary by-value positions keep their source and order.
+
             if (!$argument instanceof Node\Arg || $argument->name !== null || $argument->unpack || $argument->byRef
                 || $parameter->byRef || $parameter->variadic || !$parameter->var instanceof Expr\Variable
                 || !is_string($parameter->var->name)) {
@@ -167,13 +166,13 @@ final class CallableCollectionReturnEvidence
     /**
      * Recognizes a property bucket returned with an empty-list fallback.
      *
-     * @param Stmt\ClassMethod $method - Visible method; an empty or extra body cannot prove this return.
+     * @param Stmt\ClassMethod $method - Visible method; an empty or extra body does not match this return form.
      * @return Expr\PropertyFetch|null - Selected property read, or null for another return form.
      */
     private static function returnedBucketProperty(Stmt\ClassMethod $method): ?Expr\PropertyFetch
     {
         $statements = $method->stmts ?? [];
-        // The actual returned expression must be the whole bucket or an empty list.
+        // Additional statements or a non-coalescing return could supply callbacks from another source.
         if (count($statements) !== 1 || !$statements[0] instanceof Stmt\Return_
             || !$statements[0]->expr instanceof Expr\BinaryOp\Coalesce) {
             return null;
@@ -181,15 +180,15 @@ final class CallableCollectionReturnEvidence
 
         $fallback = $statements[0]->expr;
         $bucket   = $fallback->left;
-        // An arbitrary fallback or nested selection could introduce an unproved callback.
+        // An arbitrary fallback or nested selection could introduce a callback from an unsupported source.
         if (!self::isEmptyArray($fallback->right) || !$bucket instanceof Expr\ArrayDimFetch
             || !$bucket->var instanceof Expr\PropertyFetch || !$bucket->dim instanceof Expr\Variable
             || !is_string($bucket->dim->name)) {
             return null;
         }
-        // The key must be an unchanged, bound parameter; its value only chooses among proved buckets.
+        // The key must be an unchanged, bound parameter; its value only chooses among buckets with bounded registration evidence.
         foreach ($method->params as $parameter) {
-            // A different parameter does not select the bucket returned here.
+
             if ($parameter->var instanceof Expr\Variable && $parameter->var->name === $bucket->dim->name) {
                 return $bucket->var;
             }
@@ -244,7 +243,7 @@ final class CallableCollectionReturnEvidence
      */
     private static function mergeLocalNames(Expr\Assign $initialization, Stmt\Foreach_ $selection, ?Expr $returned): ?array
     {
-        // The accumulator starts empty and the final return must be that same plain local.
+
         if (!$initialization->var instanceof Expr\Variable || !is_string($initialization->var->name)
             || !self::isEmptyArray($initialization->expr)
             || !self::isVariable($returned, $initialization->var->name)
@@ -261,7 +260,7 @@ final class CallableCollectionReturnEvidence
     }
 
     /**
-     * Finds the by-value array parameter that supplies all selected buckets.
+     * Finds the array parameter that supplies all selected buckets after positional binding is validated.
      *
      * @param Stmt\ClassMethod $method - Resolved return method.
      * @param string           $name   - Foreach source name; absent or untyped names grant no evidence.
@@ -269,7 +268,7 @@ final class CallableCollectionReturnEvidence
      */
     private static function arrayParameterIndex(Stmt\ClassMethod $method, string $name): ?int
     {
-        // The call's actual argument is checked only after this parameter is found.
+
         foreach ($method->params as $index => $parameter) {
             // Other arguments may choose buckets but cannot supply callback values.
             if (is_int($index) && $parameter->var instanceof Expr\Variable && $parameter->var->name === $name) {
@@ -281,10 +280,10 @@ final class CallableCollectionReturnEvidence
     }
 
     /**
-     * Proves the loop can only merge one selected callback bucket into the empty accumulator.
+     * Limits each loop iteration to merging its selected callback bucket into the accumulator.
      *
      * @param Stmt\Foreach_    $selection    - Bucket iteration; by-reference selection remains unsupported.
-     * @param Stmt\ClassMethod $method       - Resolved method used to check the built-in merge name.
+     * @param Stmt\ClassMethod $method       - Resolved method whose namespace bounds the array_merge name check.
      * @param string           $resultName   - Local returned to the developer's callback loop.
      * @param string           $keyName      - Selected bucket key.
      * @param string           $callbackName - Selected callback list.
@@ -310,7 +309,7 @@ final class CallableCollectionReturnEvidence
         }
         $assignment = $branch->stmts[0]->expr;
         $merge      = $assignment->expr;
-        // The merge must write the same accumulator and call PHP's known array_merge function.
+        // The merge must write the same accumulator and use the bounded array_merge call shape.
         if (!self::isVariable($assignment->var, $resultName) || !$merge instanceof Expr\FuncCall
             || !self::isBuiltinArrayMerge($merge, $method) || $merge->isFirstClassCallable()) {
             return false;
@@ -329,7 +328,7 @@ final class CallableCollectionReturnEvidence
     private static function hasExactMergeArguments(Expr\FuncCall $merge, string $resultName, string $callbackName): bool
     {
         $arguments = $merge->getRawArgs();
-        // Both sources must be intact plain locals: the current result and the selected callback bucket.
+
         return count($arguments) === 2 && $arguments[0] instanceof Node\Arg && $arguments[1] instanceof Node\Arg
             && !$arguments[0]->unpack && !$arguments[1]->unpack
             && $arguments[0]->name === null && $arguments[1]->name === null
@@ -363,11 +362,11 @@ final class CallableCollectionReturnEvidence
     }
 
     /**
-     * Distinguishes PHP's merge function from a local replacement with the same short name.
+     * Applies bounded name and namespace checks to an array_merge call.
      *
      * @param Expr\FuncCall    $call   - Array merge expression; a dynamic name stays unproved.
      * @param Stmt\ClassMethod $method - Owning namespace checked for a written replacement function.
-     * @return bool - True only for the ordinary built-in name in this visible file.
+     * @return bool - True for an explicit global call or an unqualified call with no conflicting resolved name or namespace declaration.
      */
     private static function isBuiltinArrayMerge(Expr\FuncCall $call, Stmt\ClassMethod $method): bool
     {
@@ -386,7 +385,7 @@ final class CallableCollectionReturnEvidence
             return false;
         }
         $namespace = $method->getAttribute('parent');
-        // A function written in this namespace would intercept an unqualified call at runtime.
+        // A same-name declaration in the enclosing namespace block keeps the unqualified call unresolved.
         while ($namespace instanceof Node && !$namespace instanceof Stmt\Namespace_) {
             $namespace = $namespace->getAttribute('parent');
         }
@@ -394,7 +393,7 @@ final class CallableCollectionReturnEvidence
         if (!$namespace instanceof Stmt\Namespace_) {
             return true;
         }
-        // A visible replacement can also be declared inside a method before this call runs.
+        // Nested same-name function declarations also keep the call unresolved.
         return (new NodeFinder())->findFirst($namespace->stmts, static fn (Node $node): bool =>
             $node instanceof Stmt\Function_ && strcasecmp($node->name->toString(), 'array_merge') === 0) === null;
     }
@@ -404,7 +403,7 @@ final class CallableCollectionReturnEvidence
      *
      * @param Stmt\ClassLike     $declaration - Written class or trait; other declarations are separate owners.
      * @param Expr\PropertyFetch $selected    - Exact property read supplying the returned collection.
-     * @return bool - True for an initially empty non-public property with typed bucket appends only.
+     * @return bool - True for an initially empty non-public property with at least one typed append and no unsupported uses.
      */
     private static function hasOnlyRegisteredPropertyUses(Stmt\ClassLike $declaration, Expr\PropertyFetch $selected): bool
     {
@@ -443,7 +442,7 @@ final class CallableCollectionReturnEvidence
             if (!self::isThisProperty($use) || ($use !== $selected && !self::isTypedBucketAppend($use))) {
                 return false;
             }
-            // A typed append contributes one proved callback to any keyed bucket.
+            // A typed append contributes bounded callable evidence for any keyed bucket.
             if ($use !== $selected) {
                 $hasStore = true;
             }
@@ -456,7 +455,7 @@ final class CallableCollectionReturnEvidence
      * Checks one indexed append for an untouched native callable parameter.
      *
      * @param Expr\PropertyFetch $property - Observed use; reads and reference writes keep the warning.
-     * @return bool - True only for property[key][] assigned from a proved method parameter.
+     * @return bool - True only for property[key][] assigned from a method parameter with bounded callable evidence.
      */
     private static function isTypedBucketAppend(Expr\PropertyFetch $property): bool
     {
@@ -471,17 +470,17 @@ final class CallableCollectionReturnEvidence
     }
 
     /**
-     * Finds the closest written class or trait without borrowing another declaration's properties.
+     * Finds the nearest enclosing class, trait, interface or enum without borrowing an outer declaration.
      *
      * @param Node $node - Invocation or property use whose owner the scanner needs.
-     * @return Stmt\ClassLike|null - Visible declaration, or null when no owner can be proved.
+     * @return Stmt\ClassLike|null - Visible declaration, or null when no visible owner is found.
      */
     private static function owningDeclaration(Node $node): ?Stmt\ClassLike
     {
         $parent = $node->getAttribute('parent');
         // A nested class starts a new property boundary.
         while ($parent instanceof Node) {
-            // The nearest declaration is the only one whose property default can be inspected.
+
             if ($parent instanceof Stmt\ClassLike) {
                 return $parent;
             }
@@ -507,7 +506,7 @@ final class CallableCollectionReturnEvidence
      * Recognizes an empty PHP list without trusting an annotation or variable name.
      *
      * @param Node|null $candidateArray - Expression or absent fallback; absence is not an empty list.
-     * @return bool - True only for literal [].
+     * @return bool - True for either [] or array() with no items.
      */
     private static function isEmptyArray(?Node $candidateArray): bool
     {

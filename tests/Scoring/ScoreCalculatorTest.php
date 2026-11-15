@@ -22,26 +22,24 @@ use GruffPhp\Results\Scoring\ScoreCalculator;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers score calculation: simple A-F grade boundaries, mutation-pillar omission when Infection data is absent, file-metric inclusion, and
- * pillar-scoped composites.
+ * Covers A-F grade thresholds and the presence or absence of mutation scoring.
+ * Checks correlated penalties, pillar counts, and per-file metrics.
+ * Verifies selected-pillar composites and per-rule score exclusions.
  */
 final class ScoreCalculatorTest extends TestCase
 {
     /**
-     * Guard: a rule may not introduce a pillar STATIC_PILLARS does not name.
+     * Checks that every registered primary and secondary pillar is in STATIC_PILLARS.
+     * Keeping clean catalogue pillars present prevents findings from changing the composite divisor.
      *
-     * An unnamed pillar joins the composite only on runs where it has findings, so the divisor moves between runs and
-     * fixing the last finding in that pillar can lower the composite. Mirrors gruff-py's
-     * `test_static_pillars_covers_every_catalog_pillar`.
-     *
-     * @return void
+     * @return void - Asserts that no registered primary or secondary pillar is missing.
      */
     public function testStaticPillarsCoverEveryCataloguePillar(): void
     {
         $staticPillars   = (new \ReflectionClassConstant(ScoreCalculator::class, 'STATIC_PILLARS'))->getValue();
         $cataloguePillars = [];
 
-        // Collect every primary and secondary pillar any registered rule declares.
+
         foreach (RuleRegistry::defaults()->all() as $rule) {
             $definition = $rule->definition();
             $cataloguePillars[$definition->pillar->value] = true;
@@ -60,9 +58,9 @@ final class ScoreCalculatorTest extends TestCase
     }
 
     /**
-     * Verify grade boundaries use simple af scale.
+     * Checks that 90/80/70/60 map to A/B/C/D and 59.99 maps to F.
      *
-     * @return void
+     * @return void - Asserts A/B/C/D at 90/80/70/60 and F at 59.99.
      */
     public function testGradeBoundariesUseSimpleAFScale(): void
     {
@@ -76,7 +74,7 @@ final class ScoreCalculatorTest extends TestCase
     /**
      * Verify score report omits mutation pillar when infection data is absent.
      *
-     * @return void
+     * @return void - Asserts mutation is absent, scope is full-project, and the security pillar is graded F.
      */
     public function testScoreReportOmitsMutationPillarWhenInfectionDataIsAbsent(): void
     {
@@ -102,9 +100,9 @@ final class ScoreCalculatorTest extends TestCase
     }
 
     /**
-     * Verify overlapping size and complexity findings remain native findings.
+     * Checks that the input rule IDs remain unchanged and no design pillar appears in the report.
      *
-     * @return void
+     * @return void - Asserts original input IDs, no design pillar, and a composite below 100.
      */
     public function testOverlappingSizeAndComplexityFindingsRemainNativeFindings(): void
     {
@@ -125,14 +123,10 @@ final class ScoreCalculatorTest extends TestCase
     }
 
     /**
-     * Verify correlated findings on one symbol are billed once, not per symptom.
+     * Checks that the same findings score higher when clustered on one symbol than when spread across symbols.
+     * Both complexity findings and the size finding still contribute to their pillar counts.
      *
-     * The same three findings score better when they pile onto a single method
-     * (one root cause, clustered) than when spread across three distinct methods
-     * (three independent root causes), while every finding still counts toward
-     * its pillar.
-     *
-     * @return void
+     * @return void - Asserts a higher clustered composite, two complexity findings, and one size finding.
      */
     public function testCorrelatedFindingsOnOneSymbolShareOnePenalty(): void
     {
@@ -156,14 +150,10 @@ final class ScoreCalculatorTest extends TestCase
     }
 
     /**
-     * Verify a cluster contributes max(member penalty) / member count, not the sum.
+     * Checks the aggregate complexity penalty for correlated error, warning and advisory findings.
+     * Their combined penalty is 12.0, with all three findings still counted.
      *
-     * An Error (base 12), a Warning (base 4), and an Advisory (base 1) on one
-     * method share max(12, 4, 1) / 3 = 4.0 each. Three findings × 4.0 = a 12.0
-     * pillar penalty, proving the largest symptom sets the bill and the weaker
-     * overlapping symptoms do not stack on top of it.
-     *
-     * @return void
+     * @return void - Asserts a 12.0 penalty and three complexity findings.
      */
     public function testClusterPenaltyIsMaxMemberPenaltyDividedByCount(): void
     {
@@ -179,13 +169,10 @@ final class ScoreCalculatorTest extends TestCase
     }
 
     /**
-     * Verify correlated findings without a line still share one penalty, and the published cluster carries that weight.
+     * Checks that two warnings on the same symbol share a total penalty even without line numbers.
+     * The pillar penalty and the single published cluster weight must both be 4.0.
      *
-     * Two warnings (base 4 each) on one method with no line share max(4, 4) / 2 = 2.0 each, so the pillar is
-     * charged 4.0 and the one cluster row reports 4.0. Charging them in full billed 8.0 while the cluster row
-     * claimed they were one root cause.
-     *
-     * @return void
+     * @return void - Asserts a 4.0 complexity penalty and one cluster with weight 4.0.
      */
     public function testCorrelatedFindingsWithoutALineShareOnePenalty(): void
     {
@@ -200,13 +187,10 @@ final class ScoreCalculatorTest extends TestCase
     }
 
     /**
-     * Verify a lone correlated finding and an unrelated rule on the same symbol keep full penalty.
+     * Checks that a lone complexity finding and an unrelated naming finding on the same symbol retain full penalties.
+     * Each contributes 4.0 to its own pillar.
      *
-     * Clustering needs two or more correlated findings, so a single complexity
-     * finding keeps its base penalty; a naming finding sharing the symbol is a
-     * different root cause and is never folded into the cluster.
-     *
-     * @return void
+     * @return void - Asserts a 4.0 penalty in both the complexity and naming pillars.
      */
     public function testLoneCorrelatedAndUnrelatedFindingsKeepFullPenalty(): void
     {
@@ -223,7 +207,7 @@ final class ScoreCalculatorTest extends TestCase
     /**
      * Verify score report includes mutation pillar, file mutation scores, distribution, and diff scope.
      *
-     * @return void
+     * @return void - Asserts mutation metrics, complexity buckets, diff scope, and per-file maxima.
      */
     public function testScoreReportIncludesMutationAndFileMetrics(): void
     {
@@ -304,7 +288,7 @@ final class ScoreCalculatorTest extends TestCase
     /**
      * Verify score calculation can scope composite scoring to selected pillars.
      *
-     * @return void
+     * @return void - Asserts only the selected pillars are reported and their composite grade is C.
      */
     public function testScoreReportCanScopeCompositeToSelectedPillars(): void
     {
@@ -326,9 +310,9 @@ final class ScoreCalculatorTest extends TestCase
     }
 
     /**
-     * Verify findings from `excludeFromScore: true` rules are filtered before the penalty bucket.
+     * Checks that excluding the file-length rule changes the composite from below 100 to 100.
      *
-     * @return void
+     * @return void - Asserts the rule penalises the default score but not the excluded-rule score.
      */
     public function testExcludeFromScoreRuleFindingsDoNotPenaliseTheComposite(): void
     {
@@ -345,9 +329,9 @@ final class ScoreCalculatorTest extends TestCase
     }
 
     /**
-     * Verify default behaviour (no config supplied) is unchanged.
+     * Checks that a file-length finding still reduces the composite when analysisConfig is null.
      *
-     * @return void
+     * @return void - Asserts that the composite score is below 100 with a null analysis configuration.
      */
     public function testNullAnalysisConfigKeepsAllFindingsInScore(): void
     {
@@ -364,9 +348,9 @@ final class ScoreCalculatorTest extends TestCase
      * Build an AnalysisConfig with one rule marked excludeFromScore.
      *
      * @param RuleRegistry $registry - Source of rule defaults the config is seeded from.
-     * @param string       $ruleId - Rule identifier to mark excluded.
+     * @param string $ruleId - Rule identifier present in the supplied registry.
      *
-     * @return AnalysisConfig - a copy seeded from the registry with the named rule flagged excludeFromScore so its findings drop out of the composite
+     * @return AnalysisConfig - Registry defaults with the named rule excluded from scoring and its other settings preserved.
      */
     private function configWithExcludedRule(RuleRegistry $registry, string $ruleId): AnalysisConfig
     {
@@ -387,8 +371,7 @@ final class ScoreCalculatorTest extends TestCase
      *
      * @param list<\GruffPhp\Results\Scoring\PillarScore> $pillars - Pillar scores returned by the calculator fixture.
      *
-     * @return array<string, \GruffPhp\Results\Scoring\PillarScore> - the same scores keyed by pillar name for index-free lookup; empty when no pillars were
-     *                       given
+     * @return array<string, \GruffPhp\Results\Scoring\PillarScore> - Last score per pillar name; empty input returns an empty array.
      */
     private function pillarMap(array $pillars): array
     {
@@ -403,17 +386,16 @@ final class ScoreCalculatorTest extends TestCase
     /**
      * Build a finding fixture for assertions.
      *
-     * @param string                                                                                 $ruleId - Rule identifier.
-     * @param Pillar                                                                                 $pillar - Pillar assigned to the finding fixture.
-     * @param Severity                                                                               $severity - Severity assigned to the finding fixture.
-     * @param string                                                                                 $filePath - Finding file path.
-     * @param int|null                                                                               $line - Finding line number; null builds a finding the calculator receives without a location.
-     * @param int|null                                                                               $endLine - End line of the finding span; null
-     *                                                                                                         means the finding spans a single line.
-     * @param string|null                                                                            $symbol - Optional reported symbol for grouping and display assertions.
-     * @param array<string, bool|float|int|string|null|array<array-key, bool|float|int|string|null>> $metadata - Metadata attached to the finding fixture.
+     * @param string $ruleId - Rule identifier assigned to the fixture.
+     * @param Pillar $pillar - Primary pillar assigned to the fixture.
+     * @param Severity $severity - Severity assigned to the fixture.
+     * @param string $filePath - File path assigned to the fixture.
+     * @param int|null $line - Start line assigned to the fixture; null leaves it unspecified.
+     * @param int|null $endLine - End line assigned to the fixture; null leaves it unspecified.
+     * @param string|null $symbol - Symbol used for grouping and display; null supplies no symbol.
+     * @param array<string, bool|float|int|string|null|array<array-key, bool|float|int|string|null>> $metadata - Metadata attached to the fixture.
      *
-     * @return Finding - a fully populated fixture (High confidence, V01 tier) carrying the supplied fields for scoring assertions
+     * @return Finding - Fixture with High confidence, V01 tier, and the supplied scoring fields.
      */
     private function finding(
         string   $ruleId,
@@ -441,10 +423,8 @@ final class ScoreCalculatorTest extends TestCase
     }
 
     /**
-     * Reads the composite a fixture expects to exist, failing the test rather than dereferencing null.
-     *
-     * The ratified contract lets a composite be null when a run evaluated nothing; every fixture here
-     * supplies a positive denominator, so a null composite is a regression, not an expected shape.
+     * Reads a fixture's composite after asserting its presence.
+     * A run that evaluated nothing may omit it, but every caller here supplies a positive denominator.
      *
      * @param ScoreReport $score - Report whose composite the assertion is about to read.
      *

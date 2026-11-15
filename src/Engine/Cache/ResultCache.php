@@ -25,14 +25,9 @@ final readonly class ResultCache
     public const DIRECTORY = '.gruff-cache';
 
     /**
-     * Maximum cached file entries before oldest-first eviction.
+     * Entry cap used by finalizeRun() and canHoldRun().
      *
-     * Sized so shopware-scale repos fit their whole working set - the cap must
-     * cover the DISCOVERED file count (PHP plus text units; shopware discovers
-     * 17,543), not just files with findings, because a cap below the discovery
-     * count evicts entries before any warm run can reuse them, making the
-     * cache pure overhead. Measured store cost is ~39MB per 4096 entries, so
-     * this cap bounds the steady-state store at roughly 320MB.
+     * Files with no findings still occupy cache entries, so eligibility uses the full discovered file count.
      */
     public const MAX_ENTRIES = 32768;
 
@@ -40,7 +35,7 @@ final readonly class ResultCache
      * Wraps the project's cache directory; use forProject() to build one rooted under the project.
      *
      * @param string $cacheDir - Project-local directory holding cache entries.
-     * @param int    $maxEntries - Entry cap enforced by finalizeRun(); injectable so tests exercise eviction without thousands of writes.
+     * @param int    $maxEntries - Maximum number of JSON entries retained after finalizeRun().
      */
     public function __construct(private string $cacheDir, private int $maxEntries = self::MAX_ENTRIES)
     {
@@ -69,14 +64,14 @@ final readonly class ResultCache
     public function get(string $key): ?array
     {
         $path = $this->pathFor($key);
-        // No entry on disk for this key, or it is unreadable: a plain cache miss.
+
         if (!is_file($path) || !is_readable($path)) {
             // No entry on disk for this key, or it is unreadable: a plain cache miss, so callers re-run cold.
             return null;
         }
 
         $raw = file_get_contents($path);
-        // The file existed but could not be read, so fail open to a miss rather than risk a stale serve.
+
         if (!is_string($raw)) {
             // The entry could not be read despite existing; fail open to a miss rather than risk a stale serve.
             return null;
@@ -96,11 +91,11 @@ final readonly class ResultCache
         }
 
         $findings = [];
-        // Rebuild each cached finding in turn; a single bad row voids the whole entry.
+
         foreach ($decoded as $entry) {
             // One malformed row invalidates the whole entry - a partial rebuild could silently drop findings.
             if (!is_array($entry)) {
-                // One malformed row invalidates the whole entry; reconstructing a partial list could drop findings.
+
                 return null;
             }
 
@@ -116,16 +111,12 @@ final readonly class ResultCache
     }
 
     /**
-     * Reports whether a run's discovered files all fit under the entry cap, so callers can skip caching
-     * a working set too big to ever be reused.
+     * Reports whether the discovered working set fits within the default entry cap.
+     * Callers skip caching oversized runs to avoid retaining only part of that working set.
      *
-     * When it does not, every entry the run writes would be evicted before a
-     * warm run could reuse it, so callers skip the cache entirely for that
-     * run: caching a working set that cannot fit is pure overhead.
+     * @param int $discoveredFileCount - Number of analysable files discovered for the run.
      *
-     * @param int $discoveredFileCount - Analysable files discovered for the run.
-     *
-     * @return bool - True when the whole working set fits under the entry cap; false when the run should skip the cache.
+     * @return bool - True when the file count is at most MAX_ENTRIES.
      */
     public static function canHoldRun(int $discoveredFileCount): bool
     {
@@ -133,21 +124,17 @@ final readonly class ResultCache
     }
 
     /**
-     * Stores a file's findings under its key, best-effort - any failure is silent, since the cache is
-     * only ever an optimisation over recomputing from source.
-     *
-     * Best-effort; failures are
-     * silent, and eviction is deferred to finalizeRun() so a large run never
-     * globs the cache directory per write.
+     * Stores a file's findings under its key; cache failures leave the analysis result unchanged.
+     * Eviction waits for finalizeRun() so per-file writes do not scan the cache directory.
      *
      * @param string        $key - Cache key for a file's per-unit findings.
      * @param list<Finding> $findings - Findings produced for the file.
      *
-     * @return void
+     * @return void - Cache failures are not returned to the caller.
      */
     public function put(string $key, array $findings): void
     {
-        // No cache directory and we could not create one, so quietly skip persisting.
+
         if (!is_dir($this->cacheDir) && !mkdir($this->cacheDir, 0775, true) && !is_dir($this->cacheDir)) {
             // Cache directory is absent and could not be created; skip persisting since the cache is best-effort.
             return;
@@ -155,7 +142,7 @@ final readonly class ResultCache
 
         // A read-only cache directory is not worth failing the run over, so give up silently.
         if (!is_writable($this->cacheDir)) {
-            // Read-only cache directory: give up silently rather than fail the run for an optional optimisation.
+
             return;
         }
 
@@ -172,25 +159,22 @@ final readonly class ResultCache
     }
 
     /**
-     * Trims the store back to its entry cap at the end of a run, evicting the oldest entries first.
+     * Applies oldest-first eviction when the cache exceeds its configured entry cap.
+     * Call once per run to keep directory scans out of the per-file write path.
      *
-     * Called once at the end of a run rather than on every put(): per-put
-     * eviction globbed the whole cache directory on each write, which made
-     * large-repo scans I/O-bound.
-     *
-     * @return void
+     * @return void - Attempts to remove excess JSON entries in ascending modification-time order.
      */
     public function finalizeRun(): void
     {
         $entries = glob($this->cacheDir . '/*.json');
-        // Nothing to evict when the glob failed or the store is already within its cap.
+
         if (!is_array($entries) || count($entries) <= $this->maxEntries) {
-            // Glob failed or the cache is within its entry cap, so there is nothing to evict for this run.
+
             return;
         }
 
         usort($entries, static fn (string $left, string $right): int => (int) filemtime($left) <=> (int) filemtime($right));
-        // Delete the oldest entries past the cap, keeping the store bounded.
+
         foreach (array_slice($entries, 0, count($entries) - $this->maxEntries) as $stale) {
             unlink($stale);
         }
@@ -199,9 +183,9 @@ final readonly class ResultCache
     /**
      * Resolves the on-disk path for a cache key.
      *
-     * @param string $key - Cache key.
+     * @param string $key - Key appended to the cache directory before the .json suffix.
      *
-     * @return string - Absolute path to the key's entry file.
+     * @return string - Entry path, relative if the configured cache directory is relative.
      */
     private function pathFor(string $key): string
     {

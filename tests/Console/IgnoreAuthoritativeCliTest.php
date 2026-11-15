@@ -8,9 +8,9 @@ use JsonException;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers the path-scope guarantee end-to-end: configured paths.ignore is
- * authoritative for explicit args, changed-region diffs, and under
- * --include-ignored, and the check-ignore command shares the same engine.
+ * Exercises configured paths.ignore through the analyse and check-ignore CLI commands.
+ * Covers explicit-file exclusion, --changed-ranges, and --include-ignored.
+ * Compares ignore details across commands and checks check-ignore exit codes.
  */
 final class IgnoreAuthoritativeCliTest extends CliTestCase
 {
@@ -22,7 +22,7 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
     /**
      * Build a temporary git project with config, file, and directory ignore cases.
      *
-     * @return void
+     * @return void - Prepares the project root and ignore-policy fixtures for each test.
      */
     protected function setUp(): void
     {
@@ -40,7 +40,7 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
     /**
      * Remove the temporary ignore fixture.
      *
-     * @return void
+     * @return void - Cleans up the temporary project when it exists.
      */
     protected function tearDown(): void
     {
@@ -50,8 +50,8 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
     /**
      * Verify an explicit configured-ignored file yields no findings and is reported with its pattern.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts no findings and the configured ignore path, source, and pattern.
+     * @throws JsonException - If the command's stdout cannot be decoded as JSON.
      */
     public function testExplicitIgnoredFileProducesNoFindingsAndReportsPattern(): void
     {
@@ -74,8 +74,8 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
     /**
      * Verify the same file produces findings once the configured ignore no longer applies.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts findings appear and no ignore details are reported with --no-config.
+     * @throws JsonException - If the command's stdout cannot be decoded as JSON.
      */
     public function testSameFileProducesFindingsWhenNotConfiguredIgnored(): void
     {
@@ -92,10 +92,10 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
     }
 
     /**
-     * Verify a changed-region diff touching an ignored file still yields no findings for it.
+     * Verify explicit changed ranges do not cause analysis of a configured-ignored file.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts no findings and the file's presence in ignoredPaths.
+     * @throws JsonException - If the command's stdout cannot be decoded as JSON.
      */
     public function testChangedRangesOnIgnoredFileProducesNoFindings(): void
     {
@@ -112,10 +112,10 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
     }
 
     /**
-     * Verify --include-ignored never overrides a configured paths.ignore match.
+     * Verify --include-ignored leaves the configured ignore active for the explicit file.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts no findings and the configured ignore details for the file.
+     * @throws JsonException - If the command's stdout cannot be decoded as JSON.
      */
     public function testIncludeIgnoredStillHonoursConfiguredIgnore(): void
     {
@@ -137,8 +137,8 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
     /**
      * Verify check-ignore reports the verdict, source, and pattern for every input path.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts ordered verdicts, sources, and patterns for the supplied paths.
+     * @throws JsonException - If the command's stdout cannot be decoded as JSON.
      */
     public function testCheckIgnoreReportsVerdictSourceAndPattern(): void
     {
@@ -165,10 +165,10 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
     }
 
     /**
-     * Verify check-ignore and analyse agree on source and pattern for the same path (shared engine).
+     * Verify check-ignore and analyse report the same configured source and pattern for one path.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts both commands report the expected configured-ignore result for legacy/Bad.php.
+     * @throws JsonException - If either command's stdout cannot be decoded as JSON.
      */
     public function testCheckIgnoreSharesEngineWithAnalyse(): void
     {
@@ -190,9 +190,9 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
     }
 
     /**
-     * Verify check-ignore exit codes mirror git check-ignore (1 when nothing matches, 2 on error).
+     * Verify check-ignore returns 1 for an unignored path and 2 for an unsupported format.
      *
-     * @return void
+     * @return void - Asserts the expected exit codes for a no-match result and an invalid-format invocation.
      */
     public function testCheckIgnoreExitCodesMirrorGit(): void
     {
@@ -222,28 +222,30 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
 
     /**
      * Decode a check-ignore JSON array response into a list of result rows.
+     * Paths not ignored have null source and pattern values.
      *
      * @param Process $process - Completed check-ignore process whose stdout holds the JSON array.
      *
-     * @return list<array{path: string, ignored: bool, source: string|null, pattern: string|null}> - one row per input path in argument order;
-     *                          source/pattern are null when the path is not ignored
-     * @throws JsonException
+     * @return list<array{path: string, ignored: bool, source: string|null, pattern: string|null}> - One row per input path, in argument order.
+     * @throws JsonException - If stdout cannot be decoded as JSON.
      */
     private function decodeJsonList(Process $process): array
     {
         $decoded = json_decode($process->getOutput(), true, 512, JSON_THROW_ON_ERROR);
         self::assertIsArray($decoded);
 
-        /** @var list<array{path: string, ignored: bool, source: string|null, pattern: string|null}> $decoded The check-ignore JSON output is always a list of path-decision rows. */
+        /**
+         * @var list<array{path: string, ignored: bool, source: string|null, pattern: string|null}> $decoded - Expected check-ignore result rows.
+         */
         return $decoded;
     }
 
     /**
      * Run a git command inside the fixture project.
      *
-     * @param list<string> $args - Git arguments.
+     * @param list<string> $args - Arguments passed to git in the fixture project.
      *
-     * @return void
+     * @return void - Runs the command and asserts a successful exit code.
      */
     private function runGit(array $args): void
     {
@@ -257,9 +259,9 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
      * Write a fixture file, creating parent directories as needed.
      *
      * @param string $path     - Project-relative file path.
-     * @param string $contents - File contents.
+     * @param string $contents - Text written to the fixture file.
      *
-     * @return void
+     * @return void - Writes the supplied text after creating missing parent directories.
      */
     private function writeProjectFile(string $path, string $contents): void
     {

@@ -21,15 +21,16 @@ use GruffPhp\Results\Scoring\ScoreReport;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers HTML report rendering: escaping, severity vocabulary, editor links (VS Code, PhpStorm, Windows), diagnostics ordering, snapshot stability,
- * and interactive controls.
+ * Covers HTML report escaping, severity labels, diagnostics, and score presentation.
+ * Checks VS Code links, including Windows paths, and PhpStorm links against expected URL text.
+ * Snapshot and interactive-control assertions inspect emitted HTML without running browser interactions.
  */
 final class HtmlReporterTest extends TestCase
 {
     /**
      * Verify HTML reporter escapes run data and renders report sections.
      *
-     * @return void
+     * @return void - Asserts escaped finding text and paths, key report sections, and mutation omission without Infection data.
      */
     public function testHtmlReporterEscapesRunDataAndRendersReportSections(): void
     {
@@ -80,9 +81,9 @@ final class HtmlReporterTest extends TestCase
     }
 
     /**
-     * Verify HTML reporter omits mutation visualization.
+     * Verify HTML reporter omits mutation output when no Infection report is supplied.
      *
-     * @return void
+     * @return void - Asserts the omission notice, complexity label, and absence of the mutation row and MSI text.
      */
     public function testHtmlReporterOmitsMutationVisualization(): void
     {
@@ -112,9 +113,9 @@ final class HtmlReporterTest extends TestCase
     }
 
     /**
-     * Verify HTML reporter uses canonical severity vocabulary and accessible markup.
+     * Verify canonical severity labels, scoped table headers, and a focusable finding location.
      *
-     * @return void
+     * @return void - Asserts severity vocabulary, selected report summaries, scoped headers, and focusable location markup.
      */
     public function testHtmlReporterUsesCanonicalSeverityVocabularyAndAccessibleMarkup(): void
     {
@@ -145,7 +146,7 @@ final class HtmlReporterTest extends TestCase
     /**
      * Verify HTML reporter renders diagnostics when present.
      *
-     * @return void
+     * @return void - Asserts the diagnostic section, type and message, and escaped input path.
      */
     public function testHtmlReporterRendersDiagnosticsWhenPresent(): void
     {
@@ -165,9 +166,9 @@ final class HtmlReporterTest extends TestCase
     }
 
     /**
-     * Verify HTML reporter uses celebration subtitle when no warning or error findings exist.
+     * Check that an advisory-only report includes the no-warning-or-error message.
      *
-     * @return void
+     * @return void - Asserts the no-warning-or-error message for a report containing only an advisory finding.
      */
     public function testHtmlReporterUsesCelebrationSubtitleWhenNoWarningOrErrorFindingsExist(): void
     {
@@ -190,7 +191,7 @@ final class HtmlReporterTest extends TestCase
     /**
      * Verify HTML reporter renders opt in editor links.
      *
-     * @return void
+     * @return void - Asserts VS Code URLs with and without line numbers, plus a retained relative data path.
      */
     public function testHtmlReporterRendersOptInEditorLinks(): void
     {
@@ -210,7 +211,7 @@ final class HtmlReporterTest extends TestCase
     /**
      * Verify VS Code editor links support Windows absolute paths.
      *
-     * @return void
+     * @return void - Asserts a VS Code URL that retains the Windows drive and line while encoding the filename's space.
      */
     public function testHtmlReporterRendersWindowsVscodeEditorLinks(): void
     {
@@ -234,9 +235,9 @@ final class HtmlReporterTest extends TestCase
     }
 
     /**
-     * Verify HTML reporter renders PHP storm editor links.
+     * Verify HTML reporter renders PhpStorm editor links.
      *
-     * @return void
+     * @return void - Asserts a PhpStorm URL containing the encoded absolute file path and the finding's line number.
      */
     public function testHtmlReporterRendersPhpStormEditorLinks(): void
     {
@@ -249,9 +250,9 @@ final class HtmlReporterTest extends TestCase
     }
 
     /**
-     * Verify HTML reporter renders interactive findings only when enabled.
+     * Verify optional finding controls and script markup are absent by default and present when enabled.
      *
-     * @return void
+     * @return void - Asserts mode-specific markup, URL-state code fragments, and absence of localStorage text.
      */
     public function testHtmlReporterRendersInteractiveFindingsOnlyWhenEnabled(): void
     {
@@ -274,7 +275,7 @@ final class HtmlReporterTest extends TestCase
     /**
      * Verify HTML reporter static snapshot matches fixture.
      *
-     * @return void
+     * @return void - Asserts byte-for-byte equality between static HTML and the static.html fixture.
      */
     public function testHtmlReporterStaticSnapshotMatchesFixture(): void
     {
@@ -286,7 +287,7 @@ final class HtmlReporterTest extends TestCase
     /**
      * Verify HTML reporter interactive snapshot matches fixture.
      *
-     * @return void
+     * @return void - Asserts byte-for-byte equality between interactive HTML and the interactive.html fixture.
      */
     public function testHtmlReporterInteractiveSnapshotMatchesFixture(): void
     {
@@ -296,9 +297,9 @@ final class HtmlReporterTest extends TestCase
     }
 
     /**
-     * Verify missing score default path and active diff labels render safely.
+     * Verify missing-score placeholders, the default path, and active-diff labels.
      *
-     * @return void
+     * @return void - Asserts n/a placeholders, the dot path fallback, and the active diff's changed-file count label.
      */
     public function testHtmlReporterHandlesMissingScoreDefaultPathAndActiveDiffScope(): void
     {
@@ -330,7 +331,7 @@ final class HtmlReporterTest extends TestCase
     /**
      * Verify major sections keep their document order around diagnostics.
      *
-     * @return void
+     * @return void - Asserts that masthead, diagnostics, and verdict occur in that order.
      */
     public function testHtmlReporterKeepsMastheadDiagnosticsAndVerdictInOrder(): void
     {
@@ -351,9 +352,9 @@ final class HtmlReporterTest extends TestCase
     }
 
     /**
-     * Verify diagnostic locations prefer parsed file paths with lines over input paths.
+     * Verify diagnostic locations render parsed file paths with lines and path-only inputs.
      *
-     * @return void
+     * @return void - Asserts file-and-line diagnostic text and a path-only diagnostic location without a trailing colon.
      */
     public function testHtmlReporterDiagnosticLocationsPreferFilePathLineThenPath(): void
     {
@@ -370,7 +371,7 @@ final class HtmlReporterTest extends TestCase
     /**
      * Verify custom score reports render empty and distribution edge cases.
      *
-     * @return void
+     * @return void - Asserts the empty-offender message, n/a pillar grade, mutation omission, and distribution bar heights.
      */
     public function testHtmlReporterRendersCustomScoreReportEdgeCases(): void
     {
@@ -405,7 +406,7 @@ final class HtmlReporterTest extends TestCase
     /**
      * Verify custom score reports render offender metrics in fixed column order.
      *
-     * @return void
+     * @return void - Asserts adjacent offender metric cells, the complexity summary, and expected distribution bar heights.
      */
     public function testHtmlReporterRendersOffenderMetricColumnsInOrder(): void
     {
@@ -436,9 +437,9 @@ final class HtmlReporterTest extends TestCase
     }
 
     /**
-     * Verify interactive pillar select size is bounded.
+     * Verify the interactive pillar selector uses the expected sizes for the supplied reports.
      *
-     * @return void
+     * @return void - Asserts size 2 for the single-pillar fixture and size 6 for the multi-pillar fixture.
      */
     public function testHtmlReporterInteractivePillarSelectSizeIsBounded(): void
     {
@@ -472,7 +473,7 @@ final class HtmlReporterTest extends TestCase
     /**
      * Build a sample analysis report for renderer assertions.
      *
-     * @return AnalysisReport - html-format report carrying one finding per pillar so every renderer section is exercised
+     * @return AnalysisReport - HTML report with documentation, complexity, and modernisation findings at different severities.
      */
     private function sampleReport(): AnalysisReport
     {
@@ -512,6 +513,8 @@ final class HtmlReporterTest extends TestCase
     }
 
     /**
+     * Build an HTML report with supplied findings and diagnostics for renderer assertions.
+     *
      * @param list<Finding>       $findings - Findings to render in the HTML fixture report.
      * @param list<RunDiagnostic> $diagnostics - Diagnostics to render alongside the findings.
      * @param ScoreReport|null    $score - Precomputed score to use, or null to derive one from the findings.
@@ -542,9 +545,9 @@ final class HtmlReporterTest extends TestCase
     /**
      * Load an expected fixture snapshot.
      *
-     * @param string $name - Fixture name.
+     * @param string $name - Snapshot filename in Fixtures/Reporting/InteractiveReport.
      *
-     * @return string - raw committed snapshot text for the named fixture, used as the expected HTML in snapshot assertions
+     * @return string - raw snapshot text for the named fixture, used as the expected HTML in snapshot assertions
      */
     private function fixture(string $name): string
     {

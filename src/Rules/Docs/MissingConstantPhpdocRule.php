@@ -30,14 +30,9 @@ use PhpParser\Node\Stmt\Interface_;
 use PhpParser\Node\Stmt\Trait_;
 
 /**
- * Flags a class constant or enum case that carries no local documentation, so the user can see at a glance
- * what each value means and why it exists instead of decoding a bare literal.
- *
- * Runs per file over classes, traits, interfaces, and enums. A meaningful attached line or block comment
- * satisfies a constant. A PHPDoc or meaningful comment above the first constant of an unbroken run (no blank
- * line or other statement between) covers the whole run, unless another constant in the run has a comment of its own. Enum cases are
- * reported only when the enum itself is undocumented. Turn on `requirePhpdocForApiConstants`, or list `apiPathPatterns`, to demand real
- * PHPDoc on exported public and protected constants. Advisory, medium confidence.
+ * Flags undocumented constants in named class-likes and enum cases without case or enum PHPDoc; advisory with medium confidence.
+ * Runs share the first constant's attached PHPDoc or useful local comment unless another has its own; blank lines or other statements end runs.
+ * Public/protected constants need their own PHPDoc with `requirePhpdocForApiConstants` or matching `apiPathPatterns`.
  */
 final readonly class MissingConstantPhpdocRule implements RuleInterface
 {
@@ -79,10 +74,10 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
     }
 
     /**
-     * Reports each class constant and enum case that lacks local documentation.
+     * Reports constants and enum cases that fail documentation checks in named class-like declarations.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext - Supplies requirePhpdocForApiConstants and apiPathPatterns, which select constants needing a PHPDoc.
      *
      * @return list<Finding> - Findings for undocumented constants.
      */
@@ -92,9 +87,9 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
         $settings   = $ruleContext->settingsFor($definition);
         $findings   = [];
 
-        // Check every class-like declaration in the file.
+
         foreach (NodeIndex::nodesOf($analysisUnit, ClassLike::class) as $classLike) {
-            // Only a named class, trait, interface, or enum can own constants or cases.
+
             if (!$this->isSupportedClassLike($classLike) || $classLike->name === null) {
                 continue;
             }
@@ -118,7 +113,7 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
      */
     private function isSupportedClassLike(ClassLike $classLike): bool
     {
-        // True only for the four node kinds that can carry constants or enum cases worth documenting.
+
         return $classLike instanceof Class_
             || $classLike instanceof Trait_
             || $classLike instanceof Interface_
@@ -126,10 +121,9 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
     }
 
     /**
-     * Finds the undocumented class constants in one class-like node.
-     *
-     * Constants are judged one unbroken run at a time, so a comment above a run's first constant can cover the
-     * rest of the run, whatever words the comment uses.
+     * Finds undocumented constant names, allowing eligible comments to cover an unbroken run.
+     * A run shares its first declaration's attached PHPDoc or meaningful local comment only if later declarations have no own comments.
+     * Declarations with their own PHPDoc are skipped; strict API settings reject shared coverage for public/protected constants.
      *
      * @param ClassLike      $classLike - Node whose direct `const` statements are scanned for missing docs.
      * @param string         $className - Owning class name, used to build the `Class::CONST` symbol per finding.
@@ -151,7 +145,7 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
         foreach (PhysicalCommentAttachment::unbrokenRuns($classLike->stmts, ClassConst::class, $analysisUnit->source) as $constantRun) {
             $runCommentKind = $this->runCommentKind($constantRun, $analysisUnit->source);
             foreach ($constantRun as $position => $statement) {
-                // A constant with its own PHPDoc is documented, whatever the rest of its run holds.
+
                 if ($statement->getDocComment() !== null) {
                     continue;
                 }
@@ -172,9 +166,8 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
     }
 
     /**
-     * Names the comment that covers a whole run: the first constant's attached PHPDoc or meaningful comment,
-     * provided no later constant in the run has a comment of its own. A later comment marks per-constant
-     * documentation, so the first comment then covers only its own constant.
+     * Names the first declaration's attached PHPDoc or local comment that passes the content heuristic when it covers the run.
+     * A later declaration's own comment limits the first comment's coverage to the first declaration.
      *
      * @param non-empty-list<ClassConst> $constantRun - Unbroken run of constant declarations, in source order.
      * @param string                     $source - Whole-file source used to reject detached and trailing comments.
@@ -222,7 +215,7 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
         $attachedCommentKind = $this->localCommentKind($statement, false, $analysisUnit->source);
         $hasUsefulComment    = $this->localCommentKind($statement, true, $analysisUnit->source) !== null
             || $groupCommentKind !== null;
-        // A sufficiently documented non-API declaration produces no finding for the user.
+
         if ($hasUsefulComment && !$requiresApiPhpdoc) {
             return [];
         }
@@ -255,7 +248,7 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
      * @param int            $line - 1-based line of the `const` statement the finding points the reviewer at.
      * @param RuleDefinition $definition - Rule defaults supplying the id, severity, tier, pillar, and confidence.
      * @param AnalysisUnit   $analysisUnit - Parsed unit whose display path is recorded on the finding.
-     * @param array{kind: ?string, useful: bool, apiRequired: bool, grouped: bool} $comment - Comment classification: nearby comment kind, usefulness, strict API mode, and run coverage.
+     * @param array{kind: ?string, useful: bool, apiRequired: bool, grouped: bool} $comment - Comment coverage and strict API requirements.
      *
      * @return Finding - Finding for an undocumented class constant.
      */
@@ -272,16 +265,16 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
         $hasUsefulComment  = $comment['useful'];
         $requiresApiPhpdoc = $comment['apiRequired'];
 
-        // An exported constant with only a local comment still needs promotion to PHPDoc.
+
         if ($requiresApiPhpdoc && $hasUsefulComment) {
             $message     = sprintf('Constant %s has a local comment, but this project requires PHPDoc for exported constants.', $symbol);
             $remediation = sprintf('Promote the local comment above %s into a `/** ... */` block, or narrow `rules.docs.missing-constant-phpdoc.options.apiPathPatterns` / disable `requirePhpdocForApiConstants` if this is not exported API.', $symbol);
         } elseif ($commentKind !== null) {
-            // A comment exists but does not explain the constant, so ask for a better one.
+
             $message     = sprintf('Constant %s has a local comment, but it does not explain the constant\'s purpose.', $symbol);
             $remediation = sprintf('Replace the comment above %s with a concise explanation of why, when, or how the constant is used.', $symbol);
         } else {
-            // No nearby comment at all, so ask for one from scratch.
+
             $message     = sprintf('Constant %s has no nearby comment explaining its purpose.', $symbol);
             $remediation = 'Add an immediately preceding `//` comment or PHPDoc block that explains why, when, or how the constant is used. Avoid restating the constant name or literal value.';
         }
@@ -294,22 +287,22 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
             ...RemediationAction::Apply->metadata(),
         ];
 
-        // Record which comment style was found, when there was one.
+
         if ($commentKind !== null) {
             $metadata['commentKind'] = $commentKind;
         }
 
-        // Note when the strict exported-API requirement drove the finding.
+
         if ($requiresApiPhpdoc) {
             $metadata['requiresApiPhpdoc'] = true;
         }
 
-        // Note when the constant only borrowed its run's comment.
+
         if ($comment['grouped']) {
             $metadata['groupedLocalComment'] = true;
         }
 
-        // The advisory finding a reviewer diffs: names the constant to document and how (add vs promote a comment).
+
         return new Finding(
             ruleId:      $definition->id,
             message:     $message,
@@ -342,14 +335,14 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
         AnalysisUnit $analysisUnit,
     ): array {
         if (!$classLike instanceof Enum_ || $classLike->getDocComment() !== null) {
-            // A class-level enum docblock already documents the cases, so per-case findings would be noise.
+            // A class-level enum docblock satisfies this rule's case-level documentation check, so per-case findings would be noise.
             return [];
         }
 
         $findings = [];
-        // Check each enum case for its own PHPDoc.
+
         foreach ($classLike->stmts as $statement) {
-            // A non-case statement, or a case already documented, needs no finding.
+
             if (!$statement instanceof EnumCase || $statement->getDocComment() !== null) {
                 continue;
             }
@@ -404,12 +397,12 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
             ...RemediationAction::Apply->metadata(),
         ];
 
-        // Record the existing comment style when the case already had one.
+
         if ($commentKind !== null) {
             $metadata['commentKind'] = $commentKind;
         }
 
-        // The advisory finding a reviewer diffs: it names the case to document and how (add vs promote a comment).
+
         return new Finding(
             ruleId:      $definition->id,
             message:     $message,
@@ -429,14 +422,14 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
      * Detects an immediately attached non-doc comment.
      *
      * @param Node\Stmt $statement - Const or case statement whose attached leading comments are examined.
-     * @param bool      $meaningfulOnly - Whether generic/restating comments should be ignored.
+     * @param bool      $meaningfulOnly - Whether to require the content heuristic rather than any recognised comment.
      * @param string    $source - Whole-file source used to reject comments trailing earlier code.
      *
      * @return string|null - `line`/`block` for an attached local comment, or null when absent or not meaningful enough.
      */
     private function localCommentKind(Node\Stmt $statement, bool $meaningfulOnly, string $source): ?string
     {
-        // Look at each comment the parser attached to the statement.
+
         foreach ($statement->getComments() as $comment) {
             // Only a non-doc comment physically placed above the declaration can explain it.
             if ($comment instanceof Doc || !PhysicalCommentAttachment::isOwnLineImmediatelyAbove($comment, $statement, $source)) {
@@ -444,12 +437,12 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
             }
 
             $kind = $this->commentKind($comment);
-            // Skip anything that is not a recognised line or block comment.
+
             if ($kind === null) {
                 continue;
             }
 
-            // Accept the comment when any kind is allowed, or when it carries real intent.
+
             if (!$meaningfulOnly || $this->isMeaningfulCommentText($comment->getText(), $statement)) {
                 return $kind;
             }
@@ -463,7 +456,7 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
      *
      * @param ClassConst   $statement - Constant declaration being inspected.
      * @param string       $displayPath - Repository-relative path being analysed.
-     * @param RuleSettings $settings - Effective rule settings.
+     * @param RuleSettings $settings - Rule options enabling strict PHPDoc globally or for matching paths.
      *
      * @return bool - True when this exported constant must use PHPDoc rather than a local comment.
      */
@@ -494,9 +487,9 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
     {
         $normalizedPath = str_replace('\\', '/', $displayPath);
 
-        // Test the path against each configured API glob.
+
         foreach ($patterns as $pattern) {
-            // A single matching glob marks this file as an exported API surface.
+
             if (fnmatch($pattern, $normalizedPath, FNM_NOESCAPE)) {
                 return true;
             }
@@ -516,12 +509,12 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
     {
         $text = ltrim($comment->getText());
 
-        // A double-slash or hash opening marks a line comment.
+
         if (str_starts_with($text, '//') || str_starts_with($text, '#')) {
             return 'line';
         }
 
-        // A slash-star opening marks a block comment.
+
         if (str_starts_with($text, '/*')) {
             return 'block';
         }
@@ -530,17 +523,17 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
     }
 
     /**
-     * Reports whether local comment prose is useful enough to satisfy a private constant.
+     * Applies the local-comment heuristic used for constant coverage and enum-case promotion messages.
      *
      * @param string         $rawText - Raw parser comment text, delimiters included.
-     * @param Node\Stmt      $statement - Constant statement whose names are used to reject duplicate comments.
+     * @param Node\Stmt      $statement - Declaration whose constant names, when present, are checked for restatement.
      *
-     * @return bool - True when the comment has human-facing intent rather than boilerplate.
+     * @return bool - True for at least two word tokens with non-generic content that does not restate a declared constant name.
      */
     private function isMeaningfulCommentText(string $rawText, Node\Stmt $statement): bool
     {
         $text = $this->plainCommentText($rawText);
-        // An empty comment says nothing about the constant.
+
         if ($text === '') {
             return false;
         }
@@ -572,9 +565,9 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
 
         // For a constant, a comment that just restates the name is not real documentation.
         if ($statement instanceof ClassConst) {
-            // Compare against each name declared in the statement.
+
             foreach ($statement->consts as $const) {
-                // A comment equal to the constant name only echoes it.
+
                 if ($this->normalisedText($text) === $this->normalisedText($const->name->toString())) {
                     return false;
                 }
@@ -587,12 +580,13 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
     /**
      * Strips comment delimiters and leading block-comment stars.
      *
-     * @param string $rawText - Raw comment text.
+     * @param string $rawText - Parser comment text whose delimiters and leading block stars are removed.
      *
      * @return string - Plain prose content.
      */
     private function plainCommentText(string $rawText): string
     {
+        // Strip line markers, then the /* and */ delimiters, then leading stars; a /** opener leaves one star for the last step.
         $text = preg_replace('/^\s*(?:\/\/|#)\s?/m', '', $rawText) ?? $rawText;
         $text = preg_replace('/^\s*\/\*\s?|\s*\*\/\s*$/', '', $text) ?? $text;
         $text = preg_replace('/^\s*\*\s?/m', '', $text) ?? $text;
@@ -609,6 +603,7 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
      */
     private function commentWords(string $text): array
     {
+        // Words start with a letter, so digit runs and punctuation never count as words.
         preg_match_all('/[a-z][a-z0-9]*/i', strtolower($text), $matches);
 
         return $matches[0];
@@ -623,6 +618,7 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
      */
     private function normalisedText(string $text): string
     {
+        // Dropping every non-alphanumeric character makes MAX_SIZE, max-size and "max size" compare equal.
         return preg_replace('/[^a-z0-9]+/', '', strtolower($text)) ?? '';
     }
 }

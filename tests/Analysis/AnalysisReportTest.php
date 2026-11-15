@@ -13,16 +13,16 @@ use GruffPhp\Results\Finding\Severity;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers the AnalysisReport aggregation accessors used by triage views,
- * specifically the per-rule count buckets surfaced for M08's rule-grouped
- * triage workflow.
+ * Tests the per-rule finding summaries returned by AnalysisReport.
+ * Checks severity counts and ordering by descending total.
+ * Checks rule ID ordering when totals tie.
  */
 final class AnalysisReportTest extends TestCase
 {
     /**
      * Verify findingCountsByRule sums severities per rule and ranks rules by total.
      *
-     * @return void
+     * @return void - Asserts exact severity buckets and descending totals for three rules.
      */
     public function testFindingCountsByRuleAggregatesAndRanks(): void
     {
@@ -48,7 +48,7 @@ final class AnalysisReportTest extends TestCase
     /**
      * Verify ties on total sort by rule id ascending for deterministic output.
      *
-     * @return void
+     * @return void - Asserts alphabetical rule IDs for equal totals.
      */
     public function testFindingCountsByRuleBreaksTotalTiesByRuleId(): void
     {

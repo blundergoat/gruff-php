@@ -20,13 +20,9 @@ use GruffPhp\Results\Trend\TrendReport;
 use LogicException;
 
 /**
- * The complete result of one analysis run - everything every reporter format needs to render, in one place.
- *
- * When gruff finishes analysing, it packs the whole outcome into this readonly report: the findings,
- * the file counts, the score, and every optional section a run might have produced (mutation, diff,
- * trend, baseline, branch review). Whichever way the user asked to see results - terminal text, JSON,
- * SARIF, HTML - the reporter reads from this one object, so the text they read and the JSON their CI
- * parses always describe the same run.
+ * Carries findings, file counts and optional results from one analysis run for report renderers.
+ * Optional results include scoring, mutation, diff, trend, baseline and branch review data.
+ * Machine serializers expose canonical analysis and summary documents from the stored data.
  *
  * @phpstan-type ReportValue bool|float|int|object|string|null|array<array-key, mixed>
  * @phpstan-type MachinePathDetail array{path: string, reason: string, source: string, pattern?: string}
@@ -58,31 +54,35 @@ final readonly class AnalysisReport
     /**
      * Gathers everything one analysis run produced into the single object every reporter renders from.
      *
-     * @param string                      $toolVersion - Gruff version used to produce the report.
-     * @param list<string>                $requestedPaths - Paths requested for analysis.
-     * @param string                      $format - Output format requested for report serialization.
-     * @param string                      $failOn - Severity gate used to determine the process exit code.
-     * @param int                         $filesDiscovered - Number of source files discovered before parsing.
-     * @param int                         $filesParsed - Number of source files parsed successfully.
-     * @param list<string>                $ignoredPaths - Requested paths ignored by discovery.
-     * @param list<string>                $missingPaths - Requested paths that did not resolve to files.
-     * @param list<RunDiagnostic>         $diagnostics - Non-finding diagnostics emitted during the run.
-     * @param list<Finding>               $findings - Findings included in the report.
-     * @param int                         $exitCode - Process exit code represented by the report.
+     * @param string              $toolVersion     - Gruff version used to produce the report.
+     * @param list<string>        $requestedPaths  - Paths requested for analysis.
+     * @param string              $format          - Output format requested for report serialization.
+     * @param string              $failOn          - Severity gate used to determine the process exit code.
+     * @param int                 $filesDiscovered - Number of source files discovered before parsing.
+     * @param int                 $filesParsed     - Number of source files parsed successfully.
+     * @param list<string>        $ignoredPaths    - Requested paths ignored by discovery.
+     * @param list<string>        $missingPaths    - Requested paths that did not resolve to files.
+     * @param list<RunDiagnostic> $diagnostics     - Non-finding diagnostics emitted during the run.
+     * @param list<Finding>       $findings        - Findings included in the report.
+     * @param int                 $exitCode        - Process exit code represented by the report.
+     *
      * @param string|null                 $configPath - Config file path used for the run; null when the run used no config.
-     * @param MutationAnalysisResult|null $mutation - Mutation analysis result; null when mutation analysis was not run.
-     * @param ScoreReport|null            $score - Score summary; null when scoring was not produced for the run.
-     * @param DiffResult|null             $diff - Diff context; null when the run was not scoped to changed regions.
-     * @param TrendReport|null            $trend - Trend history; null when no trend recording was requested.
-     * @param BaselineReport|null         $baseline - Baseline application result; null when no baseline was applied.
-     * @param BranchReviewResult|null     $review - Branch review result; null when the run was not a --diff-vs review.
-     * @param FindingDisplayFilter|null   $filters - Display filters applied to the output; null when none were active.
-     * @param int|null                    $suppressedCount - Findings hidden by changed-region filtering; null when no such filtering ran.
-     * @param bool                        $shouldListAbsentBaseline - Whether reporters should list resolved (absent) baseline entries.
-     * @param ThresholdTrip|null          $failureReason - Gate threshold that tripped; null when the run did not fail a count threshold.
-     * @param int|null                    $newFindingsCount - Size of the new-findings set; null when no new-findings gate is active.
-     * @param list<SensitiveExclusionSummary> $sensitiveExclusions - One audit row per configured sensitive-data exclusion; empty when the run configured none.
-     * @param MachineReportContext        $machineContext - Serializer paths, flags, root, pre-display findings and optional suppressed SARIF results.
+     * @param MutationAnalysisResult|null $mutation   - Mutation analysis result; null when mutation analysis was not run.
+     * @param ScoreReport|null            $score      - Score summary; null when scoring was not produced for the run.
+     * @param DiffResult|null             $diff       - Diff context; null when no diff result is available.
+     * @param TrendReport|null            $trend      - Trend history; null when no trend recording was requested.
+     * @param BaselineReport|null         $baseline   - Baseline application or generation result; null when none was supplied.
+     * @param BranchReviewResult|null     $review     - Branch review result; null when the run was not a --diff-vs review.
+     * @param FindingDisplayFilter|null   $filters    - Display-filter settings; null when none were supplied.
+     *
+     * @param int|null           $suppressedCount          - Findings hidden by changed-region filtering; null when no such filtering ran.
+     * @param bool               $shouldListAbsentBaseline - Whether reporters should list resolved (absent) baseline entries.
+     * @param ThresholdTrip|null $failureReason            - Gate threshold that tripped; null when the run did not fail a count threshold.
+     * @param int|null           $newFindingsCount         - Size of the new-findings set; null when no new-findings gate is active.
+     *
+     * @param list<SensitiveExclusionSummary> $sensitiveExclusions - Audit rows for configured, built-in, inline and duplicate suppressions.
+     *
+     * @param MachineReportContext $machineContext - Serializer paths, flags, root, pre-display findings and optional suppressed SARIF results.
      */
     public function __construct(
         public string                  $toolVersion,
@@ -131,8 +131,7 @@ final readonly class AnalysisReport
     /**
      * Tallies findings by severity for the report's headline summary line.
      *
-     * @return array{advisory: int, warning: int, error: int, total: int} - per-severity finding tallies plus a precomputed total; each count is zero
-     *                         when no finding hit that severity.
+     * @return array{advisory: int, warning: int, error: int, total: int} - Severity counts and total; all zero for an empty report.
      */
     public function findingCounts(): array
     {
@@ -143,7 +142,7 @@ final readonly class AnalysisReport
             'total'    => count($this->findings),
         ];
 
-        // Sort each finding into its severity bucket.
+
         foreach ($this->findings as $finding) {
             $counts[$finding->severity->value]++;
         }
@@ -152,20 +151,15 @@ final readonly class AnalysisReport
     }
 
     /**
-     * Tallies findings per rule with a severity breakdown for triage views, surfacing the noisiest rule
-     * first.
+     * Tallies findings per rule with a severity breakdown, ordered by total descending then rule ID ascending.
      *
-     * Sorted by total descending then ruleId ascending so the noisiest rules surface first
-     * and ordering stays deterministic across runs.
-     *
-     * @return list<array{ruleId: string, total: int, advisory: int, warning: int, error: int}> - one row per triggered rule, ordered noisiest-first
-     *                            (total descending, then ruleId ascending); empty when there are no findings.
+     * @return list<array{ruleId: string, total: int, advisory: int, warning: int, error: int}> - One row per triggered rule; empty if none.
      */
     public function findingCountsByRule(): array
     {
         $byRule = [];
 
-        // Tally each finding under its rule, with a per-severity breakdown.
+
         foreach ($this->findings as $finding) {
             $byRule[$finding->ruleId] ??= ['total' => 0, 'advisory' => 0, 'warning' => 0, 'error' => 0];
             $byRule[$finding->ruleId]['total']++;
@@ -174,7 +168,7 @@ final readonly class AnalysisReport
 
         $rows = [];
 
-        // Flatten the per-rule tallies into rows ready for sorting.
+
         foreach ($byRule as $ruleId => $counts) {
             $rows[] = [
                 'ruleId'   => $ruleId,
@@ -195,10 +189,9 @@ final readonly class AnalysisReport
     }
 
     /**
-     * Counts how many files failed to parse, so the summary can warn the user some code went unscanned.
+     * Counts parse-error diagnostics for the report summary.
      *
-     * @return int - count of parse-error diagnostics only; other diagnostic types (e.g. baseline-error) are not tallied here, so zero means every
-     *             file parsed cleanly.
+     * @return int - Number of diagnostics typed parse-error; other diagnostic types do not contribute.
      */
     public function parseErrorCount(): int
     {
@@ -300,7 +293,7 @@ final readonly class AnalysisReport
     }
 
     /**
-     * Produces the only supported compact machine payload from the canonical analysis document.
+     * Produces a compact machine payload from the canonical analysis document.
      *
      * @return array<string, ReportValue> - Analysis v3 with only findings removed and the schema identifier changed.
      */
@@ -314,7 +307,7 @@ final readonly class AnalysisReport
     }
 
     /**
-     * Counts a complete finding collection by canonical severity without changing its order or identity.
+     * Counts a complete finding collection by canonical severity for the machine summary.
      *
      * @param list<Finding> $findings - Findings whose severities contribute to the machine summary.
      *
@@ -413,7 +406,7 @@ final readonly class AnalysisReport
     /**
      * Maps one run diagnostic to the canonical v3 diagnostic shape.
      *
-     * @param RunDiagnostic $diagnostic - Native diagnostic emitted while loading or parsing the run.
+     * @param RunDiagnostic $diagnostic - Native non-finding diagnostic to serialize.
      *
      * @return array<string, ReportValue> - Canonical diagnostic with optional file and line data omitted when absent.
      */
@@ -441,7 +434,7 @@ final readonly class AnalysisReport
     }
 
     /**
-     * Projects one ignored path into the auditable M15 detail shape.
+     * Projects one ignored path into an auditable record of its path, skip reason and source.
      *
      * @param IgnoredPath $ignoredPath - Native ignored-path record carrying its source and optional pattern.
      *
@@ -467,8 +460,8 @@ final readonly class AnalysisReport
      *
      * @param IgnoredPath $ignoredPath - Native ignored-path record to classify.
      *
-     * @return string - Canonical M15 reason associated with the observed source and pattern.
-     * @throws LogicException When the source or default pattern has no canonical reason.
+     * @return string - Canonical skip reason associated with the observed source and pattern.
+     * @throws LogicException - When the source or default pattern has no canonical reason.
      */
     private static function skipReason(IgnoredPath $ignoredPath): string
     {
@@ -500,9 +493,9 @@ final readonly class AnalysisReport
     }
 
     /**
-     * Projects one configured sensitive exclusion into its non-secret audit record.
+     * Projects a configured, built-in, inline or duplicate suppression into its audit record.
      *
-     * @param SensitiveExclusionSummary $summary - Exclusion result containing only approved audit fields.
+     * @param SensitiveExclusionSummary $summary - Suppression result carrying its scope, reason and suppressed count.
      *
      * @return array<string, ReportValue> - Canonical suppression record with an optional symbol.
      */
@@ -520,7 +513,7 @@ final readonly class AnalysisReport
             $payload['symbol'] = $summary->symbol;
         }
 
-        // Only a built-in row names its source; a configured row is recognised by carrying none.
+        // Built-in, inline and duplicate rows name their source; configured rows omit it.
         if ($summary->source !== null) {
             $payload['source'] = $summary->source;
         }
@@ -529,7 +522,7 @@ final readonly class AnalysisReport
     }
 
     /**
-     * Adapts the native score container without recalculating any M06-owned score value.
+     * Adapts the native score container without recalculating its scores.
      *
      * @return array<string, ReportValue> - Canonical score data, or the structural unscored representation.
      */
@@ -566,11 +559,11 @@ final readonly class AnalysisReport
     }
 
     /**
-     * Adapts baseline structure while leaving M07-owned matching semantics unchanged.
+     * Serializes a baseline result without repeating baseline matching.
      *
-     * @param BaselineReport|null $baseline - Applied native baseline result, or null for a gate-only count.
+     * @param BaselineReport|null $baseline - Native baseline application or generation result, or null for a gate-only count.
      *
-     * @return array<string, ReportValue> - Canonical baseline fields plus PHP-owned bucket extensions.
+     * @return array<string, ReportValue> - Baseline fields and PHP bucket extensions, or only newFindings (default 0) for null input.
      */
     private function machineBaseline(?BaselineReport $baseline): array
     {
@@ -579,8 +572,8 @@ final readonly class AnalysisReport
         }
 
         $legacy  = $baseline->toArray();
-        // The nine keys every port publishes, so one consumer reads five ports without a per-port branch.
-        // A generate or migrate run compared against nothing, so its movement counts are zero rather than absent.
+        // Common baseline fields let consumers read every port without a PHP-specific branch.
+        // Generation and migration keep movement fields present, even when no comparison produced counts.
         $payload = [
             'applied' => !$baseline->generated,
             'entries' => $baseline->totalEntries,
@@ -637,7 +630,7 @@ final readonly class AnalysisReport
      * Records how an active display filter changed only the rendered finding list.
      *
      * @param FindingDisplayFilter $filters        - Active filter settings applied to rendered findings.
-     * @param int                  $hiddenFindings - Number of full-run findings omitted from the rendered list.
+     * @param int                  $hiddenFindings - Omitted full-run finding count; negative values are recorded as zero.
      *
      * @return array<string, ReportValue> - Canonical display-filter metadata and hidden count.
      */
@@ -681,12 +674,9 @@ final readonly class AnalysisReport
 
     /**
      * Removes unavailable optional values from one native score row before serialization.
+     * Keeps null 'score' and 'grade' fields so consumers can distinguish an unevaluated score from an omitted field.
      *
-     * `score` and `grade` are kept even when null. Under the ratified scoring contract a null there
-     * is a statement - nothing applicable was evaluated - and omitting the key would leave a consumer
-     * unable to tell that apart from a port that never published the field at all.
-     *
-     * @param array<string, ReportValue> $values - Native row whose null entries mean the field is unavailable.
+     * @param array<string, ReportValue> $values - Native score row; unavailable nulls are removed, while unevaluated score and grade remain.
      *
      * @return array<string, ReportValue> - The same row with null-valued optional fields omitted, except the two ratified score fields.
      */
@@ -715,11 +705,7 @@ final readonly class AnalysisReport
 
     /**
      * Publishes the requested inputs that have a project-relative form and leaves out the rest.
-     *
-     * A run that could not start never resolved a project root, so its envelope is rooted at the launch directory, and
-     * a target named from a sibling directory, such as `analyse ../proj`, has no form under it. A host path may not be
-     * published, so the input is left out the way the config path beside it already is, instead of throwing away the
-     * one envelope that says why the run could not start.
+     * Outside-root inputs are omitted so startup-failure reports remain serializable without exposing host paths.
      *
      * @param list<string> $paths - Requested paths as the caller passed them.
      *
@@ -745,7 +731,7 @@ final readonly class AnalysisReport
      * @param string $path - Native path that must belong to the analysed project.
      *
      * @return string - Project-relative POSIX path accepted by the v3 schema.
-     * @throws LogicException When the path cannot be represented beneath the project root.
+     * @throws LogicException - When the path cannot be represented beneath the project root.
      */
     private function machinePath(string $path): string
     {
@@ -774,19 +760,17 @@ final readonly class AnalysisReport
     }
 
     /**
-     * Reports whether any finding reached a given severity - the check the exit-code gate uses to decide
-     * whether the run passed or failed.
+     * Reports whether the finding list contains the exact requested severity.
      *
      * @param Severity $severity - Severity level to look for in the finding list.
      *
-     * @return bool - true on the first finding at the requested severity (the gate only needs one); false means nothing in the report reached that
-     *              level.
+     * @return bool - True for an exact severity match; false for an empty list or no match.
      */
     public function hasFindingsAtSeverity(Severity $severity): bool
     {
-        // Scan for the first finding at the requested severity - one is all the gate needs.
+
         foreach ($this->findings as $finding) {
-            // A finding at exactly this severity is enough to answer yes.
+
             if ($finding->severity === $severity) {
                 return true;
             }

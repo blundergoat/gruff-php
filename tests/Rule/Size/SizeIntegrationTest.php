@@ -19,14 +19,16 @@ use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers co-firing of size rules on cumulative fixtures, config-override response, and silence on clean inputs.
+ * Exercises size rules together through the default registry on parsed fixtures.
+ * The cumulative fixture must include all six asserted size rule IDs and have unique finding fingerprints.
+ * Tighter thresholds must increase the total findings count; the short fixture must produce no size findings.
  */
 final class SizeIntegrationTest extends TestCase
 {
     /**
      * Verify cumulative fixture triggers multiple rules.
      *
-     * @return void
+     * @return void - Asserts all six size rule IDs, at least seven findings, and unique fingerprints.
      */
     public function testCumulativeFixtureTriggersMultipleRules(): void
     {
@@ -67,7 +69,7 @@ final class SizeIntegrationTest extends TestCase
     /**
      * Verify config override changes findings.
      *
-     * @return void
+     * @return void - Asserts that tighter thresholds produce more total findings than the default configuration.
      */
     public function testConfigOverrideChangesFindings(): void
     {
@@ -97,7 +99,7 @@ final class SizeIntegrationTest extends TestCase
     /**
      * Verify clean fixture produces no size findings.
      *
-     * @return void
+     * @return void - Asserts that the short fixture produces no findings whose rule ID starts with size.
      */
     public function testCleanFixtureProducesNoSizeFindings(): void
     {

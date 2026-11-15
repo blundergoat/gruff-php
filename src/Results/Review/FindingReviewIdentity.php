@@ -24,7 +24,7 @@ final readonly class FindingReviewIdentity
      */
     public function key(Finding $finding): string
     {
-        // No symbol to anchor on: file, rule, and message are all a symbol-less finding has, so they are the whole key.
+
         if ($finding->symbol === null || $finding->symbol === '') {
             return self::groupKeyForFinding($finding);
         }

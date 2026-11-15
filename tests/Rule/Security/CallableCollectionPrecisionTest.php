@@ -29,7 +29,7 @@ final class CallableCollectionPrecisionTest extends TestCase
      * Checks the warning count for one declaration-owned collection and its invocation.
      *
      * @param string $declaration      - Authored class or trait source; no supplied code executes.
-     * @param int    $expectedWarnings - Zero means every observed store and the selected loop value have evidence.
+     * @param int    $expectedWarnings - Expected DangerousFunctionCallRule finding count for the declaration.
      * @return void - A mismatched warning count fails the registration safety regression.
      */
     #[DataProvider('registrationCases')]
@@ -47,7 +47,7 @@ final class CallableCollectionPrecisionTest extends TestCase
     }
 
     /**
-     * Pairs boot and teardown registrations with writes that must keep a developer's warning.
+     * Distinguishes trusted callback registrations from mutations that must remain reportable.
      *
      * @return iterable<string, array{string, int}> - Named authored declarations and their expected warning counts.
      */

@@ -7,19 +7,18 @@ namespace GruffPhp\Engine\Config;
 use GruffPhp\Results\Finding\Severity;
 
 /**
- * One rung of a rule's severity ladder - the measured value at which a finding jumps to a given severity.
+ * Pairs a numeric threshold with the severity assigned when a measurement breaches it.
+ * Used by RuleSettings for a single-threshold override in place of warning/error thresholds.
  *
- * Rules like complexity or method length do not fire at a single cutoff; they escalate. A user's config
- * turns into a set of these, so a method just over the line reads as advisory while a badly bloated one
- * reads as an error. This pairs the number with the severity it triggers.
+ * Higher-is-worse measurements must exceed the threshold; lower-is-worse measurements must fall below it.
  */
 final readonly class SeverityThreshold
 {
     /**
-     * Pairs a numeric cutoff with the severity a value at or past it should carry.
+     * Stores the numeric boundary and severity used when a measurement breaches that boundary.
      *
-     * @param int|float $threshold - The measured value at which this severity starts to apply.
-     * @param Severity  $severity - Severity emitted once a measurement reaches the threshold.
+     * @param int|float $threshold - Boundary compared strictly in the direction chosen by the rule.
+     * @param Severity  $severity - Severity emitted when that boundary is breached.
      */
     public function __construct(
         public int|float $threshold,

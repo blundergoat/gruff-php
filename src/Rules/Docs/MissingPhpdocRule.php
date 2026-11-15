@@ -28,7 +28,7 @@ use PhpParser\Node\Stmt\Function_;
  * confidence. Inherited or trait-provided documentation does not count; the rule wants a local block.
  * The message is built from the signature: it names each parameter, and asks for the return value only when
  * one exists and for the throw condition only when the body throws in its own scope.
- * With the rule's `everyCallable` option on (off by default), undocumented named functions are reported too.
+ * With the rule's `everyCallable` option on (on by default), undocumented named functions are reported too.
  */
 final readonly class MissingPhpdocRule implements RuleInterface
 {
@@ -62,7 +62,7 @@ final readonly class MissingPhpdocRule implements RuleInterface
             tier:               RuleTier::V01,
             defaultSeverity:    Severity::Error,
             confidence:         Confidence::High,
-            defaultOptions:     [DocumentedCallables::EVERY_CALLABLE => false],
+            defaultOptions:     [DocumentedCallables::EVERY_CALLABLE => true],
             optionDescriptions: [DocumentedCallables::EVERY_CALLABLE => self::EVERY_CALLABLE_DESCRIPTION],
         );
     }
@@ -82,15 +82,15 @@ final readonly class MissingPhpdocRule implements RuleInterface
 
         $everyCallable = ($ruleContext->settingsFor($definition)->options[DocumentedCallables::EVERY_CALLABLE] ?? false) === true;
 
-        // Methods are always checked; named functions only with everyCallable on, so default findings are unchanged.
+        // Methods are checked by default; enabling everyCallable adds named functions.
         $declarations = $everyCallable
             ? NodeIndex::nodesOfAny($analysisUnit, [ClassMethod::class, Function_::class])
             : NodeIndex::nodesOf($analysisUnit, ClassMethod::class);
 
-        // Check every collected method and function declaration.
+
         foreach ($declarations as $declaration) {
-            /** @var ClassMethod|Function_ $declaration Finder predicate restricts results to method and function declarations. */
-            // A declaration that already carries a docblock is fine.
+            /** @var ClassMethod|Function_ $declaration - NodeIndex queries restrict results to methods and named functions. */
+
             if ($declaration->getDocComment() !== null) {
                 continue;
             }
@@ -108,14 +108,14 @@ final readonly class MissingPhpdocRule implements RuleInterface
      * @param RuleDefinition        $definition   - Rule metadata supplying severity, pillar, tier, and confidence.
      * @param ClassMethod|Function_ $declaration  - Undocumented method or named function whose name and start line are reported.
      *
-     * @return Finding - Documentation finding.
+     * @return Finding - Finding that reports the undocumented declaration.
      */
     private function findingForDeclaration(AnalysisUnit $analysisUnit, RuleDefinition $definition, ClassMethod|Function_ $declaration): Finding
     {
         $symbol = CyclomaticComplexityRule::resolveSymbol($declaration);
         $kind   = $declaration instanceof ClassMethod ? 'method' : 'function';
 
-        // Finding anchored at the declaration line, flagging its absent docblock.
+
         return new Finding(
             ruleId:      $definition->id,
             message:     sprintf('%s %s needs a brief intent description above its declaration (one plain-English line; not a restatement of the %s signature).%s', ucfirst($kind), $symbol, $kind, $this->signatureClause($declaration)),
@@ -133,20 +133,16 @@ final readonly class MissingPhpdocRule implements RuleInterface
     /**
      * Builds the message's second sentence from the declaration's signature and body.
      *
-     * An undocumented declaration documents none of its parameters, so every one is named. The return value is
-     * asked for only when the declaration yields one, and the throw condition only when the body throws in its
-     * own scope; both use the tests docs.return-comment and docs.missing-throws-tag apply.
-     *
      * @param ClassMethod|Function_ $declaration - Undocumented method or named function to read.
      *
-     * @return string - ` Also describe ...` naming what the block must cover, or an empty string when the signature asks for nothing beyond intent.
+     * @return string - The second message sentence for required contract details, or an empty string when only intent is required.
      */
     private function signatureClause(ClassMethod|Function_ $declaration): string
     {
         $asks       = [];
         $paramNames = [];
 
-        // No docblock means no parameter is described, so name each one.
+        // With no local docblock, the message names each plainly named parameter.
         foreach ($declaration->params as $param) {
             // Only a plain variable carries a name to quote.
             if ($param->var instanceof Variable && is_string($param->var->name)) {
@@ -158,12 +154,12 @@ final readonly class MissingPhpdocRule implements RuleInterface
             $asks[] = (count($paramNames) === 1 ? 'parameter ' : 'parameters ') . self::joinWords($paramNames);
         }
 
-        // Ask for the return value only when the declaration yields one.
+        // A declared value type or returned expression makes the return value part of the requested contract.
         if ((new ReturnCommentRule())->isValueReturning($declaration)) {
             $asks[] = 'the return value';
         }
 
-        // Ask for the failure condition only when the body throws in its own scope.
+        // A direct throw expression makes its trigger condition part of the requested contract.
         if ((new MissingThrowsTagRule())->hasDirectThrow($declaration->getStmts() ?? [])) {
             $asks[] = 'when it throws';
         }
@@ -176,7 +172,7 @@ final readonly class MissingPhpdocRule implements RuleInterface
      *
      * @param non-empty-list<string> $words - Words to join, in order.
      *
-     * @return string - The joined list.
+     * @return string - English list using commas and a final and where needed.
      */
     private static function joinWords(array $words): string
     {

@@ -15,11 +15,9 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\SourceTextRuleInterface;
 
 /**
- * Flags a Composer `path` repository, which symlinks local code straight into the dependency tree - so the
- * user confirms the linked path is trusted before it ships as if it were a published package.
- *
- * Scans `composer.json` as text over each `repositories` entry of type `path`. Warning, medium confidence -
- * a path repo is a posture smell to review, not proof of a vulnerability.
+ * Flags Composer `path` repositories for trust review without resolving their targets or checking how Composer installs them.
+ * Scans `composer.json` and emits one warning per matched repository with medium confidence.
+ * A type match does not establish a vulnerability.
  */
 final class DependencyComposerPathRule implements SourceTextRuleInterface
 {
@@ -58,15 +56,15 @@ final class DependencyComposerPathRule implements SourceTextRuleInterface
     /**
      * Reports each Composer `path` repository declared in the manifest.
      *
-     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Source unit supplying the manifest path and JSON text.
+     * @param RuleContext $ruleContext - Unused; the rule interface requires it, and this rule reads no options or project root.
      *
-     * @return list<Finding> - One finding per path repository; empty when every repository declared another type.
+     * @return list<Finding> - One finding per path repository; empty for other files, invalid input or no matching entries.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         if (!ComposerManifest::isManifest($analysisUnit->file->displayPath)) {
-            // This rule only applies to composer.json; every other file yields no findings.
+
             return [];
         }
 
@@ -77,15 +75,15 @@ final class DependencyComposerPathRule implements SourceTextRuleInterface
         }
 
         $findings = [];
-        // Check each declared repository entry.
+
         foreach ($manifest['repositories'] as $repository) {
-            // A malformed, non-object entry cannot be a path repository.
+
             if (!is_array($repository)) {
                 continue;
             }
 
             $type = isset($repository['type']) && is_string($repository['type']) ? strtolower($repository['type']) : '';
-            // Only a `path` repository links local code into the tree.
+
             if ($type !== 'path') {
                 continue;
             }

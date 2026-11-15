@@ -13,19 +13,16 @@ use GruffPhp\Rules\RuleRegistry;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers where a finding on an attributed declaration reports itself.
- *
- * A PHP 8 attribute group is a sub-node of the declaration it decorates, so `getStartLine()` on an attributed
- * method, class, property, constant or enum case returns the attribute's line. A finding reported there points
- * a reader, an editor jump, and any future autofix at `#[SomeAttribute]` rather than at the code the rule is
- * talking about. M07 routed those anchors through DeclarationLine; this suite is what keeps them there.
+ * Checks finding locations for attributed declarations in a synthetic PHP fixture.
+ * Attribute groups precede class, constant, property and method declarations in the fixture.
+ * Assertions reject attribute-line findings and pin selected class and method findings to their declaration lines.
  */
 final class DeclarationAnchorTest extends TestCase
 {
     /**
-     * Every finding on an attributed declaration must land on the declaration, never on its attribute.
+     * Verify the fixture produces findings and none with a line number point to an attribute group.
      *
-     * @return void
+     * @return void - Asserts findings exist and no reported non-null line starts with '#[' after trimming.
      */
     public function testNoFindingAnchorsOnAnAttributeGroup(): void
     {
@@ -48,9 +45,9 @@ final class DeclarationAnchorTest extends TestCase
     }
 
     /**
-     * The attributed method and class anchor on their own declaration lines.
+     * Verify the selected class and method findings use declaration lines derived from the fixture.
      *
-     * @return void
+     * @return void - Asserts that the class-doc and method-return-doc finding lines match their declarations.
      */
     public function testAttributedDeclarationsAnchorOnTheirOwnLine(): void
     {
@@ -135,7 +132,7 @@ final class DeclarationAnchorTest extends TestCase
 
             return $registry->analyse([$unit], new RuleContext($directory, AnalysisConfig::fromRegistry($registry)));
         } finally {
-            // The fixture is synthetic, but a stray temp tree in every run is its own kind of mess.
+
             unlink($path);
             rmdir($directory . '/src');
             rmdir($directory);
@@ -145,7 +142,7 @@ final class DeclarationAnchorTest extends TestCase
     /**
      * Guard the parse step so a malformed fixture fails as a fixture, not as a rule.
      *
-     * @return void
+     * @return void - Asserts that parsing returns an AnalysisUnit without parse errors.
      */
     public function testTheFixtureParses(): void
     {

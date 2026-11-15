@@ -23,7 +23,7 @@ final class ComposerManifest
      *
      * @param string $displayPath - File display path, as reported by the source file.
      *
-     * @return bool - True when the path's basename is exactly `composer.json`.
+     * @return bool - True when the path's basename is exactly composer.json.
      */
     public static function isManifest(string $displayPath): bool
     {
@@ -31,7 +31,7 @@ final class ComposerManifest
         $slashPosition  = strrpos($normalizedPath, '/');
         $basename       = $slashPosition === false ? $normalizedPath : substr($normalizedPath, $slashPosition + 1);
 
-        // Gate on the basename alone so a composer.json in any directory qualifies; the path prefix is irrelevant.
+
         return $basename === self::FILENAME;
     }
 
@@ -64,8 +64,7 @@ final class ComposerManifest
     /**
      * Resolves the 1-based line number of the first occurrence of a token.
      *
-     * Used to anchor a finding near the offending key without embedding any
-     * value in the finding payload.
+     * Used to anchor a finding near the offending key without embedding any value in the finding payload.
      *
      * @param string $source - Raw manifest contents.
      * @param string $needle - Token to locate (for example a quoted package name).
@@ -81,11 +80,11 @@ final class ComposerManifest
 
         $position = strpos($source, $needle);
         if ($position === false) {
-            // Token absent (e.g. the key was renamed since decode); anchor the finding at line 1 rather than guess.
+            // A missing token has no precise source anchor, so place the finding at the start of the file.
             return 1;
         }
 
-        // Count newlines before the match and add 1 to convert the 0-based offset into a 1-based line number.
+
         return substr_count($source, "\n", 0, $position) + 1;
     }
 }

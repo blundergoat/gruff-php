@@ -15,7 +15,9 @@ use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers property-count thresholds for declared, promoted constructor, and trait properties.
+ * Exercises property-count findings using parsed fixtures and configured warning/error thresholds.
+ * Checks declared, promoted and trait property counts with finding symbols and severities.
+ * Covers readonly data-carrier classification and a behaviour-method case that retains warning severity.
  */
 final class PropertyCountRuleTest extends TestCase
 {
@@ -25,9 +27,9 @@ final class PropertyCountRuleTest extends TestCase
     private PhpFileParser $parser;
 
     /**
-     * Prepare parser fixtures before each rule test.
+     * Create the rule and parser used by each fixture-based test.
      *
-     * @return void
+     * @return void - Initializes fresh rule and parser instances before each test.
      */
     protected function setUp(): void
     {
@@ -38,7 +40,7 @@ final class PropertyCountRuleTest extends TestCase
     /**
      * Verify no findings for few properties.
      *
-     * @return void
+     * @return void - Asserts an empty finding list for the two-property fixture.
      */
     public function testNoFindingsForFewProperties(): void
     {
@@ -50,11 +52,11 @@ final class PropertyCountRuleTest extends TestCase
     /**
      * Verify warning for too many declared properties.
      *
-     * @return void
+     * @return void - Asserts one warning for ManyPropertiesFixture with sixteen properties and the property-count rule ID.
      */
     public function testWarningForTooManyDeclaredProperties(): void
     {
-        // A warning tier of 10 puts the 16 properties at one and a half times the limit, so the finding keeps warning severity.
+        // A warning tier of 10 puts 16 properties above one and a half times the limit, retaining warning severity.
         $findings = $this->analyse('many-properties.php', ['warning' => 10, 'error' => 25]);
 
         self::assertCount(1, $findings);
@@ -67,7 +69,7 @@ final class PropertyCountRuleTest extends TestCase
     /**
      * Verify promoted properties counted.
      *
-     * @return void
+     * @return void - Asserts one finding for ManyParamsFixture with property-count metadata of six.
      */
     public function testPromotedPropertiesCounted(): void
     {
@@ -81,7 +83,7 @@ final class PropertyCountRuleTest extends TestCase
     /**
      * Verify trait properties flagged.
      *
-     * @return void
+     * @return void - Asserts one finding for LongTraitFixture with property-count metadata of sixteen.
      */
     public function testTraitPropertiesFlagged(): void
     {
@@ -93,9 +95,9 @@ final class PropertyCountRuleTest extends TestCase
     }
 
     /**
-     * Verify readonly payload objects are advisory instead of severe solely for field count.
+     * Verify readonly data-carrier metadata and advisory severity for sixteen properties.
      *
-     * @return void
+     * @return void - Asserts one finding with carrier classification, raw warning threshold type and advisory output.
      */
     public function testReadonlyDataCarrierPropertyCountIsAdvisory(): void
     {
@@ -110,13 +112,13 @@ final class PropertyCountRuleTest extends TestCase
     }
 
     /**
-     * Verify a readonly class with a behaviour method is judged as a service, not a data carrier.
+     * Verify a readonly class with an untyped method keeps the configured property-count severity.
      *
-     * @return void
+     * @return void - Asserts one finding for ReadonlyCarrierWithBehaviourFixture with property-count kind and warning severity.
      */
     public function testReadonlyClassWithBehaviourMethodKeepsConfiguredSeverity(): void
     {
-        // A warning tier of 10 puts the 16 properties in the upper band, where the configured severity applies.
+        // The untyped method fails the data-carrier heuristic, so its property-count finding keeps warning severity.
         $findings = $this->analyse('readonly-carrier-with-behaviour.php', ['warning' => 10, 'error' => 25]);
 
         self::assertCount(1, $findings);
@@ -126,13 +128,12 @@ final class PropertyCountRuleTest extends TestCase
     }
 
     /**
-     * Analyse fixture paths and return findings for assertions.
+     * Analyse one size fixture with explicit property-count thresholds.
      *
      * @param string             $fixture - Fixture filename under tests/Fixtures/Size to scan.
      * @param array<string, int> $thresholds - Warning/error property-count limits for this case.
      *
-     * @return list<\GruffPhp\Results\Finding\Finding> - property-count findings the rule raised for this fixture; empty when the count stays under both
-     *                                         thresholds
+     * @return list<\GruffPhp\Results\Finding\Finding> - Property-count findings; empty when no declaration exceeds the reporting threshold.
      */
     private function analyse(string $fixture, array $thresholds): array
     {
@@ -150,7 +151,7 @@ final class PropertyCountRuleTest extends TestCase
     /**
      * Parse the named fixture into an analysis unit.
      *
-     * @param string $filename - Fixture filename.
+     * @param string $filename - Name resolved under tests/Fixtures/Size.
      *
      * @return \GruffPhp\Engine\Parser\AnalysisUnit - parsed fixture with its display path set repo-relative for finding reports
      */

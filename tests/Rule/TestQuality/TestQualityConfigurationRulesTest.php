@@ -32,17 +32,19 @@ use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers config-driven test-quality rules and cumulative fixture contracts.
+ * Covers test-quality rule configuration and PHPUnit configuration diagnostics.
+ * Uses fixture projects to check strict, lax, legacy, and missing PHPUnit configuration.
+ * Checks selected rule coverage and fingerprint uniqueness in the cumulative fixture.
  */
 final class TestQualityConfigurationRulesTest extends TestCase
 {
-    /** Project root used by filesystem and CLI tests. */
+    /** Project root used to resolve fixtures and load analysis configuration. */
     private const PROJECT_ROOT = __DIR__ . '/../../..';
 
     /**
-     * Verify mocking domain object is enabled by default but requires patterns to fire.
+     * Verify the fixture produces zero mocking-domain-object findings without patterns and two with a domain pattern.
      *
-     * @return void
+     * @return void - Asserts the configured mocking-domain-object finding counts.
      */
     public function testMockingDomainObjectIsEnabledByDefaultAndRequiresPatternsToFire(): void
     {
@@ -65,7 +67,7 @@ final class TestQualityConfigurationRulesTest extends TestCase
     /**
      * Verify PHPUnit strict flags missing fires on lax config and stays silent on strict.
      *
-     * @return void
+     * @return void - Asserts one lax-config finding with the expected missing flags and none for strict config.
      */
     public function testPhpUnitStrictFlagsMissingFiresOnLaxConfigAndStaysSilentOnStrict(): void
     {
@@ -86,7 +88,7 @@ final class TestQualityConfigurationRulesTest extends TestCase
     /**
      * Verify PHPUnit deprecations not fatal fires on lax config and stays silent on strict.
      *
-     * @return void
+     * @return void - Asserts one finding for lax config and none for strict config.
      */
     public function testPhpUnitDeprecationsNotFatalFiresOnLaxConfigAndStaysSilentOnStrict(): void
     {
@@ -104,7 +106,7 @@ final class TestQualityConfigurationRulesTest extends TestCase
     /**
      * Verify PHPUnit coverage source missing fires on lax config and allows legacy whitelist.
      *
-     * @return void
+     * @return void - Asserts one lax-config finding and none for strict or legacy-whitelist config.
      */
     public function testPhpUnitCoverageSourceMissingFiresOnLaxConfigAndAllowsLegacyWhitelist(): void
     {
@@ -127,7 +129,7 @@ final class TestQualityConfigurationRulesTest extends TestCase
     /**
      * Verify PHPUnit rules stay silent when no config file is present.
      *
-     * @return void
+     * @return void - Asserts no findings from the strictness, deprecation, and coverage rules.
      */
     public function testPhpUnitRulesStaySilentWhenNoConfigFileIsPresent(): void
     {
@@ -139,9 +141,9 @@ final class TestQualityConfigurationRulesTest extends TestCase
     }
 
     /**
-     * Verify test quality rules respect config disables.
+     * Verify the no-assertions rule produces no findings with its disabling configuration.
      *
-     * @return void
+     * @return void - Asserts the no-assertions finding count is zero.
      */
     public function testTestQualityRulesRespectConfigDisables(): void
     {
@@ -160,9 +162,9 @@ final class TestQualityConfigurationRulesTest extends TestCase
     }
 
     /**
-     * Verify non test class methods with test prefix are not analysed.
+     * Verify test-prefixed methods in the non-test-class fixture produce no test-quality findings.
      *
-     * @return void
+     * @return void - Asserts no test-quality finding is attributed to the non-test-class fixture.
      */
     public function testNonTestClassMethodsWithTestPrefixAreNotAnalysed(): void
     {
@@ -178,9 +180,9 @@ final class TestQualityConfigurationRulesTest extends TestCase
     }
 
     /**
-     * Verify cumulative fixture represents every static test quality rule.
+     * Verify the cumulative fixture emits all explicitly expected rule IDs with distinct fingerprints.
      *
-     * @return void
+     * @return void - Asserts no expected rule ID is missing and no finding fingerprint is duplicated.
      */
     public function testCumulativeFixtureRepresentsEveryStaticTestQualityRule(): void
     {
@@ -201,7 +203,7 @@ final class TestQualityConfigurationRulesTest extends TestCase
     /**
      * Build a dummy PHPUnit analysis unit.
      *
-     * @return AnalysisUnit - a parsed unit with no test-quality candidates, used as a placeholder subject for config-only rule checks
+     * @return AnalysisUnit - Parsed test fixture used as the subject for PHPUnit configuration checks.
      */
     private function phpUnitDummyUnit(): AnalysisUnit
     {
@@ -232,7 +234,7 @@ final class TestQualityConfigurationRulesTest extends TestCase
      * @param int           $expectedCount - Exact number of findings the rule must emit.
      * @param list<Finding> $findings      - Findings to filter down to the requested rule id.
      *
-     * @return void
+     * @return void - Asserts that filtering by rule ID yields exactly the expected number of findings.
      */
     private static function assertRuleCount(string $ruleId, int $expectedCount, array $findings): void
     {
@@ -244,9 +246,9 @@ final class TestQualityConfigurationRulesTest extends TestCase
     }
 
     /**
-     * List rule IDs expected in enabled test-quality scans.
+     * List the rule IDs required by the cumulative fixture assertion.
      *
-     * @return list<string> - every test-quality rule id an enabled scan must surface; a missing entry means a rule was dropped
+     * @return list<string> - Rule IDs that the cumulative fixture's findings must include.
      */
     private function expectedRuleIds(): array
     {
@@ -303,7 +305,7 @@ final class TestQualityConfigurationRulesTest extends TestCase
     /**
      * Parse the requested path into an analysis unit.
      *
-     * @param string $path - Filesystem path.
+     * @param string $path - Project-root-relative fixture path to parse.
      *
      * @return AnalysisUnit - the fixture parsed from the project-root-relative path, retaining that path as its display name
      */

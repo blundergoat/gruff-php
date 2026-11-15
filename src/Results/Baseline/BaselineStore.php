@@ -45,7 +45,7 @@ final readonly class BaselineStore
     public const DEFAULT_FILENAME = 'gruff-baseline.json';
 
     /**
-     * The three keys the five 0.5 writers used for their row list; a file naming two of them cannot be read alike twice.
+     * Legacy row-container names checked for ambiguous array-valued payloads before PHP reads its `groups` list.
      */
     private const LEGACY_ROW_CONTAINERS = ['findings', 'groups', 'entries'];
 
@@ -70,14 +70,13 @@ final readonly class BaselineStore
 
     /**
      * Loads and validates a v3 baseline, handing back its reviewed rows.
-     *
-     * Runs whenever the user passes `--baseline` or a `gruff-baseline.json` sits at the project root.
+     * Runs whenever the user passes --baseline or a gruff-baseline.json sits at the project root.
      * A 0.5 file stops the run here with the migration command, so it is never applied under the wrong identity rule.
      *
      * @param string $path - Baseline path to read, relative to the project root when needed.
      *
-     * @return BaselineData - In-memory baseline carrying the source path, the writing port, one entry per validated row, and the sensitive counts.
-     * @throws BaselineException When the file is missing, unreadable, malformed, a 0.5 or retired layout, or fails any v3 rule.
+     * @return BaselineData - Validated rows and sensitive counts with the supplied path and writing port.
+     * @throws BaselineException - When the file is missing, unreadable, malformed, unsupported, or fails a v3 validation rule.
      */
     public function read(string $path): BaselineData
     {
@@ -103,7 +102,7 @@ final readonly class BaselineStore
             ));
         }
 
-        // Anything else (a typo, a future schema) gets the plain expected-version message.
+
         if ($schemaVersion !== self::SCHEMA_VERSION) {
             throw new BaselineException(sprintf('Baseline schemaVersion must be "%s".', self::SCHEMA_VERSION));
         }
@@ -117,7 +116,7 @@ final readonly class BaselineStore
 
         $generatedAt = $decoded['generatedAt'] ?? null;
 
-        // The timestamp is for readers only, but its absence marks a file no generator wrote.
+
         if (!is_string($generatedAt) || $generatedAt === '') {
             throw new BaselineException('Baseline generatedAt must be a non-empty timestamp.');
         }
@@ -136,15 +135,15 @@ final readonly class BaselineStore
      * @param string $path - 0.5 baseline path, relative to the project root when needed.
      *
      * @return list<LegacyGroup> - Reviewed groups in file order; empty when the 0.5 file reviewed nothing.
-     * @throws BaselineException When the file is not a well-formed 0.5 baseline.
+     * @throws BaselineException - When the file is not a well-formed 0.5 baseline.
      */
     public function readLegacy(string $path): array
     {
         $decoded = $this->decodeObject($path);
 
-        // Only the 0.5 layout is migratable; a v3 file needs no migration and a retired one has no rows to carry.
+        // Only v2 is accepted for migration; v3 needs no migration and v1 reviews cannot be translated here.
         if (($decoded['schemaVersion'] ?? null) !== self::LEGACY_SCHEMA_VERSION) {
-            // A retired v1 file gets the one route that works for it, so the refusal never ends the user's search.
+
             $retiredAdvice = ($decoded['schemaVersion'] ?? null) === self::RETIRED_SCHEMA_VERSION
                 ? ' A "' . self::RETIRED_SCHEMA_VERSION . '" file\'s reviews cannot be carried forward; regenerate it with `gruff-php analyse --generate-baseline <new path>`.'
                 : '';
@@ -181,7 +180,7 @@ final readonly class BaselineStore
                 throw new BaselineException(sprintf('Baseline group %d field "count" must be an integer of at least 1.', $index));
             }
 
-            // A 0.5 group recorded under a retired id, e.g. `docs.missing-public-phpdoc`, matches the finding the renamed rule now emits.
+            // A 0.5 group recorded under a retired id, e.g. "docs.missing-public-phpdoc", matches the finding the renamed rule now emits.
             $legacyGroups[] = ['file' => $file, 'ruleId' => RuleRegistry::canonicalRuleId($ruleId), 'message' => $message, 'count' => $count];
         }
 
@@ -189,28 +188,25 @@ final readonly class BaselineStore
     }
 
     /**
-     * Refuses to write a baseline over a 0.5 file at the shared default path.
-     *
-     * All five ports write and auto-discover the same filename, so without this an ordinary upgrade-then-generate
-     * destroys the 0.5 baseline that is the user's documented retreat path, before they know they need it.
-     * Regenerating v3 over v3 is not destructive, because v3 is what the tool now reads.
+     * Protects a default-named baseline whose declared string schema differs from v3, unless overwrite is forced.
+     * Other destinations, existing v3 files, and files without a string schema marker pass this guard.
      *
      * @param string $outputPath - Destination the user asked to generate, relative to the project root or absolute.
      * @param bool   $shouldForce - True when the user passed --force and means to overwrite the older file.
      *
-     * @return void
-     * @throws BaselineException When the default path already holds a file this version would not read.
+     * @return void - Returns when this guard permits generation at the requested destination.
+     * @throws BaselineException - When an unforced default-named file declares a non-v3 schema.
      */
     public function requireOverwritableDefaultPath(string $outputPath, bool $shouldForce): void
     {
-        // Any other destination is the user's own choice of file, and any v3 file is what this version already reads.
+        // Custom filenames and explicit force leave overwrite responsibility with the caller.
         if ($shouldForce || basename($outputPath) !== self::DEFAULT_FILENAME) {
             return;
         }
 
         $absolutePath = $this->absolutePath($outputPath);
 
-        // Nothing there to protect, which is the ordinary first-generate case.
+
         if (!is_file($absolutePath)) {
             return;
         }
@@ -238,22 +234,20 @@ final readonly class BaselineStore
     }
 
     /**
-     * Refuses a 0.5 input that names more than one recognised row container, which no two ports would read alike.
-     *
-     * The five 0.5 writers used three container keys: gruff-go and gruff-py wrote `findings`, gruff-php wrote `groups`,
-     * and gruff-rs and gruff-ts wrote `entries`. A file carrying two of them migrates differently in different ports.
+     * Rejects legacy input containing more than one array-valued recognised row container.
+     * The names cover historical port layouts; PHP migration still requires its native "groups" list.
      *
      * @param array<string, mixed> $decoded - Decoded 0.5 root object.
      * @param string               $path - Path the user named, repeated in the error so they can find the file.
      *
-     * @return void
-     * @throws BaselineException When two or more of the three container keys are present.
+     * @return void - Returns when at most one recognised key contains an array.
+     * @throws BaselineException - When multiple recognised row keys contain arrays.
      */
     private function requireOneRowContainer(array $decoded, string $path): void
     {
         $present = [];
 
-        // One container is the supported case; two is an ambiguity nothing can resolve, so the file is refused.
+
         foreach (self::LEGACY_ROW_CONTAINERS as $container) {
             if (is_array($decoded[$container] ?? null)) {
                 $present[] = $container;
@@ -270,14 +264,14 @@ final readonly class BaselineStore
     /**
      * Writes the current findings out as a fresh v3 baseline and returns exactly what was persisted.
      *
-     * Backs `gruff-php analyse --generate-baseline path`; the write is atomic, so an interrupted run never leaves a half-written file.
+     * Backs gruff-php analyse --generate-baseline path; the write is atomic, so an interrupted run never leaves a half-written file.
      *
      * @param string        $path - Baseline path to write, relative to the project root when needed.
      * @param list<Finding> $findings - Findings to record; ordinary ones become identity rows with counts, sensitive ones become counts only.
-     * @param DeclarationInventory|null $inventory - Scanned variable occurrences per file, so a variable's ordinal counts every occurrence; null ranks among findings alone.
+     * @param DeclarationInventory|null $inventory - Scanned variable positions for stable ordinals; null ranks only the supplied findings.
      *
      * @return BaselineData - The baseline exactly as persisted, so callers can report what was written without re-reading the file.
-     * @throws BaselineException When a finding cannot be identified or the file cannot be encoded or written.
+     * @throws BaselineException - When a finding cannot be identified or the file cannot be encoded or written.
      */
     public function write(string $path, array $findings, ?DeclarationInventory $inventory = null): BaselineData
     {
@@ -291,17 +285,16 @@ final readonly class BaselineStore
 
     /**
      * Carries a 0.5 baseline's reviews into a separate v3 file, leaving the original byte-identical.
-     *
-     * Backs `gruff-php analyse --migrate-baseline old.json --generate-baseline new.json`.
+     * Backs gruff-php analyse --migrate-baseline old.json --generate-baseline new.json.
      * Identities are rebuilt from the current scan, never translated from 0.5 rows, because the five 0.5 shapes disagreed on identity.
      *
      * @param string        $legacyPath - 0.5 baseline to read; never written to, renamed, or deleted.
      * @param string        $outputPath - Where the v3 file goes; refused when it is the input by spelling, link, or inode.
      * @param list<Finding> $findings - The current scan; a finding is carried across when a 0.5 row matches its file, rule, and message.
-     * @param DeclarationInventory|null $inventory - Scanned variable occurrences per file, so a variable's ordinal counts every occurrence; null ranks among findings alone.
+     * @param DeclarationInventory|null $inventory - Scanned variable positions for stable ordinals; null ranks only the supplied findings.
      *
      * @return BaselineMigration - The written baseline plus how many findings were carried and how many were sensitive.
-     * @throws BaselineException When the paths are not distinct, the input is not a 0.5 file, or the input changed during the migration.
+     * @throws BaselineException - When the paths are not distinct, the input is not a 0.5 file, or the input changed during the migration.
      */
     public function migrate(string $legacyPath, string $outputPath, array $findings, ?DeclarationInventory $inventory = null): BaselineMigration
     {
@@ -320,7 +313,7 @@ final readonly class BaselineStore
         $legacyGroups = $this->readLegacy($legacyPath);
         $accepted     = [];
 
-        // A current finding is carried across only when a 0.5 row covers its file, rule, and message; a shape that recorded less is not made to mean more.
+        // A finding is carried across only when a 0.5 row matches its file, rule, and message; weaker row shapes are not broadened.
         foreach ($findings as $finding) {
             foreach ($legacyGroups as $group) {
                 if ($group['file'] === $finding->filePath && $group['ruleId'] === $finding->ruleId && $group['message'] === $finding->message) {
@@ -332,7 +325,7 @@ final readonly class BaselineStore
 
         $writtenBaseline = $this->write($outputPath, $accepted, $inventory);
 
-        // Prove the retreat path survived rather than assume it.
+        // If the original baseline changed during migration, the new file no longer represents a safe carry-forward.
         if (file_get_contents($legacyAbsolute) !== $before) {
             throw new BaselineException(sprintf('Migration changed the 0.5 input %s; the retreat path is no longer intact.', $legacyPath));
         }
@@ -341,25 +334,25 @@ final readonly class BaselineStore
     }
 
     /**
-     * Decodes a baseline file's JSON root, stopping on anything a generator would not have written.
+     * Reads a baseline file and decodes its root for schema-specific validation.
      *
      * @param string $path - Baseline path to decode, relative to the project root when needed.
      *
-     * @return array<string, mixed> - The decoded root object.
-     * @throws BaselineException When the file is missing, unreadable, not JSON, or not an object.
+     * @return array<string, mixed> - The decoded non-list root array.
+     * @throws BaselineException - When reading or decoding fails, or the decoded root is not a non-list array.
      */
     private function decodeObject(string $path): array
     {
         $absolutePath = $this->absolutePath($path);
 
-        // A missing file is a setup problem the user can fix; name the path they asked for.
+
         if (!is_file($absolutePath)) {
             throw new BaselineException(sprintf('Baseline file not found: %s', $path));
         }
 
         $contents = file_get_contents($absolutePath);
 
-        // Unreadable usually means permissions; surface it instead of pretending there is no baseline.
+
         if ($contents === false) {
             throw new BaselineException(sprintf('Unable to read baseline file: %s', $path));
         }
@@ -367,26 +360,26 @@ final readonly class BaselineStore
         try {
             $decoded = json_decode($contents, associative: true, depth: 512, flags: JSON_THROW_ON_ERROR);
         } catch (JsonException $exception) {
-            // A merge conflict marker or a truncated write is the usual cause; the JSON error names the byte.
+
             throw new BaselineException(sprintf('Invalid baseline JSON: %s', $exception->getMessage()), 0, $exception);
         }
 
-        // Valid JSON that is not an object cannot be a baseline; fail before touching its keys.
+
         if (!is_array($decoded) || array_is_list($decoded)) {
             throw new BaselineException('Baseline root must be a JSON object.');
         }
 
-        /** @var array<string, mixed> $decoded A non-list array decoded from an object has string keys. */
+        /** @var array<string, mixed> $decoded - Decoded root after the non-list check. */
         return $decoded;
     }
 
     /**
-     * Validates the `occurrences` list and turns it into rows, refusing anything that could expire, leak, or reorder.
+     * Reads occurrence rows, validating their fields and comparing each identity with its predecessor.
      *
      * @param mixed $occurrences - Raw decoded `occurrences` value.
      *
-     * @return list<BaselineEntry> - Rows in file order, which the file keeps ascending by identity.
-     * @throws BaselineException When the list is missing, a row is invalid, or identities repeat or are out of order.
+     * @return list<BaselineEntry> - Validated rows in input order; an empty occurrence list returns no rows.
+     * @throws BaselineException - When the list or a row is invalid, or adjacent identities are equal or compare out of order.
      */
     private function entriesFromRows(mixed $occurrences): array
     {
@@ -402,10 +395,10 @@ final readonly class BaselineStore
                 throw new BaselineException(sprintf('Baseline occurrences[%d] must be an object.', $index));
             }
 
-            /** @var BaselineRow $occurrenceRow Scalar-or-null values are what the writer emits; fromArray re-checks each one it reads. */
+            /** @var BaselineRow $occurrenceRow - Row passed to fromArray() for field validation. */
             $validatedEntry = BaselineEntry::fromArray($occurrenceRow, $index);
 
-            // A repeated identity would split one count across two rows, and an out-of-order file was not written by a generator.
+            // Duplicate rows would split one identity's reviewed count across entries.
             if ($validatedEntry->identity === $previous) {
                 throw new BaselineException(sprintf('Baseline occurrences[%d] duplicates identity %s; counts must be merged into one entry.', $index, $validatedEntry->identity));
             }
@@ -422,12 +415,12 @@ final readonly class BaselineStore
     }
 
     /**
-     * Validates the `sensitive` block, which must count without identifying.
+     * Validates the "sensitive" block, which must count without identifying.
      *
-     * @param mixed $sensitive - Raw decoded `sensitive` value.
+     * @param mixed $sensitive - Raw decoded "sensitive" value.
      *
      * @return array<string, int> - Sensitive counts by rule id.
-     * @throws BaselineException When the block claims eligibility, carries an identifying key, or its total disagrees with its rows.
+     * @throws BaselineException - When fields or counts are invalid, identifying keys are present, or the total disagrees.
      */
     private function sensitiveCountsFrom(mixed $sensitive): array
     {
@@ -440,7 +433,7 @@ final readonly class BaselineStore
             throw new BaselineException('Baseline sensitive.eligible must be false.');
         }
 
-        // Any occurrence-level key under sensitive is a way a secret's location could reach disk.
+        // These occurrence details could identify a sensitive finding, so the baseline rejects them instead of writing them.
         foreach (['identity', 'path', 'line', 'message', 'symbol', 'preview'] as $forbiddenKey) {
             if (array_key_exists($forbiddenKey, $sensitive)) {
                 throw new BaselineException(sprintf('Baseline sensitive block carries forbidden key "%s".', $forbiddenKey));
@@ -471,7 +464,7 @@ final readonly class BaselineStore
             $summed            += $count;
         }
 
-        // A total that disagrees with its rows means the file was edited by hand after it was written.
+
         if (($counts['total'] ?? null) !== $summed) {
             throw new BaselineException(sprintf('Baseline sensitive.counts.total must equal the byRule sum of %d.', $summed));
         }
@@ -483,10 +476,10 @@ final readonly class BaselineStore
      * Turns the current findings into identity rows plus sensitive counts.
      *
      * @param list<Finding> $findings - The scan being recorded.
-     * @param DeclarationInventory|null $inventory - Scanned variable occurrences per file, so a variable's ordinal counts every occurrence; null ranks among findings alone.
+     * @param DeclarationInventory|null $inventory - Scanned variable positions for stable ordinals; null ranks only the supplied findings.
      *
      * @return array{entries: list<BaselineEntry>, sensitiveByRule: array<string, int>} - Rows ascending by identity, and sensitive counts by rule.
-     * @throws BaselineException When an ordinary finding cannot be identified.
+     * @throws BaselineException - When an ordinary finding cannot be identified.
      */
     private function documentFromFindings(array $findings, ?DeclarationInventory $inventory): array
     {
@@ -535,15 +528,15 @@ final readonly class BaselineStore
      * @param string       $path - Baseline path to write, relative to the project root when needed.
      * @param BaselineData $writtenBaseline - The baseline to persist.
      *
-     * @return void
-     * @throws BaselineException When the directory cannot be created or the file cannot be encoded or written.
+     * @return void - Writes the encoded baseline to the resolved destination.
+     * @throws BaselineException - When the directory cannot be created or the file cannot be encoded or written.
      */
     private function persist(string $path, BaselineData $writtenBaseline): void
     {
         $absolutePath = $this->absolutePath($path);
         $directory    = dirname($absolutePath);
 
-        // Create the target directory on demand so `--generate-baseline path/to/file` just works.
+
         if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
             throw new BaselineException(sprintf('Unable to create baseline directory: %s', $directory));
         }
@@ -580,8 +573,8 @@ final readonly class BaselineStore
      * @param string $legacyPath - Input path as the user typed it, for the message.
      * @param string $outputPath - Output path as the user typed it, for the message.
      *
-     * @return void
-     * @throws BaselineException When the two paths name one file.
+     * @return void - Returns when no spelling, resolved link, or inode makes the paths the same file.
+     * @throws BaselineException - When the two paths name one file.
      */
     private function requireDistinctPaths(string $legacyAbsolute, string $outputAbsolute, string $legacyPath, string $outputPath): void
     {
@@ -673,11 +666,11 @@ final readonly class BaselineStore
     /**
      * Removes a temp file left behind by a failed write, so a retry does not find the directory littered.
      *
-     * @param string $tempPath - Temp file to remove.
-     * @param string $displayPath - Project-relative path used only in the error message.
+     * @param string $tempPath - Temporary file created for an attempted baseline write.
+     * @param string $displayPath - User-supplied destination shown only in the error message.
      *
-     * @return void
-     * @throws BaselineException When the temp file exists and cannot be removed.
+     * @return void - Returns when no temporary regular file remains to remove.
+     * @throws BaselineException - When the temp file exists and cannot be removed.
      */
     private function removeTemporaryFile(string $tempPath, string $displayPath): void
     {

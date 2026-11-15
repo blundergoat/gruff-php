@@ -20,6 +20,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * Covers the syntax-only framework-misconfiguration security rules:
  * permissive CORS (wildcard origin + credentials) and forced error display.
+ * Guard fixtures distinguish accepted suppressions from look-alike conditions.
  */
 final class FrameworkSecurityRulesTest extends TestCase
 {
@@ -38,7 +39,7 @@ final class FrameworkSecurityRulesTest extends TestCase
     /**
      * Verify wildcard CORS plus credentials in one scope fires once.
      *
-     * @return void
+     * @return void - Asserts one warning with security pillar and medium confidence.
      */
     public function testWildcardCorsWithCredentialsDetected(): void
     {
@@ -53,7 +54,7 @@ final class FrameworkSecurityRulesTest extends TestCase
     /**
      * Verify a wildcard origin and credentials in different scopes do not fire.
      *
-     * @return void
+     * @return void - Asserts no permissive-CORS findings for the safe fixture.
      */
     public function testScopedAndPublicCorsDoNotFire(): void
     {
@@ -61,9 +62,9 @@ final class FrameworkSecurityRulesTest extends TestCase
     }
 
     /**
-     * Verify only truthy display-error toggles fire.
+     * Verify the fixture reports both error-display directives.
      *
-     * @return void
+     * @return void - Asserts two findings covering display_errors and display_startup_errors.
      */
     public function testForcedErrorDisplayDetected(): void
     {
@@ -77,11 +78,10 @@ final class FrameworkSecurityRulesTest extends TestCase
     }
 
     /**
-     * Verify a CLI-only branch (lines 25, 39) or a deployment's opt-in constant (107, 120) quiets the toggle.
+     * Verify recognised SAPI and opt-in constant guards suppress error-display findings in the fixture.
+     * Unguarded and unsupported guard cases retain their expected finding locations.
      *
-     * Every other toggle in the fixture is a look-alike that must still report, such as a web branch or a constant the file sets itself.
-     *
-     * @return void
+     * @return void - Asserts the exact ordered finding locations in the guard fixture.
      */
     public function testGuardedErrorDisplayStaysQuiet(): void
     {
@@ -96,7 +96,7 @@ final class FrameworkSecurityRulesTest extends TestCase
     /**
      * Analyse a fixture and return findings for one rule.
      *
-     * @param string $displayPath - Fixture display path.
+     * @param string $displayPath - Fixture path used for source loading and finding display.
      * @param string $ruleId - Rule identifier to filter for.
      *
      * @return list<Finding> - findings emitted by the named rule for the fixture; empty when the rule did not fire

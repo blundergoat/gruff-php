@@ -15,7 +15,7 @@ use Symfony\Component\Console\Input\InputOption;
 
 /**
  * Covers dashboard state construction: console input merging, fallback conventions, bare-flag preservation, checkbox unchecking, project-root
- * resolution, string-option validation, and the ADR-015 precedence chain (CLI > config.failOn.dashboard > binary default) through to the
+ * resolution, string-option validation, and the ADR-015 precedence chain (CLI > config.failOn.dashboard > dashboard fallback) through to the
  * scan command builder.
  */
 final class DashboardStateFactoryTest extends TestCase
@@ -26,7 +26,7 @@ final class DashboardStateFactoryTest extends TestCase
     /**
      * Remove temporary project directories created by tests.
      *
-     * @return void
+     * @return void - Runs cleanup for each tracked directory, then clears the tracking list.
      */
     protected function tearDown(): void
     {
@@ -39,7 +39,7 @@ final class DashboardStateFactoryTest extends TestCase
     /**
      * Verify console input is converted into complete dashboard defaults.
      *
-     * @return void
+     * @return void - Asserts the complete state array, including quoted paths and enabled CLI flags.
      */
     public function testDefaultQueryUsesConsoleInputAndFlags(): void
     {
@@ -72,7 +72,7 @@ final class DashboardStateFactoryTest extends TestCase
     /**
      * Verify default query falls back to conventional paths and config.
      *
-     * @return void
+     * @return void - Asserts conventional paths and config, an empty baseline, "none", and disabled flags.
      */
     public function testDefaultQueryFallsBackToConventions(): void
     {
@@ -92,7 +92,7 @@ final class DashboardStateFactoryTest extends TestCase
     /**
      * Verify bare baseline flags seed the dashboard with the default baseline file.
      *
-     * @return void
+     * @return void - Asserts that a present --baseline option with a null value selects gruff-baseline.json.
      */
     public function testDefaultQueryPreservesBareBaselineFlag(): void
     {
@@ -104,7 +104,7 @@ final class DashboardStateFactoryTest extends TestCase
     /**
      * Verify missing submitted checkboxes are treated as unchecked.
      *
-     * @return void
+     * @return void - Asserts omitted noBaseline, noConfig, and includeIgnored controls resolve to "0".
      */
     public function testStateTreatsMissingSubmittedCheckboxesAsUnchecked(): void
     {
@@ -125,7 +125,7 @@ final class DashboardStateFactoryTest extends TestCase
     /**
      * Verify request state overrides defaults and coerces checkbox-like values.
      *
-     * @return void
+     * @return void - Asserts request overrides, "sideways" becoming "full", and "yes" becoming "0".
      */
     public function testStateMergesQueryAndCoercesControls(): void
     {
@@ -166,7 +166,7 @@ final class DashboardStateFactoryTest extends TestCase
     /**
      * Verify project root resolution handles relative, absolute, and invalid paths.
      *
-     * @return void
+     * @return void - Asserts launch-root fallback, existing relative and absolute paths, and null for missing roots.
      */
     public function testProjectRootResolution(): void
     {
@@ -183,7 +183,7 @@ final class DashboardStateFactoryTest extends TestCase
     /**
      * Verify optional string options reject empty values.
      *
-     * @return void
+     * @return void - Asserts null for an empty --config value and preserves custom.yaml.
      */
     public function testOptionalStringOptionRejectsEmptyValues(): void
     {
@@ -194,18 +194,13 @@ final class DashboardStateFactoryTest extends TestCase
     }
 
     /**
-     * Verify the ADR-015 precedence chain resolves the dashboard initial-state threshold correctly.
-     *
-     * Each row writes a `.gruff-php.yaml` carrying `failOn.dashboard:
-     * error`, then invokes `defaultQuery` with the parameters under test. The
-     * expected value reflects which level of the chain wins: CLI flag (when
-     * set explicitly), config (when no flag), or binary default (when
-     * `--no-config` suppresses the config lookup).
+     * Verify CLI, configuration, and "none" fallback precedence for the dashboard threshold.
+     * Each case starts with failOn.dashboard set to error in a temporary configuration file.
      *
      * @param array<string, mixed> $parameters     - Input parameters passed to ArrayInput.
      * @param string               $expectedFailOn - Resolved threshold the state should carry.
      *
-     * @return void
+     * @return void - Asserts the resolved failOn value for each provider scenario.
      */
     #[DataProvider('provideDashboardPrecedenceCases')]
     public function testDefaultQueryAppliesDashboardThresholdPrecedence(array $parameters, string $expectedFailOn): void
@@ -220,10 +215,9 @@ final class DashboardStateFactoryTest extends TestCase
     }
 
     /**
-     * Provide ADR-015 precedence cases for `defaultQuery` resolution.
+     * Provide ADR-015 precedence cases for defaultQuery() resolution.
      *
-     * @return array<string, array{0: array<string, bool|string>, 1: string}> - cases keyed by scenario name; each value is [CLI parameters, expected
-     *                       fail-on threshold]
+     * @return array<string, array{0: array<string, bool|string>, 1: string}> - Named cases pairing CLI parameters with the expected threshold.
      */
     public static function provideDashboardPrecedenceCases(): array
     {
@@ -235,14 +229,9 @@ final class DashboardStateFactoryTest extends TestCase
     }
 
     /**
-     * Verify the state -> scan command builder round-trip preserves the resolved fail-on value.
+     * Verify a requested warning threshold reaches the generated scan command.
      *
-     * The request payload's `failOn` flows through `DashboardStateFactory::state` into
-     * `DashboardScanCommandBuilder::analyseCommand` as the `--fail-on` argument.
-     * Manual-only testing would miss a regression where the value is dropped or
-     * rewritten between the form and the scan command.
-     *
-     * @return void
+     * @return void - Asserts --fail-on is present and followed by warning after request state is merged.
      */
     public function testRoundTripRequestFailOnReachesScanCommand(): void
     {
@@ -258,7 +247,7 @@ final class DashboardStateFactoryTest extends TestCase
     /**
      * Verify the config-fallback resolved threshold reaches the scan command on the no-request path.
      *
-     * @return void
+     * @return void - Asserts --fail-on is present and followed by error when the request query is empty.
      */
     public function testRoundTripConfigFallbackReachesScanCommand(): void
     {
@@ -276,9 +265,9 @@ final class DashboardStateFactoryTest extends TestCase
     }
 
     /**
-     * Verify the binary default resolved threshold reaches the scan command when neither flag nor config carries one.
+     * Verify the dashboard fallback threshold reaches the scan command when configuration is disabled.
      *
-     * @return void
+     * @return void - Asserts --fail-on is present and followed by none when --no-config is supplied.
      */
     public function testRoundTripBinaryDefaultReachesScanCommand(): void
     {
@@ -296,9 +285,11 @@ final class DashboardStateFactoryTest extends TestCase
     }
 
     /**
-     * @param array<string, mixed> $parameters - CLI input parameters to merge over analyse-command defaults.
+     * Build the console input fixture used by dashboard state tests.
      *
-     * @return ArrayInput - input whose definition mirrors the analyse command, so default resolution matches production
+     * @param array<string, mixed> $parameters - Explicit arguments and options; an empty array uses the test definition's defaults.
+     *
+     * @return ArrayInput - Test input with the declared options and supplied parameter overrides.
      */
     private function input(array $parameters = []): ArrayInput
     {
@@ -318,9 +309,9 @@ final class DashboardStateFactoryTest extends TestCase
     /**
      * Build a temporary project containing a .gruff-php.yaml with a dashboard threshold.
      *
-     * @param string $threshold - Threshold value to set under `failOn.dashboard`.
+     * @param string $threshold - Threshold value to set under failOn.dashboard.
      *
-     * @return string - absolute root of the temp project whose `.gruff-php.yaml` now carries the threshold
+     * @return string - absolute root of the temp project whose .gruff-php.yaml now carries the threshold
      */
     private function createProjectWithConfigDashboardThreshold(string $threshold): string
     {
@@ -353,7 +344,7 @@ final class DashboardStateFactoryTest extends TestCase
      * @param string          $project  - Working directory the closure should run in.
      * @param callable():void $callable - Closure invoked under the swapped CWD.
      *
-     * @return void
+     * @return void - Runs the callback and attempts to restore the original directory even if the callback throws.
      */
     private function withCwd(string $project, callable $callable): void
     {
@@ -373,12 +364,12 @@ final class DashboardStateFactoryTest extends TestCase
      *
      * @param string $path - Absolute path to remove.
      *
-     * @return void
+     * @return void - Skips non-directories and attempts recursive removal of directory contents and the directory.
      */
     private function removeTempDirectory(string $path): void
     {
         if (!is_dir($path)) {
-            // Already gone (or never created), so there is nothing to recurse into.
+
             return;
         }
 

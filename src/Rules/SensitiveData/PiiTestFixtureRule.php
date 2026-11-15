@@ -14,11 +14,10 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\SourceTextRuleInterface;
 
 /**
- * Reports a realistic email, phone number or street address in a test fixture, so the user can swap in example data that
- * can never point at a real person.
+ * Flags realistic-looking contact details in test fixtures so callers can recommend recognisable example data.
  *
- * A user who pasted `'jane.doe@gmail.com'` into a test gets one warning on that line; files outside test paths are never read.
- * Values that are plainly synthetic stay quiet:
+ * Files outside test paths are not scanned by this rule.
+ * The following matches are exempt:
  * - reserved example domains, the 555-010x phone block, and addresses with a marker word such as "Test" or "Anytown";
  * - author and copyright lines, URL userinfo such as `http://user:pass@host`, and an HTTP auth `realm="..."` value;
  * - a local part that repeats its domain's name, such as `foo@foo.com`.
@@ -31,7 +30,7 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     public const ID = 'sensitive-data.pii-test-fixture';
 
     /**
-     * Reserved special-use domain suffixes (RFC 2606/6761/6762) whose addresses cannot receive real mail.
+     * Reserved domain suffixes that this rule treats as synthetic fixture data.
      *
      * Each keeps its leading dot, so `woo.local` matches while `mylocal.com` does not.
      */
@@ -59,7 +58,7 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
      */
     private function piiPatterns(): array
     {
-        // The name decides which allowances apply and appears in the finding message; it never widens what counts as synthetic.
+        // The name selects kind-specific allowances and labels findings; the regex defines the candidate shape.
         return [
             ['name' => 'email', 'pattern' => '/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i'],
             ['name' => 'phone', 'pattern' => '/\b(?:\+?1[-.\s]?)?\(?[2-9]\d{2}\)?[-.\s]\d{3}[-.\s]\d{4}\b/'],
@@ -68,7 +67,7 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     }
 
     /**
-     * Describes the rule for `list-rules` and for each finding it reports.
+     * Describes the rule for list-rules output and for each finding it reports.
      *
      * @return RuleDefinition - id, name, pillar, tier, and the warning/medium defaults a caller applies unless overridden
      */
@@ -82,8 +81,7 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
             tier:                RuleTier::V01,
             defaultSeverity:     Severity::Warning,
             confidence:          Confidence::Medium,
-            // Off unless a project sets `enabled: true`: precision-floor M02 found it right on 35 of 47 judged findings after its repair, below its 0.80 floor,
-            // so it is off by default rather than deleted (ADR-034).
+            // Disabled by default under ADR-034 because calibration did not meet this rule's precision floor.
             isEnabledByDefault: false,
             falsePositiveShapes: [
                 [
@@ -99,13 +97,12 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     }
 
     /**
-     * Reports each realistic PII value in a test file that none of the synthetic-data allowances covers.
+     * Reports unexempted email, phone and address matches in test files as realistic-looking contact data.
      *
      * @param AnalysisUnit $analysisUnit - Parsed file the user asked to analyse.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext  - Unused; the rule interface requires it, and this rule reads no options or project root.
      *
-     * @return list<\GruffPhp\Results\Finding\Finding> - One finding per realistic value; empty for a file outside test paths or one using
-     *                                         only example data
+     * @return list<\GruffPhp\Results\Finding\Finding> - Unexempted matches outside comments; empty when no match qualifies.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -116,7 +113,6 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
 
         $findings      = [];
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
-        // Each PII shape is searched across the whole file text, strings and data files alike.
         foreach ($this->piiPatterns() as $piiPattern) {
             // Collect every match of this shape with its byte offset, so a finding can name its line.
             preg_match_all($piiPattern['pattern'], $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
@@ -124,12 +120,10 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
             // Each match is judged on its own, so one example address does not hide a real one on the next line.
             foreach ($matches[0] as $match) {
                 [$matchedValue, $matchOffset] = $match;
-                // A value in a comment documents the fixture rather than feeding the test.
                 if (SecretScannerHelper::isInsideComment($matchOffset, $commentRanges)) {
                     continue;
                 }
 
-                // An example domain, a URL credential or another synthetic shape is not a real person's data.
                 if ($this->isKnownNotPersonalData($piiPattern['name'], $matchedValue, $analysisUnit->source, $matchOffset)) {
                     continue;
                 }
@@ -154,15 +148,14 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     }
 
     /**
-     * Reports whether a match is example data or not a person's contact detail at all, so the user sees no finding for it.
+     * Decides whether a value, its kind, or its surrounding line exempts a match from fixture findings.
      *
-     * @param string $piiKind - Which pattern matched: email, phone or address; each kind has its own allowances.
+     * @param string $piiKind      - Which pattern matched: email, phone or address; each kind has its own allowances.
      * @param string $matchedValue - The matched text.
-     * @param string $source - Full file text, for checks that read the rest of the line.
-     * @param int    $matchOffset - Byte offset of the match in the file.
+     * @param string $source       - Full file text, for checks that read the rest of the line.
+     * @param int    $matchOffset  - Byte offset of the match in the file.
      *
-     * @return bool - true for an example value, an author line, an undeliverable domain, URL userinfo, an auth realm, a mirrored
-     *              placeholder email, or a marked address; false keeps the finding
+     * @return bool - True when an allowance excludes the match; false leaves it eligible for a finding.
      */
     private function isKnownNotPersonalData(string $piiKind, string $matchedValue, string $source, int $matchOffset): bool
     {
@@ -201,12 +194,12 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     }
 
     /**
-     * Reports whether an email sits on an `@author` or copyright line, which credits a maintainer rather than feeding a test.
+     * Reports whether the email line contains an author or copyright marker associated with maintainer credits.
      *
-     * @param string $source - Full file text, used to read the whole line around the match.
+     * @param string $source      - Full file text, used to read the whole line around the match.
      * @param int    $matchOffset - Byte offset of the email in the file.
      *
-     * @return bool - true on an author or copyright line; false for any other line
+     * @return bool - True when the line contains an author or copyright marker; false otherwise.
      */
     private function sitsOnAuthorLine(string $source, int $matchOffset): bool
     {
@@ -218,25 +211,23 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     }
 
     /**
-     * Reports whether an email's domain ends in a reserved suffix such as `.test`, so mail to it can never be delivered.
+     * Recognises email suffixes that the rule exempts as reserved test domains.
      *
-     * @param string $matchedValue - The matched email; only the part after the last `@` is read.
+     * @param string $matchedValue - The matched email; only the part after the last @ is read.
      *
-     * @return bool - true for .local, .test, .invalid, .localhost or .example; false for a routable-looking domain
+     * @return bool - True for a listed reserved suffix; false otherwise.
      */
     private function usesUndeliverableDomain(string $matchedValue): bool
     {
         $atPosition = strrpos($matchedValue, '@');
-        // Without an `@` there is no domain to judge, so the match keeps its finding.
         if ($atPosition === false) {
             return false;
         }
 
         $domain = strtolower(substr($matchedValue, $atPosition + 1));
 
-        // Each reserved suffix keeps its leading dot, so only a whole label such as `woo.local` matches.
+        // Each reserved suffix keeps its leading dot, so only a whole label such as woo.local matches.
         foreach (self::RESERVED_DOMAIN_SUFFIXES as $reservedSuffix) {
-            // A reserved zone means the address is made up by construction.
             if (str_ends_with($domain, $reservedSuffix)) {
                 return true;
             }
@@ -246,12 +237,12 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     }
 
     /**
-     * Reports whether an email-shaped match is URL userinfo or an HTTP auth realm, such as `Digest realm="testrealm@host.com"`.
+     * Reports whether text before an email-shaped match has a supported URL-userinfo or HTTP-auth-realm prefix.
      *
-     * @param string $source - Full file text, used to read the line before the match.
+     * @param string $source      - Full file text, used to read the line before the match.
      * @param int    $matchOffset - Byte offset of the match in the file.
      *
-     * @return bool - true when the line just before the match ends `scheme://`, `scheme://user:` or `realm="`; false otherwise
+     * @return bool - True for a supported URL-userinfo or auth-realm prefix immediately before the match; false otherwise.
      */
     private function isUrlUserOrAuthRealm(string $source, int $matchOffset): bool
     {
@@ -264,34 +255,34 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     }
 
     /**
-     * Reports whether an email's local part repeats its domain's name, the shape of a placeholder such as `bar@bar.com`.
+     * Reports whether an email local part case-insensitively equals the penultimate domain label, a placeholder shape such as bar@bar.com.
      *
      * @param string $matchedValue - The matched email.
      *
-     * @return bool - true when the local part equals the domain label before the top-level domain; false for any other mailbox
+     * @return bool - true when the local part case-insensitively equals the domain label before the top-level domain; false for any other mailbox
      */
     private function repeatsDomainAsMailbox(string $matchedValue): bool
     {
         $atPosition = strrpos($matchedValue, '@');
-        // Without an `@` there is no local part to compare.
+        // Without an at sign there is no local part to compare.
         if ($atPosition === false) {
             return false;
         }
 
         $domainLabels = explode('.', strtolower(substr($matchedValue, $atPosition + 1)));
 
-        // A real mailbox rarely names itself after its own domain; a test placeholder often does.
+        // Equality is treated as placeholder evidence; it does not establish whether the mailbox is deliverable.
         return count($domainLabels) >= 2 && strtolower(substr($matchedValue, 0, $atPosition)) === $domainLabels[count($domainLabels) - 2];
     }
 
     /**
      * Reports whether an address, or the line around it, carries a marker word such as "Test" or "Anytown".
      *
-     * @param string $source - Full file text, used to read the whole line around the match.
-     * @param int    $matchOffset - Byte offset of the address in the file.
+     * @param string $source       - Full file text, used to read the whole line around the match.
+     * @param int    $matchOffset  - Byte offset of the address in the file.
      * @param string $matchedValue - The matched address, checked together with its line.
      *
-     * @return bool - true when a marker appears as a whole word in the address or its line; false for a realistic address
+     * @return bool - True for a whole-word marker in the address or its line; false when neither contains one.
      */
     private function carriesSyntheticAddressMarker(string $source, int $matchOffset, string $matchedValue): bool
     {
@@ -307,7 +298,7 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     /**
      * Returns the lower-cased text of the line that holds a byte offset.
      *
-     * @param string $source - Full file text.
+     * @param string $source      - Full file text.
      * @param int    $matchOffset - Byte offset inside the file.
      *
      * @return string - the whole line, lower-cased for marker checks; empty for a blank line

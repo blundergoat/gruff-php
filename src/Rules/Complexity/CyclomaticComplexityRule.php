@@ -37,7 +37,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     /**
      * Statement node classes that increase cyclomatic complexity by one.
      *
-     * @var list<class-string<Node>>
+     * @var list<class-string<Node>> - Statement kinds that each add one point to the shared score.
      */
     private const BRANCH_STATEMENT_TYPES = [
         Stmt\If_::class,
@@ -52,7 +52,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     /**
      * Expression node classes that increase cyclomatic complexity by one.
      *
-     * @var list<class-string<Node>>
+     * @var list<class-string<Node>> - Expression kinds that each add one point to the shared score.
      */
     private const BRANCH_EXPRESSION_TYPES = [
         BinaryOp\BooleanAnd::class,
@@ -105,9 +105,9 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
 
         $findings = [];
 
-        // Measure every function and method in the file.
+
         foreach ($nodes as $node) {
-            /** @var ClassMethod|Function_ $node NodeIndex query is constrained to function-like classes. */
+            /** @var ClassMethod|Function_ $node - NodeIndex query is constrained to function-like classes. */
             // An abstract or bodyless declaration has no branches to count.
             if (!self::hasExecutableBody($node)) {
                 continue;
@@ -116,7 +116,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
             $ccn            = self::dispatchOnceComplexity($node);
             $thresholdMatch = $settings->highValueThresholdMatch($ccn);
 
-            // A count within the threshold is fine, so skip it.
+
             if ($thresholdMatch === null) {
                 continue;
             }
@@ -168,20 +168,19 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     }
 
     /**
-     * Counts the decisions this rule reports: the shared cyclomatic number with each switch and each match counted once.
-     *
-     * A flat dispatch over many cases is one decision for the reader. The maintainability index keeps reading
-     * computeCyclomaticComplexity, which counts each non-default case and match-arm condition.
+     * Counts cyclomatic decisions with one point per switch or match that has non-default choices.
+     * Flat dispatches contribute one decision; the maintainability index uses computeCyclomaticComplexity
+     * to retain one point per non-default case or match-arm condition.
      *
      * @param ClassMethod|Function_ $node - Function-like node whose decisions are counted.
      *
-     * @return int - Cyclomatic complexity with every switch and match counted as one decision.
+     * @return int - Complexity score; default-only dispatches add no points.
      */
     private static function dispatchOnceComplexity(Node $node): int
     {
         $ccn = self::computeCyclomaticComplexity($node);
 
-        // Take back every case or arm condition after the first, so each dispatch adds exactly one point.
+        // Collapse multiple non-default choices to one decision; default-only dispatches contribute none.
         foreach (NodeIndex::bodyDescendants($node) as $child) {
             // A switch's non-default cases were each counted once.
             if ($child instanceof Stmt\Switch_) {
@@ -214,12 +213,12 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     public static function computeCyclomaticComplexity(Node $node): int
     {
         static $cyclomaticCache = null;
-        // Lazily create the shared per-node cache on first use.
+
         if (!$cyclomaticCache instanceof \WeakMap) {
             $cyclomaticCache = new \WeakMap();
         }
 
-        // Reuse a memoised score when this node was already counted.
+
         if (isset($cyclomaticCache[$node])) {
             $cached = $cyclomaticCache[$node];
             if (is_int($cached)) {
@@ -230,16 +229,16 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
 
         $ccn = 1;
 
-        // Add a point for each decision node in the body.
+
         foreach (NodeIndex::bodyDescendants($node) as $child) {
-            // Each branch statement or short-circuit operator adds one.
+
             if (self::isDecisionNode($child)) {
                 $ccn++;
             }
 
-            // A match adds one point per arm condition.
+
             if ($child instanceof Expr\Match_) {
-                // Count each arm's conditions in turn.
+
                 foreach ($child->arms as $arm) {
                     // The default arm has no conditions, so it adds nothing.
                     if ($arm->conds !== null) {
@@ -255,7 +254,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     }
 
     /**
-     * Reports whether a node forks control flow and so adds one cyclomatic point.
+     * Identifies the statement, expression and non-default case nodes counted as one decision.
      *
      * @param Node $child - Body descendant being classified as a decision point or not.
      *
@@ -263,7 +262,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
      */
     private static function isDecisionNode(Node $child): bool
     {
-        // Branch statements and short-circuit operators each fork control flow; a `default` case (cond null) does not.
+        // A null case condition marks the default branch, which adds no decision.
         return self::isInstanceOfAny($child, self::BRANCH_STATEMENT_TYPES)
             || self::isInstanceOfAny($child, self::BRANCH_EXPRESSION_TYPES)
             || ($child instanceof Stmt\Case_ && $child->cond !== null);
@@ -273,16 +272,16 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
      * Reports whether a node is an instance of any of the given classes.
      *
      * @param Node                      $node - Node whose runtime class is tested against the candidates.
-     * @param list<class-string<Node>> $classes - Candidate node classes.
+     * @param list<class-string<Node>> $classes - Classes checked in order until one matches the node.
      *
      * @return bool - True when the node matches one candidate class.
      */
     private static function isInstanceOfAny(Node $node, array $classes): bool
     {
-        // Check the node against each candidate class.
+
         foreach ($classes as $class) {
             if ($node instanceof $class) {
-                // First matching class is enough; the caller only needs membership, not which class matched.
+
                 return true;
             }
         }
@@ -299,7 +298,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
      */
     public static function resolveSymbol(ClassMethod|Function_ $node): string
     {
-        // A method is qualified by its owning class name.
+
         if ($node instanceof ClassMethod) {
             $parent    = $node->getAttribute('parent');
             $className = $parent instanceof Stmt\Class_
@@ -308,7 +307,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
                 ? ($parent->name?->toString() ?? 'class@anonymous')
                 : null;
 
-            // Qualify with the class name when known, otherwise use the bare method name.
+
             return $className !== null
                 ? sprintf('%s::%s()', $className, $node->name->toString())
                 : $node->name->toString() . '()';
@@ -318,16 +317,8 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     }
 
     /**
-     * Reports whether a function-like node has a real body to measure (abstract/interface methods do not).
-     *
-     * Abstract methods, interface methods, and other bodyless signatures parse as
-     * a {@see ClassMethod} with `stmts === null`: they declare a contract but
-     * contain no control flow. The executable-complexity rules (cyclomatic,
-     * cognitive, nesting depth) skip them so they never score a type-shaped
-     * declaration as if it had branches to simplify (DESIGN-PRINCIPLES P6),
-     * replacing the previous reliance on "no body folds to baseline complexity".
-     * A free {@see Function_} always carries a body, so this only ever filters
-     * bodyless methods.
+     * Reports whether a function or method has a statement body for complexity measurement.
+     * A null statement list means a bodyless method; an empty list is still an executable body.
      *
      * @param ClassMethod|Function_ $node - Function-like node under inspection.
      *
@@ -335,7 +326,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
      */
     public static function hasExecutableBody(ClassMethod|Function_ $node): bool
     {
-        // A null statement list marks a bodyless declaration (abstract/interface), which has no control flow to score.
+
         return $node->stmts !== null;
     }
 
@@ -348,7 +339,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
      */
     private static function formatNumber(int|float $number): string
     {
-        // A genuine fraction keeps its decimals; a whole value is shown without them.
+
         if (is_float($number) && floor($number) !== $number) {
             return (string) $number;
         }

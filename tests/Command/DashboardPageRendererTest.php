@@ -8,8 +8,9 @@ use GruffPhp\Cli\Dashboard\DashboardPageRenderer;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers dashboard HTML rendering: escaping, checkbox state markers, metadata payload injection around the body tag, JSON-encoding fallback, and
- * error-page formatting.
+ * Covers dashboard HTML escaping, selected controls, and report iframe markup.
+ * Checks metadata insertion with and without a body tag, plus JSON-encoding fallback.
+ * Checks escaped error text and the displayed exit code and duration.
  */
 final class DashboardPageRendererTest extends TestCase
 {
@@ -19,7 +20,7 @@ final class DashboardPageRendererTest extends TestCase
     /**
      * Verify dashboard HTML preserves shell structure and escaped form state.
      *
-     * @return void
+     * @return void - Asserts expected shell fragments, escaped inputs, selected controls, and iframe attributes.
      */
     public function testDashboardHtmlRendersEscapedControlsInOrder(): void
     {
@@ -55,7 +56,7 @@ final class DashboardPageRendererTest extends TestCase
     /**
      * Verify include-ignored checkbox state is rendered when selected.
      *
-     * @return void
+     * @return void - Asserts that the include-ignored checkbox has the checked attribute.
      */
     public function testDashboardHtmlMarksIncludeIgnoredWhenSelected(): void
     {
@@ -67,7 +68,7 @@ final class DashboardPageRendererTest extends TestCase
     /**
      * Verify no-config checkbox state is rendered when selected.
      *
-     * @return void
+     * @return void - Asserts that the no-config checkbox has the checked attribute.
      */
     public function testDashboardHtmlMarksNoConfigWhenSelected(): void
     {
@@ -79,7 +80,7 @@ final class DashboardPageRendererTest extends TestCase
     /**
      * Verify scan metadata is injected after the body tag with a complete payload.
      *
-     * @return void
+     * @return void - Asserts payload fields, encoded project text, insertion position, and notification script text.
      */
     public function testInjectDashboardMetadataEmbedsPayloadAfterBodyTag(): void
     {
@@ -106,7 +107,7 @@ final class DashboardPageRendererTest extends TestCase
     /**
      * Verify scan metadata is prepended when a report body tag is unavailable.
      *
-     * @return void
+     * @return void - Asserts that metadata precedes the original fragment and contains the formatted command.
      */
     public function testInjectDashboardMetadataPrependsPayloadWithoutBodyTag(): void
     {
@@ -124,9 +125,9 @@ final class DashboardPageRendererTest extends TestCase
     }
 
     /**
-     * Verify invalid metadata strings fall back to the minimal completion payload.
+     * Verify an invalid UTF-8 project root produces the minimal completion payload.
      *
-     * @return void
+     * @return void - Asserts that decoded metadata contains only the completion type.
      */
     public function testInjectDashboardMetadataFallsBackWhenJsonEncodingFails(): void
     {
@@ -145,7 +146,7 @@ final class DashboardPageRendererTest extends TestCase
     /**
      * Verify dashboard error HTML escapes untrusted message and detail text.
      *
-     * @return void
+     * @return void - Asserts escaped text, the supplied exit code and duration, and the error document's boundaries.
      */
     public function testErrorHtmlEscapesMessageDetailAndReportsTiming(): void
     {
@@ -174,8 +175,7 @@ final class DashboardPageRendererTest extends TestCase
      * @param array<string, string> $overrides - Values to override.
      *
      * @return array{project: string, paths: string, scanScope: string, failOn: string, config: string, baseline: string, noBaseline: string,
-     *                        noConfig: string, deepScanBudget: string, includeIgnored: string, reportInteractive: string} - every form field defaulted, with the caller's
-     *                        overrides merged on top so each test asserts on a fully populated state
+     *                        noConfig: string, deepScanBudget: string, includeIgnored: string, reportInteractive: string} - Merged dashboard state.
      */
     private function state(array $overrides = []): array
     {
@@ -199,13 +199,12 @@ final class DashboardPageRendererTest extends TestCase
      *
      * @param string $html - HTML containing the metadata script.
      *
-     * @return array<string, int|string> - the JSON payload pulled from the meta script tag, decoded and asserted to contain only string keys mapping
-     *                       to int or string values
+     * @return array<string, int|string> - Decoded payload after asserting string keys and integer or string values.
      */
     private function metadataPayload(string $html): array
     {
         $pattern = '~<script id="gruff-dashboard-meta" type="application/json">(?P<payload>.*?)</script>~';
-        // Extract the dashboard metadata JSON payload from the rendered script tag.
+        // Use the metadata script's id and type to avoid treating ordinary dashboard scripts as payload data.
         $matched = preg_match($pattern, $html, $matches);
 
         self::assertSame(1, $matched);

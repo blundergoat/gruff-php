@@ -38,13 +38,13 @@ final readonly class AnalyseCommandSetupResult
     /**
      * Wraps a validated setup so the command proceeds straight to the scan.
      *
-     * @param AnalyseCommandSetup $setup - Ready setup payload.
+     * @param AnalyseCommandSetup $setup - Setup exposed to the caller for starting analysis.
      *
-     * @return self - Ready setup result.
+     * @return self - Result containing the setup and Command::SUCCESS, with all error payloads null.
      */
     public static function ready(AnalyseCommandSetup $setup): self
     {
-        // Success variant: only the setup payload is populated and the exit code is zero.
+
         return new self($setup, null, null, null, Command::SUCCESS);
     }
 
@@ -54,38 +54,38 @@ final readonly class AnalyseCommandSetupResult
      * @param string $message  - Plain error message for console output.
      * @param int    $exitCode - Symfony command exit code for the failure.
      *
-     * @return self - Plain error setup result.
+     * @return self - Result exposing the message and supplied exit code without a setup or report.
      */
     public static function plainError(string $message, int $exitCode): self
     {
-        // Error variant carrying only an unformatted console message; the caller prints it and exits non-zero.
+
         return new self(null, null, null, $message, $exitCode);
     }
 
     /**
-     * Bows out with just an exit code when another component (a prompt or `--help`) already wrote output.
+     * Stop setup without requesting additional error output from the caller.
      *
      * @param int $exitCode - Symfony command exit code for the early exit.
      *
-     * @return self - Early exit setup result.
+     * @return self - Result containing the supplied exit code with all payloads null.
      */
     public static function exitCode(int $exitCode): self
     {
-        // Early-exit variant with no payload: another component already wrote output, so only the code is honoured.
+
         return new self(null, null, null, null, $exitCode);
     }
 
     /**
-     * Fails through the report formatter, so machine formats like `--format=json` still return structured output.
+     * Fails through the report formatter, so machine formats like --format=json still return structured output.
      *
      * @param AnalysisReport $report - Report payload describing the setup failure.
      * @param OutputFormat   $format - Output format selected for the report.
      *
-     * @return self - Report error setup result.
+     * @return self - Result containing the report and format with Command::INVALID and no ready setup.
      */
     public static function reportError(AnalysisReport $report, OutputFormat $format): self
     {
-        // Error variant whose failure is rendered through the report formatter; exit code is the invalid-usage code.
+
         return new self(null, $report, $format, null, Command::INVALID);
     }
 }

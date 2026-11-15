@@ -15,20 +15,20 @@ use GruffPhp\Rules\Shared\RuleRunnerObserver;
  */
 final class RuntimeTimingObserver implements RuleRunnerObserver
 {
-    /** @var array<string, array{totalNs: int, invocations: int}> */
+    /** @var array<string, array{totalNs: int, invocations: int}> - Cumulative nanoseconds and callback counts keyed by rule ID. */
     private array $totals = [];
 
     /**
-     * Records one rule invocation's duration, so per-rule totals build up as the scan runs.
+     * Records one timed rule operation in the per-rule totals.
      *
      * @param string $ruleId     - Rule identifier as declared in the rule's RuleDefinition.
-     * @param int    $durationNs - Wall-clock nanoseconds the rule spent in analyse().
+     * @param int    $durationNs - Elapsed nanoseconds for the observed rule operation.
      *
-     * @return void
+     * @return void - Adds the duration and increments the rule's invocation count.
      */
     public function onRuleExecuted(string $ruleId, int $durationNs): void
     {
-        // First time this rule reports in: open its running total before adding to it.
+
         if (!isset($this->totals[$ruleId])) {
             $this->totals[$ruleId] = ['totalNs' => 0, 'invocations' => 0];
         }
@@ -38,15 +38,15 @@ final class RuntimeTimingObserver implements RuleRunnerObserver
     }
 
     /**
-     * Produces the final per-rule timing table, slowest first - the order the user reads it in.
+     * Returns the accumulated per-rule timing rows, sorted by descending total duration.
      *
-     * @return list<array{ruleId: string, totalNs: int, invocations: int}> - Ordered by descending total time.
+     * @return list<array{ruleId: string, totalNs: int, invocations: int}> - One row per observed rule; empty before any callbacks.
      */
     public function snapshot(): array
     {
         $rows = [];
 
-        // Flatten the keyed totals into a plain list so it can be sorted and rendered.
+
         foreach ($this->totals as $ruleId => $row) {
             $rows[] = ['ruleId' => $ruleId, 'totalNs' => $row['totalNs'], 'invocations' => $row['invocations']];
         }

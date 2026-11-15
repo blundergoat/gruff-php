@@ -20,11 +20,9 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * The gruff-php CLI entry point - wires every subcommand into Symfony Console.
- *
- * This is what `bin/gruff-php` boots: it registers the commands a user can type (`analyse`,
- * `summary`, `report`, `dashboard`, `init`, `hook`, `list-rules`, `check-ignore`) and stamps the
- * tool name and version shown in `--help` and on every report header.
+ * Registers the gruff-php command set with Symfony Console.
+ * Supplies the name and version used by the console application.
+ * Rewraps escaping Symfony Console exceptions with code 2 while retaining their messages.
  */
 final class Application extends SymfonyApplication
 {
@@ -39,13 +37,12 @@ final class Application extends SymfonyApplication
     public const VERSION = '0.6.0';
 
     /**
-     * Registers the full command surface so every `gruff-php <command>` a user types is wired up.
+     * Registers the Gruff commands available through the gruff-php entry point.
      */
     public function __construct()
     {
         parent::__construct(self::NAME, self::VERSION);
 
-        // Every subcommand a user can run; each entry becomes one `gruff-php <name>` invocation.
         $this->addCommands([
             new AnalyseCommand(),
             new CheckIgnoreCommand(),
@@ -60,24 +57,21 @@ final class Application extends SymfonyApplication
     }
 
     /**
-     * Runs the requested command, turning any command-line the CLI cannot accept into exit 2.
+     * Runs the requested command and rethrows Symfony Console exceptions with code 2.
+     * Preserves each exception's message and cause for the caller.
      *
-     * Symfony reports an unknown flag or a stray operand with exit 1, which a CI gate reads as "findings were found".
-     * FAMILY-CONTRACT.md section 7 reserves 1 for a completed run whose findings reached the gate, so a run that never
-     * happened has to be distinguishable from one that did.
+     * @param InputInterface $input - Command line passed to Symfony for command selection and execution.
+     * @param OutputInterface $output - Destination passed to Symfony for command output.
      *
-     * @param InputInterface  $input  - The parsed command line.
-     * @param OutputInterface $output - Destination Symfony renders the error to.
-     *
-     * @return int - The command's own exit code; a usage error never reaches here and surfaces as exit 2 instead.
-     * @throws ConsoleRuntimeException When the command line names an unknown option, an unknown command, or an unexpected operand.
+     * @return int - Exit code returned by Symfony when no Console exception escapes.
+     * @throws ConsoleRuntimeException - When a Console exception escapes command selection or execution.
      */
     public function doRun(InputInterface $input, OutputInterface $output): int
     {
         try {
             return parent::doRun($input, $output);
         } catch (ConsoleException $usageError) {
-            // The message is Symfony's and stays verbatim; only the exit code changes, so the user reads the same text.
+            // Symfony's message stays verbatim while the wrapper sets exit code 2 and retains the original exception as its cause.
             throw new ConsoleRuntimeException($usageError->getMessage(), 2, $usageError);
         }
     }

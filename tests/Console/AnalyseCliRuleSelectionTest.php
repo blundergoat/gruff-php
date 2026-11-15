@@ -8,21 +8,17 @@ use JsonException;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers which rules an `analyse` run actually executes once selection, profiles, and exclusions are applied.
- *
- * Selection changes both the findings a user sees and the exit status CI reads, so these cases check that an
- * excluded rule stops running rather than being filtered from the report, that configured selection is honoured,
- * that the security profile narrows the run and overrides configured selection, and that an unknown profile is
- * refused. Split from AnalyseCliTest so neither class exceeds the family public-method threshold.
+ * Covers analyse rule selection through reported findings and CLI exit status.
+ * Checks exclusions under current and legacy rule IDs, configured selection, and security profiles.
+ * Checks that an unsupported profile produces a usage error.
  */
 final class AnalyseCliRuleSelectionTest extends CliTestCase
 {
     /**
-     * Verify --exclude-rule is execution-level: the excluded rule's findings neither display nor trip the fail gate, and the
-     * retired docs.missing-public-phpdoc id still names the renamed rule.
+     * Verify current and legacy exclusion IDs remove reported findings and clear the advisory exit gate.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts the control exits 1 and both exclusion IDs yield exit 0 with zero reported findings.
+     * @throws JsonException - If decoding an exclusion run's JSON output fails.
      */
     public function testAnalyseCommandExcludeRuleSkipsExecutionAndExitCode(): void
     {
@@ -59,10 +55,10 @@ final class AnalyseCliRuleSelectionTest extends CliTestCase
     }
 
     /**
-     * Verify analyse command applies configured rule selection.
+     * Verify analyse reports no findings with the configured rule-selection fixture.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts exit status 0 and a reported findings total of zero.
+     * @throws JsonException - If decoding the configured run's JSON output fails.
      */
     public function testAnalyseCommandAppliesConfiguredRuleSelection(): void
     {
@@ -91,14 +87,14 @@ final class AnalyseCliRuleSelectionTest extends CliTestCase
     }
 
     /**
-     * Verify security profile limits rule execution to security and sensitive-data rules.
+     * Verify the security profile reports nonempty security or sensitive-data findings and grade C.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts success, grade C, and allowed rule ID prefixes for every reported finding.
+     * @throws JsonException - If decoding the security-profile report fails.
      */
     public function testAnalyseCommandSecurityProfileRunsSecurityRulesOnly(): void
     {
-        // Security rules skip `tests/` paths, so the fixture is scanned from a production path.
+        // Security rules skip paths under tests/, so the fixture is scanned from a production path.
         $project = $this->cumulativeSecurityProject();
         $process = new Process([
                                    PHP_BINARY,
@@ -144,14 +140,14 @@ final class AnalyseCliRuleSelectionTest extends CliTestCase
     }
 
     /**
-     * Verify security profile replaces configured rule selection.
+     * Verify a security-profile run reports unsafe XML when a rule-selection config is supplied.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts success, an unsafe-XML finding, and no docs.missing-file-phpdoc finding.
+     * @throws JsonException - If decoding the configured security-profile report fails.
      */
     public function testAnalyseCommandSecurityProfileOverridesConfiguredSelection(): void
     {
-        // Security rules skip `tests/` paths, so the fixture is scanned from a production path.
+        // Security rules skip paths under tests/, so the fixture is scanned from a production path.
         $project = $this->cumulativeSecurityProject();
         $process = new Process([
                                    PHP_BINARY,
@@ -191,7 +187,7 @@ final class AnalyseCliRuleSelectionTest extends CliTestCase
     /**
      * Verify analyse command rejects unknown execution profiles.
      *
-     * @return void
+     * @return void - Asserts exit status 2 and the usage error listing default and security.
      */
     public function testAnalyseCommandReportsInvalidProfile(): void
     {

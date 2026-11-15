@@ -15,11 +15,10 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\SourceTextRuleInterface;
 
 /**
- * Flags a Composer lifecycle script that runs a shell or remote command at install time - a `curl | sh`,
- * an `eval`, a backtick - the shape that lets `composer install` execute arbitrary code (supply-chain risk).
+ * Flags install-time Composer script events whose command strings contain configured risky fragments.
+ * Matches substrings such as `curl`, `eval ` and backticks without parsing commands or proving execution.
  *
- * Scans `composer.json` as text, matching install-time events whose command contains a risky shell fragment.
- * Warning, medium confidence - fragment matching catches the shape but cannot prove intent or harm.
+ * Scans `composer.json`; each matching event produces one warning with medium confidence.
  */
 final class DependencyComposerScriptRule implements SourceTextRuleInterface
 {
@@ -29,10 +28,9 @@ final class DependencyComposerScriptRule implements SourceTextRuleInterface
     public const ID = 'security.dependency-composer-script';
 
     /**
-     * Substrings that mark a script command as a shell/remote invocation rather
-     * than a Composer PHP callable (`Class::method`) or `@`-prefixed alias.
+     * Substring candidates for shell or remote execution; matches can also occur in PHP callables or aliases.
      *
-     * @var list<string>
+     * @var list<string> - Lower-case fragments matched anywhere in command strings.
      */
     private const RISKY_FRAGMENTS = [
         'curl',
@@ -54,7 +52,7 @@ final class DependencyComposerScriptRule implements SourceTextRuleInterface
     /**
      * Composer lifecycle events that run during install/update/create-project flows.
      *
-     * @var list<string>
+     * @var list<string> - Event names eligible for risky-command inspection.
      */
     private const INSTALL_TIME_EVENTS = [
         'pre-install-cmd',
@@ -78,7 +76,7 @@ final class DependencyComposerScriptRule implements SourceTextRuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Medium confidence by default: fragment matching catches shell/remote calls but cannot prove intent or harm.
+        // Medium confidence by default: fragment matching finds shell or remote-command indicators but cannot establish intent or harm.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Composer install-time shell script',
@@ -96,17 +94,17 @@ final class DependencyComposerScriptRule implements SourceTextRuleInterface
     }
 
     /**
-     * Reports each install-time Composer script that runs a shell or remote command.
+     * Reports each install-time Composer script event containing a configured risky substring.
      *
-     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Source unit supplying the manifest path and JSON text.
+     * @param RuleContext $ruleContext - Unused; the rule interface requires it, and this rule reads no options or project root.
      *
-     * @return list<Finding> - One finding per script event with a risky command.
+     * @return list<Finding> - One finding per matching event, regardless of command count; empty when no event matches.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         if (!ComposerManifest::isManifest($analysisUnit->file->displayPath)) {
-            // This rule only applies to composer.json; every other file yields no findings.
+
             return [];
         }
 
@@ -117,9 +115,9 @@ final class DependencyComposerScriptRule implements SourceTextRuleInterface
         }
 
         $findings = [];
-        // Check each declared script event.
+
         foreach ($manifest['scripts'] as $event => $commands) {
-            // Only an install-time event running a risky command is flagged.
+
             if (!is_string($event) || !in_array($event, self::INSTALL_TIME_EVENTS, true) || !$this->hasRiskyCommand($commands)) {
                 continue;
             }
@@ -144,34 +142,34 @@ final class DependencyComposerScriptRule implements SourceTextRuleInterface
     }
 
     /**
-     * Reports whether any command for an event is a shell or remote invocation.
+     * Reports whether any string command contains a configured risky substring.
      *
-     * @param mixed $commands - Script value: a command string or a list of commands.
+     * @param mixed $commands - Event value; strings are scanned and non-string entries are ignored.
      *
-     * @return bool - True when at least one command matches a risky shell fragment.
+     * @return bool - True for a case-insensitive match of a configured fragment; false when no string command matches.
      */
     private function hasRiskyCommand(mixed $commands): bool
     {
         $normalizedCommands = is_array($commands) ? $commands : [$commands];
 
-        // Weigh each command the event runs.
+
         foreach ($normalizedCommands as $command) {
-            // A non-string command (e.g. a nested array) is skipped.
+
             if (!is_string($command)) {
                 continue;
             }
 
             $normalized = strtolower($command);
-            // Check the command against each known risky fragment.
+
             foreach (self::RISKY_FRAGMENTS as $fragment) {
                 if (str_contains($normalized, $fragment)) {
-                    // First risky fragment is enough to flag the event; no need to inspect the remaining commands.
+
                     return true;
                 }
             }
         }
 
-        // No command contained a shell/remote fragment, so the event is treated as a safe PHP callable or alias.
+        // No configured fragment matched; this does not establish that the event is safe.
         return false;
     }
 }

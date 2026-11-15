@@ -27,14 +27,16 @@ use GruffPhp\Rules\Security\SqlConcatenationRule;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
- * Covers ConfigLoader rule enabled-state and option validation behavior.
+ * Covers rule enablement and typed option loading.
+ * Uses fixture definitions alongside selected built-in rules.
+ * Checks invalid option errors and warnings for unknown rule IDs.
  */
 final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
 {
     /**
-     * Verify honours default enabled from rule definition.
+     * Verify that loading without an explicit config keeps the fixture disabled.
      *
-     * @return void
+     * @return void - Asserts the disabled state declared by the fixture's definition.
      */
     public function testHonoursDefaultEnabledFromRuleDefinition(): void
     {
@@ -46,9 +48,9 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Verify can enable default disabled rule via config.
+     * Verify that config can enable a rule disabled by default.
      *
-     * @return void
+     * @return void - Asserts that the loaded fixture settings are enabled.
      */
     public function testCanEnableDefaultDisabledRuleViaConfig(): void
     {
@@ -64,9 +66,9 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Verify loads rule options.
+     * Verify that configured scalar and list options survive loading.
      *
-     * @return void
+     * @return void - Asserts the loaded option values and their scalar or list types.
      */
     public function testLoadsRuleOptions(): void
     {
@@ -88,9 +90,9 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Verify unknown rule ids in a rules block warn through the sink and are skipped while known blocks still apply.
+     * Verify that an unknown rule ID warns while a known override applies.
      *
-     * @return void
+     * @return void - Asserts the exact warning and the known fixture's enabled state.
      */
     public function testWarnsAndIgnoresUnknownRuleIdBlocks(): void
     {
@@ -119,9 +121,9 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Verify loads the sql-concatenation safe-interpolation-receivers option.
+     * Verify that SQL interpolation receiver names survive config loading.
      *
-     * @return void
+     * @return void - Asserts that the loaded receiver list matches the configured names.
      */
     public function testLoadsSqlConcatenationSafeInterpolationReceiversOption(): void
     {
@@ -137,9 +139,9 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Verify requested rule options load with their declared toggle and additive shapes.
+     * Verify that acceptLineComments and additionalFunctions retain configured values.
      *
-     * @return void
+     * @return void - Asserts the boolean override and the configured function list.
      */
     public function testLoadsRequestedRuleOptions(): void
     {
@@ -188,13 +190,13 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Verify requested rule options reject values outside their declared types.
+     * Verify rejection of invalid line-comment and additional-function option values.
      *
      * @param string $ruleId          - Rule whose option block is configured.
      * @param string $optionsJson     - JSON object containing the invalid option value.
-     * @param string $expectedMessage - Exact loader rejection.
+     * @param string $expectedMessage - Expected validation text in the exception message.
      *
-     * @return void
+     * @return void - Expects ConfigException containing the supplied validation text.
      */
     #[DataProvider('requestedRuleOptionTypeProvider')]
     public function testRejectsInvalidRequestedRuleOptionTypes(
@@ -215,9 +217,9 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Verify rejects unknown rule option key.
+     * Verify that config loading rejects an option absent from the rule's defaults.
      *
-     * @return void
+     * @return void - Expects ConfigException naming the unknown option path.
      */
     public function testRejectsUnknownRuleOptionKey(): void
     {
@@ -234,9 +236,9 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Verify rejects invalid rule option type.
+     * Verify rejection of a string override for the integer minScopeReferences option.
      *
-     * @return void
+     * @return void - Expects ConfigException with the integer type validation text.
      */
     public function testRejectsInvalidRuleOptionType(): void
     {
@@ -254,8 +256,7 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     /**
      * Provide invalid rule option type cases for parameterized tests.
      *
-     * @return array<string, array{string, string}> - keyed by case label; each value pairs the config JSON template with the expected validation
-     *                       message template
+     * @return array<string, array{string, string}> - Named cases pairing config JSON templates with expected message templates.
      */
     public static function invalidRuleOptionTypeProvider(): array
     {
@@ -292,12 +293,12 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Verify rejects invalid rule option type variants.
+     * Verify rejection of invalid scalar and list option values.
      *
-     * @param string $configTemplate  - Config JSON template.
-     * @param string $messageTemplate - Expected exception message template.
+     * @param string $configTemplate  - JSON template whose %s placeholder receives the fixture rule ID.
+     * @param string $messageTemplate - Expected message template whose %s placeholder receives the fixture rule ID.
      *
-     * @return void
+     * @return void - Expects ConfigException with the formatted validation message text.
      */
     #[DataProvider('invalidRuleOptionTypeProvider')]
     public function testRejectsInvalidRuleOptionTypeVariants(string $configTemplate, string $messageTemplate): void
@@ -314,7 +315,9 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
 }
 
 /**
- * Fixture rule used by the loader's enabled-state tests; default-disabled with no analysis output.
+ * Supplies a rule disabled by default for loader enablement tests.
+ * The tests use its metadata to compare defaults with explicit overrides.
+ * Analysis returns no findings.
  */
 final readonly class FixtureDefaultDisabledRule implements RuleInterface
 {
@@ -342,8 +345,8 @@ final readonly class FixtureDefaultDisabledRule implements RuleInterface
     /**
      * Return findings produced by the fixture rule.
      *
-     * @param AnalysisUnit $analysisUnit - Analysis unit.
-     * @param RuleContext  $ruleContext  - Rule context for the fixture.
+     * @param AnalysisUnit $analysisUnit - Unused; the fixture never inspects the analysis unit.
+     * @param RuleContext  $ruleContext  - Unused; the fixture returns no findings regardless of context.
      *
      * @return list<\GruffPhp\Results\Finding\Finding> - always empty; this fixture exercises only the loader's enabled-state path and never reports
      */
@@ -354,7 +357,9 @@ final readonly class FixtureDefaultDisabledRule implements RuleInterface
 }
 
 /**
- * Fixture rule used by the loader's option-validation tests; exposes typed options for the test config payloads.
+ * Supplies typed defaults for tests of option validation.
+ * Includes scalar values plus empty lists and lists of strings or integers.
+ * Analysis returns no findings.
  */
 final readonly class FixtureOptionsRule implements RuleInterface
 {
@@ -364,7 +369,7 @@ final readonly class FixtureOptionsRule implements RuleInterface
     /**
      * Return metadata for the fixture rule.
      *
-     * @return RuleDefinition - metadata whose defaultOptions declare one option of each type for the validation tests to exercise
+     * @return RuleDefinition - Rule metadata with float, boolean, string, and list defaults for option validation.
      */
     public function definition(): RuleDefinition
     {
@@ -389,8 +394,8 @@ final readonly class FixtureOptionsRule implements RuleInterface
     /**
      * Return findings produced by the fixture rule.
      *
-     * @param AnalysisUnit $analysisUnit - Analysis unit.
-     * @param RuleContext  $ruleContext  - Rule context for the fixture.
+     * @param AnalysisUnit $analysisUnit - Unused; the fixture never inspects the analysis unit.
+     * @param RuleContext  $ruleContext  - Unused; the fixture returns no findings regardless of context.
      *
      * @return list<\GruffPhp\Results\Finding\Finding> - always empty; this fixture exercises only the option-validation path and never reports
      */

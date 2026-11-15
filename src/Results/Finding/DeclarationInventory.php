@@ -47,7 +47,7 @@ final readonly class DeclarationInventory
     private const DECLARATION_START_PATTERN = '/^\s*(?:#\[[^\]]*\]\s*)*(?:public|protected|private|var|abstract|final|function|class|interface|trait|enum|const)\b/u';
 
     /**
-     * Keeps the scanned positions of every variable symbol in each file.
+     * Keeps scanned positions for supported variable-symbol declarations and annotations in each file.
      *
      * @param array<string, array<string, list<int>>> $positions - Display path, then `$name` symbol, then ascending 1-based lines.
      */
@@ -56,10 +56,8 @@ final readonly class DeclarationInventory
     }
 
     /**
-     * Scans every file that carries a variable-symbol finding, reading each from the project root.
-     *
-     * A file that cannot be read contributes no positions, which leaves its variables ranked among their findings alone,
-     * exactly as before this inventory existed.
+     * Scans files selected by findings whose symbols start with `$`, resolving relative paths against the project root.
+     * Unreadable files contribute no positions, so their variables are ranked only among current findings.
      *
      * @param string        $projectRoot - Root the findings' display paths resolve against.
      * @param list<Finding> $findings - The run's findings; only those naming a variable symbol select a file to scan.
@@ -70,7 +68,7 @@ final readonly class DeclarationInventory
     {
         $positions = [];
 
-        // Only a variable symbol has more than one possible occurrence per file, so only its file is read.
+        // Files without variable-symbol findings need no variable-position inventory.
         foreach ($findings as $finding) {
             $symbol = (string)$finding->symbol;
 
@@ -109,6 +107,7 @@ final readonly class DeclarationInventory
 
                 $line = substr_count($source, "\n", 0, $offset) + 1;
 
+                // \R splits on any newline sequence, so CRLF files yield the same lines as LF files.
                 foreach (preg_split('/\R/', $docText) ?: [] as $docLine) {
                     // Match an `@var` tag line and capture the variable it names.
                     if (preg_match(self::VAR_TAG_PATTERN, trim($docLine, " \t\n\r\0\x0B/*"), $matches) === 1) {
@@ -148,7 +147,7 @@ final readonly class DeclarationInventory
      * @param string $filePath - Display path exactly as the finding carries it.
      * @param string $symbol - Variable symbol such as `$value`.
      *
-     * @return list<int> - Ascending lines; empty when the file was not scanned or never names the variable.
+     * @return list<int> - Ascending lines; empty when the file was not scanned or no supported occurrence was found.
      */
     public function positionsFor(string $filePath, string $symbol): array
     {

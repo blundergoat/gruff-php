@@ -18,14 +18,16 @@ use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers co-firing of complexity rules on cumulative fixtures, silence on simple inputs, and response to config overrides.
+ * Checks complexity findings from the default registry on complex and simple fixtures.
+ * Checks selected rules fire together and all finding fingerprints are distinct.
+ * Compares complexity finding counts after tightening configured thresholds.
  */
 final class ComplexityIntegrationTest extends TestCase
 {
     /**
      * Verify complex fixture triggers multiple complexity rules.
      *
-     * @return void
+     * @return void - Asserts cyclomatic, cognitive and nesting rule IDs are present and all finding fingerprints are unique.
      */
     public function testComplexFixtureTriggersMultipleComplexityRules(): void
     {
@@ -57,9 +59,9 @@ final class ComplexityIntegrationTest extends TestCase
     }
 
     /**
-     * Verify simple fixture produces no complexity findings.
+     * Require the simple fixture to remain free of findings from registered complexity rules.
      *
-     * @return void
+     * @return void - Asserts the simple fixture has no complexity findings.
      */
     public function testSimpleFixtureProducesNoComplexityFindings(): void
     {
@@ -80,7 +82,7 @@ final class ComplexityIntegrationTest extends TestCase
     /**
      * Verify config override changes complexity findings.
      *
-     * @return void
+     * @return void - Asserts tightened thresholds produce more complexity findings than the default configuration.
      */
     public function testConfigOverrideChangesComplexityFindings(): void
     {

@@ -7,19 +7,16 @@ namespace GruffPhp\Tests\Console;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers the bounded deep-scan budget as a user meets it on the `analyse` command line.
- *
- * The budget degrades structural analysis on very large PHP sources while keeping size, sensitive-data, and
- * config rules running, so these cases check that a bounded file is still analysed, that its diagnostic reaches
- * every renderer, that a malformed override fails before analysis, and that the CLI wins over the config block.
- * Split from AnalyseCliTest so neither class exceeds the family public-method threshold.
+ * Exercises the analyse command's deep-scan budget with real CLI processes.
+ * Cases check retained sensitive-data findings, invalid-budget diagnostics, and CLI precedence over config.
+ * Every supported output format must include the bounded-scan diagnostic and its configured limits.
  */
 final class AnalyseCliDeepScanBudgetTest extends CliTestCase
 {
     /**
      * Verify bounded PHP remains analysed and retains sensitive-data scanning.
      *
-     * @return void
+     * @return void - Asserts one parsed file, no parse errors, a non-invalidating diagnostic, and an AWS access-key finding.
      */
     public function testBoundedDeepScanKeepsTextLevelSecurityFindings(): void
     {
@@ -74,9 +71,9 @@ final class AnalyseCliDeepScanBudgetTest extends CliTestCase
     }
 
     /**
-     * Verify malformed CLI budgets fail before analysis.
+     * Verifies that a partial CLI budget produces usage exit code 2 and the expected diagnostic text.
      *
-     * @return void
+     * @return void - Asserts exit code 2 and the required budget syntax in the diagnostic.
      */
     public function testDeepScanBudgetRejectsPartialCliOverride(): void
     {
@@ -110,7 +107,7 @@ final class AnalyseCliDeepScanBudgetTest extends CliTestCase
     /**
      * Verify an atomic CLI budget wins over the config block.
      *
-     * @return void
+     * @return void - Asserts the config-sourced diagnostic, then a successful CLI override with no diagnostics.
      */
     public function testDeepScanBudgetCliOverrideWinsOverConfig(): void
     {
@@ -176,7 +173,7 @@ final class AnalyseCliDeepScanBudgetTest extends CliTestCase
     /**
      * Verify every analyse renderer exposes the bounded-scan note.
      *
-     * @return void
+     * @return void - Asserts successful exits plus the bounded-scan marker and budget text in each format.
      */
     public function testBoundedDeepScanDiagnosticIsVisibleInEveryFormat(): void
     {

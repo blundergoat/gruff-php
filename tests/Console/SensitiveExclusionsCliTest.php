@@ -9,17 +9,13 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers what a configured `sensitiveExclusions:` entry does to a real `analyse` run.
- *
- * Every case compares a no-config baseline scan of the same synthetic corpus against the same tree
- * under the case configuration: the findings the configuration removed must be exactly those whose
- * rule and path match a declared entry, so an entry can never quietly take a sibling with it. The
- * suite also pins the audit row a reviewer reads and the suppression total the terminal report
- * prints, because a suppressed finding must be accounted for rather than merely absent.
+ * Exercises configured sensitive-data exclusions against a shared synthetic corpus through the CLI.
+ * Scope cases compare scans with and without exclusions to check reported rule-and-file pairs.
+ * Other cases check JSON audit fields and text suppression totals, including agreement with summary.
  */
 final class SensitiveExclusionsCliTest extends CliTestCase
 {
-    /** Synthetic corpus fixtures copied into every test project, keyed by their project-relative path. */
+    /** Fixture basenames copied from tests/Fixtures/SensitiveExclusions into each project's corpus directory. */
     private const CORPUS_FILES = ['AwsSample.php', 'AwsSibling.php', 'JwtSample.php', 'Clean.php'];
 
     /** Rule id the corpus trips twice, in two different files. */
@@ -29,12 +25,10 @@ final class SensitiveExclusionsCliTest extends CliTestCase
     private const JWT_RULE = 'sensitive-data.jwt-token';
 
     /**
-     * Verifies a rule plus a path suppresses every occurrence of that rule in that file, reports its
-     * count, and removes nothing else - the same rule in another file and another rule in the same
-     * scan both keep reporting.
+     * Checks that excluding the AWS fixture removes its rule-and-file pair while the sibling and JWT pairs remain.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts the removed scope, a positive audit count, and both surviving scopes.
+     * @throws JsonException - When either CLI JSON report cannot be decoded.
      */
     public function testExactRuleAndPathSuppressesOnlyItsOwnScope(): void
     {
@@ -55,11 +49,10 @@ final class SensitiveExclusionsCliTest extends CliTestCase
     }
 
     /**
-     * Verifies two entries with different scopes stay independent, each reporting its own count and
-     * removing only its own findings.
+     * Checks that AWS and JWT exclusions remove their two expected scopes and each reports a positive count.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts both removed scopes and positive counts for both audit rows.
+     * @throws JsonException - When either CLI JSON report cannot be decoded.
      */
     public function testTwoDistinctEntriesReportIndependentCounts(): void
     {
@@ -87,8 +80,8 @@ final class SensitiveExclusionsCliTest extends CliTestCase
      * Verifies the corpus's second copy of one rule is reachable on its own, so excluding one file
      * demonstrably leaves the other reporting rather than merely appearing to.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts the sibling scope is removed and the original AWS scope remains.
+     * @throws JsonException - When either CLI JSON report cannot be decoded.
      */
     public function testExcludingTheSiblingFileLeavesTheOriginalReporting(): void
     {
@@ -108,13 +101,12 @@ final class SensitiveExclusionsCliTest extends CliTestCase
     }
 
     /**
-     * Verifies an entry whose scope matches nothing reports zero and removes nothing, so fixing the
-     * underlying problem - or narrowing to a symbol this pillar never stamps - never breaks a build.
+     * Checks that exclusions for a clean file or unmatched symbol remove no reported scopes and have zero suppressed counts.
      *
      * @param array<string, string> $exclusionEntry - Entry whose declared scope matches no finding in the corpus.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts no removed scopes and a zero count for the configured entry.
+     * @throws JsonException - When either CLI JSON report cannot be decoded.
      */
     #[DataProvider('scopeMatchingNothingProvider')]
     public function testScopeMatchingNothingReportsZeroWithoutFailing(array $exclusionEntry): void
@@ -133,8 +125,7 @@ final class SensitiveExclusionsCliTest extends CliTestCase
     }
 
     /**
-     * Provides the two ways an accepted entry legitimately matches nothing: a file with no finding,
-     * and a symbol on a pillar whose findings carry none.
+     * Supplies exclusions targeting the clean corpus file or an unmatched symbol in the AWS fixture.
      *
      * @return array<string, array{array<string, string>}> - the entry each row configures.
      */
@@ -156,11 +147,10 @@ final class SensitiveExclusionsCliTest extends CliTestCase
     }
 
     /**
-     * Verifies the machine report publishes the family audit row for every configured entry, carrying
-     * only configured material - never a message excerpt, preview, or matched value.
+     * Checks the exact audit row for one AWS exclusion and that JSON stdout contains no AKIA prefix.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts the configured row's fields, suppressed count, and absence of the AWS key prefix.
+     * @throws JsonException - When the CLI JSON report cannot be decoded.
      */
     public function testAuditRowCarriesTheFamilyShapeAndNoValueMaterial(): void
     {
@@ -188,10 +178,9 @@ final class SensitiveExclusionsCliTest extends CliTestCase
     }
 
     /**
-     * Verifies the terminal report states how many findings were suppressed and why, so a reader of
-     * the text output is never left with an unexplained absence.
+     * Checks that text output includes the AWS exclusion's suppression total, rule, entry index, and configured reason.
      *
-     * @return void
+     * @return void - Asserts the expected suppression text appears in the report.
      */
     public function testTextReportNamesTheSuppressionTotalAndItsReason(): void
     {
@@ -211,14 +200,9 @@ final class SensitiveExclusionsCliTest extends CliTestCase
     }
 
     /**
-     * Verifies the digest applies the same exclusion the fuller report does and accounts for it in
-     * the same words on the same surface, so the two commands can no longer disagree about one tree.
+     * Checks that analyse and summary print the expected suppression line and identical Findings lines for the configured corpus.
      *
-     * Both halves matter: a summary that filtered without saying so would hide findings behind a
-     * quietly smaller number, and a summary that declined to filter would contradict `analyse` on
-     * the very tree the reader just scanned.
-     *
-     * @return void
+     * @return void - Asserts each command's suppression line and equality of their finding-count lines.
      */
     public function testSummaryTextReportsTheSameSuppressionTotalAndFindingCountAsAnalyse(): void
     {
@@ -232,7 +216,7 @@ final class SensitiveExclusionsCliTest extends CliTestCase
 
             self::assertSame($expectedLine, $this->suppressionLine($analyse));
             self::assertSame($expectedLine, $this->suppressionLine($summary));
-            // The digest is only trustworthy if the exclusion moved its totals too, not just its wording.
+            // Matching audit text alone would not catch a disagreement in the reported finding totals.
             self::assertSame($this->findingsLine($analyse), $this->findingsLine($summary));
         } finally {
             $this->removeDir($project);
@@ -240,8 +224,7 @@ final class SensitiveExclusionsCliTest extends CliTestCase
     }
 
     /**
-     * Runs `summary` over a prepared project as text and asserts the digest actually saw the corpus -
-     * without that check, a digest of an empty scan would satisfy every assertion by reporting nothing.
+     * Runs summary as text, requiring exit code zero and the corpus/ marker in stdout.
      *
      * @param string $project - Project root to scan.
      *
@@ -270,7 +253,7 @@ final class SensitiveExclusionsCliTest extends CliTestCase
      * Pulls the one suppression audit line out of a text surface, so two surfaces can be compared on
      * the exact string a reader sees rather than on a substring either might merely contain.
      *
-     * @param string $output - Rendered text output from `analyse` or `summary`.
+     * @param string $output - Rendered text output from analyse or summary.
      *
      * @return string - the single suppression line the surface printed.
      */
@@ -283,9 +266,9 @@ final class SensitiveExclusionsCliTest extends CliTestCase
      * Pulls the canonical finding-count line out of a text surface, which is where a summary that
      * declined to filter would disagree with the report it claims to digest.
      *
-     * @param string $output - Rendered text output from `analyse` or `summary`.
+     * @param string $output - Rendered text output from analyse or summary.
      *
-     * @return string - the single canonical `Findings:` line the surface printed.
+     * @return string - the single canonical Findings: line the surface printed.
      */
     private function findingsLine(string $output): string
     {
@@ -354,14 +337,14 @@ final class SensitiveExclusionsCliTest extends CliTestCase
     {
         $yaml = "schemaVersion: gruff-php.config.v0.1\nselection:\n    pillars:\n        - sensitive-data\n";
 
-        // No entries means the baseline run, which must see no `sensitiveExclusions` block at all.
+        // No entries means the baseline run, which must see no sensitiveExclusions block at all.
         if ($entries === []) {
             return $yaml;
         }
 
         $yaml .= "sensitiveExclusions:\n";
 
-        // Render each entry by hand so the file reads exactly as a user would write it.
+
         foreach ($entries as $exclusionEntry) {
             $yaml .= sprintf("    - rule: %s\n      path: %s\n", $exclusionEntry['rule'], $exclusionEntry['path']);
             $yaml .= isset($exclusionEntry['symbol']) ? sprintf("      symbol: %s\n", $exclusionEntry['symbol']) : '';
@@ -372,12 +355,12 @@ final class SensitiveExclusionsCliTest extends CliTestCase
     }
 
     /**
-     * Runs `analyse` over a prepared project and returns the decoded machine report.
+     * Runs analyse, decodes its JSON report, and removes the project after decoding succeeds.
      *
-     * @param string $project - Project root to scan; removed by the caller.
+     * @param string $project - Project root to scan and remove after successful decoding.
      *
      * @return array<string, mixed> - the decoded report for that run.
-     * @throws JsonException
+     * @throws JsonException - When the CLI JSON report cannot be decoded; project cleanup has not yet run.
      */
     private function analyse(string $project): array
     {
@@ -388,8 +371,7 @@ final class SensitiveExclusionsCliTest extends CliTestCase
     }
 
     /**
-     * Runs `analyse` over a prepared project in the requested format and asserts the scan actually
-     * saw files - without that check, two runs that each scanned nothing compare equal.
+     * Runs analyse in the requested format, requiring exit code zero and the corpus/ marker in stdout.
      *
      * @param string $project - Project root to scan.
      * @param string $format  - Output format requested from the CLI.
@@ -433,7 +415,7 @@ final class SensitiveExclusionsCliTest extends CliTestCase
 
         $scopes = [];
 
-        // Reduce each finding to the pair an exclusion is allowed to match on.
+
         foreach ($findings as $finding) {
             self::assertIsArray($finding);
             self::assertIsString($finding['ruleId']);
@@ -458,7 +440,7 @@ final class SensitiveExclusionsCliTest extends CliTestCase
         $survivors = $this->findingScopes($configured);
         $removed   = [];
 
-        // Anything the baseline reported and the configured run did not was removed by the configuration.
+
         foreach ($this->findingScopes($baseline) as $scope) {
             if (!in_array($scope, $survivors, true)) {
                 $removed[] = $scope;

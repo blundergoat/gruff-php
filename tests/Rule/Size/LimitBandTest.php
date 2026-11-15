@@ -19,9 +19,9 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Pins the two bands the banded size and complexity rules report in (FAMILY-CONTRACT.md section 12, "Size and complexity
- * findings in two bands"): just over its limit a unit gets an advisory do-not-add notice, and at twice its limit it keeps
- * the rule's severity and the advice to split or simplify. Each fixture is generated so its measure is known exactly.
+ * Checks lower- and upper-band findings for size and complexity rules under FAMILY-CONTRACT.md section 12.
+ * Asserts each band's severity and remediation against the generated fixtures.
+ * Additional cases cover constructor limits, advisory data carriers and source-text rule eligibility.
  */
 final class LimitBandTest extends TestCase
 {
@@ -31,18 +31,18 @@ final class LimitBandTest extends TestCase
         'size.public-method-count', 'complexity.cognitive', 'complexity.cyclomatic', 'complexity.nesting-depth',
     ];
 
-    /** @var list<string> Temporary fixture paths removed after each test. */
+    /** @var list<string> - Temporary fixture paths removed after each test. */
     private array $paths = [];
 
     /**
      * Remove the generated fixtures.
      *
-     * @return void
+     * @return void - Removes generated fixture files that still exist.
      */
     protected function tearDown(): void
     {
         foreach ($this->paths as $path) {
-            // A fixture the test never wrote has nothing to remove.
+
             if (is_file($path)) {
                 unlink($path);
             }
@@ -50,9 +50,9 @@ final class LimitBandTest extends TestCase
     }
 
     /**
-     * Supplies, per rule, a fixture just over its default limit and one at twice it, with the advice each band gives.
+     * Supplies lower- and upper-band sources and expected advice for each rule.
      *
-     * @return array<string, array{string, string, string, string, string}> - rule id, lower-band source, upper-band source, lower advice, upper advice
+     * @return array<string, array{string, string, string, string, string}> - Rule ID, lower source, upper source, lower advice, upper advice.
      */
     public static function bandCases(): array
     {
@@ -70,15 +70,15 @@ final class LimitBandTest extends TestCase
     }
 
     /**
-     * Verify each banded rule reports the advisory notice just over its limit and its own severity at twice it.
+     * Verify each rule's band, severity and remediation for the lower- and upper-band fixtures.
      *
      * @param string $ruleId - Rule under test.
-     * @param string $lowerSource - Source whose measure is just over the rule's default limit.
-     * @param string $upperSource - Source whose measure is at twice the rule's default limit.
+     * @param string $lowerSource - Source exceeding the rule's default limit in the lower band.
+     * @param string $upperSource - Source producing an upper-band finding with default settings.
      * @param string $lowerAdvice - Advice the lower band gives.
      * @param string $upperAdvice - Advice the upper band gives.
      *
-     * @return void
+     * @return void - Asserts bands, severities, exact advice and the absence of prohibited remediation terms.
      */
     #[DataProvider('bandCases')]
     public function testEachRuleReportsInTwoBands(string $ruleId, string $lowerSource, string $upperSource, string $lowerAdvice, string $upperAdvice): void
@@ -100,7 +100,7 @@ final class LimitBandTest extends TestCase
     /**
      * Verify the lower band is advisory even when configuration sets an error tier the value crosses.
      *
-     * @return void
+     * @return void - Asserts advisory severity, lower-band metadata and an error-threshold message.
      */
     public function testLowerBandIsAdvisoryWhateverTheConfiguredTier(): void
     {
@@ -127,7 +127,7 @@ final class LimitBandTest extends TestCase
      * @param int $count - Promoted parameters.
      * @param string $band - Band the count falls in.
      *
-     * @return void
+     * @return void - Asserts the expected band and advisory severity for each promoted-parameter count.
      */
     #[DataProvider('valueObjectCases')]
     public function testValueObjectBandsAgainstItsOwnCeiling(int $count, string $band): void
@@ -158,7 +158,7 @@ final class LimitBandTest extends TestCase
      * @param string $band - Band the count falls in.
      * @param Severity $severity - Severity the finding carries.
      *
-     * @return void
+     * @return void - Asserts constructor-threshold metadata and the expected band and severity.
      */
     #[DataProvider('constructorCapCases')]
     public function testConstructorCapIsTheLimitInForce(int $count, string $band, Severity $severity): void
@@ -173,7 +173,7 @@ final class LimitBandTest extends TestCase
     /**
      * Verify a read-only data carrier stays advisory in both bands while its band key still follows the count.
      *
-     * @return void
+     * @return void - Asserts data-carrier metadata, the expected band and advisory severity for both counts.
      */
     public function testReadonlyDataCarrierStaysAdvisoryInBothBands(): void
     {
@@ -186,9 +186,9 @@ final class LimitBandTest extends TestCase
     }
 
     /**
-     * Verify no banded rule can see a data file: only source-text rules run on non-PHP files.
+     * Verify each listed banded rule is not a source-text rule.
      *
-     * @return void
+     * @return void - Asserts that each listed rule does not implement SourceTextRuleInterface.
      */
     public function testBandedRulesNeverMeasureDataFiles(): void
     {
@@ -205,7 +205,7 @@ final class LimitBandTest extends TestCase
      * @param string $ruleId - Rule to run.
      * @param string $source - PHP source to analyse.
      * @param array<string, int|float>|null $thresholds - Warning and error tiers; null keeps the rule's defaults.
-     * @param array<string, int|float|bool|string> $options - Option overrides layered onto the rule's defaults.
+     * @param array<string, int|float|bool|string> $options - Option overrides; empty keeps the rule's defaults.
      *
      * @return Finding - The rule's only finding on the source.
      */
@@ -255,7 +255,7 @@ final class LimitBandTest extends TestCase
     }
 
     /**
-     * Build a class whose body spans the given number of lines in one method.
+     * Build a class-length fixture with assignment lines in one method.
      *
      * @param int $lines - Approximate class length in code lines.
      *
@@ -272,7 +272,7 @@ final class LimitBandTest extends TestCase
     }
 
     /**
-     * Build a function of the given number of statements.
+     * Build a class whose run() method contains the given number of assignment statements.
      *
      * @param int $count - Number of statements.
      *
@@ -360,7 +360,7 @@ final class LimitBandTest extends TestCase
     /**
      * Build a method whose if statements nest the given number of levels.
      *
-     * @param int $depth - Nesting depth.
+     * @param int $depth - Number of nested if blocks to emit in the generated method.
      *
      * @return string - PHP source.
      */

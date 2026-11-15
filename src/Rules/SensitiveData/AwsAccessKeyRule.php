@@ -35,7 +35,7 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // High confidence: the AKIA/ASIA prefix plus a fixed 16-char body is a near-unique AWS shape, rarely noise.
+        // High confidence: retained matches require an AWS prefix and fixed-length body, then pass dummy and mask filters.
         return new RuleDefinition(
             id:              self::ID,
             name:            'AWS access key',
@@ -47,34 +47,34 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
     }
 
     /**
-     * Reports each string that resembles a live AWS access key ID, redacting the value.
+     * Reports AWS access-key-ID matches that survive comment, sample, placeholder and mask exclusions.
      *
-     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Supplies raw source and comment tokens for scanning.
+     * @param RuleContext $ruleContext - Required by the rule interface; unused by this scanner.
      *
-     * @return list<\GruffPhp\Results\Finding\Finding> - Findings for AWS keys; empty when matches are comments or dummy values.
+     * @return list<\GruffPhp\Results\Finding\Finding> - One finding per retained AWS key-ID match; empty when none survive.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         if (!str_contains($analysisUnit->source, 'AKIA') && !str_contains($analysisUnit->source, 'ASIA')) {
-            // Neither AWS key-id prefix is present, so the regex cannot match; skip it to keep the rule near-free.
+
             return [];
         }
 
-        // Match every AWS access-key-id shape, capturing each one's byte offset.
+        // AWS access-key IDs require an AKIA or ASIA prefix and sixteen uppercase-alphanumeric characters; offsets locate findings.
         preg_match_all('/\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/', $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
         $findings      = [];
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
-        // Weigh each candidate the scan found.
+
         foreach ($matches[0] as $match) {
             [$candidateSecret, $offset] = $match;
-            // A match inside a comment is documentation or an example, not a live secret.
+
             if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
                 continue;
             }
 
-            // An obvious placeholder or dummy value is not a real credential.
+
             if (SecretScannerHelper::isLikelyDummyValue($candidateSecret, shouldSplitIdentifierWords: false)) {
                 continue;
             }
@@ -110,7 +110,7 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
      */
     private static function isMaskedKey(string $candidateSecret): bool
     {
-        // Matches an AKIA or ASIA key id whose sixteen-character body is all X, the documented masking.
+        // Require the entire sixteen-character body to be X so a partial run cannot hide a credential.
         return preg_match('/^(?:AKIA|ASIA)X{16}$/', $candidateSecret) === 1;
     }
 }

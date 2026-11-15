@@ -18,11 +18,11 @@ use PhpParser\Node\Stmt\Class_;
 use PhpParser\Node\Stmt\ClassMethod;
 
 /**
- * Flags a test class that names some of its test methods in camelCase and others in snake_case, so the user
- * sees the split and settles on one convention instead of leaving a mixed, harder-to-scan suite.
+ * Flags classes whose declared `test`-prefixed methods mix suffixes with and without underscores.
+ * The prefix check is case-sensitive; attributes and inheritance do not determine which methods count.
  *
- * Fires only when a class has at least two test methods and both styles actually appear. Advisory but high
- * confidence: the mix is unambiguous, yet which single style to adopt is the team's call.
+ * Emits one advisory, high-confidence finding per mixed class.
+ * Nonempty suffixes containing an underscore count as snake_case; other nonempty suffixes count as camelCase.
  */
 final readonly class TestNamingConsistencyRule implements RuleInterface
 {
@@ -38,7 +38,7 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Confidence High but Advisory severity: mixed casing is unambiguous, yet teams pick the style to enforce.
+        // Confidence is High because the underscore split is deterministic; severity is Advisory because teams choose the enforced style.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Test method naming consistency',
@@ -50,12 +50,12 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
     }
 
     /**
-     * Reports a test class that mixes camelCase and snake_case method names.
+     * Reports classes that mix `test`-prefixed method suffixes with and without underscores.
      *
-     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit whose class declarations are inspected.
+     * @param RuleContext $ruleContext - Required by the rule interface; unused by this rule.
      *
-     * @return list<Finding> - Findings for inconsistent test names.
+     * @return list<Finding> - one finding per mixed class; empty when no class has both nonempty suffix categories
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -64,9 +64,9 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
 
         $findings = [];
 
-        // Check every class declared in the file.
+
         foreach ($classes as $class) {
-            /** @var Class_ $class Finder predicate restricts results to class declarations. */
+            /** @var Class_ $class - The Class_ query restricts results to class declarations. */
             $testMethods = $this->testMethods($class);
 
             // A single test method cannot disagree with itself, so there is nothing to compare.
@@ -76,7 +76,7 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
 
             $counts = $this->namingCounts($testMethods);
 
-            // Both styles present in one class is exactly the inconsistency to report.
+
             if ($counts['camelCase'] > 0 && $counts['snake_case'] > 0) {
                 $className = $class->name?->toString() ?? sprintf('class@anonymous:%d', $class->getStartLine());
 
@@ -115,9 +115,9 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
     {
         $testMethods = [];
 
-        // Look at each statement in the class body.
+
         foreach ($class->stmts as $stmt) {
-            // A method whose name starts with "test" counts as a test method.
+
             if ($stmt instanceof ClassMethod && str_starts_with($stmt->name->toString(), 'test')) {
                 $testMethods[] = $stmt;
             }
@@ -127,17 +127,17 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
     }
 
     /**
-     * Counts the camelCase and snake_case test method names.
+     * Classifies nonempty suffixes after `test` by whether they contain an underscore.
      *
      * @param list<ClassMethod> $testMethods - Test methods being classified by naming style.
      *
-     * @return array{camelCase: int, snake_case: int} - method counts keyed by naming style
+     * @return array{camelCase: int, snake_case: int} - suffix counts; underscores select snake_case, other suffixes select camelCase
      */
     private function namingCounts(array $testMethods): array
     {
         $counts = ['camelCase' => 0, 'snake_case' => 0];
 
-        // Classify each test method by the style of the part after "test".
+
         foreach ($testMethods as $method) {
             $afterTest = substr($method->name->toString(), 4);
 

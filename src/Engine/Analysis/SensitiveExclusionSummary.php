@@ -5,15 +5,11 @@ declare(strict_types=1);
 namespace GruffPhp\Engine\Analysis;
 
 /**
- * One audit row describing what a configured `sensitiveExclusions` entry actually hid.
+ * One audit row for a configured exclusion, the built-in test-path skip, or a section 13c filter.
+ * Configured entries each produce a row, including `suppressed: 0` when nothing matched.
  *
- * Every configured entry publishes exactly one of these on every run, whether or not it matched
- * anything, so a suppression is never silently invisible: a reviewer reading the report sees the
- * scope, the rationale its author wrote, and the number of findings it removed. An entry that
- * matched nothing reports `suppressed: 0` rather than failing, so fixing the underlying problem
- * never breaks a build. Configured rows take their rule id, path, symbol and reason from configuration;
- * built-in and section 13c rows take the rule id and path from a finding and the reason from the contract,
- * never from a matched value.
+ * Configured rows carry their declared scope and rationale; other rows use the finding's rule and path.
+ * Built-in and section 13c reasons come from the contract, never from a matched value.
  *
  * @phpstan-type SensitiveExclusionSummaryArray array{index: int, rule: string, paths: list<string>, symbol: string|null, source?: string, reason: string,
  *               suppressed: int}
@@ -21,15 +17,15 @@ namespace GruffPhp\Engine\Analysis;
 final readonly class SensitiveExclusionSummary
 {
     /**
-     * Holds one entry's declared scope alongside the count it suppressed on this run.
+     * Holds one audit row's scope, suppressed count and optional source.
      *
-     * @param int         $index      - Entry position in the configured list, matching the `sensitiveExclusions[N]` used by config diagnostics.
-     * @param string      $rule       - Exact rule id the entry suppresses.
-     * @param string      $path       - Project-relative path the entry is scoped to.
-     * @param string|null $symbol     - Symbol narrowing the scope; null when the entry covers the whole file.
-     * @param string      $reason     - Rationale supplied by whoever accepted the finding, or the contract's fixed reason on a built-in or section 13c row.
-     * @param int         $suppressed - Findings this entry removed from the run; zero is a valid, non-failing result.
-     * @param string|null $source     - `built-in` on a row the test-path skip produced, `inline` or `duplicate` on a section 13c row; null on a row for an entry the user configured.
+     * @param int $index - Configured entry position, or index in the separate built-in/section 13c sequence.
+     * @param string $rule - Rule id whose findings this row counts.
+     * @param string $path - Configured display path, or the path reported by a skipped finding.
+     * @param string|null $symbol - Configured symbol scope; null for whole-file, built-in and section 13c rows.
+     * @param string $reason - Configured rationale or the contract's fixed reason for this source.
+     * @param int $suppressed - Findings removed for this row; zero also records an unmatched configured entry.
+     * @param string|null $source - `built-in`, `inline` or `duplicate`; null identifies a configured exclusion.
      */
     public function __construct(
         public int     $index,
@@ -47,7 +43,7 @@ final readonly class SensitiveExclusionSummary
      * `paths` is a list because the family shape is shared with ports whose ordinary exclusions
      * accept several paths; a sensitive exclusion always names exactly one.
      *
-     * @return SensitiveExclusionSummaryArray - the audit row: entry index, rule, single-element path list, symbol, reason, and suppressed count.
+     * @return SensitiveExclusionSummaryArray - Audit fields with one path; includes source only for a non-configured row.
      */
     public function toArray(): array
     {
@@ -69,17 +65,15 @@ final readonly class SensitiveExclusionSummary
     }
 
     /**
-     * Renders the one-line detail the text report lists after its suppression total, so a terminal
-     * reader sees which entry hid how much and why without opening the JSON report.
+     * Renders the audit detail used after the suppression total, including the row's rule, count and reason.
      *
-     * @return string - `sensitiveExclusions[N] <rule>: <count> (<reason>)`, carrying only configured material.
+     * @return string - Rule, count and reason labelled by configured index, or by source and file when no configured index exists.
      */
     public function describe(): string
     {
-        // A built-in or section 13c row names the file it covers, since no config entry exists to point at.
-        // The test-path skip is the only built-in class, e.g. `builtInTestPath[tests/keys.php] sensitive-data.aws-access-key: 2`.
+        // Non-configured rows use a source-specific label and file because they have no configuration index.
         if ($this->source !== null) {
-            // An inline or duplicate row names its class the same way, e.g. `inline[src/db.php] security.sql-concatenation: 1`.
+
             $label = in_array($this->source, ['inline', 'duplicate'], true) ? $this->source : 'builtInTestPath';
 
             return sprintf('%s[%s] %s: %d (%s)', $label, $this->path, $this->rule, $this->suppressed, $this->reason);
@@ -89,14 +83,12 @@ final readonly class SensitiveExclusionSummary
     }
 
     /**
-     * Renders the one line every human-readable surface prints when a run suppressed something, so
-     * `analyse` and `summary` state the same total in the same words rather than each wording its
-     * own. A surface that applies these exclusions calls this and prints what it returns; that is
-     * how filtering stays accountable instead of silently shrinking a count.
+     * Formats the suppression total and details of rows with positive counts for human-readable reports.
+     * Returns null when the total is zero, leaving the report without a suppression notice.
      *
-     * @param list<SensitiveExclusionSummary> $summaries - Audit rows for one run, in configuration order.
+     * @param list<SensitiveExclusionSummary> $summaries - Audit rows for one run, in display order.
      *
-     * @return string|null - `Suppressed findings: N via <entry>; <entry>`, or null when nothing was suppressed and there is no absence to explain.
+     * @return string|null - `Suppressed findings: N via <entry>; <entry>`, or null when the total is zero.
      */
     public static function describeTotal(array $summaries): ?string
     {

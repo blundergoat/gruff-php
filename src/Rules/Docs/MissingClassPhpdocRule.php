@@ -43,7 +43,7 @@ final readonly class MissingClassPhpdocRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Advisory and high-confidence: a missing class docblock is unambiguous but not build-breaking.
+
         return new RuleDefinition(
             id:              self::ID,
             name:            'Missing class PHPDoc',
@@ -58,7 +58,7 @@ final readonly class MissingClassPhpdocRule implements RuleInterface
      * Reports each named class-like declaration that has no PHPDoc block.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext - Unused interface context; the rule checks docblock presence using its fixed definition.
      *
      * @return list<Finding> - Findings for undocumented class-like declarations.
      */
@@ -67,9 +67,9 @@ final readonly class MissingClassPhpdocRule implements RuleInterface
         $definition = $this->definition();
         $findings   = [];
 
-        // Check every class-like declaration in the file.
+
         foreach (NodeIndex::nodesOf($analysisUnit, ClassLike::class) as $node) {
-            // Only named classes, interfaces, traits, and enums are in scope.
+
             if (!$node instanceof Class_ && !$node instanceof Interface_ && !$node instanceof Trait_ && !$node instanceof Enum_) {
                 continue;
             }
@@ -79,7 +79,7 @@ final readonly class MissingClassPhpdocRule implements RuleInterface
                 continue;
             }
 
-            // A type that already carries a docblock is fine.
+
             if ($node->getDocComment() !== null) {
                 continue;
             }
@@ -109,7 +109,7 @@ final readonly class MissingClassPhpdocRule implements RuleInterface
     }
 
     /**
-     * Returns the declaration kind (class, interface, trait, or enum) for a class-like node.
+     * Supplies the declaration noun used in class-like finding messages.
      *
      * @param Node $node - Class-like node already confirmed to be a class, interface, trait, or enum.
      *

@@ -22,23 +22,16 @@ use PhpParser\Node\Stmt\Return_;
 use PhpParser\NodeFinder;
 
 /**
- * Flags a value-returning function or method whose `@return` tag states a type but no description.
+ * Flags a value-returning callable whose @return tag states a type without describing the result.
+ * Missing docblocks and return tags belong to other rules; void/never returns and constructors/destructors are exempt.
  *
- * The result's contract belongs in the `@return` tag, where PHPDoc consumers and IDEs already read
- * it and where it is the verification surface a reviewer diffs against the body. This rule fills the
- * gap its sibling docs rules leave: a value-returner with a summary plus a bare `@return Type` trips
- * neither docs.missing-return-tag (presence is satisfied) nor docs.bare-phpdoc-tags (the docblock is
- * not tags-only). It stays silent when there is no docblock or no `@return` tag, and on a wholly
- * tags-only function or method docblock, which docs.bare-phpdoc-tags already reports; with `everyCallable`
- * on, a bound closure's tags-only block is still checked because docs.bare-phpdoc-tags never reads closures.
- * It exempts void or never returns and constructors/destructors, which have no result to describe. Advisory.
+ * Bare parameter/return-only blocks on named functions and methods belong to docs.bare-phpdoc-tags.
+ * With everyCallable enabled, bound closures and arrow functions are also checked, including their bare-tag-only blocks.
+ * Findings are advisory with high confidence.
  */
 final readonly class ReturnCommentRule implements RuleInterface
 {
-    /**
-     * Stable rule identifier for described-return-tag findings. Unchanged from the rule's earlier
-     * shape so adopter configs and baselines keep working; only its meaning changed.
-     */
+    /** Stable rule identifier retained for existing configuration and baseline entries. */
     public const ID = 'docs.return-comment';
 
     /**
@@ -48,7 +41,7 @@ final readonly class ReturnCommentRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // High confidence: an @return tag with no prose after the type is unambiguous; advisory so teams opt in.
+        // For a value-returning callable eligible for this rule, an @return tag with no prose after its type is a documentation gap.
         return new RuleDefinition(
             id:                 self::ID,
             name:               'Described return tag',
@@ -56,28 +49,28 @@ final readonly class ReturnCommentRule implements RuleInterface
             tier:               RuleTier::V01,
             defaultSeverity:    Severity::Advisory,
             confidence:         Confidence::High,
-            defaultOptions:     [DocumentedCallables::EVERY_CALLABLE => false],
+            defaultOptions:     [DocumentedCallables::EVERY_CALLABLE => true],
             optionDescriptions: [DocumentedCallables::EVERY_CALLABLE => DocumentedCallables::EVERY_CALLABLE_DESCRIPTION],
             description:        'A value-returning function or method must describe its result in its @return tag, not just restate the type, so a reviewer can diff the documented contract against the body. Fires only when an @return tag is present but carries no description; missing docblocks and missing @return tags are owned by docs.missing-phpdoc and docs.missing-return-tag, and a function or method docblock made only of bare @param and @return tags, with no summary or other tag, by docs.bare-phpdoc-tags. With `everyCallable`, also closures and arrow functions bound to a name, read from the docblock above the assignment, bare-tags-only blocks included. Void/never returns and constructors/destructors are exempt. Advisory by default; opt in to stricter enforcement via .gruff-php.yaml.',
         );
     }
 
     /**
-     * Reports each value-returning function-like whose `@return` tag is present but undescribed.
+     * Reports undescribed return tags after excluding non-value callables and delegated bare-tag blocks.
      *
      * @param AnalysisUnit $unit    - parsed unit to inspect
      * @param RuleContext  $context - rule context for this analysis pass
      *
-     * @return list<Finding> - one finding per value-returning declaration with a bare `@return` tag
+     * @return list<Finding> - One finding per eligible callable with an undescribed return tag; empty when none qualify.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
         $findings   = [];
 
-        // Check every method and function in the file, plus bound closures when everyCallable is on.
+
         foreach (DocumentedCallables::inUnit($unit, $context, $definition) as ['node' => $node, 'doc' => $docComment, 'symbol' => $symbol]) {
-            // Only a value-returning callable has a result whose contract needs describing.
+
             if (!$this->isValueReturning($node)) {
                 continue;
             }
@@ -87,8 +80,8 @@ final readonly class ReturnCommentRule implements RuleInterface
                 continue;
             }
 
-            // docs.bare-phpdoc-tags reports a wholly tags-only docblock on a function or method, so stay silent there and
-            // report it once. It never reads bound closures, so their tags-only blocks stay with this rule.
+            // Leave blocks containing only bare parameter and return tags on named functions and methods to docs.bare-phpdoc-tags.
+            // Bound closures and arrow functions remain eligible because docs.bare-phpdoc-tags does not inspect them.
             if (!($node instanceof Closure || $node instanceof ArrowFunction) && PhpdocTagText::isBareTagsOnly($docComment->getText())) {
                 continue;
             }
@@ -100,7 +93,7 @@ final readonly class ReturnCommentRule implements RuleInterface
                 continue;
             }
 
-            // A return tag that already carries a description meets the contract.
+
             if (PhpdocTagText::hasReturnTagDescription($returnBody)) {
                 continue;
             }
@@ -123,15 +116,12 @@ final readonly class ReturnCommentRule implements RuleInterface
     }
 
     /**
-     * Reports whether a function-like declaration returns a value whose contract needs describing.
-     *
-     * A declared return type other than void/never counts; constructors and destructors never do
-     * (mirroring MissingReturnTagRule). When no return type is declared, fall back to whether the
-     * body actually returns an expression. Public so docs.missing-phpdoc asks for a return value by the same test.
+     * Classifies whether this rule requires a declaration's @return contract to describe a value.
+     * Constructors, destructors, void, and never are excluded; an untyped body qualifies when it contains a return expression.
      *
      * @param ClassMethod|Function_|Closure|ArrowFunction $node - function-like declaration to classify
      *
-     * @return bool - true when the declaration yields a value an @return tag should describe
+     * @return bool - True when this rule requires the declaration's @return tag to describe a value.
      */
     public function isValueReturning(ClassMethod|Function_|Closure|ArrowFunction $node): bool
     {
@@ -142,25 +132,24 @@ final readonly class ReturnCommentRule implements RuleInterface
 
         $returnType = $node->getReturnType();
 
-        // A simple named return type decides it directly: void/never carry no value.
+        // A built-in return type decides the classification directly; void and never are excluded.
         if ($returnType instanceof Identifier) {
             $typeName = strtolower($returnType->name);
 
-            // void/never declare "no value", so there is nothing for an @return description to cover.
             return $typeName !== 'void' && $typeName !== 'never';
         }
 
         if ($returnType !== null) {
-            // Any other declared shape (named, nullable, union, intersection) carries a value.
+            // Any other declared type is classified as value-returning for this rule.
             return true;
         }
 
-        // Untyped declaration: the only remaining signal is whether the body returns an expression.
+        // For an untyped declaration, the remaining signal is a return statement with an expression.
         return $this->hasReturnWithValue($node);
     }
 
     /**
-     * Reports whether a function-like body has at least one `return <expr>;` statement.
+     * Reports whether a function-like body has at least one return statement carrying an expression.
      *
      * @param ClassMethod|Function_|Closure|ArrowFunction $node - function-like declaration whose body is scanned
      *
@@ -170,10 +159,9 @@ final readonly class ReturnCommentRule implements RuleInterface
     {
         $finder = new NodeFinder();
 
-        // Look for any return statement that carries a value.
         foreach ($finder->findInstanceOf((array)$node->getStmts(), Return_::class) as $return) {
-            /** @var Return_ $return Finder predicate restricts results to return statements. */
-            // A `return <expr>;` proves the body yields a value.
+            /** @var Return_ $return - Finder predicate restricts results to return statements. */
+            // Any return with an expression counts; reachability is not checked.
             if ($return->expr !== null) {
                 return true;
             }

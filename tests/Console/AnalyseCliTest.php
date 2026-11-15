@@ -9,17 +9,16 @@ use JsonException;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers the `analyse` experience from CLI arguments through the report and exit status users receive.
- *
- * Scenarios include paths, syntax errors, thresholds, config, scoring, editor links, and every human- or machine-readable renderer.
- * Users rely on these paths whenever they invoke the primary analysis command locally, in an editor, or in CI.
+ * Exercises analyse CLI reports, exit statuses, path selection, configuration, and scoring.
+ * Covers text, JSON, HTML, and GitHub annotation output.
+ * Includes launch-directory path resolution and run-invalidating diagnostic envelopes.
  */
 final class AnalyseCliTest extends CliTestCase
 {
     /**
-     * Verify analyse command runs as no op.
+     * Checks mixed-fixture discovery and report output when only errors fail the scan.
      *
-     * @return void
+     * @return void - Asserts exit 0, version text, discovery counts, and the ignored vendor path.
      */
     public function testAnalyseCommandRunsAsNoOp(): void
     {
@@ -45,8 +44,8 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify zero-file scans are explicit and unscored in both human and machine-readable reports.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts empty-scan text, null composite values, and a non-invalidating JSON diagnostic.
+     * @throws JsonException - If decoding the command's stdout as JSON fails.
      */
     public function testAnalyseCommandReportsEmptyAnalysisAsUnscored(): void
     {
@@ -81,8 +80,7 @@ final class AnalyseCliTest extends CliTestCase
         self::assertSame(0, $summary['exitCode'] ?? null);
         $score = $report['score'] ?? null;
         self::assertIsArray($score);
-        // A run that scored nothing publishes nulls: 'N/A' with a 0 read as a failing grade to any
-        // consumer comparing numbers, which is the confusion the ratified applicability contract removes.
+        // A run that scored nothing publishes nulls because consumers could interpret 0 as a failing grade.
         self::assertSame(['grade' => null, 'score' => null], $score['composite'] ?? null);
         self::assertIsArray($diagnostics);
         $emptyAnalysisDiagnostic = $diagnostics[0] ?? null;
@@ -94,8 +92,8 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command supports an explicit single-file option.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts the requested input, one discovered and parsed file, and exit 0.
+     * @throws JsonException - If decoding the command's stdout as JSON fails.
      */
     public function testAnalyseCommandSupportsSingleFileOption(): void
     {
@@ -128,9 +126,9 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
-     * Verify analyse command reports syntax errors without aborting.
+     * Checks the parse-error report and exit 2 when a scan includes a file with invalid PHP.
      *
-     * @return void
+     * @return void - Asserts the diagnostic location, one parse error, and the reported exit code.
      */
     public function testAnalyseCommandReportsSyntaxErrorsWithoutAborting(): void
     {
@@ -151,9 +149,9 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
-     * Verify analyse command reports warning findings without failing by default.
+     * Checks warning-report output when the CLI explicitly uses the error failure threshold.
      *
-     * @return void
+     * @return void - Asserts exit 0 and exact text output against the warning fixture.
      */
     public function testAnalyseCommandReportsWarningFindingsWithoutFailingByDefault(): void
     {
@@ -178,9 +176,9 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
-     * Verify analyse command fails when finding meets default error threshold.
+     * Checks exit 1 and the reported finding when the configured file-length rule emits an error.
      *
-     * @return void
+     * @return void - Asserts the error finding's location and rule ID plus exit 1.
      */
     public function testAnalyseCommandFailsWhenFindingMeetsDefaultErrorThreshold(): void
     {
@@ -195,8 +193,8 @@ final class AnalyseCliTest extends CliTestCase
         $process->run();
 
         self::assertSame(1, $process->getExitCode());
-        // FAMILY-CONTRACT section 1: one dash-line per finding, with the location between the
-        // severity and the rule id, so the rule no longer follows the bracket directly.
+        // FAMILY-CONTRACT section 1 fixes the location between severity and rule ID for text findings.
+
         self::assertStringContainsString('[error] tests/Fixtures/Source/mixed/alpha.php:1 size.file-length', $process->getOutput());
         self::assertStringContainsString('Exit code: 1', $process->getOutput());
     }
@@ -204,7 +202,7 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command can fail on warning threshold.
      *
-     * @return void
+     * @return void - Asserts exit 1 and the warning failure threshold in the text report.
      */
     public function testAnalyseCommandCanFailOnWarningThreshold(): void
     {
@@ -228,8 +226,8 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command outputs JSON report.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts golden output, the analysis-v3 schema, four findings, and a warning-severity file-length finding.
+     * @throws JsonException - If decoding the command's stdout as JSON fails.
      */
     public function testAnalyseCommandOutputsJsonReport(): void
     {
@@ -280,8 +278,8 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command outputs JSON parse errors.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts exit 2, one parse error, and a first diagnostic of type parse-error.
+     * @throws JsonException - If decoding the command's stdout as JSON fails.
      */
     public function testAnalyseCommandOutputsJsonParseErrors(): void
     {
@@ -315,7 +313,7 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command applies configured path ignores.
      *
-     * @return void
+     * @return void - Asserts exit 0, five discovered files, two ignored paths, and the ignored alpha.php path.
      */
     public function testAnalyseCommandAppliesConfiguredPathIgnores(): void
     {
@@ -341,7 +339,7 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command reports invalid selection config.
      *
-     * @return void
+     * @return void - Asserts exit 2 and the unknown rule ID in the selection configuration diagnostic.
      */
     public function testAnalyseCommandReportsInvalidSelectionConfig(): void
     {
@@ -360,11 +358,11 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
-     * Models a user running `analyse` with an old non-empty secret-preview list.
-     * The command must exit 2 with one safe correction and never echo the configured value.
+     * Checks rejection of a non-empty legacy secret-preview list with exit 2 and a removal diagnostic.
+     * Verifies that stdout omits the configured preview's T3R2 fragment.
      *
-     * @return void
-     * @throws JsonException When the command unexpectedly returns malformed JSON instead of the config-error report.
+     * @return void - Asserts the rejection message and absence of the checked preview fragment.
+     * @throws JsonException - If decoding the command's stdout as JSON fails.
      */
     public function testAnalyseCommandRejectsConfiguredLegacySecretPreview(): void
     {
@@ -400,7 +398,7 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command reports missing infection executable in run mode.
      *
-     * @return void
+     * @return void - Asserts exit 2 and a mutation-tool diagnostic naming the missing Infection executable.
      */
     public function testAnalyseCommandReportsMissingInfectionExecutableInRunMode(): void
     {
@@ -427,8 +425,8 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command outputs scoring data in JSON report.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts grade A, full-project score scope, and absence of a diff field.
+     * @throws JsonException - If decoding the command's stdout as JSON fails.
      */
     public function testAnalyseCommandOutputsScoringDataInJsonReport(): void
     {
@@ -463,7 +461,7 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command outputs HTML report.
      *
-     * @return void
+     * @return void - Asserts report sections, omission of the mutation row, and absence of the Google Fonts domain.
      */
     public function testAnalyseCommandOutputsHtmlReport(): void
     {
@@ -493,7 +491,7 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command supports HTML editor links.
      *
-     * @return void
+     * @return void - Asserts a VS Code link prefix and the expected fixture path with line number.
      */
     public function testAnalyseCommandSupportsHtmlEditorLinks(): void
     {
@@ -518,9 +516,9 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
-     * Verify analyse command defaults HTML locations to copyable spans.
+     * Checks HTML location markup when editor links are explicitly disabled.
      *
-     * @return void
+     * @return void - Asserts location-span attributes and absence of VS Code and PhpStorm URI prefixes.
      */
     public function testAnalyseCommandDefaultsHtmlLocationsToCopyableSpans(): void
     {
@@ -546,9 +544,9 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
-     * Verify analyse command supports interactive HTML report.
+     * Checks that the interactive option controls HTML filter markup and the module-script marker.
      *
-     * @return void
+     * @return void - Asserts both markers appear when enabled and disappear with --report-interactive=false.
      */
     public function testAnalyseCommandSupportsInteractiveHtmlReport(): void
     {
@@ -592,7 +590,7 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command reports invalid HTML report options.
      *
-     * @return void
+     * @return void - Asserts exit 2 and HTML diagnostics for invalid editor-link and interactive values.
      */
     public function testAnalyseCommandReportsInvalidHtmlReportOptions(): void
     {
@@ -636,7 +634,7 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command outputs github annotations.
      *
-     * @return void
+     * @return void - Asserts exit 0, a GitHub error annotation prefix, and the missing-PHPDoc rule title.
      */
     public function testAnalyseCommandOutputsGithubAnnotations(): void
     {
@@ -659,12 +657,11 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
-     * Models a user in a sibling directory running `analyse ../proj` with a config that cannot load.
-     * The run never resolves a project root, so its envelope is rooted at the launch directory, where the target has
-     * no project-relative form; the command must still publish the config-error envelope and leave that input out.
+     * Checks the JSON config-error envelope when a sibling-directory target uses a missing config file.
+     * The envelope must omit the external input and config field and mark the first diagnostic as run-invalidating.
      *
-     * @return void
-     * @throws JsonException When the command prints no JSON envelope for the run that could not start.
+     * @return void - Asserts exit 2, empty run inputs, no config field, and a run-invalidating config-error diagnostic.
+     * @throws JsonException - If decoding the command's stdout as JSON fails.
      */
     public function testAnalyseCommandPublishesTheConfigErrorEnvelopeForATargetNamedFromASiblingDirectory(): void
     {
@@ -703,11 +700,9 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
-     * `--config` means the path the user typed, so from a nested directory `../../cfg.yaml` is read against that
-     * directory, as the `../..` target is, and not against the project root the target resolves to, where it named no
-     * file and the run refused with a config error.
+     * Checks a nested launch using a relative config path against a project-root launch.
      *
-     * @return void
+     * @return void - Asserts the nested run exits 0 and both decoded findings values match, with null used when absent.
      */
     public function testAnalyseCommandReadsAnExplicitRelativeConfigFromTheLaunchDirectory(): void
     {
@@ -731,11 +726,10 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
-     * A baseline path typed two levels inside the project names the project's own file, for writing and for reading.
-     * Read against the project root it named a file above the project: the write landed there, and the read crashed
-     * rendering the missing file's diagnostic, exiting 1 with nothing on stdout.
+     * Checks baseline generation and application from a nested launch directory using a relative baseline path.
+     * Also checks that a missing baseline outside the project yields a versioned JSON error report without the workspace path.
      *
-     * @return void
+     * @return void - Asserts baseline placement and application, then exit 2 and an analysis-v3 envelope for a missing baseline.
      */
     public function testAnalyseCommandReadsTypedBaselinePathsFromTheLaunchDirectory(): void
     {
@@ -769,12 +763,11 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
-     * Models a user in a sibling directory running `analyse ../a ../b`: two targets with no root inside the launch
-     * directory. The command must publish one run-invalidating target-error diagnostic and no findings, rather than
-     * failing while the report is rendered, and one such target on its own must still analyse.
+     * Checks rejection of two sibling targets with one run-invalidating target-error diagnostic and no findings.
+     * Running one of those targets alone must exit 0.
      *
-     * @return void
-     * @throws JsonException When the command prints no JSON envelope for the refused run.
+     * @return void - Asserts the rejected run's JSON envelope and the single-target run's successful exit.
+     * @throws JsonException - If decoding the command's stdout as JSON fails.
      */
     public function testAnalyseCommandRefusesSeveralTargetsOutsideTheLaunchDirectoryWithAnEnvelope(): void
     {
@@ -834,13 +827,14 @@ final class AnalyseCliTest extends CliTestCase
      *
      * @param string $fileName - Basename under tests/Fixtures/Cli/Golden whose contents are the expected output.
      *
-     * @return string - fixture text with the header/`"version"` stamps replaced by the live version
+     * @return string - Fixture text with the header and JSON version stamps replaced by the live version.
      */
     private function goldenOutput(string $fileName): string
     {
         $contents = file_get_contents(self::PROJECT_ROOT . '/tests/Fixtures/Cli/Golden/' . $fileName);
         self::assertIsString($contents);
 
+        // Replace the version in the "gruff-php X.Y.Z" header and in the JSON "version" field with the live version.
         $normalised = preg_replace(
             ['/^gruff-php \d+\.\d+\.\d+(?:-[A-Za-z0-9.]+)? /m', '/"version": "\d+\.\d+\.\d+(?:-[A-Za-z0-9.]+)?"/'],
             ['gruff-php ' . Application::VERSION . ' ', '"version": "' . Application::VERSION . '"'],

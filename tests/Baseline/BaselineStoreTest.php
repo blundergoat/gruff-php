@@ -16,15 +16,16 @@ use JsonException;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers baseline persistence under the v3 contract: identity rows with counts, sensitive counts without rows, loud rejection of
- * older layouts, the validator, and a migration that leaves the 0.5 original byte-identical.
+ * Exercises v3 baseline persistence with counted identities and separate sensitive counts.
+ * Checks selected validation failures, legacy-schema rejection, and migration into a separate file.
+ * Checks that tested secret representations are absent and legacy input bytes are preserved.
  */
 final class BaselineStoreTest extends TestCase
 {
     /**
-     * Verify write replaces the baseline atomically without lingering temp files.
+     * Verify two writes leave only the baseline file with two entries after the second write.
      *
-     * @return void
+     * @return void - Asserts the final directory listing and two entries read from the baseline file.
      */
     public function testWriteReplacesBaselineAtomicallyWithoutLingeringTempFiles(): void
     {
@@ -45,11 +46,11 @@ final class BaselineStoreTest extends TestCase
     }
 
     /**
-     * Verify write collapses same-identity findings into one counted row, sorts rows by identity, and stores nothing positional.
+     * Verify duplicate identities share a counted row, rows are sorted, and no line field is written.
      *
-     * @throws JsonException
+     * @throws JsonException - If decoding the written baseline fails.
      *
-     * @return void
+     * @return void - Asserts identity aggregation, row ordering, schema metadata, and absence of line fields.
      */
     public function testWriteAggregatesByIdentityAndStoresNothingPositional(): void
     {
@@ -80,7 +81,7 @@ final class BaselineStoreTest extends TestCase
             sort($sorted, SORT_STRING);
             self::assertSame($sorted, $identities);
 
-            // Two findings on one declaration at different lines are one row with the pair counted, and no row names a line.
+
             $occurrencesOnOneDeclaration = 2;
             $counts                      = array_column($occurrences, 'count', 'path');
             self::assertSame($occurrencesOnOneDeclaration, $counts['src/Example.php'] ?? null);
@@ -92,9 +93,9 @@ final class BaselineStoreTest extends TestCase
     }
 
     /**
-     * Verify a written file carries no sensitive occurrence and nothing that could name one, only counts.
+     * Verify sensitive findings contribute counts while the supplied secret text and path stay out of the file.
      *
-     * @return void
+     * @return void - Asserts one stored entry, two sensitive counts, ineligibility, and omission of the tested text and path.
      */
     public function testWriteCountsSensitiveFindingsInsteadOfStoringThem(): void
     {
@@ -127,10 +128,9 @@ final class BaselineStoreTest extends TestCase
     }
 
     /**
-     * Verify a finding whose symbol carries the ordinal separator stays out of a written baseline, is not counted as a
-     * secret, and no longer aborts the whole generation.
+     * Verify a mixed ordinary/separator-symbol batch writes one row without adding sensitive counts.
      *
-     * @return void
+     * @return void - Asserts one baseline entry and no sensitive counts after writing both findings.
      */
     public function testWriteLeavesOutASeparatorBearingSymbol(): void
     {
@@ -152,7 +152,7 @@ final class BaselineStoreTest extends TestCase
     /**
      * Verify a 0.5 baseline fails closed with the migration command rather than being misread.
      *
-     * @return void
+     * @return void - Expects BaselineException with the migration command for the v2 fixture.
      */
     public function testReadRejectsLegacyV2SchemaWithMigrationInstruction(): void
     {
@@ -165,9 +165,9 @@ final class BaselineStoreTest extends TestCase
     }
 
     /**
-     * Verify the retired v1 layout still fails closed with a regenerate instruction.
+     * Verify the retired v1 fixture is rejected with an unsupported-schema error.
      *
-     * @return void
+     * @return void - Expects BaselineException identifying the unsupported v1 schema.
      */
     public function testReadRejectsRetiredV1SchemaWithRegenerateInstruction(): void
     {
@@ -182,7 +182,7 @@ final class BaselineStoreTest extends TestCase
     /**
      * Verify a v3 fixture parses into identity rows with counts and sensitive counts.
      *
-     * @return void
+     * @return void - Asserts two entries, selected identity and rule fields, occurrence counts, language, and sensitive total.
      */
     public function testReadParsesV3FixtureRows(): void
     {
@@ -198,9 +198,9 @@ final class BaselineStoreTest extends TestCase
     }
 
     /**
-     * Verify the validator rejects every way a hand-edited file could expire, leak, or reorder.
+     * Verify rejection of invalid counts, forbidden line fields, malformed or duplicate identities, and unsorted rows.
      *
-     * @return void
+     * @return void - Expects an occurrence-specific BaselineException for each listed invalid row case.
      */
     public function testReadRejectsInvalidRows(): void
     {
@@ -231,10 +231,9 @@ final class BaselineStoreTest extends TestCase
     }
 
     /**
-     * Verify migration refuses in-place targets, keeps the 0.5 input byte-identical, writes a valid v3 file, translates no 0.5 digest,
-     * and matches the fixture's group recorded under the retired docs.missing-public-phpdoc id to the renamed rule's finding.
+     * Verify same-path and symlink targets are rejected, the original bytes survive, and the legacy rule alias matches.
      *
-     * @return void
+     * @return void - Asserts rejected aliasing targets, one accepted migrated entry, the current rule id, and unchanged input bytes.
      */
     public function testMigrateCarriesReviewsIntoASeparateFileAndPreservesTheOriginal(): void
     {
@@ -279,11 +278,10 @@ final class BaselineStoreTest extends TestCase
     }
 
     /**
-     * Verify a written baseline carries no sentinel, raw, partial, hashed or encoded.
+     * Verify the file omits the sentinel, its eight-byte prefix, SHA-256 digest, and Base64 encoding.
+     * The sensitive rule count remains available without those tested representations.
      *
-     * A file a team commits and shares must not leak the secret it was counting, in any derived form.
-     *
-     * @return void
+     * @return void - Asserts absence of the four tested representations and presence of the sensitive rule count.
      */
     public function testAWrittenBaselineCarriesNoSentinel(): void
     {
@@ -306,7 +304,7 @@ final class BaselineStoreTest extends TestCase
                 self::assertStringNotContainsString($form, $written, sprintf('the written baseline carries the %s form of the sentinel', $name));
             }
 
-            // What it does carry is a count, which is what makes the secret auditable without naming it.
+            // What it does carry is the rule count without storing the matched text.
             self::assertStringContainsString('"sensitive-data.aws-access-key": 1', $written);
         } finally {
             $this->removeDir($root);
@@ -314,7 +312,7 @@ final class BaselineStoreTest extends TestCase
     }
 
     /**
-     * Return every shape a leaked secret could take in an artifact, so a derived value is caught as well as a raw one.
+     * Return the sentinel, its first eight bytes, SHA-256 digest, and Base64 encoding for absence checks.
      *
      * @param string $sentinel - The synthetic literal the test searches for.
      *
@@ -331,9 +329,9 @@ final class BaselineStoreTest extends TestCase
     }
 
     /**
-     * Verify a generate at the default path keeps the retreat copy unless the user forces it.
+     * Verify default-path checks preserve legacy bytes on refusal and allow missing paths, forced checks, and v3 files.
      *
-     * @return void
+     * @return void - Asserts the unforced legacy check throws with --force advice and leaves the file unchanged.
      */
     public function testDefaultPathProtectionKeepsTheRetreatCopy(): void
     {
@@ -355,12 +353,12 @@ final class BaselineStoreTest extends TestCase
                 self::assertStringContainsString('--force', $exception->getMessage());
             }
 
-            // The refusal is not a write: the retreat copy is exactly as the user left it.
+
             self::assertSame($legacyBytes, file_get_contents($root . '/gruff-baseline.json'));
-            // The destructive case stays available and stays explicit.
+
             $store->requireOverwritableDefaultPath('gruff-baseline.json', true);
 
-            // Regenerating v3 over v3 is not destructive, because v3 is what the tool now reads.
+            // A current-schema file needs no migration, so the guard permits it without force.
             $store->write('gruff-baseline.json', [$this->finding()]);
             $store->requireOverwritableDefaultPath('gruff-baseline.json', false);
         } finally {
@@ -369,9 +367,9 @@ final class BaselineStoreTest extends TestCase
     }
 
     /**
-     * Verify a 0.5 input naming two row containers is refused, so no two ports read one file differently.
+     * Verify a v2 input with both groups and entries is rejected without changing the input or creating an output.
      *
-     * @return void
+     * @return void - Asserts the row-container error, unchanged input bytes, and absence of the destination file.
      */
     public function testMigrationRefusesAnAmbiguousInput(): void
     {
@@ -402,7 +400,7 @@ final class BaselineStoreTest extends TestCase
     /**
      * Verify an output hard-linked to the input is refused, because it is the same inode under another name.
      *
-     * @return void
+     * @return void - Expects the same-input-path error and verifies unchanged legacy bytes after hard-link rejection.
      */
     public function testMigrationRefusesAHardLinkedOutput(): void
     {
@@ -447,7 +445,7 @@ final class BaselineStoreTest extends TestCase
      * @param string $root - Temp project root.
      * @param string $legacyBytes - Bytes staged before the migration.
      *
-     * @return void
+     * @return void - Asserts that the staged legacy file still has exactly the supplied bytes.
      */
     private function assertLegacyInputUnchanged(string $root, string $legacyBytes): void
     {
@@ -457,9 +455,9 @@ final class BaselineStoreTest extends TestCase
     }
 
     /**
-     * Wrap one or more occurrence objects in an otherwise valid v3 document.
+     * Wrap supplied occurrence JSON in an otherwise valid v3 document.
      *
-     * @param string $occurrences - JSON occurrence objects, comma separated.
+     * @param string $occurrences - Comma-separated JSON occurrence objects; an empty string creates an empty list.
      *
      * @return string - Complete v3 document text.
      */
@@ -478,9 +476,9 @@ final class BaselineStoreTest extends TestCase
      * @param string      $ruleId - Rule id, part of the identity.
      * @param string      $message - Message; only part of the identity when no symbol is named.
      * @param string|null $symbol - Symbol the finding is anchored to; null for a file-level finding.
-     * @param Pillar      $pillar - Pillar the finding belongs to; pass SensitiveData to build a secret the store must not store.
+     * @param Pillar      $pillar - Pillar assigned to the finding; SensitiveData creates a sensitive-data fixture.
      *
-     * @return Finding - One advisory finding the store round-trips through these tests, documentation unless a pillar is named.
+     * @return Finding - Advisory finding using the supplied fields, with Documentation as the default pillar.
      */
     private function finding(
         string $filePath = 'src/Example.php',
@@ -521,9 +519,9 @@ final class BaselineStoreTest extends TestCase
     /**
      * Remove a temporary directory tree.
      *
-     * @param string $path - Filesystem path.
+     * @param string $path - Temporary directory to remove; a missing or non-directory path is ignored.
      *
-     * @return void
+     * @return void - Removes the tree if present, unlinking nested directory symlinks without following them.
      */
     private function removeDir(string $path): void
     {

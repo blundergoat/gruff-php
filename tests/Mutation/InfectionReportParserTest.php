@@ -14,8 +14,9 @@ use RecursiveIteratorIterator;
 use SplFileInfo;
 
 /**
- * Covers Infection JSON report parsing: full reports, optional status fields, malformed/missing/invalid input rejection, and runner integration with
- * project vendor binaries and config.
+ * Covers Infection report parsing, status normalisation, and per-file summaries.
+ * Checks rejection diagnostics for missing reports and invalid report data.
+ * Exercises runner arguments through temporary project executables and configuration.
  *
  * @phpstan-type InvalidReportScalar bool|float|int|object|string|null
  * @phpstan-type InvalidReportLevel10 array<array-key, InvalidReportScalar>
@@ -39,13 +40,13 @@ use SplFileInfo;
  */
 final class InfectionReportParserTest extends TestCase
 {
-    /** Project root used by filesystem and CLI tests. */
+    /** Repository root used to resolve checked-in report fixtures and missing-report paths. */
     private const PROJECT_ROOT = __DIR__ . '/../..';
 
     /**
-     * Verify parses full infection JSON report.
+     * Checks report metrics, surviving-mutant count, and the summary for the valid fixture.
      *
-     * @return void
+     * @return void - Asserts the report path, metric values, and per-file totals.
      */
     public function testParsesFullInfectionJsonReport(): void
     {
@@ -72,7 +73,7 @@ final class InfectionReportParserTest extends TestCase
     /**
      * Verify parser normalises every Infection status section and optional mutant fields.
      *
-     * @return void
+     * @return void - Asserts normalised statuses, optional values, report metrics, and both file summaries.
      */
     public function testParsesStatusSectionsOptionalFieldsAndFileSummaries(): void
     {
@@ -224,9 +225,9 @@ final class InfectionReportParserTest extends TestCase
     }
 
     /**
-     * Verify rejects malformed infection JSON report.
+     * Checks that a report with non-numeric statistics raises a report error.
      *
-     * @return void
+     * @return void - Expects MutationReportException with the non-numeric-statistics diagnostic.
      */
     public function testRejectsMalformedInfectionJsonReport(): void
     {
@@ -237,9 +238,9 @@ final class InfectionReportParserTest extends TestCase
     }
 
     /**
-     * Verify missing reports are rejected before decoding.
+     * Checks the missing-report exception and its path-specific diagnostic.
      *
-     * @return void
+     * @return void - Expects MutationReportException naming missing-report.json.
      */
     public function testRejectsMissingInfectionReport(): void
     {
@@ -252,10 +253,10 @@ final class InfectionReportParserTest extends TestCase
     /**
      * Verify malformed report shapes surface specific diagnostics.
      *
-     * @param InvalidReportShape $report - Report payload.
+     * @param InvalidReportShape $report - Invalid report payload written to the temporary report file.
      * @param string             $message - Expected exception message fragment.
      *
-     * @return void
+     * @return void - Expects MutationReportException containing the supplied message fragment.
      */
     #[DataProvider('invalidReportProvider')]
     public function testRejectsInvalidReportShapes(array $report, string $message): void
@@ -277,8 +278,7 @@ final class InfectionReportParserTest extends TestCase
     /**
      * Provide invalid report cases for parameterized tests.
      *
-     * @return array<string, array{InvalidReportShape, string}> - PHPUnit cases keyed by scenario name; each pairs a malformed report payload with
-     *                       the substring its rejection message must contain
+     * @return array<string, array{InvalidReportShape, string}> - Named invalid payloads paired with rejection-message fragments.
      */
     public static function invalidReportProvider(): array
     {
@@ -338,9 +338,9 @@ final class InfectionReportParserTest extends TestCase
     }
 
     /**
-     * Verify infection runner prefers project vendor binary.
+     * Checks that a temporary project's vendor binary receives the Infection command.
      *
-     * @return void
+     * @return void - Asserts a successful result, the local command output, and no diagnostic.
      */
     public function testInfectionRunnerPrefersProjectVendorBinary(): void
     {
@@ -365,7 +365,7 @@ final class InfectionReportParserTest extends TestCase
     /**
      * Verify infection runner uses project infection config by default.
      *
-     * @return void
+     * @return void - Asserts the local infection.json5 path is forwarded with a successful result.
      */
     public function testInfectionRunnerUsesProjectInfectionConfigByDefault(): void
     {
@@ -394,7 +394,7 @@ final class InfectionReportParserTest extends TestCase
     /**
      * Verify infection runner passes test framework options.
      *
-     * @return void
+     * @return void - Asserts the option text appears in successful local-binary output with no diagnostic.
      */
     public function testInfectionRunnerPassesTestFrameworkOptions(): void
     {
@@ -444,17 +444,13 @@ final class InfectionReportParserTest extends TestCase
      * Build one infection mutant payload for parser tests.
      *
      * @param string   $filePath - Source path the mutant claims to touch, mirrored into mutator.originalFilePath.
-     * @param string   $mutatorName - Infection mutator label, e.g. "Plus"; drives how the parser classifies the mutant.
-     * @param int|null $line - One-based source line; null omits originalStartLine to hit the optional branch.
-     * @param string   $diff - Unified diff body the report would carry; blank when a test does not assert on it.
-     * @param string   $processOutput - Captured runner stdout for the mutant; blank when irrelevant to the case.
+     * @param string   $mutatorName - Mutator label copied into mutator.mutatorName.
+     * @param int|null $line - Source line copied into originalStartLine; null omits that field.
+     * @param string   $diff - Diff text stored verbatim; an empty string is normalised to null by the parser.
+     * @param string   $processOutput - Captured mutant process output; an empty string is normalised to null by the parser.
      *
-     * @return array{
-     *     mutator: array{mutatorName: string, originalFilePath: string, originalStartLine?: int},
-     *     diff: string,
-     *     processOutput: string
-     * } - one mutant entry in the exact shape Infection writes into status lists; originalStartLine is omitted
-     *     when line is null
+     * @return array{mutator: array{mutatorName: string, originalFilePath: string, originalStartLine?: int}, diff: string, processOutput: string}
+     *     - One mutant payload; a null line omits originalStartLine.
      */
     private function mutant(string $filePath, string $mutatorName, ?int $line, string $diff = '', string $processOutput = ''): array
     {
@@ -480,7 +476,7 @@ final class InfectionReportParserTest extends TestCase
      * @param string             $path - Destination file the JSON-encoded fixture is written to; caller cleans it up.
      * @param InvalidReportShape $report - JSON-serialisable report payload to write.
      *
-     * @return void
+     * @return void - Asserts a non-false file-write result after JSON encoding.
      */
     private function writeReport(string $path, array $report): void
     {
@@ -490,14 +486,14 @@ final class InfectionReportParserTest extends TestCase
     /**
      * Remove a temporary directory tree.
      *
-     * @param string $path - Filesystem path.
+     * @param string $path - Temporary directory to remove; a non-directory path is left untouched.
      *
-     * @return void
+     * @return void - Returns after child-first cleanup attempts, or immediately when the path is not a directory.
      */
     private function removeDir(string $path): void
     {
         if (!is_dir($path)) {
-            // Nothing to tear down when the directory was never created, so treat removal as already done.
+
             return;
         }
 

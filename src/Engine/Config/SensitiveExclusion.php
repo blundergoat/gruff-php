@@ -8,25 +8,21 @@ use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Support\PathHelper;
 
 /**
- * One reviewed sensitive-data exclusion the user wrote under `sensitiveExclusions:`.
+ * One reviewed sensitive-data exclusion from the `sensitiveExclusions` configuration.
+ * Records a rule id, project-relative path, optional symbol, and the reviewer's rationale.
  *
- * A user who has read a sensitive-data finding and decided it is a synthetic fixture rather than a
- * live credential records that decision here: exactly one rule id, exactly one project-relative
- * path, an optional symbol, and the rationale a reviewer will read later. The scope is deliberately
- * narrow - the same rule in another file and another rule in the same file both keep reporting -
- * and nothing about the matched value takes part in the decision, so a suppression can never be
- * written against the secret itself.
+ * Matching uses only this scope, never the finding's message or matched value.
+ * Other rules or paths remain outside this entry's scope.
  */
 final readonly class SensitiveExclusion
 {
     /**
-     * Holds one validated exclusion entry; every field is already checked by
-     * {@see SensitiveExclusionConfigParser}, so matching never re-validates.
+     * Stores one exclusion scope and its audit reason.
      *
      * @param string      $ruleId - Exact sensitive-data rule id this entry suppresses.
      * @param string      $path - Project-relative display path this entry is scoped to.
      * @param string|null $symbol - Symbol that narrows the scope further; null when the entry covers the whole file.
-     * @param string      $reason - Reviewer-supplied rationale published in the audit row.
+     * @param string      $reason - Reviewer-supplied rationale retained with the exclusion.
      */
     public function __construct(
         public string  $ruleId,
@@ -42,8 +38,7 @@ final readonly class SensitiveExclusion
      *
      * @param Finding $finding - Finding to test against this entry's scope.
      *
-     * @return bool - true when rule id, display path, and (when configured) symbol all match exactly; false otherwise, so the finding keeps
-     *              reporting.
+     * @return bool - True when rule, normalised path, and optional symbol match this scope; false otherwise.
      */
     public function matches(Finding $finding): bool
     {

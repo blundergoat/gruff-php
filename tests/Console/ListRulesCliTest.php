@@ -11,14 +11,16 @@ use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers the version, list, and help CLI commands running end-to-end through the built binary on a clean checkout.
+ * Exercises version, command listing and rule-catalogue output through the CLI binary.
+ * Checks selected text and JSON fields, guidance, options and threshold maps.
+ * Installation fixtures cover help after a production install and init through a consumer's vendor/bin proxy.
  */
 final class ListRulesCliTest extends CliTestCase
 {
     /**
      * Verify version command runs through binary.
      *
-     * @return void
+     * @return void - Asserts a successful exit and the product name and version in stdout.
      */
     public function testVersionCommandRunsThroughBinary(): void
     {
@@ -33,7 +35,7 @@ final class ListRulesCliTest extends CliTestCase
     /**
      * Verify list command runs through binary.
      *
-     * @return void
+     * @return void - Asserts a successful exit and analyse, dashboard and report in the command list.
      */
     public function testListCommandRunsThroughBinary(): void
     {
@@ -49,7 +51,7 @@ final class ListRulesCliTest extends CliTestCase
     /**
      * Verify list-rules accepts the shared text format alias.
      *
-     * @return void
+     * @return void - Asserts a successful exit and the expected table header for text output.
      */
     public function testListRulesAcceptsTextFormatAlias(): void
     {
@@ -63,7 +65,7 @@ final class ListRulesCliTest extends CliTestCase
     /**
      * Verify list-rules with a rule id argument renders the per-rule detail view.
      *
-     * @return void
+     * @return void - Asserts the rule identity, option and escape-hatch text, and false-positive guidance heading.
      */
     public function testListRulesRendersPerRuleDetailViewForKnownId(): void
     {
@@ -86,9 +88,9 @@ final class ListRulesCliTest extends CliTestCase
     }
 
     /**
-     * Verify a user who types the retired docs.missing-public-phpdoc id sees the renamed rule's detail view, not "Unknown rule".
+     * Verifies that the retired docs.missing-public-phpdoc ID displays the docs.missing-phpdoc detail heading.
      *
-     * @return void
+     * @return void - Asserts a successful exit and the replacement rule's heading.
      */
     public function testListRulesResolvesARetiredIdToItsReplacement(): void
     {
@@ -107,7 +109,7 @@ final class ListRulesCliTest extends CliTestCase
     /**
      * Verify list-rules detail view JSON includes the structured payload.
      *
-     * @return void
+     * @return void - Asserts the requested ID, guidance-key presence and nonempty escape hatches.
      */
     public function testListRulesDetailJsonIncludesStructuredFields(): void
     {
@@ -134,11 +136,9 @@ final class ListRulesCliTest extends CliTestCase
 
     /**
      * Verify the catalogue publishes false-positive guidance for every medium and low confidence rule.
+     * Checks catalogue counts, nonblank guidance entries and high confidence for rows without guidance.
      *
-     * One method covers the whole guarantee - population, per-rule guidance, and the deliberate
-     * absence of the key - because each assertion reads the same catalogue payload.
-     *
-     * @return void
+     * @return void - Asserts catalogue counts, complete medium/low guidance and high confidence for rows without guidance.
      */
     public function testCatalogueJsonPublishesGuidanceForEveryMediumAndLowConfidenceRule(): void
     {
@@ -146,7 +146,10 @@ final class ListRulesCliTest extends CliTestCase
         $process->run();
         $exitCode = $process->getExitCode();
         $payload  = json_decode($process->getOutput(), associative: true, flags: JSON_THROW_ON_ERROR);
-        /** @var list<array{id: string, confidence: string, falsePositiveShapes?: list<array{shape: string, mitigation: string}>}> $rules Catalogue rows as published by the JSON renderer. */
+        /**
+         * @var list<array{id: string, confidence: string, falsePositiveShapes?: list<array{shape: string, mitigation: string}>}> $rules
+         *     - Catalogue rows as published by the JSON renderer.
+         */
         $rules = (array)(is_array($payload) ? ($payload['rules'] ?? []) : []);
 
         $mediumOrLowRules = array_values(array_filter(
@@ -181,7 +184,7 @@ final class ListRulesCliTest extends CliTestCase
         )));
 
         self::assertSame(0, $exitCode, $process->getErrorOutput());
-        // Precision-floor M19 (2026-10-04) retired nine rules, six of them medium or low confidence (ADR-034).
+
         self::assertCount(84, $rules);
         self::assertCount(41, $mediumOrLowRules);
         self::assertSame([], $withoutGuidance);
@@ -191,9 +194,9 @@ final class ListRulesCliTest extends CliTestCase
     }
 
     /**
-     * Verify guidance catalogued before this batch is still published by both catalogue surfaces.
+     * Verifies that waste.commented-out-code publishes the same nonempty guidance in catalogue and detail JSON.
      *
-     * @return void
+     * @return void - Asserts successful exits and identical nonempty guidance for the selected rule.
      */
     public function testPreExistingGuidanceStaysPublishedInCatalogueAndDetailViews(): void
     {
@@ -211,7 +214,10 @@ final class ListRulesCliTest extends CliTestCase
 
         $listPayload   = json_decode($listProcess->getOutput(), associative: true, flags: JSON_THROW_ON_ERROR);
         $detailPayload = json_decode($detailProcess->getOutput(), associative: true, flags: JSON_THROW_ON_ERROR);
-        /** @var list<array{id: string, falsePositiveShapes?: list<array{shape: string, mitigation: string}>}> $catalogueRules Catalogue rows as published by the JSON renderer. */
+        /**
+         * @var list<array{id: string, falsePositiveShapes?: list<array{shape: string, mitigation: string}>}> $catalogueRules
+         *     - Catalogue rows as published by the JSON renderer.
+         */
         $catalogueRules  = (array)(is_array($listPayload) ? ($listPayload['rules'] ?? []) : []);
         $catalogueShapes = array_merge(...array_map(
             static fn(array $rule): array => $rule['falsePositiveShapes'] ?? [],
@@ -225,14 +231,14 @@ final class ListRulesCliTest extends CliTestCase
         self::assertSame(0, $listProcess->getExitCode(), $listProcess->getErrorOutput());
         self::assertSame(0, $detailProcess->getExitCode(), $detailProcess->getErrorOutput());
         self::assertNotEmpty($catalogueShapes);
-        // The catalogue row and the detail card publish one text, so a reader comparing them agrees.
+
         self::assertSame($detailShapes, $catalogueShapes);
     }
 
     /**
      * Verify requested rule detail JSON preserves toggle and additive option contracts.
      *
-     * @return void
+     * @return void - Asserts selected rule IDs, default options and exact option descriptions in detail JSON.
      */
     public function testRequestedRuleDetailsExposeDocumentedOptionContracts(): void
     {
@@ -287,7 +293,7 @@ final class ListRulesCliTest extends CliTestCase
     /**
      * Verify list-rules with an unknown rule id suggests near matches and exits INVALID.
      *
-     * @return void
+     * @return void - Asserts exit code 2 and the unknown-rule message, suggestion prompt and corrected ID.
      */
     public function testListRulesUnknownRuleSuggestsNearMatches(): void
     {
@@ -307,9 +313,9 @@ final class ListRulesCliTest extends CliTestCase
     }
 
     /**
-     * Verify clean checkout install runs CLI help.
+     * Verifies that a package copy runs CLI help after installing dependencies without development packages.
      *
-     * @return void
+     * @return void - Asserts successful dependency installation and a successful help response containing Description:.
      */
     public function testCleanCheckoutInstallRunsCliHelp(): void
     {
@@ -349,8 +355,8 @@ final class ListRulesCliTest extends CliTestCase
     /**
      * Verify Composer's vendor/bin proxy boots the package through the consumer project's autoloader.
      *
-     * @return void
-     * @throws \JsonException
+     * @return void - Asserts installation without a package autoloader and successful config creation through vendor/bin.
+     * @throws \JsonException - If the consumer Composer manifest cannot be encoded as JSON.
      */
     public function testInstalledVendorBinProxyUsesConsumerAutoloader(): void
     {
@@ -415,15 +421,10 @@ final class ListRulesCliTest extends CliTestCase
     }
 
     /**
-     * Verify both JSON surfaces publish thresholds in the family shape: a named knob map on a
-     * tunable rule, and no key at all on a rule without one.
+     * Verifies selected named threshold maps in catalogue JSON and the method-length map in detail JSON.
+     * Checks that maps are nonempty, omit severity keys and omit thresholds for header injection.
      *
-     * The catalogue row and the detail card are read together because they must agree, and the
-     * three threshold kinds - a borrowed gruff-go knob name, the one-key `threshold` map, and a
-     * rule's own named defaults - are asserted on real rules so the projector cannot regress one
-     * kind while the others stay green.
-     *
-     * @return void
+     * @return void - Asserts selected catalogue maps, threshold-key absence and the method-length detail map.
      */
     public function testCatalogueAndDetailPublishThresholdsAsNamedKnobMaps(): void
     {
@@ -441,9 +442,9 @@ final class ListRulesCliTest extends CliTestCase
 
         $listPayload   = json_decode($listProcess->getOutput(), associative: true, flags: JSON_THROW_ON_ERROR);
         $detailPayload = json_decode($detailProcess->getOutput(), associative: true, flags: JSON_THROW_ON_ERROR);
-        /** @var list<array{id: string, thresholds?: array<string, int|float>}> $rules Catalogue rows as published by the JSON renderer. */
+        /** @var list<array{id: string, thresholds?: array<string, int|float>}> $rules - Catalogue rows as published by the JSON renderer. */
         $rules = (array)(is_array($listPayload) ? ($listPayload['rules'] ?? []) : []);
-        /** @var array{thresholds?: array<string, int|float>} $detail Detail card as published by the JSON renderer. */
+        /** @var array{thresholds?: array<string, int|float>} $detail - Detail card as published by the JSON renderer. */
         $detail = is_array($detailPayload) ? $detailPayload : [];
         $rulesById = array_combine(
             array_map(static fn(array $rule): string => $rule['id'], $rules),
@@ -460,18 +461,16 @@ final class ListRulesCliTest extends CliTestCase
 
         self::assertSame(0, $listProcess->getExitCode(), $listProcess->getErrorOutput());
         self::assertSame(0, $detailProcess->getExitCode(), $detailProcess->getErrorOutput());
-        // A rubric whose rule id has a gruff-go knob name borrows it.
+
         self::assertSame(['maxComplexity' => 20], $rulesById['complexity.cognitive']['thresholds'] ?? null);
         self::assertSame(['maxLines' => 100], $rulesById['size.method-length']['thresholds'] ?? null);
-        // A rubric with no knob name anywhere in the family publishes the one-key map.
+
         self::assertSame(['threshold' => 10], $rulesById['docs.todo-density']['thresholds'] ?? null);
-        // A rule with its own named defaults publishes them unchanged.
         self::assertSame(['minWords' => 2], $rulesById['test-quality.testdox-readability']['thresholds'] ?? null);
-        // A rule with no threshold omits the key rather than publishing `{}`.
         self::assertArrayNotHasKey('thresholds', $rulesById['security.header-injection'] ?? []);
         self::assertSame([], $pairShaped);
         self::assertSame([], $emptyMaps);
-        // The detail card publishes the same map as the catalogue row.
+
         self::assertSame(['maxLines' => 100], $detail['thresholds'] ?? null);
     }
 }

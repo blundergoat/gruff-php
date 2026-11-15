@@ -33,20 +33,19 @@ final readonly class BranchReviewBuilder
 {
     /**
      * Builds the user's branch review by analysing the base ref and comparing it with current findings.
-     *
      * The report uses this result to label findings as introduced, removed, or unchanged.
-     * It runs once for `analyse --diff-vs`, after the current tree has been scored.
+     * It runs once for analyse --diff-vs, after the current tree has been scored.
      *
      * @param string                $projectRoot     - Project root the comparison runs from.
-     * @param AnalyseCommandOptions $options         - Effective CLI analysis options, including the `--diff-vs` base ref.
+     * @param AnalyseCommandOptions $options         - Effective CLI analysis options, including the --diff-vs base ref.
      * @param AnalysisConfig        $config          - Effective rule and path configuration.
-     * @param RuleRegistry          $registry        - Rule registry used to analyse the base snapshot.
+     * @param RuleRegistry $registry - Registry consulted to decide whether whole-project context is needed.
      * @param list<Finding>         $currentFindings - Post-baseline findings for the current tree; empty when this branch is clean.
-     * @param ReviewScoreContext    $scoreContext    - Current composite score and the evaluated-file denominator it came from, so the base side is scored the same way.
+     * @param ReviewScoreContext $scoreContext - Current score for the delta and evaluated-file denominator reused for base scoring.
      * @param DiffResult|null       $reviewDiff      - Review diff metadata; null when the diff lookup failed, which turns review mode off.
      * @param list<RunDiagnostic>   $diagnostics     - Run diagnostics collected so far; review-mode errors are appended here in place.
      *
-     * @return BranchReviewResult|null - Introduced/removed/unchanged comparison; null means review mode is off or the base snapshot failed
+     * @return BranchReviewResult|null - Comparison result; null when review is disabled or a caught diff/runtime error prevents it.
      */
     public function build(
         string $projectRoot,
@@ -58,7 +57,7 @@ final readonly class BranchReviewBuilder
         ?DiffResult $reviewDiff,
         array &$diagnostics,
     ): ?BranchReviewResult {
-        // Without a `--diff-vs` ref or a usable diff, there is no base to compare against, so review mode stays off.
+        // Without a --diff-vs ref or a usable diff, there is no base to compare against, so review mode stays off.
         if ($options->changeScope->diffVs === null || $reviewDiff === null) {
             return null;
         }
@@ -91,7 +90,7 @@ final readonly class BranchReviewBuilder
             );
         }
 
-        // Build and analyze the base-ref snapshot for the user's comparison.
+
         // Snapshot or diff failures become diagnostics rather than aborting the ordinary scan.
         try {
             $baseRoot     = $gitArchiveSnapshot->create($projectRoot, $options->changeScope->diffVs, $baseSnapshotPaths);
@@ -99,7 +98,7 @@ final readonly class BranchReviewBuilder
             $baseFindings = [];
             $baseFiles    = [];
 
-            // Only analyse the base snapshot when it actually holds files; an empty set means nothing survived from the base ref to score.
+
             if ($basePaths !== []) {
                 $baseSources = (new AnalysisSourceLoader())->load(
                     $baseRoot,
@@ -121,8 +120,8 @@ final readonly class BranchReviewBuilder
                 $baseFiles = $baseSources->discovery->files;
             }
 
-            // Reviewed exclusions and section 13c apply on the base side too, keeping the comparison symmetric;
-            // otherwise a covered finding present in both trees reads as removed.
+            // Apply the same suppression rules to both trees so existing suppressed findings do not appear as removed.
+
             $baseFindings = (new SensitiveExclusionFilter())->apply(
                 $baseFindings,
                 $config->sensitiveExclusions(),
@@ -144,7 +143,7 @@ final readonly class BranchReviewBuilder
                         DeclarationInventory::forFindings($baseRoot, $baseFindings),
                     );
                 } catch (BaselineException $exception) {
-                    // A malformed or outdated baseline should not sink review mode; report it and continue with unfiltered base findings.
+                    // If baseline filtering fails, report the error and compare the unfiltered base findings.
                     $diagnostics[] = new RunDiagnostic(
                         type:    'baseline-error',
                         message: $exception->getMessage(),
@@ -156,7 +155,7 @@ final readonly class BranchReviewBuilder
             $baseFindings = (new AnalysisFindingSupport())->normalizeFindingPaths($baseFindings, $options->pathsRelativeTo);
             $baseScore    = (new ScoreCalculator())->calculate($baseFindings, $scoreContext->evaluatedFiles, null, null, scorePillars: $options->profileScorePillars(), analysisConfig: $config);
 
-            // Compare current and base findings so the report identifies what this branch introduced or removed.
+
             return (new BranchReviewComparator())->compare(
                 current:       $currentFindings,
                 base:          $baseFindings,
@@ -171,10 +170,10 @@ final readonly class BranchReviewBuilder
                 message: $exception->getMessage(),
             );
 
-            // Return null so a failed base comparison drops review mode but preserves the user's ordinary findings.
+
             return null;
         } finally {
-            // Always delete the temporary base-ref checkout we created, whether the comparison succeeded or threw.
+            // Attempt to remove the temporary base snapshot after both successful and failed comparisons.
             if ($baseRoot !== null) {
                 $gitArchiveSnapshot->remove($baseRoot);
             }
@@ -182,34 +181,31 @@ final readonly class BranchReviewBuilder
     }
 
     /**
-     * Measures the score movement users see between their branch and its base snapshot.
-     * When the current scan has no applicable score, it returns null so the UI does not present a synthetic improvement from an empty run.
+     * Returns the current composite score minus the base score, or null if either score is unavailable.
      *
-     * @param float|null $currentScore - Composite score of the current findings; null when discovery found no files to score.
-     * @param float      $baseScore    - Composite score calculated for the base snapshot's findings.
+     * @param float|null $currentScore - Current composite score; null when no applicable score is available.
+     * @param float      $baseScore    - Base snapshot score; null means no applicable base score is available.
      *
-     * @return float|null - Score movement from base to current, or null when the current side has no applicable score.
+     * @return float|null - Score movement from base to current, or null when either score is unavailable.
      */
     private function deltaVersusBase(?float $currentScore, ?float $baseScore): ?float
     {
-        // A base that evaluated nothing has no score to subtract, so no delta can be claimed against it.
+
         return $currentScore === null || $baseScore === null ? null : $currentScore - $baseScore;
     }
 
     /**
-     * Finds the extra whole-project files that project-wide rules need during a narrowed user scan.
-     *
-     * This keeps changed-file analysis fast without hiding the wider project context from those rules.
-     * The analysis command calls it before rules execute.
+     * Supplies analysis units for project-wide rules, loading the full tree when the requested scope needs wider context.
+     * Otherwise reuses the source set's existing units.
      *
      * @param string                $projectRoot       - Project root used for full-tree discovery.
      * @param AnalyseCommandOptions $options           - Effective CLI analysis options.
      * @param AnalysisConfig        $config            - Effective rule and path configuration.
      * @param RuleRegistry          $registry          - Rule registry consulted for enabled project rules.
-     * @param DiffResult|null       $reviewDiff        - Review diff metadata; null when branch review is inactive for this run.
+     * @param DiffResult|null $reviewDiff - Inactive for plain scans; null after a failed review diff lookup.
      * @param AnalysisSourceSet     $analysisSourceSet - Already-loaded sources for the requested paths.
      *
-     * @return list<AnalysisUnit> - Files project-wide rules need; the requested-path units alone when no full-tree load is required.
+     * @return list<AnalysisUnit> - Full-tree context units, or the existing requested-path units when no wider load is needed.
      */
     public function projectContextUnits(
         string $projectRoot,
@@ -230,7 +226,7 @@ final readonly class BranchReviewBuilder
             return $analysisSourceSet->analysisUnits;
         }
 
-        // A project-wide rule is active under a narrowed scan, so load the whole tree it must see beyond the changed files or changed line ranges.
+        // Load the full tree so project rules can see beyond the requested files or changed regions.
         return (new AnalysisSourceLoader())->load(
             $projectRoot,
             [],
@@ -264,7 +260,7 @@ final readonly class BranchReviewBuilder
             return [];
         }
 
-        // A normal (not changed-only) run compares the exact paths the user asked to analyse.
+
         if (!$options->changeScope->isChangedOnly) {
             return $support->normaliseRequestedPaths($projectRoot, $options->paths);
         }
@@ -274,7 +270,7 @@ final readonly class BranchReviewBuilder
             return [];
         }
 
-        // A bare changed-only run with no explicit paths puts every changed file in scope.
+
         if ($options->paths === []) {
             return $reviewDiff->changedFiles;
         }
@@ -285,7 +281,7 @@ final readonly class BranchReviewBuilder
             return [];
         }
 
-        // Otherwise keep only the changed files that also fall under the paths the user named.
+
         $paths = array_values(array_filter(
             $reviewDiff->changedFiles,
             static fn (string $changedFile): bool => $support->matchesRequestedPath($changedFile, $requestedPaths),
@@ -296,28 +292,27 @@ final readonly class BranchReviewBuilder
     }
 
     /**
-     * Decides which snapshot files to actually analyse, which can be narrower than the set copied
-     * from the base ref: you may check out a file for context yet only score the changed ones.
+     * Selects base-snapshot paths for analysis, independently of any wider snapshot copied for project context.
      *
      * @param string                $projectRoot - Project root the requested paths resolve against.
      * @param AnalyseCommandOptions $options     - Effective CLI options; selects changed-only vs requested paths.
      * @param DiffResult            $reviewDiff  - Review diff metadata supplying the changed-file set.
      *
-     * @return list<string> - Paths to analyse from the base snapshot; empty when no explicit paths were requested for the base side.
+     * @return list<string> - Changed or normalized requested paths; empty defaults to the snapshot root when resolved by the caller.
      */
     private function baseAnalysisPaths(string $projectRoot, AnalyseCommandOptions $options, DiffResult $reviewDiff): array
     {
-        // Changed-only with no explicit paths: analyse exactly the files the diff says this branch touched.
+
         if ($options->changeScope->isChangedOnly && $options->paths === []) {
             return $reviewDiff->changedFiles;
         }
 
-        // No paths named outside changed-only mode, so there is nothing narrower to pull from the snapshot.
+        // An empty path list is expanded to the snapshot root by existingSnapshotPaths().
         if ($options->paths === []) {
             return [];
         }
 
-        // Otherwise analyse just the paths the user requested, resolved against the project root.
+
         return (new AnalysisFindingSupport())->normaliseRequestedPaths($projectRoot, $options->paths);
     }
 
@@ -333,7 +328,7 @@ final readonly class BranchReviewBuilder
      */
     private function baseProjectContextUnits(string $baseRoot, AnalyseCommandOptions $options, AnalysisConfig $config): array
     {
-        // Load the entire base snapshot unfiltered - no changed-file narrowing here - so both sides share the same project scope.
+        // Keep project context independent of changed-file scope while retaining the configured ignore rules.
         return (new AnalysisSourceLoader())->load(
             $baseRoot,
             [],
@@ -344,10 +339,8 @@ final readonly class BranchReviewBuilder
     }
 
     /**
-     * Reports whether the user's narrowed run still needs whole-tree context for project-level rules.
-     *
-     * This decision keeps `--changed-only` and `--diff-vs` fast without starving project rules.
-     * The loader consults it before deciding how much of the tree to read.
+     * Determines whether enabled project rules need a full-tree context load for a narrowed scan.
+     * Changed regions, narrow paths, and changed-only runs with changed files can require that load.
      *
      * @param string                $projectRoot - Project root requested paths resolve against.
      * @param AnalyseCommandOptions $options     - Effective CLI options carrying the changed-only and changed-region flags.
@@ -355,7 +348,7 @@ final readonly class BranchReviewBuilder
      * @param AnalysisConfig        $config      - Effective rule and path config for resolving enabled rules.
      * @param DiffResult|null       $reviewDiff  - Review diff; null or no changes means that input does not require full project context.
      *
-     * @return bool - True when a narrowed run still needs the complete tree for project-level rules; false when the loaded scope already suffices.
+     * @return bool - True when enabled project rules need a full-tree load beyond the requested scope.
      */
     private function shouldLoadProjectContext(
         string $projectRoot,
@@ -364,7 +357,7 @@ final readonly class BranchReviewBuilder
         AnalysisConfig $config,
         ?DiffResult $reviewDiff,
     ): bool {
-        // No project-wide rule is enabled, so a narrowed run never needs the extra whole-tree load.
+
         if (!$registry->hasEnabledProjectRules($config)) {
             return false;
         }
@@ -378,12 +371,12 @@ final readonly class BranchReviewBuilder
         // does, so it must not trigger the separate full-tree context load that genuinely narrower paths
         // need; otherwise `analyse . --diff-vs=<ref>` reparses the whole tree twice for the same scope.
         $requestedPaths = (new AnalysisFindingSupport())->normaliseRequestedPaths($projectRoot, $options->paths);
-        // A genuinely narrower request (a subdirectory or single file) hides the rest of the tree, so pull it all in for project rules.
+        // Narrow paths leave project rules without the rest of the tree, so load that context separately.
         if ($requestedPaths !== [] && $requestedPaths !== ['.']) {
             return true;
         }
 
-        // For a whole-project request, only changed-only mode with real changes still needs extra context for project rules.
+
         return $options->changeScope->isChangedOnly
             && $reviewDiff instanceof DiffResult
             && $reviewDiff->changedFiles !== [];

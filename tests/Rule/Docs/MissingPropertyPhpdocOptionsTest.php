@@ -10,7 +10,9 @@ use GruffPhp\Rules\Docs\MissingPropertyPhpdocRule;
 use GruffPhp\Rules\RuleRegistry;
 
 /**
- * Covers configuration-specific behavior for property documentation findings.
+ * Exercises missing-property findings with acceptLineComments disabled and enabled.
+ * Contrasts attached descriptive line comments with generic, detached, trailing and block comments.
+ * Checks that one attached comment can cover both names in a grouped property declaration.
  */
 final class MissingPropertyPhpdocOptionsTest extends DocsRuleTestCase
 {
@@ -58,7 +60,7 @@ PHP;
     /**
      * Verify the line-comment option requires physically attached, meaning-bearing line prose.
      *
-     * @return void
+     * @return void - Asserts the default and opt-in finding sets for attached, detached, generic, block and trailing comments.
      */
     public function testLineCommentOptionRequiresAttachedMeaningfulLineProse(): void
     {
@@ -116,7 +118,7 @@ PHP;
      *
      * @param list<\GruffPhp\Results\Finding\Finding> $findings - Property findings to summarize.
      *
-     * @return list<string> - Sorted finding symbols; a missing symbol becomes an empty string and fails expectations.
+     * @return list<string> - One symbol per finding in lexical order; null symbols become empty strings.
      */
     private static function symbols(array $findings): array
     {

@@ -11,25 +11,24 @@ use PhpParser\Node\Expr;
 use PhpParser\Node\Stmt;
 
 /**
- * Narrows a full finding set down to only what the current change is responsible for, so a diff or
- * branch review shows the issues a user just introduced rather than the whole project's backlog -
- * for example after `git diff | gruff-php analyse --diff=-`. A scan scoped with `--diff`, `--since`,
- * or `--changed-ranges` runs this, and `--changed-scope` decides how wide the net is: `symbol` keeps
- * every finding in an edited method or closure, `hunk` keeps only findings on the edited lines, and
- * `file` also retains whole-file aggregate verdicts for changed files. With no diff active it is a
- * no-op that lets every finding through, so an ordinary full-project scan is never quietly trimmed.
+ * Restricts findings to the files and ranges in an active diff for changed-region analysis.
+ * Symbol scope can widen ordinary findings to enclosing declarations when parsed units are supplied.
+ * Hunk scope uses finding spans; file scope also retains designated whole-file aggregates.
+ *
+ * In changed files, findings without a line or without changed ranges remain in scope.
+ * An inactive diff preserves every finding; membership does not establish when an issue was introduced.
  */
 final readonly class DiffFindingFilter
 {
     /**
-     * Default `--changed-scope symbol`: keep every finding inside an edited method, closure, or class,
-     * so touching a single line pulls that whole symbol's issues into the review.
+     * `symbol` can widen ordinary findings to the smallest enclosing declaration recovered from parsed units.
+     * In changed files with ranges, anchor-only aggregates with a reported line must overlap at that line.
      */
     public const SCOPE_SYMBOL = 'symbol';
 
     /**
-     * `--changed-scope hunk`: the strictest view - keep only findings whose own lines sit on an edited
-     * hunk (whole-file findings with no line still pass), so the user sees issues on the lines they changed.
+     * In changed files, `hunk` keeps findings whose spans overlap changed ranges; anchor-only aggregates use their reported line.
+     * Findings without a line or without changed ranges also pass within those files.
      */
     public const SCOPE_HUNK   = 'hunk';
 
@@ -62,8 +61,8 @@ final readonly class DiffFindingFilter
     ];
 
     /**
-     * The simple entry point for callers that only want the surviving findings and don't care how many
-     * were hidden - it runs the default `symbol` scope and hands back just the kept list.
+     * Returns the findings kept by the default scope without collecting declaration spans.
+     * With no analysis units, filtering cannot widen a finding to its enclosing symbol.
      *
      * @param list<Finding> $findings - Findings to filter against the diff scope; an empty list yields an empty result.
      * @param DiffResult    $diff - Diff result used to retain changed-file findings; an inactive diff keeps every one.
@@ -72,22 +71,20 @@ final readonly class DiffFindingFilter
      */
     public function filter(array $findings, DiffResult $diff): array
     {
-        // Delegate to `apply()` with `symbol` scope and no analysis units, then return only its `findings`.
+
         $result = $this->apply($findings, $diff);
 
         return $result->findings;
     }
 
     /**
-     * The full filter behind a diff-scoped `analyse` run (say `gruff-php analyse --since=main`): keeps a
-     * finding only when the changed region accounts for it, and reports how many were hidden - surfaced
-     * as the report's `suppressedCount`. `--changed-scope` sets how wide that is.
+     * Filters findings using the requested changed-region scope and counts those excluded.
+     * Diff membership restricts review coverage; it does not determine whether an issue is new.
      *
-     * @param list<Finding>      $findings - Findings to filter against the diff scope; an empty list yields an empty result and a zero count.
-     * @param DiffResult         $diff - Diff result used to retain changed-file findings; an inactive diff keeps every finding and suppresses none.
-     * @param list<AnalysisUnit> $analysisUnits - Parsed units used to recover enclosing declarations; empty (or a non-symbol scope) disables symbol widening.
-     * @param string             $scope - `symbol` widens ordinary hits to their enclosing declaration; `hunk` keeps only hunk hits;
-     *                                    `file` keeps file aggregates and aggregate span hits for changed-file review workflows.
+     * @param list<Finding> $findings - Findings to filter; an empty list produces no findings and zero suppressions.
+     * @param DiffResult $diff - An inactive diff keeps every finding and suppresses none.
+     * @param list<AnalysisUnit> $analysisUnits - Parsed units for symbol widening; empty input disables widening.
+     * @param string $scope - `symbol` widens ordinary findings; `hunk` uses overlaps; `file` also retains file aggregates.
      *
      * @return DiffFilterResult - Kept findings in input order paired with the count dropped as outside the diff scope.
      */
@@ -107,15 +104,15 @@ final readonly class DiffFindingFilter
         $kept              = [];
         $suppressedCount   = 0;
 
-        // Sort every finding into "keep" or "hide" so the review shows only what this change is answerable for.
+
         foreach ($findings as $finding) {
-            // The changed region accounts for this finding, so it stays in the user-visible list.
+
             if ($this->isFindingInScope($finding, $diff, $declarationRanges, $scope)) {
                 $kept[] = $finding;
                 continue;
             }
 
-            // Pre-existing and untouched by the diff: hide it, but count it as suppressed (the report's `suppressedCount`).
+
             $suppressedCount++;
         }
 
@@ -123,20 +120,18 @@ final readonly class DiffFindingFilter
     }
 
     /**
-     * Decides a single finding's fate: does the current change actually account for it? Checks the file,
-     * then the exact edited lines, then - under `symbol` scope - the enclosing method or class, so a user
-     * only ever sees issues their own edit is responsible for.
+     * Tests a finding against changed-file membership and the scope's range rules.
      *
-     * @param Finding                               $finding - Single finding whose location is tested for diff membership.
-     * @param DiffResult                            $diff - Source of changed files and changed-line ranges to test against.
-     * @param array<string, list<ChangedLineRange>> $declarationRanges - Per-file declaration spans for symbol widening; empty means no widening.
-     * @param string                                $scope - Changed-region scope requested by the `--changed-scope` flag.
+     * @param Finding $finding - Finding whose location is tested for diff membership.
+     * @param DiffResult $diff - Source of changed paths and line ranges.
+     * @param array<string, list<ChangedLineRange>> $declarationRanges - Per-file declaration spans; empty disables widening.
+     * @param string $scope - Requested changed-region scope.
      *
-     * @return bool - True when the finding belongs to a changed file, hunk, or enclosing changed declaration; false hides it.
+     * @return bool - True when the finding is retained, including locationless findings in changed files.
      */
     private function isFindingInScope(Finding $finding, DiffResult $diff, array $declarationRanges, string $scope): bool
     {
-        // The diff never touched this file, so nothing in it could be a consequence of the change; drop it.
+
         if (!in_array($finding->filePath, $diff->changedFiles, true)) {
             return false;
         }
@@ -148,8 +143,8 @@ final readonly class DiffFindingFilter
         }
 
         $changedRanges = $diff->rangesFor($finding->filePath);
-        // The file changed but carries no line ranges (a rename or mode-only edit), so we can't localise the
-        // change: treat the whole file as in scope and keep every finding rather than guess which lines moved.
+        // Without ranges, every finding in this changed file stays in scope.
+
         if ($changedRanges === []) {
             return true;
         }
@@ -167,20 +162,20 @@ final readonly class DiffFindingFilter
         }
 
         $endLine = $finding->endLine ?? $line;
-        // The finding's own span sits on lines the user actually edited, so it is a direct result of the change.
+
         if ($this->hasRangeOverlap($changedRanges, $line, $endLine)) {
             return true;
         }
 
         $enclosingRange = $this->enclosingRange($declarationRanges[$finding->filePath] ?? [], $line, $endLine);
-        // It sits outside every edited hunk and inside no method we could recover, so it is pre-existing debt
-        // the user didn't touch on this change; hide it.
+
+
         if (!$enclosingRange instanceof ChangedLineRange) {
             return false;
         }
 
-        // Final `symbol`-scope check: the finding lives in a method or closure the user edited elsewhere, so
-        // editing any part of that symbol pulls its remaining findings back into review too.
+
+
         return $this->hasRangeOverlap($changedRanges, $enclosingRange->startLine, $enclosingRange->endLine);
     }
 
@@ -203,7 +198,7 @@ final readonly class DiffFindingFilter
      *
      * @param Finding $finding - Finding to classify for changed-file aggregate review.
      *
-     * @return bool - True when the rule reports one aggregate finding for the whole file.
+     * @return bool - True when the finding's rule ID is in the whole-file aggregate allowlist.
      */
     private function isFileAggregateFinding(Finding $finding): bool
     {
@@ -211,8 +206,7 @@ final readonly class DiffFindingFilter
     }
 
     /**
-     * Answers the core question behind every scope decision: does any changed hunk touch this line span?
-     * Used again and again while deciding whether a finding or an enclosing symbol counts as edited.
+     * Checks whether any changed hunk overlaps the supplied inclusive line span.
      *
      * @param list<ChangedLineRange> $ranges - Changed-line ranges to test for any overlap; empty means no change touches the span.
      * @param int                    $startLine - First line of the inclusive span being matched.
@@ -222,9 +216,9 @@ final readonly class DiffFindingFilter
      */
     private function hasRangeOverlap(array $ranges, int $startLine, int $endLine): bool
     {
-        // Walk the changed hunks looking for any that overlaps the span the caller is asking about.
+
         foreach ($ranges as $range) {
-            // A single overlapping hunk already proves the span was edited, so stop at the first hit.
+
             if ($range->touches($startLine, $endLine)) {
                 return true;
             }
@@ -234,23 +228,22 @@ final readonly class DiffFindingFilter
     }
 
     /**
-     * Finds the tightest edited declaration that wraps a finding, so a hit can be attributed to its own
-     * method or closure rather than the entire class it happens to live in.
+     * Finds the smallest declaration span containing the entire supplied finding span.
      *
      * @param list<ChangedLineRange> $ranges - Candidate declaration spans to search for an enclosing one; empty yields null.
      * @param int                    $startLine - First line of the inclusive span that must be contained.
      * @param int                    $endLine - Last line of the inclusive span that must be contained.
      *
-     * @return ChangedLineRange|null - The smallest declaration span containing the input; null when none contains it, so the caller falls back to hunk overlap.
+     * @return ChangedLineRange|null - Smallest enclosing span, or null when no declaration contains the entire finding.
      */
     private function enclosingRange(array $ranges, int $startLine, int $endLine): ?ChangedLineRange
     {
         $bestRange = null;
         $bestSize  = PHP_INT_MAX;
 
-        // Compare the finding's span against every declaration span recovered for the file.
+
         foreach ($ranges as $range) {
-            // This declaration doesn't fully contain the finding, so it can't be the enclosing symbol; skip it.
+
             if ($range->startLine > $startLine || $range->endLine < $endLine) {
                 continue;
             }
@@ -263,33 +256,32 @@ final readonly class DiffFindingFilter
             }
         }
 
-        // Return the tightest match so a finding maps to its own method, not the whole class; null means no
-        // declaration contained it, leaving the caller to fall back to plain hunk overlap.
+
+
         return $bestRange;
     }
 
     /**
-     * Builds the per-file map of editable declaration spans that `symbol` scope relies on, walking each
+     * Builds the per-file map of editable declaration spans that symbol scope relies on, walking each
      * parsed file once up front so widening a finding to its enclosing method is a cheap lookup later.
      *
      * @param list<AnalysisUnit> $analysisUnits - Parsed analysis units whose statement spans define declaration-level diff filtering.
      *
-     * @return array<string, list<ChangedLineRange>> - Declaration spans keyed by display path, each list sorted smallest-span-first; a file with no
-     *                       statements is absent, and an empty map means nothing can be widened by symbol.
+     * @return array<string, list<ChangedLineRange>> - Smallest-first spans by display path; units without statements are omitted.
      */
     private function declarationRangesByFile(array $analysisUnits): array
     {
         $rangesByFile = [];
 
-        // Walk every parsed file so `symbol` scope has a ready map to look declarations up in.
+
         foreach ($analysisUnits as $analysisUnit) {
-            // A file the parser produced no statements for has no declarations to widen to, so skip it.
+
             if ($analysisUnit->statements === []) {
                 continue;
             }
 
             $ranges = [];
-            // Descend each top-level statement to gather the span of every method, closure, and class within.
+
             foreach ($analysisUnit->statements as $statement) {
                 $this->collectDeclarationRanges($statement, $ranges);
             }
@@ -319,11 +311,11 @@ final readonly class DiffFindingFilter
      * @param Node                   $node - Subtree root walked recursively for scope-defining declarations.
      * @param list<ChangedLineRange> $ranges - Accumulator appended to in place as scope spans are discovered.
      *
-     * @return void
+     * @return void - Appends valid declaration spans to the caller's range list.
      */
     private function collectDeclarationRanges(Node $node, array &$ranges): void
     {
-        // When the node is itself a reviewable symbol, record its line span as one the diff can widen to.
+
         if ($this->isScopeNode($node)) {
             $startLine = $node->getStartLine();
             $endLine   = $node->getEndLine();
@@ -334,23 +326,23 @@ final readonly class DiffFindingFilter
             }
         }
 
-        // Recurse into every child of the node so nested methods and closures are found too.
+
         foreach ($node->getSubNodeNames() as $subNodeName) {
             $subNodeValue = $node->{$subNodeName};
-            // A single child node: descend straight into it.
+
             if ($subNodeValue instanceof Node) {
                 $this->collectDeclarationRanges($subNodeValue, $ranges);
                 continue;
             }
 
-            // Anything that is neither a node nor a list of nodes (a scalar, a name) holds no declarations.
+
             if (!is_array($subNodeValue)) {
                 continue;
             }
 
-            // A list of child nodes (statements, params): walk each entry looking for more declarations.
+
             foreach ($subNodeValue as $item) {
-                // Only real parse nodes can contain a declaration, so skip any non-node list entry.
+
                 if ($item instanceof Node) {
                     $this->collectDeclarationRanges($item, $ranges);
                 }
@@ -359,8 +351,7 @@ final readonly class DiffFindingFilter
     }
 
     /**
-     * Defines what counts as a reviewable "symbol" for diff scoping: a class, method, function, or
-     * closure is a unit a user reviews as a whole, so `symbol` scope may widen a finding out to it.
+     * Identifies class-like declarations, methods, functions, closures, and arrow functions for symbol widening.
      *
      * @param Node $node - Parser node being classified for diff-scope widening.
      *

@@ -13,13 +13,11 @@ use Symfony\Component\Process\Process;
 final class HookCliFilteringTest extends CliTestCase
 {
     /**
-     * Verify --include-rule narrows to exactly the named rule even when the config selects a pillar.
+     * Verify that an explicit hook rule replaces the configured pillar selection.
+     * Retaining both selections would also run the configured pillar's rules.
      *
-     * Regression: preserving the config's tier/pillar includes alongside the hook --include-rule made
-     * RuleSelection::allows() OR them in, so a focused `--include-rule X` also ran the configured pillar.
-     *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts that only waste.empty-method findings remain.
+     * @throws JsonException - When the hook output cannot be decoded as JSON.
      */
     public function testHookIncludeRuleNarrowsPastConfiguredPillar(): void
     {
@@ -60,8 +58,8 @@ YAML);
     /**
      * Verify unknown hook rule filters return an in-band error instead of running zero rules.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts exit code 2, an unknown-rule schema error, and no findings for both filters.
+     * @throws JsonException - When the hook output cannot be decoded as JSON.
      */
     public function testHookRejectsUnknownExecutionRuleFilters(): void
     {
@@ -99,14 +97,11 @@ YAML);
     }
 
     /**
-     * Verify repeated same-rule line findings get distinct identities so a new duplicate still surfaces.
+     * Verify that a baseline covering one occurrence leaves one duplicate finding visible.
+     * The duplicate findings share a stable identity, so baseline matching must preserve their counts.
      *
-     * Regression: line-scoped identities omit the line, so two symbol-less same-message findings (e.g.
-     * security.error-suppression) collapsed to one stableIdentity, letting a baseline holding one
-     * suppress a newly added duplicate elsewhere in the same file.
-     *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts a shared identity, one remaining finding, and an applied baseline.
+     * @throws JsonException - When the hook output cannot be decoded as JSON.
      */
     public function testHookDisambiguatesDuplicateLineFindingsForNewOnly(): void
     {
@@ -170,7 +165,7 @@ YAML);
      *
      * @param array<string, mixed> $report - Decoded hook report.
      *
-     * @return array<string, mixed> - The run block's baseline map: applied, schemaVersion, and path.
+     * @return array<string, mixed> - The run.baseline array; missing or non-array blocks fail assertions, and fields are not validated.
      */
     private function runBaselineBlock(array $report): array
     {
@@ -179,18 +174,18 @@ YAML);
         $baseline = $runAudit['baseline'] ?? null;
         self::assertIsArray($baseline);
 
-        /** @var array<string, mixed> $baseline Decoded JSON object, asserted as an array above. */
+        /** @var array<string, mixed> $baseline - Decoded JSON object, asserted as an array above. */
         return $baseline;
     }
 
     /**
      * Run the gruff CLI hook command.
      *
-     * @param string       $cwd  - Working directory.
+     * @param string       $cwd  - Directory in which the command resolves project files.
      * @param list<string> $args - CLI argv after the binary.
      *
-     * @return array{0: Process, 1: array<string, mixed>} - Process and decoded JSON.
-     * @throws JsonException
+     * @return array{0: Process, 1: array<string, mixed>} - Completed command process and its decoded JSON output.
+     * @throws JsonException - When the command output cannot be decoded as JSON.
      */
     private function runHook(string $cwd, array $args): array
     {
@@ -201,27 +196,27 @@ YAML);
     }
 
     /**
-     * Return decoded finding rows after asserting the payload shape.
+     * Read the report's findings array after asserting only its outer array shape.
      *
-     * @param array<string, mixed> $report - Decoded hook report.
+     * @param array<string, mixed> $report - Hook payload whose findings field is asserted.
      *
-     * @return list<array<string, mixed>> - Finding rows.
+     * @return list<array<string, mixed>> - Rows read from the report's findings field after its array assertion.
      */
     private function findingRows(array $report): array
     {
         $findings = $report['findings'] ?? null;
         self::assertIsArray($findings);
 
-        /** @var list<array<string, mixed>> $findings Decoded JSON finding rows, asserted as an array above. */
+        /** @var list<array<string, mixed>> $findings - Decoded JSON finding rows, asserted as an array above. */
         return $findings;
     }
 
     /**
      * Extract rule ids from finding rows.
      *
-     * @param list<array<string, mixed>> $findings - Finding rows.
+     * @param list<array<string, mixed>> $findings - Rows whose ruleId fields are extracted.
      *
-     * @return list<string> - Rule ids in finding order.
+     * @return list<string> - Rule IDs in row order, with empty strings for missing or non-string IDs.
      */
     private function ruleIds(array $findings): array
     {
@@ -232,13 +227,13 @@ YAML);
     }
 
     /**
-     * Write a ratified baseline v3 file the hook can apply, the same file `analyse --generate-baseline` gives a user.
+     * Generate a baseline through analyse so hook tests use the public baseline-writing path.
      *
      * @param string $cwd          - Project directory the baseline is generated in.
      * @param string $configFile   - Config the generating scan runs under, so the baseline covers the same rules.
      * @param string $baselineFile - Project-relative destination for the generated baseline.
      *
-     * @return void
+     * @return void - Asserts that the generating scan wrote the requested baseline file.
      */
     private function generateBaseline(string $cwd, string $configFile, string $baselineFile): void
     {
@@ -254,14 +249,14 @@ YAML);
         ], $cwd);
         $process->run();
 
-        // A generating scan still reports its findings, so its exit code says nothing about whether the file was written.
+        // Findings can cause a nonzero exit after generation succeeds, so check the file directly.
         self::assertFileExists($cwd . '/' . $baselineFile, $process->getErrorOutput());
     }
 
     /**
-     * Source that yields one file-length finding and two empty-method findings.
+     * PHP fixture with two empty methods, used to test configured pillar and explicit rule selection.
      *
-     * @return string - PHP source.
+     * @return string - Fixture text written to Example.php for the rule-selection tests.
      */
     private function fileAndSymbolSource(): string
     {
@@ -284,7 +279,7 @@ PHP;
     /**
      * Source with one error-suppression operator.
      *
-     * @return string - PHP source.
+     * @return string - Fixture text written to E.php before generating the baseline.
      */
     private function singleSuppressionSource(): string
     {
@@ -301,7 +296,7 @@ PHP;
     /**
      * Source with two error-suppression operators sharing one message.
      *
-     * @return string - PHP source.
+     * @return string - Fixture text written to E.php after the single-finding baseline is recorded.
      */
     private function doubleSuppressionSource(): string
     {

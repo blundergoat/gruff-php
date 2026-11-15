@@ -38,10 +38,9 @@ final class SensitiveDataRulesTest extends TestCase
     private const PROJECT_ROOT = __DIR__ . '/../../..';
 
     /**
-     * Verifies every synthetic credential occurrence reaches the user with a fixed zero-payload marker.
-     * Messages and metadata must omit the matched value, its edges, and its length.
+     * Checks detector counts, literal secretValues() matches in messages and JSON-encoded metadata, and preview syntax.
      *
-     * @return void
+     * @return void - Asserts expected counts, no literal matches, and no string previews rejected by the marker regex.
      */
     public function testCredentialPatternsAreDetectedWithFixedPreviews(): void
     {
@@ -69,12 +68,11 @@ final class SensitiveDataRulesTest extends TestCase
     }
 
     /**
-     * Reports whether one finding's marker falls outside the closed grammar FAMILY-CONTRACT.md section 5 ratifies.
+     * Checks a string preview against redaction-marker syntax derived from FAMILY-CONTRACT.md section 5.
+     * The pattern admits the bare marker, the listed categories, and a connection marker with a scheme-shaped suffix.
+     * Rejection indicates invalid marker syntax; it does not establish that the marker contains matched secret text.
      *
-     * The grammar admits the bare `[redacted]`, one of the seventeen ratified categories, and a connection marker
-     * naming only its already-public scheme. Anything else means a detector put matched text into a marker.
-     *
-     * @param Finding $finding - Sensitive-data finding whose `metadata.preview` marker is judged.
+     * @param Finding $finding - Sensitive-data finding whose metadata preview marker is judged.
      *
      * @return bool - true when the marker is outside the grammar; a finding with no string marker is never outside it
      */
@@ -92,7 +90,7 @@ final class SensitiveDataRulesTest extends TestCase
     /**
      * Verify config like files are discovered and scanned as text.
      *
-     * @return void
+     * @return void - Asserts text discovery, an empty AST without parse errors, and one database-URL finding.
      */
     public function testConfigLikeFilesAreDiscoveredAndScannedAsText(): void
     {
@@ -113,9 +111,9 @@ final class SensitiveDataRulesTest extends TestCase
     }
 
     /**
-     * Verify PII profiles are detected in fixture data.
+     * Checks the profile-data fixture with PII detection enabled through the registry helper.
      *
-     * @return void
+     * @return void - Asserts exactly three PII-rule findings without checking their individual classifications.
      */
     public function testPhiAndPiiProfilesAreDetectedInFixtureData(): void
     {
@@ -125,9 +123,9 @@ final class SensitiveDataRulesTest extends TestCase
     }
 
     /**
-     * Verify allowed dummy values are not flagged.
+     * Verifies the safe-dummy fixture has no sensitive-data findings.
      *
-     * @return void
+     * @return void - Asserts the filtered sensitive-data finding list is empty.
      */
     public function testAllowedDummyValuesAreNotFlagged(): void
     {
@@ -137,16 +135,15 @@ final class SensitiveDataRulesTest extends TestCase
                                  ));
         $reported = array_map(static fn(Finding $finding): string => $finding->ruleId . ':' . $finding->line, $findings);
 
-        // Line 11 is AWS's documented example key, a vendor-documented sample (FAMILY-CONTRACT.md section 5), so nothing reports.
+        // AWS's documented example key is exempt as a vendor sample under FAMILY-CONTRACT.md section 5.
         self::assertSame([], $reported);
     }
 
     /**
-     * Models stock development credentials such as `postgres:postgres`, which FAMILY-CONTRACT.md section 5 reads as documented defaults.
-     * They stay silent on loopback and single-label service hosts, while the same pair on a reachable host and a real
-     * password on a local host still report.
+     * Checks stock development pairs on loopback and single-label hosts against other credential cases.
+     * The fixture expects findings for a stock pair on a dotted host and a non-stock password on localhost.
      *
-     * @return void
+     * @return void - Asserts only the dotted-host and non-stock-password cases produce findings.
      */
     public function testStockDevelopmentCredentialsOnLocalHostsAreNotReported(): void
     {
@@ -170,11 +167,10 @@ final class SensitiveDataRulesTest extends TestCase
     }
 
     /**
-     * Models a config that shows where an AWS key goes with a run of X instead of the key.
-     * FAMILY-CONTRACT.md section 5 reads a body that is entirely X as naming no credential, while a real key that
-     * merely contains a run of X still reports, because hiding it would hide a live credential.
+     * Checks fully X-masked AWS key bodies alongside a synthetic key whose body only ends in X.
+     * The fully masked cases are suppressed, while the partly X-filled case remains reportable.
      *
-     * @return void
+     * @return void - Asserts only the partly X-filled fixture line is reported.
      */
     public function testAwsKeyWhoseWholeBodyIsXIsReadAsMasked(): void
     {
@@ -190,9 +186,10 @@ final class SensitiveDataRulesTest extends TestCase
     }
 
     /**
-     * Verify matches inside PHP comments are skipped for opt-in pattern rules but private-key still fires.
+     * Verifies the PHP-comment fixture is silent for API keys, AWS keys, JWTs, database URLs, and PII.
+     * A private-key finding remains expected in that fixture.
      *
-     * @return void
+     * @return void - Asserts zero findings for those five rules and one for the private-key rule.
      */
     public function testInCommentMatchesAreSkippedExceptPrivateKey(): void
     {
@@ -207,12 +204,10 @@ final class SensitiveDataRulesTest extends TestCase
     }
 
     /**
-     * Verify vendor-documented sample values are not reported while a live-shaped key still is.
+     * Verify the AWS and JWT rules ignore their documented samples while the AWS rule reports the live-shaped key.
+     * The FAMILY-CONTRACT section 5 samples and live-shaped key are assembled so this file stores no complete value.
      *
-     * AWS's documented example key and the jwt.io sample token are samples (FAMILY-CONTRACT section 5); every value
-     * is assembled from parts so this file stores none of them whole.
-     *
-     * @return void
+     * @return void - Asserts the filtered AWS and JWT findings contain only the live-shaped AWS key.
      */
     public function testDocumentedSamplesAreNotReported(): void
     {
@@ -246,18 +241,18 @@ final class SensitiveDataRulesTest extends TestCase
     }
 
     /**
-     * Placeholder words must begin a token, never sit inside one, in both directions.
+     * Provides token-boundary, dummy-value, and documented-sample cases for the placeholder filter.
      *
-     * @return array<string, array{0: string, 1: bool, 2: bool}> - value, whether identifier words split tokens, expected
+     * @return array<string, array{0: string, 1: bool, 2: bool}> - Cases: candidate, identifier-splitting flag, expected dummy classification.
      */
     public static function placeholderValueCases(): array
     {
         return [
-            // A word that merely contains a placeholder word is a real value and must stay reportable.
+            // An internal placeholder substring must not by itself classify a value as a dummy.
             'latest is not test'         => ['latestReleaseCredentialZq7Xw2Lp9', true, false],
             'contest is not test'        => ['contest', true, false],
             'attestation is not test'    => ['attestation', true, false],
-            // Glued, camelCase, snake_case, and separated placeholders stay suppressed.
+            // Glued, camelCase, snake_case, and separated placeholders remain classified as dummy values.
             'digit-suffixed changeme'    => ['changeme123', true, true],
             'camelCase fake'             => ['fakeToken', true, true],
             'PascalCase changeme'        => ['ChangeMe', true, true],
@@ -265,14 +260,14 @@ final class SensitiveDataRulesTest extends TestCase
             'snake_case test'            => ['my_test_secret', true, true],
             'low-cardinality filler'     => ['xxxxxxxx', true, true],
             'empty literal'              => ['', true, true],
-            // A token that begins with a placeholder word is a glued dummy, as the operator decided on 2026-09-19.
+            // A placeholder prefix marks a glued dummy value even without a separator.
             'unbroken testkey'           => ['TESTKEY', true, true],
             'glued testpass'             => ['testpass99', true, true],
             'glued example placeholder'  => ['sk_live_exampleplaceholder', true, true],
             // AWS's documented example key, assembled so this file never holds it, is a documented sample however it is split.
             'aws example key, words'     => ['AKIA' . 'IOSFODNN7' . 'EXAMPLE', true, true],
             'aws example key, whole run' => ['AKIA' . 'IOSFODNN7' . 'EXAMPLE', false, true],
-            // A live-shaped key is one alphanumeric run with no placeholder word, so it still reports.
+            // A live-shaped key without a placeholder prefix must remain a non-dummy candidate.
             'live-shaped key, whole run' => ['AKIA' . 'Q7R2M8N4' . 'P6T9V1X3', false, false],
         ];
     }
@@ -282,9 +277,9 @@ final class SensitiveDataRulesTest extends TestCase
      *
      * @param string $candidateValue             - Candidate value handed to the filter.
      * @param bool   $shouldSplitIdentifierWords - Whether identifier word boundaries also split tokens.
-     * @param bool   $isPlaceholder              - Whether the filter must suppress the value.
+     * @param bool   $isPlaceholder              - Expected dummy classification from the helper.
      *
-     * @return void
+     * @return void - Asserts the helper's dummy classification matches each supplied expectation.
      */
     #[DataProvider('placeholderValueCases')]
     public function testPlaceholderWordsMustBeginAToken(string $candidateValue, bool $shouldSplitIdentifierWords, bool $isPlaceholder): void
@@ -295,7 +290,7 @@ final class SensitiveDataRulesTest extends TestCase
     /**
      * Verify secret rules respect detector selection config.
      *
-     * @return void
+     * @return void - Asserts JWT findings are disabled while one AWS finding remains.
      */
     public function testSecretRulesRespectDetectorSelectionConfig(): void
     {
@@ -314,10 +309,10 @@ final class SensitiveDataRulesTest extends TestCase
     }
 
     /**
-     * Verify CLI text and JSON reports do not leak full secrets.
+     * Checks CLI text and JSON for literal occurrences of the synthetic values listed by secretValues().
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Requires decodable JSON, no listed literal matches in either report, and the substring 'redacted' in each.
+     * @throws JsonException - If the CLI's JSON report cannot be decoded.
      */
     public function testCliTextAndJsonReportsDoNotLeakFullSecrets(): void
     {
@@ -343,7 +338,7 @@ final class SensitiveDataRulesTest extends TestCase
      * @param int           $expectedCount - Findings the rule must report for this fixture.
      * @param list<Finding> $findings - Full analysis output to filter by rule id.
      *
-     * @return void
+     * @return void - Asserts the filtered finding count equals the expected count.
      */
     private static function assertRuleCount(string $ruleId, int $expectedCount, array $findings): void
     {
@@ -359,7 +354,7 @@ final class SensitiveDataRulesTest extends TestCase
      *
      * @param string $path - Project-relative fixture path to parse and scan.
      *
-     * @return list<Finding> - every rule finding for the fixture, in registry order; empty when nothing flagged
+     * @return list<Finding> - Finalized findings ordered by file, line, rule ID, and message; empty when none remain.
      */
     private function analysePath(string $path): array
     {
@@ -370,9 +365,9 @@ final class SensitiveDataRulesTest extends TestCase
      * Analyse sensitive-data fixtures and return findings for assertions.
      *
      * @param list<AnalysisUnit> $units - Pre-parsed units to run the default rule set over.
-     * @param ?AnalysisConfig    $config - Override config; null applies the registry defaults with the database-URL rule switched on.
+     * @param ?AnalysisConfig $config - Explicit settings, or null to enable database-URL and PII rules on registry defaults.
      *
-     * @return list<Finding> - aggregated findings the default rule set produced across the units; empty when none fired
+     * @return list<Finding> - Finalized findings from the configured registry; empty when none remain.
      */
     private function analyseUnits(array $units, ?AnalysisConfig $config = null): array
     {
@@ -389,13 +384,13 @@ final class SensitiveDataRulesTest extends TestCase
      *
      * @param RuleRegistry $registry - Default registry the config is seeded from.
      *
-     * @return AnalysisConfig - registry defaults with `sensitive-data.database-url-password` enabled
+     * @return AnalysisConfig - Registry defaults with database-URL-password and PII-fixture detection enabled.
      */
     private static function configWithOptInSensitiveRules(RuleRegistry $registry): AnalysisConfig
     {
         $config = AnalysisConfig::fromRegistry($registry);
 
-        // Both ship off by default; enabling them here mirrors a project that sets `enabled: true` for each.
+        // Both ship off by default; enabling them here mirrors a project that sets enabled: true for each.
         foreach ([DatabaseUrlPasswordRule::ID, PiiTestFixtureRule::ID] as $ruleId) {
             $settings = $config->ruleSettings($ruleId);
             $config   = $config->withRuleSettings($ruleId, new RuleSettings(
@@ -413,7 +408,7 @@ final class SensitiveDataRulesTest extends TestCase
     /**
      * Parse the requested path into an analysis unit.
      *
-     * @param string $path - Filesystem path.
+     * @param string $path - Project-relative fixture path, prefixed with PROJECT_ROOT before reading.
      *
      * @return AnalysisUnit - the parsed unit, typed PHP for .php paths and plain text otherwise
      */
@@ -429,8 +424,7 @@ final class SensitiveDataRulesTest extends TestCase
     /**
      * Run text and JSON reports over the secret fixtures.
      *
-     * @return array{string, string} - the same fixtures rendered twice: human-readable text first, machine JSON second, so the leak check can scan
-     *                       both surfaces
+     * @return array{string, string} - Reports for the same fixtures, with CLI text first and JSON second.
      */
     private function secretLeakReports(): array
     {
@@ -452,7 +446,7 @@ final class SensitiveDataRulesTest extends TestCase
      *
      * @param list<string> $arguments - CLI arguments appended after the gruff binary path.
      *
-     * @return string - the gruff CLI's stdout; stderr is dropped and a non-zero exit already fails the test before returning
+     * @return string - CLI stdout after a zero-exit assertion; failure diagnostics include both stderr and stdout.
      */
     private function runGruff(array $arguments): string
     {
@@ -471,7 +465,7 @@ final class SensitiveDataRulesTest extends TestCase
      */
     private function secretValues(): array
     {
-        // Canonical secrets the leak check hunts for; split by concatenation so this file isn't flagged.
+        // Keep each complete credential pattern out of this source while returning the canonical values used by leak checks.
         return [
             'AKIA' . 'Z9Y8X7W6V5U4T3R2',
             'sk_live_' . '51N7uQbP0JZ6r' . 'T9vL3mK8sX2y',

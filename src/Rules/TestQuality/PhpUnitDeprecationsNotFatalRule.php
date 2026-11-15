@@ -16,9 +16,9 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
 
 /**
- * Flags a PHPUnit config that does not set `failOnDeprecation="true"` - without it, deprecated calls pile
- * up silently instead of failing the build, so a reviewer never sees the suite drifting onto removed APIs.
- * Fires once per project when a PHPUnit test file is seen. Warning, high confidence.
+ * Checks discovered PHPUnit configuration for failOnDeprecation.
+ * Reports at most once per project root after a path-based test-file match.
+ * Findings use warning severity and high confidence.
  */
 final class PhpUnitDeprecationsNotFatalRule implements RuleInterface
 {
@@ -32,7 +32,7 @@ final class PhpUnitDeprecationsNotFatalRule implements RuleInterface
      */
     private readonly PhpUnitConfigDiscovery $discovery;
 
-    /** @var array<string, true> */
+    /** @var array<string, true> - Project roots already evaluated using discovered configuration. */
     private array $emittedRoots = [];
 
     /**
@@ -52,7 +52,7 @@ final class PhpUnitDeprecationsNotFatalRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Warning severity at high confidence: a missing failOnDeprecation is an unambiguous, fixable config gap.
+
         return new RuleDefinition(
             id:              self::ID,
             name:            'PHPUnit deprecations not fatal',
@@ -80,13 +80,13 @@ final class PhpUnitDeprecationsNotFatalRule implements RuleInterface
         }
 
         if (!TestQualityNodeHelper::looksLikePhpUnitTestFile($analysisUnit)) {
-            // Wait for an actual PHPUnit test file before judging the config, so non-test projects stay silent.
+            // Defer configuration checks until a path matches the PHPUnit test-file heuristic.
             return [];
         }
 
         $config = $this->discovery->discover($root);
         if ($config === null) {
-            // No discoverable phpunit.xml means there is no failOnDeprecation setting to fault; not applicable.
+            // Missing or unparseable PHPUnit configuration leaves this rule without settings to inspect.
             return [];
         }
 
@@ -100,7 +100,7 @@ final class PhpUnitDeprecationsNotFatalRule implements RuleInterface
             return [];
         }
 
-        // failOnDeprecation is absent or explicitly disabled, so deprecations would accrue silently; report it.
+
         return [
             new Finding(
                 ruleId:  self::ID,

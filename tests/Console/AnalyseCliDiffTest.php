@@ -8,14 +8,16 @@ use JsonException;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers analyse CLI diff-scope modes.
+ * Covers analyse CLI diff scopes and hook changed-range failures.
+ * Checks malformed-scope diagnostics, symbol and file filtering, and suppression counts.
+ * Uses temporary PHP fixtures to compare full scans with scoped reports.
  */
 final class AnalyseCliDiffTest extends CliTestCase
 {
     /**
      * Verify analyse command reports non Git diff mode clearly.
      *
-     * @return void
+     * @return void - Asserts exit code 2, a changed-region error, and zero reported findings.
      */
     public function testAnalyseCommandReportsNonGitDiffModeClearly(): void
     {
@@ -37,8 +39,8 @@ final class AnalyseCliDiffTest extends CliTestCase
             $process->run();
 
             self::assertSame(2, $process->getExitCode());
-            // One family type names every scope the run could not read, and a run that could not apply its
-            // scope publishes no findings beside the failure.
+            // An unreadable scope must fail without publishing findings from a wider scan.
+
             self::assertStringContainsString('[CHANGED-REGION]', $process->getOutput());
             self::assertStringContainsString('Diff mode requires a git working tree.', $process->getOutput());
             self::assertStringContainsString('Findings: 0 total', $process->getOutput());
@@ -48,12 +50,9 @@ final class AnalyseCliDiffTest extends CliTestCase
     }
 
     /**
-     * Verify the hook names an unreadable changed-region scope with the same family type analyse uses.
+     * Verify malformed and empty hook ranges produce one fatal changed-region diagnostic.
      *
-     * The hook called it `usage-error` until M46 while analyse called it `changed-region`, so one failure had two
-     * names depending on which surface saw it and a consumer matching the family type missed half of them.
-     *
-     * @return void
+     * @return void - Asserts exit code 2, the fatal diagnostic type, and an empty findings list for both inputs.
      */
     public function testHookNamesAnUnreadableChangedRangeWithTheFamilyType(): void
     {
@@ -89,12 +88,10 @@ final class AnalyseCliDiffTest extends CliTestCase
     }
 
     /**
-     * Verify a `--changed-ranges` value the run cannot scope to ends the run instead of widening it.
+     * Verify malformed or empty --changed-ranges values fail without returning findings.
+     * Refusing these values prevents dropping the requested line filter for Example.php.
      *
-     * An empty value is malformed for the same reason a garbled one is: the caller asked for a scoped run and
-     * named no range, and reading that as "no filter" scans the whole tree without saying so.
-     *
-     * @return void
+     * @return void - Asserts exit code 2, one changed-region diagnostic, and no findings for either invalid value.
      */
     public function testAnalyseCommandRefusesChangedRangesItCannotScope(): void
     {
@@ -132,10 +129,10 @@ final class AnalyseCliDiffTest extends CliTestCase
     }
 
     /**
-     * Verify changed-ranges mode reports only findings attributable to the changed symbol.
+     * Verify symbol scope retains the changed method and omits the untouched method.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts both symbol membership checks and a positive suppression count.
+     * @throws JsonException - If decoding the CLI JSON report fails.
      */
     public function testAnalyseCommandChangedRangesUsesSymbolScopeAndSuppressedCount(): void
     {
@@ -165,7 +162,7 @@ final class AnalyseCliDiffTest extends CliTestCase
             $findings = $report['findings'] ?? null;
 
             self::assertIsArray($findings);
-            /** @var list<array{symbol?: string|null}> $findings decoded finding rows used for symbol extraction */
+            /** @var list<array{symbol?: string|null}> $findings - Decoded finding rows used for symbol extraction. */
             self::assertGreaterThanOrEqual(1, $this->suppressedCount($report));
             self::assertContains('Example::changed()', $this->symbolsFromJsonFindings($findings));
             self::assertNotContains('Example::unchanged()', $this->symbolsFromJsonFindings($findings));
@@ -175,10 +172,10 @@ final class AnalyseCliDiffTest extends CliTestCase
     }
 
     /**
-     * Verify unified diff stdin mode feeds the same changed-region filter.
+     * Verify a unified diff supplied on stdin selects stdin mode and suppresses findings.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts a successful run, stdin diff metadata, and a positive suppression count.
+     * @throws JsonException - If decoding the CLI JSON report fails.
      */
     public function testAnalyseCommandDiffStdinParsesUnifiedDiff(): void
     {
@@ -226,8 +223,8 @@ PATCH
     /**
      * Verify changed-ranges accounting reconciles with full-file intra-file findings.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts two full-scan findings equal one retained finding plus one suppressed finding.
+     * @throws JsonException - If decoding the CLI JSON report fails.
      */
     public function testAnalyseCommandChangedRangesReconcilesIntraFileFindings(): void
     {
@@ -284,8 +281,8 @@ PATCH
     /**
      * Verify symbol scope treats file and class aggregate findings as anchor-local, while method findings still follow their changed symbol.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts only the two method-size rule IDs remain and both suppression counts equal four.
+     * @throws JsonException - If decoding the CLI JSON report fails.
      */
     public function testAnalyseCommandChangedRangesSymbolScopeSuppressesAggregateFindingsAwayFromAnchors(): void
     {
@@ -310,8 +307,8 @@ PATCH
     /**
      * Verify aggregate findings survive symbol scope when the edit touches their representative anchor.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts the file-length rule at the file anchor and three class rules at the class anchor.
+     * @throws JsonException - If decoding the CLI JSON report fails.
      */
     public function testAnalyseCommandChangedRangesSymbolScopeKeepsAggregateFindingOnAnchorEdit(): void
     {
@@ -338,10 +335,10 @@ PATCH
     }
 
     /**
-     * Verify file scope preserves the previous changed-file aggregate span signal for CI review workflows.
+     * Verify file scope retains all six size-rule findings for a changed line inside the class.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts all expected rule IDs and zero suppression in both count fields.
+     * @throws JsonException - If decoding the CLI JSON report fails.
      */
     public function testAnalyseCommandChangedRangesFileScopeKeepsAggregateSpanFindings(): void
     {
@@ -373,8 +370,8 @@ PATCH
     /**
      * Verify full scans still report whole-file findings when changed-region filtering is inactive.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts that the full scan reports only the file-length rule.
+     * @throws JsonException - If decoding the CLI JSON report fails.
      */
     public function testAnalyseCommandFullScanStillReportsFileLengthFinding(): void
     {
@@ -404,8 +401,8 @@ PATCH
     /**
      * Verify file-aggregate TODO density uses its first-marker anchor rather than the enclosing class span.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts suppression away from the anchor, retention at the anchor, and retention in file scope.
+     * @throws JsonException - If decoding the CLI JSON report fails.
      */
     public function testAnalyseCommandChangedRangesSymbolScopeUsesTodoDensityAnchor(): void
     {
@@ -456,7 +453,7 @@ PATCH
      *
      * @param list<array<string, mixed>> $findings - Finding rows decoded from the CLI JSON report.
      *
-     * @return list<string> - rule ids in finding order
+     * @return list<string> - Rule IDs in finding order; rows without a string ruleId are omitted.
      */
     private function ruleIdsFromJsonFindings(array $findings): array
     {
@@ -472,11 +469,11 @@ PATCH
     }
 
     /**
-     * Return decoded finding rows after narrowing their mixed JSON type.
+     * Return finding rows after asserting the report field and every row are arrays.
      *
      * @param array<string, mixed> $report - Decoded JSON report.
      *
-     * @return list<array<string, mixed>> - Finding rows.
+     * @return list<array<string, mixed>> - Rows in input order with integer-keyed fields omitted; empty when findings is empty.
      */
     private function findingRows(array $report): array
     {
@@ -542,7 +539,7 @@ PATCH
      * @param list<string> $arguments        - CLI arguments after the PHP binary and bin path.
      *
      * @return array<string, mixed> - Decoded JSON report.
-     * @throws JsonException
+     * @throws JsonException - If decoding the CLI JSON report fails.
      */
     private function runJsonAnalyse(string $workingDirectory, array $arguments): array
     {
@@ -562,7 +559,7 @@ PATCH
      * @param string $scope            - Value passed to --changed-scope.
      *
      * @return array<string, mixed> - Decoded JSON report.
-     * @throws JsonException
+     * @throws JsonException - If decoding the CLI JSON report fails.
      */
     private function runChangedScopeAnalyse(string $workingDirectory, string $ranges, string $scope): array
     {
@@ -610,7 +607,7 @@ PATCH
      *
      * @param string $projectRoot - Temporary project root to populate.
      *
-     * @return void
+     * @return void - Writes the cumulative-size source and a config selecting the size rules under test.
      */
     private function writeSizeAggregateFixture(string $projectRoot): void
     {
@@ -655,7 +652,7 @@ YAML);
      *
      * @param string $projectRoot - Temporary project root to populate.
      *
-     * @return void
+     * @return void - Writes Example.php and a config enabling only size.file-length with threshold 5.
      */
     private function writeFileLengthFixture(string $projectRoot): void
     {
@@ -680,7 +677,7 @@ YAML);
      *
      * @param string $projectRoot - Temporary project root to populate.
      *
-     * @return void
+     * @return void - Writes Example.php and a config selecting only docs.todo-density.
      */
     private function writeTodoDensityFixture(string $projectRoot): void
     {

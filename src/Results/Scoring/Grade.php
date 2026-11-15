@@ -5,12 +5,10 @@ declare(strict_types=1);
 namespace GruffPhp\Results\Scoring;
 
 /**
- * A single quality score paired with the letter grade a user reads at a glance (92.5 becomes "A").
+ * Pairs a numeric quality score with the letter shown in score reports.
+ * fromScore() rounds and clamps its input before selecting a letter.
  *
- * Raw scores are hard to skim, so every score gruff shows - the composite, each pillar, each file - is
- * wrapped here alongside its A-F letter. `fromScore()` builds one by clamping a raw score into 0-100
- * and picking the band, so reports, the dashboard, and JSON output all grade the same way and a user
- * never sees an out-of-range number or a letter that doesn't match its score.
+ * The public constructor stores supplied values directly and does not enforce that they match.
  */
 final readonly class Grade
 {
@@ -50,34 +48,34 @@ final readonly class Grade
      */
     public static function letterFor(float $score): string
     {
-        // 90 and up is the top band, shown to the user as an "A".
+
         if ($score >= 90.0) {
             return 'A';
         }
 
-        // The 80s earn a "B" - solid, with a little room to improve.
+
         if ($score >= 80.0) {
             return 'B';
         }
 
-        // The 70s are a middling "C".
+
         if ($score >= 70.0) {
             return 'C';
         }
 
-        // The 60s scrape a passing "D".
+
         if ($score >= 60.0) {
             return 'D';
         }
 
-        // Anything under 60 is a failing "F" - the code the user most needs to look at.
+
         return 'F';
     }
 
     /**
-     * Flattens the grade into the `{score, grade}` row that reports and the dashboard serialise.
+     * Returns the score and grade fields used by reports and the dashboard.
      *
-     * @return array{score: float, grade: string} - Report row: the numeric score plus its letter under the `grade` key.
+     * @return array{score: float, grade: string} - Report row containing the numeric score and its letter in the grade field.
      */
     public function toArray(): array
     {

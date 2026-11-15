@@ -43,10 +43,9 @@ final class SummaryCommand extends Command
     private const DEFAULT_TOP = 10;
 
     /**
-     * Registers the `summary` command's paths argument, flags, and `--help` text - everything the
-     * user can type after `gruff-php summary`.
+     * Registers the paths argument, flags, and help text shown for gruff-php summary.
      *
-     * @return void
+     * @return void - Configures arguments, options, and help for summary runs.
      */
     protected function configure(): void
     {
@@ -63,30 +62,30 @@ final class SummaryCommand extends Command
     }
 
     /**
-     * Runs the whole command when a user types `gruff-php summary`: validate each flag, analyse
-     * once, then render. Every early return below stops with a clear message instead of a broken digest.
+     * Runs gruff-php summary by resolving setup options, offering config initialization, analysing once,
+     * and rendering the selected summary format.
      *
      * @param InputInterface  $input  - Parsed console arguments and options for this summary invocation.
      * @param OutputInterface $output - Destination for the rendered summary and any usage or config errors.
      *
-     * @return int - Symfony command exit code.
+     * @return int - Setup, prompt, or rendered-summary exit status.
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $projectRoot = $this->projectRoot($input, $output);
-        // Without a root to report against there is nothing to scan, so stop before pretending to.
+
         if (is_int($projectRoot)) {
             return $projectRoot;
         }
 
         $format = $this->summaryFormat($input, $output);
-        // The user asked for a format we don't render (say `--format=xml`); the usage error is already shown.
+
         if ($format === null) {
             return Command::INVALID;
         }
 
         $topLimit = $this->topLimit($input, $output);
-        // `--top` wasn't a whole number (e.g. `--top=abc`), so we can't tell how many rows to list.
+
         if ($topLimit === null) {
             return Command::INVALID;
         }
@@ -116,7 +115,7 @@ final class SummaryCommand extends Command
             shouldSkipConfig:        $noConfig,
             isMachineReadableFormat: $format === 'json',
         );
-        // First run in a project with no config file: the prompt already handled the user, so pass on its verdict.
+
         if ($promptExitCode !== null) {
             return $promptExitCode;
         }
@@ -131,7 +130,7 @@ final class SummaryCommand extends Command
             deepScanBudgetOverride: $deepScanBudgetOverride,
             output:                 $output,
         );
-        // Their `.gruff-php.yaml` could not be loaded (missing, malformed, or naming an unknown rule); error shown.
+
         if (!$config instanceof AnalysisConfig) {
             return Command::INVALID;
         }
@@ -153,16 +152,13 @@ final class SummaryCommand extends Command
     }
 
     /**
-     * Anchors the run to the project its targets name, as `analyse` does, since every path shown in the summary is
-     * displayed relative to it. Anchored to the launch directory instead, `summary ../proj --format=json` run from a
-     * sibling threw on the first path outside it and printed no JSON. Also rewrites the `paths` argument so each
-     * relative target is read from the launch directory, as `analyse` does.
+     * Chooses a shared reporting root while keeping relative scan targets anchored to the launch directory.
+     * Rewrites the paths argument when the reporting root differs, so discovery still receives the requested targets.
      *
      * @param InputInterface  $input  - Console input carrying the path operands the root is resolved from.
      * @param OutputInterface $output - Destination for the error shown when no root can be chosen.
      *
-     * @return string|int - Project root path, or the exit code to stop with: 1 when the working directory can't be read,
-     *                      2 when the targets sit under different filesystem roots.
+     * @return string|int - Root path, FAILURE if getcwd() fails, or INVALID if the targets have no shared filesystem root.
      */
     private function projectRoot(InputInterface $input, OutputInterface $output): string|int
     {
@@ -175,7 +171,7 @@ final class SummaryCommand extends Command
         }
 
         $projectRoot = AnalyseCommandSetupBuilder::projectRootFromTargets($launchDirectory, $this->paths($input));
-        // The caller named targets in unrelated projects, so there is no single root to report paths against.
+
         if ($projectRoot === null) {
             $output->writeln('<error>scan targets do not share a filesystem root</error>');
 
@@ -199,7 +195,7 @@ final class SummaryCommand extends Command
     private function summaryFormat(InputInterface $input, OutputInterface $output): ?string
     {
         $format = $input->getOption('format');
-        // Accept the request only when it is a format we can actually render; everything else falls through.
+
         if (is_string($format) && in_array($format, ['text', 'json'], true)) {
             return $format;
         }
@@ -214,17 +210,17 @@ final class SummaryCommand extends Command
 
     /**
      * Reads how many rows the top-rules and top-offenders lists show, letting the user widen or
-     * narrow the digest with `--top`.
+     * narrow the digest with --top.
      *
      * @param InputInterface  $input  - Console input carrying the optional --top value.
      * @param OutputInterface $output - Destination for the usage error shown when --top is not a non-negative integer.
      *
-     * @return int|null - Row count for the top lists; null when `--top` wasn't a non-negative integer, ending the run with an error.
+     * @return int|null - Row count for the top lists; null when --top wasn't a non-negative integer, ending the run with an error.
      */
     private function topLimit(InputInterface $input, OutputInterface $output): ?int
     {
         $topRaw = $input->getOption('top');
-        // Accept only unsigned decimal digits, so `--top` can't smuggle in a negative or fractional row count.
+        // Restrict --top to unsigned decimal digits so negative and fractional row counts are rejected before conversion.
         if (is_string($topRaw) && preg_match('/^\d+$/', $topRaw) === 1) {
             return (int)$topRaw;
         }
@@ -235,18 +231,18 @@ final class SummaryCommand extends Command
     }
 
     /**
-     * Reads one non-empty string option without coercing other input shapes.
+     * Reads a non-empty string option without trimming or coercing other input shapes.
      *
      * @param InputInterface $input - Parsed console input for this run.
      * @param string         $name  - Option name to read, such as `config`.
      *
-     * @return string|null - The option's text; null when it was omitted or left blank.
+     * @return string|null - The option text unchanged; null for an empty string or a non-string value.
      */
     private function configPathOption(InputInterface $input, string $name): ?string
     {
         $configPath = $input->getOption($name);
 
-        // Treat an omitted or blank `--config` as "no explicit path", leaving the loader to find the default.
+
         return is_string($configPath) && $configPath !== '' ? $configPath : null;
     }
 
@@ -262,7 +258,7 @@ final class SummaryCommand extends Command
      */
     private function hasConfigConflict(bool $noConfig, ?string $configPath, OutputInterface $output): bool
     {
-        // Only the both-set case is a conflict; if either flag is absent there is nothing to reconcile.
+
         if (!$noConfig || $configPath === null) {
             return false;
         }
@@ -273,17 +269,16 @@ final class SummaryCommand extends Command
     }
 
     /**
-     * Collects the files or directories the user named; an empty result is the common case (a bare
-     * `gruff-php summary`) and later means "scan the whole project".
+     * Returns the string path operands, using an empty list for the default project scan.
      *
      * @param InputInterface $input - Console input carrying the variadic paths argument.
      *
-     * @return list<string> - Paths the user named; empty means none were given, which scans the whole project.
+     * @return list<string> - String operands in input order; empty selects the default project scan.
      */
     private function paths(InputInterface $input): array
     {
         $paths = $input->getArgument('paths');
-        // Defensive: this variadic argument is always an array in practice, so anything else means "none given".
+
         if (!is_array($paths)) {
             return [];
         }
@@ -295,14 +290,14 @@ final class SummaryCommand extends Command
      * Builds the settings that decide which rules run and which paths are ignored - the difference
      * between the scan the user configured and a bare default run.
      *
-     * @param bool                                                    $noConfig               - When true, skip the YAML file and build defaults straight from the registry.
-     * @param string|null                                             $configPath             - Explicit config file to load, or null to let the loader resolve the default.
-     * @param RuleRegistry                                            $registry               - Rule set used to seed defaults and validate configured rule ids.
-     * @param ConfigLoader                                            $configLoader           - Loader that reads and merges the YAML config for this project.
-     * @param array{enabled: bool, maxLines: int, maxBytes: int}|null $deepScanBudgetOverride - CLI override applied after config.
-     * @param OutputInterface                                         $output                 - Destination for the CONFIG-ERROR line shown when loading fails.
+     * @param bool $noConfig - Skip YAML and seed defaults from the registry.
+     * @param string|null $configPath - Explicit config file, or null to let the loader resolve the default.
+     * @param RuleRegistry $registry - Rules used for defaults and configuration validation.
+     * @param ConfigLoader $configLoader - Reads and merges the selected or default project configuration.
+     * @param array{enabled: bool, maxLines: int, maxBytes: int}|null $deepScanBudgetOverride - CLI budget applied after loading.
+     * @param OutputInterface $output - Receives the CONFIG-ERROR message on ConfigException.
      *
-     * @return AnalysisConfig|null - Resolved config; null when missing or malformed, so the run stops with a CONFIG-ERROR.
+     * @return AnalysisConfig|null - Effective settings; null after reporting a ConfigException.
      */
     private function analysisConfig(
         bool            $noConfig,
@@ -313,7 +308,7 @@ final class SummaryCommand extends Command
         OutputInterface $output,
     ): ?AnalysisConfig {
         try {
-            // --no-config bypasses YAML entirely and runs the registry defaults.
+
             $config = $noConfig
                 ? AnalysisConfig::fromRegistry($registry)
                 : $configLoader->load($configPath, $registry);
@@ -329,7 +324,7 @@ final class SummaryCommand extends Command
 
             return $config;
         } catch (ConfigException $exception) {
-            // A user may have misspelled a rule or retained a non-empty secret-preview list; show the correction instead of a stack trace.
+
             $output->writeln(sprintf('<error>[CONFIG-ERROR] %s</error>', $exception->getMessage()));
         }
 
@@ -337,17 +332,17 @@ final class SummaryCommand extends Command
     }
 
     /**
-     * The core of the command: discover the user's sources, run every rule once, score the result,
-     * and reduce thousands of findings to the handful of numbers the digest shows.
+     * Loads the requested sources, runs enabled analysis rules, and applies exclusions before scoring.
+     * Builds the canonical machine report and the text renderer's aggregates from the surviving findings.
      *
-     * @param string         $projectRoot          - Absolute project root that anchors source discovery.
-     * @param list<string>   $paths                - Project-relative paths requested by the summary command.
-     * @param bool           $shouldIncludeIgnored - When true, scan ignored files via filesystem traversal instead of Git/default ignores.
-     * @param string|null    $effectiveConfigPath  - Config path to echo in the report, or null when running without config.
-     * @param string         $format               - Output format recorded in canonical run metadata.
-     * @param AnalysisConfig $config               - Resolved configuration driving rule selection and ignore patterns.
-     * @param RuleRegistry   $registry             - Rule set executed against the discovered sources.
-     * @param int            $topLimit             - Maximum rows kept for the top-rules and top-offenders lists.
+     * @param string $projectRoot - Absolute project root that anchors source discovery.
+     * @param list<string> $paths - Scan operands, with relative paths resolved against the project root.
+     * @param bool $shouldIncludeIgnored - Include ignored files through filesystem traversal.
+     * @param string|null $effectiveConfigPath - Config path recorded in the report, or null when running without config.
+     * @param string $format - Output format recorded in canonical run metadata.
+     * @param AnalysisConfig $config - Resolved configuration driving rule selection and ignore patterns.
+     * @param RuleRegistry $registry - Available rules selected for execution by the configuration.
+     * @param int $topLimit - Maximum rows kept for the top-rules and top-offenders lists.
      *
      * @return SummaryReportData - Source, score, and aggregate finding data.
      */
@@ -374,9 +369,9 @@ final class SummaryCommand extends Command
             shouldReleaseUnitsAfterAnalysis: true,
         );
 
-        // Configured exclusions and section 13c apply here, exactly as they do on `analyse`, before scoring
-        // and before any total is counted - otherwise the digest would grade findings the fuller report has
-        // already accepted. The audit rows travel with the data so the text render can state what went.
+        // Apply configured exclusions and FAMILY-CONTRACT section 13c before scoring or counting, matching analyse.
+        // Otherwise the summary would grade findings that the full report excludes. Keep the audit rows
+        // so the text renderer can explain what was removed.
         $exclusionResult = (new SensitiveExclusionFilter())->apply($findings, $config->sensitiveExclusions(), InlineSuppressionFilter::forFiles($sources->discovery->files));
         $findings        = $exclusionResult->findings;
 
@@ -431,17 +426,17 @@ final class SummaryCommand extends Command
      * @param string            $format            - Validated output format, either 'text' or 'json'.
      * @param SummaryReportData $summaryReportData - Aggregated run data to render.
      *
-     * @return int - Symfony command exit code.
+     * @return int - Encoding failure status for JSON, otherwise the analysis report's exit status.
      */
     private function writeSummary(OutputInterface $output, string $format, SummaryReportData $summaryReportData): int
     {
-        // JSON is the machine-readable path (CI, editors); text is the default a person reads in the terminal.
+
         if ($format === 'json') {
             try {
                 // Raw output keeps the JSON payload free of console style markup.
                 $output->write($this->renderJson($summaryReportData) . PHP_EOL, false, OutputInterface::OUTPUT_RAW);
             } catch (JsonException $exception) {
-                // Invalid UTF-8 in a discovered path can make encoding fail; tell the user rather than emit half a JSON document.
+
                 $output->writeln(sprintf('<error>Unable to encode summary: %s</error>', $exception->getMessage()));
 
                 return Command::FAILURE;
@@ -452,7 +447,7 @@ final class SummaryCommand extends Command
 
         $output->write($this->renderText($summaryReportData));
 
-        // The text digest ends the run the way the JSON one does: a run a parse error invalidated exits 2 in both.
+
         return $summaryReportData->analysisReport->exitCode;
     }
 
@@ -467,7 +462,7 @@ final class SummaryCommand extends Command
     private function pillarLookup(RuleRegistry $registry): array
     {
         $pillarLookup = [];
-        // Walk every registered rule so any finding can later be traced back to the pillar it belongs to.
+
         foreach ($registry->all() as $rule) {
             $definition                    = $rule->definition();
             $pillarLookup[$definition->id] = $definition->pillar->value;
@@ -477,22 +472,20 @@ final class SummaryCommand extends Command
     }
 
     /**
-     * Builds the "top rules" list - which checks the user's code trips most often, ranked worst-first
-     * so the biggest problems sit at the top.
+     * Aggregates all findings into per-rule counts, ordered by total count and then rule ID.
      *
-     * @param list<Finding>         $findings     - Findings to aggregate into per-rule summary rows.
-     * @param array<string, string> $pillarLookup - Rule-id to pillar map from the registry; findings fall back to their own pillar when absent.
+     * @param list<Finding> $findings - Findings to aggregate into per-rule summary rows.
+     * @param array<string, string> $pillarLookup - Rule pillars; a missing ID falls back to the finding's pillar.
      *
-     * @return list<array{ruleId: string, count: int, advisory: int, warning: int, error: int, pillar: string}> - per-rule tallies ordered by
-     *                            descending total count, ties broken by rule id; empty when there are no findings
+     * @return list<array{ruleId: string, count: int, advisory: int, warning: int, error: int, pillar: string}> - Count descending, ID; empty if none.
      */
     private function aggregateByRule(array $findings, array $pillarLookup): array
     {
         $aggregates = [];
-        // Tally findings per rule so the digest can show which checks the user's code trips most often.
+
         foreach ($findings as $finding) {
             $ruleId = $finding->ruleId;
-            // First time this rule has fired this run: open a fresh row before counting into it.
+
             if (!isset($aggregates[$ruleId])) {
                 $aggregates[$ruleId] = [
                     'ruleId' => $ruleId,
@@ -511,7 +504,7 @@ final class SummaryCommand extends Command
         $rows = array_values($aggregates);
         usort($rows, static function (array $left, array $right): int {
             $countDelta = $right['count'] <=> $left['count'];
-            // Order by finding count, busiest rule first; only a genuine tie falls through to the id tie-break.
+
             if ($countDelta !== 0) {
                 return $countDelta;
             }
@@ -523,18 +516,16 @@ final class SummaryCommand extends Command
     }
 
     /**
-     * Counts findings per severity to fill the headline "N error · N warning · N advisory" line the
-     * user reads first to gauge how serious the run was.
+     * Counts findings per severity for the summary's finding totals.
      *
      * @param list<Finding> $findings - Findings to count by severity; empty input keeps every bucket at zero.
      *
-     * @return array{advisory: int, warning: int, error: int, total: int} - per-severity finding counts plus the grand total; every key is zero when
-     *                         there are no findings
+     * @return array{advisory: int, warning: int, error: int, total: int} - Counts by severity and total; all zero for empty input.
      */
     private function severityTotals(array $findings): array
     {
         $totals = ['advisory' => 0, 'warning' => 0, 'error' => 0, 'total' => count($findings)];
-        // Sort every finding into its severity bucket to build that one-line headline tally.
+
         foreach ($findings as $finding) {
             $totals[$finding->severity->value]++;
         }
@@ -543,19 +534,18 @@ final class SummaryCommand extends Command
     }
 
     /**
-     * Reports how many files could not be parsed, so the "N parse errors" figure warns the user that
-     * some code was skipped entirely rather than scanned and found clean.
+     * Counts parse-error diagnostics for the summary's parse-error total.
      *
-     * @param list<\GruffPhp\Engine\Analysis\RunDiagnostic> $diagnostics - Run diagnostics to scan; only parse-error entries are counted.
+     * @param list<\GruffPhp\Engine\Analysis\RunDiagnostic> $diagnostics - Run diagnostics; only parse-error entries count.
      *
      * @return int - Number of parse-error diagnostics in the source set.
      */
     private function parseErrorCount(array $diagnostics): int
     {
         $count = 0;
-        // Diagnostics also carry non-fatal notes, so count only the entries that mean a file went unanalysed.
+
         foreach ($diagnostics as $diagnostic) {
-            // A parse error is the one kind that left a file unscanned; that's what the user needs warning about.
+
             if ($diagnostic->type === 'parse-error') {
                 $count++;
             }
@@ -583,8 +573,8 @@ final class SummaryCommand extends Command
     }
 
     /**
-     * Lays out the terminal digest the user reads: header, composite grade, and pillar table, plus -
-     * only when there are findings - the top rules, worst files, and a baseline nudge.
+     * Lays out the terminal digest: header, composite grade, pillar table, ranked rules, and scored files.
+     * Adds baseline guidance when the run has findings.
      *
      * @param SummaryReportData $summaryReportData - Aggregated run data to format as aligned console text.
      *
@@ -592,10 +582,10 @@ final class SummaryCommand extends Command
      */
     private function renderText(SummaryReportData $summaryReportData): string
     {
-        // FAMILY-CONTRACT section 1: the masthead and the two-line composite block are the first
-        // three lines, and every gruff-php line sits below them. The scan card used to sit between
-        // the two, which put the number a reader came for six lines down and out of line with what
-        // `analyse` prints one command away.
+        // FAMILY-CONTRACT section 1 requires the masthead and composite block before all port-specific summary lines.
+
+
+
         $lines   = [];
         $lines[] = sprintf('%s %s summary', Application::NAME, Application::VERSION);
         // A run that evaluated nothing has no composite, and printing 100.00 would call it perfect.
@@ -656,7 +646,7 @@ final class SummaryCommand extends Command
      *
      * @param SummaryReportData $summaryReportData - Aggregated run data carrying the diagnostics to print.
      *
-     * @return list<string> - Heading and one indented row per diagnostic; empty when the run raised none.
+     * @return list<string> - Leading blank line, heading, and one row per diagnostic; empty when none exist.
      */
     private function diagnosticLines(SummaryReportData $summaryReportData): array
     {
@@ -679,11 +669,11 @@ final class SummaryCommand extends Command
     }
 
     /**
-     * Renders one aligned row per pillar, worst first, which is the block users scan before anything else.
+     * Renders one aligned row per pillar, ordered by descending scored finding count.
      *
      * @param SummaryReportData $summaryReportData - Aggregated run data carrying the scored pillars.
      *
-     * @return list<string> - One row per pillar, ordered by finding count.
+     * @return list<string> - One row per supplied pillar, most findings first.
      */
     private function pillarLines(SummaryReportData $summaryReportData): array
     {
@@ -694,10 +684,10 @@ final class SummaryCommand extends Command
 
         $pillarWidth = $this->columnWidth(array_map(static fn($pillar): string => $pillar->pillar, $sortedPillars), 14);
         $lines       = [];
-        // One aligned row per pillar (naming, complexity, security, …) - the grades users scan first.
+
         foreach ($sortedPillars as $pillar) {
             $grade = $pillar->grade === null ? 'n/a' : $pillar->grade->letter;
-            // A pillar with no applicable rules has no grade, so show "n/a" rather than a misleading zero.
+            // An absent grade must remain n/a rather than look like a measured zero.
             $scoreText = $pillar->grade === null ? '  n/a ' : sprintf('%6.2f', $pillar->grade->score);
             $lines[]   = sprintf(
                 '  %-' . $pillarWidth . 's %s %s findings=%-5d advisory=%-5d warning=%-5d error=%-5d',
@@ -715,11 +705,11 @@ final class SummaryCommand extends Command
     }
 
     /**
-     * Renders the highest-volume rules, so a user can see which single rule accounts for most of the run.
+     * Renders the highest-volume rules so a user can see which rules produce the largest finding counts.
      *
      * @param SummaryReportData $summaryReportData - Aggregated run data carrying the ranked rules.
      *
-     * @return list<string> - Heading and one row per ranked rule; empty on clean code, where the block would be clutter.
+     * @return list<string> - Leading blank line, heading, and one row per supplied rule; empty when no rules are supplied.
      */
     private function topRuleLines(SummaryReportData $summaryReportData): array
     {
@@ -749,7 +739,7 @@ final class SummaryCommand extends Command
      *
      * @param SummaryReportData $summaryReportData - Aggregated run data carrying the ranked files.
      *
-     * @return list<string> - Heading and one row per ranked file; empty when no findings means no offenders.
+     * @return list<string> - Leading blank line, heading, and one row per supplied file; empty when no files are supplied.
      */
     private function topOffenderLines(SummaryReportData $summaryReportData): array
     {
@@ -776,17 +766,16 @@ final class SummaryCommand extends Command
     }
 
     /**
-     * The machine-readable twin of the text digest: the same numbers under a stable schema so CI
-     * gates and editor integrations can read a run's verdict.
+     * Serialises the canonical analysis report as a summary without individual findings.
      *
-     * @param SummaryReportData $summaryReportData - Aggregated run data to serialise under the gruff.summary schema.
+     * @param SummaryReportData $summaryReportData - Run data whose canonical report supplies the summary payload.
      *
      * @return string - JSON-encoded summary report.
-     * @throws JsonException When the summary payload cannot be encoded.
+     * @throws JsonException - When the summary payload cannot be encoded.
      */
     private function renderJson(SummaryReportData $summaryReportData): string
     {
-        // Invalid source bytes become U+FFFD so `summary --format json` always hands the user parseable JSON.
+        // Substitute invalid UTF-8 bytes with U+FFFD so they do not cause a malformed-UTF-8 encoding error.
         return json_encode(
             $summaryReportData->analysisReport->toSummaryArray(),
             JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR,
@@ -805,10 +794,8 @@ final class SummaryCommand extends Command
     private function columnWidth(array $columnTexts, int $minimum): int
     {
         $maximum = $minimum;
-        // Grow the column to the longest value present, so no cell is truncated in the aligned output.
         foreach ($columnTexts as $columnText) {
             $length = strlen($columnText);
-            // Track the widest cell seen; that width is what every row underneath lines up against.
             if ($length > $maximum) {
                 $maximum = $length;
             }

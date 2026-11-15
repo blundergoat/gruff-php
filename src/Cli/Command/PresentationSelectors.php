@@ -14,12 +14,12 @@ namespace GruffPhp\Cli\Command;
 final readonly class PresentationSelectors
 {
     /**
-     * Captures the four presentation choices exactly as the user gave them; every list defaults to "unset".
+     * Stores presentation selectors after the caller has parsed and normalised their values.
      *
-     * @param list<string> $showRules   - Rule IDs from `--show-rule`; empty means the report shows every rule that ran.
-     * @param list<string> $hideRules   - Rule IDs from `--hide-rule`; empty means the report hides none.
-     * @param list<string> $showPillars - Pillars from `--show-pillar`; empty means the report shows every pillar.
-     * @param list<string> $hidePillars - Pillars from `--hide-pillar`; empty means the report hides none.
+     * @param list<string> $showRules - Rule IDs selected by --show-rule; empty adds no rule allowlist.
+     * @param list<string> $hideRules - Rule IDs excluded by --hide-rule; empty excludes no rules through this selector.
+     * @param list<string> $showPillars - Pillars selected by --show-pillar; empty adds no pillar allowlist.
+     * @param list<string> $hidePillars - Pillars excluded by --hide-pillar; empty excludes no pillars through this selector.
      */
     public function __construct(
         public array $showRules = [],

@@ -24,7 +24,7 @@ final class InvokedTestMethodEvidence
     /** Exact trait whose published API verifies the registered deprecation after the test. */
     private const DEPRECATION_TRAIT = 'doctrine\deprecations\phpunit\verifydeprecations';
 
-    /** Maximum number of method bodies followed before an unresolved test keeps its warning. */
+    /** Maximum number of method bodies followed along one call path. */
     private const MAX_METHOD_DEPTH = 8;
 
     /**
@@ -47,26 +47,26 @@ final class InvokedTestMethodEvidence
     }
 
     /**
-     * Follows invoked same-class methods while keeping cycles and unused closures out of the proof.
+     * Follows same-class call expressions while excluding cycles and calls inside nested function-like bodies.
      *
      * @param Stmt\ClassMethod $method         - Current body; absent statements provide no expectation.
      * @param Stmt\Class_      $class          - Exact owner whose methods may be followed.
      * @param bool             $hasVendorTrait - Whether the unmodified Doctrine trait supplies its published expectation method.
      * @param array<int, true> $visited        - Method identities already followed; empty starts a new test traversal.
-     * @return bool - True when this bounded path reaches assertion or supported expectation behavior.
+     * @return bool - True when this bounded path reaches supported assertion or expectation evidence.
      */
     private static function hasInvokedExpectation(Stmt\ClassMethod $method, Stmt\Class_ $class, bool $hasVendorTrait, array $visited): bool
     {
         $identity = spl_object_id($method);
-        // A cycle or exhausted traversal cannot turn an assertion-free test into a proved test.
+        // Cycles and the depth limit stop this bounded search without adding expectation evidence.
         if (isset($visited[$identity]) || count($visited) >= self::MAX_METHOD_DEPTH) {
             return false;
         }
         $visited[$identity] = true;
         $calls              = (new NodeFinder())->findInstanceOf($method->stmts ?? [], Expr\CallLike::class);
-        // Each actual call may supply an assertion or lead to another declared helper.
+
         foreach ($calls as $call) {
-            // Creating a callback or declaring a nested function does not execute its checks.
+            // Callback placeholders and calls nested in another function-like body do not establish expectation evidence here.
             if (!self::isExecutedCall($call) || SecurityNodeHelper::enclosingFunctionLike($call) !== $method) {
                 continue;
             }
@@ -74,21 +74,20 @@ final class InvokedTestMethodEvidence
             if (!$call instanceof Expr\FuncCall && !$call instanceof Expr\MethodCall && !$call instanceof Expr\StaticCall) {
                 continue;
             }
-            // The existing assertion policy also applies inside an actually invoked helper.
             if (TestQualityNodeHelper::isAssertionCall($call) || TestQualityNodeHelper::isMockVerificationCall($call)) {
                 return true;
             }
             $name = self::sameClassMethodName($call, $class);
-            // Unknown receivers cannot execute a helper proved from this class's source.
+            // Dynamic or foreign receivers cannot be resolved to a helper declared in this class.
             if ($name === null) {
                 continue;
             }
-            // Doctrine checks this exact registered expectation in its published after-test hook.
+            // The supported Doctrine trait contributes expectation evidence for this method name.
             if ($hasVendorTrait && $name === 'expectdeprecationwithidentifier') {
                 return true;
             }
             $callee = $class->getMethod($name);
-            // A declared and actually invoked method is the only supported delegation edge.
+            // A declared same-class callee is the only delegation edge followed by this search.
             if ($callee !== null && self::hasInvokedExpectation($callee, $class, $hasVendorTrait, $visited)) {
                 return true;
             }
@@ -98,10 +97,10 @@ final class InvokedTestMethodEvidence
     }
 
     /**
-     * Distinguishes executing a check from preparing a first-class or partial callback.
+     * Distinguishes ordinary call syntax from first-class or partial callback syntax.
      *
      * @param Expr\CallLike $call - Parsed call; an empty argument list is an ordinary zero-argument invocation.
-     * @return bool - True only when every argument is supplied now, so this expression invokes its target.
+     * @return bool - True when every raw argument is supplied rather than represented by a callback placeholder.
      */
     private static function isExecutedCall(Expr\CallLike $call): bool
     {
@@ -117,19 +116,19 @@ final class InvokedTestMethodEvidence
     }
 
     /**
-     * Resolves only this object or a written reference to the declaring class.
+     * Resolves method names only from $this or a written reference to the declaring class.
      *
-     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call  - Executed call under review.
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call  - Call expression under review.
      * @param Stmt\Class_                                   $class - Owner used for exact qualified-name comparison.
      * @return string|null - Lowercase method name; null leaves foreign, dynamic or late-static targets unresolved.
      */
     private static function sameClassMethodName(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call, Stmt\Class_ $class): ?string
     {
-        // A dynamic method name cannot identify which helper executes.
+        // A dynamic method name cannot identify which helper is referenced.
         if (!$call->name instanceof Identifier) {
             return null;
         }
-        // The current object has the exact method declarations being inspected.
+        // A $this receiver is resolved against the test class declarations inspected here.
         if ($call instanceof Expr\MethodCall && $call->var instanceof Expr\Variable && $call->var->name === 'this') {
             return strtolower($call->name->toString());
         }
@@ -146,11 +145,11 @@ final class InvokedTestMethodEvidence
     }
 
     /**
-     * Requires the exact vendor trait without adaptations, competing traits or local replacement methods.
+     * Accepts only the resolved Doctrine trait name without adaptations, competing traits or local replacement methods.
      *
      * @param Stmt\Class_  $class - PHPUnit class whose trait declarations are inspected.
      * @param AnalysisUnit $unit  - Parsed file; a local declaration of the vendor trait invalidates published API evidence.
-     * @return bool - True only when the exact Doctrine expectation remains supplied by the supported trait.
+     * @return bool - True when this file preserves the supported Doctrine trait evidence.
      */
     private static function hasVendorTrait(Stmt\Class_ $class, AnalysisUnit $unit): bool
     {
@@ -164,7 +163,7 @@ final class InvokedTestMethodEvidence
         // A locally declared replacement cannot borrow behavior from a published vendor API.
         foreach (NodeIndex::nodesOf($unit, Stmt\Trait_::class) as $trait) {
             $name = $trait->namespacedName ?? null;
-            // The fully qualified declaration would replace the trait whose hook supplies the proof.
+            // The fully qualified declaration would replace the vendor trait that supplies the expectation evidence.
             if ($name instanceof Name && strtolower($name->toString()) === self::DEPRECATION_TRAIT) {
                 return false;
             }
@@ -172,14 +171,14 @@ final class InvokedTestMethodEvidence
         $found = false;
         // Every trait must be known here; an unrelated trait may override expectation or hook behavior.
         foreach ($class->getTraitUses() as $use) {
-            // Aliasing or conflict resolution changes which implementation the test would invoke.
+            // Adaptations can change or add callable implementations, so this heuristic declines adapted uses.
             if ($use->adaptations !== []) {
                 return false;
             }
             // A comma-separated trait list can hide a competing implementation too.
             foreach ($use->traits as $traitName) {
                 $resolved = $traitName->getAttribute('resolvedName', $traitName);
-                // Only the exact supported vendor binding grants this narrowly named expectation.
+                // Only the resolved supported trait name contributes this expectation evidence.
                 if (!$resolved instanceof Name || strtolower($resolved->toString()) !== self::DEPRECATION_TRAIT) {
                     return false;
                 }

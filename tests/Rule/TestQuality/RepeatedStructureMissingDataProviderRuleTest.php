@@ -17,7 +17,9 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers detection of repeated test structures after non-candidates and the grouped method metadata carried on findings.
+ * Covers repeated-structure findings in legacy and complete-syntax grouping modes.
+ * Fixture cases check traversal past ineligible methods and declaration-sensitive grouping.
+ * Assertions check reported symbols, selected metadata, messages and declaration anchors.
  */
 final class RepeatedStructureMissingDataProviderRuleTest extends TestCase
 {
@@ -27,9 +29,9 @@ final class RepeatedStructureMissingDataProviderRuleTest extends TestCase
     private PhpFileParser $parser;
 
     /**
-     * Prepare parser fixtures before each rule test.
+     * Create a fresh rule and parser before each test.
      *
-     * @return void
+     * @return void - Initializes the rule and parser used by the fixture helpers.
      */
     protected function setUp(): void
     {
@@ -40,7 +42,7 @@ final class RepeatedStructureMissingDataProviderRuleTest extends TestCase
     /**
      * Verify repeated structures are found after non-candidate methods.
      *
-     * @return void
+     * @return void - Asserts the five expected finding symbols in emitted order.
      */
     public function testRepeatedStructuresAreFoundAfterNonCandidates(): void
     {
@@ -57,9 +59,9 @@ final class RepeatedStructureMissingDataProviderRuleTest extends TestCase
     }
 
     /**
-     * Verify findings carry the grouped method metadata and message.
+     * Verify selected findings carry grouped method metadata and message.
      *
-     * @return void
+     * @return void - Asserts five findings, selected member metadata and the fourth finding's message.
      */
     public function testFindingsCarryGroupedMethodMetadata(): void
     {
@@ -77,9 +79,9 @@ final class RepeatedStructureMissingDataProviderRuleTest extends TestCase
     }
 
     /**
-     * Verifies the complete-syntax mode preserves the accepted positive groups and rejects the distinct controls.
+     * Verifies group mode reports the eligible fixture classes and omits the distinct controls.
      *
-     * @return void
+     * @return void - Asserts exactly the seven expected group symbols.
      */
     public function testGroupModeKeepsOnlyEligibleClasses(): void
     {
@@ -99,7 +101,7 @@ final class RepeatedStructureMissingDataProviderRuleTest extends TestCase
     /**
      * Verifies one finding lists every member of a larger group and asks for labelled provider rows.
      *
-     * @return void
+     * @return void - Asserts four member lines, the anchor, label guidance and no ignoredPathPatterns mention in remediation.
      */
     public function testGroupModeListsEveryMemberAndItsDeclarationLine(): void
     {
@@ -121,7 +123,7 @@ final class RepeatedStructureMissingDataProviderRuleTest extends TestCase
     /**
      * Verifies attribute lines do not replace the method declaration as the finding anchor.
      *
-     * @return void
+     * @return void - Asserts the finding and first member use declaration line 23.
      */
     public function testGroupModeAnchorsAfterAttributes(): void
     {
@@ -136,7 +138,7 @@ final class RepeatedStructureMissingDataProviderRuleTest extends TestCase
     /**
      * Verifies the group option keeps data-provider exclusions and traversal past non-candidates.
      *
-     * @return void
+     * @return void - Asserts the five expected fixture symbols in group mode.
      */
     public function testGroupModePreservesExistingProviderControls(): void
     {
@@ -152,11 +154,11 @@ final class RepeatedStructureMissingDataProviderRuleTest extends TestCase
     }
 
     /**
-     * Differing declarations cannot become provider rows; identical declarations and closure values can.
+     * Verify grouping rejects differing declarations and accepts the eligible control fixtures.
      *
      * @param string $className - Fixture class whose group is checked.
      * @param bool   $expected  - Whether the class should report one complete group.
-     * @return void
+     * @return void - Asserts one testAlpha finding for accepted fixtures and none for rejected fixtures.
      */
     #[DataProvider('declarationCases')]
     public function testGroupModeKeepsDeclarationsExact(string $className, bool $expected): void
@@ -171,7 +173,7 @@ final class RepeatedStructureMissingDataProviderRuleTest extends TestCase
     }
 
     /**
-     * Lists the declaration boundaries and the two eligible value controls.
+     * Lists declaration and closure fixtures with their expected grouping outcomes.
      *
      * @return array<string, array{string, bool}> - Named fixture classes and expected grouping.
      */
@@ -192,7 +194,7 @@ final class RepeatedStructureMissingDataProviderRuleTest extends TestCase
     /**
      * Parse and analyse a repeated-structure fixture.
      *
-     * @param string $fixture       - Fixture filename.
+     * @param string $fixture - Filename under tests/Fixtures/TestQuality/.
      * @param bool|null $groupFindings - Explicit mode, or null to use the configured default.
      *
      * @return list<Finding> - rule findings for the fixture, ordered as the rule emits them, empty when none match
@@ -220,9 +222,9 @@ final class RepeatedStructureMissingDataProviderRuleTest extends TestCase
     /**
      * Parse the named fixture into an analysis unit.
      *
-     * @param string $filename - Fixture filename.
+     * @param string $filename - Filename under tests/Fixtures/TestQuality/.
      *
-     * @return AnalysisUnit - the parsed fixture with its display path kept repo-relative for finding output
+     * @return AnalysisUnit - Fixture contents and any read or parse diagnostics, with a repository-relative display path.
      */
     private function parseFixture(string $filename): AnalysisUnit
     {

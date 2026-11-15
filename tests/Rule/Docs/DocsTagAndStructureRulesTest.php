@@ -24,13 +24,15 @@ use GruffPhp\Rules\Shared\PhysicalCommentAttachment;
 
 /**
  * Covers documentation tag, file, class, property, and constant rules.
+ * Exercises fixture findings, declaration exemptions, and local comment attachment.
+ * Checks regex diagnostics and promoted-constructor documentation ownership.
  */
 final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
 {
     /**
-     * Verify missing throws tag detected.
+     * Verify a fixture method with an undocumented throw is reported.
      *
-     * @return void
+     * @return void - Asserts the missing-throws findings include PhpdocTagsFixture::throwsWithoutTag().
      */
     public function testMissingThrowsTagDetected(): void
     {
@@ -41,19 +43,19 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify only same-scope throws require @throws; nested-scope throws belong to their own contracts.
+     * Verify direct throws are reported without attributing nested throws to their enclosing methods.
      *
-     * @return void
+     * @return void - Asserts two direct-throw findings and excludes four outer methods containing nested throws.
      */
     public function testMissingThrowsTagPrunesNestedFunctionLikeScopes(): void
     {
         $findings = $this->analyseRule('throws-nested-scopes.php', MissingThrowsTagRule::ID);
 
         $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
-        // Direct throws in a method and a free function still report...
+
         self::assertContains('ScopedThrows::directThrow()', $symbols);
         self::assertContains('freeFunctionDirectThrow()', $symbols);
-        // ...while arrow-function, closure, anonymous-class, and IIFE throws never charge the outer method.
+
         self::assertNotContains('ScopedThrows::arrowFunctionThrow()', $symbols);
         self::assertNotContains('ScopedThrows::closureThrow()', $symbols);
         self::assertNotContains('ScopedThrows::anonymousClassThrow()', $symbols);
@@ -62,9 +64,9 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify override aware throws rule uses inherited contracts but local phpdoc is required.
+     * Verify the override-aware throws rule accepts inherited contracts but still requires local PHPDoc.
      *
-     * @return void
+     * @return void - Asserts inherited throws contracts are accepted while the implementation without local PHPDoc is flagged.
      */
     public function testOverrideAwareThrowsRuleUsesInheritedContractsButLocalPhpdocIsRequired(): void
     {
@@ -82,7 +84,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify bare PHPDoc tags are detected.
      *
-     * @return void
+     * @return void - Asserts five fixture methods appear in bare-tag findings, including generic, resource, and shape tags.
      */
     public function testBarePhpdocTagsDetected(): void
     {
@@ -99,7 +101,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify descriptive PHPDoc tags are not bare PHPDoc.
      *
-     * @return void
+     * @return void - Asserts three fixture methods with tag descriptions are absent from bare-tag findings.
      */
     public function testDescriptivePhpdocTagsAreNotBarePhpdoc(): void
     {
@@ -112,9 +114,9 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify todo density detected.
+     * Verify the TODO-density fixture produces one finding with the expected count.
      *
-     * @return void
+     * @return void - Asserts exactly one finding has count metadata equal to twelve.
      */
     public function testTodoDensityDetected(): void
     {
@@ -127,7 +129,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify var annotations require description.
      *
-     * @return void
+     * @return void - Asserts one finding identifies missing in its variable metadata and $missing as its symbol.
      */
     public function testVarAnnotationsRequireDescription(): void
     {
@@ -141,12 +143,12 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify var annotation on attribute decorated property does not flag.
      *
-     * @return void
+     * @return void - Asserts $attributedProperty is absent from local var-annotation findings.
      */
     public function testVarAnnotationOnAttributeDecoratedPropertyDoesNotFlag(): void
     {
-        // Regression: attributes between `@var` and a property keyword used to trip
-        // the token-stream heuristic, but the AST-driven path should skip declarations.
+        // Attributes between the @var docblock and property must preserve the declaration exemption.
+
         $findings = $this->analyseRule('var-annotation-description.php', VarAnnotationDescriptionRule::ID);
 
         $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
@@ -156,7 +158,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify var annotation on attribute decorated method does not flag.
      *
-     * @return void
+     * @return void - Asserts $attributedMethodResult is absent from local var-annotation findings.
      */
     public function testVarAnnotationOnAttributeDecoratedMethodDoesNotFlag(): void
     {
@@ -167,9 +169,9 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify call, statement-owner, match-arm, and narrow callable coverage while retained calls report.
+     * Verify regex-comment findings, diagnostic metadata, and retained finding identities for the fixture.
      *
-     * @return void
+     * @return void - Asserts expected symbols, regex functions, diagnostics, stable identities, and comment-line classification.
      */
     public function testRegexCommentRequiresImmediatePurposeComment(): void
     {
@@ -278,7 +280,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify clean fixture has no doc findings.
      *
-     * @return void
+     * @return void - Asserts the clean fixture has no findings whose rule IDs start with the docs. prefix.
      */
     public function testCleanFixtureHasNoDocFindings(): void
     {
@@ -293,7 +295,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify missing class phpdoc flags class interface trait enum.
      *
-     * @return void
+     * @return void - Asserts exactly four undocumented symbols and the class, enum, interface, and trait kinds.
      */
     public function testMissingClassPhpdocFlagsClassInterfaceTraitEnum(): void
     {
@@ -318,9 +320,9 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify missing class phpdoc skips anonymous and documented classes.
+     * Verify the reported symbols exclude DocumentedClass and AnonymousFactory.
      *
-     * @return void
+     * @return void - Asserts DocumentedClass and AnonymousFactory are absent from the reported symbols.
      */
     public function testMissingClassPhpdocSkipsAnonymousAndDocumentedClasses(): void
     {
@@ -334,7 +336,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify missing file phpdoc flags files without any docblock.
      *
-     * @return void
+     * @return void - Asserts one finding names the without-any-docblock.php fixture and reports line one.
      */
     public function testMissingFilePhpdocFlagsFilesWithoutAnyDocblock(): void
     {
@@ -351,7 +353,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify missing file phpdoc skips file with explicit file docblock.
      *
-     * @return void
+     * @return void - Asserts the with-file-docblock.php fixture produces no missing-file-PHPDoc findings.
      */
     public function testMissingFilePhpdocSkipsFileWithExplicitFileDocblock(): void
     {
@@ -366,7 +368,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify missing file phpdoc skips single documented class file.
      *
-     * @return void
+     * @return void - Asserts the with-only-class-docblock.php fixture produces no missing-file-PHPDoc findings.
      */
     public function testMissingFilePhpdocSkipsSingleDocumentedClassFile(): void
     {
@@ -381,7 +383,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify each promoted-constructor documentation gap has one rule owner.
      *
-     * @return void
+     * @return void - Asserts exactly four ownership rows across the missing-PHPDoc, parameter, and property rules.
      */
     public function testPromotedConstructorDocumentationHasOneOwner(): void
     {
@@ -478,7 +480,7 @@ PHP;
     /**
      * Verify missing property PHPDoc flags only undocumented declarations.
      *
-     * @return void
+     * @return void - Asserts only DocumentedProperty::$undocumented is reported, with kind declared.
      */
     public function testMissingPropertyPhpdocFlagsOnlyUndocumentedDeclarations(): void
     {
@@ -497,7 +499,7 @@ PHP;
     /**
      * Verify missing property phpdoc skips anonymous class property.
      *
-     * @return void
+     * @return void - Asserts every finding has a symbol and none contains the anonymous property's $exempt name.
      */
     public function testMissingPropertyPhpdocSkipsAnonymousClassProperty(): void
     {
@@ -516,7 +518,7 @@ PHP;
     /**
      * Verify missing constant phpdoc flags class constants and enum cases.
      *
-     * @return void
+     * @return void - Asserts one class constant and two enum cases are reported with their kinds and Apply remediation.
      */
     public function testMissingConstantPhpdocFlagsClassConstantsAndEnumCases(): void
     {
@@ -551,7 +553,7 @@ PHP;
     /**
      * Verify missing constant phpdoc exempts enum cases when enum has docblock.
      *
-     * @return void
+     * @return void - Asserts DocumentedEnum::FIRST and DocumentedEnum::SECOND are absent from constant findings.
      */
     public function testMissingConstantPhpdocExemptsEnumCasesWhenEnumHasDocblock(): void
     {
@@ -565,7 +567,7 @@ PHP;
     /**
      * Verify local comments cover only the intended constant and group shapes.
      *
-     * @return void
+     * @return void - Asserts the exact reported constants and selected missing or low-quality comment diagnostics.
      */
     public function testMissingConstantPhpdocAllowsUsefulLocalCommentsByDefault(): void
     {
@@ -609,7 +611,7 @@ PHP;
     /**
      * Verify strict API mode requires PHPDoc for public constants with useful local comments.
      *
-     * @return void
+     * @return void - Asserts selected strict-mode findings, grouped-comment metadata, and the documented constant's exemption.
      */
     public function testMissingConstantPhpdocCanRequirePhpdocForApiConstants(): void
     {
@@ -644,7 +646,7 @@ PHP;
         self::assertTrue($patientReference->metadata['requiresApiPhpdoc'] ?? null);
         self::assertTrue($patientReference->metadata['groupedLocalComment'] ?? null);
 
-        // The sixth constant under one comment is covered like the rest of its run; strict mode still wants PHPDoc.
+        // PATIENT_OVERFLOW_PATTERN shares the grouped local comment, but strict mode still requires PHPDoc.
         $patientOverflow = $byConstant['PATIENT_OVERFLOW_PATTERN'];
         self::assertSame('meaningful', $patientOverflow->metadata['commentQuality'] ?? null);
         self::assertTrue($patientOverflow->metadata['requiresApiPhpdoc'] ?? null);
@@ -655,7 +657,7 @@ PHP;
     /**
      * Verify API path patterns can opt specific exported paths into strict constant PHPDoc.
      *
-     * @return void
+     * @return void - Asserts a matching path requires API PHPDoc for TELEMETRY_KEY while DOCUMENTED_TELEMETRY_KEY stays exempt.
      */
     public function testMissingConstantPhpdocCanRequirePhpdocForApiPathPatterns(): void
     {
@@ -675,7 +677,7 @@ PHP;
     /**
      * Verify comment-only delimiter chains cover a regex while executable segments still report.
      *
-     * @return void
+     * @return void - Asserts regex finding presence and symbols, plus classification of comment-only, executable, and unclosed lines.
      */
     private function assertRegexCommentLineClassification(): void
     {

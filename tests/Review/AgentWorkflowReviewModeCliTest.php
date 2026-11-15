@@ -9,6 +9,8 @@ use Symfony\Component\Process\Process;
 
 /**
  * Covers review-mode CLI option validation that does not need branch-review fixtures.
+ * Checks --changed-only without --diff-vs and conflicting --diff and --diff-vs options.
+ * Asserts exit code 2 and diagnostic text for both invocations.
  */
 final class AgentWorkflowReviewModeCliTest extends TestCase
 {
@@ -16,9 +18,9 @@ final class AgentWorkflowReviewModeCliTest extends TestCase
     private const PROJECT_ROOT = __DIR__ . '/../..';
 
     /**
-     * Verify review mode invalid option combinations fail early.
+     * Verify invalid review-mode option combinations report usage errors.
      *
-     * @return void
+     * @return void - Asserts exit code 2 and the expected diagnostic for each tested option combination.
      */
     public function testReviewModeInvalidOptionCombinationsFailEarly(): void
     {

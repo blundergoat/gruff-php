@@ -18,7 +18,7 @@ use PhpParser\Node\Stmt;
 
 /**
  * Flags two test-naming smells in a PHPUnit class: a method whose name matches a low-signal pattern
- * (`testWorks`, `testFoo2`) and a class that mixes camelCase and snake_case test methods. A reviewer sees
+ * (`testFooWorks`, `testFoo2`) and a class that mixes camelCase and snake_case test methods. A reviewer sees
  * names that read poorly in reports. Runs per class; the poor-name patterns are tunable. Advisory, high confidence.
  */
 final readonly class TestNamingConsistencyRule implements RuleInterface
@@ -59,7 +59,7 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
      * Reports mixed test naming styles and weakly descriptive test names.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext - Supplies the configured poorNamePatterns regexes.
      *
      * @return list<Finding> - Findings for inconsistent or poor test names.
      */
@@ -68,15 +68,15 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
         $findings = [];
         $patterns = $ruleContext->settingsFor($this->definition())->stringListOption('poorNamePatterns');
 
-        // Weigh every class declaration in the file.
+
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Class_::class) as $class) {
             $camelCount = 0;
             $snakeCount = 0;
             $className  = $class->name?->toString() ?? sprintf('anonymous@%d', $class->getStartLine());
 
-            // Inspect each method for test-name style and quality.
+
             foreach ($class->getMethods() as $method) {
-                // Only real test methods are named against the conventions.
+
                 if (!TestQualityNodeHelper::isTestMethod($method)) {
                     continue;
                 }
@@ -84,9 +84,7 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
                 $methodName = $method->name->toString();
                 $afterTest  = substr($methodName, 4);
 
-                // Classify the naming style only when the name has text after test.
                 if ($afterTest !== '') {
-                    // An underscore marks snake_case; anything else is camelCase.
                     if (str_contains($afterTest, '_')) {
                         $snakeCount++;
                     } else {
@@ -95,7 +93,6 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
                 }
 
                 $matchedPattern = $this->matchPoorNamePattern($methodName, $patterns);
-                // A name matching a poor-name pattern earns its own finding.
                 if ($matchedPattern !== null) {
                     $findings[] = new Finding(
                         ruleId:      self::ID,
@@ -113,7 +110,7 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
                 }
             }
 
-            // A single, consistent naming style across the class is fine.
+
             if ($camelCount === 0 || $snakeCount === 0) {
                 continue;
             }
@@ -146,7 +143,6 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
      */
     private function matchPoorNamePattern(string $methodName, array $patterns): ?string
     {
-        // Try each configured poor-name pattern in order.
         foreach ($patterns as $pattern) {
             if ($this->isPatternMatch($pattern, $methodName)) {
                 // Surface the offending regex so the finding can name which rule the test name tripped.

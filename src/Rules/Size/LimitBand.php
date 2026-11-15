@@ -7,10 +7,11 @@ namespace GruffPhp\Rules\Size;
 use GruffPhp\Results\Finding\Severity;
 
 /**
- * Sorts a size or complexity finding into one of the two bands the family contract ratifies (FAMILY-CONTRACT.md section
- * 12, "Size and complexity findings in two bands"). A unit over its limit but under one and a half times it gets an
- * advisory notice not to grow; at that ratio or above it keeps its severity and the advice to split or simplify. The
- * message never changes between bands, so a finding keeps its identity when its unit crosses the boundary.
+ * Assigns size and complexity findings to the bands in FAMILY-CONTRACT.md section 12.
+ * Findings below 1.5 times the active limit use advisory severity and advice against further growth.
+ *
+ * Findings at or above that boundary retain their existing severity and use split-or-simplify advice.
+ * Callers retain their message format across bands so band changes preserve finding identity.
  */
 final class LimitBand
 {
@@ -63,14 +64,13 @@ final class LimitBand
      * Names the band a measured value falls in against the limit in force, compared without rounding.
      *
      * @param int|float $measuredValue - The size or complexity the rule measured.
-     * @param int|float $limit - The limit in force for this unit: the lowest threshold at which the rule reports, or the
-     *                         limit of the unit's own kind, such as a promoted value-object constructor's ceiling.
+     * @param int|float $limit - The unit's limit, such as its lowest reporting threshold or a constructor-specific ceiling.
      *
      * @return string - LimitBand::UPPER at or above one and a half times the limit, otherwise LimitBand::LOWER.
      */
     public static function of(int|float $measuredValue, int|float $limit): string
     {
-        // At or above one and a half times the limit, the finding keeps its severity and asks to split or simplify.
+
         if ($measuredValue >= self::RATIO * $limit) {
             return self::UPPER;
         }
@@ -107,7 +107,7 @@ final class LimitBand
      */
     public static function advice(string $band, string $lowerAdvice, string $upperAdvice): string
     {
-        // Each band tells the agent something different to do.
+
         if ($band === self::LOWER) {
             return $lowerAdvice;
         }

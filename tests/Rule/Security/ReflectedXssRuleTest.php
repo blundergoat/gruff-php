@@ -19,6 +19,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * Covers the reflected-XSS rule: request data reaching output sinks, with
  * escaping/casting recognised as safe and local aliases followed in-scope.
+ * Inline cases also check JSON response headers and top-level CLI guards.
  */
 final class ReflectedXssRuleTest extends TestCase
 {
@@ -31,7 +32,7 @@ final class ReflectedXssRuleTest extends TestCase
     /**
      * Verify only unescaped request-derived output is flagged.
      *
-     * @return void
+     * @return void - Asserts the fixture's six unsafe sink locations after sorting.
      */
     public function testUnescapedRequestOutputDetected(): void
     {
@@ -40,14 +41,14 @@ final class ReflectedXssRuleTest extends TestCase
         $lines = array_map(static fn(Finding $finding): ?int => $finding->line, $findings);
         sort($lines);
 
-        // directEcho, concatEcho, printSink, printfSink, aliasedEcho, serverEcho.
+        // The expected lines cover direct echo, concatenated echo, print, printf, aliased echo, and server echo sinks in fixture order.
         self::assertSame([19, 29, 39, 49, 60, 70], $lines);
     }
 
     /**
-     * Verify each finding carries safe, value-free metadata.
+     * Verify finding classifications and recognised sink names in the reflected-XSS fixture.
      *
-     * @return void
+     * @return void - Asserts six warnings with security pillar, medium confidence and allowed sink labels.
      */
     public function testFindingsCarryStableMetadataAndNoRawValues(): void
     {
@@ -71,9 +72,9 @@ final class ReflectedXssRuleTest extends TestCase
     }
 
     /**
-     * Verify escaped, cast, literal, and non-tainted output never fires.
+     * Verify escaped, cast, literal and untainted output is not flagged in the fixture.
      *
-     * @return void
+     * @return void - Asserts reported lines are non-null and stay within the fixture's unsafe section.
      */
     public function testEscapedAndSafeOutputIgnored(): void
     {
@@ -81,7 +82,7 @@ final class ReflectedXssRuleTest extends TestCase
 
         // Every safe method (escapedEcho, castEcho, escapedAlias, literalEcho,
         // bladeEscapeHelper, safePrintf, nonTaintedLocal) is defined after the
-        // last unsafe sink (serverEcho on line 70), so no finding may land below it.
+        // last unsafe sink in serverEcho, so later findings would flag safe output.
         foreach ($findings as $finding) {
             self::assertNotNull($finding->line, 'Reflected-XSS findings must remain line-addressable.');
             self::assertLessThanOrEqual(70, $finding->line, 'Safe output below line 70 must not fire.');
@@ -91,7 +92,7 @@ final class ReflectedXssRuleTest extends TestCase
     /**
      * Verify JSON encoding does not count as escaping for an HTML output sink.
      *
-     * @return void
+     * @return void - Asserts one finding on the echoed JSON expression.
      */
     public function testJsonEncodeDoesNotCountAsHtmlEscaping(): void
     {
@@ -110,7 +111,7 @@ PHP);
     /**
      * Verify WordPress's HTML escapers count as escaping while esc_url_raw(), which does not encode for HTML, still fires.
      *
-     * @return void
+     * @return void - Asserts one finding at the esc_url_raw sink.
      */
     public function testWordPressEscapersCountAsHtmlEscaping(): void
     {
@@ -130,10 +131,10 @@ PHP);
     }
 
     /**
-     * Verify isset()/empty() probes and a number formatter's number argument carry no markup, while a separator argument,
-     * a named first argument and an isset-guarded raw value still report.
+     * Verify probe results and numeric formatter inputs are unreported in this snippet.
+     * Separator arguments and an isset-guarded raw value still produce findings.
      *
-     * @return void
+     * @return void - Asserts findings only for the two separator inputs and the guarded raw output.
      */
     public function testProbesAndNumberFormattersCarryNoMarkup(): void
     {
@@ -157,9 +158,10 @@ PHP);
     }
 
     /**
-     * Verify json_encode output is markup-free only after a JSON Content-Type header beside the sink that nothing replaced.
+     * Verify plain JSON outputs stay quiet under recognised JSON headers, including aliased output.
+     * Overwritten or conditional headers, JSONP and output preceding the header retain findings.
      *
-     * @return void
+     * @return void - Asserts the exact ordered finding locations for the response-header cases.
      */
     public function testJsonEncodeCountsOnlyInAJsonResponse(): void
     {
@@ -237,7 +239,7 @@ PHP);
      * Verify output after a top-level guard that stops every SAPI but the CLI is quiet, in both operand orders and with
      * throw, exit or return.
      *
-     * @return void
+     * @return void - Asserts throw and return guards stay quiet, while output before the exit guard is still flagged.
      */
     public function testOutputAfterACliOnlyGuardIsQuiet(): void
     {
@@ -270,9 +272,9 @@ PHP);
     }
 
     /**
-     * Verify a SAPI check that is not a top-level, unconditional CLI-only stop leaves later output reported.
+     * Verify guard shapes outside the recognised top-level CLI pattern leave request output reported.
      *
-     * @return void
+     * @return void - Asserts one finding for each unsupported guard shape.
      */
     public function testOtherSapiChecksDoNotQuietOutput(): void
     {
@@ -293,7 +295,7 @@ PHP);
     /**
      * Analyse a fixture and return only reflected-XSS findings.
      *
-     * @param string $displayPath - Fixture display path.
+     * @param string $displayPath - Root-relative fixture path used for loading and finding display.
      *
      * @return list<Finding> - reflected-XSS findings for the fixture in registry order; empty when the rule fires none
      */

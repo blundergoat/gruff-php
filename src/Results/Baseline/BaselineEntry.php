@@ -19,11 +19,11 @@ final readonly class BaselineEntry
     private const FORBIDDEN_KEYS = ['line', 'endLine', 'column', 'message', 'severity', 'confidence'];
 
     /**
-     * Holds one reviewed identity exactly as it sits in the baseline file.
+     * Holds one baseline identity with an occurrence count and optional descriptive fields.
      *
-     * @param string $identity - 16 lowercase hex characters from `BaselineIdentity`; the only field matching reads.
-     * @param int    $count - Occurrences the team accepted, at least one; an extra occurrence beyond it surfaces as new.
-     * @param string $ruleId - Descriptive rule id for readers; empty when the row was hand-written without one.
+     * @param string $identity - Line-free lookup key: 16 lowercase hex characters from BaselineIdentity.
+     * @param int    $count - Positive occurrence count represented by this row; stored baseline rows use it as the reviewed allowance.
+     * @param string $ruleId - Descriptive rule id for readers; empty when the row does not provide one.
      * @param string $path - Descriptive project-relative path; empty when absent from the row.
      * @param string $subject - Descriptive identity subject, so a reviewer sees what was reviewed; empty when absent.
      */
@@ -37,31 +37,31 @@ final readonly class BaselineEntry
     }
 
     /**
-     * Rebuilds one reviewed row from a decoded `gruff-baseline.json` occurrence, refusing anything that could expire or leak.
+     * Decodes a reviewed row, validating its identity and count and rejecting forbidden fields.
      *
-     * @param array<string, bool|float|int|string|null> $occurrenceRow - Decoded occurrence object; a hand-edited file may carry anything.
-     * @param int                                       $index - Zero-based position, named in the error so the user can find the row.
+     * @param array<string, bool|float|int|string|null> $occurrenceRow - Decoded occurrence fields to validate.
+     * @param int $index - Zero-based position included in validation errors so the caller can locate the row.
      *
      * @return self - Validated row ready to match against live findings.
-     * @throws BaselineException When the identity is not 16 hex characters, the count is below one, or a forbidden key is present.
+     * @throws BaselineException - If identity is not 16 lowercase hex characters, count is not a positive integer, or a forbidden key exists.
      */
     public static function fromArray(array $occurrenceRow, int $index): self
     {
         $identity = $occurrenceRow['identity'] ?? null;
 
-        // An identity that is not the ratified digest shape cannot have come from a generator, so the row is refused rather than guessed at.
+        // Only the ratified digest shape can match live findings, so a malformed identity is refused rather than guessed at.
         if (!is_string($identity) || preg_match('/^[0-9a-f]{16}$/', $identity) !== 1) {
             throw new BaselineException(sprintf('Baseline occurrences[%d].identity must be 16 lowercase hex characters.', $index));
         }
 
         $count = $occurrenceRow['count'] ?? null;
 
-        // A count below one would mean a reviewed identity that suppresses nothing, which is a hand edit gone wrong.
+        // A non-integer or non-positive count cannot represent reviewed debt, so the row is rejected.
         if (!is_int($count) || $count < 1) {
             throw new BaselineException(sprintf('Baseline occurrences[%d].count must be a positive integer.', $index));
         }
 
-        // A positional or re-classifiable field in a row is how a 0.5 baseline expired on every edit, so its presence fails the file.
+        // Baseline rows exclude positional and diagnostic fields; suppression uses the stored identity and reviewed count.
         foreach (self::FORBIDDEN_KEYS as $forbiddenKey) {
             if (array_key_exists($forbiddenKey, $occurrenceRow)) {
                 throw new BaselineException(sprintf('Baseline occurrences[%d] carries forbidden key "%s".', $index, $forbiddenKey));
@@ -78,9 +78,9 @@ final readonly class BaselineEntry
     }
 
     /**
-     * Flattens the row into the JSON object `analyse --generate-baseline` writes, omitting empty descriptive fields.
+     * Flattens the row into the JSON object "analyse --generate-baseline" writes, omitting empty descriptive fields.
      *
-     * @return array{identity: string, count: int, ruleId?: string, path?: string, subject?: string} - Identity and count first, then whatever descriptive fields exist.
+     * @return array{identity: string, count: int, ruleId?: string, path?: string, subject?: string} - Row with nonempty descriptive fields.
      */
     public function toArray(): array
     {
@@ -97,10 +97,10 @@ final readonly class BaselineEntry
     }
 
     /**
-     * Reads one optional descriptive string from a decoded row.
+     * Returns a descriptive field when it is textual, treating absent or non-string values as empty.
      *
-     * @param array<string, bool|float|int|string|null> $occurrenceRow - Decoded occurrence object.
-     * @param string                                    $key - Field to read.
+     * @param array<string, bool|float|int|string|null> $occurrenceRow - Decoded baseline occurrence row containing optional descriptive fields.
+     * @param string                                    $key - One of ruleId, path, or subject.
      *
      * @return string - The text, or an empty string when the field is absent or not a string.
      */

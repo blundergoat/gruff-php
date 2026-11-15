@@ -16,12 +16,11 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
 
 /**
- * Flags a source file whose substantive line count runs past the configured budget, the simplest signal
- * that a file has taken on too much and is getting hard to navigate.
+ * Reports source files whose substantive line count exceeds the configured budget.
+ * Counts non-blank source lines after masking available comment tokens and parsed attribute groups.
  *
- * Runs once per file, comparing its substantive line count - blank lines and comment-only lines are
- * free (family ratification, 2026-08-05) - against the threshold (default error above 1000), so
- * required documentation can never push a file over the size bar. See ADR-012.
+ * The default threshold is 1000 lines; findings below 1.5 times the active limit are advisory.
+ * See ADR-012 and FAMILY-CONTRACT.md section 12 for the counting and banding contracts.
  */
 final readonly class FileLengthRule implements RuleInterface
 {
@@ -52,8 +51,8 @@ final readonly class FileLengthRule implements RuleInterface
     /**
      * Reports the file when its substantive line count runs over the configured budget.
      *
-     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Source, tokens and AST used to count substantive lines.
+     * @param RuleContext $ruleContext - Supplies the effective thresholds for this rule.
      *
      * @return list<Finding> - Empty when the file is within budget; otherwise the single exceeded-length finding.
      */
@@ -64,7 +63,7 @@ final readonly class FileLengthRule implements RuleInterface
         $lineCount      = SubstantiveLineCounter::countAll($analysisUnit);
         $thresholdMatch = $settings->highValueThresholdMatch($lineCount);
 
-        // A file within budget produces no finding.
+
         if ($thresholdMatch === null) {
             return [];
         }
@@ -108,7 +107,7 @@ final readonly class FileLengthRule implements RuleInterface
      */
     private function formatNumber(int|float $number): string
     {
-        // A genuine fraction keeps its decimals; a whole value is shown without them.
+
         if (is_float($number) && floor($number) !== $number) {
             return (string) $number;
         }

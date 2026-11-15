@@ -18,6 +18,8 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Covers waste detection: unreachable code, empty methods, unused imports, and commented-out code.
+ * Checks rule findings and exclusions using parsed dead-code fixtures.
+ * Also asserts that the clean fixture produces no waste or dead-code findings.
  */
 final class WasteRulesTest extends TestCase
 {
@@ -25,9 +27,9 @@ final class WasteRulesTest extends TestCase
     private PhpFileParser $parser;
 
     /**
-     * Prepare parser fixtures before each rule test.
+     * Initialize the parser used to read rule fixtures.
      *
-     * @return void
+     * @return void - Leaves each rule-fixture test with a fresh parser.
      */
     protected function setUp(): void
     {
@@ -35,9 +37,9 @@ final class WasteRulesTest extends TestCase
     }
 
     /**
-     * Verify unreachable code after return.
+     * Check the unreachable-code fixture's finding count, rule IDs, and warning severity.
      *
-     * @return void
+     * @return void - Asserts three warning findings, all attributed to UnreachableCodeRule.
      */
     public function testUnreachableCodeAfterReturn(): void
     {
@@ -53,9 +55,9 @@ final class WasteRulesTest extends TestCase
     }
 
     /**
-     * Verify no unreachable code in clean file.
+     * Check that the unreachable-code rule reports no findings for the clean fixture.
      *
-     * @return void
+     * @return void - Asserts an empty findings list for UnreachableCodeRule.
      */
     public function testNoUnreachableCodeInCleanFile(): void
     {
@@ -65,9 +67,9 @@ final class WasteRulesTest extends TestCase
     }
 
     /**
-     * Verify empty method detected.
+     * Check that the empty-method rule emits advisory findings for the empty-members fixture.
      *
-     * @return void
+     * @return void - Asserts a nonempty result containing only EmptyMethodRule advisory findings.
      */
     public function testEmptyMethodDetected(): void
     {
@@ -83,9 +85,9 @@ final class WasteRulesTest extends TestCase
     }
 
     /**
-     * Verify abstract method not flagged as empty.
+     * Checks that abstract declarations are excluded from empty-method findings.
      *
-     * @return void
+     * @return void - Asserts that AbstractFixture::abstractMethod() is absent from the finding symbols.
      */
     public function testAbstractMethodNotFlaggedAsEmpty(): void
     {
@@ -96,9 +98,9 @@ final class WasteRulesTest extends TestCase
     }
 
     /**
-     * Verify promoted constructor not flagged as empty.
+     * Checks that constructors with promoted properties are excluded from empty-method findings.
      *
-     * @return void
+     * @return void - Asserts that PromotedConstructorFixture::__construct() is absent from the finding symbols.
      */
     public function testPromotedConstructorNotFlaggedAsEmpty(): void
     {
@@ -109,9 +111,9 @@ final class WasteRulesTest extends TestCase
     }
 
     /**
-     * Verify unused imports detected.
+     * Checks that the fixture reports exactly InvalidArgumentException and LogicException as unused.
      *
-     * @return void
+     * @return void - Asserts two findings naming InvalidArgumentException and LogicException.
      */
     public function testUnusedImportsDetected(): void
     {
@@ -125,9 +127,9 @@ final class WasteRulesTest extends TestCase
     }
 
     /**
-     * Verify used import not flagged.
+     * Checks that a referenced RuntimeException import is absent from unused-import findings.
      *
-     * @return void
+     * @return void - Asserts that RuntimeException is absent from the unused-import finding symbols.
      */
     public function testUsedImportNotFlagged(): void
     {
@@ -138,9 +140,9 @@ final class WasteRulesTest extends TestCase
     }
 
     /**
-     * Verify commented out code detected.
+     * Checks that the fixture yields commented-out-code findings whose first severity is advisory.
      *
-     * @return void
+     * @return void - Asserts nonempty CommentedOutCodeRule findings with an advisory first finding.
      */
     public function testCommentedOutCodeDetected(): void
     {
@@ -151,11 +153,9 @@ final class WasteRulesTest extends TestCase
     }
 
     /**
-     * Verify prose and placeholders (lines 11-15) and restatements of the assignment below (21, 23) stay quiet.
+     * Defines the precision fixture's reportable comment set by exact source line.
      *
-     * Every other comment is disabled code or a look-alike restatement that must still report, such as an earlier edit of the line below.
-     *
-     * @return void
+     * @return void - Asserts the exact finding lines for the commented-out-code-precision fixture.
      */
     public function testCommentedOutCodeSkipsProseAndRestatements(): void
     {
@@ -165,9 +165,9 @@ final class WasteRulesTest extends TestCase
     }
 
     /**
-     * Verify clean file has no waste findings.
+     * Checks that the clean fixture emits no findings from the waste or dead-code rule families.
      *
-     * @return void
+     * @return void - Asserts an empty result after filtering for waste and dead-code rule ID prefixes.
      */
     public function testCleanFileHasNoWasteFindings(): void
     {
@@ -187,7 +187,7 @@ final class WasteRulesTest extends TestCase
      * @param string              $ruleId - Rule identifier to keep; all other findings are discarded.
      * @param AnalysisConfig|null $config - Overriding config, or null to use the registry defaults.
      *
-     * @return list<\GruffPhp\Results\Finding\Finding> - findings emitted only by the requested rule, in analyser order; empty when that rule produced none
+     * @return list<\GruffPhp\Results\Finding\Finding> - Findings for the requested rule in analyser order; empty if none match.
      */
     private function analyseRule(string $fixture, string $ruleId, ?AnalysisConfig $config = null): array
     {
@@ -201,9 +201,9 @@ final class WasteRulesTest extends TestCase
     /**
      * Parse the named fixture into an analysis unit.
      *
-     * @param string $filename - Fixture filename
+     * @param string $filename - Filename relative to tests/Fixtures/DeadCode.
      *
-     * @return \GruffPhp\Engine\Parser\AnalysisUnit - Hand back the dead-code fixture parsed from disk, with its project-relative display path attached
+     * @return \GruffPhp\Engine\Parser\AnalysisUnit - Analysis unit with the fixture's display path and any read or parse diagnostics.
      */
     private function parseFixture(string $filename): \GruffPhp\Engine\Parser\AnalysisUnit
     {

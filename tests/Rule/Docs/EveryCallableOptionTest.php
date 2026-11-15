@@ -14,15 +14,15 @@ use GruffPhp\Rules\Docs\ReturnCommentRule;
 use GruffPhp\Rules\RuleRegistry;
 
 /**
- * Pins the per-rule `everyCallable` option: off by default, and when on the docs rules also check closures and
+ * Pins the per-rule `everyCallable` defaults and explicit opt-outs; the wider docs rules check closures and
  * arrow functions bound to a name, documented by the docblock above the assignment. On `docs.missing-phpdoc` the
  * option adds undocumented named functions to the methods it always checks.
  */
 final class EveryCallableOptionTest extends DocsRuleTestCase
 {
     /**
-     * A bound closure with a bare `@return` and an untagged parameter (line 10), a bound arrow function with a bare
-     * `@param` (line 21), and an unbound arrow function passed as an argument (line 23) that is never checked.
+     * A bound closure has a bare `@return` and an untagged parameter; a bound arrow function has a bare `@param`.
+     * An unbound arrow function is passed directly to array_map.
      */
     private const SOURCE = <<<'PHP'
 <?php
@@ -79,26 +79,30 @@ final class Counter
 PHP;
 
     /**
-     * Each docs rule that accepts the switch declares it off by default.
+     * Missing-parameter and return rules include every callable by default; parameter descriptions do not.
      *
      * @return void - asserts the declared default option
      */
-    public function testEveryCallableDefaultsToOff(): void
+    public function testEveryCallableDefaultsMatchEachRule(): void
     {
-        foreach ([new MissingParamTagRule(), new ReturnCommentRule(), new ParamCommentRule()] as $rule) {
-            self::assertFalse($rule->definition()->defaultOptions['everyCallable'], $rule->definition()->id);
+        foreach ([new MissingParamTagRule(), new ReturnCommentRule()] as $rule) {
+            self::assertTrue($rule->definition()->defaultOptions['everyCallable'], $rule->definition()->id);
         }
+        self::assertFalse((new ParamCommentRule())->definition()->defaultOptions['everyCallable']);
     }
 
     /**
-     * Default settings leave bound closures unchecked, so no rule reports on this source.
+     * Default settings report the bound closure for missing parameter tags and return descriptions.
+     * Explicit false yields no findings from those rules or the parameter-description rule for this fixture.
      *
-     * @return void - asserts the default findings stay empty
+     * @return void - asserts the default finding symbols and empty results with everyCallable set to false
      */
-    public function testDefaultSettingsIgnoreBoundClosures(): void
+    public function testDefaultSettingsCheckBoundClosuresAndAllowOptOut(): void
     {
-        self::assertSame([], self::symbols($this->analyseSourceRule(self::SOURCE, MissingParamTagRule::ID)));
-        self::assertSame([], self::symbols($this->analyseSourceRule(self::SOURCE, ReturnCommentRule::ID)));
+        self::assertSame(['Closure@10'], self::symbols($this->analyseSourceRule(self::SOURCE, MissingParamTagRule::ID)));
+        self::assertSame(['Closure@10'], self::symbols($this->analyseSourceRule(self::SOURCE, ReturnCommentRule::ID)));
+        self::assertSame([], self::symbols($this->analyseWithEveryCallable(MissingParamTagRule::ID, false)));
+        self::assertSame([], self::symbols($this->analyseWithEveryCallable(ReturnCommentRule::ID, false)));
         self::assertSame([], self::symbols($this->analyseWithEveryCallable(ParamCommentRule::ID, false)));
     }
 
@@ -116,7 +120,7 @@ PHP;
     }
 
     /**
-     * With the switch on, a bound closure's bare `@return` tag is reported; the described arrow function is not.
+     * With the switch on, a bound closure's bare @return tag is reported; the described arrow function is not.
      *
      * @return void - asserts the return-comment finding on the bound closure
      */
@@ -126,7 +130,7 @@ PHP;
     }
 
     /**
-     * With the switch on, a bound arrow function's bare `@param` tag is reported; the unbound arrow function is not.
+     * With the switch on, a bound arrow function's bare @param tag is reported; the unbound arrow function is not.
      *
      * @return void - asserts the param-comment finding on the bound arrow function
      */
@@ -136,8 +140,7 @@ PHP;
     }
 
     /**
-     * With the switch on, a bound closure whose docblock holds only bare tags is reported by both describing rules,
-     * because docs.bare-phpdoc-tags never reads closures.
+     * With the switch on, both parameter-description and return-description rules report a closure whose docblock has only bare tags.
      *
      * @return void - asserts param-comment and return-comment both report the bare-tags closure
      */
@@ -161,33 +164,34 @@ PHP;
     }
 
     /**
-     * `docs.missing-phpdoc` declares the switch off by default.
+     * docs.missing-phpdoc includes every callable by default.
      *
      * @return void - asserts the declared default option
      */
-    public function testMissingPhpdocEveryCallableDefaultsToOff(): void
+    public function testMissingPhpdocEveryCallableDefaultsToOn(): void
     {
-        self::assertFalse((new MissingPhpdocRule())->definition()->defaultOptions['everyCallable']);
+        self::assertTrue((new MissingPhpdocRule())->definition()->defaultOptions['everyCallable']);
     }
 
     /**
-     * Default settings keep `docs.missing-phpdoc` on methods only, so the undocumented named function is not reported.
+     * Default settings report undocumented named functions; explicit false keeps method-only checking.
      *
-     * @return void - asserts only the undocumented method is reported, with its unchanged message
+     * @return void - asserts the default findings and the explicit method-only opt-out
      */
-    public function testMissingPhpdocDefaultSkipsNamedFunctions(): void
+    public function testMissingPhpdocDefaultChecksNamedFunctionsAndAllowsOptOut(): void
     {
         $findings = $this->analyseSourceRule(self::FUNCTION_SOURCE, MissingPhpdocRule::ID);
 
-        self::assertSame(['Counter::current()'], self::symbols($findings));
+        self::assertSame(['undocumentedHelper()', 'Counter::current()'], self::symbols($findings));
+        self::assertSame(['Counter::current()'], self::symbols($this->analyseWithEveryCallable(MissingPhpdocRule::ID, false, self::FUNCTION_SOURCE)));
         self::assertSame(
             'Method Counter::current() needs a brief intent description above its declaration (one plain-English line; not a restatement of the method signature). Also describe the return value.',
-            $findings[0]->message,
+            $findings[1]->message,
         );
     }
 
     /**
-     * With the switch on, `docs.missing-phpdoc` also reports the undocumented named function; the documented one is not.
+     * With the switch on, docs.missing-phpdoc also reports the undocumented named function; the documented one is not.
      *
      * @return void - asserts the named-function finding and its message
      */
@@ -203,10 +207,10 @@ PHP;
     }
 
     /**
-     * Analyses a fixture with one rule enabled and its `everyCallable` option set.
+     * Analyses a fixture with the selected rule enabled and its everyCallable option set.
      *
      * @param string $ruleId        - rule to enable and analyse with
-     * @param bool   $everyCallable - value for the rule's `everyCallable` option
+     * @param bool   $everyCallable - value for the rule's everyCallable option
      * @param string $source        - PHP source to analyse; the bound-closure fixture unless a test passes another
      *
      * @return list<Finding> - findings the rule reports on the fixture
@@ -228,11 +232,11 @@ PHP;
     }
 
     /**
-     * Lists each finding's symbol in report order.
+     * List finding symbols in report order, converting null symbols to empty strings.
      *
      * @param list<Finding> $findings - findings to summarise
      *
-     * @return list<string> - the symbol of each finding
+     * @return list<string> - finding symbols in report order; null symbols become empty strings
      */
     private static function symbols(array $findings): array
     {

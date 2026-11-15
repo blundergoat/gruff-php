@@ -21,13 +21,11 @@ use PhpParser\Node\Stmt\Trait_;
 use PhpParser\NodeFinder;
 
 /**
- * Reports a file whose one class, interface, trait or enum is named differently from the file, which breaks PSR-4 autoloading.
+ * Reports a lone named class, interface, trait, or enum whose name differs from the file stem.
+ * Matching the type and file names supports PSR-4 autoloading.
  *
- * A user who renamed `UserRepository` to `AccountRepository` but kept `UserRepository.php` gets one warning on the declaration.
- * Scripts, hyphenated entry points and files declaring several types stay quiet.
- *
- * The advice always offers the file rename, and offers the class rename only when the file name is already a StudlyCaps
- * class name, so `widgets.php` never suggests a class called `widgets`.
+ * Files with no named type, multiple named types, or a stem outside the rule's identifier pattern are skipped.
+ * A file rename is always offered; a type rename is offered only for an uppercase-first alphanumeric stem.
  */
 final readonly class ClassFileMismatchRule implements RuleInterface
 {
@@ -43,7 +41,7 @@ final readonly class ClassFileMismatchRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Warning rather than advisory: a name that disagrees with PSR-4 autoloading is a concrete defect, not a smell.
+        // Warning marks a direct class/file naming mismatch rather than a general naming smell.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Class/file name mismatch',
@@ -58,7 +56,7 @@ final readonly class ClassFileMismatchRule implements RuleInterface
      * Reports the file's lone type declaration when its name disagrees with the file name.
      *
      * @param AnalysisUnit $analysisUnit - Parsed file the user asked to analyse.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext - Unused; the rule interface requires it, and this rule reads no options or project root.
      *
      * @return list<Finding> - One finding for a mismatched declaration; empty when the names agree or the file is out of scope.
      */
@@ -78,11 +76,11 @@ final readonly class ClassFileMismatchRule implements RuleInterface
             return [];
         }
 
-        /** @var Class_|Interface_|Trait_|Enum_ $declaration Finder predicate restricts results to named class-like declarations. */
+        /** @var Class_|Interface_|Trait_|Enum_ $declaration - Finder predicate restricts results to named class-like declarations. */
         $declaration = $declarations[0];
         $typeName    = $declaration->name?->toString();
 
-        // An unnamed declaration has nothing to compare with the file name.
+
         if ($typeName === null) {
             return [];
         }
@@ -90,17 +88,17 @@ final readonly class ClassFileMismatchRule implements RuleInterface
         $filePath = $analysisUnit->file->displayPath;
         $fileStem = pathinfo($filePath, PATHINFO_FILENAME);
 
-        // A file name that could never be a class name, such as `run-migrations.php`, is a script, not a mismatch.
+        // File stems outside the rule's ASCII identifier shape are excluded from class/file comparison.
         if (preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $fileStem) !== 1) {
             return [];
         }
 
-        // Matching names are the expected case, so the user sees nothing.
+
         if ($fileStem === $typeName) {
             return [];
         }
 
-        // A StudlyCaps file name such as `Widget.php` is a usable class name; a lowercase one such as `widgets.php` is not.
+        // Offer the file stem as a class name only when it starts with an uppercase ASCII letter and the rest is ASCII alphanumeric.
         $remediation = preg_match('/^[A-Z][A-Za-z0-9]*$/', $fileStem) === 1
             ? sprintf('Rename the file to %s.php or the class to %s.', $typeName, $fileStem)
             : sprintf('Rename the file to %s.php so it matches the class it declares.', $typeName);

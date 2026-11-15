@@ -14,13 +14,9 @@ use RecursiveIteratorIterator;
 use SplFileInfo;
 
 /**
- * Covers the one input the run digest gained in 0.6.0: the analyser's own source bytes.
- *
- * A version string cannot see a rule that changed between two releases, so a source
- * checkout kept serving findings an older rule had written and `analyse` disagreed
- * with `summary`. These tests point the fingerprint at a throwaway source tree and
- * prove that editing, adding or renaming a source moves every file's cache key, while
- * an untouched tree keeps it.
+ * Checks how analyser source changes affect a scanned file's cache key.
+ * Uses a temporary source tree with a fixed tool version to isolate source-dependent invalidation.
+ * Covers unchanged sources, edited PHP bytes, added or renamed PHP paths, and an ignored text file.
  */
 final class AnalysisFingerprintTest extends TestCase
 {
@@ -32,7 +28,7 @@ final class AnalysisFingerprintTest extends TestCase
     /**
      * Build a two-file source tree the fingerprint can digest.
      *
-     * @return void
+     * @return void - Creates the source directory and writes two PHP fixtures.
      */
     protected function setUp(): void
     {
@@ -45,7 +41,7 @@ final class AnalysisFingerprintTest extends TestCase
     /**
      * Remove the throwaway source tree.
      *
-     * @return void
+     * @return void - Deletes fixture files and directories, then removes the temporary root.
      */
     protected function tearDown(): void
     {
@@ -63,9 +59,9 @@ final class AnalysisFingerprintTest extends TestCase
     }
 
     /**
-     * Verify an untouched source tree gives the same key twice, so a warm cache still hits.
+     * Verify consecutive key computations agree when the source tree is unchanged.
      *
-     * @return void
+     * @return void - Asserts equality of two keys for the same scanned path, bytes, and analyser sources.
      */
     public function testUnchangedSourcesKeepTheKey(): void
     {
@@ -73,9 +69,9 @@ final class AnalysisFingerprintTest extends TestCase
     }
 
     /**
-     * Verify a rule whose bytes changed under one version string can no longer be served from the cache.
+     * Verify changing a PHP source file changes the key while the tool version stays fixed.
      *
-     * @return void
+     * @return void - Asserts different keys before and after replacing the rule fixture's bytes.
      */
     public function testEditingARuleSourceMovesTheKey(): void
     {
@@ -88,7 +84,7 @@ final class AnalysisFingerprintTest extends TestCase
     /**
      * Verify a new source and a renamed source each move the key, because either can change what is reported.
      *
-     * @return void
+     * @return void - Asserts key changes after adding a PHP file and again after renaming an existing one.
      */
     public function testAddingOrRenamingASourceMovesTheKey(): void
     {
@@ -102,9 +98,9 @@ final class AnalysisFingerprintTest extends TestCase
     }
 
     /**
-     * Verify a file that is not PHP source leaves the key alone, so a stray note never empties the cache.
+     * Verify adding notes.txt leaves the computed key unchanged.
      *
-     * @return void
+     * @return void - Asserts equal keys before and after adding the text fixture.
      */
     public function testANonSourceFileLeavesTheKeyAlone(): void
     {
@@ -115,7 +111,7 @@ final class AnalysisFingerprintTest extends TestCase
     }
 
     /**
-     * Compute one scanned file's cache key under the throwaway source tree.
+     * Compute one scanned file's cache key using the throwaway analyser source tree.
      *
      * @return string - Hex cache key.
      */
@@ -133,7 +129,7 @@ final class AnalysisFingerprintTest extends TestCase
      * @param string $name     - Path relative to the throwaway root.
      * @param string $contents - Bytes to write.
      *
-     * @return void
+     * @return void - Asserts that the fixture write reports success.
      */
     private function writeSource(string $name, string $contents): void
     {

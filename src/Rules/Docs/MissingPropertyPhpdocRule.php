@@ -26,14 +26,12 @@ use PhpParser\Node\Stmt\Property;
 use PhpParser\Node\Stmt\Trait_;
 
 /**
- * Flags a declared property that has no local documentation, so the user records what each field holds and
- * the invariant it maintains.
+ * Flags undocumented properties in named classes, traits, interfaces, and enums.
+ * An own-line docblock immediately above the first property covers its run unless a later property also has one.
+ * Blank lines and non-property statements end a run.
  *
- * Runs per file over classes, traits, interfaces, and enums. Each property declaration needs a docblock
- * unless the opt-in line-comment setting finds meaningful prose physically attached above its statement. A
- * docblock above the first property of an unbroken run (no blank line or other statement between) covers the whole run, unless another
- * property in the run has a docblock of its own.
- * Advisory, medium confidence - enforcement is opt-in and documenting trivial properties is team-dependent.
+ * Meaningful attached // or # comments count only with acceptLineComments enabled.
+ * Advisory severity and medium confidence reflect team-dependent documentation needs.
  */
 final readonly class MissingPropertyPhpdocRule implements RuleInterface
 {
@@ -62,8 +60,7 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Advisory by default so property-doc enforcement is opt-in; Medium confidence because a missing
-        // local docblock is unambiguous but the value of documenting trivial properties is team-dependent.
+        // Advisory with Medium confidence because teams differ on whether trivial properties need documentation.
         return new RuleDefinition(
             id:                 self::ID,
             name:               'Missing property PHPDoc',
@@ -90,10 +87,10 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
     }
 
     /**
-     * Reports each declared property that lacks local documentation.
+     * Reports undocumented properties from the named class-like declarations this rule supports.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext  - Supplies acceptLineComments, which admits attached line comments that pass the text screen.
      *
      * @return list<Finding> - Findings for undocumented properties.
      */
@@ -103,9 +100,9 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
         $findings                 = [];
         $shouldAcceptLineComments = $ruleContext->settingsFor($definition)->option('acceptLineComments') === true;
 
-        // Check every class-like declaration in the file.
+
         foreach (NodeIndex::nodesOf($analysisUnit, ClassLike::class) as $classLike) {
-            // Only a named class, trait, interface, or enum can own properties.
+            // Anonymous classes are excluded because findings use a named owner in their property symbols.
             if (!$this->isSupportedClassLike($classLike) || $classLike->name === null) {
                 continue;
             }
@@ -126,17 +123,16 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
     }
 
     /**
-     * Reports whether a class-like node can own declared properties.
+     * Reports whether a class-like node belongs to a supported declaration kind.
      *
-     * @param ClassLike $classLike - class-like node from the parsed unit; the caller must still
-     *                             guard `$classLike->name` separately, since anonymous classes are supported but unnamed.
+     * @param ClassLike $classLike - Candidate node; the caller checks its name separately.
      *
-     * @return bool - True when the node should be inspected.
+     * @return bool - True for classes, traits, interfaces, or enums, including anonymous classes.
      */
     private function isSupportedClassLike(ClassLike $classLike): bool
     {
-        // Only these four kinds can declare properties; other ClassLike subtypes (none today, but future parser
-        // additions) are skipped rather than mis-inspected.
+
+
         return $classLike instanceof Class_
             || $classLike instanceof Trait_
             || $classLike instanceof Interface_
@@ -144,18 +140,15 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
     }
 
     /**
-     * Finds the declared properties that carry no docblock.
+     * Reports properties lacking individual documentation or coverage from a shared run docblock.
      *
-     * @param ClassLike      $classLike                - node whose `getProperties()` declarations are scanned; a
-     *                                                 docblock on the `Property` statement (not the individual prop) is what suppresses the finding.
-     * @param string         $className                - short class name the caller already resolved, used to build
-     *                                                 the `Class::$prop` symbol; passed in so this method does not re-null-check `$classLike->name`.
-     * @param RuleDefinition $definition               - this rule's metadata, copied into each emitted finding so
-     *                                                 severity and pillar stay consistent without re-deriving them per property.
-     * @param AnalysisUnit   $analysisUnit             - parsed unit supplying the display path recorded on findings.
-     * @param bool           $shouldAcceptLineComments - Whether meaningful attached line comments satisfy the rule.
+     * @param ClassLike $classLike - Class-like declaration whose property statements are checked.
+     * @param string $className - Resolved short owner name used in Class::$prop finding symbols.
+     * @param RuleDefinition $definition - Rule metadata copied into each finding.
+     * @param AnalysisUnit $analysisUnit - Source for run boundaries and attachment checks, plus the finding path.
+     * @param bool $shouldAcceptLineComments - Whether attached line comments that pass the text screen satisfy the rule.
      *
-     * @return list<Finding> - Findings for undocumented declared properties.
+     * @return list<Finding> - One finding per property name lacking accepted individual or shared documentation.
      */
     private function declaredPropertyFindings(
         ClassLike $classLike,
@@ -170,8 +163,8 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
         foreach (PhysicalCommentAttachment::unbrokenRuns($classLike->stmts, Property::class, $analysisUnit->source) as $propertyRun) {
             $isRunCovered = $this->isRunCoveredByDocblock($propertyRun, $analysisUnit->source);
             foreach ($propertyRun as $position => $property) {
-                // PHPDoc always covers a declaration, the docblock above a covered run's first property covers
-                // the rest of the run, and meaningful line comments count only under the opt-in toggle.
+                // PHPDoc covers its declaration, a run-level docblock covers later members, and screened line comments
+                // count only under the opt-in toggle.
                 if (
                     $property->getDocComment() !== null
                     || ($position > 0 && $isRunCovered)
@@ -218,12 +211,12 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
     }
 
     /**
-     * Reports whether an own-line comment attached to a property carries meaning beyond its declaration.
+     * Reports whether an attached own-line comment passes the text screen for more than a property-name restatement.
      *
      * @param Property $property - Property statement whose leading comments are inspected.
      * @param string   $source   - Whole-file source used to reject detached and trailing comments.
      *
-     * @return bool - True when an attached // or # comment meaningfully documents the property.
+     * @return bool - True when an attached // or # comment passes the rule's text screen.
      */
     private function hasMeaningfulAttachedLineComment(Property $property, string $source): bool
     {
@@ -259,15 +252,16 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
     }
 
     /**
-     * Reports whether line-comment prose explains more than a generic or repeated property label.
+     * Screens line-comment text for filler and restatements of declared property names.
      *
-     * @param string   $rawText  - Raw parser comment text including its delimiter.
+     * @param string $rawText - Raw parser comment text including its delimiter.
      * @param Property $property - Property declaration whose names are checked for restatement.
      *
-     * @return bool - True when the comment contains meaning-bearing prose.
+     * @return bool - True when the word-count, non-filler, and normalized-name checks all accept the text.
      */
     private function isMeaningfulPropertyComment(string $rawText, Property $property): bool
     {
+        // Strip a leading // or # marker and at most one following whitespace character before screening the prose.
         $text = preg_replace('/^\s*(?:\/\/|#)\s?/', '', $rawText) ?? $rawText;
         $text = trim($text);
         if ($text === '') {
@@ -311,6 +305,7 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
      */
     private function normalisedPropertyCommentText(string $text): string
     {
+        // Dropping every non-alphanumeric character makes userId, user_id and "user id" compare equal.
         return preg_replace('/[^a-z0-9]+/', '', strtolower($text)) ?? '';
     }
 
@@ -323,6 +318,7 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
      */
     private function propertyCommentWords(string $text): array
     {
+        // Insert a space at each lower-to-upper case boundary, then take letter-led words, so userId reads as "user id".
         $separated = preg_replace('/(?<=[a-z0-9])(?=[A-Z])/', ' ', $text) ?? $text;
         preg_match_all('/[a-z][a-z0-9]*/i', strtolower($separated), $matches);
 
@@ -330,11 +326,11 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
     }
 
     /**
-     * Normalizes meaning-bearing words after generic property labels are removed.
+     * Builds a comparison key after removing generic property labels and repeated words.
      *
      * @param list<string> $words - Lowercase comment or identifier words.
      *
-     * @return string - Concatenated words that remain after removing property-comment filler.
+     * @return string - Unique non-filler words concatenated in first-occurrence order; empty when none remain.
      */
     private function normalisedPropertyCommentMeaning(array $words): string
     {
@@ -346,14 +342,11 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
     /**
      * Builds one declared-property documentation finding.
      *
-     * @param string         $propertyName - bare property name without the leading `$`; combined with
-     *                                     `$className` to form the `Class::$prop` symbol shown to the reviewer.
-     * @param string         $className    - short class name owning the property, for the same symbol.
-     * @param int            $line         - 1-based start line of the property statement, so the finding
-     *                                     anchors at the declaration the author must annotate, not at the individual prop expression.
-     * @param RuleDefinition $definition   - rule metadata source for the finding's id, severity, pillar,
-     *                                     tier, and confidence.
-     * @param AnalysisUnit   $analysisUnit - parsed unit supplying the display path recorded on the finding.
+     * @param string $propertyName - Bare property name combined with $className to form the Class::$prop symbol.
+     * @param string $className - Short owner name used in the finding symbol.
+     * @param int $line - One-based declaration line shared by all names in the property statement.
+     * @param RuleDefinition $definition - Source of the finding's rule ID, severity, pillar, tier, and confidence.
+     * @param AnalysisUnit $analysisUnit - Parsed unit supplying the finding's display path.
      *
      * @return Finding - Finding for an undocumented declared property.
      */

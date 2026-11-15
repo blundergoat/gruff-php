@@ -118,7 +118,7 @@ branchy `if` version of branchless arithmetic. An older version of the line belo
 | `docs.missing-readme` | Missing README | `warning` | `high` | yes |
 | `docs.missing-return-tag` | Missing @return tag | `advisory` | `high` | yes |
 | `docs.missing-throws-tag` | Missing @throws tag | `advisory` | `medium` | yes |
-| `docs.param-comment` | Described param tag | `advisory` | `high` | no |
+| `docs.param-comment` | Described param tag | `advisory` | `high` | yes |
 | `docs.regex-comment` | Regex comment | `advisory` | `medium` | yes |
 | `docs.return-comment` | Described return tag | `advisory` | `high` | yes |
 | `docs.todo-density` | TODO/FIXME density | `error` | `high` | yes |

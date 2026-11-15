@@ -16,14 +16,9 @@ use GruffPhp\Rules\RuleRegistry;
 use JsonException;
 
 /**
- * Renders a finished analysis run as a SARIF 2.1.0 JSON document - the format GitHub Code Scanning
- * and similar platforms ingest to show findings inline on a pull request and in the Security tab.
- *
- * Reach for this when the run's consumer is a code-scanning platform rather than a person reading the
- * terminal: the user asks for it with `gruff-php analyse --format sarif`, redirects it to a `.sarif`
- * file, and uploads that file so each finding lands as an annotation on the line it flags. It sits
- * beside the other `OutputFormat` renderers (text, JSON, HTML, Markdown, hotspot, GitHub) as the code-scanning
- * option, and stamps every result with two fingerprints so an alert survives unrelated line drift.
+ * Renders an analysis report as SARIF 2.1.0 JSON for code-scanning consumers.
+ * Use `gruff-php analyse --format sarif` to produce a report for upload.
+ * Eligible results carry one baseline fingerprint; sensitive findings and symbols containing the ordinal separator receive none.
  */
 final readonly class SarifReporter
 {
@@ -37,14 +32,12 @@ final readonly class SarifReporter
     }
 
     /**
-     * Turns the whole finished run into the single SARIF string `analyse --format sarif` prints, so a
-     * code-scanning upload receives every rule and finding - with line locations and fingerprints - in
-     * one document instead of the human-readable terminal report.
+     * Builds the SARIF document from registered rules, reported and suppressed findings, and run diagnostics.
+     * Results include available line locations and eligible baseline fingerprints.
      *
      * @param AnalysisReport $report - Completed analysis run whose rules and findings become the SARIF body.
      *
-     * @return string - the SARIF 2.1.0 JSON document with trailing newline; on encode failure a minimal JSON
-     *                  error object instead, so the caller always gets parseable output rather than an exception
+     * @return string - SARIF JSON plus a newline, or a minimal JSON error object if encoding raises JsonException.
      */
     public function render(AnalysisReport $report): string
     {
@@ -56,7 +49,7 @@ final readonly class SarifReporter
             $rules[$definition->id] = $this->rule($definition);
         }
 
-        // Backfill a minimal rule entry for any finding whose rule isn't built-in - the `??=` leaves the
+        // Backfill a minimal rule entry for any finding whose rule isn't built-in - the ??= operator leaves the
         // richer definitions from the first loop untouched, so no result points at a rule we never list.
         $rendered = [...$report->findings, ...array_column($report->suppressedFindings(), 'finding')];
         // Rank once over every finding this document carries, as the baseline ranks its run; ranking one finding
@@ -87,8 +80,8 @@ final readonly class SarifReporter
         $properties  = [
             'gruffSchemaVersion' => AnalysisReport::SCHEMA_VERSION,
         ];
-        // Publish the composite score and grade only when the run produced them; a null score means
-        // scoring was skipped, so we omit the fields rather than show a misleading zero.
+        // Omit unavailable composite scores so consumers do not mistake missing grades for zero.
+
         if ($report->score?->composite !== null) {
             $properties['score'] = $report->score->composite->score;
             $properties['grade'] = $report->score->composite->letter;
@@ -138,10 +131,10 @@ final readonly class SarifReporter
 
         try {
             // Trailing newline keeps redirected .sarif files POSIX-clean; JSON_INVALID_UTF8_SUBSTITUTE swaps
-            // bad source bytes for U+FFFD so the user's Code Scanning upload never dies on one weird byte.
+            // invalid source bytes for U+FFFD so one invalid byte does not block the user's Code Scanning upload.
             return json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR) . PHP_EOL;
         } catch (JsonException $exception) {
-            // Encoding failure still emits parseable JSON so a SARIF consumer reports an error instead of choking.
+
             return sprintf('{"error":"Unable to encode SARIF: %s"}%s', addslashes($exception->getMessage()), PHP_EOL);
         }
     }
@@ -173,11 +166,10 @@ final readonly class SarifReporter
     }
 
     /**
-     * Describes one registered rule as a SARIF driver rule, so every check gruff can emit appears in the
-     * report's rule catalogue with its pillar, tier, and threshold - the metadata a Code Scanning UI
-     * shows beside each alert. Called once per rule while `render()` builds that catalogue.
+     * Builds a SARIF driver descriptor from a built-in rule's names, description, and default settings.
+     * render() uses these descriptors for the rule catalogue and supplies minimal entries for other rule IDs.
      *
-     * @param RuleDefinition $definition - Native rule definition.
+     * @param RuleDefinition $definition - Built-in rule whose names, description, and default settings populate the descriptor.
      *
      * @return array{
      *     id: string,
@@ -186,8 +178,7 @@ final readonly class SarifReporter
      *     fullDescription: array{text: string},
      *     help: array{text: string},
      *     properties: array<string, bool|float|int|string|array<array-key, bool|float|int|string|array<array-key, bool|float|int|string>>>
-     * } - one SARIF `reportingDescriptor` for the driver `rules` list; `help`/`fullDescription` duplicate the one-line rule description, and
-     * `properties` carries gruff-specific metadata (pillar, tier, threshold) only when set
+     * } - SARIF rule descriptor with names, descriptions, and required and optional gruff metadata.
      */
     private function rule(RuleDefinition $definition): array
     {
@@ -198,8 +189,8 @@ final readonly class SarifReporter
             'confidence' => $definition->confidence->value,
             'defaultEnabled' => $definition->isEnabledByDefault,
         ];
-        // Some rules also feed secondary pillars; list them when present so a consumer sees every
-        // quality area the rule touches. The common empty case maps to a single pillar and omits the key.
+
+
         if ($definition->secondaryPillars !== []) {
             $properties['secondaryPillars'] = array_map(
                 static fn(Pillar $pillar): string => $pillar->value,
@@ -207,22 +198,22 @@ final readonly class SarifReporter
             );
         }
         $single = $definition->severityThreshold;
-        // A rule with a single threshold-plus-severity (size, complexity, and the like) publishes its
-        // default threshold and the severity label it trips at, so a reviewer sees the rule's configured limit.
+        // These thresholds are registry defaults, not the effective settings for this run.
+
         if ($single instanceof \GruffPhp\Engine\Config\SeverityThreshold) {
             $properties['threshold'] = $single->threshold;
             $properties['severity']  = $single->severity->value;
-        // A rule that instead exposes a map of named thresholds passes that map straight through.
+
         } elseif ($definition->defaultThresholds !== []) {
             $properties['thresholds'] = $definition->defaultThresholds;
         }
-        // When a rule ships tunable options, expose their defaults so a reader can see what's
-        // configurable; a rule with none omits the key entirely.
+
+
         if ($definition->defaultOptions !== []) {
             $properties['options'] = $definition->defaultOptions;
         }
 
-        // Help and full description reuse the one-line rule description; gruff has no separate long-form help text.
+
         return [
             'id' => $definition->id,
             'name' => $definition->name,
@@ -240,23 +231,21 @@ final readonly class SarifReporter
     }
 
     /**
-     * Turns one finding into a single SARIF result - the object that becomes an annotation on a pull
-     * request line. Called once per finding while `render()` assembles the run's results list.
+     * Builds one SARIF result with a location, rule reference, and gruff metadata.
+     * Line and column regions are included only when the finding provides the required location data.
      *
-     * @param Finding $finding   - Finding to serialize into a single SARIF result entry.
-     * @param int     $ruleIndex - Zero-based offset of this finding's rule in the driver `rules` array, so the
-     *                           result can reference its rule by index rather than repeating the descriptor.
-     * @param array<int, int> $ordinals - Declaration ordinals `BaselineIdentity::assignOrdinals()` ranked over the whole document.
+     * @param Finding         $finding   - Finding to serialize into a single SARIF result entry.
+     * @param int             $ruleIndex - Zero-based offset of the finding's rule in the driver rules array.
+     * @param array<int, int> $ordinals  - Declaration ordinals from BaselineIdentity::assignOrdinals(), ranked over the whole document.
      *
-     * @return array<string, mixed> - one SARIF `result` entry with `region` keys only when the finding has line/column data, plus a
-     *                       `partialFingerprints.gruffFingerprint` holding the line-free baseline identity, so a Code Scanning
-     *                       alert stays open across line drift instead of closing and reopening; a sensitive finding carries none
+     * @return array<string, mixed> - SARIF result with a file location, optional region, gruff metadata, and eligible baseline fingerprint.
      */
     private function result(Finding $finding, int $ruleIndex, array $ordinals): array
     {
         // SARIF wants forward-slash, repo-relative paths, so flip Windows separators and strip any
-        // leading `./` - otherwise Code Scanning would annotate the wrong path, or none at all.
+        // leading ./ prefixes; otherwise Code Scanning could annotate the wrong path or no path at all.
         $uri = str_replace('\\', '/', $finding->filePath);
+        // Repeated relative prefixes still name the same repository path, so normalize them before publishing the SARIF location.
         $uri = (string)preg_replace('/^(?:\\.\\/)+/', '', $uri);
 
         $physicalLocation = [
@@ -270,12 +259,12 @@ final readonly class SarifReporter
             $region = [
                 'startLine' => $finding->line,
             ];
-            // Narrow the highlight to a column when the rule pinpointed one, rather than the line start.
+
             if ($finding->column !== null) {
                 $region['startColumn'] = $finding->column;
             }
-            // Stretch the region to an end line for a multi-line finding, so the highlight covers the
-            // whole offending block instead of only its first line.
+
+
             if ($finding->endLine !== null) {
                 $region['endLine'] = $finding->endLine;
             }
@@ -288,26 +277,26 @@ final readonly class SarifReporter
             'tier' => $finding->tier->value,
             'confidence' => $finding->confidence->value,
         ];
-        // Carry any extra pillars this finding touches, so a Code Scanning reader sees every quality
-        // area it affects; the empty case belongs to just its primary pillar.
+
+
         if ($finding->secondaryPillars !== []) {
             $properties['secondaryPillars'] = array_map(
                 static fn(Pillar $pillar): string => $pillar->value,
                 $finding->secondaryPillars,
             );
         }
-        // Attach the named symbol (class, method, …) the finding is about when there is one, giving the
-        // alert a human anchor; a null symbol means the finding isn't tied to a specific name.
+
+
         if ($finding->symbol !== null) {
             $properties['symbol'] = $finding->symbol;
         }
-        // Include the remediation hint when the rule offers one, so the alert tells the user how to fix
-        // it; null means this finding ships no canned advice.
+
+
         if ($finding->remediation !== null) {
             $properties['remediation'] = $finding->remediation;
         }
-        // Attach rule-specific extras (measured values, limits, names, candidates) when present, so the alert
-        // can show the detail behind the verdict; an empty map means the finding needs no extra context.
+
+
         if ($finding->metadata !== []) {
             $properties['metadata'] = $finding->metadata;
         }
@@ -327,18 +316,14 @@ final readonly class SarifReporter
     }
 
     /**
-     * Projects one finding into the fingerprints GitHub code scanning groups its alerts by.
+     * Returns the baseline fingerprint fields to merge into a SARIF result.
+     * Sensitive findings and symbols containing the ordinal separator have no durable identity.
+     * Eligible fingerprints use the supplied declaration ordinal to distinguish repeated variable symbols.
      *
-     * `gruffFingerprint` is the ratified durable identity and nothing else, so an alert survives a line move while a
-     * second declaration of one name opens its own alert. A sensitive finding has no identity at all and therefore
-     * carries no `partialFingerprints` key: publishing one would give a secret a stable name in a system gruff does
-     * not control.
+     * @param Finding         $finding  - Finding being rendered as a SARIF result.
+     * @param array<int, int> $ordinals - Declaration ordinals ranked over the whole document, keyed by spl_object_id().
      *
-     * @param Finding $finding - Finding being rendered as a SARIF result.
-     * @param array<int, int> $ordinals - Declaration ordinals ranked over the whole document, keyed by `spl_object_id`.
-     *
-     * @return array{partialFingerprints?: array{gruffFingerprint: string}} - The key to merge into the result, or an
-     *                                                                       empty array for a sensitive finding.
+     * @return array{partialFingerprints?: array{gruffFingerprint: string}} - Fingerprint fields, or an empty array when identity is forbidden.
      */
     private function partialFingerprints(Finding $finding, array $ordinals): array
     {
@@ -352,16 +337,16 @@ final readonly class SarifReporter
     }
 
     /**
-     * Translates a gruff severity into the SARIF level name a Code Scanning UI colours by, so an error
-     * shows as an error and an advisory as the quieter `note`. Called for every result `render()` emits.
+     * Translates a gruff severity into the SARIF level used by Code Scanning, where advisory findings
+     * appear at SARIF's quieter note level. Called for every result emitted by render().
      *
-     * @param Severity $severity - Gruff severity to translate; advisory collapses to SARIF `note`, which has no peer.
+     * @param Severity $severity - Finding severity; advisory maps to SARIF's note level.
      *
-     * @return string - one of SARIF's `error`/`warning`/`note` level names; advisory collapses to `note`
+     * @return string - SARIF error, warning, or note level; advisory maps to note.
      */
     private function level(Severity $severity): string
     {
-        // SARIF defines no "advisory" level, so gruff's advisory maps onto its closest peer, `note`.
+        // SARIF defines no advisory level, so gruff's advisory maps to its closest level, note.
         return match ($severity) {
             Severity::Error => 'error',
             Severity::Warning => 'warning',

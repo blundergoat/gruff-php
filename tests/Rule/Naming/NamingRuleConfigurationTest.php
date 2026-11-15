@@ -14,14 +14,16 @@ use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\RuleRegistry;
 
 /**
- * Covers configurable naming-rule behaviour and cross-rule deferral.
+ * Covers accepted abbreviations and undeclared-name findings.
+ * Pins the default abbreviation list and checks naming-rule overlap resolution.
+ * Checks remediation metadata for abbreviations that require a project decision.
  */
 final class NamingRuleConfigurationTest extends NamingRuleTestCase
 {
     /**
      * Verify accepted abbreviations can suppress short variable findings.
      *
-     * @return void
+     * @return void - Asserts x remains reported and the accepted abbreviation a is absent.
      */
     public function testAcceptedAbbreviationsCanSuppressShortVariableFindings(): void
     {
@@ -42,7 +44,7 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
     /**
      * Verify undeclared short lowercase abbreviations are reported.
      *
-     * @return void
+     * @return void - Asserts undeclared names and the remediation metadata for project vocabulary decisions.
      */
     public function testAbbreviationAllowlistDetectsUndeclaredNames(): void
     {
@@ -113,13 +115,10 @@ PHP, AbbreviationAllowlistRule::ID);
     }
 
     /**
-     * Verify the shipped seed is exactly the ratified sixteen, so domain vocabulary stays a project decision.
+     * Verify the default abbreviation list contains the expected sixteen entries.
+     * Check that dto, utc, and dob are reported while the seeded id is not.
      *
-     * `dto` and `utc` were seeded here until 2026-09-06. FAMILY-CONTRACT.md section 8 ratifies sixteen entries and
-     * replace-not-merge loading, so two extra defaults meant a gruff-php project silently accepted two names no
-     * other port did, and a user who listed their own vocabulary lost them without being told.
-     *
-     * @return void
+     * @return void - Asserts the exact default list and the findings for unseeded domain abbreviations.
      */
     public function testAbbreviationAllowlistSeedsExactlyTheRatifiedSixteen(): void
     {
@@ -140,14 +139,14 @@ PHP, AbbreviationAllowlistRule::ID);
         );
         sort($names);
 
-        // `id` is one of the sixteen and stays quiet; the three that are not are reported until a project lists them.
+
         self::assertSame(['dob', 'dto', 'utc'], $names);
     }
 
     /**
-     * Verify overlapping naming findings keep the documented primary rule.
+     * Verify identifier quality takes precedence over abbreviation findings for cb and still reports strX.
      *
-     * @return void
+     * @return void - Asserts cb has identifier quality without an abbreviation finding and strX retains identifier quality.
      */
     public function testDuplicateNamingFindingsRespectDeferralOrder(): void
     {
@@ -174,8 +173,7 @@ PHP, AbbreviationAllowlistRule::ID);
      *
      * @param list<string> $acceptedAbbreviations - Accepted abbreviation values to apply before analysing the fixture.
      *
-     * @return list<\GruffPhp\Results\Finding\Finding> - surviving abbreviation-allowlist findings after the supplied accepted abbreviations are applied;
-     *                                         empty when every short name is accepted
+     * @return list<\GruffPhp\Results\Finding\Finding> - Abbreviation findings under the supplied allowlist; empty when none remain.
      */
     private function abbreviationFindings(array $acceptedAbbreviations): array
     {

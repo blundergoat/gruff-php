@@ -81,8 +81,9 @@ use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers the default rule registry: stable rule IDs and definitions, enabled-rule execution, disabled-rule skipping, project-level finding
- * deduplication, duplicate-ID rejection, and listable descriptions.
+ * Covers default rule registration, reporting metadata, and configured rule execution.
+ * Checks duplicate-ID rejection and deduplication of repeated README-scoped findings.
+ * Exercises project accumulation and enabled-rule resolution under different configurations.
  */
 final class RuleRegistryTest extends TestCase
 {
@@ -93,9 +94,9 @@ final class RuleRegistryTest extends TestCase
     private const MAX_RULES_WITHOUT_DESCRIPTION = 63;
 
     /**
-     * Verify default registry contains stable rule ids.
+     * Assert that the default registry recognises every rule ID listed by this test.
      *
-     * @return void
+     * @return void - Asserts no listed rule ID is missing from the default registry.
      */
     public function testDefaultRegistryContainsStableRuleIds(): void
     {
@@ -147,9 +148,9 @@ final class RuleRegistryTest extends TestCase
     }
 
     /**
-     * Verify runs enabled rules over parsed files.
+     * Verify that enabled file-length analysis reports the fixture's warning and metadata.
      *
-     * @return void
+     * @return void - Asserts one file-length warning with the expected pillar and line-count metadata.
      */
     public function testRunsEnabledRulesOverParsedFiles(): void
     {
@@ -175,9 +176,9 @@ final class RuleRegistryTest extends TestCase
     }
 
     /**
-     * Verify skips disabled rules.
+     * Verify that disabling file-length analysis suppresses its findings.
      *
-     * @return void
+     * @return void - Asserts that the disabled file-length rule emits no findings for the fixture.
      */
     public function testSkipsDisabledRules(): void
     {
@@ -197,9 +198,9 @@ final class RuleRegistryTest extends TestCase
     }
 
     /**
-     * Verify deduplicates project level findings across units.
+     * Verify that repeated README-scoped findings from two units collapse to one.
      *
-     * @return void
+     * @return void - Asserts one remaining finding with the fixture rule ID and README.md path.
      */
     public function testDeduplicatesProjectLevelFindingsAcrossUnits(): void
     {
@@ -220,9 +221,9 @@ final class RuleRegistryTest extends TestCase
     }
 
     /**
-     * Verify the project-rule accumulator seam observes full project context while per-unit analysis stays scoped.
+     * Verify that project accumulation receives both supplied context units.
      *
-     * @return void
+     * @return void - Asserts project-rule discovery and a finding message containing both fixture paths.
      */
     public function testProjectRuleAccumulatorSeamObservesFullProjectContext(): void
     {
@@ -249,9 +250,9 @@ final class RuleRegistryTest extends TestCase
     }
 
     /**
-     * Verify rejects duplicate rule ids.
+     * Verify that duplicate rule IDs are rejected.
      *
-     * @return void
+     * @return void - Expects InvalidArgumentException with the duplicate rule ID in its message.
      */
     public function testRejectsDuplicateRuleIds(): void
     {
@@ -267,7 +268,7 @@ final class RuleRegistryTest extends TestCase
     /**
      * Verify default rules have listable descriptions.
      *
-     * @return void
+     * @return void - Asserts that every default rule exposes nonblank display text.
      */
     public function testDefaultRulesHaveListableDescriptions(): void
     {
@@ -283,16 +284,16 @@ final class RuleRegistryTest extends TestCase
     }
 
     /**
-     * Verify the count of rules with no written description never grows.
+     * Verify that blank configured descriptions stay within the fixed ratchet limit.
      *
-     * @return void
+     * @return void - Asserts at most MAX_RULES_WITHOUT_DESCRIPTION default rules have blank raw descriptions.
      */
     public function testRulesFallingBackToTheirNameDoNotGrow(): void
     {
-        // RuleDefinition::description() substitutes the name when no description is configured, so the
-        // emptiness check above passes for every rule and can never fail. This ratchet holds the real
-        // line: a new rule shipped without a description raises the count and fails here. Reading the
-        // raw property rather than the accessor is what makes the fallback visible.
+        // Read the raw property because description() replaces an empty configured description with the rule name.
+
+
+
         $fallbackIds = array_values(array_map(
                                         static fn($rule): string => $rule->definition()->id,
                                         array_filter(
@@ -311,7 +312,7 @@ final class RuleRegistryTest extends TestCase
     /**
      * Verify default rule definitions keep stable reporting and config metadata.
      *
-     * @return void
+     * @return void - Asserts 84 definitions and the expected hash of their sorted metadata.
      */
     public function testDefaultRuleDefinitionsStayStable(): void
     {
@@ -343,27 +344,28 @@ final class RuleRegistryTest extends TestCase
         $json = json_encode($definitions, JSON_THROW_ON_ERROR);
 
         self::assertCount(84, $definitions);
-        // M10 D35 (2026-09-26) renamed docs.missing-public-phpdoc to docs.missing-phpdoc, and docs.return-comment's description names it.
-        // Precision-floor M19 (2026-10-04) retired nine rules and turned three off by default (ADR-034).
-        // The constant and property PHPDoc descriptions name run coverage (CHANGELOG: `One comment documents a run of constants`).
-        // Precision-floor M14 turned complexity.halstead-volume off by default (CHANGELOG 0.6.0).
-        // Precision-floor M15 makes the low-confidence SUT-name heuristic advisory.
-        // Precision-floor M13 adds docs.param-comment, off by default.
-        // Precision-floor M13 gives the docs rules an everyCallable option, off by default.
-        // Precision-floor M02 (2026-10-14) retired 36 rules on the operator's php table (ADR-034) and turned five more off by default.
-        // Its repairs then left security.debug-mode-enabled and security.header-injection with under ten corpus findings, so both are opt-in,
-        // and security.silent-catch and sensitive-data.pii-test-fixture still failed their re-measures, so the operator turned both off.
-        // The calibrated repeated-structure rule enables groupFindings by default.
+
+
+
+
+
+
+
+
+
+
+
+
         self::assertSame(
-            '4a1ce3781a19f91c694eac46d03c6ca706b1703d0c4ba764f026988b5a758c68',
+            'af90fb11afa8573e9e7fd0499b7e538a4d0d2d3acae66dafed2276703d30f8bd',
             hash('sha256', $json),
         );
     }
 
     /**
-     * Verify repeated enabledRules() calls with the same config reuse the memoised set without re-reading definitions.
+     * Verify that repeated enabled-rule resolution preserves results without rereading definitions.
      *
-     * @return void
+     * @return void - Asserts identical rule lists and an unchanged definition-call counter across two resolutions.
      */
     public function testEnabledRulesAreMemoisedPerConfigObject(): void
     {
@@ -388,9 +390,9 @@ final class RuleRegistryTest extends TestCase
     }
 
     /**
-     * Verify the memoisation is keyed by config identity, so distinct configs resolve distinct rule sets.
+     * Verify that excluding file-length affects only the narrowed configuration's enabled rules.
      *
-     * @return void
+     * @return void - Asserts file-length membership differs and resolving the original config preserves its rule list.
      */
     public function testDifferentConfigObjectsResolveDifferentEnabledRuleSets(): void
     {
@@ -409,9 +411,9 @@ final class RuleRegistryTest extends TestCase
     }
 
     /**
-     * Verify class-length counts substantive lines: docblock padding is free, code still fires.
+     * Verify class-length ignores docblock padding but still reports a substantive class.
      *
-     * @return void
+     * @return void - Asserts no finding for docblock padding and one 33-line finding for substantive class code.
      */
     public function testClassLengthCountsSubstantiveLinesOnly(): void
     {
@@ -454,7 +456,7 @@ final class RuleRegistryTest extends TestCase
      */
     private function parseInline(string $source): AnalysisUnit
     {
-        // SourceFile marks the fixture as PHP explicitly, so the allocated path needs no suffix or rename.
+        // SourceFile defaults to PHP parsing, so the temporary path needs no .php suffix.
         $path = tempnam(sys_get_temp_dir(), 'gruff-php-inline-');
         self::assertNotFalse($path);
 
@@ -470,7 +472,7 @@ final class RuleRegistryTest extends TestCase
     /**
      * Parse the named fixture into an analysis unit.
      *
-     * @param string $displayPath - Fixture display path.
+     * @param string $displayPath - Repository-relative fixture path, also used in reported findings.
      *
      * @return AnalysisUnit - the parsed fixture ready for rule analysis
      */
@@ -522,8 +524,8 @@ final class RuleRegistryTest extends TestCase
             /**
              * Return findings produced by the fixture rule.
              *
-             * @param AnalysisUnit $analysisUnit - Analysis unit.
-             * @param RuleContext  $ruleContext  - Rule context for the fixture.
+             * @param AnalysisUnit $analysisUnit - Unused; no source inspection occurs.
+             * @param RuleContext  $ruleContext  - Unused; configuration does not affect the empty result.
              *
              * @return list<\GruffPhp\Results\Finding\Finding> - always empty; this fixture only observes definition() calls
              */
@@ -537,7 +539,7 @@ final class RuleRegistryTest extends TestCase
     /**
      * Build a fixture rule with the requested identifier.
      *
-     * @param string $id - Rule identifier.
+     * @param string $id - Identifier used in metadata and findings; validated when definition() is called.
      *
      * @return RuleInterface - an anonymous rule emitting one finding under the given id
      */
@@ -547,7 +549,7 @@ final class RuleRegistryTest extends TestCase
             /**
              * Build the anonymous fixture rule.
              *
-             * @param string $id - Rule identifier.
+             * @param string $id - Identifier used in findings and validated when definition() builds its metadata.
              */
             public function __construct(private string $id)
             {
@@ -573,8 +575,8 @@ final class RuleRegistryTest extends TestCase
             /**
              * Return findings produced by the fixture rule.
              *
-             * @param AnalysisUnit $analysisUnit - Analysis unit.
-             * @param RuleContext  $ruleContext  - Rule context for the fixture.
+             * @param AnalysisUnit $analysisUnit - Supplies the display path attached to the synthetic finding.
+             * @param RuleContext  $ruleContext  - Unused; finding metadata is fixed by this fixture.
              *
              * @return list<\GruffPhp\Results\Finding\Finding> - exactly one synthetic finding tagged with this rule's id, per unit
              */
@@ -607,7 +609,7 @@ final class RuleRegistryTest extends TestCase
             /**
              * Display paths of every unit fed to accumulate(), in arrival order.
              *
-             * @var list<string>
+             * @var list<string> - Ordered paths, cleared by startProject() before each pass.
              */
             private array $observedPaths = [];
 
@@ -631,9 +633,9 @@ final class RuleRegistryTest extends TestCase
             /**
              * Reset the accumulated unit paths for a fresh project pass.
              *
-             * @param RuleContext $ruleContext - Rule context for the fixture.
+             * @param RuleContext $ruleContext - Unused; reset does not depend on configuration.
              *
-             * @return void
+             * @return void - Clears all previously recorded paths.
              */
             public function startProject(RuleContext $ruleContext): void
             {
@@ -643,10 +645,10 @@ final class RuleRegistryTest extends TestCase
             /**
              * Record one analysed unit's display path.
              *
-             * @param AnalysisUnit $analysisUnit - Parsed unit to accumulate.
-             * @param RuleContext  $ruleContext  - Rule context for the fixture.
+             * @param AnalysisUnit $analysisUnit - Supplies the display path appended in arrival order.
+             * @param RuleContext  $ruleContext  - Unused; recording does not depend on configuration.
              *
-             * @return void
+             * @return void - Appends one path, including repeated paths.
              */
             public function accumulate(AnalysisUnit $analysisUnit, RuleContext $ruleContext): void
             {
@@ -656,9 +658,9 @@ final class RuleRegistryTest extends TestCase
             /**
              * Emit one finding listing every accumulated unit path.
              *
-             * @param RuleContext $ruleContext - Rule context for the fixture.
+             * @param RuleContext $ruleContext - Unused; output depends only on recorded paths.
              *
-             * @return list<Finding> - a single finding naming the observed paths, proving full project context reached the seam
+             * @return list<Finding> - One finding, even with no paths; its file path is 'unknown' when none were recorded.
              */
             public function finishProject(RuleContext $ruleContext): array
             {
@@ -679,8 +681,8 @@ final class RuleRegistryTest extends TestCase
             /**
              * Run the legacy whole-project pass for the fixture.
              *
-             * @param list<AnalysisUnit> $units       - Parsed units available to the project-level rule.
-             * @param RuleContext        $ruleContext - Rule context for the fixture.
+             * @param list<AnalysisUnit> $units       - Unused; this entry point always returns an empty list.
+             * @param RuleContext        $ruleContext - Unused; this entry point performs no analysis.
              *
              * @return list<Finding> - always empty; the registry routes this accumulator through the streaming seam instead
              */
@@ -692,9 +694,9 @@ final class RuleRegistryTest extends TestCase
     }
 
     /**
-     * Build a project-level fixture rule with duplicate identity.
+     * Build a per-unit fixture that repeats the same README-scoped finding.
      *
-     * @return RuleInterface - an anonymous rule reusing the project-level id to force a collision
+     * @return RuleInterface - A rule emitting identical findings across units for the deduplication test.
      */
     private function duplicateProjectRule(): RuleInterface
     {
@@ -702,7 +704,7 @@ final class RuleRegistryTest extends TestCase
             /**
              * Return metadata for the fixture rule.
              *
-             * @return RuleDefinition - the project-level fixture identity, deliberately sharing one id
+             * @return RuleDefinition - Fixed identity and reporting metadata for the repeated README-scoped finding.
              */
             public function definition(): RuleDefinition
             {
@@ -719,8 +721,8 @@ final class RuleRegistryTest extends TestCase
             /**
              * Return findings produced by the fixture rule.
              *
-             * @param AnalysisUnit $analysisUnit - Analysis unit.
-             * @param RuleContext  $ruleContext  - Rule context for the fixture.
+             * @param AnalysisUnit $analysisUnit - Unused; each call targets README.md.
+             * @param RuleContext  $ruleContext  - Unused; findings have fixed metadata.
              *
              * @return list<\GruffPhp\Results\Finding\Finding> - one README-scoped finding per unit, so dedup must collapse them to one
              */

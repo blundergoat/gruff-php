@@ -24,15 +24,16 @@ use PhpParser\ParserFactory;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers which assignment shapes carry request taint to security sinks: concat propagates,
- * references are deliberately untracked.
+ * Covers request-taint propagation through compound concatenation and archive receivers.
+ * Archive cases distinguish tainted destinations, entries and sources from clean receiver resets.
+ * Reference-alias cases expect no header findings for either a cleaned or a tainted partner.
  */
 final class TaintAssignmentTest extends TestCase
 {
     /**
      * Verify compound concat assignments propagate request taint into shared-helper sinks.
      *
-     * @return void
+     * @return void - Asserts one finding for each of the four selected security rules.
      */
     public function testCompoundAssignmentTaintReachesSharedHelperSinks(): void
     {
@@ -48,7 +49,7 @@ final class TaintAssignmentTest extends TestCase
     /**
      * Verify request-controlled archive sources flag extraction while cleaned receivers stay silent.
      *
-     * @return void
+     * @return void - Asserts exact finding lines, selected messages and archive-source metadata.
      */
     public function testArchiveSourceTaintFlagsUploadedArchivesButNotCleanedReceivers(): void
     {
@@ -57,10 +58,10 @@ final class TaintAssignmentTest extends TestCase
                                      static fn(Finding $finding): bool => $finding->ruleId === UnsafeArchiveExtractionRule::ID,
                                  ));
 
-        // 18/25 are the destination/entries shapes; 32/54 the direct tainted-source shapes; 66/89/100
-        // the conditional shapes (a skippable clean re-open cannot clear taint, including sibling
-        // branches, and a skippable tainted open still flags). Clean open, unskippable re-open/reassignment,
-        // and the clean re-open on the sink's own path must all stay silent.
+        // A skippable clean reopen must not silence an extraction reached with the tainted source.
+
+
+
         self::assertSame(
             [18, 25, 32, 54, 66, 89, 100],
             array_map(static fn(Finding $finding): ?int => $finding->line, $findings),
@@ -75,9 +76,9 @@ final class TaintAssignmentTest extends TestCase
     }
 
     /**
-     * Verify reference assignments stay untracked so aliasing can never manufacture a false positive.
+     * Verify the two reference-alias examples produce no header-injection findings.
      *
-     * @return void
+     * @return void - Asserts no header findings for aliases cleaned or tainted through their partner.
      */
     public function testReferenceAssignmentsAreDeliberatelyUntracked(): void
     {
@@ -122,7 +123,7 @@ PHP,
      * @param int           $expectedCount - Expected number of findings for that rule.
      * @param list<Finding> $findings - Full-run findings to filter.
      *
-     * @return void
+     * @return void - Asserts that the selected rule has exactly the expected number of findings.
      */
     private static function assertRuleCount(string $ruleId, int $expectedCount, array $findings): void
     {
@@ -171,7 +172,7 @@ PHP,
 
         $nodeTraverser = new NodeTraverser();
         $nodeTraverser->addVisitor(new ParentConnectingVisitor());
-        /** @var list<Stmt> $traversed Statements connected to parent attributes for rule traversal. */
+        /** @var list<Stmt> $traversed - Statements connected to parent attributes for rule traversal. */
         $traversed = $nodeTraverser->traverse($statements);
 
         return new AnalysisUnit(

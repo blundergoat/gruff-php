@@ -38,14 +38,14 @@ final class SilentCatchRule implements RuleInterface
     /**
      * Words that turn a comment into a reason for the silence, such as "if" in "Do nothing if we cannot memzero".
      *
-     * @var list<string>
+     * @var list<string> - Tokens used to recognise explanatory catch comments.
      */
     private const REASON_WORDS = ['if', 'because', 'since', 'when', 'unless', 'must', 'cannot', 'cant', 'below', 'expected', 'otherwise', 'continue', 'from'];
 
     /**
      * Stock phrasing of a silent catch, such as "do nothing" or "ignore the exception", which restates the silence without saying why.
      *
-     * @var list<string>
+     * @var list<string> - Tokens excluded when looking for wording beyond stock silence phrases.
      */
     private const STOCK_PHRASE_WORDS = [
         'do', 'does', 'nothing', 'no', 'op', 'noop', 'nop', 'ignore', 'ignored', 'ignoring', 'silent', 'silently', 'silence',
@@ -54,7 +54,7 @@ final class SilentCatchRule implements RuleInterface
     ];
 
     /**
-     * Describes the rule for `list-rules` and for each finding it reports.
+     * Describes the rule for list-rules output and each reported finding.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
@@ -67,32 +67,32 @@ final class SilentCatchRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::High,
-            // Off unless a project sets `enabled: true`: precision-floor M02 found it right on 13 of 25 judged findings after its repair, below its 0.80 floor,
-            // so it is off by default rather than deleted (ADR-034).
+            // Disabled by default because its post-repair precision remained below the required floor (ADR-034).
+
             isEnabledByDefault: false,
         );
     }
 
     /**
-     * Reports each catch block that drops its exception without a reason or later handling.
+     * Reports each otherwise empty catch with neither recognised reason wording nor a recognised later read.
      *
      * @param AnalysisUnit $analysisUnit - Parsed file the user asked to analyse.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext - Unused; the rule interface requires it, and this rule reads no options or project root.
      *
-     * @return list<Finding> - One finding per unexplained empty catch; empty when every catch handles, explains or later reads its exception.
+     * @return list<Finding> - One finding per catch that matches the silence heuristic; empty when none match.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $findings = [];
 
-        // Every catch clause in the file is a candidate, including each clause of a multi-catch try.
+
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Catch_::class) as $catch) {
-            // A catch that logs, rethrows or falls back does something with the failure.
+
             if (!$this->hasNoHandling($catch)) {
                 continue;
             }
 
-            // A reason in the comment, or a later read of the caught value, means the silence was reviewed or the failure is handled.
+
             if ($this->commentExplainsSilence($catch) || $this->readsCaughtExceptionLater($catch, $analysisUnit)) {
                 continue;
             }
@@ -114,17 +114,17 @@ final class SilentCatchRule implements RuleInterface
     }
 
     /**
-     * Reports whether a catch block runs no code, holding at most comments.
+     * Reports whether a catch block contains no executable statements.
      *
      * @param Stmt\Catch_ $catch - Catch clause to inspect.
      *
-     * @return bool - True when the body is empty or holds only comments; false once it has one real statement.
+     * @return bool - True when every body entry is a non-executable placeholder; false when any executable statement appears.
      */
     private function hasNoHandling(Stmt\Catch_ $catch): bool
     {
-        // A comment-only body parses as placeholder statements, so anything else is real handling.
+        // Comment-only bodies use Nop placeholders; any other statement excludes the catch from this rule.
         foreach ($catch->stmts as $statement) {
-            // One real statement, such as a log call or `return null;`, means the failure is acted on.
+
             if (!$statement instanceof Stmt\Nop) {
                 return false;
             }
@@ -134,27 +134,26 @@ final class SilentCatchRule implements RuleInterface
     }
 
     /**
-     * Reports whether an empty catch's comment gives a reason for the silence, such as "Fall back to case folding below."
-     *
-     * A reason needs a connective word plus a word of its own, so "do nothing" and "Catch exceptions and remain silent." still report.
-     * A TODO-style marker means the handling is still owed, and a commented-out line of code is not prose.
+     * Matches comments inside an otherwise empty catch against the explanation heuristic.
+     * A reason word or phrase also needs a distinct explanatory word.
+     * TODO-style markers reject the prose; blank and selected code-like lines are filtered before matching.
      *
      * @param Stmt\Catch_ $catch - Empty catch whose placeholder statements carry the comments.
      *
-     * @return bool - True when the comment explains the silence; false for no comment, stock phrasing or an open TODO.
+     * @return bool - True when comment text matches the heuristic; false for no comment, stock phrasing, or an open TODO.
      */
     private function commentExplainsSilence(Stmt\Catch_ $catch): bool
     {
         $proseLines = [];
-        // Each placeholder statement carries the comments written inside the catch body.
+
         foreach ($catch->stmts as $placeholder) {
-            // A body can hold several comments, such as two `//` lines.
+            // Collect every attached comment because one catch body may split its explanation across several comments.
             foreach ($placeholder->getComments() as $comment) {
-                // A block comment spans several lines, and each is judged on its own.
+                // Process block-comment lines separately so disabled code does not hide explanatory prose on another line.
                 foreach (preg_split('/\R/', $comment->getText()) ?: [] as $commentLine) {
-                    // Strip the comment markers (`//`, `#`, `/*`, `*`, `*/`) to leave the words.
+                    // Ignore comment syntax so only the catch's explanatory words influence the heuristic.
                     $text = trim((string) preg_replace('~^\s*(?://+|#+|/\*+|\*+/?)|\*+/\s*$~', '', $commentLine));
-                    // A blank line, or disabled code such as `// error_log($e);` ending in `;`, `{` or `}`, says nothing about why.
+                    // Ignore blank lines and disabled code ending in a semicolon or brace because they do not explain the silence.
                     if ($text !== '' && preg_match('/[;{}]$|^\$\w/', $text) !== 1) {
                         $proseLines[] = $text;
                     }
@@ -163,7 +162,7 @@ final class SilentCatchRule implements RuleInterface
         }
 
         $prose = implode(' ', $proseLines);
-        // No prose, or a TODO, FIXME, XXX or HACK marker saying the handling is still owed, leaves the catch unexplained.
+        // No prose or an open TODO, FIXME, XXX or HACK marker prevents a heuristic match.
         if ($prose === '' || preg_match('/\b(?:TODO|FIXME|XXX|HACK)\b/i', $prose) === 1) {
             return false;
         }
@@ -174,14 +173,14 @@ final class SilentCatchRule implements RuleInterface
         $givesReason = array_intersect($words, self::REASON_WORDS) !== []
             || str_contains($phrased, ' fall back ') || str_contains($phrased, ' in case ');
 
-        // A reason word alone, as in "ignore if", explains nothing; it needs at least one word beyond the stock phrasing.
+        // A reason word alone, as in "ignore if", does not qualify; another word must remain after stock terms are removed.
         return $givesReason && array_diff($words, self::STOCK_PHRASE_WORDS, self::REASON_WORDS, ['fall', 'back', 'in', 'case']) !== [];
     }
 
     /**
-     * Reports whether the code after the try reads the caught exception before anything replaces or drops it.
+     * Reports whether the first later use in the same block qualifies as a read of the caught exception.
      *
-     * The first later use decides: a read, such as `log($error)`, handles the failure; a rebinding, `unset()` or `isset()` does not.
+     * The rule treats a read such as log($error) as later handling; direct rebinding, unset, or isset of the variable does not qualify.
      *
      * @param Stmt\Catch_  $catch - Empty catch that names its exception variable.
      * @param AnalysisUnit $analysisUnit - Parsed file whose top-level statements follow a try written at file scope.
@@ -191,12 +190,12 @@ final class SilentCatchRule implements RuleInterface
     private function readsCaughtExceptionLater(Stmt\Catch_ $catch, AnalysisUnit $analysisUnit): bool
     {
         $tryStatement = $catch->getAttribute('parent');
-        // `catch (Exception)` without a variable leaves nothing to read later.
+        // A catch clause without a variable leaves nothing to read later.
         if (!$catch->var instanceof Expr\Variable || !is_string($catch->var->name) || !$tryStatement instanceof Stmt\TryCatch) {
             return false;
         }
 
-        // Only statements after the try, in the same block, can act on the caught value.
+        // This heuristic inspects only statements after the try in the same block.
         foreach ($this->statementsAfterTry($tryStatement, $analysisUnit) as $laterStatement) {
             $firstUse = $this->firstUseOf($laterStatement, $catch->var->name);
             // The first statement that mentions the variable decides; earlier statements that ignore it do not.
@@ -214,7 +213,7 @@ final class SilentCatchRule implements RuleInterface
      * @param Stmt\TryCatch $tryStatement - Try statement to locate.
      * @param AnalysisUnit  $analysisUnit - Parsed file whose root statements hold a try written at file scope.
      *
-     * @return list<Node> - Later statements in source order; empty when the try is the last statement in its block.
+     * @return list<Node> - Following sibling nodes in source order; empty when none remain or the containing block is not found.
      */
     private function statementsAfterTry(Stmt\TryCatch $tryStatement, AnalysisUnit $analysisUnit): array
     {
@@ -225,10 +224,10 @@ final class SilentCatchRule implements RuleInterface
             $statementBlocks = array_filter(array_map(static fn(string $name): mixed => $holder->{$name}, $holder->getSubNodeNames()), 'is_array');
         }
 
-        // Find the block that holds the try, then keep what comes after it.
+
         foreach ($statementBlocks as $statementBlock) {
             $position = array_search($tryStatement, $statementBlock, true);
-            // This block holds the try, so its later entries are the statements that run next.
+
             if (is_int($position)) {
                 return array_values(array_filter(array_slice($statementBlock, $position + 1), static fn(mixed $node): bool => $node instanceof Node));
             }
@@ -238,12 +237,12 @@ final class SilentCatchRule implements RuleInterface
     }
 
     /**
-     * Finds the first use of a variable inside a statement, in source order.
+     * Classifies the first relevant use of a variable inside a statement.
      *
      * @param Node   $node - Statement or expression to walk.
      * @param string $variableName - Caught variable's name, without the dollar sign.
      *
-     * @return bool|null - True for a read, false for a rebinding or drop, null when the node never mentions the variable.
+     * @return bool|null - True for a read, false for a rebinding, drop, or non-handling test, and null when the variable is absent.
      */
     private function firstUseOf(Node $node, string $variableName): ?bool
     {
@@ -252,11 +251,9 @@ final class SilentCatchRule implements RuleInterface
             return null;
         }
 
-        // A closure sees the caught exception only through its `use` list, which reads it.
+        // A closure sees the caught exception only through its captured-variable list, which reads it.
         if ($node instanceof Expr\Closure) {
-            // `function () use ($error) { ... }` carries the exception into the closure.
             foreach ($node->uses as $closureUse) {
-                // A matching name in the use list is a read of the caught value.
                 if ($closureUse->var->name === $variableName) {
                     return true;
                 }
@@ -265,7 +262,7 @@ final class SilentCatchRule implements RuleInterface
             return null;
         }
 
-        // A plain mention that no binding form below claimed is a read, such as `error_log($error->getMessage())`.
+        // A variable occurrence not claimed by a surrounding binding form is treated as a read.
         if ($node instanceof Expr\Variable) {
             return $node->name === $variableName ? true : null;
         }
@@ -276,9 +273,7 @@ final class SilentCatchRule implements RuleInterface
             return $bindingOutcome === 1;
         }
 
-        // Otherwise walk the children in source order until one mentions the variable.
         foreach ($node->getSubNodeNames() as $subNodeName) {
-            // A child slot holds one node or a list of nodes, such as the statements of an if body.
             foreach (is_array($node->{$subNodeName}) ? $node->{$subNodeName} : [$node->{$subNodeName}] as $child) {
                 $firstUse = $child instanceof Node ? $this->firstUseOf($child, $variableName) : null;
                 // The earliest child that mentions the variable decides for the whole statement.
@@ -292,21 +287,20 @@ final class SilentCatchRule implements RuleInterface
     }
 
     /**
-     * Decides the first use inside a statement that can bind or drop variables.
+     * Classifies variable uses in forms that can bind, drop, or only test a value.
      *
      * @param Node   $node - Statement or expression to inspect.
      * @param string $variableName - Caught variable's name, without the dollar sign.
      *
-     * @return int - 1 for a read, -1 for a rebinding or drop of the variable, 0 when the node binds nothing and its children decide.
+     * @return int - 1 for a read, -1 for direct rebinding, unset, or isset of the variable, and 0 when child nodes decide.
      */
     private function useInBindingForm(Node $node, string $variableName): int
     {
         $isCaughtName = static fn(mixed $target): bool => $target instanceof Expr\Variable && $target->name === $variableName;
 
-        // `$message = $error->getMessage()` reads before it binds; `$error = null` drops the exception.
+        // A read in the assigned expression handles the exception before rebinding can drop it.
         if ($node instanceof Expr\Assign || $node instanceof Expr\AssignRef) {
             $rightSideUse = $this->firstUseOf($node->expr, $variableName);
-            // The right-hand side runs first, so a read there handles the exception before any rebinding.
             if ($rightSideUse !== null) {
                 return $rightSideUse ? 1 : -1;
             }
@@ -314,14 +308,14 @@ final class SilentCatchRule implements RuleInterface
             return $isCaughtName($node->var) ? -1 : 0;
         }
 
-        // A second `catch (Exception $error)`, `unset($error)` or `isset($error)` leaves the earlier exception unhandled.
+        // A direct catch binding, unset, or isset of the caught name does not count as later handling.
         if ($node instanceof Stmt\Catch_ || $node instanceof Stmt\Unset_ || $node instanceof Expr\Isset_) {
             $targets = $node instanceof Stmt\Catch_ ? [$node->var] : $node->vars;
 
             return array_filter($targets, $isCaughtName) !== [] ? -1 : 0;
         }
 
-        // `foreach ($items as $error)` rebinds the name, though the loop's own expression runs first and may read it.
+        // A foreach target can rebind the caught name, while the iterable expression may read it first.
         if ($node instanceof Stmt\Foreach_ && ($isCaughtName($node->keyVar) || $isCaughtName($node->valueVar))) {
             return $this->firstUseOf($node->expr, $variableName) === true ? 1 : -1;
         }

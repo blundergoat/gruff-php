@@ -17,11 +17,9 @@ use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Node\Expr;
 
 /**
- * Flags the `@` error-suppression operator, which silences whatever failure the expression hits and leaves
- * the user staring at a blank result with no clue why an operation quietly did nothing.
- *
- * Runs per file over every suppression node. Warning, high confidence - the operator is an unambiguous AST
- * node, and modernisation is a secondary pillar since explicit error handling is the modern replacement.
+ * Flags each `@` error-suppression node with one warning and high confidence in identifying the operator.
+ * Does not establish whether the expression fails or which diagnostics are suppressed.
+ * Recommends explicit error handling, with modernisation as a secondary pillar.
  */
 final class ErrorSuppressionRule implements RuleInterface
 {
@@ -37,7 +35,7 @@ final class ErrorSuppressionRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // High confidence: the `@` operator is an unambiguous AST node, so the gate can rely on this warning.
+        // High confidence: the error-suppression operator is an unambiguous AST node.
         return new RuleDefinition(
             id:               self::ID,
             name:             'Error suppression operator',
@@ -53,7 +51,7 @@ final class ErrorSuppressionRule implements RuleInterface
      * Reports each `@`-suppressed expression that can hide a runtime failure.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext - Unused; the rule interface requires it, and this rule reads no options or project root.
      *
      * @return list<Finding> - One finding per `@`-suppressed expression in the unit.
      */
@@ -61,7 +59,7 @@ final class ErrorSuppressionRule implements RuleInterface
     {
         $findings = [];
 
-        // Flag every `@`-suppressed expression in the file.
+
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\ErrorSuppress::class) as $node) {
             $findings[] = new Finding(
                 ruleId:           self::ID,

@@ -5,54 +5,47 @@ declare(strict_types=1);
 namespace GruffPhp\Rules\Docs;
 
 /**
- * Shared PHPDoc tag-text helpers for the documentation rules. Strips docblock framing into content
- * lines, locates the body of an `@return` tag, decides whether a return type is followed by a real
- * description, and decides whether a whole docblock is nothing but bare `@param`/`@return` tags.
+ * Provides shared PHPDoc tag-text checks for documentation rules, including bare parameters and return descriptions.
+ * Keeps tag parsing and the definition of a bare-tags-only docblock consistent across these rules.
  *
- * BarePhpdocTagsRule (tags-only docblock detection) and ReturnCommentRule (described-`@return`
- * enforcement) both need the same generics-tolerant "is there prose after the type" check and the
- * same tags-only definition, so they live here once: a function or method's tags-only block is reported by
- * docs.bare-phpdoc-tags alone, and the other docs rules skip it rather than report it twice; a bound closure's
- * tags-only block, which docs.bare-phpdoc-tags never reads, stays with the describing rules.
+ * A method or function's wholly bare block is handled by docs.bare-phpdoc-tags alone.
+ * Other description rules skip those blocks to avoid duplicate findings.
+ * Bound closures' bare blocks stay with the description rules because docs.bare-phpdoc-tags excludes closures.
  */
 final readonly class PhpdocTagText
 {
     /**
-     * Reports whether prose follows a return type, tolerating spaces inside PHPDoc generic types so that
-     * `array<string, int>` is read as the type alone, not type-plus-description.
+     * Reports whether text follows the first top-level whitespace while ignoring whitespace inside balanced PHPDoc
+     * type brackets such as array<string, int>.
      *
      * @param string $body - text following `@return `, e.g. `array<string, int> remaining counts`, to scan
      *
-     * @return bool - true when a description follows the type; false when the type stands alone
+     * @return bool - true when text follows the first top-level whitespace; false when no such text is found
      */
     public static function hasReturnTagDescription(string $body): bool
     {
         $depth  = 0;
         $length = strlen($body);
 
-        // Walk the body character by character, tracking generic-bracket depth.
+        // Bracket depth prevents whitespace inside balanced type brackets from ending the type.
         for ($offset = 0; $offset < $length; $offset++) {
             $character = $body[$offset];
 
-            // An opening bracket enters a generic type.
             if (str_contains('<{[(', $character)) {
                 $depth++;
                 continue;
             }
 
-            // A closing bracket leaves the generic type.
             if (str_contains('>}])', $character) && $depth > 0) {
                 $depth--;
                 continue;
             }
 
             if ($depth === 0 && ctype_space($character)) {
-                // First space outside any generic brackets ends the type; description present if anything follows.
                 return trim(substr($body, $offset + 1)) !== '';
             }
         }
 
-        // Reached the end with no top-level space, so the type stood alone with no description.
         return false;
     }
 
@@ -62,27 +55,26 @@ final readonly class PhpdocTagText
      *
      * @param string $docText - raw docblock text including its `/**`, ` * `, and `*\/` framing
      *
-     * @return string|null - the type-and-description body after `@return` (an empty string when the tag
-     *   is present but carries nothing), or null when the docblock has no `@return` tag at all
+     * @return string|null - Type and description after the first @return; empty for a bodyless tag, or null when absent.
      */
     public static function returnTagBody(string $docText): ?string
     {
         $lines = self::contentLines($docText);
 
-        // Scan each content line for the return tag.
+
         foreach ($lines as $index => $line) {
             if ($line === '@return') {
-                // A lone `@return` with no type or prose: present but empty, so callers see no description.
+
                 return '';
             }
 
-            // A return tag carrying a body: gather the type and any continuation lines.
+
             if (str_starts_with($line, '@return ')) {
                 $bodyLines = [trim(substr($line, strlen('@return ')))];
 
-                // Continuation lines, until the next tag, extend a multiline array shape.
+
                 for ($offset = $index + 1, $count = count($lines); $offset < $count; $offset++) {
-                    // The next tag ends the return body.
+
                     if (str_starts_with($lines[$offset], '@')) {
                         break;
                     }
@@ -105,19 +97,18 @@ final readonly class PhpdocTagText
      *
      * @param string $docText - raw docblock text including its `/**`, ` * `, and `*\/` framing
      *
-     * @return bool - true when the block holds only bare param/return tags; false when it is empty, has
-     *   a summary or other prose line, or has any described or other tag
+     * @return bool - True for a non-empty block of bare @param/@return tags; false for prose, other tags, or descriptions.
      */
     public static function isBareTagsOnly(string $docText): bool
     {
         $lines = self::contentLines($docText);
 
-        // An empty docblock carries no tags, so it is not a tags-only block.
+
         if ($lines === []) {
             return false;
         }
 
-        // Any prose line, other tag, or described tag means the block is not bare.
+
         foreach ($lines as $line) {
             if (!self::isBareParamOrReturnTag($line)) {
                 return false;
@@ -133,15 +124,13 @@ final readonly class PhpdocTagText
      *
      * @param string $docText - raw docblock text including its `/**`, ` * `, and `*\/` framing
      *
-     * @return list<string> - each bare tag's parameter name without `$`, in docblock order; empty when every
-     *   `@param` tag is described or names no variable
+     * @return list<string> - Bare tag names without $, in docblock order; duplicates retained; empty when no qualifying tag exists.
      */
     public static function bareParamTagNames(string $docText): array
     {
         $lines = self::contentLines($docText);
         $names = [];
 
-        // Scan each content line for a param tag.
         foreach ($lines as $index => $line) {
             // Only `@param` itself counts; `@param-out` and similar tags document something else.
             if (preg_match('/^@param(?:\s|$)/', $line) !== 1) {
@@ -150,9 +139,9 @@ final readonly class PhpdocTagText
 
             $bodyLines = [trim(substr($line, strlen('@param')))];
 
-            // Continuation lines, until the next tag, extend a multiline array shape or description.
+
             for ($offset = $index + 1, $count = count($lines); $offset < $count; $offset++) {
-                // The next tag ends this param body.
+
                 if (str_starts_with($lines[$offset], '@')) {
                     break;
                 }
@@ -162,7 +151,7 @@ final readonly class PhpdocTagText
 
             $name = self::bareParamName(trim(implode("\n", $bodyLines)));
 
-            // Record only a tag that names its variable and carries nothing after it.
+
             if ($name !== null) {
                 $names[] = $name;
             }
@@ -177,25 +166,23 @@ final readonly class PhpdocTagText
      *
      * @param string $body - text following `@param`: an optional type, the variable, then any description, to scan
      *
-     * @return string|null - the parameter name without `$` when the tag stops at its variable; null when a
-     *   description follows or the tag names no variable
+     * @return string|null - Parameter name without $ if no description follows; null for described or missing variables.
      */
     private static function bareParamName(string $body): ?string
     {
         $depth  = 0;
         $length = strlen($body);
 
-        // Walk the body character by character, tracking generic-bracket depth.
         for ($offset = 0; $offset < $length; $offset++) {
             $character = $body[$offset];
 
-            // An opening bracket enters a type shape.
+
             if (str_contains('<{[(', $character)) {
                 $depth++;
                 continue;
             }
 
-            // A closing bracket leaves the type shape.
+
             if (str_contains('>}])', $character) && $depth > 0) {
                 $depth--;
                 continue;
@@ -208,32 +195,30 @@ final readonly class PhpdocTagText
             }
         }
 
-        // No variable at depth zero: there is no parameter this tag could name.
+
         return null;
     }
 
     /**
-     * Reports whether one PHPDoc line is a `@param` or `@return` tag with a type but no description.
+     * Reports whether one PHPDoc line matches this rule's supported bare @param or @return shape.
      *
      * @param string $line - single trimmed docblock line, already stripped of comment markers, to classify
      *
-     * @return bool - true when the line is a bare parameter or return tag; false for prose, other tags,
-     *   and described tags
+     * @return bool - True for a supported bare tag shape; false for other lines or text classified as a description.
      */
     private static function isBareParamOrReturnTag(string $line): bool
     {
-        // Match @param tags that end at the variable name with no descriptive prose.
+        // A terminal parameter variable is the rule's supported bare @param shape.
         if (preg_match('/^@param\s+\S+(?:\s+\S+)*\s+\$\w+\s*$/', $line) === 1) {
-            // A @param stopping at the variable name carries no description, so it is bare.
             return true;
         }
 
         if (!str_starts_with($line, '@return ')) {
-            // Lines that are neither a bare @param nor a @return cannot be a bare return tag.
+
             return false;
         }
 
-        // A @return is bare exactly when no prose follows its type, so negate the description check.
+
         return !self::hasReturnTagDescription(trim(substr($line, strlen('@return '))));
     }
 
@@ -246,6 +231,7 @@ final readonly class PhpdocTagText
      */
     private static function contentLines(string $docText): array
     {
+        // Normalize docblock lines for tag classification; literal stars inside the text are omitted from the returned content.
         $stripped = preg_replace('/\/\*\*|\*\/|\*/', '', $docText) ?? $docText;
         $stripped = trim($stripped);
 

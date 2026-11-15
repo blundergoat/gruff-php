@@ -20,19 +20,16 @@ use GruffPhp\Results\Scoring\ScoreReport;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers Markdown reporter rendering: the canonical cross-port Pillars table
- * (7 columns: pillar, grade, score, findings, advisory, warning, error) shared
- * with the Go/Python/Rust/TypeScript reporters, including header shape, score
- * formatting, sort order, and graceful handling of empty / non-applicable
- * pillar inputs.
+ * Tests the seven-column Markdown Pillars header, separator, and section order.
+ * Covers row ordering, score formatting, supplied severity counts, and omitted or ungraded pillars.
+ * Checks the placeholder row, escaped pillar identifiers, and output equivalence with action metadata.
  */
 final class MarkdownReporterTest extends TestCase
 {
     /**
-     * Verify Markdown reporter renders the canonical 7-column Pillars header
-     * and separator near the top of the report, before the Findings section.
+     * Verify the seven-column Pillars header and separator are present and the Pillars heading precedes Findings.
      *
-     * @return void
+     * @return void - Asserts header and separator text plus heading order.
      */
     public function testMarkdownReporterRendersCanonicalPillarsHeader(): void
     {
@@ -69,12 +66,10 @@ final class MarkdownReporterTest extends TestCase
     }
 
     /**
-     * Verify Markdown reporter renders pillar rows sorted by findings DESC,
-     * then pillar ASC, with scores formatted to two decimals, mirroring the
-     * cross-port canonical block. The expected block is asserted as a single
-     * string so the row order is verified by exact match.
+     * Verify pillar rows sort by descending finding count, then ascending name, with two-decimal scores.
+     * The expected table block must occur contiguously in the rendered report.
      *
-     * @return void
+     * @return void - Asserts the expected row order, counts, grades, and formatted scores.
      */
     public function testMarkdownReporterSortsPillarsByFindingsDescThenNameAsc(): void
     {
@@ -113,11 +108,9 @@ final class MarkdownReporterTest extends TestCase
     }
 
     /**
-     * Verify Markdown reporter skips non-applicable pillars (for example the
-     * mutation pillar when no Infection report is supplied) so the canonical
-     * table never carries rows the analyser flagged as inapplicable.
+     * Verify the supplied inapplicable mutation pillar is omitted while the applicable documentation row is rendered.
      *
-     * @return void
+     * @return void - Asserts the documentation row is present and the mutation row is absent.
      */
     public function testMarkdownReporterOmitsNonApplicablePillars(): void
     {
@@ -144,11 +137,9 @@ final class MarkdownReporterTest extends TestCase
     }
 
     /**
-     * Verify Markdown reporter renders an `_(none)_` placeholder row when no
-     * applicable pillars are available, so the column layout stays parsable by
-     * downstream PR-comment scrapers even on a zero-pillar run.
+     * Verify a placeholder row is rendered when the only supplied pillar is inapplicable.
      *
-     * @return void
+     * @return void - Asserts the seven-cell placeholder row is present.
      */
     public function testMarkdownReporterRendersPlaceholderRowWhenNoApplicablePillars(): void
     {
@@ -173,11 +164,9 @@ final class MarkdownReporterTest extends TestCase
     }
 
     /**
-     * Verify Markdown reporter sources pillar data from the existing
-     * {@see PillarScore} entries without recomputing per-severity counts when
-     * the supplied counts diverge from the raw finding list.
+     * Verify Markdown uses supplied {@see PillarScore} counts instead of recomputing them from empty findings.
      *
-     * @return void
+     * @return void - Asserts the supplied finding and severity counts appear despite an empty finding list.
      */
     public function testMarkdownReporterReusesPillarScoreSeverityCounts(): void
     {
@@ -202,10 +191,9 @@ final class MarkdownReporterTest extends TestCase
     }
 
     /**
-     * Verify Markdown reporter renders `n/a` grade and score cells when the
-     * supplied {@see PillarScore} has no grade attached.
+     * Verify Markdown renders n/a grade and score cells when the supplied {@see PillarScore} has no grade attached.
      *
-     * @return void
+     * @return void - Asserts both grade and score cells contain n/a for the ungraded pillar.
      */
     public function testMarkdownReporterRendersNotApplicableGradeWhenGradeMissing(): void
     {
@@ -230,10 +218,9 @@ final class MarkdownReporterTest extends TestCase
     }
 
     /**
-     * Verify Markdown reporter escapes pipe characters in pillar identifiers
-     * so a future pillar name carrying `|` cannot break the surrounding row.
+     * Verify the pipe in the supplied pillar identifier is escaped in the rendered row.
      *
-     * @return void
+     * @return void - Asserts the expected row contains the escaped a|b identifier.
      */
     public function testMarkdownReporterEscapesPipeCharactersInPillarCells(): void
     {
@@ -258,9 +245,9 @@ final class MarkdownReporterTest extends TestCase
     }
 
     /**
-     * Verify action metadata does not alter the family-frozen Markdown finding block.
+     * Verify action metadata leaves the rendered Markdown unchanged for otherwise identical findings.
      *
-     * @return void
+     * @return void - Asserts equality of the complete renders for the plain and classified findings.
      */
     public function testRemediationActionMetadataDoesNotChangeMarkdownOutput(): void
     {
@@ -287,9 +274,7 @@ final class MarkdownReporterTest extends TestCase
     }
 
     /**
-     * Build an analysis report fixture for renderer assertions; either uses
-     * the supplied {@see ScoreReport} or derives one from the supplied
-     * findings via {@see ScoreCalculator}.
+     * Build a Markdown fixture from the supplied {@see ScoreReport} or a score derived from the findings via {@see ScoreCalculator}.
      *
      * @param list<Finding>    $findings - Findings to render in the markdown fixture report.
      * @param ScoreReport|null $score - Precomputed score to use, or null to derive one from the findings.

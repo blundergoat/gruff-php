@@ -17,15 +17,13 @@ use PhpParser\Node\Expr\ArrowFunction;
 use PhpParser\Node\Expr\Closure;
 
 /**
- * Flags a documented function or method whose `@param` tags state a type and name but no description, once per
- * declaration, naming every such parameter.
+ * Flags existing @param tags without descriptions, reporting all affected names once per declaration.
  *
- * The parameter sibling of docs.return-comment: a docblock with a summary or a described tag over a bare
- * `@param Type $name` trips neither docs.missing-param-tag (presence is satisfied) nor docs.bare-phpdoc-tags
- * (the docblock is not tags-only). It stays silent when there is no docblock, and on a wholly tags-only
- * function or method docblock, which docs.bare-phpdoc-tags already reports, so one docblock is never reported
- * by both; with `everyCallable` on, a bound closure's tags-only block is still checked because
- * docs.bare-phpdoc-tags never reads closures. Off by default; advisory when enabled.
+ * A summary or described tag leaves any bare @param tags for this rule.
+ * A wholly bare @param/@return block on a method or function belongs to docs.bare-phpdoc-tags.
+ *
+ * The everyCallable option also checks bound closures and arrow functions, including their bare-tags-only blocks.
+ * Missing docblocks and missing tags are handled elsewhere; this rule is enabled by default at advisory severity.
  */
 final readonly class ParamCommentRule implements RuleInterface
 {
@@ -41,7 +39,7 @@ final readonly class ParamCommentRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // High confidence: a @param tag with nothing after its variable is unambiguous; off by default so teams opt in.
+        // High confidence: a @param tag with nothing after its variable is unambiguous; enabled by default so each tag describes its parameter.
         return new RuleDefinition(
             id:                 self::ID,
             name:               'Described param tag',
@@ -49,30 +47,30 @@ final readonly class ParamCommentRule implements RuleInterface
             tier:               RuleTier::V01,
             defaultSeverity:    Severity::Advisory,
             confidence:         Confidence::High,
-            isEnabledByDefault: false,
+            isEnabledByDefault: true,
             defaultOptions:     [DocumentedCallables::EVERY_CALLABLE => false],
             optionDescriptions: [DocumentedCallables::EVERY_CALLABLE => DocumentedCallables::EVERY_CALLABLE_DESCRIPTION],
-            description:        'A function or method must describe each parameter in its @param tag, not just restate the type and name, so a reviewer can check what a caller must pass. Fires once per declaration whose docblock has a @param tag with nothing after the variable, naming every such parameter. Silent without a docblock; missing @param tags are owned by docs.missing-param-tag, and a function or method docblock made only of bare @param and @return tags, with no summary or other tag, by docs.bare-phpdoc-tags. With `everyCallable`, also closures and arrow functions bound to a name, read from the docblock above the assignment, bare-tags-only blocks included. Off by default; enable it via .gruff-php.yaml.',
+            description:        'A function or method must describe each parameter in its @param tag, not just restate the type and name, so a reviewer can check what a caller must pass. Fires once per declaration whose docblock has a @param tag with nothing after the variable, naming every such parameter. Silent without a docblock; missing @param tags are owned by docs.missing-param-tag, and a function or method docblock made only of bare @param and @return tags, with no summary or other tag, by docs.bare-phpdoc-tags. With `everyCallable`, also closures and arrow functions bound to a name, read from the docblock above the assignment, bare-tags-only blocks included. Enabled by default; opt out via rules.docs.param-comment.enabled: false.',
         );
     }
 
     /**
-     * Reports each documented function-like whose docblock carries at least one undescribed `@param` tag.
+     * Reports documented callables with undescribed @param tags, except tags-only methods and functions owned by docs.bare-phpdoc-tags.
      *
      * @param AnalysisUnit $unit    - parsed unit to inspect
-     * @param RuleContext  $context - rule context for this analysis pass
+     * @param RuleContext  $context - supplies callable-selection options for this rule
      *
-     * @return list<Finding> - one finding per declaration, naming every parameter whose `@param` tag is bare
+     * @return list<Finding> - One finding per declaration, naming every parameter whose @param tag is bare.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
         $findings   = [];
 
-        // Check every method and function in the file, plus bound closures when everyCallable is on.
+
         foreach (DocumentedCallables::inUnit($unit, $context, $definition) as ['node' => $node, 'doc' => $docComment, 'symbol' => $symbol]) {
             if ($docComment === null) {
-                // No docblock means no @param tag to describe.
+
                 continue;
             }
 
@@ -85,7 +83,6 @@ final readonly class ParamCommentRule implements RuleInterface
             $bareNames = PhpdocTagText::bareParamTagNames($docComment->getText());
 
             if ($bareNames === []) {
-                // Every @param tag carries a description, or there is none to check.
                 continue;
             }
 

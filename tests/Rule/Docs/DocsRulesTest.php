@@ -18,17 +18,17 @@ use GruffPhp\Rules\Docs\ReturnCommentRule;
 use GruffPhp\Rules\RuleRegistry;
 
 /**
- * Covers documentation rule enforcement: missing PHPDoc on public/accessor/private/magic/interface-contract methods, and missing param and return
- * tags across array, descriptive, void, and scalar-throws cases.
+ * Covers missing PHPDoc and required parameter and return tags on methods and inherited contracts.
+ * Checks finding symbols and messages, including signature details and malformed or multiline tags.
+ * Covers parameter and return descriptions and their handoff to the rule for wholly bare tag blocks.
  */
 final class DocsRulesTest extends DocsRuleTestCase
 {
     /**
-     * Verify an inherited contract satisfies the return and param tags only for what it really declares, whether a
-     * same-file ancestor documents it or `{@inheritdoc}` or `#[Override]` points elsewhere, and that the return-tag
-     * message asks only for the tag.
+     * Verify same-file ancestors, inheritdoc markers and Override attributes supply only the contracts they declare.
+     * Confirm unmatched contracts still report findings and the return-tag message asks only for the tag.
      *
-     * @return void
+     * @return void - Asserts inherited-tag exemptions, remaining findings, and the return-tag message.
      */
     public function testInheritedContractsSatisfyReturnAndParamTags(): void
     {
@@ -48,11 +48,11 @@ final class DocsRulesTest extends DocsRuleTestCase
         sort($returnSymbols);
         sort($paramSymbols);
 
-        // Only what a visible or marked contract really documents is exempt: find(), count(), exists(), purge() and
-        // AuditedRepository::save() stay silent, while a constructor, a parameter the override adds, a parent with
-        // prose only, a prose mention of @inheritdoc, a marker with nothing to inherit, a same-named class in another
-        // namespace, a namespaced Override attribute, a method whose parent's run() is private, and a parameter a
-        // parent never documents under that name all still owe their tags; an extending interface's marker holds.
+        // Ancestor tags cover returns and parameters matched by name or position; constructor parameters and the added $audit need local tags.
+        // Prose mentions, markers without ancestry, and private parent methods do not supply inherited tags.
+        // Unrelated short-name matches and namespaced Override attributes are ignored; extending interfaces can inherit tags.
+
+
         self::assertSame([
             'AuditedRepository::rename()',
             'HalfDocumentedPair::pair()',
@@ -88,9 +88,9 @@ final class DocsRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify undocumented methods of every supported kind report, while a documented method stays quiet.
+     * Verify undocumented fixture methods are reported while the documented method produces no finding.
      *
-     * @return void
+     * @return void - Asserts the exact missing-PHPDoc symbols and error severity.
      */
     public function testMissingPhpdocDetected(): void
     {
@@ -122,7 +122,7 @@ final class DocsRulesTest extends DocsRuleTestCase
     /**
      * Verify the missing-PHPDoc message names every parameter of an undocumented private method and never calls it public.
      *
-     * @return void
+     * @return void - Asserts the parameter list and absence of public-method wording.
      */
     public function testMissingPhpdocMessageNamesEachParameter(): void
     {
@@ -133,10 +133,10 @@ final class DocsRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify the message asks for the return value only when the declaration yields one, and that a method with no
-     * parameters, no value and no throw keeps the exact message it had before this change.
+     * Verify typed and untyped value-returning methods request return descriptions.
+     * Check the exact message for a void method with no parameters or throws.
      *
-     * @return void
+     * @return void - Asserts return-value hints and the complete message for the empty void method.
      */
     public function testMissingPhpdocMessageAsksForReturnValueOnlyWhenOneExists(): void
     {
@@ -153,7 +153,7 @@ final class DocsRulesTest extends DocsRuleTestCase
     /**
      * Verify the message asks when the callable throws only for a throw in its own body, not one inside a nested closure.
      *
-     * @return void
+     * @return void - Asserts the direct-throw hint and its absence for the nested closure.
      */
     public function testMissingPhpdocMessageAsksForThrowsOnlyWhenTheBodyThrows(): void
     {
@@ -164,10 +164,9 @@ final class DocsRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify missing param tag recognises multi-line `@param array{...}` shapes whose closing documented
-     * variable sits on a different physical line than the `@param` token.
+     * Verify multiline array-shape @param tags are recognised when the variable follows the closing type line.
      *
-     * @return void
+     * @return void - Asserts valid multiline parameter tags are accepted and a malformed tag is reported.
      */
     public function testMissingParamTagRecognisesMultiLineArrayShape(): void
     {
@@ -181,7 +180,7 @@ final class DocsRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Build `symbol|parameter` rows for findings whose metadata identifies a parameter.
+     * Build symbol|parameter rows for findings whose metadata identifies a parameter.
      *
      * @param list<\GruffPhp\Results\Finding\Finding> $findings - Findings from a missing-param-tag fixture.
      *
@@ -203,9 +202,9 @@ final class DocsRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify missing param tag detected for array parameters.
+     * Verify array parameters require explicit @param documentation.
      *
-     * @return void
+     * @return void - Asserts the undocumented array parameter is named in a finding.
      */
     public function testMissingParamTagDetectedForArrayParameters(): void
     {
@@ -221,10 +220,9 @@ final class DocsRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify missing param tag detected for documented methods even when signature type describes
-     * parameter.
+     * Verify that the fixture's documented method needs a parameter tag even when its signature supplies the type.
      *
-     * @return void
+     * @return void - Asserts a natively typed parameter still receives a missing-tag finding.
      */
     public function testMissingParamTagDetectedForDocumentedMethodsEvenWhenSignatureTypeDescribesParameter(): void
     {
@@ -240,9 +238,9 @@ final class DocsRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify missing param tag detected when throws doc omits scalar param.
+     * Verify an @throws tag does not replace the scalar parameter's required @param tag.
      *
-     * @return void
+     * @return void - Asserts exception documentation does not exempt the scalar parameter from a tag.
      */
     public function testMissingParamTagDetectedWhenThrowsDocOmitsScalarParam(): void
     {
@@ -258,9 +256,9 @@ final class DocsRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify missing param tag detected for descriptive docblock.
+     * Verify prose in a method docblock does not replace its required @param tag.
      *
-     * @return void
+     * @return void - Asserts the prose-only method receives a finding naming its parameter.
      */
     public function testMissingParamTagDetectedForDescriptiveDocblock(): void
     {
@@ -276,9 +274,9 @@ final class DocsRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify complete param tag not flagged.
+     * Verify a complete set of @param tags produces no missing-parameter finding.
      *
-     * @return void
+     * @return void - Asserts the fully tagged method is absent from missing-parameter findings.
      */
     public function testCompleteParamTagNotFlagged(): void
     {
@@ -289,9 +287,9 @@ final class DocsRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify generic param tags with spaces are not flagged.
+     * Verify spaces inside generic parameter types do not hide otherwise valid @param tags.
      *
-     * @return void
+     * @return void - Asserts generic parameter types containing spaces are accepted.
      */
     public function testGenericParamTagsWithSpacesAreNotFlagged(): void
     {
@@ -302,9 +300,9 @@ final class DocsRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify missing return tag detected for array return types.
+     * Verify an array return type still requires an explicit @return tag.
      *
-     * @return void
+     * @return void - Asserts the array-returning method receives a missing-return-tag finding.
      */
     public function testMissingReturnTagDetectedForArrayReturnTypes(): void
     {
@@ -315,9 +313,9 @@ final class DocsRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify missing return tag detected when signature fully describes return.
+     * Verify a native return type does not replace its required @return tag.
      *
-     * @return void
+     * @return void - Asserts a native scalar return type does not replace its required tag.
      */
     public function testMissingReturnTagDetectedWhenSignatureFullyDescribesReturn(): void
     {
@@ -328,9 +326,9 @@ final class DocsRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify missing return tag detected for descriptive docblock.
+     * Verify descriptive prose does not replace a method's required @return tag.
      *
-     * @return void
+     * @return void - Asserts the prose-only method receives a missing-return-tag finding.
      */
     public function testMissingReturnTagDetectedForDescriptiveDocblock(): void
     {
@@ -341,9 +339,9 @@ final class DocsRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify any documented method requires return tag.
+     * Verify marker-only and private method docblocks need return tags, while a tagged private method is accepted.
      *
-     * @return void
+     * @return void - Asserts marker and private-method return findings plus the marker's parameter exemption.
      */
     public function testAnyDocumentedMethodRequiresReturnTag(): void
     {
@@ -360,17 +358,17 @@ final class DocsRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify void method with docblock triggers missing return tag.
+     * Verify documented void and never methods still require an explicit return tag.
      *
-     * @return void
+     * @return void - Asserts missing-return findings for both no-value declaration types.
      */
     public function testVoidMethodWithDocblockTriggersMissingReturnTag(): void
     {
-        // Policy lock: per .goat-flow/learning-loop/lessons/workflow.md "Respect explicit rule style
-        // even when it restates native syntax", every documented method without @return
-        // must fire - including methods declared void or never. Skipping void was an
-        // unintended narrowing; explicit void/never fixtures lock the broader contract
-        // so a future agent cannot silently re-narrow it.
+        // Policy: explicit void/never fixtures lock the broader contract requiring return tags for no-value methods.
+        // See .goat-flow/learning-loop/lessons/workflow.md: "Respect explicit rule style even when it restates native syntax".
+
+
+
         $findings = $this->analyseRule('phpdoc-tags.php', MissingReturnTagRule::ID);
 
         $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
@@ -379,9 +377,9 @@ final class DocsRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify the rule fires only on value-returning declarations whose @return tag has no description.
+     * Verify the rule reports only value-returning declarations whose @return tag has no description.
      *
-     * @return void
+     * @return void - Asserts the exact bare-return symbols and advisory severity.
      */
     public function testReturnDescriptionFiresOnlyOnBareValueReturnTags(): void
     {
@@ -401,9 +399,9 @@ final class DocsRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify the rule stays silent on described, void/never, constructor/destructor, and missing-tag cases.
+     * Verify the rule does not report described, void/never, constructor/destructor, or missing-tag cases.
      *
-     * @return void
+     * @return void - Asserts each exempt fixture symbol is absent from return-description findings.
      */
     public function testReturnDescriptionStaysSilentOutsideItsContract(): void
     {
@@ -425,10 +423,10 @@ final class DocsRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify a wholly tags-only docblock is reported once, by docs.bare-phpdoc-tags, while a summary over a bare
-     * `@return` still reports under docs.return-comment (M13-T23).
+     * Verify bare parameter/return blocks belong to docs.bare-phpdoc-tags.
+     * Check that adding a summary leaves a bare return tag for docs.return-comment.
      *
-     * @return void
+     * @return void - Asserts the two rules report disjoint, exact fixture symbol lists.
      */
     public function testReturnDescriptionLeavesTagsOnlyBlocksToBarePhpdocTags(): void
     {
@@ -481,7 +479,7 @@ PHP;
     /**
      * Verify multiline array-shape return tags are scanned through their closing type line.
      *
-     * @return void
+     * @return void - Asserts both tag bodies are found and their description states differ.
      */
     public function testReturnTagTextReadsMultilineReturnDescriptions(): void
     {
@@ -518,7 +516,7 @@ PHPDOC;
     /**
      * Verify the described-return contract holds on the shared, realistic phpdoc-tags fixture.
      *
-     * @return void
+     * @return void - Asserts the exact bare-return findings and absence of complete, described, or void cases.
      */
     public function testReturnDescriptionFiresOnRealisticBareReturnTags(): void
     {
@@ -526,8 +524,8 @@ PHPDOC;
         $symbols  = array_map(static fn($finding): ?string => $finding->symbol, $findings);
         sort($symbols);
 
-        // M13-T23: arrayShapeDoc() and uselessDoc() are wholly tags-only docblocks, which docs.bare-phpdoc-tags
-        // reports, so docs.return-comment no longer reports them a second time.
+        // Wholly bare tag blocks belong to docs.bare-phpdoc-tags, so this rule must not report arrayShapeDoc() or uselessDoc().
+
         self::assertSame([
                              'PhpdocTagsFixture::missingArrayParam()',
                              'PhpdocTagsFixture::missingParam()',
@@ -540,10 +538,10 @@ PHPDOC;
     }
 
     /**
-     * Verify docs.param-comment, once enabled, reports one finding per declaration naming every bare `@param`, reads
-     * past callable and multiline array-shape types, and leaves described tags alone (M13-T24).
+     * Verify docs.param-comment names all bare parameters in one finding per declaration.
+     * Check callable and multiline array-shape tags without reporting described parameters.
      *
-     * @return void
+     * @return void - Asserts one message per affected declaration, naming only its bare parameters.
      */
     public function testParamCommentNamesEveryBareParamOncePerDeclaration(): void
     {
@@ -561,10 +559,9 @@ PHPDOC;
     }
 
     /**
-     * Verify docs.param-comment shares the tags-only predicate, so a wholly tags-only docblock is reported once, by
-     * docs.bare-phpdoc-tags (M13-T24).
+     * Verify a bare tags-only function is omitted by docs.param-comment and reported by docs.bare-phpdoc-tags.
      *
-     * @return void
+     * @return void - Asserts tagsOnly() is absent from parameter-description findings and is the sole bare-tag finding.
      */
     public function testParamCommentLeavesTagsOnlyBlocksToBarePhpdocTags(): void
     {
@@ -582,13 +579,17 @@ PHPDOC;
     }
 
     /**
-     * Verify docs.param-comment is off by default, so default settings report nothing new (M13-T24).
+     * Verify parameter descriptions are checked by default and an explicit rule disablement remains effective.
      *
-     * @return void
+     * @return void - Asserts three findings by default and none when the rule is disabled.
      */
-    public function testParamCommentIsOffByDefault(): void
+    public function testParamCommentIsOnByDefaultAndCanBeDisabled(): void
     {
-        self::assertSame([], $this->analyseSourceRule($this->paramCommentSource(), ParamCommentRule::ID));
+        self::assertCount(3, $this->analyseSourceRule($this->paramCommentSource(), ParamCommentRule::ID));
+        $config   = AnalysisConfig::fromRegistry(RuleRegistry::defaults());
+        $settings = $config->ruleSettings(ParamCommentRule::ID);
+        $config   = $config->withRuleSettings(ParamCommentRule::ID, new RuleSettings(false, $settings->thresholds, $settings->options));
+        self::assertSame([], $this->analyseSourceRule($this->paramCommentSource(), ParamCommentRule::ID, $config));
     }
 
     /**
@@ -607,7 +608,7 @@ PHPDOC;
     }
 
     /**
-     * Returns inline source covering bare, described, callable-typed, array-shaped and tags-only `@param` tags.
+     * Returns inline source covering bare, described, callable-typed, array-shaped and tags-only @param tags.
      *
      * @return string - PHP source for the docs.param-comment tests
      */
@@ -729,7 +730,7 @@ PHP;
 
         $messages = [];
 
-        // Key each message by its method symbol so a test reads the one it pins.
+
         foreach ($this->analyseSourceRule($source, MissingPhpdocRule::ID) as $finding) {
             $messages[(string) $finding->symbol] = $finding->message;
         }

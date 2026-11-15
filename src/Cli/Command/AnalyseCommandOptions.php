@@ -17,16 +17,9 @@ use GruffPhp\Output\Reporter\FindingDisplayFilter;
 use Symfony\Component\Console\Input\InputInterface;
 
 /**
- * Immutable bag of every validated flag a user typed after `gruff-php analyse`.
- *
- * `fromInput()` normalises the raw console options into this object once, capturing a usage error
- * if any flag is rejected so the command can reject a contradictory combination (say `--no-config`
- * next to `--config`) with a single clear line instead of starting a scan that would mislead.
- * The `with*` methods hand back adjusted copies as later stages fill in the mutation budget or
- * the project's default baseline, and the accessor methods give the run its rule selection,
- * scored pillars, and the display filter the reporter uses. Reach for this whenever you need to
- * know what the user actually asked analyse to do; the `report` command reuses the static
- * profile checks so a forwarded `--profile` is rejected the same way before any subprocess runs.
+ * Immutable analyse options, defaults, and any captured parsing error.
+ * fromInput() collects console values; usageError() checks supported combinations before a scan.
+ * Copy methods resolve later inputs, while profile and display helpers expose choices to command stages.
  */
 final readonly class AnalyseCommandOptions
 {
@@ -41,32 +34,32 @@ final readonly class AnalyseCommandOptions
     private const PROFILE_SECURITY = 'security';
 
     /**
-     * Holds the fully parsed, validated option set; callers build it through `fromInput()` rather
-     * than by hand so the usage-error capture and flag normalisation all live in one place.
+     * Stores parsed values and defaults; construction does not check flag combinations.
+     * Use fromInput() to parse console input and usageError() to check supported combinations.
      *
-     * @param list<string>                                            $paths                  - Files or directories the user named; empty means none were given, so the whole project is scanned.
-     * @param bool                                                    $shouldIncludeIgnored   - Set by `--include-ignored`; when true, files the ignore rules would skip are scanned anyway.
-     * @param string|null                                             $configPath             - Explicit `--config` path, or null when none was given so the default `.gruff-php.yaml` is discovered.
-     * @param bool                                                    $noConfig               - Set by `--no-config`; when true, no YAML config is loaded and registry defaults run instead.
-     * @param bool                                                    $noCache                - Set by `--no-cache`; when true, the run ignores the on-disk cache and re-analyses every file.
-     * @param string                                                  $profile                - The `--profile` value ('default' or 'security') deciding which rules run.
-     * @param MutationAnalysisOptions                                 $mutation               - Parsed `--infection-*` and `--mutation-*` options driving mutation analysis.
-     * @param ChangeScopeOptions                                      $changeScope            - The `--diff`, `--since`, `--changed-ranges`, `--changed-scope`, `--diff-vs`, and `--changed-only` choices that narrow the run.
-     * @param string|null                                             $historyFile            - Trend-history file from `--history-file`, or null when the user is not recording a trend.
-     * @param bool                                                    $noBaseline             - Set by `--no-baseline`; when true, no baseline loads so previously accepted debt surfaces again.
-     * @param BaselineApplicationOptions                              $baseline               - Parsed `--baseline` and `--generate-baseline` options.
-     * @param string                                                  $reportEditorLink       - Editor-link style from `--report-editor-link`: none, vscode, or phpstorm.
-     * @param bool                                                    $isReportInteractive    - Set by `--report-interactive`; when true, the report offers interactive prompts.
-     * @param string|null                                             $pathsRelativeTo        - Base path from `--paths-relative-to` for display, or null when paths are shown as discovered.
-     * @param string|null                                             $minSeverity            - Severity floor from `--min-severity`, or null when every severity is shown.
-     * @param list<string>                                            $includePillars         - Pillars from `--include-pillar`; empty means no include filter, so every pillar shows.
-     * @param list<string>                                            $excludePillars         - Pillars from `--exclude-pillar`; empty means nothing is filtered out of the report.
-     * @param list<string>                                            $includeRules           - Rule IDs from `--include-rule` the run executes exclusively; empty means every configured rule runs. Enforced at execution level, like the hook command.
-     * @param list<string>                                            $excludeRules           - Rule IDs from `--exclude-rule` that do not run at all; empty means nothing is excluded.
-     * @param PresentationSelectors                                   $presentation           - The four family flags that decide what the report shows and nothing else.
-     * @param string|null                                             $minConfidence          - Confidence floor from `--min-confidence`; null means every confidence reaches the exit gate.
-     * @param array{enabled: bool, maxLines: int, maxBytes: int}|null $deepScanBudgetOverride - Parsed CLI budget override, or null when config/defaults govern.
-     * @param string|null                                             $optionError            - A usage error found while parsing (the last failing check wins), or null when every flag was accepted.
+     * @param list<string> $paths - Requested scan paths; empty means no explicit paths remain after parsing.
+     * @param bool $shouldIncludeIgnored - The parsed --include-ignored switch.
+     * @param string|null $configPath - Explicit --config path; null means no non-empty path was supplied.
+     * @param bool $noConfig - Requests a run without YAML configuration through --no-config.
+     * @param bool $noCache - Requests an uncached scan through --no-cache.
+     * @param string $profile - Requested profile; usageError() accepts default or security.
+     * @param MutationAnalysisOptions $mutation - Infection and mutation inputs, with the budget resolved separately.
+     * @param ChangeScopeOptions $changeScope - Changed-region and comparison choices, including the --diff-base alias.
+     * @param string|null $historyFile - File requested by --history-file; null means no CLI history file was supplied.
+     * @param bool $noBaseline - Whether --no-baseline was requested; suppresses default baseline adoption.
+     * @param BaselineApplicationOptions $baseline - Baseline application, generation, migration, and overwrite choices.
+     * @param string $reportEditorLink - Editor-link style from --report-editor-link: none, vscode, or phpstorm.
+     * @param bool $isReportInteractive - Whether interactive HTML finding filters were requested by --report-interactive.
+     * @param string|null $pathsRelativeTo - Display base from --paths-relative-to; null means no CLI override.
+     * @param string|null $minSeverity - CLI severity floor; null adds no CLI severity restriction.
+     * @param list<string> $includePillars - Pillars from --include-pillar; empty adds no restriction from this list.
+     * @param list<string> $excludePillars - Pillars from --exclude-pillar; empty adds no exclusions from this list.
+     * @param list<string> $includeRules - Canonical rule IDs requested by --include-rule; empty leaves this selector unset.
+     * @param list<string> $excludeRules - Canonical rule IDs requested by --exclude-rule; empty leaves this selector unset.
+     * @param PresentationSelectors $presentation - --show-* and --hide-* choices applied to report display.
+     * @param string|null $minConfidence - Confidence floor from --min-confidence; null means no CLI override.
+     * @param array{enabled: bool, maxLines: int, maxBytes: int}|null $deepScanBudgetOverride - CLI budget override; null defers to config/defaults.
+     * @param string|null $optionError - Last error captured by fromInput(); null when its parsing checks found none.
      */
     public function __construct(
         public array                      $paths,
@@ -101,17 +94,16 @@ final readonly class AnalyseCommandOptions
     }
 
     /**
-     * Turns everything the user typed after `gruff-php analyse` into one validated options bag,
-     * remembering a rejected flag so the command can stop before running a misleading scan.
-     * This is the single entry point; call it once per invocation rather than reading raw input.
+     * Collects console options and records recoverable parsing errors without rejecting the object.
+     * Call usageError() on the result before using flags that require validation.
      *
      * @param InputInterface $input - Console input to normalize into analyse options.
      *
-     * @return self - fully populated options bag whose optionError carries a usage error, if any.
+     * @return self - Parsed options; optionError holds the last error from the checks performed here.
      */
     public static function fromInput(InputInterface $input): self
     {
-        /** @var list<string> $paths The command definition declares a variadic paths argument. */
+        /** @var list<string> $paths - The command definition declares a variadic paths argument. */
         $paths               = $input->getArgument('paths');
         $filePaths           = self::repeatedStringOption($input, 'file');
         $configPath          = $input->getOption('config');
@@ -127,18 +119,18 @@ final readonly class AnalyseCommandOptions
             $deepScanBudget = null;
         }
 
-        // A string back from the `--file` parser means one occurrence was blank (`--file=`); hold that error and drop the unusable list.
+        // Retain the --file parsing error without carrying an invalid path list into the options.
         if (is_string($filePaths)) {
             $optionError = $filePaths;
             $filePaths   = [];
         }
 
-        // The user asked for an editor link we can't build (anything but none/vscode/phpstorm), so record the usage error.
+
         if (!in_array($reportEditorLink, ['none', 'vscode', 'phpstorm'], true)) {
             $optionError = '--report-editor-link must be one of: vscode, phpstorm, none.';
         }
 
-        // A string here means `--report-interactive` had an unrecognised value; keep the error and treat it as off.
+
         if (is_string($isReportInteractive)) {
             $optionError         = $isReportInteractive;
             $isReportInteractive = false;
@@ -146,7 +138,7 @@ final readonly class AnalyseCommandOptions
 
         $paths    = array_merge($paths, $filePaths);
         $diffMode = self::diffMode($input, $paths);
-        // A bare `-` selected stdin diff mode, so strip that placeholder out of the real file paths.
+        // A bare dash selected stdin diff mode, so strip that placeholder out of the real file paths.
         if ($diffMode === '-') {
             $paths = array_values(array_filter(
                                       $paths,
@@ -197,7 +189,7 @@ final readonly class AnalyseCommandOptions
             minSeverity:            self::optionalStringOption($input, 'min-severity'),
             includePillars:         self::stringListOption($input, 'include-pillar'),
             excludePillars:         self::stringListOption($input, 'exclude-pillar'),
-            // Rule flags accept a retired id, e.g. `--exclude-rule docs.missing-public-phpdoc`, and keep its replacement.
+            // Rule flags accept retired IDs such as --exclude-rule docs.missing-public-phpdoc and retain their canonical replacements.
             includeRules:           array_map(RuleRegistry::canonicalRuleId(...), self::stringListOption($input, 'include-rule')),
             excludeRules:           array_map(RuleRegistry::canonicalRuleId(...), self::stringListOption($input, 'exclude-rule')),
             presentation:           new PresentationSelectors(
@@ -213,10 +205,9 @@ final readonly class AnalyseCommandOptions
     }
 
     /**
-     * Returns a copy with the mutation budget filled in, called once the command has parsed the
-     * `--mutation-budget` value the user passed so the rest of the run can gate on it.
+     * Returns a copy with the parsed --mutation-budget value so the rest of the run can gate on it.
      *
-     * @param int|null $mutationBudget - Most surviving mutants the run will tolerate before it fails; null when the user gave no `--mutation-budget`, so survivors only report and never fail the run.
+     * @param int|null $mutationBudget - Budget to place on the copied mutation options; null clears it.
      *
      * @return self - a new options bag identical to this one but with the mutation budget swapped in.
      */
@@ -258,9 +249,8 @@ final readonly class AnalyseCommandOptions
     }
 
     /**
-     * Returns a copy that quietly adopts the project's checked-in baseline so a plain
-     * `gruff-php analyse` hides already-accepted debt without the user naming `--baseline`. Applied
-     * once at startup; it only kicks in when the user left every baseline flag alone.
+     * Adopts the project's existing default baseline when no applied or generated baseline was selected.
+     * An explicit baseline, generation request, or --no-baseline keeps this instance unchanged.
      *
      * @param string $projectRoot - Project root used to look for the default baseline file.
      *
@@ -268,7 +258,7 @@ final readonly class AnalyseCommandOptions
      */
     public function withDefaultBaseline(string $projectRoot): self
     {
-        // Leave the options as-is when the user already chose a baseline, is generating one, opted out with `--no-baseline`, or the project has no default baseline file to adopt.
+
         if (
             $this->baseline->baselinePath !== null
             || $this->baseline->generateBaselinePath !== null
@@ -310,10 +300,9 @@ final readonly class AnalyseCommandOptions
     }
 
     /**
-     * Parses the family CLI shape: `off` disables the guard, otherwise `<lines>:<bytes>` replaces
-     * both bounds atomically.
+     * Parses the family CLI budget: off disables the guard; otherwise lines:bytes replaces both bounds.
      *
-     * @param string|null $budgetOverride - Raw `--deep-scan-budget` text as typed; null when the flag was absent.
+     * @param string|null $budgetOverride - Raw --deep-scan-budget text; null when the flag was absent.
      *
      * @return array{enabled: bool, maxLines: int, maxBytes: int}|string|null - Parsed override, usage error, or null when absent.
      */
@@ -344,10 +333,10 @@ final readonly class AnalyseCommandOptions
     }
 
     /**
-     * The command's pre-run gate: reports the first thing wrong with the user's flag combination so
-     * it can print one usage line and stop, rather than begin a scan the flags can't actually mean.
+     * Returns a captured parsing error before checking supported option combinations.
+     * Captured errors take priority; otherwise the combination checks stop at their first failure.
      *
-     * @return string|null - the first failing check's message, or null when every flag combination validated and the run may proceed.
+     * @return string|null - Captured or combination error; null when these checks find none.
      */
     public function usageError(): ?string
     {
@@ -362,17 +351,13 @@ final readonly class AnalyseCommandOptions
     }
 
     /**
-     * Turns the user's display flags (min-severity, include/exclude pillars and rules) into the
-     * filter the reporter consults to decide which findings actually reach the screen.
+     * Builds a display filter from the CLI severity and combined include/exclude and show/hide selectors.
      *
-     * The rule lists are already enforced at execution level via the run's RuleSelection;
-     * they ride along here so report metadata (run.filters) names every active filter.
-     *
-     * @return FindingDisplayFilter - the enum-typed filter the reporter applies to decide which findings to display.
+     * @return FindingDisplayFilter - Filter the command applies before it builds the report.
      */
     public function displayFilter(): FindingDisplayFilter
     {
-        // The family spellings and this port's older ones feed one filter, because they describe the same view.
+
         $shownPillars  = [...$this->includePillars, ...$this->presentation->showPillars];
         $hiddenPillars = [...$this->excludePillars, ...$this->presentation->hidePillars];
 
@@ -386,15 +371,14 @@ final readonly class AnalyseCommandOptions
     }
 
     /**
-     * Translates `--profile=security` into the narrowed rule set the run should execute, so a
-     * security-only pass skips every unrelated check. The default profile changes nothing.
+     * Translates --profile=security into the narrowed rule set the run should execute, so a security-only pass skips every unrelated check.
+     * The default profile changes nothing.
      *
-     * @return RuleSelection|null - selection narrowing execution to security pillars under the security profile, or null to keep the configured rule
-     *                            set.
+     * @return RuleSelection|null - Security and sensitive-data rules, or null to retain the configured selection.
      */
     public function profileRuleSelection(): ?RuleSelection
     {
-        // Only `--profile=security` narrows execution; any other profile keeps the user's configured rules, signalled by null.
+
         if ($this->profile !== self::PROFILE_SECURITY) {
             return null;
         }
@@ -417,19 +401,16 @@ final readonly class AnalyseCommandOptions
     }
 
     /**
-     * The shared lookup behind `profileScorePillars()`: given a profile name, says which pillars
-     * the grade counts.
+     * Returns scoring pillars for a profile; null leaves scoring unrestricted by the profile.
+     * Shared with report so forwarded profile/include choices use the same pillar set.
      *
-     * Static so commands that forward analyse options (report) can validate profile/include
-     * coherence against the same pillar set before any prompt or subprocess runs.
+     * @param string $profile - Profile to inspect; values other than security return null.
      *
-     * @param string $profile - Requested profile name.
-     *
-     * @return list<Pillar>|null - the pillars the security profile scores, or null when the profile scores every pillar
+     * @return list<Pillar>|null - Security and sensitive-data pillars for security; null for every other value.
      */
     public static function scorePillarsForProfile(string $profile): ?array
     {
-        // Only the security profile restricts scoring to its two pillars; every other profile scores everything, hence null.
+
         if ($profile !== self::PROFILE_SECURITY) {
             return null;
         }
@@ -438,10 +419,8 @@ final readonly class AnalyseCommandOptions
     }
 
     /**
-     * Checks a profile name the user asked for and returns the error message when it is one we
-     * don't offer, so a typo like `--profile=paranoid` is caught rather than silently ignored.
-     *
-     * Shared with report so forwarded profile errors are rejected before report-only side effects.
+     * Rejects profile names other than default and security with a usage-error message.
+     * Shared with report so invalid forwarded profiles are rejected before report-only side effects.
      *
      * @param string $profile - Requested profile name.
      *
@@ -449,18 +428,17 @@ final readonly class AnalyseCommandOptions
      */
     public static function profileUsageErrorFor(string $profile): ?string
     {
-        // A known profile (default or security) is exactly what we support, so there is nothing to complain about.
+
         if (in_array($profile, [self::PROFILE_DEFAULT, self::PROFILE_SECURITY], true)) {
             return null;
         }
 
-        // Reject unknown profiles loudly rather than silently falling back to default behaviour.
+
         return sprintf('Unsupported profile "%s". Use default or security.', $profile);
     }
 
     /**
-     * Tells discovery whether the user opted into scanning only a changed region rather than the
-     * whole tree, which happens the moment they pass `--diff`, `--since`, or `--changed-ranges`.
+     * Reports whether --diff, --since, or --changed-ranges selected changed-region mode.
      *
      * @return bool - true when any changed-region opt-in (--diff, --since, or --changed-ranges) is active, so discovery should be scoped.
      */
@@ -472,10 +450,10 @@ final readonly class AnalyseCommandOptions
     }
 
     /**
-     * Says whether the changed-region mode can itself supply the list of files to scan, which is
-     * true for `--diff` and `--since` but not `--changed-ranges` (there the user already named paths).
+     * Reports whether changed-region mode can supply the files to scan. This is true for --diff and --since,
+     * but not --changed-ranges, where the caller already supplied paths.
      *
-     * @return bool - true only for --diff and --since, which yield a concrete file list; --changed-ranges names paths the caller already gave.
+     * @return bool - True for --diff and --since when a resolved diff can supply files; explicit ranges rely on caller-supplied paths.
      */
     public function usesChangedFilesForDiscovery(): bool
     {
@@ -483,38 +461,38 @@ final readonly class AnalyseCommandOptions
     }
 
     /**
-     * Works out whether the user asked for interactive report prompts, accepting the usual yes/no
-     * spellings of `--report-interactive` and turning anything unrecognised into a usage error.
+     * Resolves whether --report-interactive enables HTML finding filters, accepting common yes/no values.
+     * Returns a usage error for anything unrecognised.
      *
-     * @param InputInterface $input - Console input whose `--report-interactive` flag and value are inspected.
+     * @param InputInterface $input - Console input whose --report-interactive flag and value are inspected.
      *
      * @return bool|string - the resolved interactive flag when well-formed, or a usage-error message string when the value is unrecognised.
      */
     private static function reportInteractive(InputInterface $input): bool|string
     {
-        // The flag was never passed, so interactive mode simply stays off.
+
         if (!$input->hasParameterOption('--report-interactive', true)) {
             return false;
         }
 
         $optionValue = $input->getOption('report-interactive');
 
-        // A bare `--report-interactive` with no attached value reads as an explicit "yes, turn it on".
+        // A bare --report-interactive reads as an explicit request to enable interactive filters.
         if ($optionValue === null || $optionValue === true || $optionValue === '') {
             return true;
         }
 
-        // Symfony already handed us a real boolean, so honour it directly.
+
         if (is_bool($optionValue)) {
             return $optionValue;
         }
 
-        // Whatever is left isn't even text we could read as yes/no, so it can only be a usage error.
+
         if (!is_string($optionValue)) {
             return '--report-interactive must be true or false.';
         }
 
-        // Accept the common truthy/falsy spellings; an unrecognised string (say `--report-interactive=maybe`) is a usage error, not a silent default.
+
         return match (strtolower($optionValue)) {
             '1', 'true', 'yes', 'on' => true,
             '0', 'false', 'no', 'off' => false,
@@ -523,15 +501,12 @@ final readonly class AnalyseCommandOptions
     }
 
     /**
-     * The workhorse for optional text flags: reads one option and gives back its value only when
-     * the user actually typed something, so an absent or empty flag collapses to a null the caller
-     * can replace with its own default.
+     * Reads a non-empty string option, returning null for empty strings and non-string values.
      *
      * @param InputInterface $input - Console input the option is read from.
      * @param string         $name  - Option name without the leading dashes.
      *
-     * @return string|null - the option value when a non-empty string, or null so callers can apply a null-coalescing default for absent or empty
-     *                     input.
+     * @return string|null - Non-empty option value, or null so the caller can apply its default.
      */
     private static function optionalStringOption(InputInterface $input, string $name): ?string
     {
@@ -541,16 +516,13 @@ final readonly class AnalyseCommandOptions
     }
 
     /**
-     * Reads a string option that must tell "the user never gave it" apart from "the user gave it empty".
-     *
-     * `optionalStringOption()` folds an empty value into null, which suits an option whose empty form means unset.
-     * `--changed-ranges=` instead asks to scope the run and names no range, which the range parser refuses; folding
-     * it into null would run the whole tree without saying so.
+     * Preserves empty strings so --changed-ranges= remains distinguishable from an omitted value.
+     * Unlike optionalStringOption(), this leaves an empty value available for range validation.
      *
      * @param InputInterface $input - Console input to read the option from.
      * @param string         $name  - Option name to look up.
      *
-     * @return string|null - The value exactly as typed, including an empty string; null only when the option is absent.
+     * @return string|null - String value including an empty string, or null when getOption() returns a non-string value.
      */
     private static function providedStringOption(InputInterface $input, string $name): ?string
     {
@@ -560,29 +532,28 @@ final readonly class AnalyseCommandOptions
     }
 
     /**
-     * Collects a flag the user may repeat (like `--file`) into one list, keeping each value exactly
+     * Collects a flag the user may repeat (like --file) into one list, keeping each value exactly
      * as typed with no comma-splitting, and rejecting the whole run if any occurrence was left blank.
      *
      * @param InputInterface $input - Console input the repeated option is read from.
      * @param string         $name  - Option name without the leading dashes; named in the error on a blank entry.
      *
-     * @return list<string>|string - the verbatim occurrence values (no comma splitting), or a usage-error message string when any occurrence is
-     *                             blank.
+     * @return list<string>|string - Occurrence values without comma splitting, or an error for an empty or non-string entry.
      */
     private static function repeatedStringOption(InputInterface $input, string $name): array|string
     {
         $values = $input->getOption($name);
 
-        // The user never used this flag, so there is nothing to collect.
+
         if (!is_array($values)) {
             return [];
         }
 
         $items = [];
 
-        // Walk each occurrence in the order the user typed them, keeping every value verbatim.
+
         foreach ($values as $optionValue) {
-            // A blank occurrence (e.g. `--file=` with nothing after it) is a mistake worth naming rather than silently dropping.
+
             if (!is_string($optionValue) || $optionValue === '') {
                 return sprintf('--%s requires a non-empty value.', $name);
             }
@@ -595,8 +566,8 @@ final readonly class AnalyseCommandOptions
 
     /**
      * Reads a repeatable list flag (the pillar and rule filters) and flattens it into one clean set
-     * of ids, so a user can spread values across repeats and commas - `--include-rule=a,b
-     * --include-rule=c` - and still get back a de-duplicated, trimmed list.
+     * of ids, so a user can spread values across repeats and commas - --include-rule=a,b
+     * --include-rule=c - and still get back a de-duplicated, trimmed list.
      *
      * @param InputInterface $input - Console input the repeated option is read from.
      * @param string         $name  - Option name without the leading dashes; each occurrence is comma-split and trimmed.
@@ -607,24 +578,24 @@ final readonly class AnalyseCommandOptions
     {
         $values = $input->getOption($name);
 
-        // The user never passed this flag, so the resulting list is empty.
+
         if (!is_array($values)) {
             return [];
         }
 
         $items = [];
 
-        // Visit each time the user gave the flag, since any one of them may carry a comma-separated list.
+
         foreach ($values as $optionValue) {
-            // Quietly skip an empty or non-string occurrence; unlike the strict `--file` reader, here a blank just contributes nothing.
+            // Quietly skip an empty or non-string occurrence; unlike the strict --file reader, here a blank just contributes nothing.
             if (!is_string($optionValue) || $optionValue === '') {
                 continue;
             }
 
-            // Split this occurrence on commas so a single `--include-rule=a,b` expands into separate ids.
+
             foreach (explode(',', $optionValue) as $optionPart) {
                 $trimmedOptionPart = trim($optionPart);
-                // Keep only the pieces that still hold a real id once the surrounding spaces are trimmed off.
+
                 if ($trimmedOptionPart !== '') {
                     $items[] = $trimmedOptionPart;
                 }
@@ -635,23 +606,23 @@ final readonly class AnalyseCommandOptions
     }
 
     /**
-     * Reads how the user asked to diff: nothing when `--diff` is absent, stdin when they piped one
-     * in, a bare `--diff` for the working tree, or the ref they named so only that change is scanned.
+     * Reads the selected diff mode from --diff and the parsed paths.
+     * Returns stdin mode for a "-" path, working tree for bare --diff, or the explicit ref.
      *
-     * @param InputInterface $input - Console input whose `--diff` flag and value are inspected.
-     * @param list<string>   $paths - Parsed positional and --file paths; a bare "-" entry selects stdin diff mode.
+     * @param InputInterface $input - Console input whose --diff flag and value are inspected.
+     * @param list<string>   $paths - Parsed positional and --file paths; with --diff present, "-" selects stdin mode.
      *
      * @return string|null - "-" for stdin, "working-tree" for a bare --diff, the explicit ref otherwise, or null when --diff was not supplied.
      */
     private static function diffMode(InputInterface $input, array $paths): ?string
     {
-        // Without `--diff` the user isn't in diff mode at all, so report none.
+
         if (!$input->hasParameterOption('--diff', true)) {
             return null;
         }
 
         $optionValue = $input->getOption('diff');
-        // A `-` among the paths means the user piped a diff on stdin, which takes precedence over any ref value.
+        // A "-" path selects stdin mode and takes precedence over any ref value.
         if (in_array('-', $paths, true)) {
             return '-';
         }
@@ -661,13 +632,13 @@ final readonly class AnalyseCommandOptions
 
     /**
      * Catches the user asking to both skip config and load a specific one at the same time, since
-     * obeying either `--no-config` or `--config` alone would quietly ignore what they also typed.
+     * obeying either --no-config or --config alone would quietly ignore what they also typed.
      *
      * @return string|null - the message when --no-config and --config are both set, or null when the config flags do not conflict.
      */
     private function configUsageError(): ?string
     {
-        // Only both flags together conflict; if either is absent there is nothing to reconcile.
+
         if (!$this->noConfig || $this->configPath === null) {
             return null;
         }
@@ -676,33 +647,32 @@ final readonly class AnalyseCommandOptions
     }
 
     /**
-     * Stops the user from applying and regenerating a baseline in a single run - mixing a read of an
-     * existing baseline with a fresh write - which would leave them with an unpredictable result.
+     * Checks baseline generation prerequisites and conflicts with applying an existing baseline.
+     * Migration requires a generation destination; application and generation are mutually exclusive.
      *
-     * @return string|null - the message when both --baseline and --generate-baseline are set (they are mutually exclusive, whatever paths they name), or null when at most one is set.
+     * @return string|null - Error for migration without a destination or simultaneous application and generation; null otherwise.
      */
     private function baselineUsageError(): ?string
     {
-        // A migration has nowhere to write without a new path, and writing over the input would destroy the user's retreat copy.
+
         if ($this->baseline->migrateBaselinePath !== null && $this->baseline->generateBaselinePath === null) {
             return '--migrate-baseline requires --generate-baseline <new path>; the migrated file is written there and the original is left untouched.';
         }
 
-        // With at most one of `--baseline` / `--generate-baseline` set there is no clash, so allow the run.
+
         if ($this->baseline->baselinePath === null || $this->baseline->generateBaselinePath === null) {
             return null;
         }
 
-        // Both are set: applying and regenerating a baseline in one run mixes a read with a rewrite, so forbid the combination outright.
+
         return '--baseline and --generate-baseline are mutually exclusive.';
     }
 
     /**
-     * Guards the family of "scan only what changed" flags, which each pick the changed region a
-     * different way and so must be used one at a time, with a valid scope and a path to anchor to.
+     * Rejects incompatible change selectors, unsupported scope names, and explicit ranges without paths.
+     * --diff-vs cannot be combined with --diff, --since, or --changed-ranges.
      *
-     * @return string|null - the first message for stacked changed-region modes, a bad --changed-scope, or ranges without a path, or null when all
-     *                     hold.
+     * @return string|null - First failing change-option check, or null when these checks find no conflict.
      */
     private function diffUsageError(): ?string
     {
@@ -712,22 +682,22 @@ final readonly class AnalyseCommandOptions
                                          $this->changeScope->changedRanges,
                                      ], static fn(?string $mode): bool => $mode !== null);
 
-        // Stacking two changed-region flags (say `--diff` and `--since`) is ambiguous, since each derives the region differently.
+
         if (count($changedModes) > 1) {
             return '--diff, --since, and --changed-ranges are mutually exclusive.';
         }
 
-        // `--diff-vs` is its own comparison mode and cannot sit on top of a changed-region flag.
+
         if ($this->changeScope->diffVs !== null && $changedModes !== []) {
             return '--diff, --since, --changed-ranges, and --diff-vs are mutually exclusive.';
         }
 
-        // An unknown `--changed-scope` (e.g. `--changed-scope=line`) would silently mis-map ranges to findings, so refuse it.
+
         if (!in_array($this->changeScope->changedScope, ['symbol', 'hunk', 'file'], true)) {
             return '--changed-scope must be one of: symbol, hunk, file.';
         }
 
-        // `--changed-ranges` gives line spans, which mean nothing unless the user also names the file they belong to.
+        // --changed-ranges gives line spans, which mean nothing unless the user also names the file they belong to.
         if ($this->changeScope->changedRanges !== null && $this->paths === []) {
             return '--changed-ranges requires at least one file path.';
         }
@@ -736,57 +706,56 @@ final readonly class AnalyseCommandOptions
     }
 
     /**
-     * Makes sure `--changed-only` has the `--diff-vs` companion it depends on, so a user asking to
+     * Makes sure --changed-only has the --diff-vs companion it depends on, so a user asking to
      * report just the changed files can't accidentally leave out what those changes are measured against.
      *
      * @return string|null - the message when --changed-only is set without the --diff-vs comparison ref it needs, or null otherwise.
      */
     private function changedOnlyUsageError(): ?string
     {
-        // Either the user didn't ask for changed-only, or they already supplied `--diff-vs`, so nothing is missing.
+
         if (!$this->changeScope->isChangedOnly || $this->changeScope->diffVs !== null) {
             return null;
         }
 
-        // Changed-only needs a comparison ref to decide which files changed; --diff-vs supplies it.
+
         return '--changed-only requires --diff-vs.';
     }
 
     /**
      * Rejects the contradiction of switching the baseline off while also handing one in, so a user
-     * who typed both `--no-baseline` and `--baseline` is told rather than having one flag ignored.
+     * who typed both --no-baseline and --baseline is told rather than having one flag ignored.
      *
      * @return string|null - the message when --no-baseline is combined with an applied --baseline, or null when the two do not conflict.
      */
     private function noBaselineUsageError(): ?string
     {
-        // It only clashes when `--no-baseline` rides alongside an actual `--baseline` to apply; otherwise let it pass.
+
         if (!$this->noBaseline || $this->baseline->baselinePath === null) {
             return null;
         }
 
-        // Disabling the baseline while also pointing at one to apply is contradictory, so reject the run.
+
         return '--no-baseline cannot be combined with --baseline.';
     }
 
     /**
-     * Vets the severity and pillar names the user typed for the display filter and returns the first
-     * unusable one, so a bad value is reported cleanly here instead of crashing the reporter later.
+     * Validates display-filter severity and pillar names so invalid values become usage errors before the filter is built.
      *
      * @return string|null - message for the first invalid severity or pillar, or null when all display inputs resolve.
      */
     private function displayFilterError(): ?string
     {
-        // A `--min-severity` the user gave that isn't a real severity (say `--min-severity=critical`) is caught here, before displayFilter() would hard-fail on Severity::from().
+        // Invalid severity text would make Severity::from() throw while the report filter is being built.
         if ($this->minSeverity !== null && Severity::tryFrom($this->minSeverity) === null) {
             return sprintf('Unsupported min severity "%s". Use advisory, warning, or error.', $this->minSeverity);
         }
 
-        // Check both the include and exclude pillar lists the user supplied.
+
         foreach (['--include-pillar' => $this->includePillars, '--exclude-pillar' => $this->excludePillars] as $option => $values) {
-            // Look at each pillar name the user put in this particular list.
+
             foreach ($values as $optionValue) {
-                // The first name that isn't a real pillar wins the error; naming which flag it came from helps the user fix it.
+
                 if (Pillar::tryFrom($optionValue) === null) {
                     return sprintf('Unsupported pillar "%s" for %s.', $optionValue, $option);
                 }

@@ -39,7 +39,7 @@ final class DependencyComposerRulesTest extends TestCase
     /**
      * Verify a VCS repository entry is flagged once with its repository type.
      *
-     * @return void
+     * @return void - Asserts one security warning with medium confidence and VCS repository metadata.
      */
     public function testVcsRepositoryDetected(): void
     {
@@ -55,7 +55,7 @@ final class DependencyComposerRulesTest extends TestCase
     /**
      * Verify a path repository entry is flagged once.
      *
-     * @return void
+     * @return void - Asserts one finding with path repository metadata.
      */
     public function testPathRepositoryDetected(): void
     {
@@ -66,9 +66,9 @@ final class DependencyComposerRulesTest extends TestCase
     }
 
     /**
-     * Verify a shell/remote install-time script is flagged and a safe one is not.
+     * Verify only the install-time event is reported, excluding custom build and lint events.
      *
-     * @return void
+     * @return void - Asserts one finding for post-install-cmd and none for build or lint.
      */
     public function testInstallTimeShellScriptDetected(): void
     {
@@ -83,9 +83,9 @@ final class DependencyComposerRulesTest extends TestCase
     }
 
     /**
-     * Verify a safe manifest produces no dependency-posture findings.
+     * Verify each Composer dependency rule stays silent for the clean fixture.
      *
-     * @return void
+     * @return void - Asserts that all three Composer dependency rules return no findings for the clean fixture.
      */
     public function testSafeManifestProducesNoFindings(): void
     {
@@ -101,7 +101,7 @@ final class DependencyComposerRulesTest extends TestCase
     /**
      * Verify the rules ignore files that are not a Composer manifest.
      *
-     * @return void
+     * @return void - Asserts no Composer dependency findings when the fixture display path is not a manifest.
      */
     public function testNonManifestPathIsIgnored(): void
     {
@@ -156,7 +156,7 @@ final class DependencyComposerRulesTest extends TestCase
     {
         $config = AnalysisConfig::fromRegistry($registry);
 
-        // Both ship off by default; enabling them here mirrors a project that sets `enabled: true` for each.
+
         foreach ([DependencyComposerPathRule::ID, DependencyComposerVcsRule::ID] as $ruleId) {
             $settings = $config->ruleSettings($ruleId);
             $config   = $config->withRuleSettings($ruleId, new RuleSettings(

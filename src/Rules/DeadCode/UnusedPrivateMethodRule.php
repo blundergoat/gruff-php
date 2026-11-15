@@ -57,8 +57,8 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // High-confidence warning: a private method no in-scope call shape reaches is dead and safe to delete,
-        // yet stale dead code rarely breaks a build, so it warns rather than errors.
+
+
         return new RuleDefinition(
             id:              self::ID,
             name:            'Unused private method',
@@ -76,7 +76,7 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
      * Reports each private method that no in-scope call reaches, class by class.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext - Unused; the rule interface requires it, and this rule reads no options or project root.
      *
      * @return list<Finding> - one finding per private method unreferenced in its class-like; empty when none are dead.
      */
@@ -88,12 +88,12 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
 
         $findings = [];
 
-        // Check each class, trait, or enum in the file.
+
         foreach ($classLikes as $classLike) {
-            /** @var Class_|Trait_|Enum_ $classLike NodeIndex query is constrained to class-like classes. */
+            /** @var Class_|Trait_|Enum_ $classLike - Class, trait, or enum selected by NodeIndex. */
             $privateMethods = $this->privateMethods($classLike);
 
-            // Nothing to check when the class declares no private methods.
+
             if ($privateMethods === []) {
                 continue;
             }
@@ -121,7 +121,7 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     }
 
     /**
-     * Collects a class-like's private methods, skipping magic methods PHP invokes through language hooks.
+     * Collects private methods while excluding magic-method names that PHP may invoke implicitly.
      *
      * @param Class_|Trait_|Enum_ $classLike - Class-like declaration whose private methods are collected.
      *
@@ -131,15 +131,15 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     {
         $privateMethods = [];
 
-        // Scan the class body for private method declarations.
+
         foreach ($classLike->stmts as $stmt) {
-            // Only private methods are candidates.
+
             if (!$stmt instanceof Stmt\ClassMethod || !$stmt->isPrivate()) {
                 continue;
             }
 
             $name = $stmt->name->toString();
-            // Skip magic methods; PHP calls them for you, so they are never truly dead.
+            // Skip magic-method names because PHP may invoke them without an explicit same-class call.
             if (!in_array($name, self::MAGIC_METHODS, true)) {
                 $privateMethods[$name] = $stmt;
             }
@@ -149,24 +149,24 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     }
 
     /**
-     * Collects the names of every private method called in scope, by call or callable-array reference.
+     * Collects literal same-class method names from calls and callable-array references in the class-like body.
      *
      * @param NodeFinder          $nodeFinder - Reused tree walker that enumerates every node under the class-like body.
      * @param Class_|Trait_|Enum_ $classLike - Class-like declaration whose body is searched for private method calls.
      *
-     * @return array<string, true> - set of method names referenced anywhere in scope; a name's absence means it is unused.
+     * @return array<string, true> - Literal same-class method names observed in calls or callable-array references.
      */
     private function calledPrivateMethodNames(NodeFinder $nodeFinder, Class_|Trait_|Enum_ $classLike): array
     {
         $calledNames = [];
         $allNodes    = $nodeFinder->find($classLike->stmts, static fn(): bool => true);
 
-        // Walk every node, resolving any call or callable array to a method name.
+
         foreach ($allNodes as $node) {
             $name = $this->calledMethodName($node)
                 ?? CallableReferenceResolver::sameClassCallableArrayMethodName($node, $classLike);
 
-            // Record any method name a call resolved to.
+
             if ($name !== null) {
                 $calledNames[$name] = true;
             }
@@ -184,13 +184,13 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
      */
     private function calledMethodName(Node $node): ?string
     {
-        // A `$this->...()` call may name a private method.
+
         if ($node instanceof Expr\MethodCall
             && $node->var instanceof Expr\Variable
             && $node->var->name === 'this'
         ) {
             if ($node->name instanceof Node\Identifier) {
-                // A literal `$this->name()` call counts as a use of that private method.
+
                 return $node->name->toString();
             }
 
@@ -200,13 +200,13 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
             }
         }
 
-        // A `self::...()` or `static::...()` call may name a private method.
+
         if ($node instanceof Expr\StaticCall
             && ($node->class instanceof Node\Name)
             && in_array($node->class->toString(), ['self', 'static'], true)
         ) {
             if ($node->name instanceof Node\Identifier) {
-                // A `self::name()` or `static::name()` call counts as a use of that private method.
+
                 return $node->name->toString();
             }
 
@@ -220,19 +220,18 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     }
 
     /**
-     * Reports whether the class holds a computed same-class dispatch whose target cannot be resolved.
+     * Reports whether the class has a same-class dispatch target that is not a literal name node.
      *
      * @param NodeFinder          $nodeFinder - Reused tree walker over the class-like body.
      * @param Class_|Trait_|Enum_ $classLike - Class-like declaration whose body is searched for dynamic dispatch.
      *
-     * @return bool - true when a `$this->{$expr}()`, `self::{$expr}()`, `static::{$expr}()`, or same-class callable
-     *              array with a non-literal method slot exists; dynamic calls on other receivers never count.
+     * @return bool - True for a non-literal same-class call or callable-array method slot; calls on other receivers do not count.
      */
     private function hasUnresolvableDynamicDispatch(NodeFinder $nodeFinder, Class_|Trait_|Enum_ $classLike): bool
     {
         // Scan the whole class-like body: one computed dispatch anywhere makes every candidate unsafe to report.
         foreach ($nodeFinder->find($classLike->stmts, static fn(): bool => true) as $node) {
-            // A computed instance call on the object itself: the target name is unknowable statically.
+            // This instance-call shape has no literal target name, so the rule skips reporting this class-like.
             if ($node instanceof Expr\MethodCall
                 && $node->var instanceof Expr\Variable
                 && $node->var->name === 'this'
@@ -242,7 +241,7 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
                 return true;
             }
 
-            // The static-call twin of the same shape, reached through self or static.
+
             if ($node instanceof Expr\StaticCall
                 && $node->class instanceof Node\Name
                 && in_array($node->class->toString(), ['self', 'static'], true)
@@ -264,8 +263,7 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     /**
      * Builds one finding per private method whose name never appears among the observed calls.
      *
-     * @param AnalysisUnit                    $analysisUnit - Supplies the display path stamped on each finding; the
-     *                                                         line span comes from each method node, not this unit.
+     * @param AnalysisUnit                    $analysisUnit - Supplies the finding path; method nodes supply line spans.
      * @param RuleDefinition                  $definition - Supplies the rule id, severity, pillar, and tier copied into every finding.
      * @param Class_|Trait_|Enum_             $classLike - Owner whose name prefixes each reported private method symbol.
      * @param array<string, Stmt\ClassMethod> $privateMethods - Candidate private methods keyed by name.
@@ -283,9 +281,9 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
         $findings  = [];
         $className = $this->resolveClassName($classLike);
 
-        // Report each declared method that no call referenced.
+
         foreach ($privateMethods as $name => $classMethod) {
-            // A method that was called is live, so skip it.
+
             if (isset($calledNames[$name])) {
                 continue;
             }
@@ -314,7 +312,7 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
      *
      * @param Class_|Trait_|Enum_ $node - Class-like declaration whose display symbol is needed for finding text.
      *
-     * @return string - declared class/trait/enum name, or an `@anonymous`/`unknown@line` placeholder when unnamed.
+     * @return string - Declared class/trait/enum name, or a `class@anonymous`/`unknown@line` placeholder when unnamed.
      */
     private function resolveClassName(Node $node): string
     {

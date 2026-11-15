@@ -1,10 +1,6 @@
 <?php
 
-/**
- * Config-loader tests model the files users place at a project root or pass with `--config`.
- *
- * They protect discovery, inheritance, rule tuning, migration behavior, and actionable failures for invalid or empty values.
- */
+
 declare(strict_types=1);
 
 namespace GruffPhp\Tests\Config;
@@ -31,9 +27,9 @@ use PHPUnit\Framework\Attributes\DataProvider;
 final class ConfigLoaderTest extends ConfigLoaderTestCase
 {
     /**
-     * Verify loads default rule settings when no config exists.
+     * Verify that loading without a config uses the file-length rule defaults.
      *
-     * @return void
+     * @return void - Asserts the file-length rule is enabled with an error threshold of 1000.
      */
     public function testLoadsDefaultRuleSettingsWhenNoConfigExists(): void
     {
@@ -50,7 +46,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     /**
      * Verify loads explicit threshold overrides.
      *
-     * @return void
+     * @return void - Asserts the file-length rule remains enabled with a warning threshold of 3.
      */
     public function testLoadsExplicitThresholdOverrides(): void
     {
@@ -70,7 +66,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     /**
      * Verify loads default YAML config file.
      *
-     * @return void
+     * @return void - Asserts the discovered preferred config supplies a cyclomatic threshold of 70.
      */
     public function testLoadsDefaultYamlConfigFile(): void
     {
@@ -97,7 +93,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     /**
      * Verify loads the legacy default YAML config file when the preferred file is absent.
      *
-     * @return void
+     * @return void - Asserts the discovered legacy config supplies a cyclomatic threshold of 130.
      */
     public function testLoadsLegacyDefaultYamlConfigFile(): void
     {
@@ -124,7 +120,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     /**
      * Verify falls back to package default YAML config file.
      *
-     * @return void
+     * @return void - Asserts the preferred fallback config supplies a cyclomatic threshold of 110.
      */
     public function testFallsBackToPackageDefaultYamlConfigFile(): void
     {
@@ -154,7 +150,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     /**
      * Verify falls back to package legacy default YAML config file.
      *
-     * @return void
+     * @return void - Asserts the legacy fallback config supplies a cyclomatic threshold of 170.
      */
     public function testFallsBackToPackageLegacyDefaultYamlConfigFile(): void
     {
@@ -184,7 +180,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     /**
      * Verify loads explicit YAML config file.
      *
-     * @return void
+     * @return void - Asserts the explicitly named YAML config supplies a cyclomatic threshold of 90.
      */
     public function testLoadsExplicitYamlConfigFile(): void
     {
@@ -203,7 +199,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     /**
      * Verify loads a YAML block-list rule option as a string list.
      *
-     * @return void
+     * @return void - Asserts additionalFunctions contains exactly the configured custom_runner entry.
      */
     public function testLoadsYamlBlockListRuleOptions(): void
     {
@@ -221,7 +217,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     /**
      * Verify loads severity threshold with error severity.
      *
-     * @return void
+     * @return void - Asserts an error threshold of 70, no match at 70, and an error match at 71.
      */
     public function testLoadsSeverityThresholdWithErrorSeverity(): void
     {
@@ -246,7 +242,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     /**
      * Verify loads severity threshold with warning severity.
      *
-     * @return void
+     * @return void - Asserts a warning threshold of 70, no match at 70, and a warning match at 71.
      */
     public function testLoadsSeverityThresholdWithWarningSeverity(): void
     {
@@ -271,7 +267,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     /**
      * Verify loads severity threshold with warning severity for inverse threshold rule.
      *
-     * @return void
+     * @return void - Asserts a warning threshold of 45, no match at 45, and a warning match at 44.
      */
     public function testLoadsSeverityThresholdWithWarningSeverityForInverseThresholdRule(): void
     {
@@ -296,7 +292,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     /**
      * Verify a failureConditions block is parsed into the config count gate.
      *
-     * @return void
+     * @return void - Asserts a total limit of 200 and severity-count limits of zero errors and five warnings.
      */
     public function testLoadsFailureConditionsBlock(): void
     {
@@ -314,9 +310,9 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Verify extends: gruff.strict applies the preset's tightened thresholds.
+     * Verify gruff.strict supplies a cognitive-complexity threshold of 15.
      *
-     * @return void
+     * @return void - Asserts the loaded cognitive threshold is a SeverityThreshold with value 15.
      */
     public function testExtendsAppliesBundledPresetSettings(): void
     {
@@ -337,9 +333,9 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Verify a cyclic extends chain throws with the chain in the message.
+     * Verify cyclic config inheritance is rejected.
      *
-     * @return void
+     * @return void - Expects ConfigException with a message identifying an extends cycle.
      */
     public function testExtendsCycleThrows(): void
     {
@@ -363,7 +359,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     /**
      * Verify a failureConditions.newFindings block parses into a nested sub-gate.
      *
-     * @return void
+     * @return void - Asserts the nested new-findings gate is present with an error-count limit of zero.
      */
     public function testLoadsNewFindingsSubGate(): void
     {
@@ -381,12 +377,12 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Verifies each invalid inline config shape stops the user's command with its exact actionable message.
+     * Verify each invalid inline config raises ConfigException containing the expected message fragment.
      *
-     * @param string $configJson      - Non-empty inline JSON config; empty input is covered by the loader's empty-document test.
-     * @param string $expectedMessage - Non-empty exception message the user must receive for this case.
+     * @param string $configJson - Non-empty JSON config written to the temporary file before loading.
+     * @param string $expectedMessage - Non-empty text that must occur in the ConfigException message.
      *
-     * @return void
+     * @return void - Expects ConfigException and checks the supplied message fragment.
      */
     #[DataProvider('invalidInlineConfigProvider')]
     public function testRejectsInlineInvalidConfig(string $configJson, string $expectedMessage): void
@@ -400,9 +396,9 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Provides named invalid-config cases so a failed row identifies the user action and expected correction.
+     * Provide named invalid-config inputs and the message fragments expected by the rejection test.
      *
-     * @return array<string, array{string, string}> - Non-empty named cases pairing malformed config with the exact user-facing error; never null
+     * @return array<string, array{string, string}> - Non-empty named cases pairing invalid config with expected message fragments.
      */
     public static function invalidInlineConfigProvider(): array
     {
@@ -551,9 +547,9 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Verify excludeFromScore defaults to false and honours explicit true/false overrides.
+     * Verify excludeFromScore is false for the project config and honours explicit true/false overrides.
      *
-     * @return void
+     * @return void - Asserts score exclusion is false for the project config and follows both explicit boolean values.
      */
     public function testExcludeFromScoreDefaultsToFalseAndHonoursOverrides(): void
     {
@@ -575,9 +571,9 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Verify a config that omits `schemaVersion` fails the load with the migration hint.
+     * Verify a config that omits schemaVersion fails the load with the migration hint.
      *
-     * @return void
+     * @return void - Expects ConfigException containing the required-schemaVersion migration hint.
      */
     public function testRejectsMissingSchemaVersion(): void
     {
@@ -592,9 +588,9 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Verify a config with a non-canonical `schemaVersion` value fails the load.
+     * Verify a config with a non-canonical schemaVersion value fails the load.
      *
-     * @return void
+     * @return void - Expects ConfigException containing the canonical-schemaVersion diagnostic.
      */
     public function testRejectsWrongSchemaVersion(): void
     {
@@ -609,9 +605,9 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Verify a config with a full `failOn:` block round-trips through `load()`.
+     * Verify the configured failOn thresholds are available after loading.
      *
-     * @return void
+     * @return void - Asserts error, warning, and none for analyse, report, and dashboard, with no summary gate.
      */
     public function testAcceptsMinimumSeverityBlockRoundTrips(): void
     {
@@ -628,9 +624,9 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Verify can disable a rule.
+     * Verify that an explicit rule setting disables the file-length rule.
      *
-     * @return void
+     * @return void - Asserts the explicit fixture disables the file-length rule.
      */
     public function testCanDisableARule(): void
     {
@@ -646,7 +642,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     /**
      * Verify a rule block and a selection entry keyed by the retired docs.missing-public-phpdoc id configure the renamed rule.
      *
-     * @return void
+     * @return void - Asserts the renamed rule is disabled and its current ID appears in the exclusion list.
      */
     public function testRetiredRuleIdConfiguresTheRenamedRule(): void
     {
@@ -658,9 +654,9 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Verify loads minimum PHP version.
+     * Verify that loading preserves the configured minimum PHP version.
      *
-     * @return void
+     * @return void - Asserts minimumPhpVersion returns the configured value 7.4.
      */
     public function testLoadsMinimumPhpVersion(): void
     {
@@ -672,9 +668,9 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Verify loads path ignores allowlists and rule selection.
+     * Verify that ignored paths, allowlists, and rule selection are loaded from configuration.
      *
-     * @return void
+     * @return void - Asserts configured paths and abbreviations, file-length inclusion, and header-injection exclusion.
      */
     public function testLoadsPathIgnoresAllowlistsAndRuleSelection(): void
     {

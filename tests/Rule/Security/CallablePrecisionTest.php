@@ -30,9 +30,9 @@ final class CallablePrecisionTest extends TestCase
      * Keeps each authored callable example at its expected warning count.
      *
      * @param string $body             - Method body to parse; no supplied code executes.
-     * @param int    $expectedWarnings - Zero means the complete invocation has bounded callable evidence.
-     * @param string $prefix           - Optional namespace declarations; empty uses the ordinary fixture namespace.
-     * @return void
+     * @param int    $expectedWarnings - Expected DangerousFunctionCallRule finding count for the complete fixture.
+     * @param string $prefix           - Optional declarations inserted into the fixture namespace; empty adds none.
+     * @return void - Asserts the rule's finding count across the wrapper, prefix and supplied body.
      */
     #[DataProvider('invocationCases')]
     public function testInvocationEvidence(string $body, int $expectedWarnings, string $prefix = ''): void
@@ -47,7 +47,7 @@ final class CallablePrecisionTest extends TestCase
         $traverser = new NodeTraverser();
         $traverser->addVisitor(new NameResolver(null, ['replaceNodes' => false]));
         $traverser->addVisitor(new ParentConnectingVisitor());
-        /** @var list<Stmt> $statements Parsed fixture declarations; an empty body contributes no statements. */
+        /** @var list<Stmt> $statements - Parsed namespace and class statements after name and parent resolution. */
         $statements = $traverser->traverse($parser->parse($source) ?? []);
         $unit       = new AnalysisUnit(new SourceFile(__FILE__, 'src/Runner.php'), $source, $statements, [], []);
         $context    = new RuleContext(__DIR__, AnalysisConfig::fromRegistry(RuleRegistry::defaults()));
@@ -57,9 +57,9 @@ final class CallablePrecisionTest extends TestCase
     }
 
     /**
-     * Keeps partial-call placeholders from producing scanner warnings or granting binder evidence.
+     * Verify invocation evidence before and after adding a placeholder to the Closure::bind arguments.
      *
-     * @return void - Every supported placeholder remains safe to inspect with either parser dependency version.
+     * @return void - Asserts that a factory-call placeholder preserves evidence and a binder placeholder removes it.
      */
     public function testPartialApplicationPlaceholders(): void
     {
@@ -108,7 +108,7 @@ final class CallablePrecisionTest extends TestCase
         yield 'unknown property receiver' => ['$handler = $unknown->callback; $handler();', 1];
         yield 'unproved bind target' => ['$handler = \Closure::bind($unknown, null); $handler();', 1];
         yield 'shadowed binder' => ['$handler = Closure::bind(static fn () => 1, null); $handler();', 1, 'class Closure {}'];
-        // A local holding one literal function name is judged as a direct call to that function (precision-floor M05).
+        // A local holding one literal function name is judged as a direct call to that function.
         yield 'literal function name runs as a direct call' => ['$format = \'strtoupper\'; $format(\'x\');', 0];
         yield 'literal dangerous name still reports' => ['$run = \'system\'; $run($unknown);', 1];
         yield 'literal name with a second write stays dynamic' => ['$format = \'strtoupper\'; if ($condition) { $format = $unknown; } $format(\'x\');', 1];

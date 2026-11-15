@@ -32,23 +32,23 @@ use PhpParser\Node\Scalar;
 final class ProcessCommandConstructionRule implements RuleInterface
 {
     /**
-     * Stable rule identifier for request-controlled process commands.
+     * Stable rule identifier for process-command construction findings.
      */
     public const ID = 'security.process-command-construction';
 
     /**
      * Procedural functions whose first argument the shell parses as a command line.
      *
-     * @var list<string>
+     * @var list<string> - Global function names inspected for command construction.
      */
     private const PROCEDURAL_COMMAND_SINKS = ['exec', 'passthru', 'popen', 'proc_open', 'shell_exec', 'system'];
 
     /**
-     * Functions whose result is one shell-escaped argument, so splicing it into a command opens no injection point.
+     * Functions that quote one shell argument; their output is accepted only outside an open surrounding quote.
      *
      * escapeshellcmd() is deliberately absent: it leaves argument separators in place.
      *
-     * @var list<string>
+     * @var list<string> - Function names recognized as quoting a complete shell argument.
      */
     private const SHELL_ARGUMENT_ESCAPERS = ['escapeshellarg'];
 
@@ -92,7 +92,7 @@ final class ProcessCommandConstructionRule implements RuleInterface
      * Reports each shell command built from request data or from an unescaped dynamic value.
      *
      * @param AnalysisUnit $analysisUnit - Parsed file the user asked to analyse.
-     * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext  - Unused; the rule interface requires it, and this rule reads no options or project root.
      *
      * @return list<Finding> - One finding per unsafe command; empty when every command is literal, escaped or an argv array.
      */
@@ -110,9 +110,9 @@ final class ProcessCommandConstructionRule implements RuleInterface
 
         $findings = array_merge($findings, $this->proceduralCommandFindings($analysisUnit));
 
-        // `new Process(...)` from Symfony runs its first argument as the command.
+
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\New_::class) as $construction) {
-            // Other classes, even ones taking a string, do not start a process.
+
             if (!SecurityNodeHelper::hasMatchingClassName($construction->class, ['Symfony\Component\Process\Process', 'Process'])) {
                 continue;
             }
@@ -126,7 +126,7 @@ final class ProcessCommandConstructionRule implements RuleInterface
 
         // `Process::fromShellCommandline(...)` hands a raw string to the shell.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\StaticCall::class) as $staticCall) {
-            // Other static calls, including other Process factories, do not parse a shell string.
+
             if (
                 !SecurityNodeHelper::hasMatchingClassName($staticCall->class, ['Symfony\Component\Process\Process', 'Process'])
                 || SecurityNodeHelper::methodName($staticCall) !== 'fromshellcommandline'
@@ -149,16 +149,16 @@ final class ProcessCommandConstructionRule implements RuleInterface
      *
      * @param AnalysisUnit $analysisUnit - Parsed file holding the candidate calls.
      *
-     * @return list<Finding> - One finding per unsafe call; empty when every command is literal or safely escaped.
+     * @return list<Finding> - One finding per call rejected by the command-construction heuristic; empty when every call passes.
      */
     private function proceduralCommandFindings(AnalysisUnit $analysisUnit): array
     {
         $findings = [];
 
-        // Every function call is a candidate, because exec() and friends can be called anywhere in the file.
+
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $functionCall) {
             $functionName = SecurityNodeHelper::globalFunctionName($functionCall);
-            // Only these functions hand their first argument to the shell.
+
             if ($functionName === null || !in_array($functionName, self::PROCEDURAL_COMMAND_SINKS, true)) {
                 continue;
             }
@@ -169,7 +169,7 @@ final class ProcessCommandConstructionRule implements RuleInterface
                 $commandArgument = $this->shellCommandFromArgumentVector($commandArgument);
             }
 
-            // A literal command is fixed; splicing in an unescaped value is what opens the injection point.
+            // Literal commands need no interpolation check; the helper decides whether a construction contains an unaccepted splice.
             if ($commandArgument !== null && $this->splicesUnescapedValue($analysisUnit, $commandArgument)) {
                 $findings[] = $this->dynamicCommandFinding($analysisUnit, $functionCall, $functionName);
             }
@@ -180,15 +180,12 @@ final class ProcessCommandConstructionRule implements RuleInterface
 
     /**
      * Reports whether a command splices in a value that could break out of its argument.
-     *
-     * A string built inside another call, such as sprintf(), always counts, because that call can splice other values around it.
-     * escapeshellarg() counts as safe only outside an open quote, where its own quotes still delimit the value.
+     * Nested call-built strings count; escapeshellarg() is safe only when its quotes are outside an open quote.
      *
      * @param AnalysisUnit $analysisUnit - Parsed file searched for the assignments to a spliced local.
      * @param Expr         $command - Command argument passed to an exec()-style function.
      *
-     * @return bool - True when any spliced part is not literal text, an `(int)` cast, an escaped argument or a plain-word local;
-     *                false for a fully literal or fully escaped command.
+     * @return bool - True for an inspected construction inside a call or with an unaccepted operand; false otherwise.
      */
     private function splicesUnescapedValue(AnalysisUnit $analysisUnit, Expr $command): bool
     {
@@ -209,13 +206,13 @@ final class ProcessCommandConstructionRule implements RuleInterface
                     continue;
                 }
 
-                // An `(int)` cast, or escapeshellarg() outside an open quote, cannot break out of its argument.
+                // An (int) cast, or escapeshellarg() outside an open quote, cannot break out of its argument.
                 if ($operand instanceof Expr\Cast\Int_
                     || ($this->isShellSafeOperand($operand) && !SecurityNodeHelper::hasOpenQuote($literalText, '\'"', false))) {
                     continue;
                 }
 
-                // A local the code only ever sets to its own plain words, such as `$mode = $isDir ? 'J' : 'H'`, carries no outside data.
+                // The scan accepts a local when it finds only assignments that select one of the code's plain words.
                 if (LocalAssignmentEvidence::onlyEverHolds($analysisUnit, $operand, fn(Expr $assigned): bool => $this->isPlainWordOrChoice($assigned), false)) {
                     continue;
                 }
@@ -232,13 +229,12 @@ final class ProcessCommandConstructionRule implements RuleInterface
      *
      * @param Expr $assigned - Right-hand side of an assignment to a spliced local.
      *
-     * @return bool - True for letters, digits and `_ . / : = + -` only; a quote, backslash, space or shell character never qualifies.
+     * @return bool - True for letters, digits and _ . / : = + - only; a quote, backslash, space or shell character never qualifies.
      */
     private function isPlainWordOrChoice(Expr $assigned): bool
     {
-        // A literal word, such as `'J'` or `'-la'`, is judged by its characters.
         if ($assigned instanceof Scalar\String_) {
-            // Only characters the shell passes through unchanged, so the word cannot open a quote or start a second command.
+            // Excluding whitespace, quotes, backslashes, and shell separators keeps the word from opening a quote or starting another command.
             return preg_match('~^[\w./:=+-]+$~', $assigned->value) === 1;
         }
 
@@ -270,19 +266,19 @@ final class ProcessCommandConstructionRule implements RuleInterface
      *
      * @param Expr\Array_ $argumentVector - proc_open() command array; an empty array has no executable or shell text.
      *
-     * @return Expr|null - The item the shell runs as a command; null when PHP runs the argv array directly with no shell.
+     * @return Expr|null - Value after a recognized shell command flag, or null when the executable, flag or following value is unidentified.
      */
     private function shellCommandFromArgumentVector(Expr\Array_ $argumentVector): ?Expr
     {
         $firstItem = $argumentVector->items[0] ?? null;
-        // Only a literal shell name proves that this otherwise-safe argv form brings shell parsing back.
+        // Only a literal shell name lets this heuristic recognize that the argv form reintroduces shell parsing.
         if ($firstItem === null || !$firstItem->value instanceof Node\Scalar\String_) {
             return null;
         }
 
         $interpreterPath = str_replace('\\', '/', strtolower($firstItem->value->value));
         $interpreterName = basename($interpreterPath);
-        // A direct executable such as `git` receives each array item as one argument, so nothing is injected.
+
         if (!in_array($interpreterName, self::SHELL_INTERPRETER_NAMES, true)) {
             return null;
         }
@@ -332,13 +328,13 @@ final class ProcessCommandConstructionRule implements RuleInterface
     }
 
     /**
-     * Builds the finding for a command that request data reaches.
+     * Builds the finding for a command matched by the request-data check.
      *
      * @param AnalysisUnit $analysisUnit - Parsed file supplying the reported path.
      * @param Node         $sinkNode     - Command call or backtick string supplying the reported line.
      * @param string       $sinkName     - Kind of command, shown in the message and metadata.
      *
-     * @return Finding - Security finding.
+     * @return Finding - Warning carrying the request-data match summary and sink metadata.
      */
     private function requestControlledFinding(AnalysisUnit $analysisUnit, Node $sinkNode, string $sinkName): Finding
     {
@@ -357,7 +353,7 @@ final class ProcessCommandConstructionRule implements RuleInterface
      * @param Node         $sinkNode     - Command call supplying the reported line.
      * @param string       $sinkName     - Function name, shown in the message and metadata.
      *
-     * @return Finding - Security finding.
+     * @return Finding - Warning carrying the dynamic-command summary and sink metadata.
      */
     private function dynamicCommandFinding(AnalysisUnit $analysisUnit, Node $sinkNode, string $sinkName): Finding
     {
@@ -377,7 +373,7 @@ final class ProcessCommandConstructionRule implements RuleInterface
      * @param string       $sinkName       - Kind of command, shown in the message and metadata.
      * @param string       $findingSummary - Evidence-specific start of the message.
      *
-     * @return Finding - Security finding.
+     * @return Finding - Medium-confidence warning with the source path and line, supplied summary, sink metadata and remediation.
      */
     private function findingForSink(
         AnalysisUnit $analysisUnit,

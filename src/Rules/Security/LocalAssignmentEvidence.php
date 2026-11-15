@@ -14,7 +14,7 @@ use PhpParser\Node\Stmt;
 /**
  * Proves that a local variable reaching a sink can only hold values its own function assigned in plain sight.
  *
- * Sink rules use it to stay quiet on values a user cannot influence, such as `$id = (int) $_POST['id']` reaching header().
+ * Sink rules suppress findings for accepted forms, such as `$id = (int) $_POST['id']` reaching header().
  * Every write in the function, closures included, must be a plain assignment the rule accepts, with one before the sink.
  *
  * Any write the scan cannot follow refuses the proof, so the finding stays:
@@ -27,14 +27,14 @@ final class LocalAssignmentEvidence
     /**
      * Superglobals a local name must not shadow, beyond the request-input set.
      *
-     * @var list<string>
+     * @var list<string> - Additional names excluded from local-variable proofs.
      */
     private const OTHER_SUPERGLOBALS = ['GLOBALS', '_ENV', '_SESSION'];
 
     /**
      * Calls that can create or overwrite any local by name, such as `extract($_POST)`.
      *
-     * @var list<string>
+     * @var list<string> - Global function names that invalidate local-assignment proofs.
      */
     private const BY_NAME_WRITERS = ['extract', 'parse_str', 'mb_parse_str'];
 
@@ -71,7 +71,7 @@ final class LocalAssignmentEvidence
                 return false;
             }
 
-            // Other locals in the same function do not matter.
+
             if ($occurrence->name !== $sinkOperand->name) {
                 continue;
             }
@@ -99,20 +99,20 @@ final class LocalAssignmentEvidence
     }
 
     /**
-     * Reports whether a function calls something that can write locals by name.
+     * Reports whether a function subtree contains syntax treated as capable of writing locals by name.
      *
      * @param AnalysisUnit $analysisUnit - Parsed file to search.
      * @param FunctionLike $owningFunction - Function whose body is checked, closures inside it included.
      *
-     * @return bool - True for extract(), parse_str(), mb_parse_str(), eval() or an include inside the function.
+     * @return bool - True when a listed by-name call, eval expression, or include expression appears in the scanned function subtree.
      */
     private static function hasByNameWriter(AnalysisUnit $analysisUnit, FunctionLike $owningFunction): bool
     {
-        // eval() and include run code the scan never sees; the listed calls write locals named by their data.
+        // eval() and include hide writes from this scan; the listed calls are conservatively treated as by-name writers.
         foreach (NodeIndex::nodesOfAny($analysisUnit, [Expr\FuncCall::class, Expr\Eval_::class, Expr\Include_::class]) as $candidate) {
             $writesByName = !$candidate instanceof Expr\FuncCall
                 || in_array(SecurityNodeHelper::globalFunctionName($candidate), self::BY_NAME_WRITERS, true);
-            // One by-name writer anywhere in the function can set the local to anything.
+            // One candidate anywhere in the scanned subtree is enough to stop the local-value proof.
             if ($writesByName && self::isWithin($candidate, $owningFunction)) {
                 return true;
             }
@@ -122,36 +122,36 @@ final class LocalAssignmentEvidence
     }
 
     /**
-     * Reports whether an occurrence of a local writes it in a way the scan cannot judge by value.
+     * Reports whether a local occurrence invalidates the scan's plain-assignment evidence.
      *
      * @param Expr\Variable $occurrence - Occurrence of the local.
-     * @param mixed         $parent - The occurrence's parent node; null at the top of a file.
+     * @param mixed         $parent - Parent node used to distinguish assignments, bindings, and ordinary reads.
      *
-     * @return bool - True for a compound, by-reference, loop, destructuring, global, static, catch, use or parameter binding.
+     * @return bool - True for non-plain assignments and bindings that invalidate the caller's local-value evidence.
      */
     private static function isHiddenWrite(Expr\Variable $occurrence, mixed $parent): bool
     {
-        // `$alias = &$id` lets a later `$alias = $_GET['x']` change the local, whichever side it is on.
+        // $alias = &$id lets a later $alias = $_GET['x'] change the local, whichever side it is on.
         if ($parent instanceof Expr\AssignRef) {
             return true;
         }
 
-        // `$id .= $_GET['x']` appends text to an integer.
+        // Compound assignments change the local outside the plain-assignment sequence this scan accepts.
         if ($parent instanceof Expr\AssignOp) {
             return $parent->var === $occurrence;
         }
 
-        // `foreach ($_GET['ids'] as $id)` binds the local to each element.
+        // foreach ($_GET['ids'] as $id) binds the local to each element.
         if ($parent instanceof Stmt\Foreach_) {
             return $parent->keyVar === $occurrence || $parent->valueVar === $occurrence;
         }
 
-        // `[&$id]` aliases the local, and `[$id] = $_GET['pair']` binds it to an element.
+        // [&$id] aliases the local, and [$id] = $_GET['pair'] binds it to an element.
         if ($parent instanceof Node\ArrayItem) {
             return $parent->byRef || self::isDestructuringTarget($parent);
         }
 
-        // A global, static, catch, closure use or parameter binding brings in a value from outside the function body.
+        // These bindings are initialized or captured outside the plain-assignment path accepted by this evidence check.
         return $parent instanceof Stmt\Global_ || $parent instanceof Node\StaticVar || $parent instanceof Stmt\Catch_
             || $parent instanceof Node\ClosureUse || $parent instanceof Node\Param;
     }
@@ -169,12 +169,12 @@ final class LocalAssignmentEvidence
         // Nested destructuring such as `[[$id]] = ...` climbs through the inner lists to the outermost one.
         while ($container instanceof Expr\Array_ || $container instanceof Expr\List_ || $container instanceof Node\ArrayItem) {
             $parent = $container->getAttribute('parent');
-            // The list is the left side of an assignment, so the local receives an element.
+
             if (($parent instanceof Expr\Assign || $parent instanceof Expr\AssignRef) && $parent->var === $container) {
                 return true;
             }
 
-            // The list is a foreach binding, so the local receives part of each element.
+
             if ($parent instanceof Stmt\Foreach_ && ($parent->valueVar === $container || $parent->keyVar === $container)) {
                 return true;
             }
@@ -191,14 +191,14 @@ final class LocalAssignmentEvidence
      * @param Node         $node - Node to place.
      * @param FunctionLike $owningFunction - Function to look for among the node's ancestors.
      *
-     * @return bool - True when the function encloses the node; false for code in another function or at file scope.
+     * @return bool - True when the given function is an ancestor; false for nodes outside its subtree.
      */
     private static function isWithin(Node $node, FunctionLike $owningFunction): bool
     {
         $ancestor = $node->getAttribute('parent');
-        // Climb until the function is found or the top of the file is reached.
+
         while ($ancestor instanceof Node) {
-            // Found the owning function among the ancestors.
+
             if ($ancestor === $owningFunction) {
                 return true;
             }

@@ -3,6 +3,10 @@
 How to move a project between `gruff-php` lines, what each move breaks, and how to go back.
 Every break below is the one this port's own `CHANGELOG.md` records; nothing here is a plan.
 
+## Changes after the initial `0.6.0` build
+
+`docs.param-comment` is now enabled by default. The `everyCallable` default is now true for `docs.missing-phpdoc`, `docs.missing-param-tag` and `docs.return-comment`: named functions can report missing PHPDoc, and bound closures and arrow functions can report missing parameter tags or undescribed return tags. Existing explicit settings keep their values. To retain the earlier behavior, set `rules.docs.param-comment.enabled: false` and `rules.<id>.options.everyCallable: false` for those three rules. `docs.param-comment` keeps its own `everyCallable` default false.
+
 ## What is stable across `0.5.x`
 
 - Rule identifiers. A released `ruleId` keeps its meaning; it is not renamed or repurposed inside a line.

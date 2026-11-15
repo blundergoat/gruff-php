@@ -17,9 +17,9 @@ final readonly class SensitiveExclusionResult
     /**
      * Pairs the surviving findings with the audit rows explaining what was removed.
      *
-     * @param list<Finding>                                        $findings           - Findings no configured entry, test-path skip or section 13c filter removed, in their original order.
-     * @param list<SensitiveExclusionSummary>                      $summaries          - Configured rows in declaration order, then built-in test-path, inline and duplicate rows; empty when nothing was configured or removed.
-     * @param list<array{finding: Finding, justification: string}> $suppressedFindings - Findings another tool's comment or a repeated claim removed, each with its audit reason, which SARIF keeps as suppressed results (FAMILY-CONTRACT.md section 13c).
+     * @param list<Finding> $findings - Remaining findings, preserving report order.
+     * @param list<SensitiveExclusionSummary> $summaries - Configuration order, then built-in, inline, duplicate; empty if no entries or removals.
+     * @param list<array{finding: Finding, justification: string}> $suppressedFindings - Section 13c removals and reasons for SARIF.
      */
     public function __construct(
         public array $findings,
@@ -29,16 +29,15 @@ final readonly class SensitiveExclusionResult
     }
 
     /**
-     * Totals what every entry suppressed, which is the number the text report and the agent hook
-     * surface so removed findings stay visible as a count.
+     * Totals findings suppressed across all audit rows, including built-in and section 13c filters.
      *
-     * @return int - findings removed across all configured entries; zero when nothing is configured or nothing matched.
+     * @return int - Sum of the rows' suppressed counts; zero when there are no rows or no findings were removed.
      */
     public function suppressedCount(): int
     {
         $total = 0;
 
-        // Sum each entry's own count so the total always agrees with the published audit rows.
+
         foreach ($this->summaries as $summary) {
             $total += $summary->suppressed;
         }

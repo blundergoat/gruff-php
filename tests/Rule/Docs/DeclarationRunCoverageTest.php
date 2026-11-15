@@ -8,17 +8,17 @@ use GruffPhp\Rules\Docs\MissingConstantPhpdocRule;
 use GruffPhp\Rules\Docs\MissingPropertyPhpdocRule;
 
 /**
- * Pins documentation coverage by structure: a comment above the first declaration
- * of an unbroken run covers the run, unless another declaration in the run has its own comment. A blank line or any
- * other statement ends a run.
+ * Checks shared documentation for unbroken runs of constants and properties.
+ * Constants accept leading local comments; properties require docblocks under the default policy.
+ * Later individual documentation prevents sharing, while blank lines end a run.
  */
 final class DeclarationRunCoverageTest extends DocsRuleTestCase
 {
     /**
-     * Verify a comment above a run's first constant covers the run by structure rather than by its words,
-     * unless another constant in the run has its own comment.
+     * Verify leading PHPDoc and local comments cover the constant runs in the fixture.
+     * A later individual comment prevents sharing, and a blank line leaves the next constant uncovered.
      *
-     * @return void
+     * @return void - Asserts that only RETRY_THIRD and TIMEOUT_READ lack accepted documentation.
      */
     public function testMissingConstantPhpdocCoversAnUnbrokenRunByStructure(): void
     {
@@ -58,10 +58,10 @@ PHP, MissingConstantPhpdocRule::ID);
     }
 
     /**
-     * Verify a docblock above a run's first property covers the run, while a later docblock, a blank line, or a
-     * line comment under the default docblock policy leaves the other properties to stand alone.
+     * Verify a docblock on the first property covers its declaration run.
+     * Later docblocks, blank lines and line comments leave subsequent properties to stand alone under the default policy.
      *
-     * @return void
+     * @return void - Asserts that jitter, password, readTimeout and user are the only reported properties.
      */
     public function testDocblockAboveARunsFirstPropertyCoversTheRun(): void
     {
@@ -100,11 +100,11 @@ PHP, MissingPropertyPhpdocRule::ID));
     }
 
     /**
-     * Return finding symbols in stable lexical order.
+     * Return finding symbols in sorted order for assertions.
      *
-     * @param list<\GruffPhp\Results\Finding\Finding> $findings - Findings to summarize.
+     * @param list<\GruffPhp\Results\Finding\Finding> $findings - Findings whose symbols form the assertion input.
      *
-     * @return list<string> - Sorted finding symbols; a missing symbol becomes an empty string and fails expectations.
+     * @return list<string> - Sorted symbols with duplicates retained; null symbols become empty strings.
      */
     private static function symbols(array $findings): array
     {

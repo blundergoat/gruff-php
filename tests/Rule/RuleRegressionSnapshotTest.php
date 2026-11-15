@@ -45,10 +45,10 @@ use GruffPhp\Rules\TestQuality\TestLongerThanSutRule;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers cross-rule report stability over the full fixture corpus users depend on for release confidence.
+ * Pins the default corpus's unit count, finding count and canonical finding payload hash.
  *
- * Snapshot hashes and catalogue coverage expose any change to finding counts, content, identity, or calibration signal.
- * Maintainers use this suite before release so users do not receive unexplained report or scoring drift.
+ * Separate calibration scans supply rule coverage missing from the default corpus.
+ * Together the tests require at least one finding for every registered rule.
  *
  * @phpstan-import-type FindingArray from Finding
  * @phpstan-import-type FindingMetadata from Finding
@@ -61,73 +61,74 @@ final class RuleRegressionSnapshotTest extends TestCase
     /**
      * Verify the default rule registry keeps fixture findings stable.
      *
-     * @return void
+     * @return void - Asserts the fixture-unit count, finding count and canonical payload hash.
      */
     public function testDefaultRuleRegistryFindingsStayStableAcrossFixtures(): void
     {
         [$units, $findings, $json] = $this->analysePaths(['tests/Fixtures']);
 
-        // M07 added tests/Fixtures/Baseline/gruff-baseline-v3.json to the corpus, and M19 ten precision fixtures.
-        // Precision-floor M19 (2026-10-04) removed ten fixtures that served only retired rules, renamed the detector-selection config
-        // to Config/disable-jwt-token.yaml, and added Config/enable-default-off-rules.yaml.
-        // Precision-floor M02 (2026-10-14) removed 27 fixtures that served only the 36 rules it retired (ADR-034).
-        // Its repairs then added four precision fixtures: debug-mode guards, header values, silent catches and commented-out code.
-        // The repeated-structure and declaration controls add two fixture files.
+
+
+
+
+
+
         self::assertCount(163, $units);
-        // M19 (2026-09-19) removed confirmed false positives and nothing else: an immediately invoked closure, a
-        // statically written first-class callable, `#[\Override]` and `{@inheritdoc}` methods, and pure-hex digests.
-        // AWS's documented example key now reports, as the operator decided, and so does one sibling-scope `$x()`.
-        // Its review fixes then added 38 findings, every one on a new fixture line: ten laundering and shadowing
-        // `$x()` shapes, two one-line wrappers, a namespaced `sprintf()`, a concatenated secret, and 24 findings
-        // other rules raise on that new fixture code. The operator-requested double-check added 39 more: 3 on the
-        // dynamic-call fixture's two new pins, 33 on the two inherited-contract fixtures (21 docs tags the narrowed
-        // exemption owes, 12 from other rules), and 3 docs tags on older fixtures that exemption no longer hides.
+
+
+
+
+
+
+
+
         // M10 D23 (2026-09-25) removed one: synthetic-secrets.php's digit-free mixed-case alphabet run, since a
         // qualifying high-entropy literal now holds a letter and a digit.
-        // M10 D33 (2026-09-26) removed one: safe-dummy-values.php line 11, AWS's documented example key, now a documented sample.
-        // M10 D35 renamed docs.missing-public-phpdoc to docs.missing-phpdoc, which moves the hash and no count.
-        // M55 removes the bound local-closure call at phpunit-mechanics-smells.php:74; its test-quality findings remain.
-        // Precision-floor M19 (2026-10-04) removed 47: 40 from the nine retired rules (ADR-034), 5 from the three rules
-        // now off by default, and the two docs.missing-file-phpdoc findings on the deleted entropy fixtures.
-        // The run-coverage and code-line CHANGELOG entries removed 6 and added 1: docs.missing-constant-phpdoc now covers an unbroken
-        // run by structure, which clears four constants in missing-constant-phpdoc-line-comment.php and reports
-        // RESET_GROUP_BETA_PATTERN, whose run has another commented constant; waste.unreachable-code no longer reports
-        // the trailing `// reported` comment in dynamic-call-precision.php; and test-longer-than-sut counts code
-        // lines, which cleared testHasLotsOfWhitespaceAndComments in a since-deleted fixture.
-        // Precision-floor M14's cognitive repair added two guard-clause methods to Complexity/cognitive.php: each adds a
-        // docs.missing-phpdoc finding, and the class's 26 public methods now pass size.public-method-count's limit of 25.
-        // The repair itself moves no finding or measured value in this corpus.
-        // Precision-floor M15 clears four loop-context findings: one identifying expected value and three
-        // singleton loops. A repeated-loop control now uses a fixed expected literal, adding one magic-number finding.
-        // M15 default-off policy removes 42 findings from eight test-quality rules; explicit calibration still covers them.
-        // M15 additionally makes two insufficient-evidence rules opt-in, removing 11 fixture findings.
-        // Precision-floor M13-T23 leaves a wholly tags-only docblock to docs.bare-phpdoc-tags alone, so docs.return-comment
-        // no longer reports it a second time; that removes 4 findings.
-        // Precision-floor M05 adds 19, all on the new escapeSplicedSinkValues function in Security/procedural-sink-precision.php
-        // and none elsewhere: 8 dangerous-function-call on its non-literal shell_exec and exec lines, its 5 process-command and
-        // 4 SQL controls that still report, and 2 naming.abbreviation-allowlist on its signature.
-        // Precision-floor M02 (2026-10-14) retired 36 rules (ADR-034) and deleted the 27 fixtures that served only them: net 1075 fewer.
-        // Precision-floor M02 then turned five rules off by default (ADR-034): net 80 fewer.
-        // Its repairs add 88: 78 on the four new precision fixtures, 7 on procedural-sink-precision.php's new plain-word controls,
-        // and 5 on pii-realistic.php's new mailbox controls, less the 2 database-URL passwords pii-test-fixture now reads as URL userinfo.
-        // Making security.debug-mode-enabled and security.header-injection opt-in then removes their 15 and 30 fixture findings,
-        // and turning security.silent-catch and sensitive-data.pii-test-fixture off after their re-measures failed removes 16 and 13.
-        // The group controls add 225 default-mode findings; the prior 1,558 findings stay identical.
-        // M138 adds 116 findings on its new declaration fixture; every prior fixture finding is unchanged.
-        // M145 enables groups by default: this rule emits 17 groups in place of 40 legacy findings.
-        self::assertCount(1876, $findings);
-        // M08 made sensitive-data markers carry the class the detector already knew: a classified finding now reads
-        // `[redacted:aws-access-key]` where it read `[redacted]`. The finding count, the rule set, and every
-        // line-free identity are unchanged; only the marker text inside those findings moved.
-        // Precision-floor M14 banded the size and complexity rules: a finding under one and a half times its limit is
-        // advisory with do-not-add advice, every banded finding carries limitBand, and complexity advice asks for a
-        // simpler path. The count and every identity are unchanged; severity, advice and metadata moved the hash.
-        // Precision-floor M13-T26 builds the docs.missing-phpdoc message from the signature: it names each parameter, and asks for
-        // the return value and the throw condition only where they exist. The count and every identity are unchanged; the messages moved the hash.
-        // Precision-floor M05's 19 new fixture findings move the hash; no existing finding's message or identity changes.
-        // Precision-floor M02's retirements, default-off changes, repair fixtures and four repaired rules going opt-in move the hash.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        self::assertCount(1976, $findings);
+
+
+
+
+
+
+
+
+
+
         self::assertSame(
-            'a289348fddab08358c6ef99857365090ccd52856e69658a364e33bfc9ad0fac4',
+            '9063c0e250507729f8c2205e39eabf16c0d732960a00b0fd5c4f225d626eea03',
             hash('sha256', $json),
         );
     }
@@ -135,7 +136,7 @@ final class RuleRegressionSnapshotTest extends TestCase
     /**
      * Verify every registered rule has either default-corpus signal or explicit calibration coverage.
      *
-     * @return void
+     * @return void - Asserts the expected default coverage gaps and that supplemental findings cover each gap.
      */
     public function testDefaultAndSupplementalCalibrationScenariosCoverEveryRegisteredRule(): void
     {
@@ -188,8 +189,7 @@ final class RuleRegressionSnapshotTest extends TestCase
      * @param AnalysisConfig|null $config      - Optional config override, or null to use default-registry config.
      * @param string              $projectRoot - Project root used to resolve fixture paths and rule context.
      *
-     * @return array{0: list<AnalysisUnit>, 1: list<Finding>, 2: string} - parsed units, raw findings, and canonical JSON for the analysed paths, in
-     *                  that order
+     * @return array{0: list<AnalysisUnit>, 1: list<Finding>, 2: string} - Parsed units, raw findings and canonical JSON, in that order.
      */
     private function analysePaths(
         array           $paths,
@@ -218,7 +218,7 @@ final class RuleRegressionSnapshotTest extends TestCase
     /**
      * Build supplemental calibration findings for the test fixture.
      *
-     * @return list<Finding> - the extra findings the baseline corpus scan cannot reach, merged into one calibration list
+     * @return list<Finding> - All findings from supplemental scans, including rules already represented in the default corpus.
      */
     private function supplementalCalibrationFindings(): array
     {
@@ -254,7 +254,7 @@ final class RuleRegressionSnapshotTest extends TestCase
             ['tests/Fixtures/TestQuality/testdox-readability.php'],
             (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/enable-testdox-readability.yaml', $registry),
         )[1],
-            // Exercise opt-in rules explicitly, including M15's test-quality defaults and M02's security and dead-code ones.
+            // Enable opt-in rules so the coverage assertion can include their findings.
             ...$this->analysePaths(
             ['tests/Fixtures/Security', 'tests/Fixtures/DeadCode', 'tests/Fixtures/SensitiveData', 'tests/Fixtures/TestQuality'],
             (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/enable-default-off-rules.yaml', $registry),
@@ -265,10 +265,9 @@ final class RuleRegressionSnapshotTest extends TestCase
     }
 
     /**
-     * Build docs.param-comment findings from a synthetic file, because the rule is off by default and every docs fixture's
-     * bare @param tag sits in a tags-only block that docs.bare-phpdoc-tags owns.
+     * Collect findings from a summarised function whose bare parameter tag is not in a tags-only block.
      *
-     * @return list<Finding> - findings from one summarised function whose @param tag names only a type, with the rule on
+     * @return list<Finding> - All findings from the synthetic source, with docs.param-comment explicitly enabled.
      */
     private function paramCommentFindings(): array
     {
@@ -294,7 +293,7 @@ final class RuleRegressionSnapshotTest extends TestCase
     /**
      * Build missing readme findings for the test fixture.
      *
-     * @return list<Finding> - findings from a synthetic src tree with no README, isolating the docs.missing-readme signal
+     * @return list<Finding> - All findings from a synthetic src tree with no README.
      */
     private function missingReadmeFindings(): array
     {
@@ -311,9 +310,9 @@ final class RuleRegressionSnapshotTest extends TestCase
     }
 
     /**
-     * Build php unit config calibration findings for the test fixture.
+     * Build PHPUnit configuration calibration findings for the test fixture.
      *
-     * @return list<Finding> - findings produced against the lax phpunit-config fixture root so the phpunit.* config rules fire
+     * @return list<Finding> - All findings for non-candidates.php analysed with the lax PHPUnit project root.
      */
     private function phpUnitConfigCalibrationFindings(): array
     {
@@ -372,9 +371,9 @@ final class RuleRegressionSnapshotTest extends TestCase
     /**
      * Build a stable finding payload row for snapshot hashing.
      *
-     * @param Finding $finding - single finding to flatten; its metadata is recursively key-sorted for stability
+     * @param Finding $finding - Finding to serialize with sorted top-level and metadata-map keys.
      *
-     * @return FindingArray - the flattened finding with top-level keys sorted so equal findings serialise byte-for-byte alike
+     * @return FindingArray - the finding payload with top-level keys sorted so equal findings serialise byte-for-byte alike
      */
     private static function canonicalFindingArray(Finding $finding): array
     {
@@ -390,11 +389,11 @@ final class RuleRegressionSnapshotTest extends TestCase
     }
 
     /**
-     * Sorts nested finding metadata so the user-visible regression snapshot stays stable across equivalent map ordering.
+     * Sorts top-level and immediate nested map keys so equivalent metadata produces a stable regression snapshot.
      *
-     * @param FindingMetadata $metadata - Finding metadata payload.
+     * @param FindingMetadata $metadata - Metadata to sort by its top-level and immediate nested map keys.
      *
-     * @return FindingMetadata - the metadata with both nested maps and the top level key-sorted for a stable snapshot hash
+     * @return FindingMetadata - Metadata with top-level and immediate nested map keys sorted for a stable snapshot hash.
      */
     private static function canonicalMetadata(array $metadata): array
     {
@@ -414,7 +413,7 @@ final class RuleRegressionSnapshotTest extends TestCase
     /**
      * Create a temporary directory for filesystem assertions.
      *
-     * @return string - absolute path to a freshly created, uniquely named temp directory for the caller to populate
+     * @return string - path to a freshly created, uniquely named temp directory for the caller to populate
      */
     private function tempDir(): string
     {
@@ -428,14 +427,14 @@ final class RuleRegressionSnapshotTest extends TestCase
     /**
      * Remove a temporary directory tree.
      *
-     * @param string $path - Filesystem path.
+     * @param string $path - Temporary directory root to clean up; non-directory paths are ignored.
      *
-     * @return void
+     * @return void - Recursively removes entries and attempts to remove the directory.
      */
     private function removeDir(string $path): void
     {
         if (!is_dir($path)) {
-            // Nothing to clean up when the path was never created; treat removal as a no-op.
+
             return;
         }
 

@@ -4,6 +4,8 @@ Notable user-facing changes to `gruff-php` are listed here.
 
 ## Unreleased
 
+- **BREAKING: parameter descriptions and wider callable checks are enabled by default** - `docs.param-comment` now checks parameter descriptions. `docs.missing-phpdoc` also checks named functions, and `docs.missing-param-tag` and `docs.return-comment` also check bound closures and arrow functions. Set `rules.docs.param-comment.enabled: false` to disable parameter descriptions, or `rules.<id>.options.everyCallable: false` to retain an earlier callable scope. Existing explicit settings keep their values.
+
 - **Security:** Upgrade `symfony/filesystem` and `symfony/yaml` to 8.1.11 to resolve their reported security advisories.
 
 - **Grouped duplicate-test findings are enabled by default** - `test-quality.repeated-structure-missing-data-provider` reports one finding per eligible group, listing every method and line. Set `rules.test-quality.repeated-structure-missing-data-provider.options.groupFindings: false` for legacy shape-group findings. Nested declarations now retain their literals and PHPDoc, and body attribute arguments stay exact.

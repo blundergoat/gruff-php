@@ -20,9 +20,9 @@ final class NewFindingsGateCliTest extends CliTestCase
     private string $project = '';
 
     /**
-     * Build a temporary project whose Calc fixture has one undocumented method.
+     * Create a temporary project with a README and a Calc fixture containing documented alpha.
      *
-     * @return void
+     * @return void - Creates and populates the per-test project directory.
      */
     protected function setUp(): void
     {
@@ -34,7 +34,7 @@ final class NewFindingsGateCliTest extends CliTestCase
     /**
      * Remove the temporary fixture.
      *
-     * @return void
+     * @return void - Removes the fixture directory and its contents when it exists.
      */
     protected function tearDown(): void
     {
@@ -44,9 +44,9 @@ final class NewFindingsGateCliTest extends CliTestCase
     /**
      * Verify --fail-on-new passes (exit 0, zero new) when every finding is baselined.
      *
-     * @throws JsonException
+     * @throws JsonException - If the CLI output cannot be decoded as JSON.
      *
-     * @return void
+     * @return void - Asserts exit 0, zero new findings and no failure reason.
      */
     public function testPassesWhenNoNewFindings(): void
     {
@@ -61,11 +61,11 @@ final class NewFindingsGateCliTest extends CliTestCase
     }
 
     /**
-     * Verify --fail-on-new does not also apply the default total-findings gate.
+     * Verify --fail-on-new passes when the comparison with HEAD has no changes.
      *
-     * @throws JsonException
+     * @throws JsonException - If the CLI output cannot be decoded as JSON.
      *
-     * @return void
+     * @return void - Asserts exit 0, zero new findings and no failure reason against unchanged HEAD.
      */
     public function testFailOnNewDoesNotApplyDefaultTotalGate(): void
     {
@@ -83,9 +83,9 @@ final class NewFindingsGateCliTest extends CliTestCase
     }
 
     /**
-     * Verify explicit --fail-on overrides a configured new-findings gate unless --fail-on-new is also set.
+     * Verify explicit --fail-on none bypasses a configured new-findings gate without a reference.
      *
-     * @return void
+     * @return void - Asserts exit 0 and absence of the missing-reference diagnostic.
      */
     public function testExplicitFailOnOverridesConfiguredNewFindingsGate(): void
     {
@@ -103,9 +103,9 @@ final class NewFindingsGateCliTest extends CliTestCase
     /**
      * Verify --fail-on-new fails with a "new" scope on a finding not in the baseline.
      *
-     * @throws JsonException
+     * @throws JsonException - If the CLI output cannot be decoded as JSON.
      *
-     * @return void
+     * @return void - Asserts exit 1 with failure scope new and threshold kind error.
      */
     public function testFailsOnBaselineNewFinding(): void
     {
@@ -124,9 +124,9 @@ final class NewFindingsGateCliTest extends CliTestCase
     /**
      * Verify --fail-on-new fails on a finding introduced versus a --diff-vs base ref.
      *
-     * @throws JsonException
+     * @throws JsonException - If the CLI output cannot be decoded as JSON.
      *
-     * @return void
+     * @return void - Asserts exit 1 and failure scope new after adding an undocumented method.
      */
     public function testFailsOnDiffVsIntroducedFinding(): void
     {
@@ -144,9 +144,9 @@ final class NewFindingsGateCliTest extends CliTestCase
     }
 
     /**
-     * Verify --fail-on-new errors at setup when no baseline or --diff-vs reference exists.
+     * Verify --fail-on-new rejects a run without a baseline or --diff-vs reference.
      *
-     * @return void
+     * @return void - Asserts exit 2 and the missing-reference diagnostic.
      */
     public function testErrorsWithoutReferencePoint(): void
     {
@@ -157,11 +157,11 @@ final class NewFindingsGateCliTest extends CliTestCase
     }
 
     /**
-     * Write the Calc fixture, optionally with a second undocumented method.
+     * Write Calc with documented alpha and an optional undocumented beta method.
      *
-     * @param bool $shouldIncludeBeta - Whether to include a second undocumented public method.
+     * @param bool $shouldIncludeBeta - Whether to add undocumented beta beside documented alpha.
      *
-     * @return void
+     * @return void - Writes the Calc source file used by the gate scenarios.
      */
     private function writeCalc(bool $shouldIncludeBeta): void
     {
@@ -239,9 +239,9 @@ final class NewFindingsGateCliTest extends CliTestCase
     /**
      * Run a git command inside the fixture project.
      *
-     * @param list<string> $args - Git arguments.
+     * @param list<string> $args - Arguments passed to Git in the fixture project.
      *
-     * @return void
+     * @return void - Asserts that Git exits successfully in the temporary project.
      */
     private function git(array $args): void
     {
@@ -255,9 +255,9 @@ final class NewFindingsGateCliTest extends CliTestCase
      * Write a fixture file, creating parent directories as needed.
      *
      * @param string $path     - Project-relative file path.
-     * @param string $contents - File contents.
+     * @param string $contents - Contents written to the fixture file.
      *
-     * @return void
+     * @return void - Creates missing parent directories and writes the fixture file.
      */
     private function writeProjectFile(string $path, string $contents): void
     {

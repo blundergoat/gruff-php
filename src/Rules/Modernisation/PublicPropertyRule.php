@@ -18,14 +18,9 @@ use PhpParser\Node;
 use PhpParser\Node\Stmt;
 
 /**
- * Flags a public mutable property that lets any caller read and overwrite object state directly, so the
- * user can move to readonly properties or accessor methods that keep the class's invariants intact.
- *
- * Runs per file over every class, skipping readonly owners and DTO-style data carriers. Readonly owners
- * cannot expose mutable properties, while DTO public state is intentional. Each remaining declared or
- * promoted property is reported at warning when it is public, non-static, and still writable from
- * outside; `readonly`, `private(set)`, and `protected(set)` all close that write side. gruff-php only
- * surfaces the property, it never rewrites it for you.
+ * Flags public mutable instance properties as warnings, suggesting readonly declarations or invariant-preserving accessors.
+ * Skips readonly classes, classes with Data, Dto, DTO, Payload, or ValueObject suffixes, and names matched case-insensitively against allowedClasses.
+ * Covers declared and promoted properties with no readonly or restricted-set modifier; never rewrites source.
  */
 final readonly class PublicPropertyRule implements RuleInterface
 {
@@ -65,10 +60,10 @@ final readonly class PublicPropertyRule implements RuleInterface
     /**
      * Reports each public mutable declared or promoted property that exposes overwritable state.
      *
-     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed file whose classes supply property declarations and finding locations.
+     * @param RuleContext  $ruleContext  - Rule settings supplying the allowedClasses exemption.
      *
-     * @return list<Finding> - One finding per exposed public mutable property; empty when every class guards its state.
+     * @return list<Finding> - One finding per non-exempt public mutable instance property; empty when none qualify.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -76,11 +71,11 @@ final readonly class PublicPropertyRule implements RuleInterface
         $allowedClasses = $this->normalizedClassSet($settings->stringListOption('allowedClasses'));
         $findings       = [];
 
-        // Inspect every class declared in the file.
+
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Class_::class) as $class) {
             $className = $this->resolvedClassName($class);
 
-            // Readonly classes cannot expose mutable instance state, while DTO public fields are intentional.
+            // Readonly owners cannot expose writable properties; DTO suffixes and configured classes are intentional exemptions.
             if (
                 $class->isReadonly()
                 || ModernisationNodeHelper::isDtoClass($class)
@@ -121,11 +116,11 @@ final readonly class PublicPropertyRule implements RuleInterface
     }
 
     /**
-     * Resolves a declaration to the exact name configured by a consumer.
+     * Returns the resolved class name, falling back to the declared short name.
      *
-     * @param Stmt\Class_ $class - Named or anonymous class declaration.
+     * @param Stmt\Class_ $class - Class declaration whose name is used for the allowedClasses lookup.
      *
-     * @return string|null - Fully qualified name without a leading separator, or null for anonymous classes.
+     * @return string|null - Resolved name without a leading separator, short name if unresolved, or null for anonymous classes.
      */
     private function resolvedClassName(Stmt\Class_ $class): ?string
     {
@@ -149,9 +144,9 @@ final readonly class PublicPropertyRule implements RuleInterface
     {
         $findings = [];
 
-        // Check each property the class declares.
+
         foreach ($class->getProperties() as $property) {
-            // Only a plain public, non-static property with an open write side exposes overwritable state.
+
             if (!$property->isPublic() || $property->isStatic() || !$this->hasOpenWriteSide($property)) {
                 continue;
             }
@@ -166,16 +161,16 @@ final readonly class PublicPropertyRule implements RuleInterface
     }
 
     /**
-     * Reports whether a declaration still lets an outside caller assign to the property.
+     * Reports whether a public declaration keeps its write side open to outside callers.
      *
-     * @param Stmt\Property|Node\Param $declaration - Property statement or promoted constructor parameter.
+     * @param Stmt\Property|Node\Param $declaration - Public property statement or parameter already confirmed as a public promotion.
      *
      * @return bool - True when no readonly or restricted-set modifier closes the write side.
      */
     private function hasOpenWriteSide(Stmt\Property|Node\Param $declaration): bool
     {
         // PHP 8.4 asymmetric visibility keeps the read side public while closing the write side, so a
-        // `private(set)` or `protected(set)` property leaves an outside caller nothing to overwrite.
+        // private(set) or protected(set) property leaves an outside caller nothing to overwrite.
         return !$declaration->isReadonly()
             && !$declaration->isPrivateSet()
             && !$declaration->isProtectedSet();
@@ -200,7 +195,7 @@ final readonly class PublicPropertyRule implements RuleInterface
         $findings = [];
 
         foreach ($constructor->params as $parameter) {
-            // Only a public promotion with an open write side exposes writable object state.
+
             if (!$parameter->isPromoted() || !$parameter->isPublic() || !$this->hasOpenWriteSide($parameter)) {
                 continue;
             }

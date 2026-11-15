@@ -19,9 +19,9 @@ use PhpParser\Node\Name;
 use PhpParser\Node\Stmt;
 
 /**
- * Flags a test whose only assertion restates a fact static analysis already proves - `assertTrue(class_exists(X::class))`,
- * `assertTrue(method_exists(...))` - for a class or member declared in the same parsed file, so the test guards
- * nothing a type checker would not catch. Reports candidates, not deletions. Runs over every test. Advisory, high confidence.
+ * Reports assertTrue() existence checks for class-like declarations or members indexed from the same parsed file.
+ * These are source-based review candidates; runtime loading and compatibility contracts can still justify them.
+ * A test can produce multiple findings, one per recognised assertion; findings are advisory at high confidence.
  */
 final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
 {
@@ -58,37 +58,37 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
      * Reports assertion calls that restate declarations already present in the parsed unit.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext - Required by the rule interface; unused by this rule.
      *
      * @return list<Finding> - Findings for static-analysis-redundant test candidates.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $declarations = $this->collectDeclarations($analysisUnit);
-        // No same-file declarations means nothing can be statically redundant.
+        // Without same-file declarations, this rule has no static redundancy evidence.
         if ($declarations === []) {
             return [];
         }
 
         $findings = [];
 
-        // Weigh every test scope in the file.
+
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
-            // Inspect each assertion the test makes.
+
             foreach (TestQualityNodeHelper::assertionCalls($scope) as $assertionCall) {
-                // Only an assertTrue() can wrap a static existence check.
+
                 if (TestQualityNodeHelper::callName($assertionCall) !== 'asserttrue') {
                     continue;
                 }
 
                 $subjectCall = TestQualityNodeHelper::firstArgValue($assertionCall);
-                // The assertion is redundant only when it wraps a function call.
+
                 if (!$subjectCall instanceof Expr\FuncCall) {
                     continue;
                 }
 
                 $candidate = $this->candidateFromSubjectCall($subjectCall, $declarations);
-                // Keep only calls a same-file declaration provably satisfies.
+                // Keep only calls backed by a matching same-file declaration.
                 if ($candidate === null) {
                     continue;
                 }
@@ -123,21 +123,21 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit whose declarations should be indexed.
      *
-     * @return array<string, array{kind: string, name: string, methods: array<string, string>, properties: array<string, string>}> - Declaration index.
+     * @return array<string, array{kind: string, name: string, methods: array<string, string>, properties: array<string, string>}> - Name-keyed rows.
      */
     private function collectDeclarations(AnalysisUnit $analysisUnit): array
     {
         $declarations = [];
 
-        // Weigh every top-level class-like declaration.
+
         foreach ($this->topLevelClassLikes($analysisUnit) as $node) {
-            // An anonymous class registers no name to assert against.
+
             if ($node->name === null) {
                 continue;
             }
 
             $name = $this->classLikeName($node);
-            // Skip declarations whose name cannot be resolved.
+
             if ($name === null) {
                 continue;
             }
@@ -149,7 +149,7 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
                 'properties' => [],
             ];
 
-            // Index the declared methods and properties.
+
             foreach ($node->stmts as $statement) {
                 if ($statement instanceof Stmt\ClassMethod) {
                     // PHP resolves method names case-insensitively, so index by the lowercase name.
@@ -168,7 +168,7 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
                 }
             }
 
-            // Register the record under each of its lookup keys.
+
             foreach ($this->classLikeKeys($node, $name) as $key) {
                 $declarations[$key] = $record;
             }
@@ -178,10 +178,8 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
     }
 
     /**
-     * Collects the class-like declarations PHP registers unconditionally: those at the file top level or
-     * directly inside a namespace block. Declarations nested in functions, methods, or conditional
-     * blocks are only registered once that code path runs, so a static existence assertion against
-     * them is not provably redundant and must be excluded from the index.
+     * Collects class-like declarations directly at file or namespace scope, preserving source order.
+     * Nested declarations are excluded because their registration depends on executing the enclosing code.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit whose top-level declarations should be collected.
      *
@@ -191,13 +189,13 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
     {
         $classLikes = [];
 
-        // Weigh every top-level statement.
+
         foreach ($analysisUnit->statements as $statement) {
-            // A namespace block holds its own class-like declarations.
+
             if ($statement instanceof Stmt\Namespace_) {
-                // Collect each class-like declared in the namespace.
+
                 foreach ($statement->stmts as $namespaceStatement) {
-                    // Only class-like statements are registered here.
+
                     if ($namespaceStatement instanceof Stmt\ClassLike) {
                         $classLikes[] = $namespaceStatement;
                     }
@@ -205,7 +203,7 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
                 continue;
             }
 
-            // A class-like at file scope registers unconditionally too.
+
             if ($statement instanceof Stmt\ClassLike) {
                 $classLikes[] = $statement;
             }
@@ -215,37 +213,39 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
     }
 
     /**
-     * Builds the candidate metadata when a source declaration proves the subject call, or null.
+     * Builds candidate metadata when the subject call has matching same-file declaration evidence, or null.
      *
-     * @param Expr\FuncCall                                                                                  $subjectCall - Function call wrapped by assertTrue().
-     * @param array<string, array{kind: string, name: string, methods: array<string, string>, properties: array<string, string>}> $declarations - Same-unit declaration index.
+     * @param Expr\FuncCall $subjectCall - Function call wrapped by assertTrue().
+     * @param array<string, array{kind: string, name: string, methods: array<string, string>, properties: array<string, string>}> $declarations
+     *     - Same-unit declaration index.
      *
-     * @return array{variant: string, assertion: string, staticFact: string, evidenceSymbol: string, candidateConfidence: string}|null - Candidate evidence for a redundant static-fact assertion, or null when the assertion stays unowned.
+     * @return array{variant: string, assertion: string, staticFact: string, evidenceSymbol: string, candidateConfidence: string}|null
+     *     - Candidate evidence, or null for unsupported calls or missing declaration evidence.
      */
     private function candidateFromSubjectCall(Expr\FuncCall $subjectCall, array $declarations): ?array
     {
         $assertion = TestQualityNodeHelper::functionName($subjectCall);
-        // A dynamic subject call has no name to resolve.
+
         if ($assertion === null) {
             return null;
         }
 
         $symbolName = $this->classNameFromClassConst(TestQualityNodeHelper::firstArgValue($subjectCall));
-        // A non-::class first argument names no class to check.
+
         if ($symbolName === null) {
             return null;
         }
 
         $declaration = $declarations[strtolower($symbolName)] ?? null;
-        // Only a class declared in this same file can be statically redundant.
+        // Require same-file evidence before considering an assertion redundant.
         if ($declaration === null) {
             return null;
         }
 
         $expectedKind = $this->expectedKindForExistenceAssertion($assertion);
-        // class/interface/trait/enum existence checks compare against the declaration kind.
+
         if ($expectedKind !== null) {
-            // A mismatched kind means the assertion is not redundant.
+
             if ($declaration['kind'] !== $expectedKind) {
                 return null;
             }
@@ -259,12 +259,12 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
             ];
         }
 
-        // method_exists() checks a declared method.
+
         if ($assertion === 'method_exists') {
             return $this->memberCandidate($subjectCall, $declaration, 'methods', 'method');
         }
 
-        // property_exists() checks a declared property.
+
         if ($assertion === 'property_exists') {
             return $this->memberCandidate($subjectCall, $declaration, 'properties', 'property');
         }
@@ -275,17 +275,18 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
     /**
      * Builds the candidate metadata for a method_exists()/property_exists() assertion, or null.
      *
-     * @param Expr\FuncCall                                                       $subjectCall - Existence check wrapped by assertTrue().
-     * @param array{kind: string, name: string, methods: array<string, string>, properties: array<string, string>} $declaration - Same-unit declaration row.
-     * @param 'methods'|'properties'                                             $memberBucket - Declaration member bucket to inspect.
-     * @param 'method'|'property'                                                $memberKind - Human-readable member kind.
+     * @param Expr\FuncCall $subjectCall - Existence check wrapped by assertTrue().
+     * @param array{kind: string, name: string, methods: array<string, string>, properties: array<string, string>} $declaration - Same-file record.
+     * @param 'methods'|'properties' $memberBucket - Declaration member bucket to inspect.
+     * @param 'method'|'property' $memberKind - Human-readable member kind.
      *
-     * @return array{variant: string, assertion: string, staticFact: string, evidenceSymbol: string, candidateConfidence: string}|null - Candidate evidence for a declared member existence assertion, or null when the member is not statically proven.
+     * @return array{variant: string, assertion: string, staticFact: string, evidenceSymbol: string, candidateConfidence: string}|null
+     *     - Candidate evidence, or null without a literal string member name matching the indexed declaration.
      */
     private function memberCandidate(Expr\FuncCall $subjectCall, array $declaration, string $memberBucket, string $memberKind): ?array
     {
         $member = TestQualityNodeHelper::literalValue(TestQualityNodeHelper::argValue($subjectCall, 1));
-        // A dynamic member name cannot be matched against declarations.
+
         if (!is_string($member)) {
             return null;
         }
@@ -294,7 +295,7 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
         // language resolves it so a wrong-case property_exists() is not mistaken for a proven member.
         $memberKey    = $memberKind === 'property' ? $member : strtolower($member);
         $declaredName = $declaration[$memberBucket][$memberKey] ?? null;
-        // The member is redundant only when the class actually declares it.
+
         if (!is_string($declaredName)) {
             return null;
         }
@@ -313,11 +314,11 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
     }
 
     /**
-     * Returns the class-like kind an existence function proves, or null for a member check.
+     * Maps supported class-like existence function names to declaration kinds.
      *
      * @param string $assertion - Lowercase existence function name.
      *
-     * @return string|null - Expected class-like kind, or null when the function checks a member.
+     * @return string|null - Expected kind, or null for member checks and unsupported function names.
      */
     private function expectedKindForExistenceAssertion(string $assertion): ?string
     {
@@ -331,15 +332,15 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
     }
 
     /**
-     * Resolves a `ClassName::class` expression to its parser-resolved class name, or null.
+     * Extracts the name from a named ::class fetch, using the parser's resolved name when available.
      *
      * @param Expr|null $expr - Candidate first argument to an existence function.
      *
-     * @return string|null - Resolved class name, or null when the expression is dynamic or not ::class.
+     * @return string|null - Resolved or written name; null for dynamic, special or non-::class expressions.
      */
     private function classNameFromClassConst(?Expr $expr): ?string
     {
-        // Only a ClassName::class fetch names a resolvable class.
+
         if (!$expr instanceof Expr\ClassConstFetch || !$expr->class instanceof Name) {
             return null;
         }
@@ -350,7 +351,7 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
         }
 
         $name = $expr->name;
-        // A ::CONST other than ::class is not a class reference.
+
         if (!$name instanceof Node\Identifier || strtolower($name->toString()) !== 'class') {
             return null;
         }
@@ -361,15 +362,15 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
     }
 
     /**
-     * Returns the resolved display name for a class-like declaration, or null when anonymous.
+     * Returns a declaration's namespaced name when available, otherwise its written name.
      *
-     * @param Stmt\ClassLike $classLike - Class-like declaration.
+     * @param Stmt\ClassLike $classLike - Declaration whose resolved or written name is returned.
      *
-     * @return string|null - Resolved declaration name, or null for anonymous classes.
+     * @return string|null - Namespaced or written declaration name; null for anonymous classes.
      */
     private function classLikeName(Stmt\ClassLike $classLike): ?string
     {
-        // An anonymous class has no name to report.
+
         if ($classLike->name === null) {
             return null;
         }
@@ -382,8 +383,8 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
     /**
      * Builds the lookup keys for a class-like declaration's resolved and short names.
      *
-     * @param Stmt\ClassLike $classLike - Class-like declaration.
-     * @param string         $resolvedName - Resolved class-like name.
+     * @param Stmt\ClassLike $classLike - Declaration whose short name supplies a fallback lookup key.
+     * @param string         $resolvedName - Resolved name used as the primary lookup key.
      *
      * @return list<string> - Lowercase lookup keys.
      */
@@ -391,7 +392,7 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
     {
         $keys = [strtolower($resolvedName)];
 
-        // Also key by the short name so unqualified references resolve.
+        // Also key by the short name so this heuristic can compare unqualified references.
         if ($classLike->name !== null) {
             $keys[] = strtolower($classLike->name->toString());
         }
@@ -402,9 +403,9 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
     /**
      * Returns which PHP declaration kind a class-like node represents.
      *
-     * @param Stmt\ClassLike $classLike - Class-like declaration.
+     * @param Stmt\ClassLike $classLike - Declaration whose concrete kind is classified.
      *
-     * @return 'class'|'interface'|'trait'|'enum' - Declaration kind.
+     * @return 'class'|'interface'|'trait'|'enum' - Lowercase label identifying the supplied declaration's syntax kind.
      */
     private function classLikeKind(Stmt\ClassLike $classLike): string
     {

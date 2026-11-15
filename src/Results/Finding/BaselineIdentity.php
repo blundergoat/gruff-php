@@ -40,13 +40,12 @@ final readonly class BaselineIdentity
     private const MEASURED_VALUE_PLACEHOLDER = '#';
 
     /**
-     * Tells whether a finding may ever receive a baseline identity.
-     *
-     * A sensitive finding never does: it stays visible and blocking on every run until the user fixes it or excludes it with a written reason.
+     * Checks whether the finding is eligible for baseline review.
+     * Sensitive-data findings are excluded by pillar or rule-ID prefix and cannot be hidden by a baseline.
      *
      * @param Finding $finding - Any finding from the current scan.
      *
-     * @return bool - True for an ordinary finding; false for a sensitive-data finding, which the baseline counts but never stores or hides.
+     * @return bool - True unless the pillar is SensitiveData or the rule ID starts with `sensitive-data.`.
      */
     public static function isEligible(Finding $finding): bool
     {
@@ -54,15 +53,12 @@ final readonly class BaselineIdentity
     }
 
     /**
-     * Tells whether a finding can be given an identity at all.
-     *
-     * A sensitive finding cannot, and neither can an ordinary finding whose symbol already contains the ordinal
-     * separator: its subject could pose as another symbol's ordinal, so it is reported and never baselined, the way a
-     * sensitive finding already is. The operator chose that reading over a symbol-less fallback on 2026-09-19.
+     * Checks baseline eligibility and rejects symbols containing the reserved ordinal separator.
+     * Null and empty symbols remain eligible for message-based identities.
      *
      * @param Finding $finding - Any finding from the current scan.
      *
-     * @return bool - True when `identityOf()` can name the finding; false for a sensitive finding or a separator-bearing symbol.
+     * @return bool - True for an eligible finding whose symbol contains no `#`; false otherwise.
      */
     public static function hasIdentity(Finding $finding): bool
     {
@@ -70,16 +66,17 @@ final readonly class BaselineIdentity
     }
 
     /**
-     * Replaces every measured value in a message with `#`, per the identity amendment of 2026-09-05.
+     * Replaces numeric tokens in a finding message with the # placeholder before identity hashing.
      *
      * "File has 1010 lines (limit 1000)" becomes "File has # lines (limit #)", so a file that grows keeps the identity the user reviewed.
      *
      * @param string $message - Finding message as the rule emitted it; it may state a length, count, percentage, or version.
      *
-     * @return string - The message with each run of digits, including `.` or `,` groups, replaced by `#`; unchanged when it has none.
+     * @return string - The message with digit runs, including dot or comma groups, replaced by the # placeholder; unchanged when none occur.
      */
     public static function normaliseMeasuredValues(string $message): string
     {
+        // A dotted version such as 1.2.3 becomes one # because its groups belong to a single match.
         return (string)preg_replace(self::MEASURED_VALUE_PATTERN, self::MEASURED_VALUE_PLACEHOLDER, $message);
     }
 
@@ -90,13 +87,13 @@ final readonly class BaselineIdentity
      * @param int     $ordinal - 1-based declaration ordinal among same-named symbols in the file; ignored for a symbol-less finding.
      *
      * @return string - The subject the identity hashes.
-     * @throws BaselineException When a symbol-bearing finding has no ordinal, or its symbol contains the ordinal separator.
+     * @throws BaselineException - When a symbol contains `#` or its ordinal is less than 1.
      */
     public static function subject(Finding $finding, int $ordinal): string
     {
         $symbol = $finding->symbol;
 
-        // A file-level finding has nothing but its message to name it: its measurement is stripped, and a reworded message is a new finding by design.
+        // Null or empty symbols use the normalised message; rewording that message changes the identity.
         if ($symbol === null || $symbol === '') {
             return self::normaliseMeasuredValues($finding->message);
         }
@@ -108,7 +105,7 @@ final readonly class BaselineIdentity
             throw new BaselineException($findingLabel . ' containing "' . self::ORDINAL_SEPARATOR . '".');
         }
 
-        // Defaulting a missing ordinal to 1 would merge two same-named methods back together, the collision the ordinal exists to prevent.
+        // Treating a missing ordinal as 1 could merge this finding with the first declaration of the same symbol.
         if ($ordinal < 1) {
             throw new BaselineException($findingLabel . ' without a declaration ordinal.');
         }
@@ -123,7 +120,7 @@ final readonly class BaselineIdentity
      * @param int     $ordinal - Declaration ordinal from `assignOrdinals()`; 0 is only valid for a symbol-less finding.
      *
      * @return string - 16 lowercase hex characters; identical input on any port with the same tool language yields the same value.
-     * @throws BaselineException When the subject cannot be built.
+     * @throws BaselineException - When the subject cannot be built.
      */
     public static function identityOf(Finding $finding, int $ordinal): string
     {
@@ -133,7 +130,7 @@ final readonly class BaselineIdentity
     /**
      * Hashes the ratified identity under an explicit tool language.
      *
-     * Conformance tests use it to reproduce the digests the family oracle pins for other ports, which is the only proof the rule is one rule.
+     * Accepts the language explicitly so callers can reproduce identities for different ports.
      *
      * @param string $toolLanguage - One of go, php, py, rs, or ts.
      * @param string $ruleId - Native rule id, never a concept id.
@@ -149,17 +146,13 @@ final readonly class BaselineIdentity
 
     /**
      * Ranks each symbol-bearing finding's declaration among same-named symbols in its file.
-     *
-     * PHP refuses to declare a class, method, function, property, or constant twice in one file, so every finding on such a symbol is ordinal 1:
-     * two findings on `Widget::process()` at different lines are one declaration, and inserting code above it moves nothing.
-     * Only a variable symbol such as `$value` can be declared in several places, so those are ranked by the line of each occurrence.
-     * The inventory gives every scanned occurrence of a variable its slot, so a clean earlier `@var $value` keeps its place and
-     * a review stays on the occurrence it was given to.
+     * Non-variable symbols use ordinal 1; variable symbols are ranked by finding lines and optional inventory positions.
+     * Symbol-less findings receive 0.
      *
      * @param list<Finding>             $findings - One run's findings.
      * @param DeclarationInventory|null $inventory - Scanned variable occurrences per file; null ranks variables among their findings alone.
      *
-     * @return array<int, int> - `spl_object_id` of each finding to its 1-based ordinal; a symbol-less finding maps to 0.
+     * @return array<int, int> - spl_object_id of each finding to its 1-based ordinal; a symbol-less finding maps to 0.
      */
     public static function assignOrdinals(array $findings, ?DeclarationInventory $inventory = null): array
     {
@@ -210,14 +203,12 @@ final readonly class BaselineIdentity
     }
 
     /**
-     * Names the declaration position a symbol-bearing finding sits on, the value both ordinals and collision detection rank by.
-     *
-     * A class, method, function, property, or constant symbol is declared once per file, so every finding on it shares position 1.
-     * A variable symbol can be bound in several places, so its position is the line of the finding itself.
+     * Returns the position used to rank ordinals and detect collisions.
+     * Non-variable symbols use position 1; variable symbols use the finding line.
      *
      * @param Finding $finding - Finding with a non-empty symbol.
      *
-     * @return int - Declaration position; 1 for a declaration PHP declares once per file, otherwise the finding's line.
+     * @return int - Position used for ranking: 1 for a non-variable symbol, otherwise the finding's line.
      */
     public static function declarationPosition(Finding $finding): int
     {
@@ -225,11 +216,11 @@ final readonly class BaselineIdentity
     }
 
     /**
-     * Tells whether a symbol names a variable, the one kind of symbol PHP lets a file declare more than once.
+     * Selects position-based ordinal handling for emitted symbols that start with a dollar sign.
      *
-     * @param string $symbol - Symbol as the rule emitted it, such as `$value` or `Widget::process()`.
+     * @param string $symbol - Symbol as the rule emitted it, such as $value or Widget::process().
      *
-     * @return bool - True for a plain variable; false for a class, method, function, property, or constant symbol.
+     * @return bool - True when the symbol starts with a dollar sign; false otherwise.
      */
     private static function isVariableSymbol(string $symbol): bool
     {

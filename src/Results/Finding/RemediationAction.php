@@ -6,9 +6,8 @@ namespace GruffPhp\Results\Finding;
 
 /**
  * Defines the machine-readable action attached to a finding's metadata.
- * Rules use these values to distinguish a direct source fix, deterministic configuration,
- * and a compatibility-sensitive decision before reporters or hooks transport the finding.
- * Users reach the action through JSON, hook, and SARIF consumers in this release.
+ * Rules distinguish direct source changes, configuration changes, and decisions that need review.
+ * The action travels with the finding's metadata through reporters and hooks.
  */
 enum RemediationAction: string
 {
@@ -30,15 +29,15 @@ enum RemediationAction: string
     /**
      * Builds the canonical metadata fragment transported with a classified finding.
      *
-     * @param string|null $configurationKey - Full configuration path for an available hatch; null means no hatch is offered.
+     * @param string|null $configurationKey - Configuration path to include verbatim; null omits the configurationKey entry.
      *
-     * @return array{remediationAction: string, configurationKey?: string} - Action metadata, including the config path when one exists.
+     * @return array{remediationAction: string, configurationKey?: string} - Action value and any supplied configuration path.
      */
     public function metadata(?string $configurationKey = null): array
     {
         $metadata = [self::METADATA_KEY => $this->value];
 
-        // A finding exposes the full configuration path only when its rule offers a deliberate hatch.
+
         if ($configurationKey !== null) {
             $metadata[self::CONFIGURATION_KEY] = $configurationKey;
         }

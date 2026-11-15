@@ -8,18 +8,14 @@ use GruffPhp\Engine\Analysis\InlineSuppressionFilter;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers FAMILY-CONTRACT.md section 13c as a user meets it: another tool's suppression comment, and one exec call
- * reported under two rules.
- *
- * - A phpcs or psalm comment naming a check that makes the finding's claim suppresses it where it was written.
- * - An unrelated sniff, a type-checker comment and an uncommented sibling line keep reporting.
- * - An `exec` whose command is built at run time reports once, as security.process-command-construction.
- * - Each removal is counted in an `inline` or `duplicate` audit row, the text line and a suppressed SARIF result.
+ * Covers FAMILY-CONTRACT.md section 13c using phpcs and psalm comments plus an exec call reported by two rules.
+ * Checks ordered security line/rule pairs and inline/duplicate audit rows against exact expected lists.
+ * Text assertions cover two audit rows; SARIF assertions check the collected suppression kinds and reasons.
  */
 final class InlineSuppressionCliTest extends CliTestCase
 {
     /**
-     * Source whose line numbers the assertions below name; each line exercises one comment form or control.
+     * Fixture for matching and unrelated suppression comments, unsuppressed calls and duplicate findings.
      */
     private const SOURCE = <<<'PHP'
         <?php
@@ -45,9 +41,9 @@ final class InlineSuppressionCliTest extends CliTestCase
         PHP;
 
     /**
-     * Verifies which security findings survive: only the lines no comment covers, and `exec` once.
+     * Checks suppression matching and the duplicate exec report using the fixture's expected security line/rule pairs.
      *
-     * @return void
+     * @return void - Asserts ordered security line/rule pairs and inline/duplicate audit rows.
      */
     public function testCommentsSuppressOnlyTheChecksTheyNameAndAnExecCallReportsOnce(): void
     {
@@ -56,7 +52,6 @@ final class InlineSuppressionCliTest extends CliTestCase
         try {
             $report   = $this->decodeJsonOutput($this->scan($project, 'json'));
             $security = [];
-            // Each surviving security finding is listed as `line rule`, so one assertion shows the whole outcome.
             foreach ($this->listAt($report, 'findings') as $finding) {
                 $finding = $this->decodedJsonObject($finding);
                 if (is_string($finding['ruleId'] ?? null) && str_starts_with($finding['ruleId'], 'security.')) {
@@ -85,9 +80,9 @@ final class InlineSuppressionCliTest extends CliTestCase
     }
 
     /**
-     * Verifies the text line counts every removal and SARIF keeps each as a suppressed result with its reason.
+     * Checks two text audit rows and the reasons and kinds collected from SARIF results that contain a suppression.
      *
-     * @return void
+     * @return void - Asserts selected text counts and the ordered SARIF suppression reasons.
      */
     public function testTextAndSarifKeepEveryRemovalVisible(): void
     {
@@ -101,7 +96,7 @@ final class InlineSuppressionCliTest extends CliTestCase
             $sarif         = $this->decodeJsonOutput($this->scan($project, 'sarif'));
             $sarifRun      = $this->decodedJsonObject($this->listAt($sarif, 'runs')[0] ?? null);
             $justification = [];
-            // Each suppressed result carries one inSource suppression naming the audit reason.
+            // For results with a suppression, the first entry must use inSource and name the audit reason.
             foreach ($this->listAt($sarifRun, 'results') as $result) {
                 $suppressions = $this->decodedJsonObject($result)['suppressions'] ?? null;
                 $suppression  = is_array($suppressions) ? ($suppressions[0] ?? null) : null;
@@ -135,7 +130,7 @@ final class InlineSuppressionCliTest extends CliTestCase
     }
 
     /**
-     * Runs `analyse` over the project in one output format, as a user would from the project root.
+     * Runs the analyse command over the project in one output format, as a user would from the project root.
      *
      * @param string $project - Root of the fixture project.
      * @param string $format  - Output format to request.
@@ -182,7 +177,7 @@ final class InlineSuppressionCliTest extends CliTestCase
     }
 
     /**
-     * Lists the report's section 13c audit rows as `index|source|rule|suppressed|reason`.
+     * Lists section 13c audit rows as pipe-separated index, source, rule, suppressed-count and reason fields.
      *
      * @param array<string, mixed> $report - Decoded JSON report.
      *

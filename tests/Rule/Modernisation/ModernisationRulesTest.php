@@ -20,18 +20,19 @@ use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers modernisation rule detection: PHP version gating, PHP 8.x candidates, exemption of legitimate mutable cases, and error-suppression flagged
- * as security-with-modernisation pillar.
+ * Covers readonly-candidate version gates and public-property findings in modernisation fixtures.
+ * Checks readonly owners, restricted setters, class exemptions and mutation cases against expected findings.
+ * Checks that error suppression carries the modernisation secondary pillar without a duplicate modernisation-rule finding.
  */
 final class ModernisationRulesTest extends TestCase
 {
-    /** Project root used by filesystem and CLI tests. */
+    /** Shared project root for fixture loading, configuration lookup and rule contexts. */
     private const PROJECT_ROOT = __DIR__ . '/../../..';
 
     /**
-     * Verify PHP version gating suppresses PHP eight suggestions.
+     * Verifies that a PHP 7.4 target suppresses readonly candidates while retaining the public-property finding.
      *
-     * @return void
+     * @return void - Asserts zero readonly findings and one public-property finding for the PHP 7.4 configuration.
      */
     public function testPhpVersionGatingSuppressesPhpEightSuggestions(): void
     {
@@ -45,9 +46,9 @@ final class ModernisationRulesTest extends TestCase
     }
 
     /**
-     * Verify PHP eight two config enables modernisation candidates.
+     * A PHP 8.2 target enables readonly candidates while retaining the public-property finding.
      *
-     * @return void
+     * @return void - Asserts two readonly-candidate findings and one public-property finding under the PHP 8.2 configuration.
      */
     public function testPhpEightTwoConfigEnablesModernisationCandidates(): void
     {
@@ -61,9 +62,9 @@ final class ModernisationRulesTest extends TestCase
     }
 
     /**
-     * Verify PHP eight candidates are detected.
+     * Verifies the public-property finding count in the PHP 8.0 fixture.
      *
-     * @return void
+     * @return void - Asserts one public-property finding.
      */
     public function testPhpEightCandidatesAreDetected(): void
     {
@@ -75,7 +76,7 @@ final class ModernisationRulesTest extends TestCase
     /**
      * Verify readonly owners stay quiet while public mutable promoted properties report once.
      *
-     * @return void
+     * @return void - Asserts the two mutable property names, their source lines and unique reporting with no parser diagnostics.
      */
     public function testPublicPropertyRuleHandlesReadonlyOwnersAndPromotedProperties(): void
     {
@@ -125,7 +126,7 @@ PHP);
     /**
      * Verify PHP 8.4 restricted-set properties stay quiet while an open write side still reports.
      *
-     * @return void
+     * @return void - Asserts only the open declared and promoted properties are reported, with no parser diagnostics.
      */
     public function testPublicPropertyRuleSkipsAsymmetricVisibilityWriteRestrictions(): void
     {
@@ -157,9 +158,9 @@ PHP);
     }
 
     /**
-     * Verify an exact configured class exemption leaves other mutable classes reportable.
+     * Verifies that the configured class is exempt while the other fixture class remains reportable.
      *
-     * @return void
+     * @return void - Asserts both properties report by default and only the unlisted class reports after configuration.
      */
     public function testPublicPropertyRuleHonoursAllowedClasses(): void
     {
@@ -207,9 +208,9 @@ PHP);
     }
 
     /**
-     * Verify PHP eight one candidates are detected.
+     * The PHP 8.1 fixture produces two readonly-property candidate findings.
      *
-     * @return void
+     * @return void - Asserts two readonly-candidate findings in the PHP 8.1 fixture.
      */
     public function testPhpEightOneCandidatesAreDetected(): void
     {
@@ -219,9 +220,9 @@ PHP);
     }
 
     /**
-     * Verify late mutation inheritance DTO and controller cases are not flagged.
+     * Verifies that the mutation, inheritance, DTO and controller fixtures produce no readonly-candidate or public-property findings.
      *
-     * @return void
+     * @return void - Asserts zero findings for both property rules across the supplied fixtures.
      */
     public function testLateMutationInheritanceDtoAndControllerCasesAreNotFlagged(): void
     {
@@ -235,9 +236,9 @@ PHP);
     }
 
     /**
-     * Verify error suppression uses security finding with modernisation secondary pillar.
+     * Verifies one error-suppression finding carries a modernisation secondary pillar without a duplicate modernisation-rule finding.
      *
-     * @return void
+     * @return void - Asserts the suppression count, secondary pillar and absence of modernisation.error-suppression findings.
      */
     public function testErrorSuppressionUsesSecurityFindingWithModernisationSecondaryPillar(): void
     {
@@ -261,10 +262,10 @@ PHP);
      * Assert the expected modernisation finding count for a rule.
      *
      * @param string        $ruleId - Rule id whose findings are counted.
-     * @param int           $expectedCount - Number of findings the fixture should trip for that rule.
+     * @param int           $expectedCount - Expected number of findings carrying that rule ID.
      * @param list<Finding> $findings - Full finding set to filter down to the rule.
      *
-     * @return void
+     * @return void - Asserts that exactly $expectedCount findings carry the requested rule ID.
      */
     private static function assertRuleCount(string $ruleId, int $expectedCount, array $findings): void
     {
@@ -310,9 +311,9 @@ PHP);
     /**
      * Parse the requested path into an analysis unit.
      *
-     * @param string $path - Filesystem path.
+     * @param string $path - Project-relative fixture path to read.
      *
-     * @return AnalysisUnit - the parsed fixture ready for rule analysis, carrying the project-relative display path
+     * @return AnalysisUnit - Fixture source and parse results under that display path, including diagnostics on read or parse failure.
      */
     private function unitForPath(string $path): AnalysisUnit
     {
@@ -339,9 +340,9 @@ PHP);
     /**
      * Build analysis configuration for modernisation assertions.
      *
-     * @param string $path - Filesystem path.
+     * @param string $path - YAML config path; relative paths use the project root, and an empty string requests discovery.
      *
-     * @return AnalysisConfig - config loaded from the fixture's own YAML, applying its rule overrides
+     * @return AnalysisConfig - Loaded settings merged onto registry defaults; defaults alone when discovery finds no config.
      */
     private function config(string $path): AnalysisConfig
     {

@@ -12,10 +12,9 @@ use GruffPhp\Results\Scoring\PillarScore;
 use GruffPhp\Support\PathHelper;
 
 /**
- * Turns a finished analysis run into the standalone HTML inspection report - the browser-opened view of
- * a scan produced by `gruff-php analyse --format html`, `gruff-php report`, or the dashboard's scan
- * button. Lays out the masthead, grade-stamp verdict, pillar and offender tables, complexity histogram,
- * and findings list into one self-contained document, HTML-escaping every untrusted value on the way in.
+ * Renders an analysis run as a standalone HTML report with inline styles and optional finding filters.
+ * The document includes run metadata, diagnostics, scores, offender and pillar tables, a complexity chart, and findings.
+ * Finding and offender locations use configured editor links; report text is escaped before insertion into HTML.
  */
 final readonly class HtmlReporter
 {
@@ -23,8 +22,8 @@ final readonly class HtmlReporter
      * Captures the render choices made on the command line before any report is built: where the
      * project lives (for editor links) and whether findings should be clickable and filterable.
      *
-     * @param string $projectRoot - Absolute project root used to turn report-relative paths into editor links; empty falls back to the current working directory.
-     * @param string $editorLink - Editor-link mode for file:line references (`vscode`, `phpstorm`, or `none`); `none` renders plain, unclickable locations.
+     * @param string $projectRoot - Absolute root for relative editor paths; empty uses the current working directory.
+     * @param string $editorLink - Editor-link mode: vscode, phpstorm, or none; none renders unclickable locations.
      * @param bool   $interactive - When true, include the live filter form and its script; false renders a static report with no controls.
      */
     public function __construct(
@@ -39,14 +38,14 @@ final readonly class HtmlReporter
      *
      * @param AnalysisReport $report - The finished analysis run whose score, findings, and diagnostics fill the page.
      *
-     * @return string - A complete standalone HTML document (doctype through closing `html`), with styles inlined and, in interactive mode, the filter script inlined too.
+     * @return string - A standalone HTML document with inline styles and, in interactive mode, an inline filter script.
      */
     public function render(AnalysisReport $report): string
     {
         $score        = $report->score;
         $grade        = $score?->composite->letter ?? 'n/a';
-        // Two different absences: scoring never ran at all, or it ran and found nothing to evaluate.
-        // The second must not render a number, because that is how an empty scan used to read as perfect.
+        // Keep missing and unevaluated scores distinct so neither appears to be a perfect score.
+
         $numericScore = match (true) {
             $score === null            => 'n/a',
             $score->composite === null => 'not evaluated',
@@ -88,7 +87,7 @@ final readonly class HtmlReporter
      *
      * @param AnalysisReport $report - Report whose requested paths, diff scope, format, and tool version label the header.
      *
-     * @return string - The masthead header fragment: the brand, the resolved paths/scope/format/fail meta panel, and the tool version stamp.
+     * @return string - The masthead header fragment: the brand, the requested paths/scope/format/fail meta panel, and the tool version stamp.
      */
     private function masthead(AnalysisReport $report): string
     {
@@ -109,7 +108,7 @@ final readonly class HtmlReporter
     }
 
     /**
-     * Builds the diagnostics band of run messages (parse failures, skipped files) above the findings, or nothing when the run was clean.
+     * Builds the diagnostics band above the findings, omitting it when no run messages exist.
      *
      * @param AnalysisReport $report - Report whose run diagnostics drive the section; an empty list omits it entirely.
      *
@@ -117,14 +116,14 @@ final readonly class HtmlReporter
      */
     private function diagnostics(AnalysisReport $report): string
     {
-        // A clean run logged no messages, so omit the whole band rather than show an empty box.
+
         if ($report->diagnostics === []) {
             return '';
         }
 
         $html = '<section class="diagnostics"><h2 class="section-head">diagnostics <span class="aside">run messages</span></h2><div class="diagnostic-list">';
 
-        // One row per run message (parse errors, skipped files) so the reader sees what the scan couldn't reach.
+
         foreach ($report->diagnostics as $diagnostic) {
             $html .= $this->diagnosticRow($diagnostic);
         }
@@ -135,12 +134,12 @@ final readonly class HtmlReporter
     /**
      * Builds the verdict banner - the big grade stamp, the one-line headline, the severity stat tiles, and the score-driver notes.
      *
-     * @param string                                                     $grade - Composite letter grade already resolved by the caller; rendered into the grade stamp.
-     * @param string                                                     $numericScore - Pre-formatted "NN.NN / 100" score string, or "n/a" when the run computed no score.
-     * @param array{advisory: int, warning: int, error: int, total: int} $counts - Severity tallies for the visible findings, filling the stat tiles.
-     * @param AnalysisReport                                             $report - Report supplying the per-pillar context for the one-line verdict sentence and the score drivers.
+     * @param string $grade - Composite letter grade or fallback label rendered in the grade stamp.
+     * @param string $numericScore - Formatted score, "n/a" for no score, or "not evaluated" for no composite.
+     * @param array{advisory: int, warning: int, error: int, total: int} $counts - Visible finding counts for the stat tiles.
+     * @param AnalysisReport $report - Report supplying the verdict's pillar context and score-driver notes.
      *
-     * @return string - The verdict section pairing the grade stamp with the summary headline, the severity stat tiles, and the score-driver notes.
+     * @return string - The grade stamp, summary headline, severity stat tiles, and score-driver notes.
      */
     private function verdict(string $grade, string $numericScore, array $counts, AnalysisReport $report): string
     {
@@ -164,7 +163,7 @@ final readonly class HtmlReporter
     }
 
     /**
-     * Builds the canonical pillars table - one graded row per quality pillar, worst-first, with mutation kept in the findings list instead.
+     * Builds the table of applicable non-mutation pillars, ordered by finding count descending and then by name.
      *
      * @param AnalysisReport $report - Report whose applicable pillar scores populate the table (mutation excluded).
      *
@@ -184,12 +183,12 @@ final readonly class HtmlReporter
                 . '<th scope="col" class="num">error</th>'
                 . '</tr></thead><tbody>';
 
-        // No pillar rows to show (no score, or every pillar was non-applicable or excluded) - show one placeholder row so the table isn't left headless.
+
         if ($rows === []) {
             $html .= '<tr><td colspan="7">No pillars.</td></tr>';
         }
 
-        // One row per applicable pillar, already ordered worst-first, so the reader scans the trouble spots top-down.
+
         foreach ($rows as $pillar) {
             $html .= $this->pillarRow($pillar);
         }
@@ -198,10 +197,9 @@ final readonly class HtmlReporter
     }
 
     /**
-     * Builds the top-offenders table: the files dragging the grade down the most, ranked by score so
-     * the reader knows exactly where to start cleaning up.
+     * Builds the top-offenders table from the score's existing ranked files.
      *
-     * @param AnalysisReport $report - Report whose score supplies the ranked offender files; a null score yields an empty table.
+     * @param AnalysisReport $report - Report supplying ranked offender files; a null score produces the placeholder row.
      *
      * @return string - The top-offenders section table, one row per ranked file, or a "No offenders found." placeholder when there are none.
      */
@@ -211,12 +209,12 @@ final readonly class HtmlReporter
         $html  = '<section class="offenders"><h2 class="section-head">top offenders <span class="aside">sorted by score</span></h2>'
                  . '<table class="offender-list"><thead><tr><th scope="col">file</th><th scope="col" class="num">cyclo</th><th scope="col" class="num">cognit.</th><th scope="col" class="num">LOC</th><th scope="col" class="num">findings</th><th scope="col" class="num">grade</th></tr></thead><tbody>';
 
-        // Nothing ranked (a clean or unscored run) still needs a row, so show a "none found" placeholder.
+
         if ($items === []) {
             $html .= '<tr><td colspan="6">No offenders found.</td></tr>';
         }
 
-        // One row per ranked file, worst score first, so the messiest files sit at the top of the list.
+
         foreach ($items as $item) {
             $html .= $this->offenderRow($item);
         }
@@ -225,9 +223,10 @@ final readonly class HtmlReporter
     }
 
     /**
-     * Builds the cyclomatic-complexity histogram - one bar per complexity bucket, its height set by how many methods fall in that bucket and its colour reddening for the higher-complexity buckets.
+     * Builds a histogram from cyclomatic-complexity findings with rounded bar heights scaled by count and a 4% minimum.
+     * High-complexity buckets receive warning or failure colours; a missing score produces no bars.
      *
-     * @param AnalysisReport $report - Report whose complexity distribution buckets become histogram bars; empty renders a flat chart.
+     * @param AnalysisReport $report - Report supplying complexity bucket counts; an empty distribution produces no bars.
      *
      * @return string - The distribution chart section: the summary sentence, one histogram bar per CC bucket, and the bucket-label axis.
      */
@@ -238,7 +237,7 @@ final readonly class HtmlReporter
         $bars         = '';
         $axis         = '';
 
-        // Scale each bucket into a bar height and tint the higher-complexity buckets warn/fail, so hot spots pop out.
+
         foreach ($distribution as $label => $count) {
             $height = max(4, (int)round(($count / $maximumCount) * 100));
             $class  = in_array($label, ['16-20', '21+'], true) ? ' fail' : (in_array($label, ['11-15'], true) ? ' warn' : '');
@@ -269,12 +268,12 @@ final readonly class HtmlReporter
             $listAttributes,
         );
 
-        // A clean pass has nothing to list, so show a reassuring "No findings." note instead of a blank panel.
+
         if ($report->findings === []) {
             $html .= '<div class="empty">No findings.</div>';
         }
 
-        // One card per finding, in report order, so the reader can walk each flagged issue in turn.
+
         foreach ($report->findings as $finding) {
             $html .= $this->findingRow($finding);
         }
@@ -325,23 +324,23 @@ final readonly class HtmlReporter
     }
 
     /**
-     * Selects and orders the pillar rows for the table: only applicable pillars, worst-first, always without mutation, reusing the existing scores.
+     * Selects applicable non-mutation pillars and orders them by finding count descending, then by name, reusing the existing scores.
      *
      * @param AnalysisReport $report - Report whose pillar scores are filtered and sorted; a null score yields no rows.
      *
-     * @return list<PillarScore> - Applicable, mutation-excluded pillars in display order (findings DESC, then pillar ASC); empty when the run had no score.
+     * @return list<PillarScore> - Applicable non-mutation pillars by findings descending, then name; empty when none qualify.
      */
     private function pillarSummaryRows(AnalysisReport $report): array
     {
-        // No score means the run never produced pillar grades, so there are simply no rows to show.
+
         if ($report->score === null) {
             return [];
         }
 
         $rows = [];
-        // Sift the scored pillars down to the ones worth putting in the table.
+
         foreach ($report->score->pillars as $pillar) {
-            // A pillar with no rules in play this run isn't graded, so leave it out of the table.
+
             if (!$pillar->applicable) {
                 continue;
             }
@@ -354,7 +353,7 @@ final readonly class HtmlReporter
             $rows[] = $pillar;
         }
 
-        // Order the rows worst-first (most findings), breaking ties by pillar name so the layout is stable run to run.
+
         usort($rows, static function (PillarScore $left, PillarScore $right): int {
             return $right->findings <=> $left->findings ?: strcmp($left->pillar, $right->pillar);
         });
@@ -377,8 +376,7 @@ final readonly class HtmlReporter
     }
 
     /**
-     * Renders one row of the top-offenders table: the file path as a clickable location and a grade
-     * pill, alongside its cyclomatic, cognitive, LOC, and finding metrics.
+     * Renders one offender row with its configured location markup, grade pill, complexity, LOC, and finding metrics.
      *
      * @param FileScore $file - Per-file score for this row; complexity and LOC metrics may be null and render "n/a".
      *
@@ -397,11 +395,11 @@ final readonly class HtmlReporter
     }
 
     /**
-     * Renders one finding as a card (severity, rule, message, location, pillar); its fields also become filter data-* attributes when interactive.
+     * Renders one finding as a card; its filterable severity, pillar, path, rule, and search text become data attributes in interactive mode.
      *
-     * @param Finding $finding - Finding to render; its fields also become data-* filter attributes in interactive mode.
+     * @param Finding $finding - Finding to render; its filterable fields also become data attributes in interactive mode.
      *
-     * @return string - One finding card: the severity badge, rule id, message, location, and pillar, plus filter data-* attributes in interactive mode.
+     * @return string - One finding card with severity, rule, message, location, pillar, and optional filter data-* attributes.
      */
     private function findingRow(Finding $finding): string
     {
@@ -449,8 +447,7 @@ final readonly class HtmlReporter
     }
 
     /**
-     * Renders one stat tile in the verdict grid: a big number over a caption, tinted by severity. These
-     * are the totals the reader eyeballs first - findings, errors, warnings, advisories.
+     * Renders one verdict stat tile with a count, caption, and optional severity colour.
      *
      * @param string $number - Pre-stringified count shown large (the caller casts the integer total/severity tally).
      * @param string $label - Lowercase caption under the number (for example "findings", "errors").
@@ -469,27 +466,27 @@ final readonly class HtmlReporter
     }
 
     /**
-     * Gathers the plain-English "score drivers" notes shown under the verdict - why the grade landed where it did.
+     * Gathers the score explanation and available run-context notes shown under the verdict.
      *
-     * @param AnalysisReport $report - Report whose score, diff, baseline, filters, and mutation inputs become driver notes.
+     * @param AnalysisReport $report - Report whose score, diff, baseline, filters, and mutation data supply the notes.
      *
-     * @return string - The "score drivers" list of explanation, diff, baseline-movement, filter, and mutation notes, or an empty string when there was no score.
+     * @return string - Score explanation and available context notes as a list, or an empty string when there is no score.
      */
     private function scoreContext(AnalysisReport $report): string
     {
-        // No score means there are no drivers to explain, so drop the whole notes block.
+
         if ($report->score === null) {
             return '';
         }
 
         $items = [$report->score->explanation];
 
-        // A changed-files run (say `analyse --diff`) adds a note explaining that only the diff was scored.
+
         if ($report->diff !== null && $report->diff->active) {
             $items[] = $report->diff->message;
         }
 
-        // With a baseline in play, spell out how many findings are new, unchanged, or resolved against it.
+
         if ($report->baseline !== null) {
             $items[] = sprintf(
                 'Baseline movement: %d new, %d unchanged, %d resolved; unchanged findings are accepted debt removed before scoring.',
@@ -498,9 +495,9 @@ final readonly class HtmlReporter
                 $report->baseline->absentCount,
             );
 
-            // Only when the reader asked to see resolved items do we list each cleaned-up group by name.
+
             if ($report->shouldListAbsentBaseline) {
-                // One "Resolved:" note per fixed finding group, so the report visibly credits the cleanup work.
+
                 foreach ($report->baseline->staleEntries as $resolvedEntry) {
                     $items[] = sprintf(
                         'Resolved: %s %s (resolved %d): %s',
@@ -513,12 +510,12 @@ final readonly class HtmlReporter
             }
         }
 
-        // If display filters are active, warn that they only thin what's shown - the score still uses every finding.
+
         if ($report->filters !== null && $report->filters->isActive()) {
             $items[] = 'Display filters affect rendered findings only; score and exit code use the scored finding set.';
         }
 
-        // A mutation-testing input adds a note that its MSI fed the score, since the HTML shows no separate mutation panel.
+
         if ($report->mutation !== null) {
             $items[] = sprintf(
                 'Mutation input from %s contributes MSI to the score; HTML keeps mutation details in findings rather than a separate mutation visualization.',
@@ -527,7 +524,7 @@ final readonly class HtmlReporter
         }
 
         $list = '';
-        // Wrap each collected note as a list item for the "score drivers" panel.
+
         foreach ($items as $item) {
             $list .= sprintf('<li>%s</li>', $this->escape($item));
         }
@@ -549,26 +546,26 @@ final readonly class HtmlReporter
     }
 
     /**
-     * Writes the one-line verdict headline: "all clear", or a count of serious findings and how many pillars they span.
+     * Summarises warning and error findings and the distinct pillars they span.
      *
-     * @param AnalysisReport                                             $report - Report whose findings are scanned to count the distinct pillars carrying warnings or errors.
-     * @param array{advisory: int, warning: int, error: int, total: int} $counts - Severity tallies used to decide whether the summary is clean or thresholded.
+     * @param AnalysisReport $report - Findings used to identify pillars carrying warnings or errors.
+     * @param array{advisory: int, warning: int, error: int, total: int} $counts - Severity counts; advisories do not affect the headline.
      *
-     * @return string - A one-line summary: the reassuring no-findings sentence, or the warning/error count and the number of pillars they span.
+     * @return string - A no-warning-or-error sentence, or their combined count and the number of affected pillars.
      */
     private function verdictSummary(AnalysisReport $report, array $counts): string
     {
         $thresholdFindings = $counts['warning'] + $counts['error'];
 
-        // Nothing at warning or error severity is the good outcome, so say so plainly and stop.
+
         if ($thresholdFindings === 0) {
             return 'No warning or error findings flagged.';
         }
 
         $pillars = [];
-        // Otherwise tally how many distinct pillars the serious findings span, to size the problem in one sentence.
+
         foreach ($report->findings as $finding) {
-            // Advisory-only findings don't count toward this headline, so skip anything below warning severity.
+
             if (!in_array($finding->severity->value, ['warning', 'error'], true)) {
                 continue;
             }
@@ -586,11 +583,11 @@ final readonly class HtmlReporter
     }
 
     /**
-     * Writes the one-line caption above the histogram: how many methods exceed CC 10 and how that splits across buckets.
+     * Writes the histogram caption for methods above CC 10 and their split across complexity buckets.
      *
      * @param array<string, int> $distribution - Complexity bucket counts keyed by range label; absent buckets are treated as zero.
      *
-     * @return string - A one-line summary of how many methods exceed CC 10, with the per-bucket split across 11-15, 16-20, and 21+.
+     * @return string - A summary of methods above CC 10, split across the 11-15, 16-20, and 21+ buckets.
      */
     private function cyclomaticSummary(array $distribution): string
     {
@@ -611,12 +608,12 @@ final readonly class HtmlReporter
     }
 
     /**
-     * Renders a file:line reference - a clickable editor anchor when links are on, otherwise an inert span that still copies the path.
+     * Renders an escaped file:line label as an editor link when configured, or a focusable span otherwise.
      *
      * @param string   $filePath - Report-relative or absolute path shown to the reader and carried in data-path.
      * @param int|null $line - Line number appended after a colon, or null to show the path alone (used for file-level rows).
      *
-     * @return string - The path (with optional line) as a clickable editor-link anchor when one is configured, otherwise an inert focusable span that still copies via data-path.
+     * @return string - An editor anchor or focusable span, both carrying the displayed location in data-path.
      */
     private function locationMarkup(string $filePath, ?int $line): string
     {
@@ -624,7 +621,7 @@ final readonly class HtmlReporter
         $locationAttribute = sprintf(' data-path="%s"', $this->escape($text));
         $href              = $this->editorHref($filePath, $line);
 
-        // With editor links on, make the location a real anchor the reader can click straight into their editor.
+
         if ($href !== null) {
             return sprintf(
                 '<a class="loc-link" href="%s"%s>%s</a>',
@@ -638,16 +635,16 @@ final readonly class HtmlReporter
     }
 
     /**
-     * Builds the editor deep-link URL for a finding's file, honouring `--report-editor-link`; null when links are off or the editor is unsupported.
+     * Builds the editor deep-link URL for a finding file according to --report-editor-link; returns null when links are disabled or unsupported.
      *
      * @param string   $filePath - Path to open; resolved to absolute before being encoded into the editor URL.
      * @param int|null $line - Target line for the editor to jump to, or null to open the file without a line anchor.
      *
-     * @return string|null - The `vscode://` or `phpstorm://` URL opening the file at the line, or null when editor links are off or the configured editor is unsupported.
+     * @return string|null - A VS Code or PhpStorm URL with an optional line, or null for disabled or unsupported modes.
      */
     private function editorHref(string $filePath, ?int $line): ?string
     {
-        // The reader opted out of editor links (the default, or `--report-editor-link=none`), so emit no href at all.
+
         if ($this->editorLink === 'none') {
             return null;
         }
@@ -662,12 +659,12 @@ final readonly class HtmlReporter
     }
 
     /**
-     * Assembles a `vscode://file` URL that survives Unix, Windows-drive, and UNC paths, opening VS Code on the flagged line.
+     * Assembles a vscode://file URL for Unix, Windows-drive, and UNC paths with an optional line suffix.
      *
      * @param string   $absolutePath - Absolute filesystem path; separators are normalised and each segment URL-encoded.
      * @param int|null $line - Line to open at, appended as ":line", or null to open the file without a line anchor.
      *
-     * @return string - A `vscode://file` URL with each path segment URL-encoded (Windows drive colon preserved) and the optional ":line" anchor appended.
+     * @return string - A vscode://file URL with encoded segments, a preserved Windows drive colon, and an optional line suffix.
      */
     private function vscodeHref(string $absolutePath, ?int $line): string
     {
@@ -675,7 +672,7 @@ final readonly class HtmlReporter
         $segments        = explode('/', $path);
         $encodedSegments = [];
 
-        // URL-encode each path segment so odd characters survive in the link, walking them one at a time.
+        // URL-encode each path segment so special characters remain part of the path.
         foreach ($segments as $index => $segment) {
             // Match a Windows drive segment so the drive colon remains usable by VS Code.
             $encodedSegments[] = $index === 0 && preg_match('/^[A-Za-z]:$/', $segment) === 1
@@ -684,7 +681,7 @@ final readonly class HtmlReporter
         }
 
         $encodedPath = implode('/', $encodedSegments);
-        // A Windows drive path has no leading slash, so add one to keep the `vscode://file` URL well-formed.
+        // A Windows drive path has no leading slash, so add one to keep the vscode://file URL well-formed.
         if (!str_starts_with($encodedPath, '/')) {
             $encodedPath = '/' . $encodedPath;
         }
@@ -701,13 +698,13 @@ final readonly class HtmlReporter
      */
     private function absolutePath(string $filePath): string
     {
-        // An already-absolute path needs no rooting, so hand it straight back.
+
         if (PathHelper::isAbsolute($filePath)) {
             return $filePath;
         }
 
         $projectRoot = $this->projectRoot;
-        // No project root was configured, so fall back to the current working directory to anchor the path.
+
         if ($projectRoot === '') {
             $cwd         = getcwd();
             $projectRoot = is_string($cwd) ? $cwd : '';
@@ -727,7 +724,7 @@ final readonly class HtmlReporter
     {
         $pillars = [];
 
-        // Collect the distinct pillars present in this run, so the filter only offers ones that can actually match.
+
         foreach ($report->findings as $finding) {
             $pillars[$finding->pillar->value] = true;
         }
@@ -735,7 +732,7 @@ final readonly class HtmlReporter
         ksort($pillars);
 
         $pillarOptions = '';
-        // Turn each present pillar into a dropdown option the reader can filter the findings by.
+
         foreach (array_keys($pillars) as $pillar) {
             $pillarOptions .= sprintf('<option value="%s">%s</option>', $this->escape($pillar), $this->escape($pillar));
         }
@@ -763,7 +760,7 @@ final readonly class HtmlReporter
 
     /**
      * Renders one line of the diagnostics list: the message type, its text, and (when known) the
-     * file:line it points at, so the reader can jump to whatever the scan flagged.
+     * file:line it points at, so the reader can locate whatever the scan flagged.
      *
      * @param RunDiagnostic $diagnostic - Diagnostic whose type, message, and optional location populate the row.
      *
@@ -785,18 +782,18 @@ final readonly class HtmlReporter
      *
      * @param RunDiagnostic $diagnostic - Diagnostic whose filePath or path locates it; a line is appended only with a filePath.
      *
-     * @return string - The location span (filePath or path, with a line appended only alongside a filePath), or an empty string when no location is attached.
+     * @return string - A span preferring filePath over path, with a line only for filePath; empty when both paths are null.
      */
     private function diagnosticLocation(RunDiagnostic $diagnostic): string
     {
         $location = $diagnostic->filePath ?? $diagnostic->path;
 
-        // A diagnostic with no location at all (a general run note) shows no file span.
+
         if ($location === null) {
             return '';
         }
 
-        // Only a real file gets a line number appended; a bare path is shown without one.
+
         if ($diagnostic->filePath !== null && $diagnostic->line !== null) {
             $location .= ':' . $diagnostic->line;
         }
@@ -805,11 +802,11 @@ final readonly class HtmlReporter
     }
 
     /**
-     * The one choke point every value passes through: HTML-escapes untrusted paths and messages so a crafted finding can't inject markup.
+     * Escapes text for use in HTML text content and quoted attribute values.
      *
      * @param string $text - Untrusted text (path, message, label) to neutralise before it reaches the document.
      *
-     * @return string - The text with HTML special characters and quotes escaped (and invalid bytes substituted) so it is safe in both attribute and text contexts.
+     * @return string - Text with HTML special characters and quotes escaped, replacing invalid UTF-8 bytes.
      */
     private function escape(string $text): string
     {

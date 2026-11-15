@@ -30,8 +30,8 @@ final class CallableCollectionReturnPrecisionTest extends TestCase
     /**
      * Checks the dynamic-call warning count for one authored return form.
      *
-     * @param string $declaration      - Parsed source only; empty or invalid source cannot earn a quiet result.
-     * @param int    $expectedWarnings - Zero means the complete returned list has proved callback elements.
+     * @param string $declaration      - Authored class source to parse and analyse; the snippet is never executed.
+     * @param int    $expectedWarnings - Expected DangerousFunctionCallRule finding count for the declaration.
      * @return void - A changed count fails the source-bound precision regression.
      */
     #[DataProvider('returnedCollectionCases')]

@@ -36,10 +36,9 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers the security findings users see for dangerous execution, deserialisation, request input, and disabled rules.
- *
- * Focused cases keep safe application code quiet while exact finding lines show which risky call a user needs to review.
- * Registry-wide cases ensure those precision fixes still work as part of a normal Gruff PHP scan.
+ * Checks security-rule findings for execution, request data, and configured rule settings.
+ * Pins finding counts and source lines with the full registry and explicit fixture configuration.
+ * Callable and escaping controls check which patterns the rules leave unreported.
  */
 final class SecurityRulesTest extends TestCase
 {
@@ -47,9 +46,9 @@ final class SecurityRulesTest extends TestCase
     private PhpFileParser $parser;
 
     /**
-     * Prepare parser fixtures before each rule test.
+     * Create the parser used to load security fixture files.
      *
-     * @return void
+     * @return void - Initialises the parser for each test.
      */
     protected function setUp(): void
     {
@@ -57,9 +56,9 @@ final class SecurityRulesTest extends TestCase
     }
 
     /**
-     * Verify dangerous execution patterns detected.
+     * Assert dangerous-execution findings and representative function metadata.
      *
-     * @return void
+     * @return void - Asserts nine findings, a Warning first finding, and the listed execution categories.
      */
     public function testDangerousExecutionPatternsDetected(): void
     {
@@ -77,9 +76,9 @@ final class SecurityRulesTest extends TestCase
     }
 
     /**
-     * Verify configured dangerous functions are normalized and added without removing built-ins.
+     * Assert normalization of a configured function and retention of the built-in exec finding.
      *
-     * @return void
+     * @return void - Asserts the custom_runner and exec findings in source order.
      */
     public function testAdditionalDangerousFunctionsAreAdditiveAndNormalized(): void
     {
@@ -118,7 +117,7 @@ final class SecurityRulesTest extends TestCase
     /**
      * Verify typed callable invocations are not dangerous dynamic calls.
      *
-     * @return void
+     * @return void - Asserts absence of dynamic-call findings and presence of the system finding.
      */
     public function testTypedCallableInvocationsAreNotDangerousDynamicCalls(): void
     {
@@ -132,21 +131,21 @@ final class SecurityRulesTest extends TestCase
     /**
      * Verify local closure invocations are not treated like arbitrary dynamic calls.
      *
-     * @return void
+     * @return void - Asserts that the literal-bound system call is the only finding.
      */
     public function testLocalClosureInvocationsAreNotDangerousDynamicCalls(): void
     {
         $findings  = $this->findingsForRule($this->localClosureUnit(), DangerousFunctionCallRule::ID);
         $functions = array_map(static fn(Finding $finding): mixed => $finding->metadata['function'] ?? null, $findings);
 
-        // `$dynamic = 'system'` is the local's only write, so the call is judged as the direct system() call it is.
+        // The dynamic local is assigned only 'system', so the rule treats its invocation as a direct system() call.
         self::assertSame(['system'], $functions);
     }
 
     /**
      * Verify callable collections are not treated like arbitrary dynamic calls.
      *
-     * @return void
+     * @return void - Asserts that the callable-collection fixture has no dangerous-function findings.
      */
     public function testCallableCollectionInvocationsAreNotDangerousDynamicCalls(): void
     {
@@ -156,9 +155,9 @@ final class SecurityRulesTest extends TestCase
     }
 
     /**
-     * Verify request data security heuristics detected.
+     * Assert the expected counts for the selected security heuristics.
      *
-     * @return void
+     * @return void - Asserts the five rule-specific finding counts.
      */
     public function testRequestDataSecurityHeuristicsDetected(): void
     {
@@ -174,47 +173,46 @@ final class SecurityRulesTest extends TestCase
     /**
      * Provide precision fixtures whose exact finding lines pin one rule's attack-shape coverage each.
      *
-     * @return array<string, array{string, string, list<int>}> - rows of fixture file, rule id, and the exact finding lines; the XML row's silent
-     *                       lines are the noisy-valid ZipArchive, ORM, builder, and LIBXML_NONET shapes
+     * @return array<string, array{string, string, list<int>}> - Fixture, rule id, and expected finding lines keyed by case label.
      */
     public static function precisionFixtureCases(): array
     {
         return [
             'sql concatenation attack shapes' => ['sql-concatenation-precision.php', SqlConcatenationRule::ID, [7, 8, 9, 10, 25]],
-            // From escapeSplicedSinkValues on (precision-floor M05): an (int) cast, ->quoteString() and Util::backquote()
-            // operands are escaped SQL, so only the bare $id and ->quote() lines report, and the last two: a construction
-            // inside sprintf(), and quoteString() inside an already open quote.
+            // In escapeSplicedSinkValues(), integer casts and unquoted quoteString()/backquote() values stay quiet.
+            // Bare $id, ->quote(), a construction inside sprintf(), and quoteString() inside an open quote report.
+
             'procedural sql sinks follow one unambiguous local assignment' => [
                 'procedural-sink-precision.php', SqlConcatenationRule::ID, [8, 21, 22, 23, 24, 59, 60, 90, 91, 94, 95],
             ],
-            // From escapeSplicedSinkValues on: escapeshellarg() and (int) operands are escaped, as is a concatenation inside
-            // escapeshellarg()'s argument, even within sprintf(); a bare $flag or $pid, escapeshellcmd(), a construction
-            // inside sprintf(), and escapeshellarg() inside an open double quote still report.
+            // Integer casts and escapeshellarg() outside open quotes stay quiet, including concatenation inside its argument.
+            // Bare values, escapeshellcmd(), nested command construction, and escapeshellarg() inside an open quote report.
+
             //
-            // A local only ever set to plain words is quiet (101, 103); a word with a space or quote, a raw ternary arm, a short
-            // ternary, a local passed to a call and a local overwritten after the sink still report (105-116).
+            // Locals assigned only plain words stay quiet; spaces, quotes, raw ternary arms, and short ternaries report.
+            // The preg_match() output array and a local overwritten after the sink also report.
             'procedural command sinks flag dynamic command strings' => [
                 'procedural-sink-precision.php', ProcessCommandConstructionRule::ID, [13, 61, 75, 76, 82, 85, 86, 92, 93, 105, 107, 109, 111, 114, 116],
             ],
-            // 54/64/82: a conditional rebind never hides a real parser, including sibling-branch sinks,
-            // and a conditional construction counts as possibly-XML; the rebind on the sink's own path stays silent.
+            // Conditional rebinding retains possible XML receiver evidence, including in sibling branches.
+            // Conditional XML construction also reports; rebinding on the sink's own path stays quiet.
             'xml loaders need xml receivers' => ['xml-receiver-gating.php', UnsafeXmlLoadingRule::ID, [22, 27, 33, 38, 54, 64, 82]],
             // Each pair is the same sink written positionally then with named arguments only. Both lines must
-            // appear: a row that lost its second line would mean named arguments had stopped resolving again.
+            // appear so a regression in named-argument resolution cannot pass unnoticed.
             'named header arguments resolve' => ['named-argument-sinks.php', HeaderInjectionRule::ID, [7, 8]],
-            // Quiet: comments that give a reason, `can't` included (16-37), and a caught value read afterwards (95, 102).
+            // Explanatory comments, including "can't", and later reads of the caught value stay quiet.
             //
-            // Reported: stock phrasing, a bare reason word, a TODO, disabled code and no reason word (53-78), and a caught value never
-            // read, or rebound, overwritten, unset, probed with isset(), rebound by a loop or read only in a nested function (121-159).
+            // Stock phrases, bare reason words, TODOs, disabled code, and unexplained silence report.
+            // Caught values also report when unused, replaced, unset, probed only by isset(), or read only in a nested function.
             'silent catches that explain or handle the exception stay quiet' => [
                 'silent-catch-precision.php', SilentCatchRule::ID,
                 [53, 58, 63, 68, 73, 78, 121, 125, 134, 140, 145, 152, 159],
             ],
-            // Quiet: a protocol-token status line (12, 13) and values that can only be integers (37, 40, 42). Every other header reports:
-            // - protocol look-alikes (23-27), and locals written with text in any branch, loop pass or short ternary (56-79);
-            // - writes the scan cannot follow (93-105) and a variable-variable (119);
-            // - values bound from outside the body (138-144), and extract(), eval() or an include in the function (160-188);
-            // - a by-reference array item, or a local named like a superglobal (200, 202).
+            // Protocol-token status lines and values the rule recognises as integers stay quiet.
+            // Look-alikes, uncertain or external writes, variable-variables, and writes by extract(), eval(), or include report.
+            // Locals aliased through array items and superglobal names also report.
+
+
             'header values that cannot carry CR/LF stay quiet' => [
                 'header-value-precision.php', HeaderInjectionRule::ID,
                 [23, 24, 25, 26, 27, 56, 61, 63, 65, 79, 93, 97, 100, 105, 119, 138, 140, 142, 144, 160, 174, 188, 200, 202],
@@ -224,21 +222,21 @@ final class SecurityRulesTest extends TestCase
             'named ini_set arguments resolve' => ['named-argument-sinks.php', DebugModeEnabledRule::ID, [25, 26]],
             'named curl_setopt arguments resolve' => ['named-argument-sinks.php', DisabledSslVerificationRule::ID, [31, 32]],
             'named xml arguments resolve' => ['named-argument-sinks.php', UnsafeXmlLoadingRule::ID, [43, 44]],
-            // 104: a callable parameter in a sibling function no longer proves this one's variable. 111, 112, 114:
-            // request-chosen targets, including through Closure::fromCallable and a first-class `$x(...)` reference.
-            // 124: an early-return guard is a known residual the rule does not read. Every other call is a proven shape.
+            // Callable evidence does not cross sibling functions; request-selected targets report even through callable wrappers.
+            // Syntax-only guards, callable-string annotations, shadowed names, unrelated receivers, reassignment, and spread arrays report.
+            // Early-return guards remain unrecognised; closure and callable shapes recognised by the rule stay quiet.
             'dynamic calls prove callability the way PHP does' => ['dynamic-call-precision.php', DangerousFunctionCallRule::ID, [104, 111, 112, 114, 124, 132, 137, 140, 141, 144, 146, 154, 161, 167, 177, 196, 199]],
         ];
     }
 
     /**
-     * Verify each precision fixture flags exactly its attack-shape lines and nothing else.
+     * Assert the selected rule's exact finding lines for each precision fixture.
      *
      * @param string    $fixture       - Fixture filename under tests/Fixtures/Security to analyse.
      * @param string    $ruleId        - Rule whose findings are pinned.
      * @param list<int> $expectedLines - Exact finding lines the fixture must produce.
      *
-     * @return void
+     * @return void - Asserts the exact sorted finding lines for the selected rule.
      */
     #[DataProvider('precisionFixtureCases')]
     public function testPrecisionFixturesFlagExactLines(string $fixture, string $ruleId, array $expectedLines): void
@@ -249,9 +247,9 @@ final class SecurityRulesTest extends TestCase
     }
 
     /**
-     * Verify XML loader calls on typed and assigned `$this` properties keep the receiver gate precise.
+     * Verify XML loader calls on typed and assigned properties of the current object keep the receiver gate precise.
      *
-     * @return void
+     * @return void - Asserts findings for typed, assigned, and promoted XML properties only.
      */
     public function testXmlPropertyReceiversUseTypedAndAssignedEvidence(): void
     {
@@ -261,9 +259,9 @@ final class SecurityRulesTest extends TestCase
     }
 
     /**
-     * Verify boundary security patterns detected.
+     * Assert SQL-concatenation and disabled-SSL finding counts.
      *
-     * @return void
+     * @return void - Asserts three findings for each of the two selected rules.
      */
     public function testBoundarySecurityPatternsDetected(): void
     {
@@ -274,10 +272,9 @@ final class SecurityRulesTest extends TestCase
     }
 
     /**
-     * Provide stricter option overrides and the lines each one re-flags in the precision fixtures.
+     * Provide security-rule option overrides and the expected finding lines.
      *
-     * @return array<string, array{string, string, array<string, bool|list<string>>, list<int>}> - keyed by case label;
-     *                       each value lists rule id, fixture, option override, and the expected flagged lines
+     * @return array<string, array{string, string, array<string, bool|list<string>>, list<int>}> - Rule, fixture, options, and expected lines.
      */
     public static function strictOptionOverrideProvider(): array
     {
@@ -292,14 +289,14 @@ final class SecurityRulesTest extends TestCase
     }
 
     /**
-     * Verify the strict-project option overrides re-flag exactly the relaxed shapes they target.
+     * Assert finding lines with the supplied security-rule option overrides.
      *
      * @param string                           $ruleId        - rule whose options are overridden
      * @param string                           $fixture       - precision fixture to analyse
      * @param array<string, bool|list<string>> $options       - full option map for the override
      * @param list<int>                        $expectedLines - lines the rule must flag under the override
      *
-     * @return void
+     * @return void - Asserts the exact finding lines produced under the option override.
      */
     #[DataProvider('strictOptionOverrideProvider')]
     public function testStrictOptionOverridesReflagRelaxedShapes(string $ruleId, string $fixture, array $options, array $expectedLines): void
@@ -315,9 +312,9 @@ final class SecurityRulesTest extends TestCase
     }
 
     /**
-     * Verify expanded security sink patterns detected.
+     * Assert counts for process, URL, XML, and archive findings.
      *
-     * @return void
+     * @return void - Asserts one finding for each of the four selected rules.
      */
     public function testExpandedSecuritySinkPatternsDetected(): void
     {
@@ -330,9 +327,9 @@ final class SecurityRulesTest extends TestCase
     }
 
     /**
-     * Verify safe wrappers and literal patterns are not flagged.
+     * Assert that safe-patterns.php produces no security findings.
      *
-     * @return void
+     * @return void - Asserts an empty list after filtering findings to security rule ids.
      */
     public function testSafeWrappersAndLiteralPatternsAreNotFlagged(): void
     {
@@ -347,9 +344,9 @@ final class SecurityRulesTest extends TestCase
     }
 
     /**
-     * Verify unserialize with object hydration disabled is not reported.
+     * Verify unserialize() with allowed_classes set to false is not reported.
      *
-     * @return void
+     * @return void - Asserts that the guarded call yields no unsafe-unserialize findings.
      */
     public function testUnserializeAllowedClassesFalseIsNotFlagged(): void
     {
@@ -359,9 +356,9 @@ final class SecurityRulesTest extends TestCase
     }
 
     /**
-     * Verify cumulative security fixture covers every security rule without duplicate findings.
+     * Assert that the cumulative fixture reports the listed security rules without duplicate fingerprints.
      *
-     * @return void
+     * @return void - Asserts presence of the listed rule ids and uniqueness of finding fingerprints.
      */
     public function testCumulativeSecurityFixtureCoversEverySecurityRuleWithoutDuplicateFindings(): void
     {
@@ -395,9 +392,9 @@ final class SecurityRulesTest extends TestCase
     }
 
     /**
-     * Verify security rules respect config disables.
+     * Assert no dangerous-function findings under the disable-rule fixture configuration.
      *
-     * @return void
+     * @return void - Asserts a zero count for the dangerous-function rule.
      */
     public function testSecurityRulesRespectConfigDisables(): void
     {
@@ -419,10 +416,10 @@ final class SecurityRulesTest extends TestCase
      * Assert the expected security finding count for a rule.
      *
      * @param string        $ruleId        - rule id whose findings are counted; all other rules' findings are filtered out first
-     * @param int           $expectedCount - exact findings expected for that rule, including zero to assert it never fires
+     * @param int           $expectedCount - exact findings expected for that rule, including zero to assert this analysis produces none
      * @param list<Finding> $findings      - Findings to filter down to the requested rule id.
      *
-     * @return void
+     * @return void - Asserts that matching findings have the requested count.
      */
     private static function assertRuleCount(string $ruleId, int $expectedCount, array $findings): void
     {
@@ -449,22 +446,21 @@ final class SecurityRulesTest extends TestCase
     }
 
     /**
-     * Run one security rule against a fixture and return its findings.
+     * Run the registry with the supplied or fixture configuration and retain one rule's findings.
      *
      * @param AnalysisUnit        $analysisUnit - already-parsed fixture to run the full default registry over
      * @param string              $ruleId       - rule id to retain; findings from every other rule are discarded
-     * @param AnalysisConfig|null $config       - config override for option-behaviour cases, or null for registry defaults
+     * @param AnalysisConfig|null $config       - Configuration to use; null loads enable-default-off-rules.yaml.
      *
      * @return list<Finding> - only the findings whose ruleId matches $ruleId, re-indexed from zero; empty when that rule never fired
      */
     private function findingsForRule(AnalysisUnit $analysisUnit, string $ruleId, ?AnalysisConfig $config = null): array
     {
         $registry = RuleRegistry::defaults();
-        // Four security rules ship off by default (ADR-034); a per-rule test enables them as a project would.
         $config ??= (new ConfigLoader(__DIR__ . '/../../..'))->load('tests/Fixtures/Config/enable-default-off-rules.yaml', $registry);
         $findings = $registry->analyse([$analysisUnit], new RuleContext(__DIR__ . '/../../..', $config));
 
-        // Narrow the full run down to the single rule under test so assertions are not polluted by neighbours.
+
         return array_values(array_filter(
                                 $findings,
                                 static fn(Finding $finding): bool => $finding->ruleId === $ruleId,
@@ -472,11 +468,11 @@ final class SecurityRulesTest extends TestCase
     }
 
     /**
-     * Analyse security fixtures and return findings for assertions.
+     * Analyse a security fixture with the configuration that enables default-off rules.
      *
-     * @param string $fixture - fixture basename under the security fixtures directory to parse and run every rule over
+     * @param string $fixture - Basename under tests/Fixtures/Security to parse and analyse.
      *
-     * @return list<Finding> - every finding the default registry raised against the fixture, in discovery order; empty when the fixture is clean
+     * @return list<Finding> - Findings from enabled registry rules in canonical report order; empty when none are reported.
      */
     private function analyse(string $fixture): array
     {
@@ -492,7 +488,7 @@ final class SecurityRulesTest extends TestCase
     /**
      * Parse the named fixture into an analysis unit.
      *
-     * @param string $filename - Fixture filename.
+     * @param string $filename - Basename under tests/Fixtures/Security; only a .php suffix selects PHP parsing.
      *
      * @return AnalysisUnit - the parsed fixture, tagged PHP or text by extension so non-PHP fixtures still feed the text-based rules
      */
@@ -544,7 +540,7 @@ final class SecurityRulesTest extends TestCase
      */
     private function typedCallableUnit(): AnalysisUnit
     {
-        // Invoking typed callables is not command execution; only the literal system() call should fire here.
+
         return $this->parseSource(
             <<<'PHP'
 <?php
@@ -582,11 +578,11 @@ PHP,
     /**
      * Parse the local-closure fixture into an analysis unit.
      *
-     * @return AnalysisUnit - unit whose locally bound closures and array callables are safe, leaving only the dynamic system() call to flag
+     * @return AnalysisUnit - Fixture with closures, array callables, and a literal-bound system() invocation to distinguish.
      */
     private function localClosureUnit(): AnalysisUnit
     {
-        // Locally bound closures and array callables are safe; the rule should only react to the dynamic system() call.
+
         return $this->parseSource(
             <<<'PHP'
 <?php
@@ -624,11 +620,11 @@ PHP,
     /**
      * Parse the callable-collection fixture into an analysis unit.
      *
-     * @return AnalysisUnit - unit invoking callables drawn from a property array, none of which are sinks, so it must stay clean
+     * @return AnalysisUnit - Fixture exercising a callable property and closures stored in a property array.
      */
     private function callableCollectionUnit(): AnalysisUnit
     {
-        // Calling callables drawn from a property array must stay clean; none of these are command-execution sinks.
+
         return $this->parseSource(
             <<<'PHP'
 <?php
@@ -670,7 +666,7 @@ PHP,
     /**
      * Parse XML property-receiver shapes into an analysis unit.
      *
-     * @return AnalysisUnit - unit whose typed, constructor-assigned, same-scope assigned, and promoted XML properties should flag
+     * @return AnalysisUnit - Fixture with unsafe XML-property calls plus safe-option and unknown-receiver controls.
      */
     private function xmlPropertyReceiverUnit(): AnalysisUnit
     {
@@ -715,7 +711,7 @@ PHP,
      */
     private function safeUnserializeUnit(): AnalysisUnit
     {
-        // The allowed_classes => false guard makes this unserialize call safe, so the rule must not flag it.
+
         return $this->parseSource(
             <<<'PHP'
 <?php
@@ -732,10 +728,10 @@ PHP,
     /**
      * Parse inline source into an analysis unit.
      *
-     * @param string $source      - Source directory.
-     * @param string $displayPath - Fixture display path.
+     * @param string $source      - PHP source text; syntax errors fail the test and empty input yields no statements.
+     * @param string $displayPath - Display path assigned to the inline fixture in analysis results.
      *
-     * @return AnalysisUnit - unit carrying the parsed statements and tokens under $displayPath, with parent attributes connected for rule traversal
+     * @return AnalysisUnit - Parsed inline source with tokens and parent-linked statements under $displayPath.
      */
     private function parseSource(string $source, string $displayPath): AnalysisUnit
     {
@@ -749,7 +745,7 @@ PHP,
 
         $nodeTraverser = new NodeTraverser();
         $nodeTraverser->addVisitor(new ParentConnectingVisitor());
-        /** @var list<Stmt> $traversed Statements connected to parent attributes for rule traversal. */
+        /** @var list<Stmt> $traversed - Statements connected to parent attributes for rule traversal. */
         $traversed = $nodeTraverser->traverse($statements);
 
         return new AnalysisUnit(

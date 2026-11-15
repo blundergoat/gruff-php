@@ -38,11 +38,11 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
     /**
      * Describes the maintainability-index rule for the registry and reports.
      *
-     * @return RuleDefinition - Rule metadata and thresholds.
+     * @return RuleDefinition - Registry entry with the advisory floor and reporting metadata.
      */
     public function definition(): RuleDefinition
     {
-        // Advisory: a low index flags a refactor candidate to weigh, not a confirmed defect, so it ships at the
+        // Advisory: a low index flags code to consider refactoring, not a confirmed defect, so it uses the
         // lowest severity tier and sorts below warnings/errors. The shipped --fail-on default is advisory, so this
         // does fail the gate; a consumer who wants it non-blocking raises --fail-on to warning.
         return new RuleDefinition(
@@ -63,17 +63,16 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
     }
 
     /**
-     * Reports each function-like node whose maintainability index sits below the configured floor.
+     * Reports below-floor maintainability scores outside the built-in test paths.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context carrying thresholds.
      *
-     * @return list<Finding> - One finding per node below the maintainability threshold; empty when all nodes pass.
+     * @return list<Finding> - One finding per below-floor node; empty for excluded paths or no threshold breaches.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        // A test, fixture or example file is long by design: its sequential setup and assertions lower the index without
-        // making it harder to follow, so the family's test-path class reports nothing.
+        // Built-in test, fixture, and example paths are outside this rule's reporting scope.
         if (SensitiveExclusionFilter::isBuiltInTestPath($analysisUnit->file->displayPath)) {
             return [];
         }
@@ -85,13 +84,13 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
 
         $findings = [];
 
-        // Score every function and method in the file.
+
         foreach ($nodes as $node) {
-            /** @var ClassMethod|Function_ $node NodeIndex query is constrained to function-like classes. */
+            /** @var ClassMethod|Function_ $node - NodeIndex query is constrained to function-like classes. */
             $mi             = self::computeMaintainabilityIndex($node, $analysisUnit);
             $thresholdMatch = $settings->lowValueThresholdMatch($mi);
 
-            // A node at or above the floor is fine, so skip it.
+
             if ($thresholdMatch === null) {
                 continue;
             }
@@ -153,7 +152,7 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
 
         $mi = (171.0 - 5.2 * log($volume) - 0.23 * $ccn - 16.2 * log($lloc)) * 100.0 / 171.0;
 
-        // Clamp at zero: the normalised SEI index has a 0-100 floor, so a very dense method cannot report negative.
+        // Clamp at zero so dense methods stay within the index's 0-100 range.
         return max(0.0, $mi);
     }
 
@@ -162,11 +161,11 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
      *
      * @param int|float $number - Configured maintainability threshold; an integral float drops its ".0" tail.
      *
-     * @return string - Human-readable threshold value with fractional values preserved and whole values stripped.
+     * @return string - Human-readable threshold with fractions kept and whole values shown without decimals.
      */
     private static function formatNumber(int|float $number): string
     {
-        // A genuine fraction keeps its decimals; a whole value is shown without them.
+
         if (is_float($number) && floor($number) !== $number) {
             return (string) $number;
         }

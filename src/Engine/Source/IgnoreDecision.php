@@ -5,12 +5,9 @@ declare(strict_types=1);
 namespace GruffPhp\Engine\Source;
 
 /**
- * The answer to "should gruff skip this path?" - whether it is ignored and, if so, why.
- *
- * As gruff walks a project it asks the ignore engine about each path; this carries the verdict back.
- * When a path is ignored it also records the reason (config, default, generated, gitignore) and the
- * pattern that matched, so a report can tell the user not just that a file was skipped but which rule
- * skipped it - handy when a file they expected to be scanned quietly was not.
+ * Carries an ignore decision with optional reason and matching-pattern details.
+ * Source discovery and check-ignore use it to distinguish in-scope paths from exclusions.
+ * Reports can use the source and pattern to explain which rule excluded a path.
  */
 final readonly class IgnoreDecision
 {
@@ -19,7 +16,7 @@ final readonly class IgnoreDecision
      *
      * @param bool        $ignored - True when the path is excluded from analysis.
      * @param string|null $source - Reason category when ignored (config, default, generated, or gitignore); null when the path is in scope.
-     * @param string|null $pattern - The glob, directory token, filename, or git rule that matched; null when in scope or when no concrete pattern applied.
+     * @param string|null $pattern - Matched glob, directory token, filename, or Git rule; null when in scope or no pattern applies.
      */
     public function __construct(
         public bool $ignored,
@@ -38,7 +35,7 @@ final readonly class IgnoreDecision
      */
     public static function ignored(string $source, ?string $pattern): self
     {
-        // Always flags ignored=true; the source and pattern record why so reports can attribute the exclusion.
+
         return new self(true, $source, $pattern);
     }
 
@@ -49,7 +46,7 @@ final readonly class IgnoreDecision
      */
     public static function notIgnored(): self
     {
-        // In-scope path: source and pattern stay null because there is no exclusion to attribute.
+
         return new self(false);
     }
 }

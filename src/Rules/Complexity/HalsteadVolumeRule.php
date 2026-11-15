@@ -26,9 +26,9 @@ use PhpParser\Node\Stmt\Function_;
  * Flags a function or method whose Halstead volume - a measure of how much distinct information its
  * operators and operands carry - runs high, a heuristic for code that is dense to read and test.
  *
- * Runs per file over every function-like node, counting distinct and total operators and operands to
- * derive volume (plus difficulty and effort for context). Anything over the configured threshold
- * (default advisory above 8000) is reported. A trivial body scores zero and trips nothing.
+ * Disabled by default; when enabled, counts distinct and total operators and operands across functions and methods
+ * to derive volume, difficulty and effort. Volumes above the configured threshold are reported (default advisory above 8000).
+ * Bodies with no counted operands produce all-zero metrics.
  */
 final readonly class HalsteadVolumeRule implements RuleInterface
 {
@@ -45,7 +45,7 @@ final readonly class HalsteadVolumeRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         // Advisory: high volume is a weigh-it signal, not proof of a defect, so it ships at the lowest severity tier
-        // and sorts below warnings/errors. The shipped --fail-on default is advisory, so this does fail the gate;
+        // and sorts below warnings/errors. When enabled, its findings can fail the default --fail-on advisory gate;
         // a consumer who wants it non-blocking raises --fail-on to warning.
         return new RuleDefinition(
             id:                self::ID,
@@ -72,7 +72,7 @@ final readonly class HalsteadVolumeRule implements RuleInterface
      * Reports each function-like node whose Halstead volume exceeds the configured threshold.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext - Supplies the configured volume thresholds; a callable below every threshold is not reported.
      *
      * @return list<Finding> - one finding per function-like node over threshold, empty when every node stayed under.
      */
@@ -85,14 +85,14 @@ final readonly class HalsteadVolumeRule implements RuleInterface
 
         $findings = [];
 
-        // Measure every function and method in the file.
+
         foreach ($nodes as $node) {
-            /** @var ClassMethod|Function_ $node NodeIndex query is constrained to function-like classes. */
+            /** @var ClassMethod|Function_ $node - NodeIndex query is constrained to function-like classes. */
             $metrics        = self::computeHalsteadMetrics($node);
             $volume         = $metrics['volume'];
             $thresholdMatch = $settings->highValueThresholdMatch($volume);
 
-            // A volume within the threshold is fine, so skip it.
+
             if ($thresholdMatch === null) {
                 continue;
             }
@@ -138,18 +138,17 @@ final readonly class HalsteadVolumeRule implements RuleInterface
      *
      * @param ClassMethod|Function_ $node - Function-like node whose body supplies the operator and operand counts.
      *
-     * @return array{volume: float, difficulty: float, effort: float, vocabulary: int, length: int} - the full Halstead set for the node; a trivial
-     *                       body yields all-zero figures that trip no threshold.
+     * @return array{volume: float, difficulty: float, effort: float, vocabulary: int, length: int} - Metrics; all zero without counted operands.
      */
     public static function computeHalsteadMetrics(Node $node): array
     {
         static $metricsCache = null;
-        // Lazily create the shared per-node cache on first use.
+
         if (!$metricsCache instanceof \WeakMap) {
             $metricsCache = new \WeakMap();
         }
 
-        // Reuse a valid cached result when this node was already measured.
+
         if (isset($metricsCache[$node])) {
             $cached = self::validatedMetrics($metricsCache[$node]);
             if ($cached !== null) {
@@ -163,17 +162,16 @@ final readonly class HalsteadVolumeRule implements RuleInterface
         $totalOperators = 0;
         $totalOperands  = 0;
 
-        // Tally operators and operands across every node in the body.
+
         foreach (NodeIndex::bodyDescendants($node) as $childNode) {
             $operatorKey = self::operatorKey($childNode);
-            // Record each operator, both as a distinct kind and a total occurrence.
+
             if ($operatorKey !== null) {
                 $operators[$operatorKey] = true;
                 $totalOperators++;
             }
 
             $operandKey = self::operandKey($childNode);
-            // Record each operand, both as a distinct value and a total occurrence.
             if ($operandKey !== null) {
                 $operands[$operandKey] = true;
                 $totalOperands++;
@@ -189,16 +187,14 @@ final readonly class HalsteadVolumeRule implements RuleInterface
     /**
      * Re-validates a cached metrics entry, returning null (forcing a recompute) when it is malformed.
      *
-     * @param mixed $rawMetrics - Value previously stored in the WeakMap cache; trusted to be a metrics array but
-     *                          re-validated because the cache is untyped and a malformed entry must be recomputed.
+     * @param mixed $rawMetrics - Cached value; malformed entries are rejected so the caller recomputes the metrics.
      *
-     * @return array{volume: float, difficulty: float, effort: float, vocabulary: int, length: int}|null - the validated metrics, or null when the
-     *                       cache entry is missing a field or mistyped and must be recomputed.
+     * @return array{volume: float, difficulty: float, effort: float, vocabulary: int, length: int}|null - Valid metrics, or null to recompute.
      */
     private static function validatedMetrics(mixed $rawMetrics): ?array
     {
         if (!is_array($rawMetrics)) {
-            // Cache entry is not even an array; null tells the caller to recompute from scratch.
+
             return null;
         }
 
@@ -209,7 +205,7 @@ final readonly class HalsteadVolumeRule implements RuleInterface
         $length     = $rawMetrics['length'] ?? null;
 
         if (!is_float($volume) || !is_float($difficulty) || !is_float($effort) || !is_int($vocabulary) || !is_int($length)) {
-            // A field is missing or mistyped, so the entry is unusable; null forces a recompute.
+
             return null;
         }
 
@@ -231,7 +227,7 @@ final readonly class HalsteadVolumeRule implements RuleInterface
      */
     private static function operatorKey(Node $node): ?string
     {
-        // Binary/assign ops and control-flow statements are the operators; the class name keys each distinct kind.
+
         return match (true) {
             $node instanceof BinaryOp,
                 $node instanceof Expr\AssignOp,
@@ -267,12 +263,11 @@ final readonly class HalsteadVolumeRule implements RuleInterface
     }
 
     /**
-     * Builds the operand key for a parameter, or null for a destructured or dynamically named one.
+     * Builds a parameter operand key when the parameter has a statically named variable.
      *
-     * @param Node\Param $parameter - Declared parameter; only a plain `$name` variable yields a key, so destructured
-     *                              or expression-named params are skipped.
+     * @param Node\Param $parameter - Parameter whose variable name supplies the operand key.
      *
-     * @return string|null - the `$name` operand key, or null for destructured or dynamic-named params with no name.
+     * @return string|null - The $name key, or null for a non-variable or dynamically named parameter.
      */
     private static function parameterOperandKey(Node\Param $parameter): ?string
     {
@@ -286,25 +281,23 @@ final readonly class HalsteadVolumeRule implements RuleInterface
     }
 
     /**
-     * Computes the Halstead metrics from the operator and operand counts, guarding the trivial-body case.
+     * Computes the Halstead metrics from operator and operand counts, returning zero metrics when operands are absent.
      *
      * @param int $uniqueOperators - Distinct operator kinds (n1); drives vocabulary and the difficulty numerator.
-     * @param int $uniqueOperands - Distinct operand names (n2); a zero short-circuits to the empty-metrics result
-     *                             to avoid dividing by it in the difficulty term.
+     * @param int $uniqueOperands - Distinct operands (n2); zero returns all-zero metrics to avoid division by zero.
      * @param int $totalOperators - Every operator occurrence (N1), counting repeats; feeds program length.
-     * @param int $totalOperands - Every operand occurrence (N2), counting repeats; a zero also yields empty metrics.
+     * @param int $totalOperands - Every operand occurrence (N2), counting repeats; zero also yields all-zero metrics.
      *
-     * @return array{volume: float, difficulty: float, effort: float, vocabulary: int, length: int} - the computed metrics; all-zero when vocabulary
-     *                       or operand counts are zero so log() and the difficulty division stay defined.
+     * @return array{volume: float, difficulty: float, effort: float, vocabulary: int, length: int} - Metrics; zero without vocabulary or operands.
      */
     private static function metricsForCounts(int $uniqueOperators, int $uniqueOperands, int $totalOperators, int $totalOperands): array
     {
         $length     = $totalOperators + $totalOperands;
         $vocabulary = $uniqueOperators + $uniqueOperands;
 
-        // A trivial body (no vocabulary or no operands) yields zeroes and trips no threshold.
+        // Avoid log(0) and division by zero when no vocabulary or operands were counted.
         if ($vocabulary === 0 || $uniqueOperands === 0 || $totalOperands === 0) {
-            // Trivial body: zeroes keep log() and the difficulty division below defined, never tripping a threshold.
+
             return ['volume' => 0.0, 'difficulty' => 0.0, 'effort' => 0.0, 'vocabulary' => 0, 'length' => 0];
         }
 
@@ -329,7 +322,7 @@ final readonly class HalsteadVolumeRule implements RuleInterface
      */
     private static function formatNumber(int|float $number): string
     {
-        // A genuine fraction keeps its decimals; a whole value is shown without them.
+
         if (is_float($number) && floor($number) !== $number) {
             return (string)$number;
         }

@@ -19,11 +19,9 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers the GCP service-account key rule as a user meets it when a key file is committed.
- *
- * - A real key reports once with a redacted marker, a placeholder key stays quiet, and the private-key rule reports its own line.
- * - No report format (text, JSON, SARIF, GitHub, Markdown or HTML) prints the raw key body.
- * - Schema field names and placeholder identifiers do not fire the PII rule.
+ * Covers GCP service-account fixture findings and rendered previews.
+ * The key fixture produces one GCP finding; the placeholder stays quiet and the private-key finding uses a different line.
+ * The six exercised report formats include a redaction marker and omit the checked key-body prefix.
  */
 final class SensitiveDataExpansionRulesTest extends TestCase
 {
@@ -40,9 +38,9 @@ final class SensitiveDataExpansionRulesTest extends TestCase
     private const PHI_GUARD_FIXTURE = 'tests/Fixtures/SensitiveData/phi-schema-placeholders.php';
 
     /**
-     * Verify a real service-account key fires once with a redacted preview.
+     * Verify one GCP finding has the expected metadata and a redaction marker in its preview.
      *
-     * @return void
+     * @return void - Asserts the finding count, pillar, confidence, detector and preview marker.
      */
     public function testGcpServiceAccountKeyDetected(): void
     {
@@ -60,7 +58,7 @@ final class SensitiveDataExpansionRulesTest extends TestCase
     /**
      * Verify a placeholder service-account key does not fire.
      *
-     * @return void
+     * @return void - Asserts no GCP findings are returned for the placeholder fixture.
      */
     public function testGcpPlaceholderKeyIgnored(): void
     {
@@ -68,9 +66,9 @@ final class SensitiveDataExpansionRulesTest extends TestCase
     }
 
     /**
-     * Verify the GCP and generic private-key rules are complementary, not duplicate.
+     * Verify the key fixture yields one finding per rule on different lines.
      *
-     * @return void
+     * @return void - Asserts one GCP finding, one private-key finding and distinct line numbers.
      */
     public function testGcpAndPrivateKeyFindingsAreDistinct(): void
     {
@@ -84,9 +82,9 @@ final class SensitiveDataExpansionRulesTest extends TestCase
     }
 
     /**
-     * Verify no renderer leaks the raw key body.
+     * Verify six report formats omit the checked key-body prefix and contain a redaction marker.
      *
-     * @return void
+     * @return void - Asserts prefix absence and marker presence in each captured report.
      */
     public function testNewDetectorsDoNotLeakRawSecretsAcrossFormats(): void
     {
@@ -104,9 +102,9 @@ final class SensitiveDataExpansionRulesTest extends TestCase
     }
 
     /**
-     * Verify schema field names and placeholder identifiers do not fire PII rules.
+     * Verify schema field names and placeholder identifiers produce no findings from the PII fixture rule.
      *
-     * @return void
+     * @return void - Asserts the selected rule returns no findings for the fixture.
      */
     public function testSchemaAndPlaceholderValuesDoNotFirePhiOrPii(): void
     {
@@ -114,12 +112,12 @@ final class SensitiveDataExpansionRulesTest extends TestCase
     }
 
     /**
-     * Analyse a fixture and return findings for one rule.
+     * Analyse a project-relative fixture with registry defaults and return one rule's findings.
      *
-     * @param string $displayPath - Fixture display path.
-     * @param string $ruleId - Rule identifier to filter for.
+     * @param string $displayPath - Project-relative fixture path resolved under PROJECT_ROOT.
+     * @param string $ruleId - Rule identifier whose findings are retained.
      *
-     * @return list<Finding> - findings emitted by that one rule, in detection order; empty when the rule did not fire
+     * @return list<Finding> - Matching findings in report order; empty when the rule is disabled or has no findings.
      */
     private function findingsForRule(string $displayPath, string $ruleId): array
     {
@@ -134,10 +132,9 @@ final class SensitiveDataExpansionRulesTest extends TestCase
     /**
      * Run the gruff CLI and return its stdout.
      *
-     * @param list<string> $arguments - CLI arguments.
+     * @param list<string> $arguments - Arguments appended after the PHP binary and CLI script.
      *
-     * @return string - the full rendered report captured from stdout; a non-zero exit aborts via assertion first,
-     *   so the returned text is always the complete report to scan for leaked secrets
+     * @return string - Captured stdout after the zero-exit assertion succeeds.
      */
     private function runGruff(array $arguments): string
     {

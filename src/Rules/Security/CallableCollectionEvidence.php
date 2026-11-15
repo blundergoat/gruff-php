@@ -23,12 +23,12 @@ final class CallableCollectionEvidence
      * Checks the collection behind an unchanged loop value at this exact invocation.
      *
      * @param Expr\FuncCall $call - Dynamic invocation; calls outside the selecting loop receive no collection evidence.
-     * @return bool - True when the owning declaration proves its observable registrations and reads.
+     * @return bool - True when the owning declaration matches the supported registration and read shapes.
      */
     public static function hasInvocationEvidence(Expr\FuncCall $call): bool
     {
         $parent = $call->getAttribute('parent');
-        // Stop at the method or closure boundary so a captured name never borrows another loop's evidence.
+        // Stop at the callable boundary so a captured name never borrows another loop's evidence.
         while ($parent instanceof Node && !$parent instanceof Node\FunctionLike) {
             // Only the loop selecting this unchanged callback can establish its collection source.
             if ($parent instanceof Stmt\Foreach_ && CallableFlowEvidence::hasUnchangedLoopValue($call, $parent)) {
@@ -44,7 +44,7 @@ final class CallableCollectionEvidence
      * Binds a selected collection to its own declaration, default and observed property uses.
      *
      * @param Stmt\Foreach_ $loop - Current callback iteration; unsupported selection shapes keep the warning.
-     * @return bool - True only for an owned collection with at least one proved registration.
+     * @return bool - True only for an owned collection with at least one supported typed registration.
      */
     private static function hasCollectionEvidence(Stmt\Foreach_ $loop): bool
     {
@@ -81,7 +81,7 @@ final class CallableCollectionEvidence
         foreach ($declaration->getProperties() as $definition) {
             // Each item in a shared declaration still has its own case-sensitive name and initial value.
             foreach ($definition->props as $item) {
-                // Other property declarations cannot supply this collection's starting value.
+
                 if ($item->name->toString() !== $property->name->toString()) {
                     continue;
                 }
@@ -138,7 +138,7 @@ final class CallableCollectionEvidence
      * @param Expr\PropertyFetch|Expr\StaticPropertyFetch $propertyUse     - One observed reference to this property.
      * @param Expr\PropertyFetch|Expr\StaticPropertyFetch $property        - Collection identity at the invocation.
      * @param bool                                        $hasClassBucket  - Whether stores and reads must select the runtime-class bucket.
-     * @param bool                                        $hasRegistration - Tracks proved appends; false means none observed yet.
+     * @param bool                                        $hasRegistration - Tracks supported typed appends; false means none observed yet.
      * @return bool - False for every other use, including argument borrowing and property references.
      */
     private static function hasKnownUse(
@@ -166,7 +166,7 @@ final class CallableCollectionEvidence
         if ($parent->expr instanceof Expr\Array_ && $parent->expr->items === []) {
             return $selection === $propertyUse || self::isSelectedCollection($selection, $property, $hasClassBucket);
         }
-        // Registration appends one untouched native callable parameter to exactly the selected collection.
+        // A supported registration directly appends a callable parameter with no observed local writes to the selected collection.
         if ($parent instanceof Expr\Assign && $selection instanceof Expr\ArrayDimFetch && $selection->dim === null
             && self::isSelectedCollection($selection->var, $property, $hasClassBucket)
             && CallableFlowEvidence::hasRegisteredParameterEvidence($parent->expr, $parent)) {
@@ -189,7 +189,7 @@ final class CallableCollectionEvidence
     {
         // Boot registrations partition a static property by the current runtime class.
         if ($hasClassBucket) {
-            // Arbitrary keys and self::class can select another bucket, so neither grants this proof.
+            // Arbitrary keys and self::class can select another bucket, so neither matches the required static::class shape.
             if (!$property instanceof Expr\StaticPropertyFetch || !$selection instanceof Expr\ArrayDimFetch
                 || !$selection->dim instanceof Expr\ClassConstFetch || !$selection->dim->class instanceof Name
                 || strtolower($selection->dim->class->toString()) !== 'static'
@@ -220,7 +220,7 @@ final class CallableCollectionEvidence
     }
 
     /**
-     * Finds the class or trait that owns a property use without borrowing an outer declaration.
+     * Finds the nearest enclosing class, trait, interface or enum without borrowing an outer declaration.
      *
      * @param Node $node - Read, write or loop whose source owner is needed.
      * @return Stmt\ClassLike|null - Nearest declaration; null means no local property contract can be inspected.
@@ -230,7 +230,7 @@ final class CallableCollectionEvidence
         $parent = $node->getAttribute('parent');
         // Anonymous and nested classes form their own property boundary.
         while ($parent instanceof Node) {
-            // The nearest class-like owner decides which declarations are visible to this proof.
+
             if ($parent instanceof Stmt\ClassLike) {
                 return $parent;
             }

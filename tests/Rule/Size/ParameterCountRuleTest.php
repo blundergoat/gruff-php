@@ -17,8 +17,9 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers parameter-count thresholds for methods, constructor variants (promoted, value-object exemption, configured ceiling), exempt callables, and
- * interfaces.
+ * Exercises parameter-count findings using parsed fixtures and per-test rule settings.
+ * Checks finding counts, symbols, severities and metadata for methods, constructors and interface declarations.
+ * Covers constructor caps and promoted value-object ceilings, including configured overrides.
  */
 final class ParameterCountRuleTest extends TestCase
 {
@@ -28,9 +29,9 @@ final class ParameterCountRuleTest extends TestCase
     private PhpFileParser $parser;
 
     /**
-     * Prepare parser fixtures before each rule test.
+     * Create the rule and parser used by each fixture-based test.
      *
-     * @return void
+     * @return void - Initializes fresh rule and parser instances before each test.
      */
     protected function setUp(): void
     {
@@ -41,7 +42,7 @@ final class ParameterCountRuleTest extends TestCase
     /**
      * Verify no findings for few parameters.
      *
-     * @return void
+     * @return void - Asserts an empty finding list for the zero-parameter fixture.
      */
     public function testNoFindingsForFewParameters(): void
     {
@@ -51,9 +52,9 @@ final class ParameterCountRuleTest extends TestCase
     }
 
     /**
-     * Verify six parameters against a warning tier of 5 are lower-band advisory notices and nine are still an error.
+     * Exercise configured parameter limits across ordinary methods and a promoted constructor.
      *
-     * @return void
+     * @return void - Asserts two lower-band advisories, one upper-band error and the expected callable symbols.
      */
     public function testSixParametersAreLowerBandNoticesAndNineAnError(): void
     {
@@ -76,7 +77,7 @@ final class ParameterCountRuleTest extends TestCase
     /**
      * Verify error for nine parameters.
      *
-     * @return void
+     * @return void - Asserts one error for nineParams() with parameter-count metadata of nine.
      */
     public function testErrorForNineParameters(): void
     {
@@ -89,9 +90,9 @@ final class ParameterCountRuleTest extends TestCase
     }
 
     /**
-     * Provide fixture/symbol pairs that must remain exempt from parameter-count findings.
+     * Provide fixture/symbol pairs whose absence from parameter-count findings is asserted.
      *
-     * @return iterable<string, array{fixture: string, symbol: string}> - one case per exempt callable, keyed by the PHPUnit data-set label
+     * @return iterable<string, array{fixture: string, symbol: string}> - One fixture and expected-absent symbol per PHPUnit data-set label.
      */
     public static function exemptCallableProvider(): iterable
     {
@@ -112,12 +113,12 @@ final class ParameterCountRuleTest extends TestCase
     }
 
     /**
-     * Verify exempt callables are not reported under the standard threshold.
+     * Verify each supplied symbol is absent from the findings under the standard thresholds.
      *
      * @param string $fixture - Fixture filename to parse.
      * @param string $symbol - Symbol whose absence from findings is asserted.
      *
-     * @return void
+     * @return void - Asserts that the supplied symbol does not appear in the fixture's findings.
      */
     #[DataProvider('exemptCallableProvider')]
     public function testExemptCallableDoesNotFire(string $fixture, string $symbol): void
@@ -131,7 +132,7 @@ final class ParameterCountRuleTest extends TestCase
     /**
      * Verify promoted constructor parameters counted.
      *
-     * @return void
+     * @return void - Asserts one constructor finding whose parameter-count metadata is six.
      */
     public function testPromotedConstructorParametersCounted(): void
     {
@@ -151,7 +152,7 @@ final class ParameterCountRuleTest extends TestCase
     /**
      * Verify constructor-specific threshold can allow constructors while ordinary methods still fire.
      *
-     * @return void
+     * @return void - Asserts both method symbols are present and the constructor symbol is absent.
      */
     public function testConfiguredConstructorThresholdAllowsConstructorWhileKeepingMethodFindings(): void
     {
@@ -169,9 +170,9 @@ final class ParameterCountRuleTest extends TestCase
     }
 
     /**
-     * Verify constructor-specific threshold emits dedicated metadata under legacy thresholds.
+     * Verify constructor-specific threshold emits dedicated metadata under configured warning and error thresholds.
      *
-     * @return void
+     * @return void - Asserts one advisory constructor finding with lower-band, cap and kind metadata plus the threshold message.
      */
     public function testConfiguredConstructorThresholdFiresWithMetadata(): void
     {
@@ -189,7 +190,7 @@ final class ParameterCountRuleTest extends TestCase
                                                 static fn($finding) => $finding->symbol === 'ManyParamsFixture::__construct()',
                                             ));
 
-        // Six parameters against a constructor cap of 5 sit under one and a half times it, so the finding is a notice.
+        // Six parameters against a constructor cap of 5 sit under one and a half times it, so the finding is advisory.
         self::assertCount(1, $constructorFindings);
         self::assertSame(Severity::Advisory, $constructorFindings[0]->severity);
         self::assertSame(LimitBand::LOWER, $constructorFindings[0]->metadata[LimitBand::KEY]);
@@ -204,9 +205,9 @@ final class ParameterCountRuleTest extends TestCase
     }
 
     /**
-     * Verify constructor-specific threshold uses the single-threshold severity shape.
+     * Verify constructor-specific threshold uses the registry's default severity.
      *
-     * @return void
+     * @return void - Asserts one constructor error carrying the configured cap of four.
      */
     public function testConfiguredConstructorThresholdUsesDefaultSeverityThreshold(): void
     {
@@ -230,7 +231,7 @@ final class ParameterCountRuleTest extends TestCase
     /**
      * Verify service constructors with many dependencies are judged by the default threshold, not exempt as value objects.
      *
-     * @return void
+     * @return void - Asserts one lower-band advisory for twelve constructor parameters without a special finding kind.
      */
     public function testServiceConstructorWithManyDependenciesIsNotExemptAsAValueObject(): void
     {
@@ -246,9 +247,9 @@ final class ParameterCountRuleTest extends TestCase
     }
 
     /**
-     * Verify a final readonly constructor with a behaviour method is judged as a service, not a value object.
+     * Verify a final readonly constructor with a void-returning method does not receive the promoted value-object exemption.
      *
-     * @return void
+     * @return void - Asserts one lower-band advisory for eleven constructor parameters without a special finding kind.
      */
     public function testReadonlyServiceConstructorWithBehaviourIsNotExemptAsAValueObject(): void
     {
@@ -259,7 +260,7 @@ final class ParameterCountRuleTest extends TestCase
                                                 static fn($finding) => $finding->symbol === 'ReadonlyServiceConstructorFixture::__construct()',
                                             ));
 
-        // Eleven parameters against the default limit of 10 sit under one and a half times it, so the finding is a notice.
+        // Eleven parameters against the default limit of 10 sit under one and a half times it, so the finding is advisory.
         self::assertCount(1, $constructorFindings);
         self::assertArrayNotHasKey('findingKind', $constructorFindings[0]->metadata);
         self::assertSame(LimitBand::LOWER, $constructorFindings[0]->metadata[LimitBand::KEY]);
@@ -270,7 +271,7 @@ final class ParameterCountRuleTest extends TestCase
     /**
      * Verify a promoted readonly DTO above the default ceiling fires with the ceiling-bypass message.
      *
-     * @return void
+     * @return void - Asserts one advisory ceiling finding with 26 parameters, ceiling 25 and the ceiling message.
      */
     public function testPromotedConstructorAboveDefaultCeilingFires(): void
     {
@@ -295,7 +296,7 @@ final class ParameterCountRuleTest extends TestCase
     /**
      * Verify a project override of the ceiling fires earlier on a smaller promoted DTO.
      *
-     * @return void
+     * @return void - Asserts one advisory ceiling finding with nine parameters and the configured cap of five.
      */
     public function testPromotedConstructorCeilingHonoursOptionOverride(): void
     {
@@ -323,7 +324,7 @@ final class ParameterCountRuleTest extends TestCase
     /**
      * Verify constructor threshold does not override promoted value-object exemption.
      *
-     * @return void
+     * @return void - Asserts the promoted payload constructor is absent from findings despite the constructor cap of five.
      */
     public function testConstructorThresholdDoesNotOverridePromotedValueObjectExemption(): void
     {
@@ -340,7 +341,7 @@ final class ParameterCountRuleTest extends TestCase
     /**
      * Verify interface parameters counted.
      *
-     * @return void
+     * @return void - Asserts one finding whose parameter-count metadata is six.
      */
     public function testInterfaceParametersCounted(): void
     {
@@ -351,16 +352,14 @@ final class ParameterCountRuleTest extends TestCase
     }
 
     /**
-     * Analyse fixture paths and return findings for assertions.
+     * Analyse one size fixture with explicit thresholds and merged rule options.
      *
-     * @param string                                                                       $fixture - Fixture filename under tests/Fixtures/Size to
-     *                                                                                                 scan.
-     * @param array<string, int>                                                           $thresholds - Warning/error parameter-count limits for this
-     *                                                                                     case.
-     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options - Extra rule options merged over the rule
-     *                                                             defaults.
+     * @param string             $fixture - Fixture filename under tests/Fixtures/Size to scan.
+     * @param array<string, int> $thresholds - Warning/error parameter-count limits for this case.
      *
-     * @return list<\GruffPhp\Results\Finding\Finding> - findings the rule emitted for the fixture, empty when nothing tripped the threshold
+     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options - Overrides merged onto rule defaults.
+     *
+     * @return list<\GruffPhp\Results\Finding\Finding> - Parameter-count findings after exemptions and active limits; empty when none qualify.
      */
     private function analyse(string $fixture, array $thresholds, array $options = []): array
     {
@@ -377,12 +376,11 @@ final class ParameterCountRuleTest extends TestCase
     }
 
     /**
-     * Analyse fixture paths and return findings for assertions.
+     * Analyse one size fixture while retaining the registry's thresholds and severity setting.
      *
-     * @param string                                                                       $fixture - Fixture filename under tests/Fixtures/Size to
-     *                                                                                              scan.
-     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options - Option overrides layered onto the shipped
-     *                                                             defaults, thresholds untouched.
+     * @param string $fixture - Fixture filename under tests/Fixtures/Size to scan.
+     *
+     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options - Overrides merged onto registry options.
      *
      * @return list<\GruffPhp\Results\Finding\Finding> - findings produced under the default thresholds, empty when none fired
      */
@@ -407,9 +405,9 @@ final class ParameterCountRuleTest extends TestCase
     /**
      * Parse the named fixture into an analysis unit.
      *
-     * @param string $filename - Fixture filename.
+     * @param string $filename - Name resolved under tests/Fixtures/Size.
      *
-     * @return \GruffPhp\Engine\Parser\AnalysisUnit - the parsed fixture ready for the rule to analyse
+     * @return \GruffPhp\Engine\Parser\AnalysisUnit - Analysis unit retaining the fixture path and any read or parse diagnostics.
      */
     private function parseFixture(string $filename): \GruffPhp\Engine\Parser\AnalysisUnit
     {

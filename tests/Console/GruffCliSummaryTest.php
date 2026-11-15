@@ -10,10 +10,10 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers the one-screen `summary` experience and the compact machine-readable result users can request.
+ * Exercises the `summary` command's text digest and JSON output through CLI processes.
  *
- * The suite protects digest sections, omitted finding detail, JSON schema, command registration, options, and config failures.
- * Users exercise these paths when they need a quick terminal overview or a stable summary payload for automation.
+ * Covers digest content, selected JSON fields, analysis projection, launch-directory consistency, and exit codes.
+ * Checks CLI-list output, invalid options, removed configuration, and bounded-scan diagnostics.
  */
 final class GruffCliSummaryTest extends CliTestCase
 {
@@ -26,7 +26,7 @@ final class GruffCliSummaryTest extends CliTestCase
     /**
      * Verify summary runs and shows digest sections.
      *
-     * @return void
+     * @return void - Asserts a successful exit and digest headings, numeric tallies, and baseline guidance.
      */
     public function testSummaryRunsAndShowsDigestSections(): void
     {
@@ -57,9 +57,9 @@ final class GruffCliSummaryTest extends CliTestCase
     }
 
     /**
-     * Verify summary does not emit per finding lines.
+     * Verify summary omits warning/advisory markers and the standalone Findings heading.
      *
-     * @return void
+     * @return void - Asserts a successful exit and the absence of those markers and heading.
      */
     public function testSummaryDoesNotEmitPerFindingLines(): void
     {
@@ -74,9 +74,8 @@ final class GruffCliSummaryTest extends CliTestCase
 
         self::assertSame(0, $process->getExitCode());
 
-        // The analyse text reporter shows per-finding `[warning] rule.id` lines under a bare
-        // "Findings" heading. The summary digest must aggregate; it must not include those lines.
-        // The canonical `Findings:` tally line (with colon) is expected and asserted elsewhere.
+        // The analyse text reporter uses a bare "Findings" heading for per-finding output, which the summary digest must omit.
+        // The colon in "Findings:" distinguishes the aggregate tally that remains valid here.
         $output = $process->getOutput();
         self::assertStringNotContainsString('[warning]', $output);
         self::assertStringNotContainsString('[advisory]', $output);
@@ -84,10 +83,10 @@ final class GruffCliSummaryTest extends CliTestCase
     }
 
     /**
-     * Verify summary JSON output matches schema.
+     * Verify the summary JSON schema version, selected fields, and absence of top-level findings.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts tool and input metadata, score keys, file count, and finding-count keys.
+     * @throws JsonException - If CLI stdout cannot be decoded as JSON.
      */
     public function testSummaryJsonOutputMatchesSchema(): void
     {
@@ -131,15 +130,10 @@ final class GruffCliSummaryTest extends CliTestCase
     }
 
     /**
-     * Verify summary and analyse JSON are the same from a sibling directory and from a subdirectory of the project as
-     * from inside it.
+     * Compare selected summary/analyse sections with a project-root launch and check normalized inputs from sibling and subdirectory launches.
      *
-     * Anchored to the launch directory, `summary ../project --format json` threw on the first path outside it and
-     * printed no JSON. Reading operands against the project root, `..` typed from `project/sub` named the directory
-     * above the project, here holding Stray.php, so both commands scanned it and threw.
-     *
-     * @return void
-     * @throws JsonException When a run prints no JSON envelope.
+     * @return void - Asserts normalized inputs and matching section values for sibling and subdirectory launches.
+     * @throws JsonException - If a CLI response cannot be decoded as JSON.
      */
     public function testMachineJsonIsTheSameFromAnyLaunchDirectory(): void
     {
@@ -173,11 +167,9 @@ final class GruffCliSummaryTest extends CliTestCase
     }
 
     /**
-     * Verify the text and JSON digests both exit 2 on a run a parse error invalidated, and 0 once it parses.
+     * Verify both formats exit 2 for a parse error and text exits 0 after the file is repaired.
      *
-     * The text digest used to end every run with success, so a gate on `gruff-php summary` passed a broken run.
-     *
-     * @return void
+     * @return void - Asserts failure exits in both formats and successful recovery in text output.
      */
     public function testSummaryExitsTwoInTextAndJsonWhenAParseErrorInvalidatesTheRun(): void
     {
@@ -206,8 +198,8 @@ final class GruffCliSummaryTest extends CliTestCase
     /**
      * Verify summary JSON is the exact findings-free projection of analysis JSON for the same inputs.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts equality after removing top-level findings and replacing the analysis schema version.
+     * @throws JsonException - If either command's stdout cannot be decoded as JSON.
      */
     public function testSummaryJsonOutputIsExactAnalysisProjection(): void
     {
@@ -239,7 +231,7 @@ final class GruffCliSummaryTest extends CliTestCase
     /**
      * Verify both compact formats retain the nonfatal budget diagnostic.
      *
-     * @return void
+     * @return void - Asserts both formats succeed and include the bounded-scan diagnostic and CLI budget.
      */
     public function testSummaryShowsBoundedDeepScanDiagnostic(): void
     {
@@ -264,10 +256,10 @@ final class GruffCliSummaryTest extends CliTestCase
     }
 
     /**
-     * Models a user running `summary` with an old non-empty secret-preview list.
-     * The command must exit 2 with the same actionable migration message as `analyse`.
+     * Models a user running summary with an old non-empty secret-preview list.
+     * The command must exit 2 and identify the removed key with instructions to delete it.
      *
-     * @return void
+     * @return void - Asserts exit code 2 and the migration message for allowlists.secretPreviews.
      */
     public function testSummaryRejectsConfiguredLegacySecretPreview(): void
     {
@@ -296,7 +288,7 @@ final class GruffCliSummaryTest extends CliTestCase
      * @param list<string> $arguments - CLI arguments appended after the base command.
      * @param string       $message   - Expected usage error excerpt.
      *
-     * @return void
+     * @return void - Asserts exit code 2 and the supplied usage-error excerpt for each option case.
      */
     #[DataProvider('invalidSummaryOptionProvider')]
     public function testSummaryRejectsInvalidOptions(array $arguments, string $message): void
@@ -315,9 +307,9 @@ final class GruffCliSummaryTest extends CliTestCase
     }
 
     /**
-     * Verify list includes summary command.
+     * Keep the summary substring present in the CLI list output.
      *
-     * @return void
+     * @return void - Asserts a successful list exit and the summary substring in stdout.
      */
     public function testListIncludesSummaryCommand(): void
     {
@@ -329,13 +321,13 @@ final class GruffCliSummaryTest extends CliTestCase
     }
 
     /**
-     * Run one machine-output CLI command and validate that stdout is a JSON object.
+     * Run one machine-output CLI command and assert that stdout decodes to an array with string keys.
      *
      * @param list<string> $arguments        - CLI arguments appended after the gruff-php binary.
      * @param string       $workingDirectory - Directory the command is launched from.
      *
      * @return array<string, mixed> - Decoded string-keyed machine document.
-     * @throws JsonException When stdout is not valid JSON.
+     * @throws JsonException - When stdout is not valid JSON.
      */
     private function runMachineJson(array $arguments, string $workingDirectory = self::PROJECT_ROOT): array
     {
@@ -361,8 +353,7 @@ final class GruffCliSummaryTest extends CliTestCase
     /**
      * Provide invalid summary option combinations and their usage errors.
      *
-     * @return iterable<string, array{0: list<string>, 1: string}> - one named case per yield, each pairing the extra CLI arguments with the
-     *                          usage-error excerpt expected on stdout
+     * @return iterable<string, array{0: list<string>, 1: string}> - Named cases pairing extra CLI arguments with expected stdout excerpts.
      */
     public static function invalidSummaryOptionProvider(): iterable
     {

@@ -71,7 +71,7 @@ final class HeaderInjectionRule implements RuleInterface
      * Reports each `header()` call whose value request data can reach.
      *
      * @param AnalysisUnit $analysisUnit - Parsed file the user asked to analyse.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext - Unused; the rule interface requires it, and this rule reads no options or project root.
      *
      * @return list<Finding> - One finding per request-fed header() call; empty when every header value is fixed, numeric or a status line.
      */
@@ -79,15 +79,15 @@ final class HeaderInjectionRule implements RuleInterface
     {
         $findings = [];
 
-        // Every function call is a candidate, because header() can be called anywhere in the file.
+
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
-            // Only PHP's own header() writes a response header; a namespaced helper of the same name does not.
+
             if (SecurityNodeHelper::globalFunctionName($call) !== 'header') {
                 continue;
             }
 
             $headerLine = SecurityNodeHelper::sinkArgumentValue($call, 0);
-            // A header built only from the code's own text, such as `header('Content-Type: text/html')`, is safe.
+
             if ($headerLine === null || !SecurityNodeHelper::containsUserInput($headerLine)) {
                 continue;
             }
@@ -116,11 +116,11 @@ final class HeaderInjectionRule implements RuleInterface
     /**
      * Reports whether a header value is the server's protocol token followed only by literal status text, such as a hand-written 404.
      *
-     * The web server sets the protocol token while parsing the request line, so it holds no CR/LF.
+     * This heuristic treats the server protocol token as CR/LF-free and requires every following part to be literal.
      *
      * @param Expr $headerLine - First argument of header().
      *
-     * @return bool - True for `$_SERVER['SERVER_PROTOCOL'] . ' 404 Not Found'`; false when any other part is dynamic.
+     * @return bool - True for $_SERVER['SERVER_PROTOCOL'] . ' 404 Not Found'; false when any other part is dynamic.
      */
     private function isServerProtocolStatusLine(Expr $headerLine): bool
     {
@@ -128,7 +128,7 @@ final class HeaderInjectionRule implements RuleInterface
         $protocolPart  = array_shift($headerParts);
         $isProtocolKey = $protocolPart instanceof Expr\ArrayDimFetch && $protocolPart->var instanceof Expr\Variable
             && $protocolPart->var->name === '_SERVER' && $protocolPart->dim instanceof Scalar\String_ && $protocolPart->dim->value === 'SERVER_PROTOCOL';
-        // Other $_SERVER entries, such as QUERY_STRING, carry text the visitor chose.
+        // Other $_SERVER entries are outside this narrow server-protocol exception.
         if (!$isProtocolKey) {
             return false;
         }
@@ -136,7 +136,7 @@ final class HeaderInjectionRule implements RuleInterface
         $statusText = '';
         // Everything after the protocol must be the code's own text.
         foreach ($headerParts as $headerPart) {
-            // A second dynamic part, such as `$_GET['reason']`, could carry request text after the protocol.
+            // A second dynamic part, such as $_GET['reason'], could carry request text after the protocol.
             if (!$headerPart instanceof Scalar\String_ && !$headerPart instanceof InterpolatedStringPart) {
                 return false;
             }
@@ -144,24 +144,24 @@ final class HeaderInjectionRule implements RuleInterface
             $statusText .= $headerPart->value;
         }
 
-        // The literal text must open with a three-digit status code, as in ` 404 Not Found`; the protocol alone is not a status line.
+        // The literal text must open with whitespace and a three-digit status code; the protocol alone is not a status line.
         return preg_match('/^\s+\d{3}\b/', $statusText) === 1;
     }
 
     /**
-     * Reports whether every dynamic part of a header value is an integer, such as an attachment id cast with `(int)`.
+     * Reports whether every dynamic header part matches the rule's integer syntax or local-assignment heuristic.
      *
      * @param AnalysisUnit $analysisUnit - File searched for the assignments to each local.
      * @param Expr         $headerLine - First argument of header().
      *
-     * @return bool - True when each part is literal text, an integer expression or a local only ever assigned an integer.
+     * @return bool - True when every part is literal text or accepted by one of the rule's integer heuristics.
      */
     private function isIntegerOnlyValue(AnalysisUnit $analysisUnit, Expr $headerLine): bool
     {
-        // Each part of the concatenation or interpolated string is checked on its own.
+
         foreach (SecurityNodeHelper::flattenedOperands($headerLine) as $headerPart) {
             $isLiteralText = $headerPart instanceof Scalar\String_ || $headerPart instanceof InterpolatedStringPart;
-            // One part that may hold text, such as a raw `$_POST` value, keeps the finding.
+            // A part outside those integer heuristics, such as a raw request value, keeps the finding.
             if (!$isLiteralText && !$this->isIntegerExpression($headerPart) && !$this->isLocalOnlyEverAnInteger($analysisUnit, $headerPart)) {
                 return false;
             }
@@ -190,16 +190,16 @@ final class HeaderInjectionRule implements RuleInterface
     }
 
     /**
-     * Reports whether a local is only ever assigned integers in its function, such as `$pages = $perPage ? (int) ceil($total / $perPage) : 0`.
+     * Reports whether visible assignments let the header heuristic treat a local as integer-only.
      *
      * @param AnalysisUnit $analysisUnit - File searched for the local's assignments.
      * @param Node         $headerPart - Header part to inspect.
      *
-     * @return bool - True when an earlier integer assignment exists and nothing else writes the local.
+     * @return bool - True after an earlier integer assignment when visible writes remain integers; calls may still receive the local.
      */
     private function isLocalOnlyEverAnInteger(AnalysisUnit $analysisUnit, Node $headerPart): bool
     {
-        // Passing the local to a call stays allowed: code commonly hands an integer id to lookups before echoing it in a header.
+        // Passing the local to a call stays allowed, even though a by-reference callee could replace its value.
         return LocalAssignmentEvidence::onlyEverHolds($analysisUnit, $headerPart, fn(Expr $assigned): bool => $this->isIntegerExpression($assigned), true);
     }
 }

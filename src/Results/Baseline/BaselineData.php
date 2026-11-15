@@ -8,6 +8,7 @@ namespace GruffPhp\Results\Baseline;
  * A baseline in memory: where it came from, which port wrote it, its reviewed rows, and the sensitive counts it kept instead of rows.
  *
  * The store returns one after the user loads or generates a baseline, and the filter reads it on every `analyse --baseline` run.
+ * Reviewed rows drive suppression; sensitive counts are retained only as audit totals.
  */
 final readonly class BaselineData
 {
@@ -16,7 +17,7 @@ final readonly class BaselineData
      *
      * @param string              $path - Path the baseline was read from or written to, shown so the user sees which file a run used.
      * @param string              $toolLanguage - Port that wrote the file; a run by another port refuses it rather than resolving every row.
-     * @param list<BaselineEntry> $entries - Reviewed rows in file order; empty when nothing was reviewed yet, so every live finding stays new.
+     * @param list<BaselineEntry> $entries - Reviewed rows in file order; empty means no reviewed identities can suppress findings.
      * @param array<string, int>  $sensitiveByRule - Sensitive findings counted per rule at write time; empty when the run had none.
      */
     public function __construct(
@@ -28,7 +29,7 @@ final readonly class BaselineData
     }
 
     /**
-     * Indexes the reviewed rows by identity, which is how `analyse --baseline` looks up each live finding.
+     * Indexes the reviewed rows by identity, which is how "analyse --baseline" looks up each live finding.
      *
      * @return array<string, BaselineEntry> - Identity to row; empty when the baseline has no reviewed rows, so nothing is suppressed.
      */

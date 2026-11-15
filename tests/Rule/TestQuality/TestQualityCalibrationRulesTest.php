@@ -18,7 +18,9 @@ use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers calibration-specific test-quality rule shapes.
+ * Covers test-quality calibration through the configured rule registry.
+ * Parsed fixtures exercise the integration-harness count and a repeated-structure path exclusion.
+ * Assertions filter findings by rule ID; the fixture methods are not executed.
  */
 final class TestQualityCalibrationRulesTest extends TestCase
 {
@@ -26,9 +28,9 @@ final class TestQualityCalibrationRulesTest extends TestCase
     private const PROJECT_ROOT = __DIR__ . '/../../..';
 
     /**
-     * Verify test-longer-than-SUT ignores command and process integration harness calls.
+     * Verify the integration-harness fixture produces one test-longer-than-SUT finding.
      *
-     * @return void
+     * @return void - Asserts the rule-specific finding count is one.
      */
     public function testTestLongerThanSutIgnoresIntegrationHarnessCalls(): void
     {
@@ -38,9 +40,9 @@ final class TestQualityCalibrationRulesTest extends TestCase
     }
 
     /**
-     * Verify repeated-structure rubric supports project-specific path exemptions.
+     * Verify repeated-structure rule supports project-specific path exemptions.
      *
-     * @return void
+     * @return void - Asserts no repeated-structure findings under the configured path pattern.
      */
     public function testRepeatedStructureRuleSupportsIgnoredPathPatterns(): void
     {
@@ -62,7 +64,7 @@ final class TestQualityCalibrationRulesTest extends TestCase
      * @param int           $expectedCount - Findings the rule must report for this fixture.
      * @param list<Finding> $findings      - Full analysis output to filter by rule id.
      *
-     * @return void
+     * @return void - Asserts the number of findings whose rule ID matches the requested rule.
      */
     private static function assertRuleCount(string $ruleId, int $expectedCount, array $findings): void
     {
@@ -77,9 +79,9 @@ final class TestQualityCalibrationRulesTest extends TestCase
      * Analyse test-quality fixtures and return findings for assertions.
      *
      * @param string          $path   - Project-relative fixture path to parse and scan.
-     * @param ?AnalysisConfig $config - Override config; null enables the default-off calibration rules.
+     * @param ?AnalysisConfig $config - Configuration override; null loads the fixture configuration that enables default-off rules.
      *
-     * @return list<Finding> - every finding the full default rule set emitted for the fixture, unfiltered; empty when clean
+     * @return list<Finding> - Unfiltered findings from rules enabled by the chosen configuration; empty when none are reported.
      */
     private function analysePath(string $path, ?AnalysisConfig $config = null): array
     {
@@ -96,9 +98,9 @@ final class TestQualityCalibrationRulesTest extends TestCase
     /**
      * Parse the requested path into an analysis unit.
      *
-     * @param string $path - Filesystem path.
+     * @param string $path - Project-relative fixture path, also used as the display path.
      *
-     * @return AnalysisUnit - the parsed fixture, repo-relative display path preserved, ready to feed the rule registry
+     * @return AnalysisUnit - Fixture contents and any read or parse diagnostics, retaining the supplied display path.
      */
     private function unitForPath(string $path): AnalysisUnit
     {

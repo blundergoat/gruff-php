@@ -19,12 +19,10 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 
 /**
- * Flags a docblock that lists only bare param/return tags with no summary and no tag descriptions, so the
- * user turns box-ticking documentation into something that states intent.
+ * Flags methods and named functions whose PHPDoc contains only bare param/return tags, with no descriptive prose.
+ * A block qualifies when every non-empty content line is such a tag and none has a description.
  *
- * Runs per file over documented function-likes. A docblock fires only when every line is a tag AND every
- * tag is a bare param/return with no prose after its type. Advisory, medium confidence - a tags-only block
- * can be deliberate on a trivial unit.
+ * Closures are not scanned; an advisory at medium confidence allows for deliberately type-only documentation.
  */
 final readonly class BarePhpdocTagsRule implements RuleInterface
 {
@@ -62,7 +60,7 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
      * Reports each docblock that only lists bare parameter or return tags.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext  - Unused; the rule interface requires it, and this rule reads no options or project root.
      *
      * @return list<Finding> - Findings for bare PHPDoc blocks.
      */
@@ -73,12 +71,12 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
 
         $findings = [];
 
-        // Check every documented method and function in the file.
+
         foreach ($nodes as $node) {
-            /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
+            /** @var ClassMethod|Function_ $node - NodeIndex restricts results to methods and named functions. */
             $docComment = $node->getDocComment();
 
-            // An undocumented callable has no docblock to weigh.
+
             if ($docComment === null) {
                 continue;
             }

@@ -16,9 +16,9 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
 
 /**
- * Flags a PHPUnit config that declares no coverage source (`<source>` in PHPUnit 10+, or the legacy
- * `<filter><whitelist>`) - without it a coverage run measures nothing useful and the numbers mislead. Fires
- * once per project when a PHPUnit test file is seen. Advisory, medium confidence.
+ * Checks discovered PHPUnit configuration for a declared coverage source.
+ * Reports at most once per project root after a path-based test-file match.
+ * Findings use advisory severity and medium confidence.
  */
 final class PhpUnitCoverageSourceMissingRule implements RuleInterface
 {
@@ -32,7 +32,7 @@ final class PhpUnitCoverageSourceMissingRule implements RuleInterface
      */
     private readonly PhpUnitConfigDiscovery $discovery;
 
-    /** @var array<string, true> */
+    /** @var array<string, true> - Project roots already evaluated using discovered configuration. */
     private array $emittedRoots = [];
 
     /**
@@ -71,7 +71,7 @@ final class PhpUnitCoverageSourceMissingRule implements RuleInterface
     /**
      * Reports a project once when its PHPUnit config lacks coverage source configuration.
      *
-     * @param AnalysisUnit $analysisUnit - Parsed unit used to decide whether the project has PHPUnit tests.
+     * @param AnalysisUnit $analysisUnit - Parsed unit whose path gates the PHPUnit test-file heuristic.
      * @param RuleContext  $ruleContext - Rule context carrying project root.
      *
      * @return list<Finding> - Findings for missing PHPUnit coverage source settings.
@@ -85,13 +85,13 @@ final class PhpUnitCoverageSourceMissingRule implements RuleInterface
         }
 
         if (!TestQualityNodeHelper::looksLikePhpUnitTestFile($analysisUnit)) {
-            // Wait for an actual PHPUnit test file before judging the config, so non-test projects stay silent.
+            // Defer configuration checks until a path matches the PHPUnit test-file heuristic.
             return [];
         }
 
         $config = $this->discovery->discover($root);
         if ($config === null) {
-            // No discoverable phpunit.xml means there is no coverage config to fault; treat as not applicable.
+            // Missing or unparseable PHPUnit configuration leaves this rule without settings to inspect.
             return [];
         }
 
@@ -100,11 +100,11 @@ final class PhpUnitCoverageSourceMissingRule implements RuleInterface
         if ($this->hasCoverageSource($config->root)
             || isset($config->root->filter->whitelist) && $config->root->filter->whitelist->count() > 0
         ) {
-            // Either a modern <source> or a legacy <filter><whitelist> scopes coverage, so the config is fine.
+            // A supported source/include element or legacy <filter><whitelist> suppresses this rule's missing-source finding.
             return [];
         }
 
-        // Neither include mechanism is present, so coverage would measure nothing meaningful; report it once.
+
         return [
             new Finding(
                 ruleId:  self::ID,

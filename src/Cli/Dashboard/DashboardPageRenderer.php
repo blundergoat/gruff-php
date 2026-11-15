@@ -5,14 +5,10 @@ declare(strict_types=1);
 namespace GruffPhp\Cli\Dashboard;
 
 /**
- * Produces every HTML document the local `gruff-php dashboard` server hands back to the browser:
- * the controls-panel shell, a finished scan's report wrapped with completion metadata, an error
- * page when a scan cannot run, and the "Ready to scan" holding frame shown before the first run.
+ * Builds the dashboard shell, scan-report metadata, error pages, and initial iframe placeholder.
+ * The request handler uses the shell; the scan runner uses the report and error helpers.
  *
- * Reach for this when a user runs `gruff-php dashboard` and opens the localhost page to configure
- * and trigger scans by clicking instead of retyping flags. The request handler builds the controls
- * page from here, and the scan runner uses it to wrap each finished report with the exit code,
- * duration, and command the status bar shows. It only assembles markup; running the scan lives elsewhere.
+ * This class assembles HTML, CSS, and JavaScript; scan execution belongs to the scan runner.
  */
 final readonly class DashboardPageRenderer
 {
@@ -21,7 +17,8 @@ final readonly class DashboardPageRenderer
      * current settings, plus the iframe that will hold each scan's report. This is the first thing a
      * user sees after running `gruff-php dashboard` and opening the localhost URL.
      *
-     * @param array{project: string, paths: string, scanScope: string, failOn: string, config: string, baseline: string, noBaseline: string, noConfig: string, deepScanBudget: string, includeIgnored: string, reportInteractive: string} $state - Current form state echoed back into the controls so the panel reopens on the user's last choices.
+     * @param array{project: string, paths: string, scanScope: string, failOn: string, config: string, baseline: string, noBaseline: string, noConfig: string, deepScanBudget: string, includeIgnored: string, reportInteractive: string} $state
+     *         - Current form values rendered into the controls and used for the initial scan.
      *
      * @return string - Complete dashboard shell HTML.
      */
@@ -72,13 +69,12 @@ final readonly class DashboardPageRenderer
     }
 
     /**
-     * Wraps a finished scan's report HTML with a small metadata script so the dashboard shell can
-     * fill its status line with the run's exit code, duration, and command. Called once per scan the
-     * user triggers, just before the report is streamed into the iframe.
+     * Adds scan completion metadata and a parent-frame notification to supplied report HTML.
+     * Inserts them after exact <body> matches, or prepends them when that marker is absent.
      *
      * @param string       $html        - Report HTML produced by the scan subprocess.
-     * @param string       $projectRoot - Project root the scan ran against; included in the metadata payload posted to the parent frame, though the panel does not surface it today.
-     * @param list<string> $command     - Full scan argv; normalised to a copy-pasteable command for display.
+     * @param string       $projectRoot - Project root included in metadata; the current panel does not display it.
+     * @param list<string> $command     - Scan argv formatted for the metadata command display.
      * @param int          $exitCode    - Scan process exit code the status line reports to the user.
      * @param int          $durationMs  - Wall-clock scan time in milliseconds shown beside the exit code.
      *
@@ -102,7 +98,7 @@ final readonly class DashboardPageRenderer
             JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES,
         );
 
-        // json_encode only fails on genuinely unencodable data; fall back to a bare message so the panel still receives valid JSON.
+        // If metadata cannot be JSON-encoded, still notify the parent that the scan finished.
         if (!is_string($payload)) {
             $payload = '{"type":"gruff-scan-complete"}';
         }
@@ -110,24 +106,23 @@ final readonly class DashboardPageRenderer
         $metadata = '<script id="gruff-dashboard-meta" type="application/json">' . $payload . '</script>'
             . '<script>(()=>{const el=document.getElementById("gruff-dashboard-meta");if(window.parent&&el){window.parent.postMessage(JSON.parse(el.textContent),window.location.origin);}})();</script>';
 
-        // A normal report carries a <body>, so splice the metadata script in right after it and let it run inside the document.
+
         if (str_contains($html, '<body>')) {
             return str_replace('<body>', '<body>' . $metadata, $html);
         }
 
-        // An error page or bare fragment has no <body> to anchor to, so prepend the script and still deliver the report.
+
         return $metadata . $html;
     }
 
     /**
-     * Renders the self-contained page the dashboard shows inside its iframe when a scan cannot run or
-     * returns no report - a project path that does not resolve, or a scan that produced no output. It
-     * gives the user the message, the exit code and duration, and the raw detail instead of a blank frame.
-     * (A subprocess that exits non-zero but still emits HTML is shown as a normal report, not this page.)
+     * Renders an error document with an escaped summary and detail, plus the supplied exit code and duration.
+     * Used by the scan runner for an invalid project root or empty report output.
+     * Nonzero scans with output use that output instead.
      *
      * @param string $message    - Short, human-readable summary of what went wrong.
      * @param string $detail     - Fuller error text (often captured stderr) shown in the page's detail block.
-     * @param int    $exitCode   - Scan process exit code, surfaced so the user can tell a crash from a clean failure.
+     * @param int    $exitCode   - Exit status displayed with the failure details.
      * @param int    $durationMs - Wall-clock scan time in milliseconds shown alongside the exit code.
      *
      * @return string - Complete dashboard error HTML.
@@ -149,8 +144,8 @@ final readonly class DashboardPageRenderer
      *
      * @param string $label       - Human-readable control label shown above the input.
      * @param string $name        - Form field name bound to a scan query parameter.
-     * @param string $fieldValue  - Current value to pre-fill; reflected user input, so it is escaped here; empty when the user has not filled it in.
-     * @param string $placeholder - Greyed-out hint shown while the field is empty; an empty string means show no hint at all.
+     * @param string $fieldValue  - Current input value, escaped before insertion; may be empty.
+     * @param string $placeholder - Hint shown for an empty field; an empty string supplies no hint.
      *
      * @return string - Escaped label-and-input HTML for one control.
      */
@@ -195,7 +190,7 @@ final readonly class DashboardPageRenderer
      */
     private function dashboardCss(): string
     {
-        // Single-quoted heredoc (nowdoc) so PHP performs no variable interpolation on the CSS literal.
+
         return <<<'CSS'
 :root{color-scheme:dark;--paper:#f3e9d2;--ink:#11100e;--panel:#1b1815;--field:#0d0c0a;--line:#332d27;--muted:#b5ab94;--accent:#e85d04;--accent-dark:#120f0d}*{box-sizing:border-box}body{margin:0;background:var(--ink);color:var(--paper);font:14px ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;height:100vh;overflow:hidden}.controls-toggle{position:fixed;top:14px;right:24px;z-index:20;width:44px;height:44px;border:1px solid var(--accent);border-radius:6px;background:var(--accent);color:var(--accent-dark);font:700 24px/1 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;cursor:pointer;display:grid;place-items:center;box-shadow:0 4px 14px rgba(0,0,0,.45)}.controls-toggle.busy:after{content:'';position:absolute;right:5px;bottom:5px;width:9px;height:9px;border-radius:50%;background:var(--paper);border:1px solid var(--accent-dark)}.controls-panel{position:fixed;top:66px;right:24px;z-index:21;width:min(560px,calc(100vw - 48px));max-height:calc(100vh - 86px);overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 18px 50px rgba(0,0,0,.45);padding:18px}.panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding-bottom:14px;border-bottom:1px solid var(--line)}.panel-head strong{display:block;font:italic 30px Georgia,Iowan Old Style,serif;letter-spacing:0}.panel-head span{display:block;margin-top:4px;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.18em}.panel-head button{width:44px;height:44px;padding:0;border:1px solid var(--line);background:var(--field);color:var(--paper);font-size:24px;line-height:1}.scan-summary{display:grid;grid-template-columns:minmax(108px,auto) 1fr;gap:10px 18px;margin:18px 0 16px;padding:14px 16px;background:var(--field);border:1px solid var(--line);font-size:12px}.scan-status,.scan-command{display:contents}.scan-summary span{color:var(--muted);text-transform:uppercase;letter-spacing:.12em}.scan-summary strong,.scan-summary code{min-width:0;color:var(--paper);font:13px ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}.scan-meta-line{min-width:0;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:start}.scan-summary code{white-space:normal;overflow:visible;overflow-wrap:anywhere;word-break:break-word}.scan-meta-line button{align-self:start;min-width:68px;padding:7px 9px;font-size:11px}form{display:grid;grid-template-columns:1fr;gap:14px}.field-stack,.field-grid,.option-grid{display:grid;gap:12px}.field-grid{grid-template-columns:1fr 1fr}.option-grid{grid-template-columns:repeat(4,minmax(0,1fr));padding:4px 0}label{display:flex;flex-direction:column;gap:7px;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.1em}.check{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:10px;text-transform:none;letter-spacing:0;font-size:12px;color:var(--paper);line-height:1.35}.check span{min-width:0}input,select{width:100%;min-height:46px;border:1px solid var(--line);background:var(--field);color:var(--paper);padding:10px 12px;font:14px ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}input[type=checkbox]{width:18px;min-height:18px;height:18px;margin:0;accent-color:var(--accent)}button{border:1px solid var(--accent);background:var(--accent);color:var(--accent-dark);padding:12px 14px;font:700 13px ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;cursor:pointer}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--paper);outline-offset:2px}button:disabled{opacity:.6;cursor:wait}.panel-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding-top:2px}.panel-actions button{min-height:48px}iframe{width:100vw;height:100vh;border:0;background:var(--field);display:block}@media(max-width:700px){.controls-toggle{top:10px;right:18px}.controls-panel{top:60px;right:18px;width:calc(100vw - 36px);padding:16px}.field-grid,.option-grid,.scan-summary,.scan-meta-line{grid-template-columns:1fr}.panel-head strong{font-size:28px}}
 CSS;
@@ -203,21 +198,20 @@ CSS;
 
     /**
      * Returns the inline script embedded in the dashboard shell - the client-side glue that opens the
-     * controls panel, submits scans into the iframe, ticks the elapsed timer, and copies the last command.
+     * controls panel, submits scans into the iframe, ticks the elapsed timer, and copies the last scan metadata.
      *
      * @return string - The dashboard's inline JavaScript.
      */
     private function dashboardJs(): string
     {
-        // Single-quoted heredoc (nowdoc) so PHP performs no variable interpolation on the JS literal.
+
         return <<<'JS'
 const form=document.getElementById('scan-form');const frame=document.getElementById('report-frame');const refresh=document.getElementById('refresh');const runButton=document.getElementById('run-scan');const status=document.getElementById('scan-status');const scanMeta=document.getElementById('scan-meta');const copyScanMeta=document.getElementById('copy-scan-meta');const toggle=document.getElementById('controls-toggle');const panel=document.getElementById('controls-panel');const close=document.getElementById('controls-close');let scans=0;let busyTimer=null;let busyStarted=0;function params(){return new URLSearchParams(new FormData(form));}function setOpen(open){panel.hidden=!open;toggle.setAttribute('aria-expanded',open?'true':'false');if(open){form.elements.project.focus();}}function stopBusyTimer(){if(busyTimer!==null){clearInterval(busyTimer);busyTimer=null;}}function renderBusy(){status.textContent='Scanning... '+Math.floor((Date.now()-busyStarted)/1000)+'s';}function setBusy(busy){refresh.disabled=busy;runButton.disabled=busy;toggle.classList.toggle('busy',busy);toggle.setAttribute('aria-label',busy?'Scanning':'Dashboard controls');stopBusyTimer();if(busy){busyStarted=Date.now();renderBusy();busyTimer=setInterval(renderBusy,1000);}else{status.textContent='Scan loaded';}}function updateMeta(data){if(!data||data.type!=='gruff-scan-complete'){return;}const exit=Number.isInteger(data.exitCode)?data.exitCode:'?';const duration=Number.isInteger(data.durationMs)?data.durationMs+'ms':'duration n/a';const command=typeof data.command==='string'?data.command:'';scanMeta.textContent='exit '+exit+' · '+duration+(command===''?'':' · '+command);}async function copyMeta(){const text=scanMeta.textContent||'';try{if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(text);}else{const range=document.createRange();range.selectNodeContents(scanMeta);const selection=window.getSelection();if(selection){selection.removeAllRanges();selection.addRange(range);document.execCommand('copy');selection.removeAllRanges();}}copyScanMeta.textContent='Copied';setTimeout(()=>{copyScanMeta.textContent='Copy';},1200);}catch(error){copyScanMeta.textContent='Copy failed';setTimeout(()=>{copyScanMeta.textContent='Copy';},1200);}}function run(){const qs=params();const visible=new URLSearchParams(qs);qs.set('_run',Date.now().toString()+'-'+(++scans));setBusy(true);frame.removeAttribute('srcdoc');frame.src='/scan?'+qs.toString();history.replaceState(null,'','/?'+visible.toString());}toggle.addEventListener('click',event=>{event.stopPropagation();setOpen(panel.hidden);});close.addEventListener('click',()=>setOpen(false));document.addEventListener('click',event=>{if(!panel.hidden&&!panel.contains(event.target)&&event.target!==toggle){setOpen(false);}});document.addEventListener('keydown',event=>{if(event.key==='Escape'){setOpen(false);}});window.addEventListener('message',event=>{if(event.origin!==window.location.origin)return;updateMeta(event.data);});frame.addEventListener('load',()=>{setBusy(false);try{const el=frame.contentDocument&&frame.contentDocument.getElementById('gruff-dashboard-meta');if(el){updateMeta(JSON.parse(el.textContent||'{}'));}}catch(error){}});form.addEventListener('submit',event=>{event.preventDefault();run();});refresh.addEventListener('click',run);copyScanMeta.addEventListener('click',copyMeta);setTimeout(run,0);
 JS;
     }
 
     /**
-     * Returns the small "Ready to scan." document seeded into the iframe on load, so the user sees a
-     * calm placeholder rather than a blank frame until their first scan finishes and replaces it.
+     * Renders the initial "Ready to scan." iframe placeholder, replaced when the shell starts its automatic scan.
      *
      * @return string - Complete loading-frame HTML.
      */
@@ -227,32 +221,30 @@ JS;
     }
 
     /**
-     * Turns the scan's raw argv into a tidy, copy-pasteable command line for the dashboard's status
-     * bar: it normalises the interpreter-and-binary prefix to `php bin/gruff-php` and quotes only the
-     * arguments that need it, so the user can lift the exact command back into a terminal.
+     * Formats scan argv for display, replacing its first two entries with php bin/gruff-php.
+     * Arguments outside the simple token character set are quoted with escapeshellarg().
      *
-     * @param list<string> $command - Raw scan argv; the interpreter and binary prefix are normalised to `php bin/gruff-php` for display.
+     * @param list<string> $command - Raw scan argv; only entries after the first two are retained.
      *
-     * @return string - Shell-safe, copy-pasteable command string for the dashboard metadata.
+     * @return string - Display command with a normalised prefix and quoted arguments where needed.
      */
     private function displayCommand(array $command): string
     {
         $display = ['php', 'bin/gruff-php', ...array_slice($command, 2)];
 
         return implode(' ', array_map(
-            // Keep an argument bare when it is only safe, portable token characters; shell-quote anything riskier so the command the user copies can't misbehave.
+            // Keep the display token set bare; quote other arguments so their boundaries remain visible.
             static fn (string $argument): string => preg_match('~^[A-Za-z0-9_@%+=:,./-]+$~', $argument) === 1 ? $argument : escapeshellarg($argument),
             $display,
         ));
     }
 
     /**
-     * Escapes a string for safe inclusion in HTML - the single choke point every user-supplied value
-     * passes through before it lands in the dashboard markup, so reflected form input can't inject HTML.
+     * Escapes text for HTML element content and quoted attributes, substituting malformed UTF-8.
      *
      * @param string $text - Untrusted value, typically reflected form state, that a caller is binding into HTML markup.
      *
-     * @return string - The HTML-escaped value, safe in both attribute and element contexts.
+     * @return string - Escaped text suitable for HTML element content and quoted attributes.
      */
     private function escape(string $text): string
     {

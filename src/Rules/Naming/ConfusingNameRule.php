@@ -63,12 +63,12 @@ final readonly class ConfusingNameRule implements RuleInterface
     }
 
     /**
-     * Reports each class whose standalone name is too vague to convey responsibility.
+     * Reports each class whose standalone name matches the rule's vague-name candidate list.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext - Unused; the rule interface requires it, and this rule reads no options or project root.
      *
-     * @return list<Finding> - Findings for confusing identifiers.
+     * @return list<Finding> - One finding per class with an exact listed name; empty when none match.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -77,9 +77,9 @@ final readonly class ConfusingNameRule implements RuleInterface
 
         $findings = [];
 
-        // Check every class declared in the file.
+
         foreach ($classes as $class) {
-            /** @var Class_ $class Finder predicate restricts results to class declarations. */
+            /** @var Class_ $class - NodeIndex returns only class declarations for this lookup. */
             $name = $class->name?->toString();
 
             // An anonymous class has no name to judge.
@@ -87,7 +87,7 @@ final readonly class ConfusingNameRule implements RuleInterface
                 continue;
             }
 
-            // Only the known vague standalone names are flagged.
+
             if (!in_array($name, self::CONFUSING_STANDALONE, true)) {
                 continue;
             }

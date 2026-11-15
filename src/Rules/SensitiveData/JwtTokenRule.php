@@ -60,32 +60,32 @@ final readonly class JwtTokenRule implements SourceTextRuleInterface
     /**
      * Reports each string that resembles an embedded JWT token, redacting the value.
      *
-     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Supplies raw source and comment tokens for scanning.
+     * @param RuleContext $ruleContext - Required by the rule interface; unused by this scanner.
      *
-     * @return list<\GruffPhp\Results\Finding\Finding> - Findings for JWT-like literals.
+     * @return list<\GruffPhp\Results\Finding\Finding> - One finding per retained JWT-shaped match; empty when none survive.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         if (!str_contains($analysisUnit->source, 'eyJ')) {
-            // Every JWT header segment begins "eyJ"; without it no token can match, so skip the scan.
+
             return [];
         }
 
-        // Match every JWT-shaped token in the source, capturing each one's byte offset.
+        // Candidate offsets allow comment and dummy-value filters before a redacted finding is emitted.
         preg_match_all('/\b' . self::JWT_SHAPE_PATTERN . '\b/', $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
         $findings      = [];
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
-        // Weigh each candidate the scan found.
+
         foreach ($matches[0] as $match) {
             [$candidateSecret, $offset] = $match;
-            // A token inside a comment is an example, not a live secret.
+
             if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
                 continue;
             }
 
-            // An obvious sample or dummy token is not a real secret.
+
             if (SecretScannerHelper::isLikelyDummyValue($candidateSecret)) {
                 continue;
             }

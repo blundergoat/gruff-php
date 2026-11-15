@@ -22,15 +22,16 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers git diff parsing (changed lines, modes, renames, deletions, paths with spaces, untracked files), merge-base resolution, finding-filter
- * scope, and rejection of unsafe base refs.
+ * Covers Git diff paths and ranges for edits, additions, deletions, renames, paths with spaces, and untracked files.
+ * Checks local diff modes, merge-base comparisons, ignored-file exclusion, and unsafe-ref rejection.
+ * Verifies hunk and symbol filtering, changed-file fallback, and inactive-diff passthrough.
  */
 final class GitDiffProviderTest extends TestCase
 {
     /**
      * Verify diff finding filter keeps only touched changed line findings.
      *
-     * @return void
+     * @return void - Asserts exactly one finding remains at the changed line.
      */
     public function testDiffFindingFilterKeepsOnlyTouchedChangedLineFindings(): void
     {
@@ -57,7 +58,7 @@ final class GitDiffProviderTest extends TestCase
     /**
      * Verify Git diff provider parses unstaged changed lines.
      *
-     * @return void
+     * @return void - Asserts an active diff for Example.php with nonempty changed ranges.
      */
     public function testGitDiffProviderParsesUnstagedChangedLines(): void
     {
@@ -87,7 +88,7 @@ final class GitDiffProviderTest extends TestCase
     /**
      * Verify Git diff provider parses staged, working-tree, and base-ref modes.
      *
-     * @return void
+     * @return void - Asserts mode metadata, changed-file membership, and empty ranges for the staged deletion.
      */
     public function testGitDiffProviderParsesModesAndDeletedFiles(): void
     {
@@ -131,7 +132,7 @@ final class GitDiffProviderTest extends TestCase
     /**
      * Verify working tree mode includes untracked, unignored files.
      *
-     * @return void
+     * @return void - Asserts the new file is included without ranges and the ignored file is excluded.
      */
     public function testGitDiffProviderWorkingTreeIncludesUntrackedFiles(): void
     {
@@ -157,7 +158,7 @@ final class GitDiffProviderTest extends TestCase
     /**
      * Verify Git diff provider parses paths with spaces.
      *
-     * @return void
+     * @return void - Asserts the spaced path is preserved and has nonempty changed ranges.
      */
     public function testGitDiffProviderParsesPathsWithSpaces(): void
     {
@@ -185,7 +186,7 @@ final class GitDiffProviderTest extends TestCase
     /**
      * Verify Git diff provider includes rename-only source and destination files.
      *
-     * @return void
+     * @return void - Asserts both rename paths are listed with empty changed ranges.
      */
     public function testGitDiffProviderIncludesRenameOnlyFiles(): void
     {
@@ -209,7 +210,7 @@ final class GitDiffProviderTest extends TestCase
     /**
      * Verify base-ref diffs use merge-base scope instead of base tip scope.
      *
-     * @return void
+     * @return void - Asserts the feature file is included and the main-only file is excluded.
      */
     public function testGitDiffProviderUsesMergeBaseForBaseRefs(): void
     {
@@ -246,7 +247,7 @@ final class GitDiffProviderTest extends TestCase
     /**
      * Verify diff finding filter uses changed files when line ranges are unavailable.
      *
-     * @return void
+     * @return void - Asserts only the finding in the changed file remains when its ranges are empty.
      */
     public function testDiffFindingFilterFallsBackToChangedFiles(): void
     {
@@ -272,7 +273,7 @@ final class GitDiffProviderTest extends TestCase
     /**
      * Verify inactive diff leaves findings unchanged.
      *
-     * @return void
+     * @return void - Asserts an inactive diff returns the original findings unchanged.
      */
     public function testDiffFindingFilterLeavesInactiveDiffUnchanged(): void
     {
@@ -284,7 +285,7 @@ final class GitDiffProviderTest extends TestCase
     /**
      * Verify symbol scope keeps a signature-line finding when the changed hunk is inside the method body.
      *
-     * @return void
+     * @return void - Asserts the changed method's signature finding remains and the sibling's is suppressed.
      */
     public function testDiffFindingFilterSymbolScopeKeepsSignatureFindingForChangedBody(): void
     {
@@ -310,9 +311,9 @@ final class GitDiffProviderTest extends TestCase
     }
 
     /**
-     * Verify hunk scope keeps only findings whose own location overlaps a changed hunk.
+     * Verify hunk scope drops a signature finding when only its method body changes.
      *
-     * @return void
+     * @return void - Asserts no findings remain and one finding is suppressed.
      */
     public function testDiffFindingFilterHunkScopeExcludesSignatureFindingForChangedBody(): void
     {
@@ -338,9 +339,9 @@ final class GitDiffProviderTest extends TestCase
     }
 
     /**
-     * Verify symbol scope widens to the owning method, not an inner control-flow block.
+     * Verify symbol scope retains an if-block finding when another statement in the same method changes.
      *
-     * @return void
+     * @return void - Asserts the finding inside the unchanged if block remains with zero suppressions.
      */
     public function testDiffFindingFilterSymbolScopeUsesOwningMethodNotControlFlowBlock(): void
     {
@@ -416,13 +417,13 @@ PATCH,
     }
 
     /**
-     * Verify unified diff parsing exposes changed files and added-line ranges.
+     * Verify unified diff parsing exposes changed files and ranges, including deletion-only anchors.
      *
      * @param string $patch - Unified diff patch text.
      * @param int    $expectedStart - Expected range start line.
      * @param int    $expectedEnd - Expected range end line.
      *
-     * @return void
+     * @return void - Asserts the changed path and one range with the supplied start and end.
      */
     #[\PHPUnit\Framework\Attributes\DataProvider('unifiedDiffPatchProvider')]
     public function testUnifiedDiffParserParsesChangedLineRanges(string $patch, int $expectedStart, int $expectedEnd): void
@@ -437,7 +438,7 @@ PATCH,
     /**
      * Verify Git diff provider reports non Git directory.
      *
-     * @return void
+     * @return void - Asserts DiffException with the working-tree-required message for a non-repository directory.
      */
     public function testGitDiffProviderReportsNonGitDirectory(): void
     {
@@ -473,7 +474,7 @@ PATCH,
      *
      * @param string $mode - Unsafe diff mode argument.
      *
-     * @return void
+     * @return void - Asserts each supplied unsafe ref raises DiffException with a safe-ref message.
      */
     #[\PHPUnit\Framework\Attributes\DataProvider('unsafeDiffModeProvider')]
     public function testGitDiffProviderRejectsUnsafeBaseRefs(string $mode): void
@@ -496,8 +497,8 @@ PATCH,
     /**
      * Build a finding fixture for assertions.
      *
-     * @param string $filePath - Finding file path.
-     * @param int    $line - Finding line number.
+     * @param string $filePath - Reported path assigned to the fixture for file-membership checks.
+     * @param int    $line - Reported location assigned to the fixture for range-overlap checks.
      *
      * @return Finding - an advisory missing-phpdoc finding fixed at the given path and line for filter assertions
      */
@@ -537,6 +538,8 @@ PATCH,
     }
 
     /**
+     * Provide sibling-method source for symbol-scope filtering tests.
+     *
      * @return string - PHP source declaring one edited and one untouched sibling method for scope filtering
      */
     private function symbolScopeSource(): string
@@ -559,6 +562,8 @@ PHP;
     }
 
     /**
+     * Provide nested control flow for testing method-wide symbol scope.
+     *
      * @return string - PHP source with a finding inside an if block and an edit elsewhere in the same method
      */
     private function controlFlowScopeSource(): string
@@ -581,7 +586,7 @@ PHP;
     /**
      * Skip the current test when Git is unavailable.
      *
-     * @return void
+     * @return void - Skips the test when the Git version probe exits unsuccessfully.
      */
     private function skipWhenGitIsUnavailable(): void
     {
@@ -610,10 +615,10 @@ PHP;
     /**
      * Run a Git command in a fixture repository.
      *
-     * @param string $cwd - Working directory.
-     * @param string $args - Command arguments.
+     * @param string $cwd - Fixture repository in which Git runs.
+     * @param string $args - Arguments appended after the git executable.
      *
-     * @return void
+     * @return void - Asserts Git exits successfully, using stderr as the failure message.
      */
     private function runGit(string $cwd, string ...$args): void
     {
@@ -626,9 +631,9 @@ PHP;
     /**
      * Initialise a repository with two committed PHP files.
      *
-     * @param string $tempDir - Fixture repository root.
+     * @param string $tempDir - Existing directory to initialise as the Git fixture repository.
      *
-     * @return void
+     * @return void - Creates and commits Example.php and DeleteMe.php, asserting each Git command succeeds.
      */
     private function initialiseRepository(string $tempDir): void
     {
@@ -644,14 +649,14 @@ PHP;
     /**
      * Remove a temporary directory tree.
      *
-     * @param string $path - Filesystem path.
+     * @param string $path - Temporary directory to delete; a non-directory path is left untouched.
      *
-     * @return void
+     * @return void - Removes the tree recursively, unlinking child symlinks without following them.
      */
     private function removeDir(string $path): void
     {
         if (!is_dir($path)) {
-            // Nothing to remove when the path was never created or already gone.
+
             return;
         }
 

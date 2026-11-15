@@ -8,16 +8,16 @@ use GruffPhp\Rules\Naming\IdentifierTokenizer;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers IdentifierTokenizer's case- and underscore-split behaviour. Split out
- * of NamingRulesTest to keep that suite's public-method count under the
- * `size.public-method-count` error threshold.
+ * Covers tokenization of mixed-case, underscore-separated, and lowercase identifiers.
+ * Checks that a leading underscore is discarded and acronym boundaries split into words.
+ * Checks that trailing digit runs remain separate tokens, including a run with a leading zero.
  */
 final class IdentifierTokenizerTest extends TestCase
 {
     /**
      * Verify identifier tokenizer splits common identifier shapes.
      *
-     * @return void
+     * @return void - Asserts exact token lists for case changes, underscores, acronyms, and digits.
      */
     public function testIdentifierTokenizerSplitsCommonIdentifierShapes(): void
     {
@@ -32,15 +32,9 @@ final class IdentifierTokenizerTest extends TestCase
     }
 
     /**
-     * Verify digit runs survive tokenization as their own tokens (P1).
+     * Verify digit runs remain separate tokens without losing the leading zero in adr020.
      *
-     * Digits and acronyms carry identity: `sha256`, `utf8`, `v2` are exact,
-     * correct names. The tokenizer must keep each digit run as a standalone token
-     * rather than deleting it or folding it into the stem, so a downstream naming
-     * rule never mistakes `sha256` for a `foo1`-style numbered placeholder. This
-     * is the DESIGN-PRINCIPLES P1 rubric.
-     *
-     * @return void
+     * @return void - Asserts exact word and digit tokens for hash, encoding, version, and ADR-style identifiers.
      */
     public function testIdentifierTokenizerPreservesDigitIdentity(): void
     {

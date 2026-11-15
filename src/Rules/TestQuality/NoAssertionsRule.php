@@ -16,10 +16,9 @@ use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Node\Stmt\ClassMethod;
 
 /**
- * Reports tests without detected checks so developers can add evidence of the behavior they expect.
- *
- * Direct assertions, invoked same-class helpers and the supported Doctrine expectation count as checks.
- * Unknown external helpers remain reviewable findings at error severity and medium confidence.
+ * Reports test scopes with no supported check or exemption detected.
+ * Recognizes direct checks, same-class helper evidence, supported Doctrine expectations and fluent JSON checks.
+ * Emits error findings at medium confidence and is disabled by default.
  */
 final readonly class NoAssertionsRule implements RuleInterface
 {
@@ -35,7 +34,6 @@ final readonly class NoAssertionsRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Error severity applies when enabled; calibration leaves this rule opt-in.
         return new RuleDefinition(
             id:                  self::ID,
             name:                'Test without assertions',
@@ -54,20 +52,20 @@ final readonly class NoAssertionsRule implements RuleInterface
     }
 
     /**
-     * Reports tests that do not contain an observable assertion or expectation.
+     * Reports each test scope for which no supported check or exemption is detected.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext  - Unused; the rule interface requires it, and this rule reads no options or project root.
      *
-     * @return list<Finding> - Findings for assertion-free tests.
+     * @return list<Finding> - Findings for scopes with no detected check or exemption; empty when none qualify.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $findings = [];
 
-        // Weigh every test scope in the file.
+
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
-            // A test with any observable expectation is already proving something.
+
             if ($this->hasObservableExpectation($scope)
                 || InvokedTestMethodEvidence::hasExpectation($scope, $analysisUnit)
                 || FluentJsonAssertionEvidence::hasExpectation($scope, $analysisUnit)) {
@@ -93,39 +91,36 @@ final readonly class NoAssertionsRule implements RuleInterface
     }
 
     /**
-     * Reports whether a test has any observable assertion, verification, or expectation marker.
+     * Reports whether the rule detects a supported assertion, verification, expectation, skip, or incomplete marker.
      *
-     * @param TestQualityScope $scope - Test scope whose body is searched for any observable expectation.
+     * @param TestQualityScope $scope - Test scope searched for supported expectation evidence.
      *
-     * @return bool - True when the test has an observable expectation.
+     * @return bool - True when supported assertion, verification, expectation, skip, or incomplete evidence is detected.
      */
     private function hasObservableExpectation(TestQualityScope $scope): bool
     {
         if (TestQualityNodeHelper::assertionCalls($scope) !== []) {
-            // A direct assertion call is the clearest proof of intent, so the test is already covered.
             return true;
         }
 
         if ($scope->node instanceof ClassMethod && $this->hasExpectedExceptionAnnotation($scope->node)) {
-            // A legacy @expectedException docblock asserts a throw, so count it as an observable expectation.
+            // A legacy @expectedException annotation counts as observable throw evidence for this heuristic.
             return true;
         }
 
-        // Fall back to scanning the test's calls for a mock check or explicit marker.
         foreach (TestQualityNodeHelper::calls($scope) as $call) {
             if (TestQualityNodeHelper::isMockVerificationCall($call)) {
-                // A mock verification (such as a Mockery expectation) is checked at teardown, so it counts.
+                // A supported mock-expectation name counts as observable evidence for this heuristic.
                 return true;
             }
 
             $name = TestQualityNodeHelper::callName($call);
             if (in_array($name, ['addtoassertioncount', 'marktestincomplete', 'marktestskipped'], true)) {
-                // These PHPUnit calls register an explicit expectation or deliberate skip, not an empty test.
+                // These names adjust the assertion count or mark the test incomplete or skipped, so the heuristic accepts them.
                 return true;
             }
         }
 
-        // No assertion, expectation annotation, mock verification, or marker found, so the test verifies nothing.
         return false;
     }
 

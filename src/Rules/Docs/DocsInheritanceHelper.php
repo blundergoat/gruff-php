@@ -15,41 +15,39 @@ use PhpParser\Node\Stmt\Trait_;
 use PhpParser\NodeFinder;
 
 /**
- * Resolves whether a method inherits its documentation contract from a parent or interface, so the docs
- * rules can exempt an override that legitimately relies on the ancestor's documented contract.
+ * Supports documentation rules that let methods rely on contracts declared by parents or interfaces.
+ * Resolves methods on same-file direct ancestors and recognises inheritdoc and Override markers.
  *
- * Used by the missing-throws, missing-param and missing-return rules: an
- * `@inheritdoc` marker, an `#[Override]` attribute, or a documented same-file ancestor method all count as an
- * inherited contract. Only ancestors declared in the same parsed unit are resolved; cross-file inheritance is
- * out of scope, so a marker stands in for an ancestor this file cannot see.
+ * The throws rule uses the broad docblock check; parameter and return rules inspect ancestor tags.
+ * Cross-file declarations are not resolved, so callers can use markers as fallback evidence.
  */
 final readonly class DocsInheritanceHelper
 {
     /**
-     * Reports whether a method inherits its documentation contract from a parent, interface, or marker.
+     * Reports whether a method has an explicit inheritance marker or a documented same-file direct ancestor.
      *
      * @param ClassMethod     $classMethod - Method node whose inherited contract should be inspected.
      * @param list<Node\Stmt> $statements - Parsed statements used to find ancestor declarations.
      * @param NodeFinder      $nodeFinder - Node finder used to search inherited method candidates.
      *
-     * @return bool - True when inheritance or override metadata provides the contract docs.
+     * @return bool - True when a marker is present or a documented direct ancestor method is found in this unit.
      */
     public function hasInheritedContractDoc(ClassMethod $classMethod, array $statements, NodeFinder $nodeFinder): bool
     {
         if ($this->hasInheritDoc($classMethod) || $this->hasOverrideAttribute($classMethod)) {
-            // An explicit @inheritdoc or #[Override] is the author asserting the parent owns the contract.
+            // An explicit @inheritdoc or #[Override] counts as an inherited contract for this rule.
             return true;
         }
 
         $class = $this->enclosingClass($classMethod);
         if (!$class instanceof Class_) {
-            // Only Class_ nodes can extend or implement, so nothing else can inherit a contract.
+
             return false;
         }
 
         $ancestorNames = $this->ancestorNames($class);
 
-        // Inherited docs only count when a named ancestor in this same unit actually documents the method.
+
         return $ancestorNames !== [] && $this->hasDocumentedAncestorMethod(
             ancestorNames: $ancestorNames,
             methodName:    strtolower($classMethod->name->toString()),
@@ -65,27 +63,26 @@ final readonly class DocsInheritanceHelper
      * @param list<Node\Stmt> $statements - Parsed statements used to find ancestor declarations.
      * @param NodeFinder      $nodeFinder - Node finder used to search inherited method candidates.
      *
-     * @return ClassMethod|null - The ancestor's method, so a caller can read exactly which tags it declares; null when
-     *   the class has no ancestor declared in this unit, or that ancestor has no non-private method of this name.
+     * @return ClassMethod|null - First non-private match in unit traversal order, or null if no direct ancestor method matches.
      */
     public function sameFileAncestorMethod(ClassMethod $classMethod, array $statements, NodeFinder $nodeFinder): ?ClassMethod
     {
         $class = $this->enclosingClass($classMethod);
         $ancestorNames = $class instanceof Class_ ? $this->ancestorNames($class) : [];
         if ($ancestorNames === []) {
-            // Without a named parent or interface there is nothing in this file to inherit from.
+
             return null;
         }
 
         $methodName = strtolower($classMethod->name->toString());
-        // Search every class-like in the unit for a matching ancestor method.
+
         foreach ($nodeFinder->findInstanceOf($statements, ClassLike::class) as $candidate) {
             // Only the class's named ancestors are worth searching.
             if (!$this->isNamedAncestorCandidate($candidate, $ancestorNames)) {
                 continue;
             }
 
-            // The first same-named method on a direct ancestor is the one overridden; a private one never is.
+            // Private methods are not inherited and cannot supply the overriding method's contract.
             foreach ($candidate->getMethods() as $ancestorMethod) {
                 if (!$ancestorMethod->isPrivate() && strtolower($ancestorMethod->name->toString()) === $methodName) {
                     return $ancestorMethod;
@@ -101,8 +98,7 @@ final readonly class DocsInheritanceHelper
      *
      * @param ClassMethod $classMethod - Method whose docblock and attributes are read.
      *
-     * @return bool - True for `{@inheritdoc}`, a tag-line `@inheritdoc`, or `#[Override]` in a class-like that can
-     *   inherit a contract; false for no marker, or for a marker in a standalone class, which inherits nothing.
+     * @return bool - True when an inheritdoc or Override marker is present and the owning class-like can inherit a contract.
      */
     public function hasInheritanceMarker(ClassMethod $classMethod): bool
     {
@@ -112,13 +108,12 @@ final readonly class DocsInheritanceHelper
 
     /**
      * Reports whether a method's class-like can inherit a contract from a declaration this file may not see.
+     * Classes qualify through extends, implements or trait use; enums through implements or trait use.
+     * Interfaces qualify through extends; traits qualify because their using class may supply the contract.
      *
      * @param ClassMethod $classMethod - Method whose owning class-like is read.
      *
-     * @return bool - True for a class that extends, implements, or uses a trait (whose abstract methods are a
-     *   contract), an enum that implements or uses a trait, an interface that extends another, and a trait, whose
-     *   using class may implement an interface; false for a standalone class, enum or interface, where an
-     *   `@inheritdoc` marker inherits nothing.
+     * @return bool - True for these inheritance paths; false for standalone classes, enums and interfaces or a missing owner.
      */
     public function canInheritContract(ClassMethod $classMethod): bool
     {
@@ -148,12 +143,12 @@ final readonly class DocsInheritanceHelper
     private function ancestorNames(Class_ $class): array
     {
         $ancestorNames = [];
-        // A named parent class is a direct ancestor.
+
         if ($class->extends instanceof Name) {
             $ancestorNames[] = $this->resolvedName($class->extends);
         }
 
-        // Each implemented interface is a direct ancestor too.
+
         foreach ($class->implements as $interface) {
             $ancestorNames[] = $this->resolvedName($interface);
         }
@@ -178,14 +173,14 @@ final readonly class DocsInheritanceHelper
         array $statements,
         NodeFinder $nodeFinder,
     ): bool {
-        // Search every class-like in the unit for a matching ancestor.
+
         foreach ($nodeFinder->findInstanceOf($statements, ClassLike::class) as $candidate) {
             // Only the class's named ancestors are worth searching.
             if (!$this->isNamedAncestorCandidate($candidate, $ancestorNames)) {
                 continue;
             }
 
-            // Look for the overridden method on the ancestor.
+
             foreach ($candidate->getMethods() as $ancestorMethod) {
                 if ($this->isDocumentedMethod($ancestorMethod, $methodName)) {
                     // First documented ancestor override is enough; the contract is inherited.
@@ -194,7 +189,7 @@ final readonly class DocsInheritanceHelper
             }
         }
 
-        // No same-unit ancestor documents this method, so the override carries no inherited contract.
+
         return false;
     }
 
@@ -209,7 +204,7 @@ final readonly class DocsInheritanceHelper
     private function isNamedAncestorCandidate(ClassLike $candidate, array $ancestorNames): bool
     {
         if (!$candidate instanceof Class_ && !$candidate instanceof Interface_) {
-            // Traits and enums cannot be ancestors, so they never supply inherited method contracts.
+            // Only classes and interfaces can be named by extends or implements in this lookup.
             return false;
         }
 
@@ -217,7 +212,7 @@ final readonly class DocsInheritanceHelper
         // namespace of this file from standing in for the real ancestor.
         $candidateName = ($candidate->namespacedName ?? $candidate->name)?->toLowerString();
 
-        // Anonymous classes (null name) and unrelated types are excluded; only listed ancestors match.
+
         return $candidateName !== null && in_array($candidateName, $ancestorNames, true);
     }
 
@@ -231,7 +226,7 @@ final readonly class DocsInheritanceHelper
      */
     private function isDocumentedMethod(ClassMethod $ancestorMethod, string $methodName): bool
     {
-        // Match is case-insensitive and requires a docblock; an undocumented ancestor inherits nothing.
+
         return strtolower($ancestorMethod->name->toString()) === $methodName
             && $ancestorMethod->getDocComment() !== null;
     }
@@ -261,9 +256,9 @@ final readonly class DocsInheritanceHelper
      */
     private function hasOverrideAttribute(ClassMethod $classMethod): bool
     {
-        // Scan each attribute group on the method.
+
         foreach ($classMethod->attrGroups as $group) {
-            // Check each attribute for the Override marker.
+
             foreach ($group->attrs as $attribute) {
                 // PHP's own attribute resolves to the global `Override`; a namespaced class of that name is not it.
                 if ($this->resolvedName($attribute->name) === 'override') {
@@ -273,7 +268,7 @@ final readonly class DocsInheritanceHelper
             }
         }
 
-        // No attribute named override on any group, so the method does not assert an inherited contract.
+
         return false;
     }
 
@@ -288,27 +283,26 @@ final readonly class DocsInheritanceHelper
     {
         $parent = $classMethod->getAttribute('parent');
 
-        // Walk outward through the parent chain looking for the enclosing class.
+
         while ($parent instanceof Node) {
             if ($parent instanceof Class_) {
-                // Nearest enclosing Class_ wins; interfaces and traits are skipped by the loop condition.
+
                 return $parent;
             }
 
             $parent = $parent->getAttribute('parent');
         }
 
-        // The chain ended without a Class_, so the method lives outside any class body.
+
         return null;
     }
 
     /**
-     * Returns a name as PHP resolves it in its namespace, lowercased for PHP's case-insensitive class names.
+     * Returns the resolved name when available, otherwise the written name, lowercased for case-insensitive class-name comparison.
      *
      * @param Name $name - Name as written in an `extends`, `implements`, or attribute position.
      *
-     * @return string - The fully qualified name the parser's name resolver recorded, without a leading backslash;
-     *   the name as written when no resolution was recorded.
+     * @return string - Resolved name or input name when unresolved, lowercased and without a leading backslash.
      */
     private function resolvedName(Name $name): string
     {

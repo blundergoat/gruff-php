@@ -30,18 +30,18 @@ final class CallableFlowEvidence
      * Checks additional local evidence after the rule's existing invocation checks have failed.
      *
      * @param Expr\FuncCall       $call             - Actual dynamic invocation; named calls and missing bodies receive no extra trust.
-     * @param Closure(Expr): bool $declaredCallable - Existing rule proof for a selected declaration or literal.
+     * @param Closure(Expr): bool $declaredCallable - Existing rule check for a selected declaration or literal.
      * @return bool - True only when the invocation's current value has bounded callable evidence.
      */
     public static function hasInvocationEvidence(Expr\FuncCall $call, Closure $declaredCallable): bool
     {
         $scope = SecurityNodeHelper::enclosingFunctionLike($call);
-        // File-level or unavailable bodies have no local sequence from which to prove an alias.
+        // File-level or unavailable bodies have no local sequence from which to establish bounded alias evidence.
         if (!$call->name instanceof Expr || $scope === null || $scope->getStmts() === null) {
             return false;
         }
 
-        // Jumps or runtime-created locals can bypass the assignment sequence this bounded proof relies on.
+        // Jumps or runtime-created locals can bypass the assignment sequence used by this bounded analysis.
         if (self::hasUnboundedLocalWrites($scope)) {
             return false;
         }
@@ -50,11 +50,11 @@ final class CallableFlowEvidence
     }
 
     /**
-     * Confirms a registered value is an untouched native callable parameter in its own method.
+     * Treats a registered value as callable evidence when it is a native callable parameter with no observed local writes.
      *
      * @param Expr $registeredCallback - Appended value; aliases, untyped values and request expressions remain unresolved.
      * @param Node $registration       - Store position whose method owns the parameter.
-     * @return bool - True only while no observable write or borrowed reference can replace that parameter.
+     * @return bool - True when the supported AST shapes contain no replacing write or borrowed reference.
      */
     public static function hasRegisteredParameterEvidence(Expr $registeredCallback, Node $registration): bool
     {
@@ -72,8 +72,7 @@ final class CallableFlowEvidence
      * Resolves a local callee to the function a single string literal names, so the call can be judged like a direct one.
      *
      * @param Expr\FuncCall $call - Dynamic invocation through a plain local; other callee forms are not resolved.
-     * @return string|null - Lower-cased function name without its leading backslash when the local's only write is one
-     *                       plain string literal assigned before the call on the same branch; null otherwise.
+     * @return string|null - Lower-cased name without leading backslashes; null unless its sole assignment precedes the call on the same branch.
      */
     public static function literalCalleeName(Expr\FuncCall $call): ?string
     {
@@ -87,7 +86,7 @@ final class CallableFlowEvidence
 
         $writes     = self::variableWrites($call->name->name, $scope);
         $assignment = $writes[0] ?? null;
-        // Exactly one ordinary assignment of a plain literal, completed before the call on every path to it.
+
         if (count($writes) !== 1 || !$assignment instanceof Expr\Assign || !$assignment->expr instanceof Node\Scalar\String_
             || $assignment->getEndFilePos() >= $call->getStartFilePos()
             || !self::isBeforeReadOnSameBranch($assignment, $call, $scope)) {
@@ -98,16 +97,15 @@ final class CallableFlowEvidence
     }
 
     /**
-     * Proves a loop callback comes from a local list written as closure literals in the same function.
+     * Recognizes a loop callback drawn from a local list of closure literals in the same function.
      *
      * @param Expr\FuncCall $call - Invocation of a foreach value; any other callee keeps its warning.
-     * @return bool - True when the loop iterates a local assigned once, before the loop, from an array literal whose
-     *                every item is a closure or arrow function, and only the loop writes the invoked value.
+     * @return bool - True for an unchanged loop value from a non-empty closure array assigned once before the loop on the same branch.
      */
     public static function hasLocalClosureListEvidence(Expr\FuncCall $call): bool
     {
         $scope = SecurityNodeHelper::enclosingFunctionLike($call);
-        // A closure is left out: a by-reference `use` would let the enclosing function rewrite the list mid-body.
+        // Closures are excluded because a by-reference capture can let the enclosing function rewrite the list mid-body.
         if ((!$scope instanceof Stmt\ClassMethod && !$scope instanceof Stmt\Function_)
             || !$call->name instanceof Expr\Variable || !is_string($call->name->name)
             || self::hasUnboundedLocalWrites($scope)) {
@@ -115,7 +113,7 @@ final class CallableFlowEvidence
         }
 
         $loop = self::selectingLoop($call, $call->name->name);
-        // The invoked value must be written by its own by-value loop and nothing else.
+
         if ($loop === null || $loop->byRef || self::variableWrites($call->name->name, $scope) !== [$loop]
             || !$loop->expr instanceof Expr\Variable || !is_string($loop->expr->name)) {
             return false;
@@ -123,7 +121,7 @@ final class CallableFlowEvidence
 
         $writes     = self::variableWrites($loop->expr->name, $scope);
         $assignment = $writes[0] ?? null;
-        // The list is assigned once, from a closure-literal array, completed before the loop on the same branch.
+
         return count($writes) === 1 && $assignment instanceof Expr\Assign && $assignment->var instanceof Expr\Variable
             && $assignment->expr instanceof Expr\Array_ && self::isClosureLiteralList($assignment->expr)
             && $assignment->getEndFilePos() < $loop->getStartFilePos()
@@ -131,10 +129,10 @@ final class CallableFlowEvidence
     }
 
     /**
-     * Reports whether a closure captures a local by reference, so the enclosing function can rewrite it at any call.
+     * Reports whether a closure captures a local by reference, allowing that closure to change the captured local when invoked.
      *
-     * @param FunctionLike $scope - Function whose local is read; only a closure has a `use` list.
-     * @param string       $name  - Local name without `$`.
+     * @param FunctionLike $scope - Function-like scope to inspect; non-closures have no capture list.
+     * @param string       $name  - Local name without the dollar-sign prefix.
      * @return bool - True when the closure imports that name by reference.
      */
     private static function isCapturedByReference(FunctionLike $scope, string $name): bool
@@ -272,7 +270,7 @@ final class CallableFlowEvidence
     }
 
     /**
-     * Rejects control flow or runtime imports that can replace locals without an ordinary assignment.
+     * Rejects control flow that can bypass assignments and runtime imports that can replace locals.
      *
      * @param FunctionLike $scope - Function being inspected; an empty body contains no hidden local writes.
      * @return bool - True means local provenance needs a broader analysis and must keep its warning.
@@ -353,14 +351,14 @@ final class CallableFlowEvidence
     }
 
     /**
-     * Proves a copied local only while its earlier assignment remains valid at this read.
+     * Accepts a copied local only when bounded flow checks find a usable earlier assignment for this read.
      *
      * @param Expr\Variable       $callbackValue    - Plain callback local; dynamic variable names remain unresolved.
      * @param Node                $before           - Read position used to exclude later or unfinished assignments.
      * @param FunctionLike        $scope            - Owning function; other scopes cannot supply new alias evidence.
      * @param Closure(Expr): bool $declaredCallable - Existing proof for a typed parameter or property.
      * @param int                 $depth            - Alias steps already followed; the shared bound prevents cycles.
-     * @return bool - True when the local's current value is proved without ambiguous writes or references.
+     * @return bool - True when bounded flow checks accept the local without ambiguous writes or references.
      */
     private static function hasLocalVariableEvidence(
         Expr\Variable $callbackValue,
@@ -376,11 +374,11 @@ final class CallableFlowEvidence
         }
         $writes = self::variableWrites($callbackValue->name, $scope);
         $latest = null;
-        // Any possible write before the read must be understood; a later loop write may reach the next iteration.
+        // Every modeled write before the read must be understood; a later loop write may reach the next iteration.
         foreach ($writes as $write) {
             // A mutation after this read can still replace the callback before a subsequent loop iteration.
             if ($write->getStartFilePos() >= $before->getStartFilePos()) {
-                // Shared loops make the later write observable at this source position.
+                // A shared loop keeps the later write relevant to a later visit to this read.
                 if (self::hasSharedLoop($write, $before, $scope)) {
                     return false;
                 }
@@ -415,7 +413,7 @@ final class CallableFlowEvidence
      * Identifies writes whose borrowed reference may survive later assignments.
      *
      * @param Node $write - Earlier mutation or escape already matched to this local.
-     * @return bool - True means a later assignment cannot restore sole ownership of the callback.
+     * @return bool - True when later assignments cannot rule out an earlier reference escape.
      */
     private static function hasPersistentReference(Node $write): bool
     {
@@ -427,13 +425,13 @@ final class CallableFlowEvidence
      * Finds mutations and calls that may borrow a local by reference.
      *
      * @param string       $name  - Case-sensitive local name being read.
-     * @param FunctionLike $scope - Function whose writes matter; nested function bodies cannot replace its local.
+     * @param FunctionLike $scope - Function whose local writes and reference escapes are collected.
      * @return list<Node> - Possible writes; an empty list leaves only a typed parameter as evidence.
      */
     private static function variableWrites(string $name, FunctionLike $scope): array
     {
         return array_values((new NodeFinder())->find($scope->getStmts() ?? [], static function (Node $node) use ($name, $scope): bool {
-            // Nested functions own different locals, even when their spelling matches this callback.
+            // Inspect captures at closure creation; nested function bodies are excluded from this scope.
             $owner = $node instanceof Expr\Closure ? $node->getAttribute('parent') : $node;
             if (!$owner instanceof Node || SecurityNodeHelper::enclosingFunctionLike($owner) !== $scope) {
                 return false;
@@ -448,7 +446,7 @@ final class CallableFlowEvidence
                 || $node instanceof Expr\PreDec || $node instanceof Expr\PostDec) {
                 return self::hasVariableReference($node->var, $name);
             }
-            // Unsetting or rebinding a loop/catch variable invalidates the previous callback.
+            // Unsetting the local or binding it to a global prevents treating its earlier value as current evidence.
             if ($node instanceof Stmt\Unset_ || $node instanceof Stmt\Global_) {
                 return self::hasVariableReference($node, $name);
             }
@@ -468,9 +466,9 @@ final class CallableFlowEvidence
     /**
      * Detects a borrowed reference that may outlive an ordinary assignment.
      *
-     * @param Node   $node - Same-scope closure creation or call to inspect.
+     * @param Node   $node - Same-scope array item, closure creation or call to inspect.
      * @param string $name - Local callback whose ownership must remain known.
-     * @return bool - True when another callable may retain or replace this local.
+     * @return bool - True when an array, closure or call can expose this local by reference.
      */
     private static function hasReferenceEscape(Node $node, string $name): bool
     {
@@ -482,7 +480,7 @@ final class CallableFlowEvidence
         if ($node instanceof Expr\Closure) {
             // By-value captures cannot replace the outer variable.
             foreach ($node->uses as $capture) {
-                // This reference prevents later assignments from restoring local ownership.
+
                 if ($capture->byRef && $capture->var->name === $name) {
                     return true;
                 }
@@ -562,14 +560,14 @@ final class CallableFlowEvidence
     private static function hasSharedLoop(Node $write, Node $read, FunctionLike $scope): bool
     {
         $parent = $read->getAttribute('parent');
-        // Check only loops surrounding this invocation.
+
         while ($parent instanceof Node && $parent !== $scope) {
             // Repeated bodies can carry a later write back to this invocation.
             if ($parent instanceof Stmt\For_ || $parent instanceof Stmt\Foreach_ || $parent instanceof Stmt\While_ || $parent instanceof Stmt\Do_) {
                 $ancestor = $write;
-                // A write belongs to the loop only when its parent chain reaches that exact loop node.
+
                 while ($ancestor instanceof Node && $ancestor !== $scope) {
-                    // The shared loop can execute this write before the next read.
+
                     if ($ancestor === $parent) {
                         return true;
                     }
@@ -604,7 +602,7 @@ final class CallableFlowEvidence
         }
         // Positional arguments have a known callback slot; spreads and names require a separate resolver.
         foreach ($arguments as $argument) {
-            // Unknown binding order cannot prove which value PHP binds.
+
             if (!$argument instanceof Node\Arg || $argument->name !== null || $argument->unpack) {
                 return false;
             }
@@ -624,12 +622,12 @@ final class CallableFlowEvidence
     {
         // Each parameter is local to this function; a same-named outer parameter cannot supply its type.
         foreach ($scope->getParams() as $parameter) {
-            // Only the exact local declaration can vouch for an untouched parameter.
+            // Only the exact by-value local declaration can supply its native type.
             if ($parameter->byRef || !$parameter->var instanceof Expr\Variable || $parameter->var->name !== $name) {
                 continue;
             }
             $type = $parameter->type;
-            // Nullable declarations still prove the non-null callable target under the existing rule policy.
+            // Nullable declarations retain the callable type used by the existing rule policy.
             if ($type instanceof Node\NullableType) {
                 $type = $type->type;
             }

@@ -8,16 +8,18 @@ use JsonException;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers analyse command mutation-report behavior.
+ * Covers analyse output when an Infection report is supplied.
+ * Checks mutation totals, finding metadata, and text and Markdown summaries.
+ * Checks budget and baseline findings with --fail-on=none and a successful exit.
  */
 final class AnalyseCliMutationTest extends CliTestCase
 {
     /**
      * Verify analyse command ingests infection report in JSON.
      *
-     * @throws JsonException
+     * @throws JsonException - If decoding the command's JSON output fails.
      *
-     * @return void
+     * @return void - Asserts mutation totals and MSI and covered MSI metadata on the first survived-mutant finding.
      */
     public function testAnalyseCommandIngestsInfectionReportInJson(): void
     {
@@ -72,7 +74,7 @@ final class AnalyseCliMutationTest extends CliTestCase
     /**
      * Verify analyse command renders mutation summary in text.
      *
-     * @return void
+     * @return void - Asserts success, MSI 50.00%, status counts, escaped and timed-out explanations, and a survived-mutant rule ID.
      */
     public function testAnalyseCommandRendersMutationSummaryInText(): void
     {
@@ -101,7 +103,7 @@ final class AnalyseCliMutationTest extends CliTestCase
     /**
      * Verify analyse command renders score and mutation context in markdown.
      *
-     * @return void
+     * @return void - Asserts successful Markdown output includes score-driver guidance, MSI 50.00%, and mutation status counts.
      */
     public function testAnalyseCommandRendersScoreAndMutationContextInMarkdown(): void
     {
@@ -130,9 +132,9 @@ final class AnalyseCliMutationTest extends CliTestCase
     /**
      * Verify analyse command reports mutation budget and msi regression.
      *
-     * @throws JsonException
+     * @throws JsonException - If decoding the command's JSON output fails.
      *
-     * @return void
+     * @return void - Asserts a baseline delta of -30, an exceeded budget, and both corresponding finding rule IDs.
      */
     public function testAnalyseCommandReportsMutationBudgetAndMsiRegression(): void
     {

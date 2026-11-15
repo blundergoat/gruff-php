@@ -21,13 +21,11 @@ use PhpParser\Node\Stmt\Enum_;
 use PhpParser\Node\Stmt\Trait_;
 
 /**
- * Flags a class, trait, or enum whose substantive length runs past the configured budget - the container
- * measure that tells the user a single type has grown too large to sit comfortably in one file.
+ * Reports classes, traits and enums whose substantive line count exceeds the configured budget.
+ * Counts each declaration span after masking comment tokens and parsed attribute groups, ignoring blank lines.
  *
- * Runs per file over every class-like scope, counting substantive lines between its declaration and
- * closing brace - blank and comment-only lines are free (family ratification, 2026-08-05) - against
- * the threshold (default error above 1000), so required documentation can never push a type over the
- * size bar. Class-length is a container measure, not a density measure. See ADR-012.
+ * The default threshold is 1000 lines; findings below 1.5 times the active limit are advisory.
+ * See ADR-012 and FAMILY-CONTRACT.md section 12 for the counting and banding contracts.
  */
 final readonly class ClassLengthRule implements RuleInterface
 {
@@ -43,7 +41,7 @@ final readonly class ClassLengthRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Error at 1000 substantive lines: the catalogue default callers inherit unless .gruff-php.yaml overrides it.
+
         return new RuleDefinition(
             id:                self::ID,
             name:              'Class length',
@@ -57,12 +55,12 @@ final readonly class ClassLengthRule implements RuleInterface
     }
 
     /**
-     * Reports each class-like scope whose substantive length runs over the configured budget.
+     * Reports classes, traits and enums whose substantive length exceeds the configured budget.
      *
-     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Source and AST containing the declaration spans to measure.
+     * @param RuleContext $ruleContext - Supplies the effective thresholds for this rule.
      *
-     * @return list<Finding> - One finding per oversized class-like scope; empty when every type is within budget.
+     * @return list<Finding> - One finding per measured class, trait or enum above its limit; empty when none qualify.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -73,7 +71,7 @@ final readonly class ClassLengthRule implements RuleInterface
 
         $findings = [];
 
-        // Measure each class, trait, and enum in the file.
+
         foreach ($nodes as $node) {
             $startLine = $node->getStartLine();
             $endLine   = $node->getEndLine();
@@ -86,7 +84,7 @@ final readonly class ClassLengthRule implements RuleInterface
             $length         = SubstantiveLineCounter::countRange($analysisUnit, $startLine, $endLine);
             $thresholdMatch = $settings->highValueThresholdMatch($length);
 
-            // A scope within budget is fine, so skip it.
+
             if ($thresholdMatch === null) {
                 continue;
             }
@@ -131,7 +129,7 @@ final readonly class ClassLengthRule implements RuleInterface
      *
      * @param Node $node - Class-like node (Class_, Trait_, or Enum_) whose declared name labels the finding.
      *
-     * @return string - Class-like display symbol.
+     * @return string - Declared name, or a line-keyed label when no name is available.
      */
     private function resolveSymbol(Node $node): string
     {
@@ -141,12 +139,12 @@ final readonly class ClassLengthRule implements RuleInterface
         }
 
         if ($node instanceof Trait_) {
-            // Traits are always named in valid PHP; the fallback only guards against an unparsed name node.
+            // Traits are named in valid PHP; a missing name receives a line-based fallback.
             return $node->name?->toString() ?? sprintf('trait@%d', $node->getStartLine());
         }
 
         if ($node instanceof Enum_) {
-            // Enums are always named in valid PHP; the fallback only guards against an unparsed name node.
+            // Enums are named in valid PHP; a missing name receives a line-based fallback.
             return $node->name?->toString() ?? sprintf('enum@%d', $node->getStartLine());
         }
 
@@ -163,7 +161,7 @@ final readonly class ClassLengthRule implements RuleInterface
      */
     private function formatNumber(int|float $number): string
     {
-        // A genuine fraction keeps its decimals; a whole value is shown without them.
+
         if (is_float($number) && floor($number) !== $number) {
             return (string) $number;
         }

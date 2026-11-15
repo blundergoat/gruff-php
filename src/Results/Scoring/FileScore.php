@@ -5,13 +5,10 @@ declare(strict_types=1);
 namespace GruffPhp\Results\Scoring;
 
 /**
- * One file's line in the "worst offenders" list - its grade, finding counts, and the peak complexity
- * and mutation metrics that explain why it scored the way it did.
+ * One file's score-report row, with its grade, finding counts, finding weight, and optional metrics.
+ * ScoreCalculator supplies rows for files with findings or mutation results.
  *
- * When a user wants to know which files to fix first, gruff ranks them and shows this row for each: the
- * file's letter grade and score, how many findings of each severity it carries, the penalty they cost,
- * and - where measured - its worst cyclomatic and cognitive complexity, its longest method, and its
- * mutation score. It's the per-file detail sitting behind the run's composite grade.
+ * Complexity and length maxima come from finding metadata; mutation scores come from per-file mutation results.
  */
 final readonly class FileScore
 {
@@ -24,10 +21,10 @@ final readonly class FileScore
      * @param int        $advisory - Advisory-severity findings in the file.
      * @param int        $warning - Warning-severity findings in the file.
      * @param int        $error - Error-severity findings in the file.
-     * @param float      $penalty - Total score penalty these findings cost the file.
-     * @param int|null   $maxCyclomatic - Highest cyclomatic complexity found in the file; null when it was not measured for this run.
-     * @param int|null   $maxCognitive - Highest cognitive complexity found in the file; null when it was not measured.
-     * @param int|null   $maxLines - Longest method's line count in the file; null when it was not measured.
+     * @param float      $penalty - Sum of the file's finding weights used by the scoring curve.
+     * @param int|null   $maxCyclomatic - Highest reported cyclomatic complexity; null when matching finding metadata has no integer value.
+     * @param int|null   $maxCognitive - Highest reported cognitive complexity; null when matching finding metadata has no integer value.
+     * @param int|null   $maxLines - Maximum reported file, class, or method length; null when no size finding has integer line metadata.
      * @param float|null $mutationScore - The file's mutation score; null when mutation analysis did not cover it.
      */
     public function __construct(
@@ -46,12 +43,8 @@ final readonly class FileScore
     }
 
     /**
-     * Flattens this score into the JSON-report row shape the reporters and dashboard consume.
-     *
-     * Keys are the wire contract: renaming one breaks every JSON/SARIF/HTML consumer, so treat the
-     * shape as stable. The nested grade is expanded into separate `score`/`grade` keys and `penalty`
-     * is rounded to 2 decimals so downstream diffs stay stable; nullable metric keys stay null when
-     * the metric was not measured for this file.
+     * Returns the report row used by score reporters, rounding the penalty to two decimals.
+     * Unmeasured metrics remain null.
      *
      * @return array{
      *     file: string,

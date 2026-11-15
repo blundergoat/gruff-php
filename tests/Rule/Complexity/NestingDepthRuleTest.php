@@ -18,7 +18,9 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers nesting depth measurement on fixtures plus warning and error transitions for shallow, deep, and very deeply nested methods.
+ * Checks maximum nesting depths for methods in the nesting fixture.
+ * Verifies that the simple fixture emits no findings at the configured cutoffs.
+ * Asserts warning and error severities for selected findings from the nesting fixture.
  */
 final class NestingDepthRuleTest extends TestCase
 {
@@ -28,9 +30,9 @@ final class NestingDepthRuleTest extends TestCase
     private PhpFileParser $parser;
 
     /**
-     * Prepare parser fixtures before each rule test.
+     * Give each test an independent nesting-depth rule and parser.
      *
-     * @return void
+     * @return void - Initializes the parser and rule properties with fresh instances.
      */
     protected function setUp(): void
     {
@@ -60,10 +62,10 @@ final class NestingDepthRuleTest extends TestCase
     /**
      * Verify nesting depth matches expected.
      *
-     * @param string $methodName - Fixture method name.
-     * @param int    $expectedDepth - Expected nesting depth.
+     * @param string $methodName - Method to select from nesting.php.
+     * @param int    $expectedDepth - Maximum nesting depth expected for the selected method.
      *
-     * @return void
+     * @return void - Asserts the fixture method exists and its maximum nesting depth equals the supplied value.
      */
     #[DataProvider('methodDepthProvider')]
     public function testNestingDepthMatchesExpected(string $methodName, int $expectedDepth): void
@@ -89,7 +91,7 @@ final class NestingDepthRuleTest extends TestCase
     /**
      * Verify no findings for shallow methods.
      *
-     * @return void
+     * @return void - Asserts the simple fixture emits no findings with warning 4 and error 6.
      */
     public function testNoFindingsForShallowMethods(): void
     {
@@ -99,9 +101,9 @@ final class NestingDepthRuleTest extends TestCase
     }
 
     /**
-     * Verify warning for deeply nested method.
+     * Verify the first nesting finding has warning severity.
      *
-     * @return void
+     * @return void - Asserts nonempty findings and the nesting rule ID and warning severity of the first finding.
      */
     public function testWarningForDeeplyNestedMethod(): void
     {
@@ -116,7 +118,7 @@ final class NestingDepthRuleTest extends TestCase
     /**
      * Verify error for very deeply nested method.
      *
-     * @return void
+     * @return void - Asserts an error finding exists and the first error identifies NestingFixture::fiveLevels().
      */
     public function testErrorForVeryDeeplyNestedMethod(): void
     {
@@ -131,8 +133,7 @@ final class NestingDepthRuleTest extends TestCase
      * Analyse complexity fixtures and return findings for assertions.
      *
      * @param string             $fixture    - fixture filename under Fixtures/Complexity to parse and run.
-     * @param array<string, int> $thresholds - warning/error cutoffs keyed by level; sets where the rule starts
-     *                                       emitting, so a test can force or suppress findings on the same fixture.
+     * @param array<string, int> $thresholds - Warning and error depth cutoffs used to force or suppress findings.
      *
      * @return list<\GruffPhp\Results\Finding\Finding> - findings the rule emits under those thresholds, to assert on.
      */
@@ -151,7 +152,7 @@ final class NestingDepthRuleTest extends TestCase
     /**
      * Parse the named fixture into an analysis unit.
      *
-     * @param string $filename - Fixture filename.
+     * @param string $filename - Filename relative to tests/Fixtures/Complexity.
      *
      * @return \GruffPhp\Engine\Parser\AnalysisUnit - parsed fixture carrying the repo-relative display path the rule reports findings against
      */

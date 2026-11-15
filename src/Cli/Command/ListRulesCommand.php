@@ -15,14 +15,10 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * Backs the `gruff-php list-rules` command - the browsable catalogue of every quality rule the
- * analyser can apply.
+ * Lists registered quality rules and shows detailed metadata for a requested rule id.
+ * Catalogue and detail output support JSON plus human-readable text; text and table share their respective renderers.
  *
- * Reach for this when a user asks "what does gruff check?" or wants to inspect one rule before
- * tuning it. With no argument it prints the whole catalogue as a table, JSON, or plain text; pass
- * a `<ruleId>` and it renders that rule in full - severity, options, the `.gruff-php.yaml` escape
- * hatches that disable or retune it, and known false-positive shapes. A mistyped id gets a
- * "did you mean" nudge instead of an empty result.
+ * Details include defaults, configuration guidance, and documented false positives; unknown ids may receive close-match suggestions.
  */
 final class ListRulesCommand extends Command
 {
@@ -33,11 +29,8 @@ final class ListRulesCommand extends Command
     private const SUGGESTION_DISTANCE = 4;
 
     /**
-     * Knob names the family already publishes for a single-threshold rubric, keyed by rule id.
-     *
-     * The ratified listing shape (M09, 2026-09-09) carries every threshold as a named map the way
-     * gruff-go does. A rubric whose id has a knob name in gruff-go borrows that name; every other
-     * rubric publishes the one-key map `{"threshold": N}` so no new permanent identifier is invented.
+     * Maps single-threshold rule ids to the knob names published in the family listing format.
+     * Rules absent from this map use `threshold`, avoiding a second name for an unnamed knob.
      */
     private const THRESHOLD_KNOB_NAMES = [
         'complexity.cognitive'    => 'maxComplexity',
@@ -49,8 +42,7 @@ final class ListRulesCommand extends Command
     ];
 
     /**
-     * Declares the `list-rules` command name, its optional `<ruleId>` argument, and the `--format`
-     * flag - everything the user can type after `gruff-php list-rules`.
+     * Declares the list-rules command's rule selector and output format for catalogue or detail views.
      *
      * @return void - Registers the command's metadata with Symfony; nothing is returned.
      */
@@ -70,13 +62,13 @@ final class ListRulesCommand extends Command
      * @param InputInterface  $input - Parsed invocation; supplies the `--format` option and optional `<ruleId>` argument.
      * @param OutputInterface $output - Destination the rendered catalogue, detail view, or error is written to.
      *
-     * @return int - Symfony exit code: SUCCESS once output is written, INVALID for a bad format, FAILURE if JSON encoding fails
+     * @return int - SUCCESS after output, INVALID for a bad format or unknown rule id, FAILURE if JSON encoding fails.
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $format = $input->getOption('format');
-        // Reject anything but the three renderers we support, so a bad flag like `--format=xml` fails
-        // fast with a usage error rather than a broken render at the end.
+
+
         if (!is_string($format) || !in_array($format, ['text', 'table', 'json'], true)) {
             $output->writeln('<error>USAGE-ERROR Unsupported rule-list format. Use text, table, or json.</error>');
 
@@ -87,7 +79,7 @@ final class ListRulesCommand extends Command
         $config   = AnalysisConfig::fromRegistry($registry);
         $ruleId   = $input->getArgument('ruleId');
 
-        // A non-empty `<ruleId>` means the user wants one rule in depth, so branch to the detail view.
+
         if (is_string($ruleId) && $ruleId !== '') {
             return $this->renderRuleDetail(
                 ruleId:   $ruleId,
@@ -101,8 +93,8 @@ final class ListRulesCommand extends Command
         /** @var list<array{id: string, name: string, pillar: string, tier: string, defaultSeverity: string, confidence: string, defaultEnabled: bool, thresholds?: array<string, int|float>, options: array<string, int|float|bool|string|array<array-key, int|float|bool|string>>|\stdClass, description: string}> $rows Accumulator shape is built from rule definitions for table rendering; a row may also carry falsePositiveShapes. */
         $rows = [];
 
-        // No id given: build one catalogue row per registered rule, tagging each with whether this
-        // project currently has it enabled.
+        // Catalogue enablement comes from registry defaults; this command does not load project configuration.
+
         foreach ($registry->all() as $rule) {
             $definition = $rule->definition();
             $settings   = $config->ruleSettings($definition->id);
@@ -126,7 +118,7 @@ final class ListRulesCommand extends Command
         $output->writeln('Rule ID | Pillar | Tier | Severity | Confidence | Enabled | Description');
         $output->writeln('--- | --- | --- | --- | --- | --- | ---');
 
-        // Emit one Markdown-style table row per rule, in registry order, under the header just printed.
+
         foreach ($rows as $ruleMetadata) {
             $output->writeln(sprintf(
                                  '%s | %s | %s | %s | %s | %s | %s',
@@ -144,40 +136,39 @@ final class ListRulesCommand extends Command
     }
 
     /**
-     * Renders one rule's full detail view once the user passed a `<ruleId>`, or hands off to the
+     * Renders one rule's full detail view once the user passed the ruleId argument, or hands off to the
      * typo path when that id matches nothing in the registry.
      *
-     * @param string          $ruleId - Rule id the caller asked to inspect; matched exactly, with a retired id resolving to its replacement.
-     * @param RuleRegistry    $registry - Source of the canonical rule set the lookup and typo suggestions draw from.
-     * @param AnalysisConfig  $config - Effective config supplying whether the matched rule is enabled for this project.
-     * @param string          $format - Pre-validated output format (`text`, `table`, or `json`) selecting the renderer.
-     * @param OutputInterface $output - Destination the detail view or unknown-rule message is written to.
+     * @param string $ruleId - Requested rule id; matched exactly after resolving a registered retired alias.
+     * @param RuleRegistry $registry - Source of the canonical rule set and typo suggestions.
+     * @param AnalysisConfig $config - Registry-default configuration supplying the matched rule's enabled state.
+     * @param string $format - Pre-validated output format (text, table, or json).
+     * @param OutputInterface $output - Destination for the detail view or unknown-rule message.
      *
-     * @return int - Symfony exit code: SUCCESS once the detail view is written, FAILURE if JSON encoding fails; an unknown id defers to the
-     *             not-found path's INVALID
+     * @return int - SUCCESS after output, FAILURE if JSON encoding fails, or INVALID for an unknown id.
      */
     private function renderRuleDetail(string $ruleId, RuleRegistry $registry, AnalysisConfig $config, string $format, OutputInterface $output): int
     {
         $match           = null;
         $requestedRuleId = RuleRegistry::canonicalRuleId($ruleId);
-        // Scan the registry for the requested id; a retired id such as `docs.missing-public-phpdoc` already resolved to its replacement.
+        // Retired ids resolve before matching so callers receive the current rule's detail view.
         foreach ($registry->all() as $rule) {
             $definition = $rule->definition();
-            // Stop at the first exact hit - that is the rule whose detail view we will render.
+
             if ($definition->id === $requestedRuleId) {
                 $match = $definition;
                 break;
             }
         }
 
-        // Nothing matched, so the id was mistyped or retired; hand off to the "did you mean" response.
+
         if ($match === null) {
             return $this->renderRuleNotFound($ruleId, $registry, $output);
         }
 
         $enabled = $config->ruleSettings($match->id)->enabled;
 
-        // A single rule's detail serialises to JSON for tooling; text and table share the human renderer below.
+
         if ($format === 'json') {
             try {
                 $output->write(json_encode($this->ruleDetailPayload($match, $enabled), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . PHP_EOL, false, OutputInterface::OUTPUT_RAW);
@@ -197,8 +188,7 @@ final class ListRulesCommand extends Command
     }
 
     /**
-     * Tells the user their `<ruleId>` matched no rule and offers up to three closest ids as
-     * "did you mean" hints, so a small typo like `naming-cammel-case` still points somewhere useful.
+     * Tells the user that the rule id matched nothing and offers nearby registered ids as typo suggestions.
      *
      * @param string          $ruleId - Unrecognised rule id the caller typed; echoed back and used as the match anchor.
      * @param RuleRegistry    $registry - Source of known rule ids the Levenshtein suggestions are drawn from.
@@ -211,7 +201,7 @@ final class ListRulesCommand extends Command
         $output->writeln(sprintf('<error>Unknown rule: %s.</error>', $ruleId));
 
         $candidates = [];
-        // Score every known id by how many edits separate it from what the user typed.
+
         foreach ($registry->all() as $rule) {
             $candidateId              = $rule->definition()->id;
             $candidates[$candidateId] = levenshtein($ruleId, $candidateId);
@@ -219,20 +209,20 @@ final class ListRulesCommand extends Command
 
         asort($candidates);
         $suggestions = [];
-        // Walk the ids closest-first (asort ordered them by distance) to pick the best few hints.
+
         foreach ($candidates as $candidateId => $distance) {
             // Beyond this edit distance the id is too different to be a likely typo, so drop it.
             if ($distance > self::SUGGESTION_DISTANCE) {
                 continue;
             }
             $suggestions[] = $candidateId;
-            // Three hints is enough to be helpful without burying the user in near-misses.
+            // Keep the suggestion list short so likely corrections do not bury the error.
             if (count($suggestions) === 3) {
                 break;
             }
         }
 
-        // Only add the "did you mean" line when at least one id was close enough to suggest.
+
         if ($suggestions !== []) {
             $output->writeln(sprintf('Did you mean: %s ?', implode(', ', $suggestions)));
         }
@@ -241,14 +231,12 @@ final class ListRulesCommand extends Command
     }
 
     /**
-     * Assembles one rule's detail as a JSON-ready associative array for `list-rules <ruleId>
-     * --format json`, so tooling reads the same facts the text view shows a person.
+     * Assembles metadata for `list-rules <ruleId> --format json`, including thresholds and configuration guidance.
      *
      * @param RuleDefinition $definition - Rule whose metadata, thresholds, options, and escape hatches are serialised.
-     * @param bool           $enabled - Effective project enabled state; emitted as the `defaultEnabled` field.
+     * @param bool $enabled - Registry-default enabled state, emitted as `defaultEnabled`.
      *
-     * @return array - JSON-ready detail document; empty option maps are stdClass so they encode as
-     *                   `{}` rather than `[]`, and `thresholds` is present only for a tunable rule
+     * @return array - JSON detail; empty option maps encode as objects and threshold-free rules omit `thresholds`.
      * @phpstan-return array{
      *     id: string,
      *     name: string,
@@ -293,11 +281,11 @@ final class ListRulesCommand extends Command
 
     /**
      * Lays out one rule's detail as the block a person reads in the terminal - identity header,
-     * description, default options, `.gruff-php.yaml` escape hatches, and false-positive shapes,
+     * description, default options, .gruff-php.yaml escape hatches, and false-positive shapes,
      * with default options and false-positive shapes shown only when the rule has them.
      *
      * @param RuleDefinition $definition - Rule whose name, pillar, options, hatches, and false-positive shapes render.
-     * @param bool           $enabled - Effective project enabled state; printed on the "Enabled by default" line.
+     * @param bool $enabled - Registry-default enabled state; printed on the "Enabled by default" line.
      *
      * @return string - the full multi-line detail block, newline-joined and terminated with a trailing newline so it writes cleanly raw
      */
@@ -316,12 +304,12 @@ final class ListRulesCommand extends Command
         $lines[] = 'Description:';
         $lines[] = '  ' . $definition->description();
 
-        // Show the tunable options only for rules that have them; a rule with no knobs skips this block.
+
         if ($definition->defaultOptions !== []) {
             $lines[]  = '';
             $lines[]  = 'Default options:';
             $keyWidth = max(array_map('strlen', array_keys($definition->defaultOptions)));
-            // One aligned row per option: its key, the default value, and any help text the rule supplies.
+
             foreach ($definition->defaultOptions as $key => $defaultValue) {
                 $valueRender = $this->formatOptionValue($defaultValue);
                 $description = $definition->optionDescriptions[$key] ?? '';
@@ -335,12 +323,12 @@ final class ListRulesCommand extends Command
         }
 
         $hatches = $this->escapeHatchesFor($definition);
-        // List the `.gruff-php.yaml` paths that switch this rule off or retune it; every rule carries at least the enable/exclude-from-score hatches, so this block always renders.
+        // Every rule has enable and score-exclusion entries, so configuration guidance is always available.
         if ($hatches !== []) {
             $lines[]   = '';
             $lines[]   = 'Escape hatches:';
             $pathWidth = max(array_map(static fn(array $escapeHatch): int => strlen($escapeHatch['path']), $hatches));
-            // One aligned row per config path, so a user can copy the exact key to change in their config.
+            // Align each control label with its description so users can scan the available configuration changes.
             foreach ($hatches as $hatch) {
                 $lines[] = sprintf(
                     '  %-' . $pathWidth . 's  %s',
@@ -350,36 +338,34 @@ final class ListRulesCommand extends Command
             }
         }
 
-        // Only rules with documented false positives get this section; it warns where the check can misfire.
+
         if ($definition->falsePositiveShapes !== []) {
             $lines[] = '';
             $lines[] = 'Common false-positive shapes:';
-            // Pair each misfire shape with its mitigation so the user knows how to quiet a false alarm.
+
             foreach ($definition->falsePositiveShapes as $entry) {
                 $lines[] = '  - ' . $entry['shape'];
                 $lines[] = '    Mitigation: ' . $entry['mitigation'];
             }
         }
 
-        // Join the accumulated lines and add a trailing newline so the block ends cleanly when written raw.
+
         return implode(PHP_EOL, $lines) . PHP_EOL;
     }
 
     /**
-     * Lists the `.gruff-php.yaml` config paths a user can set to retune or silence a rule - the
+     * Lists the .gruff-php.yaml controls a user can set to retune or silence a rule - the
      * per-option keys first, then the always-present enable and exclude-from-score switches, and a
      * threshold/severity pair for the rules that support one.
      *
-     * @param RuleDefinition $definition - Rule whose option keys, severity threshold, and id seed the config paths.
+     * @param RuleDefinition $definition - Rule whose option keys, severity threshold, and id seed the displayed controls.
      *
-     * @return list<array{path: string, description: string}> - settable `.gruff-php.yaml` config paths with help text: per-option paths first,
-     *                          then the enable and exclude-from-score switches every rule gets, and a threshold/severity path for tunable rules. Never empty.
+     * @return list<array{path: string, description: string}> - Ordered control labels; always includes enable and score controls.
      */
     private function escapeHatchesFor(RuleDefinition $definition): array
     {
         $hatches = [];
 
-        // One hatch per tunable option, pointing at the exact `rules.<id>.options.<key>` path to set.
         foreach (array_keys($definition->defaultOptions) as $optionKey) {
             $description = $definition->optionDescriptions[$optionKey] ?? 'See `Default options` above.';
             $hatches[]   = [
@@ -397,7 +383,6 @@ final class ListRulesCommand extends Command
             'description' => 'Set to true to keep findings visible without penalising the composite score (ADR-016).',
         ];
 
-        // Add the threshold/severity hatch only for rules that actually have a tunable threshold.
         if ($definition->severityThreshold !== null || $definition->defaultThresholds !== []) {
             $hatches[] = [
                 'path'        => sprintf('rules.%s.threshold + severity', $definition->id),
@@ -405,7 +390,7 @@ final class ListRulesCommand extends Command
             ];
         }
 
-        // Order matters: per-option paths first, then the always-present enable/score/threshold hatches listed last.
+        // Keep option-specific controls first so the detail view presents them before shared enable and score controls.
         return $hatches;
     }
 
@@ -442,16 +427,13 @@ final class ListRulesCommand extends Command
     }
 
     /**
-     * Flattens one rule into the single row the catalogue shows - the shared shape behind both the
-     * Markdown table and the `--format json` list, so a rule reads the same either way.
+     * Builds the metadata row used by the catalogue's table and JSON renderers.
+     * JSON retains additional fields that the table does not display.
      *
      * @param RuleDefinition $definition - Rule whose metadata, thresholds, and options populate the catalogue row.
-     * @param bool           $enabled - Effective project enabled state; emitted as the `defaultEnabled` field.
+     * @param bool $enabled - Registry-default enabled state, emitted as `defaultEnabled`.
      *
-     * @return array - one catalogue row of rule metadata for table or JSON output; empty option maps
-     *                   are stdClass so they encode as `{}` rather than `[]`, `thresholds` is present
-     *                   only for a tunable rule, and `falsePositiveShapes` only for rules that
-     *                   catalogue guidance
+     * @return array - Catalogue metadata with optional thresholds and non-empty guidance; empty options encode as an object.
      *
      * @phpstan-return array{
      *     id: string,
@@ -487,8 +469,8 @@ final class ListRulesCommand extends Command
             $ruleMetadata['thresholds'] = $thresholds;
         }
 
-        // Catalogued guidance rides along only where a rule has some; an absent key means none is
-        // catalogued, which reads differently from a rule that documents an empty list.
+
+
         if ($definition->falsePositiveShapes !== []) {
             $ruleMetadata['falsePositiveShapes'] = $definition->falsePositiveShapes;
         }
@@ -497,13 +479,8 @@ final class ListRulesCommand extends Command
     }
 
     /**
-     * Projects a rule's default thresholds into the family listing shape: a named knob map, or
-     * nothing at all for a rule with no tunable threshold.
-     *
-     * A single-threshold rubric (ADR-008's `threshold`/`severity` pair) publishes its number under
-     * the knob name gruff-go already uses for the same rule id, or under `threshold` when no port
-     * names that knob. The pair's severity is not repeated here: it always equals the rule's
-     * `defaultSeverity`, which the row publishes once. Named-knob rules publish their map as is.
+     * Projects default thresholds into the family listing's named numeric map.
+     * Single thresholds use the mapped knob or `threshold`; named maps are unchanged and severities are omitted.
      *
      * @param RuleDefinition $definition - Rule whose severity threshold or named defaults are projected.
      *

@@ -7,18 +7,17 @@ namespace GruffPhp\Tests\Console;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers the built-in test-path skip as a user meets it when scanning a project with sample keys under `tests/` or `examples/`.
- *
- * - Sensitive-data findings in test, fixture and example files are dropped, while production files keep reporting.
- * - Every drop is counted in a `source: "built-in"` audit row, because FAMILY-CONTRACT.md section 13a lets no surface filter in silence.
+ * Exercises built-in skips for sensitive-data and security findings on test, fixture and example paths.
+ * Checks production findings and built-in audit rows required by FAMILY-CONTRACT.md section 13a.
+ * Also checks the example-file suppression count on analyse and summary text output.
  */
 final class BuiltInTestPathSkipCliTest extends CliTestCase
 {
     /**
-     * Verifies a key in test, fixture and example files is skipped and counted per file and rule.
-     * Production files still report, including `src/latest.php`, whose name merely contains `test`.
+     * Checks which fixture paths retain the sample-key finding and which receive built-in audit rows.
+     * The rows must identify the skipped paths and rule in the expected index order.
      *
-     * @return void
+     * @return void - Asserts the two production paths and three indexed built-in rows for the sample-key rule.
      */
     public function testTheTestPathClassSkipsSensitiveFindingsAndCountsThem(): void
     {
@@ -26,7 +25,7 @@ final class BuiltInTestPathSkipCliTest extends CliTestCase
 
         try {
             $report   = $this->decodeJsonOutput($this->scan($project, 'json'));
-            // Only the two production files may still report the key.
+
             $keyFiles = array_values(array_filter(
                 ['Tests/Fixtures/keys.json', 'examples/demo.json', 'src/LoginTest.php', 'src/config.json', 'src/latest.php'],
                 fn(string $filePath): bool => in_array('sensitive-data.aws-access-key', $this->rulesFor($report, $filePath), true),
@@ -46,10 +45,10 @@ final class BuiltInTestPathSkipCliTest extends CliTestCase
     }
 
     /**
-     * Verifies a deliberate shell call in test and example files is skipped and counted with the security reason.
-     * The same call in production code still reports, which is the control that proves the rules still run.
+     * Checks that security findings remain in production code and are absent from the test and example paths.
+     * Present security audit rows must name a skipped path and carry the security suppression reason.
      *
-     * @return void
+     * @return void - Asserts rule presence, empty skipped-path results, and nonempty audit rows with the expected reason and paths.
      */
     public function testTheTestPathClassSkipsSecurityFindingsAndCountsThem(): void
     {
@@ -68,11 +67,11 @@ final class BuiltInTestPathSkipCliTest extends CliTestCase
                 static fn(string $rule): bool => str_starts_with($rule, 'security.'),
             ));
 
-            // The call reports once, under the narrower process-command rule (FAMILY-CONTRACT.md section 13c).
+            // This checks the section 13c rule's presence; it does not assert that the call produces only one finding.
             self::assertContains('security.process-command-construction', $this->rulesFor($report, 'src/Runner.php'));
             self::assertSame([], $securityRulesFor('tests/RunnerTest.php'));
             self::assertSame([], $securityRulesFor('examples/run_demo.php'));
-            // Every skipped security finding is counted in a built-in row that carries the security reason.
+
             $securityRows = array_values(array_filter(
                 $this->builtInRows($report),
                 static fn(array $auditRow): bool => is_string($auditRow['rule'] ?? null) && str_starts_with($auditRow['rule'], 'security.'),
@@ -90,9 +89,9 @@ final class BuiltInTestPathSkipCliTest extends CliTestCase
 
     /**
      * Verifies both text surfaces print the skip's count, so a terminal reader sees what the built-in class hid.
-     * Example: `analyse` on a project with a sample key in `examples/demo.json` prints a `builtInTestPath[examples/demo.json]` line.
+     * Example: analyse on a project with a sample key in examples/demo.json prints a builtInTestPath[examples/demo.json] line.
      *
-     * @return void
+     * @return void - Asserts the example-file suppression line includes count 1 in both text outputs.
      */
     public function testTheSkipIsCountedOnAnalyseAndSummaryText(): void
     {
@@ -110,7 +109,7 @@ final class BuiltInTestPathSkipCliTest extends CliTestCase
     /**
      * Writes a temporary project holding one AWS-shaped key in three test-path files and two production files.
      *
-     * @return string - root of the new project, outside the repository so an interrupted run leaves no key in the working tree
+     * @return string - Root of the new project under the system temporary directory.
      */
     private function createTestPathProject(): string
     {
@@ -131,17 +130,17 @@ final class BuiltInTestPathSkipCliTest extends CliTestCase
     /**
      * Writes each file of a temporary project, creating its directories first.
      *
-     * @param string                $project - Root of the temporary project; created when absent.
+     * @param string                $project - Root used to resolve the supplied project-relative file paths.
      * @param array<string, string> $contentsByPath - File contents keyed by project-relative path.
      *
-     * @return void
+     * @return void - Asserts successful directory creation and file writes for the supplied paths.
      */
     private function writeProjectFiles(string $project, array $contentsByPath): void
     {
-        // A nested path such as `Tests/Fixtures/keys.json` needs its directories before the file can be written.
+
         foreach ($contentsByPath as $relativePath => $contents) {
             $directory = dirname($project . '/' . $relativePath);
-            // Each directory is created once, whatever order the files arrive in.
+
             if (!is_dir($directory)) {
                 self::assertTrue(mkdir($directory, 0777, true), $directory);
             }
@@ -151,16 +150,16 @@ final class BuiltInTestPathSkipCliTest extends CliTestCase
     }
 
     /**
-     * Runs `analyse` over the prepared project in one output format, as a user would from the project root.
+     * Runs analyse over the prepared project in one output format, as a user would from the project root.
      *
      * @param string $project - Project root to scan.
-     * @param string $format  - Output format requested from the CLI, `json` or `text`.
+     * @param string $format  - CLI output format: json or text.
      *
      * @return Process - the finished process, whose stdout carries the report.
      */
     private function scan(string $project, string $format): Process
     {
-        // Temp roots sit under an ignored directory, so ask for them explicitly.
+        // Include ordinarily ignored paths so the assertions isolate built-in test-path suppression.
         $process = new Process([
             PHP_BINARY,
             self::PROJECT_ROOT . '/bin/gruff-php',
@@ -181,7 +180,7 @@ final class BuiltInTestPathSkipCliTest extends CliTestCase
     }
 
     /**
-     * Runs `summary` over the prepared project, the other text surface that prints the skip's count.
+     * Runs the summary command over the prepared project, the other text surface that prints the skip count.
      *
      * @param string $project - Project root to scan.
      *
@@ -193,7 +192,7 @@ final class BuiltInTestPathSkipCliTest extends CliTestCase
             PHP_BINARY,
             self::PROJECT_ROOT . '/bin/gruff-php',
             'summary',
-            // `summary` has no --no-cache: it never reads or writes the result cache.
+            // The summary command has no --no-cache option because it does not use the result cache.
             '--no-config',
             '--include-ignored',
         ], $project);
@@ -204,11 +203,11 @@ final class BuiltInTestPathSkipCliTest extends CliTestCase
     }
 
     /**
-     * Lists the audit rows the built-in skip produced, which are the ones naming a source.
+     * Selects suppression audit rows whose source is exactly built-in.
      *
-     * @param array<string, mixed> $report - Decoded machine report.
+     * @param array<string, mixed> $report - Decoded machine report; missing or null suppressions are treated as empty.
      *
-     * @return list<array<array-key, mixed>> - one row per file and rule the skip hid; empty when no test file had a sensitive finding
+     * @return list<array<array-key, mixed>> - Rows with source built-in, preserving report order; empty when none match.
      */
     private function builtInRows(array $report): array
     {
@@ -216,7 +215,7 @@ final class BuiltInTestPathSkipCliTest extends CliTestCase
         self::assertIsArray($suppressions, 'the report publishes a suppressions array');
         $rows = [];
 
-        // A row that is not an object means the report shape broke, so the test fails here rather than on a confusing diff.
+        // Suppression rows from every source must be arrays, including rows excluded from the result.
         foreach ($suppressions as $auditRow) {
             self::assertIsArray($auditRow, 'each suppression is an audit row');
             $rows[] = $auditRow;
@@ -231,7 +230,7 @@ final class BuiltInTestPathSkipCliTest extends CliTestCase
      * @param array<string, mixed> $report   - Decoded machine report.
      * @param string               $filePath - Project-relative path to filter on.
      *
-     * @return list<string> - one rule id per finding reported for that file; empty when the file reported nothing
+     * @return list<string> - Matching IDs in order, including duplicates; absent/null IDs become empty strings; no matches return [].
      */
     private function rulesFor(array $report, string $filePath): array
     {
@@ -243,7 +242,7 @@ final class BuiltInTestPathSkipCliTest extends CliTestCase
             self::assertIsArray($finding, 'each finding is a row');
             $ruleId = $finding['ruleId'] ?? '';
             self::assertIsString($ruleId, 'each finding names its rule');
-            // Findings in other files become null here and are dropped below, so only the asked-for file's rules remain.
+
             $rules[] = ($finding['file'] ?? null) === $filePath ? $ruleId : null;
         }
 

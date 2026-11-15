@@ -5,12 +5,9 @@ declare(strict_types=1);
 namespace GruffPhp\Engine\Source;
 
 /**
- * One file picked up for analysis, tagged with how gruff should read it - as parsed PHP or as plain text.
- *
- * Discovery produces one of these per in-scope file. The type decides the path each file takes: PHP
- * files go through the AST parser so structural rules can inspect them, while other files (config, YAML,
- * lock files) are scanned as text by the rules that opt into text. The display path is what any finding
- * on the file shows the user.
+ * Describes a source file's filesystem path, display path, and parser selection.
+ * PHP selects AST parsing; other types retain source text without AST or token processing.
+ * Discovery uses root-relative display paths where possible and canonical absolute paths otherwise.
  */
 final readonly class SourceFile
 {
@@ -28,7 +25,7 @@ final readonly class SourceFile
      * Captures a discovered file and the type that decides how gruff reads it.
      *
      * @param string $absolutePath - Absolute filesystem path to the file.
-     * @param string $displayPath - Project-relative path shown to the user in findings.
+     * @param string $displayPath - Path shown in findings, which may be root-relative or absolute.
      * @param string $type - Source type that selects PHP parsing or plain-text scanning; defaults to PHP.
      */
     public function __construct(
@@ -45,7 +42,7 @@ final readonly class SourceFile
      */
     public function isPhp(): bool
     {
-        // PHP-typed files take the AST parser path; every other type is scanned as plain text instead.
+
         return $this->type === self::TYPE_PHP;
     }
 }

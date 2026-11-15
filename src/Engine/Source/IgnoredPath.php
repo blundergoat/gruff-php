@@ -5,12 +5,9 @@ declare(strict_types=1);
 namespace GruffPhp\Engine\Source;
 
 /**
- * One skipped path paired with why it was skipped - the report-facing record of an exclusion.
- *
- * Where `IgnoreDecision` answers the yes/no question mid-walk, this is the durable detail kept for the
- * files gruff actually excluded: the display path, the reason category, and the pattern that matched.
- * The summary and reports list these, so a user can see exactly what was left out of the scan and on
- * whose authority - their config, a built-in default, or a .gitignore rule.
+ * Records an excluded path with its reason category and matching pattern for reports.
+ * `IgnoreDecision` supplies exclusion details; this record associates them with the display path.
+ * A null pattern means no concrete match string was recorded.
  */
 final readonly class IgnoredPath
 {
@@ -19,7 +16,7 @@ final readonly class IgnoredPath
      *
      * @param string      $path - Project-relative display path that was ignored.
      * @param string      $source - Reason category: config, default, generated, or gitignore.
-     * @param string|null $pattern - The glob, directory token, filename, or git rule that matched; null when the exclusion had no concrete match string.
+     * @param string|null $pattern - Matched glob, directory token, filename, or Git rule; null when no concrete match string was recorded.
      */
     public function __construct(
         public string  $path,
@@ -29,24 +26,23 @@ final readonly class IgnoredPath
     }
 
     /**
-     * Builds an ignored-path detail from a path and the engine decision that excluded it, defaulting a
-     * source-less decision to a config exclusion.
+     * Builds an ignored-path detail from a path and the engine decision that excluded it, defaulting a source-less decision to a config exclusion.
      *
      * @param string         $path - Display path that was ignored.
      * @param IgnoreDecision $decision - Engine decision carrying the source and pattern behind the exclusion.
      *
-     * @return self - Immutable detail pairing the display path with the resolved source and matching pattern.
+     * @return self - Detail pairing the display path with the resolved source and matching pattern.
      */
     public static function from(string $path, IgnoreDecision $decision): self
     {
-        // A decision with no recorded source is treated as a config exclusion, the default ignore origin.
+
         return new self($path, $decision->source ?? PathIgnoreResolver::SOURCE_CONFIG, $decision->pattern);
     }
 
     /**
      * Flattens the ignored-path detail into the report row shape, so the skipped-file list serialises cleanly.
      *
-     * @return array{path: string, source: string, pattern: string|null} - report row; pattern is null when the exclusion had no concrete match string.
+     * @return array{path: string, source: string, pattern: string|null} - Report row; a null pattern means no concrete match string.
      */
     public function toArray(): array
     {

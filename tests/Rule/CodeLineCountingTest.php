@@ -14,22 +14,22 @@ use GruffPhp\Rules\Waste\UnreachableCodeRule;
 use GruffPhp\Tests\Rule\Docs\DocsRuleTestCase;
 
 /**
- * Pins FAMILY-CONTRACT section 12 (search `Code lines in every line count`) for the rules precision-floor M12
- * moved to code lines: comment, attribute and blank lines never push a unit over a limit, and a unit one code
- * line over the limit still reports.
+ * Pins FAMILY-CONTRACT section 12, under "Code lines in every line count", with rule-level fixtures.
+ * Covers length thresholds with attributes, comments and blank lines in the source.
+ * Contrasts a comment after return with an unreachable statement after return.
  */
 final class CodeLineCountingTest extends DocsRuleTestCase
 {
     /** Class-length warning bar used by the attribute-line control. */
     private const CLASS_WARNING_LINES = 12;
 
-    /** test-longer-than-sut's default minTestLines: a test this long in code lines reports. */
+    /** Default minTestLines boundary for the fixture with one SUT call and an assertion. */
     private const MIN_SUT_TEST_LINES = 12;
 
     /**
      * Verify attribute lines do not count toward a class's length, while code lines still do.
      *
-     * @return void
+     * @return void - Asserts no finding for two methods and one finding reporting 15 lines for three.
      */
     public function testClassLengthLeavesAttributeLinesOut(): void
     {
@@ -49,7 +49,7 @@ final class CodeLineCountingTest extends DocsRuleTestCase
     /**
      * Verify setup-bloat weighs setUp() and the tests by code lines, and still reports a setUp() long in code.
      *
-     * @return void
+     * @return void - Asserts no setup-bloat finding for four setup statements and one for five.
      */
     public function testSetupBloatComparesCodeLines(): void
     {
@@ -60,7 +60,7 @@ final class CodeLineCountingTest extends DocsRuleTestCase
     /**
      * Verify test-longer-than-sut measures a test in code lines, and still reports a test long in code.
      *
-     * @return void
+     * @return void - Asserts no finding for six assignments and one finding with testLines metadata of 12 for seven.
      */
     public function testTestLongerThanSutComparesCodeLines(): void
     {
@@ -78,7 +78,7 @@ final class CodeLineCountingTest extends DocsRuleTestCase
     /**
      * Verify a comment after a terminator is not unreachable code, while a statement after a return still is.
      *
-     * @return void
+     * @return void - Asserts one finding at the statement after return, with none for the trailing comment.
      */
     public function testUnreachableCodeIgnoresACommentAfterATerminator(): void
     {
@@ -102,11 +102,11 @@ PHP, UnreachableCodeRule::ID);
     }
 
     /**
-     * Build a class whose methods each carry four attribute lines: `3 + 4 * methods` code lines.
+     * Build a class whose methods each carry four attribute lines and contribute four code lines beyond the class shell.
      *
      * @param int $methods - Number of four-code-line methods in the class.
      *
-     * @return string - PHP source for one class.
+     * @return string - PHP source for a class with the requested number of attributed methods.
      */
     private function attributedClass(int $methods): string
     {
@@ -120,7 +120,7 @@ PHP, UnreachableCodeRule::ID);
     }
 
     /**
-     * Build a test class whose setUp() has `statements + 3` code lines among comment and blank lines, beside one
+     * Build a test class whose setUp() has statements + 3 code lines among comment and blank lines, beside one
      * four-code-line test.
      *
      * @param int $statements - Statements in setUp().
@@ -139,7 +139,7 @@ PHP, UnreachableCodeRule::ID);
     }
 
     /**
-     * Build a test whose body is `literals + 5` code lines: literal assignments, one SUT call and one assertion,
+     * Build a test method with literals + 5 code lines: literal assignments, one SUT call and one assertion,
      * with a comment line above each assignment.
      *
      * @param int $literals - Literal assignments before the SUT call.

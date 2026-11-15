@@ -27,15 +27,10 @@ use Closure;
 use GruffPhp\Engine\Source\SourceDiscoveryResult;
 
 /**
- * Runs the discover-parse-analyse work behind `gruff-php analyse`, turning the paths the
- * user asked to scan into the findings the command then reports.
+ * Discovers and analyses sources for `gruff-php analyse`, returning findings and run metadata.
+ * Releases parsed units as it goes when the enabled rules and requested scope support streaming.
  *
- * Two pipelines live here and the run auto-selects between them, so the user never has to
- * choose:
- *  - `runStreaming()` parses, analyses, then releases one file at a time, keeping peak memory
- *    near a single file so large repositories scan without running out of memory.
- *  - `runLegacy()` loads everything up front - the mode `--diff-vs` reviews and changed-region
- *    runs need, because they weigh the changed set against a full base snapshot at once.
+ * Uses batch analysis for reviews, changed regions, narrow project-rule scopes, or rules that need all units.
  */
 final class AnalysisPipeline
 {
@@ -48,11 +43,11 @@ final class AnalysisPipeline
     private readonly Closure $projectContextUnitsResolver;
 
     /**
-     * Holds the rule registry every run executes and the resolver that gathers whole-project
-     * context for the legacy diff and review path.
+     * Stores the rule registry and the project-context resolver used by the legacy pipeline.
      *
-     * @param RuleRegistry                                                                                                             $registry - Registry used to execute enabled rules.
-     * @param Closure(string, AnalyseCommandOptions, AnalysisConfig, RuleRegistry, ?DiffResult, AnalysisSourceSet): list<AnalysisUnit> $closure  - Resolves full project context units for legacy review analysis.
+     * @param RuleRegistry $registry - Registry used to execute enabled rules.
+     * @param Closure(string, AnalyseCommandOptions, AnalysisConfig, RuleRegistry, ?DiffResult, AnalysisSourceSet): list<AnalysisUnit> $closure
+     *     - Resolves project-context units for legacy analysis.
      */
     public function __construct(
         private readonly RuleRegistry $registry,
@@ -62,15 +57,15 @@ final class AnalysisPipeline
     }
 
     /**
-     * Entry point `AnalyseCommand` calls once per `gruff-php analyse`: it routes the request to the
+     * Entry point AnalyseCommand calls once per gruff-php analyse: it routes the request to the
      * streaming or legacy pipeline and hands back the findings and timings the run then reports.
      *
      * @param string                  $projectRoot        - Project root used for discovery and parsing.
      * @param AnalyseCommandOptions   $options            - Effective CLI analysis options.
      * @param AnalysisConfig          $config             - Effective rule and path configuration.
-     * @param RuleContext             $ruleContext        - Rule execution context.
-     * @param DiffResult|null         $reviewDiff         - Branch-review diff metadata; a plain scan passes a non-null inactive diff, and this is null only when a `--diff-vs` review was requested but its Git lookup failed.
-     * @param list<string>|null       $analysisPaths      - Paths to analyse; null when a changed-only or diff run resolved to no files in scope, which returns an empty result.
+     * @param RuleContext             $ruleContext        - Context passed to each enabled rule.
+     * @param DiffResult|null $reviewDiff - Inactive for plain scans; null after a failed review diff lookup.
+     * @param list<string>|null $analysisPaths - Paths to analyse; null skips discovery and rule execution.
      * @param int                     $discoverStart      - Monotonic start timestamp for discovery timing.
      * @param RuleRunnerObserver|null $ruleRunnerObserver - Per-rule timing observer; null when this run isn't collecting timings.
      *
@@ -82,10 +77,7 @@ final class AnalysisPipeline
      *     projectContextUnits: list<AnalysisUnit>,
      *     suppressions: list<SensitiveExclusionSummary>,
      *     suppressedFindings: list<array{finding: Finding, justification: string}>
-     * } - analysis result for the run: discovered sources, findings left after the configured sensitive
-     *     exclusions, the test-path skip and section 13c's filter ran, discover/parse and analyse timings in
-     *     nanoseconds, the resolved project-context units (empty under the streaming path), one audit row per
-     *     configured exclusion and per skipped or suppressed file and rule, and the findings section 13c removed
+     * } - Sources, filtered findings, discovery/parse and analysis timings, context units, and suppression details.
      */
     public function runAnalysis(
         string                $projectRoot,
@@ -108,8 +100,8 @@ final class AnalysisPipeline
             ruleRunnerObserver: $ruleRunnerObserver,
         );
 
-        // Reviewed exclusions, the test-path skip and section 13c apply before scoring, the exit gate or reporting.
-        // Every configured entry and every removal publishes a count so nothing is hidden silently.
+        // Apply configured, test-path, and inline suppressions before scoring and reporting.
+
         $exclusionResult = (new SensitiveExclusionFilter())->apply(
             $analysisRun['findings'],
             $config->sensitiveExclusions(),
@@ -134,9 +126,9 @@ final class AnalysisPipeline
      * @param string                  $projectRoot        - Project root used for discovery and parsing.
      * @param AnalyseCommandOptions   $options            - Effective CLI analysis options.
      * @param AnalysisConfig          $config             - Effective rule and path configuration.
-     * @param RuleContext             $ruleContext        - Rule execution context.
-     * @param DiffResult|null         $reviewDiff         - Branch-review diff metadata; a plain scan passes a non-null inactive diff, and this is null only when a `--diff-vs` review was requested but its Git lookup failed.
-     * @param list<string>|null       $analysisPaths      - Paths to analyse; null when a changed-only or diff run resolved to no files in scope, which returns an empty result.
+     * @param RuleContext             $ruleContext        - Context passed to each enabled rule.
+     * @param DiffResult|null $reviewDiff - Inactive for plain scans; null after a failed review diff lookup.
+     * @param list<string>|null $analysisPaths - Paths to analyse; null skips discovery and rule execution.
      * @param int                     $discoverStart      - Monotonic start timestamp for discovery timing.
      * @param RuleRunnerObserver|null $ruleRunnerObserver - Per-rule timing observer; null when this run isn't collecting timings.
      *
@@ -146,8 +138,7 @@ final class AnalysisPipeline
      *     discoverParseNs: int,
      *     analyseNs: int,
      *     projectContextUnits: list<AnalysisUnit>
-     * } - raw pipeline result: discovered sources, findings as the rules produced them, discover/parse and
-     *     analyse timings in nanoseconds, and the resolved project-context units
+     * } - Sources, raw findings, discovery/parse and analysis timings, and resolved project-context units.
      */
     private function runPipeline(
         string                $projectRoot,
@@ -159,9 +150,9 @@ final class AnalysisPipeline
         int                   $discoverStart,
         ?RuleRunnerObserver   $ruleRunnerObserver,
     ): array {
-        // A changed-only or diff run resolved to no files in scope (nothing changed to review), so there are
-        // no paths to scan; return an empty result that still carries the discovery timing measured so far
-        // rather than crashing.
+        // No files are in scope; retain elapsed discovery time so the empty run still has timing metadata.
+
+
         if ($analysisPaths === null) {
             return [
                 'sources' => new AnalysisSourceSet(new SourceDiscoveryResult([], [], []), [], []),
@@ -172,8 +163,8 @@ final class AnalysisPipeline
             ];
         }
 
-        // Nothing about this run needs a second copy of the tree in memory, so take the low-peak-memory
-        // streaming path that frees each file right after it is analysed.
+
+
         if ($this->canStream($projectRoot, $options, $reviewDiff, $ruleContext)) {
             return $this->runStreaming(
                 projectRoot:        $projectRoot,
@@ -186,8 +177,8 @@ final class AnalysisPipeline
             );
         }
 
-        // A `--diff-vs` review or a changed-region run needs every unit and the base snapshot resident at
-        // once, so fall back to the legacy load-all path.
+        // Scope or rule requirements prevent streaming, so analyse the loaded units together.
+
         return $this->runLegacy(
             projectRoot:        $projectRoot,
             options:            $options,
@@ -201,16 +192,14 @@ final class AnalysisPipeline
     }
 
     /**
-     * Decides, with no input from the user, whether this run can take the memory-light streaming path or
-     * must fall back to loading every file at once.
+     * Reports whether this scope and its enabled rules support releasing units after analysis.
      *
      * @param string                $projectRoot - Project root requested paths resolve against.
      * @param AnalyseCommandOptions $options     - CLI options; changed-region and diff modes force the legacy path.
-     * @param DiffResult|null       $reviewDiff  - Branch-review diff metadata; a plain scan passes a non-null inactive diff (null only when a `--diff-vs` review's Git lookup failed), and an active review keeps the base snapshot so streaming is refused.
+     * @param DiffResult|null $reviewDiff - Inactive for plain scans; null after a failed review diff lookup.
      * @param RuleContext           $ruleContext - Context whose enabled rules must all tolerate per-unit release.
      *
-     * @return bool - true when every unit can be released immediately after analysis (streaming is safe), false when a review/diff or changed-region
-     *              mode forces the legacy load-all path
+     * @return bool - True when review, scope, and enabled-rule constraints permit streaming.
      */
     private function canStream(
         string                $projectRoot,
@@ -218,14 +207,14 @@ final class AnalysisPipeline
         ?DiffResult           $reviewDiff,
         RuleContext           $ruleContext,
     ): bool {
-        // An explicit project-root request ('.', './', or the root path itself) still covers the whole
-        // tree, so it can stream like a bare invocation; only a genuinely narrower path needs the legacy
-        // load-all flow that pulls whole-tree project context separately from the requested files.
+        // Narrow path scopes need wider context when project rules are enabled, so those runs cannot stream.
+
+
         $requestedPaths              = (new AnalysisFindingSupport())->normaliseRequestedPaths($projectRoot, $options->paths);
         $hasNarrowProjectRuleContext = $requestedPaths !== [] && $requestedPaths !== ['.']
             && $this->registry->hasEnabledProjectRules($ruleContext->config);
 
-        // Stream only when nothing needs the whole tree at once: no active review/diff, no changed-region mode, no narrow project-rule context, and every enabled rule tolerates per-unit release.
+
         return ($reviewDiff === null || !$reviewDiff->active)
                && !$options->hasChangedRegionMode()
                && !$hasNarrowProjectRuleContext
@@ -234,12 +223,9 @@ final class AnalysisPipeline
     }
 
     /**
-     * Reports whether one successfully parsed file belongs in the ratified scoring denominator.
+     * Counts PHP inputs in the scoring denominator, excluding text-only inputs scanned by raw-text rules.
      *
-     * Only PHP files carry code to score. A README is scanned by the raw-text rules and counted as
-     * parsed, but including it would divide real findings by files no PHP rule ever evaluated.
-     *
-     * @param SourceFile $file - File that parsed without error.
+     * @param SourceFile $file - File accepted without fatal parse diagnostics.
      *
      * @return int - 1 when the file enters the scoring denominator, 0 otherwise.
      */
@@ -249,12 +235,11 @@ final class AnalysisPipeline
     }
 
     /**
-     * Streaming pipeline: parse a file, analyse it, then free its AST before the next one, so a large
-     * repository scans with peak memory near a single file instead of the whole tree at once.
+     * Analyses and releases each parsed unit before loading the next, retaining findings and rule accumulator state.
      *
      * @param string                  $projectRoot        - Root for discovery, parsing, and the per-project result cache.
      * @param AnalyseCommandOptions   $options            - CLI options; gate the cache and whether ignored files load.
-     * @param AnalysisConfig          $config             - Ignore patterns plus the inputs to the cache fingerprint.
+     * @param AnalysisConfig $config - Ignore patterns, deep-scan budget, and cache fingerprint inputs.
      * @param RuleContext             $ruleContext        - Context the per-unit and accumulator rule passes run against.
      * @param list<string>            $analysisPaths      - Project-relative paths to discover under; never null here.
      * @param int                     $discoverStart      - Monotonic hrtime start for the discover-and-parse span.
@@ -266,8 +251,7 @@ final class AnalysisPipeline
      *     discoverParseNs: int,
      *     analyseNs: int,
      *     projectContextUnits: list<AnalysisUnit>
-     * } - streaming-path result: discovered sources, finalised findings, discover/parse and analyse timings
-     *     in nanoseconds, and an always-empty projectContextUnits since streaming retains no parsed units
+     * } - Discovered sources, final findings, nanosecond timings, and empty projectContextUnits because units are released.
      */
     private function runStreaming(
         string                $projectRoot,
@@ -289,13 +273,13 @@ final class AnalysisPipeline
         $discoveryResult   = $discovery['discovery'];
         $phpFileParser     = new PhpFileParser();
 
-        // The per-file result cache is only byte-identical-correct when no rule
-        // needs cross-file state: project rules (accumulators included) observe
-        // every unit during analysis, so reusing a cached file's findings without
-        // re-running them would corrupt the project-rule output. A run whose
-        // discovered working set exceeds the cache's entry cap is also ineligible:
-        // its entries would be evicted before any warm run could reuse them, so
-        // over-cap repos silently run uncached instead of thrashing the store.
+        // Cached findings cannot replay the cross-file state collected by project rules, so those runs bypass the cache.
+        // Runs larger than the entry cap bypass caching because the store cannot retain every file's result.
+
+
+
+
+
         $cacheable = !$options->noCache
             && !$this->registry->hasEnabledProjectRules($config)
             && ResultCache::canHoldRun(count($discoveryResult->files));
@@ -308,43 +292,43 @@ final class AnalysisPipeline
         $evaluatedCount = 0;
         $analyseStart   = hrtime(true);
 
-        // Walk the discovered files one at a time; this loop is where each file the user asked to scan is
-        // parsed, checked, and then dropped so memory never holds more than the file in hand.
+
+
         foreach ($discoveryResult->files as $file) {
-            // With the cache live and the file readable, try to reuse a previous run's findings for it instead
-            // of parsing again - this is what makes a warm re-scan of unchanged code feel instant.
+
+
             $cached = self::lookUpCachedFile($file, $cache, $fingerprint, $config);
 
-            // A stored entry means this exact file content was scanned before, so replay its findings,
-            // count it as parsed, and skip straight to the next file without re-running any rule.
+
+
             if ($cached['findings'] !== null) {
                 array_push($findings, ...$cached['findings']);
                 if ($cached['budgetDiagnostic'] !== null) {
                     $sourceDiagnostics[] = self::runDiagnosticFor($cached['budgetDiagnostic'], $file);
                 }
                 $parsedCount++;
-                // A cached hit was evaluated exactly as a fresh parse would have been.
+
                 $evaluatedCount += self::evaluatedIncrement($file);
                 continue;
             }
 
             $unit = $phpFileParser->parse($file, $config->deepScanBudget());
-            // Count the file toward the parsed tally only when it actually compiled; a file with parse errors
-            // still has its problems reported but is not counted as successfully scanned.
+            // Nonfatal budget limits still count toward coverage even when deep parsing is skipped.
+
             if (!$unit->hasParseErrors()) {
                 $parsedCount++;
                 $evaluatedCount += self::evaluatedIncrement($file);
             }
-            // Turn each parser complaint into a run diagnostic so a syntactically broken file surfaces to the
-            // user as a reported parse error instead of silently vanishing from the results.
+            // Keep nonfatal budget notes as well as fatal parse errors visible in the run report.
+
             foreach ($unit->diagnostics as $diagnostic) {
                 $sourceDiagnostics[] = self::runDiagnosticFor($diagnostic, $file);
             }
 
             $unitFindings = $this->registry->analyseUnit($unit, $ruleContext, $ruleRunnerObserver);
             array_push($findings, ...$unitFindings);
-            // Store the freshly computed findings only for a clean parse, so the next run over unchanged code
-            // can reuse them; a broken file's partial results are never cached.
+            // Cache units without fatal parse errors, including bounded scans whose text-level findings can be replayed.
+
             if ($cache instanceof ResultCache && $cached['key'] !== null && !$unit->hasParseErrors()) {
                 $cache->put($cached['key'], $unitFindings);
             }
@@ -354,14 +338,14 @@ final class AnalysisPipeline
             unset($unit);
         }
 
-        // Trim the store to its cap exactly once per run; evicting per put globbed the cache directory on every write.
+        // Trim once after all writes to avoid scanning the cache directory for every stored file.
         $cache?->finalizeRun();
 
         array_push($findings, ...$this->registry->endStreaming($ruleContext, $ruleRunnerObserver));
         $findings  = $this->registry->finalizeFindings($findings);
         $analyseNs = hrtime(true) - $analyseStart;
 
-        // Streaming never retains parsed units, so report no project-context units alongside the finalised findings.
+
         return [
             'sources' => new AnalysisSourceSet($discoveryResult, [], $sourceDiagnostics, $parsedCount, $evaluatedCount),
             'findings' => $findings,
@@ -372,20 +356,16 @@ final class AnalysisPipeline
     }
 
     /**
-     * Looks one discovered file up in the per-run result cache before it is parsed.
-     *
-     * The key is returned on a miss as well as a hit, because the caller needs it again to store the findings
-     * it is about to compute. A file that cannot be read, or a run with the cache off, simply reports a miss and
-     * falls through to a normal parse.
+     * Looks up cached findings and returns the key for a later cache write when one can be computed.
+     * Disabled caching or unreadable files return no key; null findings mean a miss, while an empty list is a hit.
+     * The budget check runs whenever a key is available, including on cache misses.
      *
      * @param SourceFile               $file        - Discovered file about to be analysed.
      * @param ResultCache|null         $cache       - Live store for this run; null when the run is uncacheable.
      * @param AnalysisFingerprint|null $fingerprint - Run identity the file key is derived from; null with no cache.
      * @param AnalysisConfig           $config      - Effective config supplying the deep-scan budget.
      *
-     * @return array{key: string|null, findings: list<Finding>|null, budgetDiagnostic: ParseDiagnostic|null} - Cache
-     *     key when one could be computed, stored findings on a hit and null on a miss, and any bounded-deep-scan
-     *     note the replayed file would have reported.
+     * @return array{key: string|null, findings: list<Finding>|null, budgetDiagnostic: ParseDiagnostic|null} - State for replay or a later write.
      */
     private static function lookUpCachedFile(
         SourceFile           $file,
@@ -400,8 +380,8 @@ final class AnalysisPipeline
         }
 
         $contents = file_get_contents($file->absolutePath);
-        // Only a successful read gives us bytes to fingerprint; a file that could not be read falls
-        // through to a normal parse rather than a cache lookup.
+
+
         if (!is_string($contents)) {
             return $miss;
         }
@@ -435,14 +415,14 @@ final class AnalysisPipeline
     }
 
     /**
-     * Load-everything-then-analyse pipeline, taken when the run can't stream - a `--diff-vs` review or a
-     * changed-region scan - because it needs the changed-only set and the base snapshot resident together.
+     * Loads requested sources and any wider project context for runs that cannot stream.
+     * Analyses them together, then limits project-rule findings to the requested files.
      *
-     * @param string                  $projectRoot        - Root for discovery and parsing of the changed-only set.
+     * @param string $projectRoot - Root for discovery and parsing of the requested paths.
      * @param AnalyseCommandOptions   $options            - CLI options forwarded to discovery and the context resolver.
      * @param AnalysisConfig          $config             - Effective config supplying ignore patterns and rule selection.
      * @param RuleContext             $ruleContext        - Context the whole-project analysis pass runs against.
-     * @param DiffResult|null         $reviewDiff         - Branch-review diff driving which base units load; a changed-region scan passes a non-null inactive diff, and this is null only when a `--diff-vs` review was requested but its Git lookup failed.
+     * @param DiffResult|null $reviewDiff - Diff metadata for the context resolver; null after a failed review lookup.
      * @param list<string>            $analysisPaths      - Project-relative paths to load and parse; never null here.
      * @param int                     $discoverStart      - Monotonic hrtime start for the discover-and-parse span.
      * @param RuleRunnerObserver|null $ruleRunnerObserver - Per-rule timing sink; null when this run isn't collecting per-rule timings.
@@ -453,8 +433,7 @@ final class AnalysisPipeline
      *     discoverParseNs: int,
      *     analyseNs: int,
      *     projectContextUnits: list<AnalysisUnit>
-     * } - legacy-path result: discovered sources, finalised findings, discover/parse and analyse timings in
-     *     nanoseconds, and the resolved project-context units that diff/review flows compare to the base snapshot
+     * } - Sources, requested-file findings, discovery/parse and analysis timings, and project-context units.
      */
     private function runLegacy(
         string                $projectRoot,
@@ -498,7 +477,7 @@ final class AnalysisPipeline
         );
         $analyseNs = hrtime(true) - $analyseStart;
 
-        // Surface the resolved project-context units too so review flows can diff them against the base snapshot.
+
         return [
             'sources' => $sources,
             'findings' => $findings,

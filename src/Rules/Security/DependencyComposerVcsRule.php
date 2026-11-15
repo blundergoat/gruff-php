@@ -31,7 +31,7 @@ final class DependencyComposerVcsRule implements SourceTextRuleInterface
     /**
      * Composer repository types that pull code straight from version control.
      *
-     * @var list<string>
+     * @var list<string> - Repository type names that produce VCS findings.
      */
     private const VCS_TYPES = ['vcs', 'git', 'svn', 'hg', 'fossil', 'perforce'];
 
@@ -63,17 +63,17 @@ final class DependencyComposerVcsRule implements SourceTextRuleInterface
     }
 
     /**
-     * Reports each Composer repository that resolves dependencies from version control.
+     * Reports each Composer repository whose declared type is recognized as version control.
      *
-     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Source unit supplying the manifest path and JSON text.
+     * @param RuleContext $ruleContext - Unused; the rule interface requires it, and this rule reads no options or project root.
      *
-     * @return list<Finding> - One finding per VCS repository; empty when every repository resolves through Packagist.
+     * @return list<Finding> - One finding per recognized VCS repository; empty for other files, invalid input or no matches.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         if (!ComposerManifest::isManifest($analysisUnit->file->displayPath)) {
-            // This rule only applies to composer.json; every other file yields no findings.
+
             return [];
         }
 
@@ -84,15 +84,15 @@ final class DependencyComposerVcsRule implements SourceTextRuleInterface
         }
 
         $findings = [];
-        // Check each declared repository entry.
+
         foreach ($manifest['repositories'] as $repository) {
-            // A malformed, non-object entry cannot be a VCS repository.
+
             if (!is_array($repository)) {
                 continue;
             }
 
             $type = isset($repository['type']) && is_string($repository['type']) ? strtolower($repository['type']) : '';
-            // Only a version-control repository type is flagged.
+
             if (!in_array($type, self::VCS_TYPES, true)) {
                 continue;
             }

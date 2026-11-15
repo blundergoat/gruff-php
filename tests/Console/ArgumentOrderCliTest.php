@@ -7,21 +7,16 @@ namespace GruffPhp\Tests\Console;
 use Symfony\Component\Process\Process;
 
 /**
- * Pins the argument-order clause FAMILY-CONTRACT.md section 7 ratifies on 2026-09-06.
- *
- * Every operand-accepting command must produce the same output and the same exit code whether its flags are written
- * before or after the path. The defect the clause exists to prevent is real and was shipped: gruff-go silently
- * discarded flags placed after a path, so `analyse . --fail-on=error` ran at the default threshold and a CI gate
- * nobody had disabled stopped gating.
- *
- * Reach for this test when adding a command that takes paths, or when changing how the console parses arguments.
+ * Exercises FAMILY-CONTRACT.md section 7 for path operands and option parsing.
+ * Compares exit codes and timestamp-normalized stdout with flags before and after paths.
+ * Also checks -- before a leading-dash path and rejection of an operand passed to init.
  */
 final class ArgumentOrderCliTest extends CliTestCase
 {
     /**
-     * Verify that moving a command's flags after its path changes neither its output nor its exit code.
+     * Verify that moving flags after a command path preserves its exit code and output apart from timestamp-shaped text.
      *
-     * @return void
+     * @return void - Asserts matching exit codes and timestamp-normalised output for every operand command.
      */
     public function testOperandCommandsAcceptFlagsAfterThePath(): void
     {
@@ -47,9 +42,9 @@ final class ArgumentOrderCliTest extends CliTestCase
     }
 
     /**
-     * Verify that `--` ends flag parsing, so a leading-dash operand after it is reachable as a path.
+     * Verify that -- ends flag parsing, so a leading-dash operand after it is reachable as a path.
      *
-     * @return void
+     * @return void - Asserts exit 0 and output containing the leading-dash filename.
      */
     public function testDoubleDashEndsFlagParsing(): void
     {
@@ -65,7 +60,7 @@ final class ArgumentOrderCliTest extends CliTestCase
     /**
      * Verify that a command taking no operands rejects one rather than discarding it silently.
      *
-     * @return void
+     * @return void - Asserts usage exit code 2 for init with a stray operand.
      */
     public function testCommandWithoutOperandsRejectsAStrayOne(): void
     {
@@ -76,7 +71,7 @@ final class ArgumentOrderCliTest extends CliTestCase
     }
 
     /**
-     * Build a one-file project the ordering comparison can scan.
+     * Build a project with one PHP source file and a README for the ordering comparison.
      *
      * @return string - absolute path to the created project root
      */
@@ -90,7 +85,7 @@ final class ArgumentOrderCliTest extends CliTestCase
     }
 
     /**
-     * Every operand-accepting command, with the flags whose placement is under test.
+     * Supplies the operand-command cases and flags covered by the ordering comparison.
      *
      * @return array<string, array{0: string, 1: list<string>, 2: string}> - command, flags, and operand per case
      */
@@ -122,14 +117,15 @@ final class ArgumentOrderCliTest extends CliTestCase
     }
 
     /**
-     * Remove the one field two runs of the same command are allowed to differ on.
+     * Normalises timestamp-shaped text before comparing output from two command runs.
      *
      * @param string $output - Raw stdout from one run.
      *
-     * @return string - the same output with every generated timestamp replaced by a fixed marker
+     * @return string - Output with every matching timestamp-shaped substring replaced by a fixed marker.
      */
     private function withoutTimestamps(string $output): string
     {
+        // Ignore date-time-shaped differences, including values whose trailing Z is absent.
         return (string) preg_replace('/\d{4}-\d{2}-\d{2}T[\d:.]+Z?/', '<timestamp>', $output);
     }
 }

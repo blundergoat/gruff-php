@@ -18,15 +18,16 @@ use GruffPhp\Results\Finding\Severity;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers v3 matching as users meet it: reviewed debt that survives line movement, siblings that never inherit a review, count-aware
- * budgets, a fixed spend order, collisions that hide nothing, secrets that are never eligible, and refusal of another port's file.
+ * Covers reviewed baseline counts, line movement, and symbol and file identity changes.
+ * Exercises variable ordinals, message normalisation, sensitive findings, and diff-scoped reports.
+ * Checks foreign-port refusal and retention of findings whose symbols contain the ordinal separator.
  */
 final class BaselineFilterTest extends TestCase
 {
     /**
-     * Verify the identity reproduces the digests the family oracle pins for other ports.
+     * Verify the fixed digests for the supplied language, path, and subject combinations.
      *
-     * @return void
+     * @return void - Asserts the expected digest for each supplied vector.
      */
     public function testIdentityMatchesTheFamilyOracle(): void
     {
@@ -39,9 +40,9 @@ final class BaselineFilterTest extends TestCase
     }
 
     /**
-     * Verify a measurement never enters a symbol-less identity, so a file that grew keeps the identity the user reviewed.
+     * Verify numeric groups are normalised in messages while text without numbers stays unchanged.
      *
-     * @return void
+     * @return void - Asserts replacements for integer, decimal, grouped-number, and version examples and preserves number-free text.
      */
     public function testMeasuredValuesNeverEnterASymbolLessIdentity(): void
     {
@@ -51,9 +52,9 @@ final class BaselineFilterTest extends TestCase
     }
 
     /**
-     * Verify the ratified invariant: a baseline removes reviewed ordinary findings from score and exit, and nothing else.
+     * Verify that only the reviewed ordinary finding is removed from the retained findings in this scenario.
      *
-     * @return void
+     * @return void - Asserts the retained fresh and sensitive findings and the unchanged, new, and ineligible counts.
      */
     public function testABaselineOnlyEverRemovesReviewedFindings(): void
     {
@@ -63,7 +64,7 @@ final class BaselineFilterTest extends TestCase
 
         $application = (new BaselineFilter())->apply($this->baseline([$reviewed, $secret]), [$reviewed, $fresh, $secret], false);
 
-        // Only the reviewed finding leaves the gated set; the new one and the secret still fail the run.
+
         self::assertSame([$fresh, $secret], $application['findings']);
         self::assertSame(1, $application['report']->unchangedCount);
         self::assertSame(1, $application['report']->newCount);
@@ -73,7 +74,7 @@ final class BaselineFilterTest extends TestCase
     /**
      * Verify a line-shifted finding still matches its reviewed identity.
      *
-     * @return void
+     * @return void - Asserts one unchanged finding, no new findings, and no absent occurrences after the line shift.
      */
     public function testLineShiftedFindingStaysUnchanged(): void
     {
@@ -85,9 +86,9 @@ final class BaselineFilterTest extends TestCase
     }
 
     /**
-     * Verify an empty baseline reports every finding as new.
+     * Verify an empty baseline reports both supplied ordinary findings as new.
      *
-     * @return void
+     * @return void - Asserts two new findings, no unchanged findings, and no absent occurrences.
      */
     public function testEmptyBaselineReportsAllFindingsNew(): void
     {
@@ -101,7 +102,7 @@ final class BaselineFilterTest extends TestCase
     /**
      * Verify a second occurrence on one declaration is new rather than covered by the single reviewed occurrence.
      *
-     * @return void
+     * @return void - Asserts one unchanged occurrence and one new occurrence against a single reviewed occurrence.
      */
     public function testASecondOccurrenceBeyondTheReviewedCountIsNew(): void
     {
@@ -114,7 +115,7 @@ final class BaselineFilterTest extends TestCase
     /**
      * Verify surplus reviewed occurrences are reported resolved when fewer are present.
      *
-     * @return void
+     * @return void - Asserts two unchanged occurrences and one absent occurrence when three reviewed occurrences decrease to two.
      */
     public function testSurplusReviewedOccurrencesAreResolved(): void
     {
@@ -127,7 +128,7 @@ final class BaselineFilterTest extends TestCase
     /**
      * Verify occurrences beyond the reviewed count are new while the reviewed ones stay unchanged.
      *
-     * @return void
+     * @return void - Asserts two unchanged occurrences and one new occurrence when two reviewed occurrences increase to three.
      */
     public function testOccurrencesBeyondTheReviewedCountAreNew(): void
     {
@@ -138,9 +139,9 @@ final class BaselineFilterTest extends TestCase
     }
 
     /**
-     * Verify the reviewed count is spent lowest line first, so two ports hide the same occurrence rather than merely the same number.
+     * Verify the lower-line occurrence consumes the single reviewed count even when it appears later in scan order.
      *
-     * @return void
+     * @return void - Asserts that the early occurrence is unchanged and the late occurrence is new.
      */
     public function testReviewedCountIsSpentLowestLineFirst(): void
     {
@@ -156,7 +157,7 @@ final class BaselineFilterTest extends TestCase
     /**
      * Verify a new sibling never inherits a review, whether the symbol or the file changed.
      *
-     * @return void
+     * @return void - Asserts one new finding and one absent reviewed occurrence for each symbol-change and file-change case.
      */
     public function testReplacementAndRenameAreReviewWorthy(): void
     {
@@ -170,10 +171,9 @@ final class BaselineFilterTest extends TestCase
     }
 
     /**
-     * Verify two findings on one method share one identity and spend its reviewed count: PHP cannot declare a method twice in one file,
-     * so the second finding is new by count, never hidden by the first review.
+     * Verify one reviewed method occurrence yields one unchanged finding and one new finding when two are present.
      *
-     * @return void
+     * @return void - Asserts the unchanged and new partition sizes without selecting which occurrence matched.
      */
     public function testTwoFindingsOnOneMethodShareOneIdentityAndSpendItsCount(): void
     {
@@ -184,9 +184,9 @@ final class BaselineFilterTest extends TestCase
     }
 
     /**
-     * Verify a variable symbol, which a file can declare in several places, is ranked by line so two bindings stay apart.
+     * Verify the earlier variable finding remains unchanged and the later one is reported new.
      *
-     * @return void
+     * @return void - Asserts exact unchanged and new finding lists and no absent reviewed occurrences.
      */
     public function testVariableSymbolsAreRankedByDeclarationLine(): void
     {
@@ -203,7 +203,7 @@ final class BaselineFilterTest extends TestCase
     /**
      * Verify a clean earlier occurrence of a variable keeps its ordinal slot, so the review stays on the occurrence it was given to.
      *
-     * @return void
+     * @return void - Asserts that the later reviewed finding stays unchanged while the earlier finding is new with the shared inventory.
      */
     public function testAnEarlierCleanVariableOccurrenceKeepsItsOrdinalSlot(): void
     {
@@ -218,9 +218,9 @@ final class BaselineFilterTest extends TestCase
     }
 
     /**
-     * Verify a message rewording expires only a file-level finding, which has nothing but its message to name it.
+     * Verify rewording preserves a symbol-bearing match but makes a symbol-less finding new and its reviewed row absent.
      *
-     * @return void
+     * @return void - Asserts one unchanged symbol-bearing finding and a new finding plus an absent occurrence for the file-level case.
      */
     public function testMessageRewordingOnlyMattersWithoutASymbol(): void
     {
@@ -236,9 +236,9 @@ final class BaselineFilterTest extends TestCase
     }
 
     /**
-     * Verify a sensitive finding is never hidden, even by a hand-written row claiming its identity, and never becomes a row.
+     * Verify a sensitive finding stays visible and is counted as ineligible while an unmatched baseline row is reported absent.
      *
-     * @return void
+     * @return void - Asserts the retained finding, empty unchanged set, and ineligible and absent counts.
      */
     public function testSensitiveFindingsAreNeverEligible(): void
     {
@@ -250,14 +250,14 @@ final class BaselineFilterTest extends TestCase
         self::assertSame([$secret], $application['findings']);
         self::assertSame([], $application['unchanged']);
         self::assertSame(1, $application['report']->notEligibleCount);
-        // The hand-written row matches nothing, so it is permanently stale rather than a suppression.
+
         self::assertSame(1, $application['report']->absentCount);
     }
 
     /**
      * Verify a baseline written by another port is refused rather than applied.
      *
-     * @return void
+     * @return void - Asserts BaselineException with a message identifying the foreign port.
      */
     public function testForeignBaselineIsRefused(): void
     {
@@ -272,7 +272,7 @@ final class BaselineFilterTest extends TestCase
     /**
      * Verify a diff-scoped run never marks unscanned reviewed debt resolved.
      *
-     * @return void
+     * @return void - Asserts skipped stale evaluation, zero absent occurrences, and no stale entries.
      */
     public function testDiffScopeSkipsAbsentEvaluation(): void
     {
@@ -285,10 +285,9 @@ final class BaselineFilterTest extends TestCase
     }
 
     /**
-     * Verify a finding whose symbol carries the ordinal separator is reported with no identity instead of failing the
-     * run, as the operator decided on 2026-09-19, while an ordinary reviewed finding is still hidden.
+     * Verify a separator-bearing symbol has no identity and stays visible while an ordinary reviewed finding is suppressed.
      *
-     * @return void
+     * @return void - Asserts identity availability, ordinary eligibility, the retained finding, and the ineligible count.
      */
     public function testSeparatorBearingSymbolIsReportedWithoutAnIdentity(): void
     {
@@ -297,7 +296,7 @@ final class BaselineFilterTest extends TestCase
 
         self::assertTrue(BaselineIdentity::hasIdentity($reviewed));
         self::assertFalse(BaselineIdentity::hasIdentity($separated));
-        // It is still an ordinary finding, never counted as a secret.
+        // The missing identity does not change the finding's pillar-based eligibility.
         self::assertTrue(BaselineIdentity::isEligible($separated));
 
         $application = (new BaselineFilter())->apply($this->baseline([$reviewed]), [$reviewed, $separated], false);
@@ -320,10 +319,10 @@ final class BaselineFilterTest extends TestCase
     }
 
     /**
-     * Build the baseline a generate run would write for the reviewed findings.
+     * Build a test baseline by counting the supplied findings, including findings that generation would exclude.
      *
-     * @param list<Finding> $reviewed - Findings the user reviewed.
-     * @param DeclarationInventory|null $inventory - Scanned variable occurrences the generate run ranked with; null ranks among findings alone.
+     * @param list<Finding> $reviewed - Findings to include in fixture rows without eligibility filtering.
+     * @param DeclarationInventory|null $inventory - Scanned variable occurrences for ordinals; null ranks among supplied findings alone.
      *
      * @return BaselineData - One row per identity with its count.
      */
@@ -353,7 +352,7 @@ final class BaselineFilterTest extends TestCase
      *
      * @param string      $ruleId - Rule identifier emitted for the finding.
      * @param string      $message - Finding message; part of the identity only when no symbol is named.
-     * @param int|null    $line - Source line; varied to prove lines never enter the identity.
+     * @param int|null    $line - Source line for spend order and variable ordinals; null represents an unlocated finding.
      * @param string|null $symbol - Symbol the finding is anchored to; null for a file-level finding.
      * @param string      $filePath - Project-relative path, part of the identity.
      * @param Pillar      $pillar - Pillar; SensitiveData makes the finding ineligible.

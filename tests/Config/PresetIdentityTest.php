@@ -10,15 +10,16 @@ use GruffPhp\Rules\RuleRegistry;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Anchors the "no behaviour change" guarantee: `extends: gruff.recommended` with no
- * overrides resolves to the same config as running with no config file at all.
+ * Compares the recommended preset with registry defaults through a selected configuration snapshot.
+ * Covers per-rule settings, the minimum PHP version, and accepted abbreviations.
+ * Other configuration fields and config-file discovery are outside this comparison.
  */
 final class PresetIdentityTest extends TestCase
 {
     /**
-     * Verify extends: gruff.recommended equals the registry-default (no-config) result.
+     * Verify the recommended preset matches registry defaults for the fields selected by snapshot().
      *
-     * @return void
+     * @return void - Asserts equality of the selected rule settings, PHP version, and accepted abbreviations.
      */
     public function testExtendsRecommendedEqualsNoConfig(): void
     {
@@ -40,9 +41,9 @@ final class PresetIdentityTest extends TestCase
     }
 
     /**
-     * Build a comparable snapshot of a config's rule settings and global knobs.
+     * Build the rule-settings, PHP-version, and abbreviation snapshot used by the preset identity assertion.
      *
-     * @param AnalysisConfig $config - Config to snapshot.
+     * @param AnalysisConfig $config - Configuration supplying the rule settings, PHP version, and accepted abbreviations.
      *
      * @return array<string, mixed> - Deterministic snapshot for equality comparison.
      */

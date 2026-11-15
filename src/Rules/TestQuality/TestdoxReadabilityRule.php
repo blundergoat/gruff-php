@@ -16,9 +16,9 @@ use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Node\Stmt\ClassMethod;
 
 /**
- * Flags a PHPUnit test method whose name yields too few words to read as a behaviour sentence in testdox
- * output - `testProcess` renders as "process", which tells a reader nothing about the scenario. Runs over
- * every non-Pest test method; the minimum-words cap is tunable. Advisory, low confidence.
+ * Flags non-Pest test methods whose names split into fewer words than the configured minimum.
+ * Uses a configurable minWords threshold as a readability heuristic.
+ * Findings are advisory and have low confidence; word count does not establish sentence quality.
  */
 final readonly class TestdoxReadabilityRule implements RuleInterface
 {
@@ -54,22 +54,21 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
     }
 
     /**
-     * Reports test names that produce hard-to-read TestDox output.
+     * Reports test method names whose word count falls below the readability threshold.
      *
-     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Unit whose discovered test methods are checked.
+     * @param RuleContext $ruleContext - Supplies the minWords threshold for this analysis pass.
      *
-     * @return list<Finding> - one advisory finding per non-Pest test method whose name yields fewer words than the threshold; empty when every name
-     *                       passes
+     * @return list<Finding> - One advisory finding per non-Pest test method below minWords; empty when none qualify.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $threshold = (int)$ruleContext->settingsFor($this->definition())->numericThreshold('minWords');
         $findings  = [];
 
-        // Weigh every test scope in the file.
+
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
-            // Only a non-Pest method name renders through testdox here.
+
             if ($scope->isPest || !$scope->node instanceof ClassMethod) {
                 continue;
             }
@@ -77,7 +76,7 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
             $methodName = $scope->name;
             $words      = $this->splitWords($methodName);
 
-            // A name with enough words already reads as a sentence.
+
             if (count($words) >= $threshold) {
                 continue;
             }
@@ -109,12 +108,13 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
     /**
      * Splits a test method name into TestDox words for the readability check.
      *
-     * @param string $methodName - Raw test method name; the `test` prefix is stripped and CamelCase split into words.
+     * @param string $methodName - Raw test method name; the test prefix is stripped and CamelCase split into words.
      *
-     * @return list<string> - the test name's words in order, `test` prefix removed and CamelCase split; empty when the name reduces to nothing
+     * @return list<string> - the test name's words in order, test prefix removed and CamelCase split; empty when the name reduces to nothing
      */
     private function splitWords(string $methodName): array
     {
+        // Ignore PHPUnit naming syntax and treat inner capitals, spaces, and underscores as word boundaries for the threshold.
         $name   = preg_replace('/^test[_]?/i', '', $methodName) ?? $methodName;
         $name   = (string)preg_replace('/(?<!^)([A-Z])/', ' $1', $name);
         $tokens = preg_split('/[\s_]+/', $name) ?: [];
@@ -124,15 +124,14 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
     }
 
     /**
-     * Renders the split words as PHPUnit would show them in testdox output.
+     * Renders the split words for this rule's finding preview.
      *
      * @param list<string> $words - Words split from the test name, in order; empty when the name reduced to nothing.
      *
-     * @return string - the words lower-cased and space-joined to mirror PHPUnit's testdox output; empty string when no words remain
+     * @return string - Lowercase words joined by spaces for the finding preview; empty when no words remain.
      */
     private function renderTestdox(array $words): string
     {
-        // No words left means an empty testdox line.
         if ($words === []) {
             return '';
         }

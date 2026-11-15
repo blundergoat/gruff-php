@@ -9,14 +9,16 @@ use Symfony\Component\Process\Process;
 
 /**
  * Covers the gruff.hook.v2 agent-hook CLI contract.
+ * Exercises capability advertisements, finding metadata, changed ranges, and baseline filtering.
+ * Checks JSON diagnostics and errors alongside the exit codes asserted by individual tests.
  */
 final class HookCliContractTest extends CliTestCase
 {
     /**
      * Verify hook capabilities advertise the cross-analyzer contract.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts the hook version, flag names, flag ordering, and enabled capabilities.
+     * @throws JsonException - When decoding hook stdout fails.
      */
     public function testHookCapabilitiesAdvertiseContract(): void
     {
@@ -35,7 +37,7 @@ final class HookCliContractTest extends CliTestCase
 
         $supports = $report['supports'] ?? null;
         self::assertIsArray($supports);
-        // v2 adds four advertisements, and each must be true of this port rather than merely present.
+
         foreach ([
             'baseline', 'baselineV3', 'changedRanges', 'confidenceGate', 'deepScanBudget', 'diagnostics',
             'diff', 'ignoreReport', 'metadata', 'newOnly', 'scopeField', 'stableIdentity',
@@ -45,9 +47,9 @@ final class HookCliContractTest extends CliTestCase
     }
 
     /**
-     * Verify hook JSON keeps the bounded-scan diagnostic and sensitive-data findings.
+     * Verify bounded-scan JSON includes an AWS-key finding and a diagnostic that does not invalidate the run.
      *
-     * @return void
+     * @return void - Asserts exit code zero, an AWS-key finding, and a non-invalidating bounded-scan diagnostic.
      */
     public function testHookReportsBoundedDeepScanWithoutInvalidatingRun(): void
     {
@@ -82,8 +84,8 @@ final class HookCliContractTest extends CliTestCase
     /**
      * Verify full scan keeps file findings but changed-region hook output suppresses them with no anchor residual.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts file-length suppression, the selected empty-method symbol, and suppression counts.
+     * @throws JsonException - When decoding hook stdout fails.
      */
     public function testHookChangedRangesSuppressesFileScopeFindingsWithoutAnchorResidual(): void
     {
@@ -142,10 +144,10 @@ final class HookCliContractTest extends CliTestCase
     }
 
     /**
-     * Verify hook findings carry scope, remediation, stable identity, and normalized threshold metadata.
+     * Verify the file-length hook finding carries scope, remediation, string-valued identity fields, and normalized threshold metadata.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts the file-length finding's fields and its measured, threshold, unit, and direction metadata.
+     * @throws JsonException - When decoding hook stdout fails.
      */
     public function testHookFindingShapeIncludesScopeRemediationStableIdentityAndThresholdMetadata(): void
     {
@@ -179,7 +181,7 @@ final class HookCliContractTest extends CliTestCase
 
             $metadata = $fileLength['metadata'] ?? null;
             self::assertIsArray($metadata);
-            // Substantive count: the fixture's blank and comment-only lines are free under file-length.
+            // Substantive count: the fixture's blank lines are free under file-length.
             $expectedMeasuredLines = 10;
             self::assertSame($expectedMeasuredLines, $metadata['measured'] ?? null);
             self::assertSame(5, $metadata['threshold'] ?? null);
@@ -191,10 +193,10 @@ final class HookCliContractTest extends CliTestCase
     }
 
     /**
-     * Verify hook findings transport canonical remediation action metadata unchanged.
+     * Verify hook output exposes the expected remediation action and configuration key.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts exit code zero and the expected abbreviation-allowlist remediation metadata values.
+     * @throws JsonException - When decoding hook stdout fails.
      */
     public function testHookTransportsRemediationActionMetadata(): void
     {
@@ -213,10 +215,10 @@ final class HookCliContractTest extends CliTestCase
     }
 
     /**
-     * Verify hook new-only matching is stable across measured-value changes but reports newly crossing findings.
+     * Verify baseline filtering hides an existing size finding after growth and reports a newly oversized file.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts equal optional identity values, unequal fingerprints, baseline suppression, and a new size finding.
+     * @throws JsonException - When decoding hook stdout fails.
      */
     public function testHookBaselineUsesStableIdentityIndependentOfMeasuredValues(): void
     {
@@ -265,7 +267,6 @@ final class HookCliContractTest extends CliTestCase
                 'json',
             ]);
             self::assertSame([], $this->findingRows($filteredReport));
-            // v2 reports the applied baseline in the run block; suppressed.count stays the changed-region filter's own count.
             $runBaselineBlock = $this->runBaselineBlock($filteredReport);
             self::assertTrue($runBaselineBlock['applied'] ?? false);
             self::assertSame('gruff.baseline.v3', $runBaselineBlock['schemaVersion'] ?? null);
@@ -292,10 +293,10 @@ final class HookCliContractTest extends CliTestCase
     }
 
     /**
-     * Verify hook stable identities survive line shifts for symbol findings.
+     * Compare identity values and baseline filtering before and after a symbol's line shift.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts equal optional identity values, unequal fingerprint values, and baseline suppression.
+     * @throws JsonException - When decoding hook stdout fails.
      */
     public function testHookBaselineUsesStableIdentityIndependentOfLineShifts(): void
     {
@@ -351,10 +352,10 @@ final class HookCliContractTest extends CliTestCase
     }
 
     /**
-     * Verify Symfony flag parsing works before and after the path and hook exits zero with findings.
+     * Verify hook accepts flags before and after the path and returns matching nonempty rule lists.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts zero exits and matching, nonempty rule lists for both flag positions.
+     * @throws JsonException - When decoding hook stdout fails.
      */
     public function testHookAllowsFlagsBeforeAndAfterPath(): void
     {
@@ -393,8 +394,8 @@ final class HookCliContractTest extends CliTestCase
     /**
      * Verify hook reports ignored paths and config errors in-band.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts ignored-path provenance and a structured schema error with exit code two.
+     * @throws JsonException - When decoding hook stdout fails.
      */
     public function testHookReportsIgnoredPathsAndConfigErrors(): void
     {
@@ -448,7 +449,7 @@ YAML);
             $config = $badReport['config'] ?? null;
             self::assertIsArray($config);
             self::assertFalse($config['schemaOk'] ?? true);
-            // v2 carries the error as an object, because a configuration a consumer cannot fix is a dead end.
+            // The structured error keeps remediation available when configuration validation fails.
             self::assertIsArray($config['error'] ?? null);
             $configError = $config['error'];
             self::assertIsString($configError['message'] ?? null);
@@ -460,15 +461,10 @@ YAML);
     }
 
     /**
-     * Verify complexity findings report a score unit and the rule's measured complexity value.
+     * Verify a cyclomatic finding reports a score unit and the rule's measured complexity value.
      *
-     * Regression: the presenter previously keyed threshold metadata on the non-existent rule
-     * ids `complexity.cognitive-complexity` / `complexity.cyclomatic-complexity`, so the contract
-     * emitted unit "count" and recovered `measured` from a fragile first-numeric-metadata fallback
-     * instead of the rule's own `complexity` value.
-     *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts the score unit, above direction, threshold one, and matching measured and complexity values.
+     * @throws JsonException - When decoding hook stdout fails.
      */
     public function testHookComplexityFindingReportsScoreUnitAndMeasuredComplexity(): void
     {
@@ -506,13 +502,10 @@ YAML);
     }
 
     /**
-     * Verify a malformed --baseline file returns the in-band hook error instead of crashing the contract.
+     * Verify malformed baseline JSON produces an in-band hook error with exit code two.
      *
-     * Regression: json_decode(JSON_THROW_ON_ERROR) on the baseline raised an uncaught JsonException that
-     * escaped the DiffException|RuntimeException handler, breaking the JSON contract on a common operational error.
-     *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts the hook contract version and a structured error message mentioning the baseline.
+     * @throws JsonException - When decoding hook stdout fails.
      */
     public function testHookReturnsInBandErrorForMalformedBaseline(): void
     {
@@ -549,12 +542,10 @@ YAML);
 
     /**
      * Verify --exclude-rule drops only the named rule and preserves the configured selection.
+     * An exclusion must not widen the configured rule selection.
      *
-     * Regression: an empty include list means "all rules", so replacing the config selection with a
-     * bare --exclude-rule widened a focused config to the whole rule set instead of removing one rule.
-     *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts file-length is absent and the unique remaining rule is waste.empty-method.
+     * @throws JsonException - When decoding hook stdout fails.
      */
     public function testHookExcludeRulePreservesConfiguredSelection(): void
     {
@@ -584,13 +575,13 @@ YAML);
     }
 
     /**
-     * Write a ratified baseline v3 file the hook can apply, the same file `analyse --generate-baseline` gives a user.
+     * Run analyse --generate-baseline for a project and assert that the destination exists.
      *
      * @param string $cwd          - Project directory the baseline is generated in.
      * @param string $configFile   - Config the generating scan runs under, so the baseline covers the same rules.
      * @param string $baselineFile - Project-relative destination for the generated baseline.
      *
-     * @return void
+     * @return void - Asserts that the requested baseline file exists after the generating command finishes.
      */
     private function generateBaseline(string $cwd, string $configFile, string $baselineFile): void
     {
@@ -606,16 +597,16 @@ YAML);
         ], $cwd);
         $process->run();
 
-        // A generating scan still reports its findings, so its exit code says nothing about whether the file was written.
+        // Findings can cause a nonzero exit after generation succeeds, so check the file directly.
         self::assertFileExists($cwd . '/' . $baselineFile, $process->getErrorOutput());
     }
 
     /**
-     * Read the applied-baseline block a v2 hook payload reports, so a test can assert what classified the run.
+     * Read baseline audit data, whether or not a baseline was applied.
      *
      * @param array<string, mixed> $report - Decoded hook report.
      *
-     * @return array<string, mixed> - The run block's baseline map: applied, schemaVersion, and path.
+     * @return array<string, mixed> - The run.baseline array; missing or non-array blocks fail assertions, and fields are not validated.
      */
     private function runBaselineBlock(array $report): array
     {
@@ -624,18 +615,18 @@ YAML);
         $baseline = $runAudit['baseline'] ?? null;
         self::assertIsArray($baseline);
 
-        /** @var array<string, mixed> $baseline Decoded JSON object, asserted as an array above. */
+        /** @var array<string, mixed> $baseline - Decoded JSON object, asserted as an array above. */
         return $baseline;
     }
 
     /**
      * Run the gruff CLI hook command.
      *
-     * @param string       $cwd  - Working directory.
+     * @param string       $cwd  - Directory in which the command resolves project files.
      * @param list<string> $args - CLI argv after the binary.
      *
      * @return array{0: Process, 1: array<string, mixed>} - Process and decoded JSON.
-     * @throws JsonException
+     * @throws JsonException - When decoding hook stdout fails.
      */
     private function runHook(string $cwd, array $args): array
     {
@@ -648,10 +639,10 @@ YAML);
     /**
      * Return a focused config for hook tests.
      *
-     * @param int  $fileLengthThreshold - Size threshold.
+     * @param int  $fileLengthThreshold - Substantive-line threshold for the file-length rule.
      * @param bool $shouldIncludeWaste  - Whether to include the empty-method rule.
      *
-     * @return string - YAML config.
+     * @return string - YAML selecting file-length at error severity and optionally the empty-method rule.
      */
     private function focusedConfig(int $fileLengthThreshold, bool $shouldIncludeWaste = true): string
     {
@@ -674,7 +665,7 @@ YAML;
     /**
      * Return a config that runs only symbol-level empty-method findings.
      *
-     * @return string - YAML config.
+     * @return string - YAML selecting only waste.empty-method.
      */
     private function symbolOnlyConfig(): string
     {
@@ -687,9 +678,9 @@ YAML;
     }
 
     /**
-     * Source that yields both a file-scope and symbol-scope finding.
+     * Provide two empty methods for hook tests that combine file and symbol findings.
      *
-     * @return string - PHP source.
+     * @return string - PHP source declaring Example::ok() and Example::empty() with empty bodies.
      */
     private function fileAndSymbolSource(): string
     {
@@ -710,9 +701,9 @@ PHP;
     }
 
     /**
-     * Source with one empty-method finding.
+     * Provide a single empty method for the hook line-shift test.
      *
-     * @return string - PHP source.
+     * @return string - PHP source declaring only Example::empty() inside Example.
      */
     private function singleEmptyMethodSource(): string
     {
@@ -729,11 +720,11 @@ PHP;
     }
 
     /**
-     * Build source with a target physical line count.
+     * Build a four-line PHP skeleton, padding it to the requested physical line count.
      *
-     * @param int $lines - Number of physical lines.
+     * @param int $lines - Target physical line count; the four-line skeleton is the minimum.
      *
-     * @return string - PHP source.
+     * @return string - PHP source with at least four substantive lines and a trailing newline.
      */
     private function oversizedSource(int $lines): string
     {
@@ -757,7 +748,7 @@ PHP;
     /**
      * Return a config that runs only the cyclomatic-complexity rule at a low threshold.
      *
-     * @return string - YAML config.
+     * @return string - YAML selecting complexity.cyclomatic with threshold one and warning severity.
      */
     private function complexityConfig(): string
     {
@@ -776,7 +767,7 @@ YAML;
     /**
      * Source with one method whose cyclomatic complexity exceeds a low threshold.
      *
-     * @return string - PHP source.
+     * @return string - PHP source with branches, loops, and a ternary in Complex::tangled().
      */
     private function complexMethodSource(): string
     {
@@ -819,24 +810,24 @@ PHP;
      *
      * @param array<string, mixed> $report - Decoded hook report.
      *
-     * @return list<array<string, mixed>> - Finding rows.
+     * @return list<array<string, mixed>> - Findings as supplied; only the outer array is asserted, without validating rows or list keys.
      */
     private function findingRows(array $report): array
     {
         $findings = $report['findings'] ?? null;
         self::assertIsArray($findings);
 
-        /** @var list<array<string, mixed>> $findings Decoded JSON finding rows, asserted as an array above. */
+        /** @var list<array<string, mixed>> $findings - Decoded JSON finding rows, asserted as an array above. */
         return $findings;
     }
 
     /**
      * Return the first finding matching a rule id.
      *
-     * @param list<array<string, mixed>> $findings - Finding rows.
+     * @param list<array<string, mixed>> $findings - Finding rows to search in their supplied order.
      * @param string                     $ruleId   - Rule id to find.
      *
-     * @return array<string, mixed>|null - Finding row.
+     * @return array<string, mixed>|null - First matching row in input order, or null for empty input or no match.
      */
     private function firstFindingByRule(array $findings, string $ruleId): ?array
     {
@@ -852,9 +843,9 @@ PHP;
     /**
      * Extract symbols from finding rows.
      *
-     * @param list<array<string, mixed>> $findings - Finding rows.
+     * @param list<array<string, mixed>> $findings - Finding rows whose optional symbol fields are inspected.
      *
-     * @return list<string> - Symbols.
+     * @return list<string> - String-valued symbols in input order, including empty strings and duplicates; nonstrings are skipped.
      */
     private function symbols(array $findings): array
     {
@@ -871,9 +862,9 @@ PHP;
     /**
      * Extract rule ids from finding rows.
      *
-     * @param list<array<string, mixed>> $findings - Finding rows.
+     * @param list<array<string, mixed>> $findings - Finding rows whose ruleId fields are read.
      *
-     * @return list<string> - Rule ids.
+     * @return list<string> - One rule ID per input row in order; missing or nonstring IDs become empty strings.
      */
     private function ruleIds(array $findings): array
     {
@@ -888,7 +879,7 @@ PHP;
      *
      * @param array<string, mixed> $report - Decoded hook report.
      *
-     * @return int - Suppressed count.
+     * @return int - Count of findings removed by hook filtering; missing or non-integer counts fail assertions.
      */
     private function suppressedCount(array $report): int
     {

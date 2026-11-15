@@ -33,7 +33,7 @@ final readonly class InlineSuppressionFilter
     /**
      * phpcs sniffs section 13c names for gruff-php, each with the rule making the same claim.
      *
-     * @var array<string, string>
+     * @var array<string, string> - Gruff rule ids keyed by phpcs sniff name.
      */
     private const PHPCS_SNIFF_RULES = [
         'WordPress.PHP.NoSilencedErrors' => 'security.error-suppression',
@@ -43,7 +43,7 @@ final readonly class InlineSuppressionFilter
     /**
      * psalm issues section 13c names for gruff-php, each with the rules making the same claim.
      *
-     * @var array<string, list<string>>
+     * @var array<string, list<string>> - Gruff rule ids grouped by psalm issue name.
      */
     private const PSALM_ISSUE_RULES = [
         'ForbiddenCode' => ['security.dangerous-function-call', 'security.process-command-construction'],
@@ -52,7 +52,7 @@ final readonly class InlineSuppressionFilter
     /**
      * Built-in calls on which security.dangerous-function-call repeats security.process-command-construction's claim.
      *
-     * @var list<string>
+     * @var list<string> - Function names eligible for repeated-claim merging.
      */
     private const EXEC_FAMILY = ['exec', 'passthru', 'popen', 'proc_open', 'shell_exec', 'system'];
 
@@ -84,18 +84,18 @@ final readonly class InlineSuppressionFilter
     }
 
     /**
-     * Removes the findings another tool's comment covers, then the repeated claims, and counts both.
+     * Removes findings matched by supported suppression-directive text, then repeated claims, and counts both.
      *
      * @param SensitiveExclusionResult $result - Findings and audit rows left after the sensitive exclusions and the test-path skip.
      *
-     * @return SensitiveExclusionResult - Survivors, the earlier rows followed by the inline and then the repeated-claim rows, and every removed finding.
+     * @return SensitiveExclusionResult - Survivors; prior, inline, then duplicate audit rows; prior and newly suppressed findings.
      */
     public function apply(SensitiveExclusionResult $result): SensitiveExclusionResult
     {
         $survivors  = [];
         $suppressed = [];
         $lines      = [];
-        // A finding leaves only when a comment on its own line, or alone on the line above, names a check making its claim.
+        // A finding leaves only when supported directive text maps to its rule on its line or a preceding comment-marker line.
         foreach ($result->findings as $finding) {
             if ($this->isCoveredByComment($finding, $lines)) {
                 $suppressed[] = ['finding' => $finding, 'justification' => self::INLINE_REASON];
@@ -115,17 +115,17 @@ final readonly class InlineSuppressionFilter
     }
 
     /**
-     * Reports whether a comment on the finding's line, or alone on the line above, names a check making its claim.
+     * Reports whether supported directive text maps to the finding on its line or on a preceding comment-marker line.
      *
-     * @param Finding                     $finding - Finding to judge.
+     * @param Finding                     $finding - Finding whose path, line, and rule are checked for a covering directive.
      * @param array<string, list<string>> $lines   - Lines of each file read so far, keyed by display path; filled on demand.
      *
-     * @return bool - true when the finding is suppressed where it was written
+     * @return bool - True when recognized directive text maps to the finding's rule.
      */
     private function isCoveredByComment(Finding $finding, array &$lines): bool
     {
         $line = $finding->line;
-        // Only the four rules section 13c maps can be covered, and a file-level finding has no line to carry a comment.
+        // Only mapped rules can be suppressed, and a file-level finding has no line that a directive can cover.
         if ($line === null || $line < 1 || !self::isMappedRule($finding->ruleId)) {
             return false;
         }
@@ -140,11 +140,11 @@ final readonly class InlineSuppressionFilter
     }
 
     /**
-     * Reports whether a rule appears in section 13c's table for gruff-php.
+     * Checks whether a rule has a supported PHPCS or Psalm inline-suppression mapping.
      *
      * @param string $ruleId - Rule id of a finding.
      *
-     * @return bool - true for the four rules a phpcs or psalm comment can cover
+     * @return bool - True when a configured phpcs or Psalm directive can suppress the rule.
      */
     private static function isMappedRule(string $ruleId): bool
     {
@@ -168,11 +168,11 @@ final readonly class InlineSuppressionFilter
     }
 
     /**
-     * Reports whether a line holds only a comment, so a directive on it speaks for the line below.
+     * Reports whether a trimmed line starts with a supported comment marker, allowing a directive there to cover the line below.
      *
      * @param string $trimmed - The line with surrounding whitespace removed.
      *
-     * @return bool - true for a `//`, `#`, `/*` or docblock `*` line
+     * @return bool - True when the line starts with `//`, `#`, `/*` or `*`.
      */
     private static function isCommentOnly(string $trimmed): bool
     {
@@ -180,12 +180,12 @@ final readonly class InlineSuppressionFilter
     }
 
     /**
-     * Reports whether one line's phpcs or psalm comment names a check making the rule's claim.
+     * Reports whether a source line contains supported phpcs or psalm directive text that maps to the rule.
      *
      * @param string $line   - Source line to read.
      * @param string $ruleId - Rule id of the finding.
      *
-     * @return bool - true when the comment covers the rule
+     * @return bool - True when the line's parsed directive text maps to the rule.
      */
     private static function hasCoveringComment(string $line, string $ruleId): bool
     {
@@ -193,17 +193,16 @@ final readonly class InlineSuppressionFilter
     }
 
     /**
-     * Reports whether a `phpcs:ignore` on the line covers the rule: naming no sniff it covers every phpcs row, and a
-     * named sniff, category or error code covers the row whose sniff it contains or is contained in.
+     * Reports whether a line contains `phpcs:ignore` text that the configured sniff mapping treats as covering the rule.
      *
      * @param string $line   - Source line to read.
      * @param string $ruleId - Rule id of the finding.
      *
-     * @return bool - true when phpcs would ignore the sniff section 13c maps to this rule
+     * @return bool - True when the rule has a configured sniff and the parsed text names it or names no sniff.
      */
     private static function isIgnoredByPhpcs(string $line, string $ruleId): bool
     {
-        // Captures whatever follows `phpcs:ignore` on the line: its sniff list, reason and comment close.
+        // Keep the directive tail so the sniff list can be separated from an optional reason or block-comment close.
         if (preg_match('/phpcs:ignore\b(.*)$/', $line, $match) !== 1) {
             return false;
         }
@@ -215,7 +214,7 @@ final readonly class InlineSuppressionFilter
         if ($sniff === false) {
             return false;
         }
-        // A phpcs:ignore naming no sniff ignores every sniff on the line, as phpcs reads it.
+        // With no parsed sniff reference, the directive text is treated as covering every configured phpcs sniff.
         if ($matched === 0) {
             return true;
         }
@@ -229,20 +228,20 @@ final readonly class InlineSuppressionFilter
     }
 
     /**
-     * Reports whether a `@psalm-suppress` on the line names an issue section 13c maps to the rule.
+     * Reports whether a line contains `@psalm-suppress` text whose parsed issue names map to the rule.
      *
      * @param string $line   - Source line to read.
      * @param string $ruleId - Rule id of the finding.
      *
-     * @return bool - true when a named psalm issue makes the rule's claim
+     * @return bool - True when one parsed issue name maps to the rule.
      */
     private static function isSuppressedByPsalm(string $line, string $ruleId): bool
     {
-        // Captures the issue names after `@psalm-suppress`, separated by spaces or commas.
+        // Limit candidates to directive tokens so only configured Psalm issue names can suppress the rule.
         if (preg_match('/@psalm-suppress\s+([\w\s,]+)/', $line, $match) !== 1) {
             return false;
         }
-        // Each issue name stands alone between spaces or commas.
+        // Whitespace and commas delimit Psalm issue names; only names mapped to this rule suppress it.
         foreach (preg_split('/[\s,]+/', trim($match[1])) ?: [] as $issue) {
             if (in_array($ruleId, self::PSALM_ISSUE_RULES[$issue] ?? [], true)) {
                 return true;
@@ -253,7 +252,7 @@ final readonly class InlineSuppressionFilter
     }
 
     /**
-     * Merges security.dangerous-function-call into security.process-command-construction on one exec-family call.
+     * Merges a dangerous-function finding when its file, line, and exec-family function match a command-construction finding.
      *
      * @param list<Finding> $findings - Findings left after the inline comments.
      *
@@ -262,7 +261,7 @@ final readonly class InlineSuppressionFilter
     private function mergeRepeatedClaims(array $findings): array
     {
         $commandCalls = [];
-        // Count the command-construction findings per file, line and call, so each merges at most one repeat.
+        // Count command-construction findings by file, line, and sink so each count removes at most one repeat.
         foreach ($findings as $finding) {
             if ($finding->ruleId === 'security.process-command-construction') {
                 $key                = self::callKey($finding, $finding->metadata['sink'] ?? null);
@@ -274,7 +273,7 @@ final readonly class InlineSuppressionFilter
         foreach ($findings as $finding) {
             $function = $finding->metadata['function'] ?? null;
             $key      = self::callKey($finding, $function);
-            // The dangerous-call finding repeats the claim only on an exec-family call the other rule reports.
+            // Merge only when an exec-family function has the same file, line, and sink key as a command-construction finding.
             if ($finding->ruleId === 'security.dangerous-function-call' && in_array($function, self::EXEC_FAMILY, true) && ($commandCalls[$key] ?? 0) > 0) {
                 $commandCalls[$key]--;
                 $merged[] = ['finding' => $finding, 'justification' => self::DUPLICATE_REASON];
@@ -287,12 +286,12 @@ final readonly class InlineSuppressionFilter
     }
 
     /**
-     * Keys one call by file, line and called function.
+     * Builds a grouping key from the finding's file, line, and called-function metadata.
      *
-     * @param Finding $finding  - Finding on the call.
-     * @param mixed   $function - Called function name from the finding's metadata.
+     * @param Finding $finding  - Finding that supplies the file and line key components.
+     * @param mixed   $function - Called-function metadata; a non-string value uses an empty key component.
      *
-     * @return string - A key two findings on the same call share.
+     * @return string - File, line, and called-function key used to group potentially repeated findings.
      */
     private static function callKey(Finding $finding, mixed $function): string
     {

@@ -10,14 +10,10 @@ use GruffPhp\Support\PathHelper;
 use RuntimeException;
 
 /**
- * Appends each run's score to a bounded per-project history file, so a user can watch their quality
- * trend over time.
+ * Records scored runs in a history file and compares each score with the latest entry from the same scope.
+ * Retention is capped per scope, so full-project and diff runs keep separate histories.
  *
- * When a user runs `analyse` with a history file, this records a snapshot - score, grade, scope,
- * finding count, timestamp - and hands back a `TrendReport` showing how the score moved since the last
- * comparable run. It keeps the history honest and bounded: deltas only ever compare like scopes (a diff
- * run against an earlier diff run), history is capped per scope so the file cannot grow forever, and a
- * tampered or half-written file is rejected loudly rather than silently corrupting the trend.
+ * Missing or blank files start a new history. Nonblank files must decode to a list of string-keyed rows with scalar or null values.
  *
  * @phpstan-type TrendEntry array<string, bool|float|int|string|null>
  */
@@ -27,24 +23,24 @@ final readonly class TrendRecorder
     private const MAX_HISTORY_ENTRIES_PER_SCOPE = 50;
 
     /**
-     * Records this run's score in the history file and returns how it compares to the last same-scope
-     * run, so the user sees "82 (+3)" rather than a bare number.
+     * Record this run's score and compare it with the latest same-scope row's score.
+     * The delta is null when that row is absent or has no numeric score.
      *
-     * @param string      $projectRoot - Project root used to resolve the history path.
-     * @param string      $path - History file path to append to.
-     * @param ScoreReport $score - Score report to snapshot.
+     * @param string      $projectRoot  - Project root used to resolve the history path.
+     * @param string      $path         - History file path to append to.
+     * @param ScoreReport $score        - Score report to snapshot.
      * @param int         $findingCount - Total finding count recorded alongside the score.
-     * @throws RuntimeException When the history file cannot be read, validated, or written.
-     * @throws \JsonException When history JSON cannot be decoded or encoded.
+     * @throws RuntimeException - When the current score is absent or the history cannot be read, validated, or written.
+     * @throws \JsonException - When history JSON cannot be decoded or encoded.
      *
-     * @return TrendReport - The current score plus the delta from the previous same-scope run; the delta is null when there is no comparable earlier run.
+     * @return TrendReport - Current score and change from the last same-scope run; null delta means no usable earlier score.
      */
     public function record(string $projectRoot, string $path, ScoreReport $score, int $findingCount): TrendReport
     {
         $composite = $score->composite;
 
-        // A run that evaluated nothing has no score to record. The caller already filters these out;
-        // refusing here as well keeps a scoreless row out of the history every later delta reads from.
+        // A report without a composite cannot form a trend point, so rejecting it keeps later comparisons
+        // from treating a scoreless row as the latest same-scope entry.
         if ($composite === null) {
             throw new RuntimeException('A run that evaluated nothing has no score to record in the trend history.');
         }
@@ -67,13 +63,11 @@ final readonly class TrendRecorder
         $entries   = $this->trimEntriesPerScope($entries);
         $directory = dirname($resolvedPath);
 
-        // Make sure the history file's directory exists before writing, creating it when the user's path is new.
         if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
             throw new RuntimeException(sprintf('Unable to create history directory: %s', $directory));
         }
 
-        // Invalid bytes become U+FFFD so a history write can never crash the user's run; history values
-        // are never match keys, so substitution cannot desynchronise anything.
+        // During encoding, invalid UTF-8 is replaced rather than causing a JSON error.
         if (file_put_contents($resolvedPath, json_encode($entries, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR) . PHP_EOL, LOCK_EX) === false) {
             throw new RuntimeException(sprintf('Unable to write history file: %s', $resolvedPath));
         }
@@ -91,22 +85,16 @@ final readonly class TrendRecorder
     }
 
     /**
-     * Finds the most recent history entry with the same scope, so the delta compares a diff run only
-     * against an earlier diff run and never against a full-project one.
-     *
-     * Keeps the delta a user sees after `analyse --history-file` honest: a diff-scoped score is only
-     * ever compared with an earlier diff-scoped score, never a full run.
+     * Find the latest entry with the same scope so a diff run is never compared with a full-project run.
      *
      * @param list<TrendEntry> $entries - Validated history rows in file order.
-     * @param string           $scope - Current run's score scope ('full-project' or 'diff').
+     * @param string           $scope   - Current run's score scope ('full-project' or 'diff').
      *
-     * @return TrendEntry|null - Latest same-scope row; null when the history holds none. Rows without a scope field predate scope stamping and count as full-project.
+     * @return TrendEntry|null - Latest same-scope row, or null when none exists; rows with no scope count as full-project.
      */
     private function latestEntryForScope(array $entries, string $scope): ?array
     {
-        // Walk newest-first so the delta compares against the most recent comparable run.
         for ($index = count($entries) - 1; $index >= 0; $index--) {
-            // Match same-scope rows only; scope-less rows are legacy history from full runs.
             if ($this->entryScope($entries[$index]) === $scope) {
                 return $entries[$index];
             }
@@ -128,13 +116,10 @@ final readonly class TrendRecorder
         $seenByScope = [];
         $keptIndexes = [];
 
-        // Scan newest-first, keeping each scope's rows only until it hits its per-scope cap.
         for ($index = count($entries) - 1; $index >= 0; $index--) {
             $scope               = $this->entryScope($entries[$index]);
-            // Count how many of this scope we have seen so far in the newest-first scan.
             $seenByScope[$scope] = ($seenByScope[$scope] ?? 0) + 1;
 
-            // Keep this row while its scope is still under the cap; older ones beyond it are dropped.
             if ($seenByScope[$scope] <= self::MAX_HISTORY_ENTRIES_PER_SCOPE) {
                 $keptIndexes[$index] = true;
             }
@@ -143,7 +128,6 @@ final readonly class TrendRecorder
         ksort($keptIndexes);
 
         $boundedEntries = [];
-        // Re-emit the kept rows in their original oldest-to-newest order.
         foreach (array_keys($keptIndexes) as $index) {
             $boundedEntries[] = $entries[$index];
         }
@@ -152,15 +136,14 @@ final readonly class TrendRecorder
     }
 
     /**
-     * Reads an entry's scope, treating a legacy scope-less row as a full-project run.
+     * Reads an entry's string scope; a missing or non-string value falls back to a full-project run.
      *
-     * @param TrendEntry $trendEntry - Validated history row.
+     * @param TrendEntry $trendEntry - History row used for delta comparison and retention grouping.
      *
      * @return string - The entry's scope, used for delta and retention comparisons; 'full-project' for rows recorded before scope stamping.
      */
     private function entryScope(array $trendEntry): string
     {
-        // Old history rows had no scope; users should see them as full-project runs.
         $entryScope = $trendEntry['scope'] ?? null;
 
         return is_string($entryScope) ? $entryScope : 'full-project';
@@ -188,7 +171,6 @@ final readonly class TrendRecorder
             throw new RuntimeException(sprintf('History file must contain a JSON array: %s', $path));
         }
 
-        // Each decoded row is re-validated so a tampered history file fails loudly rather than silently.
         return array_map(
             fn (mixed $trendEntry): array => $this->normaliseEntry($trendEntry, $path),
             $decoded,
@@ -198,7 +180,7 @@ final readonly class TrendRecorder
     /**
      * Reads the raw history bytes, distinguishing "no history yet" from a genuinely unreadable file.
      *
-     * @param string      $path - Resolved history file path to read.
+     * @param string $path - Resolved history file path to read.
      *
      * @return string|null - Raw file contents; null when the file is missing or whitespace-only, both meaning "no history".
      */
@@ -206,19 +188,16 @@ final readonly class TrendRecorder
     {
         // A missing file is the first-run case, so there is nothing to read yet.
         if (!is_file($path)) {
-            // A missing file is the first-run case, not an error: caller starts a fresh history.
             return null;
         }
 
         $contents = file_get_contents($path);
-        // The file exists but could not be read, which is a real error to surface.
         if ($contents === false) {
             throw new RuntimeException(sprintf('Unable to read history file: %s', $path));
         }
 
-        // A blank file counts as no history, so a truncated earlier write can't crash this run.
+        // A whitespace-only file represents no earlier snapshots.
         if (trim($contents) === '') {
-            // A blank file is treated like no history so a truncated write cannot crash the next run.
             return null;
         }
 
@@ -227,25 +206,21 @@ final readonly class TrendRecorder
     }
 
     /**
-     * Validates one decoded history row is a string-keyed map and keeps its scalar values, rejecting a
-     * tampered file rather than trusting it.
+     * Validate that a decoded history row has string keys and only scalar or null values.
      *
      * @param mixed  $trendEntry - Decoded JSON row; must be a string-keyed map, else the file is rejected.
-     * @param string $path - History file path, used only to make validation errors point at the file.
+     * @param string $path       - History file path, used only to make validation errors point at the file.
      *
-     * @return TrendEntry - The row with every value confirmed scalar, ready to fold back into history.
+     * @return TrendEntry - The row with string keys and scalar or null values, ready to retain in history.
      */
     private function normaliseEntry(mixed $trendEntry, string $path): array
     {
-        // A row has to be a keyed object; a bare list or a scalar means the file is malformed.
         if (!is_array($trendEntry) || array_is_list($trendEntry)) {
             throw new RuntimeException(sprintf('History file contains an invalid entry: %s', $path));
         }
 
         $normalisedEntry = [];
-        // Vet every key and value in the row before trusting any of it.
         foreach ($trendEntry as $key => $trendValue) {
-            // History keys must be strings; a numeric key signals a corrupted file.
             if (!is_string($key)) {
                 throw new RuntimeException(sprintf('History file contains a non-string entry key: %s', $path));
             }
@@ -257,17 +232,15 @@ final readonly class TrendRecorder
     }
 
     /**
-     * Confirms a single history value is a scalar, rejecting the nested arrays or objects that are not
-     * valid trend data.
+     * Accept scalar or null history values and reject nested structures.
      *
-     * @param mixed  $trendValue - Decoded value to vet; non-scalar shapes are not valid trend data.
-     * @param string $path - History file path, surfaced in the error when a value is rejected.
+     * @param mixed  $trendValue - Decoded history value to validate; only scalars and null are retained.
+     * @param string $path       - History file path, surfaced in the error when a value is rejected.
      *
-     * @return bool|float|int|string|null - The same value once confirmed scalar.
+     * @return bool|float|int|string|null - Accepted scalar or null value, unchanged.
      */
     private function normaliseEntryValue(mixed $trendValue, string $path): bool|float|int|string|null
     {
-        // Only plain scalars belong in a history row; a nested structure means the file was tampered with.
         if (is_bool($trendValue) || is_float($trendValue) || is_int($trendValue) || is_string($trendValue) || $trendValue === null) {
             return $trendValue;
         }
@@ -281,7 +254,7 @@ final readonly class TrendRecorder
      *
      * @param TrendEntry|null $trendEntry - Trend-history row to read; null when the history has no previous entry.
      *
-     * @return float|null - The row's score; null when there is no previous entry or its score is missing or non-numeric, so the delta reads as unknown rather than zero.
+     * @return float|null - Numeric score, or null for an absent row or unusable score so the delta remains unknown.
      */
     private function scoreFromEntry(?array $trendEntry): ?float
     {

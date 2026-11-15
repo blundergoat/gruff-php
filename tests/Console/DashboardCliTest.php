@@ -7,21 +7,23 @@ namespace GruffPhp\Tests\Console;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers the dashboard CLI command: refreshable HTML server, mutation UI suppression when configured, and ad-hoc scans of other projects via browser query.
+ * Exercises dashboard HTTP responses through a live CLI server.
+ * Checks scan markup, interactive and diff options, and omission of mutation results without an Infection report.
+ * Also checks selected secret snippets are absent and query parameters can select another project.
  */
 final class DashboardCliTest extends CliTestCase
 {
     /**
      * Raw sensitive snippets that dashboard scans must never render.
      *
-     * @var list<string>
+     * @var list<string> - Fixture fragments checked for absence from the dashboard scan response.
      */
     private const SENSITIVE_SNIPPETS = ['MIIBVgIBADANBgkqhkiG', 's3cr3tValue', 'Tok3nXyZ9'];
 
     /**
-     * Verify dashboard command serves refreshable HTML report.
+     * Check dashboard and scan response text for default, interactive, and diff queries.
      *
-     * @return void
+     * @return void - Asserts HTTP status text, control markup, filter markup presence or absence, and command-flag text.
      */
     public function testDashboardCommandServesRefreshableHtmlReport(): void
     {
@@ -85,9 +87,9 @@ final class DashboardCliTest extends CliTestCase
     }
 
     /**
-     * Verify dashboard scan omits mutation UI.
+     * Verify a scan without an Infection report shows the mutation-omission notice.
      *
-     * @return void
+     * @return void - Asserts the omission notice is present and the mutation label and MSI text are absent.
      */
     public function testDashboardScanOmitsMutationUi(): void
     {
@@ -123,9 +125,9 @@ final class DashboardCliTest extends CliTestCase
     }
 
     /**
-     * Verify dashboard scans do not leak raw sensitive-data snippets.
+     * Verify the scan response omits the selected fixture secrets and includes redaction text.
      *
-     * @return void
+     * @return void - Asserts HTTP 200, absence of every SENSITIVE_SNIPPETS value, and presence of redacted text.
      */
     public function testDashboardScanDoesNotLeakSensitiveDataSecrets(): void
     {
@@ -168,7 +170,7 @@ final class DashboardCliTest extends CliTestCase
     /**
      * Verify dashboard command can scan another project from browser query.
      *
-     * @return void
+     * @return void - Asserts HTTP 200 and that the response names the queried project and Example.php.
      */
     public function testDashboardCommandCanScanAnotherProjectFromBrowserQuery(): void
     {

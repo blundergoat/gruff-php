@@ -6,14 +6,10 @@ namespace GruffPhp\Engine\Config;
 
 /**
  * Carries a 0.5 configuration forward to the 0.6 schema, line by line.
+ * The per-command exit gate moves from minimumSeverity to failOn; allowlists.secretPreviews is removed.
+ * FAMILY-CONTRACT.md section 5 requires unconditional category markers, so the removed setting has no effect.
  *
- * Two keys moved in 0.6.0 and a user's committed file still spells them the old way: the per-command exit gate left
- * `minimumSeverity:` for `failOn:`, and `allowlists.secretPreviews` was removed outright because FAMILY-CONTRACT.md
- * section 5 makes category markers unconditional. A file carrying either is refused by the loader, so a user
- * upgrading needs a way across that does not mean re-typing their configuration.
- *
- * The rewrite is line-oriented rather than a parse-and-re-render, which keeps every comment, blank line, and value
- * the user wrote exactly as written; anything the migration does not understand passes through untouched.
+ * Line-oriented rewriting copies unaffected lines verbatim without parsing and re-rendering the configuration.
  */
 final class ConfigMigrator
 {
@@ -25,8 +21,7 @@ final class ConfigMigrator
      *
      * @param string $original - The whole 0.5 configuration file, as written.
      *
-     * @return array{text: string, changes: list<string>} - the migrated text, and one readable line per rewrite;
-     *                                                      an empty changes list means the text is the input unchanged
+     * @return array{text: string, changes: list<string>} - Migrated text and change descriptions; text is $original when changes is empty.
      */
     public static function migrate(string $original): array
     {
@@ -39,7 +34,7 @@ final class ConfigMigrator
         while ($index < $total) {
             $skipped = self::removedKeyBlockLength($lines, $index);
 
-            // The removed key takes its whole indented block with it, or an empty list stays behind meaning nothing.
+            // Removing the legacy key also discards its contiguous indented values.
             if ($skipped > 0) {
                 $changes[] = sprintf('line %d: allowlists.secretPreviews removed; section 5 makes category markers unconditional', $index + 1);
                 $index    += $skipped;
@@ -49,7 +44,7 @@ final class ConfigMigrator
 
             $renamed = self::renamedGateLine($lines, $index);
 
-            // A per-command map under the old key is the exit gate, which now has its own name.
+
             if ($renamed !== null) {
                 $changes[]  = sprintf('line %d: minimumSeverity: renamed to failOn:, the key that gates the exit code in 0.6', $index + 1);
                 $migrated[] = $renamed;
@@ -91,17 +86,16 @@ final class ConfigMigrator
     }
 
     /**
-     * Rewrite the old gate key when it introduces a per-command block, leaving the scalar display floor alone.
+     * Rewrites a bare old gate key only when the next line is more deeply indented.
      *
      * @param list<string> $lines - The whole file, split on newlines.
      * @param int          $index - The line being considered.
      *
-     * @return string|null - the rewritten line, or null when this line is not the old gate key in its block form
+     * @return string|null - Rewritten key line, or null unless a bare key is followed by a more deeply indented line.
      */
     private static function renamedGateLine(array $lines, int $index): ?string
     {
-        // A commented-out key is prose, and a key with a value on the same line is the 0.6 display floor. The
-        // regex captures the indent and whatever followed the colon, so an empty tail means a block opens below.
+        // Comments and keys with same-line values stay unchanged; the regex isolates bare keys for the indented-block check below.
         if (preg_match('/^(\s*)minimumSeverity\s*:\s*(.*)$/', $lines[$index], $match) !== 1 || trim($match[2]) !== '') {
             return null;
         }
@@ -157,13 +151,13 @@ final class ConfigMigrator
     }
 
     /**
-     * Pin the schema version, inserting it at the top when the 0.5 file never named one.
+     * Pins the schema version, inserting it at the top when the 0.5 file has no top-level schemaVersion key.
      *
      * @param list<string> $lines    - The migrated lines so far.
      * @param list<string> $changes  - The rewrites applied so far.
      * @param string       $original - The file as written, returned unchanged when nothing needed rewriting.
      *
-     * @return array{text: string, changes: list<string>} - the migration result
+     * @return array{text: string, changes: list<string>} - Version-pinned text and accumulated changes; text is $original when changes is empty.
      */
     private static function withSchemaVersion(array $lines, array $changes, string $original): array
     {
@@ -171,7 +165,7 @@ final class ConfigMigrator
         $existing = null;
 
         foreach ($lines as $position => $line) {
-            // The regex anchors at column zero, so only a root schemaVersion key counts as the one to pin.
+            // Only an unindented schemaVersion key is eligible, which avoids rewriting an indented key with the same name.
             if (preg_match('/^schemaVersion\s*:/', $line) === 1) {
                 $existing = $position;
                 break;

@@ -14,12 +14,10 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\SourceTextRuleInterface;
 
 /**
- * Flags a database connection URL that embeds a password inline (`mysql://user:pass@host`), so the user can
- * move the credential into a secret store or environment variable.
+ * Flags inline passwords in supported database URLs so callers can move credentials into runtime configuration.
  *
- * A source-text rule covering the common DB schemes (mysql, mariadb, mongodb, pgsql/postgres, redis). It
- * skips matches inside comments and obvious dummy passwords, and the reported URL has its password
- * redacted. Warning severity, high confidence - a literal `:password@` is an unambiguous credential.
+ * It scans raw source, excluding comment tokens and selected placeholder or development-default values.
+ * Findings contain only a scheme marker, with no user, password, host, path or credential length.
  */
 final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
 {
@@ -32,7 +30,7 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
      * Stock development user names and passwords, compared case-insensitively and whole (FAMILY-CONTRACT.md section 5).
      * They are documented defaults such as `postgres:postgres` or `scott:tiger`, not credentials, so they are held as plain text.
      *
-     * @var list<string>
+     * @var list<string> - Whole words allowed for both user names and passwords in the development exemption.
      */
     private const STOCK_DEVELOPMENT_WORDS = [
         'admin', 'bar', 'dbpass', 'dbuser', 'default', 'demo', 'example', 'foo', 'guest', 'mysql', 'pass', 'passwd',
@@ -40,22 +38,22 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
     ];
 
     /**
-     * Loopback hosts on which a stock credential is a development default rather than a live weakness.
+     * Hosts explicitly accepted by the stock-development-credential exemption.
      *
-     * @var list<string>
+     * @var list<string> - Host values accepted directly by isStockDevelopmentUrl().
      */
     private const LOOPBACK_HOSTS = ['localhost', '127.0.0.1', '::1', '0.0.0.0'];
 
     /**
      * Describes the database-URL-password sensitive-data rule for the registry and reports.
      *
-     * @return RuleDefinition - warning severity, high confidence; ships off by default, so only a config can turn it on
+     * @return RuleDefinition - Rule metadata with warning severity, high confidence and default enablement disabled.
      */
     public function definition(): RuleDefinition
     {
-        // High confidence is justified because a literal `:password@` inside a recognised DB scheme is an
-        // unambiguous credential, not a heuristic guess; the dummy-value and comment filters below cut the
-        // residual false positives, so callers can gate on these findings without manual triage.
+
+
+
         return new RuleDefinition(
             id:                 self::ID,
             name:               'Database URL password',
@@ -63,31 +61,29 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
             tier:               RuleTier::V01,
             defaultSeverity:    Severity::Warning,
             confidence:         Confidence::High,
-            // Off unless a project sets `enabled: true`: the 0.6.0 precision measurement found all nine judged findings wrong (ADR-034).
+            // Off unless a project sets enabled: true: the 0.6.0 precision measurement found all nine judged findings wrong (ADR-034).
             // Nine findings are too few to delete the rule on, so it stays available for projects that want it.
             isEnabledByDefault: false,
         );
     }
 
     /**
-     * Reports each database URL that embeds a password so users can move it to runtime configuration.
-     * The finding carries only the fixed marker; user, password, host, path, and length never reach output.
+     * Reports source text shaped like a database URL with an inline password so users can move it to runtime configuration.
+     * The finding carries only the scheme-derived marker; user, password, host, path, and length never reach output.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext - Unused; the rule interface requires it, and this rule reads no options or project root.
      *
      * @return list<\GruffPhp\Results\Finding\Finding> - Findings for credential-bearing database URLs.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        // Fast bail: a credential-bearing DB URL needs scheme://...:...@...
-        // Skip the alternation when no supported scheme prefix appears.
+        // Unsupported schemes cannot produce this rule's database-credential finding.
         if (preg_match('#(?:mysql|mariadb|mongodb|pgsql|postgres|postgresql|redis)://#i', $analysisUnit->source) !== 1) {
-            // No supported DB scheme in the source means there can be no inline credential to report.
             return [];
         }
 
-        // Match every credential-bearing DB URL, capturing the scheme, user, password, and host.
+        // Named captures separate credentials and host for exemptions while retaining the scheme for the redacted marker.
         preg_match_all(
             '#\b(?<scheme>mysql|mariadb|mongodb|pgsql|postgres|postgresql|redis)://(?<user>[^:\s/@]+):(?<password>[^@\s"\']+)@(?<host>[^"\']+)#i',
             $analysisUnit->source,
@@ -97,26 +93,25 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
 
         $findings      = [];
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
-        // Weigh each URL the scan found.
         foreach ($matches[0] as $index => $match) {
             [, $offset] = $match;
-            // A URL inside a comment is an example, not a live credential.
+            // Skip URLs inside comments as documentation examples; a real credential left in a comment is not reported.
             if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
                 continue;
             }
 
             $password = $matches['password'][$index][0];
-            // An obvious placeholder password is not a real secret.
+            // Passwords recognised by the dummy-value heuristic are exempted.
             if (SecretScannerHelper::isLikelyDummyValue($password)) {
                 continue;
             }
 
-            // A stock pair such as `postgres:postgres` on a local or Compose host is a documented development default.
+            // Stock credentials on a loopback or single-label host are exempted as likely development defaults.
             if (self::isStockDevelopmentUrl($matches['user'][$index][0], $password, $matches['host'][$index][0])) {
                 continue;
             }
 
-            // The scheme is the one part of a connection string the URL already publishes in plain text.
+            // Keep only the non-secret scheme in the marker; omit the captured credentials, host, path, and length.
             $displayMarker = SecretScannerHelper::connectionStringMarker($matches['scheme'][$index][0]);
 
             $findings[] = SecretScannerHelper::finding(
@@ -135,25 +130,26 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
     }
 
     /**
-     * Reports whether a URL's credential is a stock development pair on a host only a developer's machine reaches.
-     * The same pair on any other host still reports, because a default credential on a reachable host is a live weakness.
+     * Identifies stock credential pairs eligible for the development-default exemption.
+     * Both words must be listed stock values and the host must be in LOOPBACK_HOSTS or have a single label.
      *
-     * @param string $user - User name between the scheme and the colon, e.g. `postgres`.
-     * @param string $password - Password between the colon and the `@`.
-     * @param string $hostAndRest - Everything after the `@` up to the closing quote, e.g. `localhost:5432/app`.
+     * @param string $user - User name between the scheme and the colon, e.g. postgres.
+     * @param string $password - Password between the colon and the @.
+     * @param string $hostAndRest - Everything after the @ up to the closing quote, e.g. localhost:5432/app.
      *
-     * @return bool - true when both words are stock and the host is loopback or a single-label service name such as `db`
+     * @return bool - True for two stock words and a host in LOOPBACK_HOSTS or a non-empty single-label host.
      */
     private static function isStockDevelopmentUrl(string $user, string $password, string $hostAndRest): bool
     {
-        // Both halves must be stock words; one real word keeps the finding.
+
         if (!in_array(strtolower($user), self::STOCK_DEVELOPMENT_WORDS, true)
             || !in_array(strtolower($password), self::STOCK_DEVELOPMENT_WORDS, true)) {
             return false;
         }
 
+        // Only the URL authority is relevant to the loopback and single-label host exemption.
         $authority = strtolower((string)preg_replace('#[/?\#].*$#s', '', $hostAndRest));
-        // A bracketed IPv6 host such as `[::1]:5432` keeps its colons inside the brackets.
+        // A bracketed IPv6 host such as [::1]:5432 keeps its colons inside the brackets.
         $host = preg_match('#^\[(?<address>[^\]]+)\]#', $authority, $bracketed) === 1
             ? $bracketed['address']
             : explode(':', $authority, 2)[0];

@@ -15,14 +15,13 @@ use PhpParser\Node\Scalar;
 use PhpParser\Node\Stmt;
 
 /**
- * Central AST toolkit every test-quality rule leans on: it finds the PHPUnit and Pest test scopes in a file,
- * recognises assertion, mock, and expectation calls, and reads literal argument values back out of them. The
- * discovered scopes are memoised per unit so the many test rules share a single AST walk rather than each
- * re-scanning the file. Pure static helpers - no rule state lives here.
+ * Provides AST helpers for test-quality rules: scope discovery, call classification, and literal argument values.
+ * Scopes are PHPUnit methods or Pest closures recognised from node shapes and names.
+ * Memoises discovered scopes per analysis unit for reuse across rules.
  */
 final class TestQualityNodeHelper
 {
-    /** @var \WeakMap<AnalysisUnit, list<TestQualityScope>>|null */
+    /** @var \WeakMap<AnalysisUnit, list<TestQualityScope>>|null - Cached scopes by unit; null before the first lookup. */
     private static ?\WeakMap $scopeCache = null;
 
     /**
@@ -37,7 +36,7 @@ final class TestQualityNodeHelper
         $displayPath = '/' . str_replace('\\', '/', $analysisUnit->file->displayPath);
 
         if (str_contains($displayPath, '/tests/') || str_contains($displayPath, '/Tests/')) {
-            // A tests/ directory is the strongest signal; classify without inspecting the basename.
+
             return true;
         }
 
@@ -51,23 +50,23 @@ final class TestQualityNodeHelper
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect for test scopes.
      *
-     * @return list<TestQualityScope> - test scopes discovered in source order; empty when the unit has no tests
+     * @return list<TestQualityScope> - PHPUnit method scopes followed by Pest scopes, each in AST order; empty when none match.
      */
     public static function testScopes(AnalysisUnit $analysisUnit): array
     {
-        // 18 test-quality rules each call this for every PHP unit; cache so the AST walks once per unit.
+        // Cache scope discovery per unit so multiple rules can share the result.
         $cache = self::$scopeCache ??= new \WeakMap();
 
         if ($cache->offsetExists($analysisUnit)) {
-            // Reuse the memoised scopes; recomputing would re-walk the whole AST for no gain.
+
             return $cache->offsetGet($analysisUnit);
         }
 
         $scopes = [];
 
-        // Weigh every method declared in the file for xUnit-style tests.
+
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\ClassMethod::class) as $classMethod) {
-            // Skip methods that are not recognised test methods.
+
             if (!self::isTestMethod($classMethod)) {
                 continue;
             }
@@ -88,22 +87,22 @@ final class TestQualityNodeHelper
             );
         }
 
-        // Weigh every function call for a Pest it()/test() block.
+
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
             $name = self::functionName($call);
-            // Only it()/test() with a description and a body defines a Pest scope.
+
             if (($name !== 'it' && $name !== 'test') || count($call->args) < 2) {
                 continue;
             }
 
-            // Spread or named-argument forms are not a plain Pest definition.
+
             if (!$call->args[0] instanceof Arg || !$call->args[1] instanceof Arg) {
                 continue;
             }
 
             $description = self::argString($call->args[0]) ?? $name;
             $closure     = $call->args[1]->value;
-            // Without a closure body there is no Pest test to scope.
+
             if (!$closure instanceof Expr\Closure) {
                 continue;
             }
@@ -125,7 +124,7 @@ final class TestQualityNodeHelper
     }
 
     /**
-     * Reports whether the method is a PHPUnit test (Test attribute, @test annotation, or test*-prefix on a TestCase subclass).
+     * Reports whether the method matches a supported test shape by attribute, annotation, or method and parent names.
      *
      * @param Stmt\ClassMethod $classMethod - Method node to classify.
      *
@@ -134,69 +133,68 @@ final class TestQualityNodeHelper
     public static function isTestMethod(Stmt\ClassMethod $classMethod): bool
     {
         if (self::hasAttribute($classMethod, 'Test')) {
-            // An explicit #[Test] attribute is authoritative regardless of method name or base class.
+            // A Test-named attribute is sufficient for this heuristic regardless of the method or parent name.
             return true;
         }
 
         if (self::hasTestAnnotation($classMethod)) {
-            // A @test docblock tag is equally authoritative, independent of the test* prefix.
+            // A standalone @test tag is also sufficient for this heuristic, independent of the method name.
             return true;
         }
 
         $name = $classMethod->name->toString();
 
         if (!str_starts_with($name, 'test')) {
-            // No attribute, no annotation, no test* prefix: nothing marks this as a test method.
+
             return false;
         }
 
-        // The bare `test*` prefix only counts as a PHPUnit test method when the enclosing
-        // class extends a *TestCase base. This stops library code with method names like
-        // testScopes()/testCandidate() being analysed as test bodies.
+        // A test-prefixed name only qualifies when the declared parent name ends in TestCase,
+        // which avoids classifying similarly named methods in ordinary library classes.
         return self::extendsTestCase(self::parentClass($classMethod));
     }
 
     /**
-     * Reports whether the method docblock carries a standalone PHPUnit `@test` annotation line.
+     * Reports whether the method docblock carries a standalone PHPUnit @test annotation line.
      *
-     * @param Stmt\ClassMethod $classMethod - Method node whose docblock is scanned for a standalone `@test` tag.
+     * @param Stmt\ClassMethod $classMethod - Method node whose docblock is scanned for a standalone @test tag.
      *
-     * @return bool - true when the method docblock declares `@test` as a standalone tag line
+     * @return bool - true when the method docblock declares @test as a standalone tag line
      */
     private static function hasTestAnnotation(Stmt\ClassMethod $classMethod): bool
     {
         $docText = $classMethod->getDocComment()?->getText() ?? '';
 
-        // Match a standalone PHPUnit @test annotation line inside the method docblock.
+        // Require the tag at the start of a docblock line so prose that merely mentions @test does not classify the method.
         return preg_match('/^\s*\*\s*@test\b/m', $docText) === 1;
     }
 
     /**
-     * Reports whether the class extends a *TestCase base.
+     * Reports whether the declared parent short name ends with TestCase, ignoring case.
      *
      * @param Stmt\Class_|null $class - Class node to inspect, or null when the method is detached.
      *
-     * @return bool - true when the parent name ends with `testcase` (case-insensitive)
+     * @return bool - true when the parent name ends with TestCase (case-insensitive)
      */
     public static function extendsTestCase(?Stmt\Class_ $class): bool
     {
         if ($class === null || $class->extends === null) {
-            // A detached method or a class with no parent cannot extend a TestCase base.
+
             return false;
         }
 
         $parent = strtolower($class->extends->getLast());
 
-        // Match by the `TestCase` suffix so vendor and custom base classes both qualify.
+        // Match only the parent-name suffix so qualified and custom names work without resolving their declarations.
         return str_ends_with($parent, 'testcase');
     }
 
     /**
-     * Collects the function, method, and static calls in a test scope.
+     * Collects function, method, and static call nodes from the test body.
      *
-     * @param TestQualityScope $scope - Test scope whose statements should be walked.
+     * @param TestQualityScope $scope - Test scope whose body and nested bodies are traversed.
      *
-     * @return list<Expr\FuncCall|Expr\MethodCall|Expr\StaticCall> - every call the scope makes, of any of the three call shapes
+     * @return list<Expr\FuncCall|Expr\MethodCall|Expr\StaticCall> - Call nodes in AST order; empty when none match.
      */
     public static function calls(TestQualityScope $scope): array
     {
@@ -219,7 +217,7 @@ final class TestQualityNodeHelper
     }
 
     /**
-     * Reports whether the call is a PHPUnit assertion, Pest expectation, or other supported assertion shape.
+     * Reports whether the call name matches a supported PHPUnit assertion, Pest expectation, or other assertion shape.
      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Call node to classify.
      *
@@ -229,12 +227,12 @@ final class TestQualityNodeHelper
     {
         $name = self::callName($call);
         if ($name === null) {
-            // A dynamic call target has no resolvable name, so it cannot be a known assertion.
+
             return false;
         }
 
         if (str_starts_with($name, 'assert') || $name === 'fail') {
-            // Every PHPUnit assertion is an assert* method, and fail() is a forced assertion failure.
+
             return true;
         }
 
@@ -262,11 +260,11 @@ final class TestQualityNodeHelper
             'expectuserdeprecationmessage',
             'expectnottoperformassertions',
         ],           true)) {
-            // PHPUnit expect*() methods declare an expectation, which the rules treat as an assertion.
+
             return true;
         }
 
-        // Remaining matches are Pest expectation terminals (expect(...)->toBe*); anything else is not an assertion.
+
         return in_array($name, [
             'tobe',
             'tobearray',
@@ -325,25 +323,25 @@ final class TestQualityNodeHelper
     }
 
     /**
-     * Returns the lowercase short name of the call (method, function, or static), or null when the name is dynamic.
+     * Returns the lowercase function name or method identifier, or null for a dynamic name.
      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Call node whose name should be normalized.
      *
-     * @return string|null - the lowercase identifier, or null when the call target is a variable / expression
+     * @return string|null - Lowercase literal name, including any function namespace; null for a dynamic name.
      */
     public static function callName(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): ?string
     {
         if ($call instanceof Expr\FuncCall) {
-            // Function calls resolve their name through the Name-aware helper.
+
             return self::functionName($call);
         }
 
         if ($call->name instanceof Identifier) {
-            // Method and static calls expose a literal method name; lowercase it for case-insensitive matching.
+
             return strtolower($call->name->toString());
         }
 
-        // Dynamic targets such as $obj->$method() have no static name to return.
+
         return null;
     }
 
@@ -357,26 +355,26 @@ final class TestQualityNodeHelper
     public static function functionName(Expr\FuncCall $call): ?string
     {
         if ($call->name instanceof Name) {
-            // A static function name is present; lowercase it so callers can match case-insensitively.
+
             return strtolower($call->name->toString());
         }
 
-        // A variable function such as $fn() has no static name to return.
+
         return null;
     }
 
     /**
-     * Reports whether the call creates a mock or spy via a recognised factory name.
+     * Reports whether the call name matches a supported mock, spy, builder, or prophecy factory.
      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Call node to classify.
      *
-     * @return bool - true for a recognised mock or spy factory; createStub needs no interaction expectation
+     * @return bool - True for a supported factory name; createStub is excluded because it needs no interaction expectation.
      */
     public static function isMockCreationCall(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
     {
         $name = self::callName($call);
 
-        // Stubs supply values without interaction expectations, so only mock and spy factories count here.
+        // Stubs supply values without interaction expectations, so createStub is excluded from the supported factory names.
         return $name !== null && in_array($name, [
                 'createmock',
                 'getmockbuilder',
@@ -388,21 +386,21 @@ final class TestQualityNodeHelper
     }
 
     /**
-     * Reports whether the call wires a mock expectation (expects, shouldReceive, once, etc.).
+     * Reports whether a non-first-class call name matches a supported mock-expectation method.
      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Call node to classify.
      *
-     * @return bool - true when the call name matches a mock-verification idiom (expects, shouldReceive, once, etc.)
+     * @return bool - True for a listed expectation-wiring name unless the call is a first-class callable reference.
      */
     public static function isMockVerificationCall(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
     {
-        // A stored callable has not registered the teardown expectation yet.
+        // A first-class callable reference does not invoke the named method, so it cannot configure or verify an expectation here.
         if ($call->isFirstClassCallable()) {
             return false;
         }
         $name = self::callName($call);
 
-        // True only for the recognised expectation-wiring idioms; a dynamic call (null name) never matches.
+
         return $name !== null && in_array($name, [
                 'expects',
                 'shouldreceive',
@@ -420,11 +418,11 @@ final class TestQualityNodeHelper
     }
 
     /**
-     * Returns the value of the call's first argument, or null when the call has no first argument.
+     * Returns the first argument expression, if one is available.
      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Call node to inspect.
      *
-     * @return Expr|null - the first argument's expression, or null when the call has no first argument
+     * @return Expr|null - First argument expression, or null for an absent argument or first-class callable placeholder.
      */
     public static function firstArgValue(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): ?Expr
     {
@@ -432,16 +430,16 @@ final class TestQualityNodeHelper
     }
 
     /**
-     * Returns the value of the call's argument at the given index, or null when missing or spread.
+     * Returns the expression at an argument-list position, or null when no argument node exists.
      *
-     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call  - Call node to inspect.
-     * @param int                                           $index - Zero-based argument index.
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Call whose argument list is inspected.
+     * @param int $index - Zero-based position in the argument list, irrespective of argument names.
      *
-     * @return Expr|null - the argument's expression at that index, or null when it is missing or a spread placeholder
+     * @return Expr|null - Argument expression, including unpacked values; null for a missing argument or first-class callable placeholder.
      */
     public static function argValue(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call, int $index): ?Expr
     {
-        // A missing or spread argument yields no expression to read.
+
         if (!isset($call->args[$index]) || !$call->args[$index] instanceof Arg) {
             return null;
         }
@@ -462,25 +460,24 @@ final class TestQualityNodeHelper
     }
 
     /**
-     * Resolves the literal value of an expression (scalar literal or const true/false/null), or null when not a literal.
+     * Resolves supported scalar literals and true/false/null constant expressions.
      *
-     * @param Expr|null $expr - Expression to resolve.
+     * @param Expr|null $expr - Expression to inspect; null yields null.
      *
-     * @return bool|int|float|string|null - the resolved compile-time value; null when the expression is not a literal (note the literal `null` const
-     *                                    also yields null)
+     * @return bool|int|float|string|null - Literal scalar value; null for literal null, absent input, or unsupported expressions.
      */
     public static function literalValue(?Expr $expr): bool|int|float|string|null
     {
         if ($expr instanceof Scalar\String_ || $expr instanceof Scalar\LNumber || $expr instanceof Scalar\DNumber) {
-            // String/int/float literals carry their PHP value directly on the node.
+
             return $expr->value;
         }
 
-        // A bare constant may be one of the magic literals true/false/null.
+
         if ($expr instanceof Expr\ConstFetch) {
             $name = strtolower($expr->name->toString());
 
-            // Only the three magic constants map to real literals; any other const fetch is not statically known.
+
             return match ($name) {
                 'true' => true,
                 'false' => false,
@@ -489,7 +486,7 @@ final class TestQualityNodeHelper
             };
         }
 
-        // Variables, calls, and other expressions have no compile-time literal value.
+
         return null;
     }
 
@@ -528,9 +525,9 @@ final class TestQualityNodeHelper
      */
     public static function hasAttribute(Stmt\ClassMethod $node, string $shortName): bool
     {
-        // Weigh every attribute group on the method.
+
         foreach ($node->attrGroups as $attributeGroup) {
-            // One group can hold several attributes.
+
             foreach ($attributeGroup->attrs as $attribute) {
                 if (strtolower($attribute->name->getLast()) === strtolower($shortName)) {
                     // Match on the last name segment so both #[Test] and #[PHPUnit\...\Test] qualify.
@@ -539,23 +536,23 @@ final class TestQualityNodeHelper
             }
         }
 
-        // No attribute group on the method carried the requested short name.
+
         return false;
     }
 
     /**
-     * Returns the enclosing Class_ node via the `parent` AST attribute, or null when unattached.
+     * Returns the node's immediate parent when it is a class, or null otherwise.
      *
-     * @param Node $node - Node whose parent chain should be inspected.
+     * @param Node $node - Node whose immediate `parent` attribute should be inspected.
      *
-     * @return Stmt\Class_|null - the enclosing class node, or null when the node is unattached or sits in a trait/interface
+     * @return Stmt\Class_|null - Immediate class parent; null when the parent is absent or has another node type.
      */
     public static function parentClass(Node $node): ?Stmt\Class_
     {
         $parent = $node->getAttribute('parent');
 
-        // The parent attribute is set by the parent-linking visitor; null here means the node is unattached
-        // or sits inside a trait/interface rather than a class.
+
+
         return $parent instanceof Stmt\Class_ ? $parent : null;
     }
 
@@ -568,8 +565,10 @@ final class TestQualityNodeHelper
      */
     public static function normalizedTestName(string $name): string
     {
+        // Ignore the leading test marker so naming style does not distinguish otherwise equivalent test names.
         $name = preg_replace('/^test[_]?/i', '', $name) ?? $name;
 
+        // Remove every non-alphanumeric character, so test_user_login and testUserLogin compare equal.
         return strtolower((string)preg_replace('/[^a-z0-9]+/i', '', $name));
     }
 

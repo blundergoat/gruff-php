@@ -8,14 +8,16 @@ use GruffPhp\Results\Finding\DeclarationInventory;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers the source scan that lists every place a variable symbol can be reported, so its baseline ordinal does not depend on which places warned.
+ * Checks source-line inventories for inline var annotations and property declarations.
+ * Covers promoted, attributed, parenthesised, and multi-name properties.
+ * Verifies docblock start lines while excluding property docblocks and ordinary parameters.
  */
 final class DeclarationInventoryTest extends TestCase
 {
     /**
-     * Verify a docblock's `@var` tag is listed at the docblock's start line and a property at its own line.
+     * Verify a docblock's @var tag is listed at the docblock's start line and a property at its own line.
      *
-     * @return void
+     * @return void - Asserts annotation, property, and promoted-property lines while excluding the ordinary parameter.
      */
     public function testScanListsVarDocblocksAndPropertyLines(): void
     {
@@ -57,7 +59,7 @@ final class DeclarationInventoryTest extends TestCase
     /**
      * Verify a property's own docblock adds no position, and attribute-led, parenthesised and multi-name properties are listed.
      *
-     * @return void
+     * @return void - Asserts each declared property uses its declaration line without a separate docblock position.
      */
     public function testScanReadsEveryPropertyShapeAndSkipsDeclarationDocblocks(): void
     {

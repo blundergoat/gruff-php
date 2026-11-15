@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace GruffPhp\Results\Baseline;
 
 /**
- * What a baseline did to one `analyse` run, so the user sees how their accepted debt moved instead of a bare pass or fail.
- *
- * Applying a baseline hides reviewed findings before scoring while anything new still fails the run.
- * This record carries the numbers the reports print: new, unchanged, resolved, plus the collisions and sensitive findings a baseline may never hide.
+ * Applying a baseline removes reviewed findings from the set passed on for scoring.
+ * This record carries new, unchanged, and absent counts, plus collisions and findings without usable baseline identities.
  * The user meets it as the "Baseline" block under `analyse`, or right after `analyse --generate-baseline`.
  */
 final readonly class BaselineReport
@@ -30,15 +28,15 @@ final readonly class BaselineReport
      * @param bool                $generated - True when this run wrote a fresh baseline; false when it applied an existing one.
      * @param int                 $totalEntries - Reviewed rows in the baseline, shown as the "Entries:" count.
      * @param int                 $suppressedFindings - Findings hidden as reviewed debt before scoring; equals $unchangedCount.
-     * @param string              $staleEvaluation - `full-project`, `not-evaluated-diff-scope`, `generated`, or `migrated`.
-     * @param list<BaselineEntry> $staleEntries - Reviewed identities with fewer live occurrences than reviewed, each count being how many resolved; empty when nothing resolved or the scan was too narrow to tell.
-     * @param string              $source - `explicit` or `default`, telling the user whether they named this baseline or gruff discovered it.
-     * @param int                 $newCount - Findings beyond what the baseline reviewed; still fail the run.
+     * @param string              $staleEvaluation - "full-project", "not-evaluated-diff-scope", "generated", or "migrated".
+     * @param list<BaselineEntry> $staleEntries - Missing reviewed occurrences by identity; empty when none are found or the check is skipped.
+     * @param string              $source - Controls whether reporters label the baseline source as "explicit" or "default".
+     * @param int                 $newCount - Findings beyond the reviewed count, passed on for scoring.
      * @param int                 $unchangedCount - Findings still covered by reviewed debt.
      * @param int                 $absentCount - Reviewed occurrences gone from this run, summed across $staleEntries.
      * @param int                 $collisionCount - Findings whose identity could not separate two declarations; reported, never hidden.
-     * @param int                 $notEligibleCount - Sensitive findings, which no baseline entry can hide.
-     * @param int                 $sensitiveCounted - Sensitive findings the written baseline counted rather than stored; 0 on an apply run.
+     * @param int $notEligibleCount - Findings without usable identities, including sensitive findings and separator-bearing symbols.
+     * @param int $sensitiveCounted - Sensitive findings counted without identity rows when writing; zero when applying a baseline.
      */
     public function __construct(
         public string $path,
@@ -58,7 +56,7 @@ final readonly class BaselineReport
     }
 
     /**
-     * Flattens the report into the JSON shape `analyse --format json` emits; the text reporters read the fields directly.
+     * Serializes this record's fields, stale rows, and bucket counts into an array.
      *
      * @return array{
      *     path: string,
@@ -70,7 +68,7 @@ final readonly class BaselineReport
      *     source: string,
      *     stale: list<array{identity: string, count: int, ruleId?: string, path?: string, subject?: string}>,
      *     buckets: array{new: int, unchanged: int, absent: int, collision: int, notEligible: int, sensitiveCounted: int}
-     * } - `staleEntries` is the resolved row count while the rows live under `stale`, and every movement total sits under `buckets`.
+     * } - "staleEntries" is the resolved row count while the rows live under "stale", and every movement total sits under "buckets".
      */
     public function toArray(): array
     {

@@ -14,28 +14,22 @@ use PhpParser\Node\Stmt\Function_;
 use PhpParser\Node\Stmt\Property;
 
 /**
- * Resolves the line a finding on a declaration should report.
+ * Selects a declaration line for findings that would otherwise point at a leading attribute.
  *
- * A PHP 8 attribute group is a sub-node of the declaration it decorates, so `getStartLine()` on an attributed
- * method, class, property, constant or enum case returns the attribute's line rather than the signature's. The
- * finding then points a reader, an editor jump, and any future autofix at `#[SomeAttribute]` instead of at the
- * code the rule is talking about. This resolves the declaration's own line instead.
- *
- * A declaration carrying no attributes is returned unchanged, so adopting this helper cannot move any finding
- * that was already correct.
+ * Attributed named declarations use the name or first declared item's line as an anchor.
+ * Unattributed nodes and declarations without a supported anchor retain the node's original start line.
  */
 final class DeclarationLine
 {
     /**
-     * Report the line of the declaration itself, skipping any attribute group above it.
+     * Selects a finding line for a declaration, using a name or item anchor when attributes are present.
      *
-     * @param Node $node - Declaration node a rule is reporting; any node without attribute groups is returned unchanged.
+     * @param Node $node - Declaration to locate; unsupported or unattributed nodes retain their original start line.
      *
-     * @return int - 1-based source line of the declaration, never the line of one of its attributes.
+     * @return int - Selected name or first-item line, or the original start line when no anchor is available.
      */
     public static function of(Node $node): int
     {
-        // Unattributed declarations already start where the reader expects, so nothing moves for them.
         if (self::attributeGroups($node) === []) {
             return $node->getStartLine();
         }
@@ -44,11 +38,11 @@ final class DeclarationLine
     }
 
     /**
-     * Read the attribute groups a node carries, across the node kinds that can carry them.
+     * Returns attribute groups for the declaration kinds supported by this helper.
      *
-     * @param Node $node - Any parsed node; kinds that cannot carry attributes report none.
+     * @param Node $node - Node to inspect; unsupported kinds are treated as having no attribute groups.
      *
-     * @return list<Node\AttributeGroup> - Attribute groups on this declaration; empty when it has none or cannot have any.
+     * @return list<Node\AttributeGroup> - Groups on a supported declaration; empty for unsupported nodes or no attributes.
      */
     private static function attributeGroups(Node $node): array
     {
@@ -63,16 +57,16 @@ final class DeclarationLine
     }
 
     /**
-     * Find the first token of the declaration proper, after any attribute group.
+     * Returns the name or first declared item's line for a supported declaration.
      *
-     * @param Node $node - Attributed declaration whose own start line is wanted.
+     * @param Node $node - Attributed declaration whose name or item should anchor the finding.
      *
-     * @return int|null - Declaration line, or null when this node kind has no named part to anchor on.
+     * @return int|null - Anchor line, or null for anonymous classes, closures, arrow functions, unsupported nodes, or empty item lists.
      */
     private static function declarationStartLine(Node $node): ?int
     {
-        // The name is the first token the declaration owns, so it is where the signature begins even when
-        // the attribute sits on its own line above it or inline on the same one.
+
+
         if ($node instanceof ClassMethod || $node instanceof Function_ || $node instanceof EnumCase) {
             return $node->name->getStartLine();
         }
@@ -82,7 +76,7 @@ final class DeclarationLine
             return $node->name?->getStartLine();
         }
 
-        // A property or constant list declares its names in items; the first one sits on the declaration line.
+        // The first declared item provides an anchor after attributes, even when modifiers are on an earlier line.
         if ($node instanceof Property) {
             return $node->props === [] ? null : $node->props[0]->getStartLine();
         }

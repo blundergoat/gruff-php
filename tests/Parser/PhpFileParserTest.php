@@ -9,14 +9,16 @@ use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers PHP file parsing into analysis units and reporting of syntax errors as parse diagnostics.
+ * Covers conversion of PHP source fixtures into analysis units.
+ * Checks syntax-error diagnostics and nonfatal limits on structural parsing.
+ * Checks that text-source fixtures remain unbounded and have no diagnostics.
  */
 final class PhpFileParserTest extends TestCase
 {
     /**
-     * Verify parses valid PHP file into analysis unit.
+     * Checks that the valid fixture produces a populated analysis unit without parse errors.
      *
-     * @return void
+     * @return void - Asserts nonempty statements and tokens, a positive line count, and no parse errors.
      */
     public function testParsesValidPhpFileIntoAnalysisUnit(): void
     {
@@ -30,9 +32,9 @@ final class PhpFileParserTest extends TestCase
     }
 
     /**
-     * Verify reports syntax error diagnostic.
+     * Malformed PHP is represented by a parser diagnostic instead of parsed statements.
      *
-     * @return void
+     * @return void - Asserts one diagnostic with a nonempty message and positive line number, and no statements.
      */
     public function testReportsSyntaxErrorDiagnostic(): void
     {
@@ -47,9 +49,9 @@ final class PhpFileParserTest extends TestCase
     }
 
     /**
-     * Verify either bound degrades PHP to raw text without marking it unanalysed.
+     * Checks the raw-text unit and diagnostic returned with both parsing limits set to one.
      *
-     * @return void
+     * @return void - Asserts retained source, no statements or tokens, and one nonfatal budget diagnostic.
      */
     public function testDeepScanBudgetProducesNonfatalRawTextUnit(): void
     {
@@ -72,9 +74,9 @@ final class PhpFileParserTest extends TestCase
     }
 
     /**
-     * Verify the guard is never applied to non-code text, even above both limits.
+     * Checks that a text-source fixture is unbounded with both parsing limits set to one.
      *
-     * @return void
+     * @return void - Asserts retained source and no budget or parse diagnostics.
      */
     public function testDeepScanBudgetDoesNotApplyToTextSources(): void
     {
@@ -92,9 +94,9 @@ final class PhpFileParserTest extends TestCase
     /**
      * Resolve a parser fixture path.
      *
-     * @param string $path - Filesystem path.
+     * @param string $path - Fixture path relative to tests/Fixtures/Source.
      *
-     * @return string - absolute, realpath-resolved path to the named fixture; the assertion guarantees the file exists
+     * @return string - Canonical fixture path after asserting that realpath() returned a string.
      */
     private function fixturePath(string $path): string
     {

@@ -12,21 +12,19 @@ use PhpParser\Token;
 /**
  * Carries a parsed source file, AST statements, tokens, and parse diagnostics.
  *
- * The `statements`, `tokens`, and `source` properties are intentionally mutable
- * so the analysis pipeline can release each unit's heavy contents after the
- * per-unit rule phase, while the `file` / `diagnostics` shell stays around for
- * project-level rules and reporting metadata.
+ * Mutable `statements`, `tokens`, and `source` let the pipeline release parsed contents after their consumers finish.
+ * Readonly `file` and `diagnostics` remain available for project-level rules and reporting.
  */
 final class AnalysisUnit
 {
     /**
-     * Bundles a parsed file's source, statements, comment tokens, and any parse diagnostics.
+     * Bundles a file's source, statements, retained parser tokens, and diagnostics.
      *
      * @param SourceFile            $file        - Source file that produced this analysis unit.
      * @param string                $source      - Raw source text.
      * @param list<Stmt>            $statements  - Parsed top-level statements.
-     * @param list<Token>           $tokens      - Comment tokens emitted by the parser.
-     * @param list<ParseDiagnostic> $diagnostics - Parse diagnostics collected for the file; empty when it parsed cleanly.
+     * @param list<Token>           $tokens      - Parser tokens retained for analysis.
+     * @param list<ParseDiagnostic> $diagnostics - Parse failures or nonfatal limit notices; empty when none were recorded.
      */
     public function __construct(
         public readonly SourceFile $file,
@@ -40,7 +38,7 @@ final class AnalysisUnit
     /**
      * Reports whether this file hit fatal parse trouble, which is what marks it as unanalysed in reports.
      *
-     * @return bool - True when the unit has at least one parse diagnostic.
+     * @return bool - True when at least one diagnostic is fatal; false for an empty list or nonfatal notices only.
      */
     public function hasParseErrors(): bool
     {
@@ -72,37 +70,32 @@ final class AnalysisUnit
     /**
      * Counts the source lines, used by size rules and reporting to describe how big the file is.
      *
-     * @return int - Number of lines; zero for an empty source string.
+     * @return int - Newline-delimited segment count, including a trailing empty segment; zero for empty source.
      */
     public function lineCount(): int
     {
-        // An empty file has no lines at all.
+
         if ($this->source === '') {
             // An empty file has no lines; count zero rather than reporting a phantom first line.
             return 0;
         }
 
-        // Add one because the final line carries no trailing newline, so newline count undercounts by one.
+
         return substr_count($this->source, "\n") + 1;
     }
 
     /**
-     * Releases the unit's heavy parsed contents so the AST, token, and source memory can be reclaimed
-     * once per-file rules are done, keeping only the file/diagnostics shell that reporting still needs.
-     *
-     * Project rules that have already extracted what they
-     * need from this unit will not touch it again; the `file` and `diagnostics`
-     * shell stays intact for reporting.
+     * Clears source, statements, and tokens after their consumers finish, keeping file metadata and diagnostics for reporting.
      *
      * @return void - Unit is left in a released state with empty contents.
      */
     public function release(): void
     {
-        // Break ParentConnectingVisitor's back-edges so PHP's reference
-        // counter can free each node immediately, rather than waiting for the
-        // cycle collector. This matters at scale (4-5GB peak on large-project
-        // scans without it) because every AST node holds a `parent`
-        // attribute pointing up the tree.
+        // Remove parent-child cycles before dropping the statements to avoid relying on PHP's cycle collector.
+
+
+
+
         foreach ($this->statements as $statement) {
             self::breakParentLinks($statement);
         }
@@ -112,30 +105,28 @@ final class AnalysisUnit
     }
 
     /**
-     * Recursively nulls the `parent` attribute every node carries from ParentConnectingVisitor, so the
-     * AST stops being a reference cycle and PHP can free it promptly.
+     * Clears parent attributes throughout a subtree to break the AST's parent-child reference cycles.
      *
-     * @param Node $node - Subtree root to descend; its `parent` back-edge and every descendant's are nulled in
-     *                   place.
+     * @param Node $node - Root of the subtree whose parent links are cleared in place.
      *
-     * @return void
+     * @return void - Parent attributes are null throughout the subtree.
      */
     private static function breakParentLinks(Node $node): void
     {
         $node->setAttribute('parent', null);
-        // Walk every child of this node, clearing parent links as we descend.
+
         foreach ($node->getSubNodeNames() as $subNodeName) {
             $subNodeValue = $node->{$subNodeName};
-            // A single child node: recurse straight into it.
+
             if ($subNodeValue instanceof Node) {
                 self::breakParentLinks($subNodeValue);
                 continue;
             }
-            // A list of children: recurse into each node it holds.
+
             if (is_array($subNodeValue)) {
-                // Descend into each node element of the child list.
+
                 foreach ($subNodeValue as $item) {
-                    // Only actual nodes carry the parent links we need to clear.
+
                     if ($item instanceof Node) {
                         self::breakParentLinks($item);
                     }

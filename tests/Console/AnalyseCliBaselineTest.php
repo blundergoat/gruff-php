@@ -16,9 +16,9 @@ final class AnalyseCliBaselineTest extends CliTestCase
     /**
      * Verify analyse command writes trend history file.
      *
-     * @throws JsonException
+     * @throws JsonException - When the CLI report or stored trend history is invalid JSON.
      *
-     * @return void
+     * @return void - Asserts that analysis writes one trend entry and exposes trend metadata.
      */
     public function testAnalyseCommandWritesTrendHistoryFile(): void
     {
@@ -59,9 +59,9 @@ final class AnalyseCliBaselineTest extends CliTestCase
     /**
      * Verify changed-region runs record a diff-scope trend entry without a cross-scope delta.
      *
-     * @throws JsonException
+     * @throws JsonException - When the CLI report cannot be decoded as JSON.
      *
-     * @return void
+     * @return void - Asserts separate trend scopes and no previous score or delta for the first diff run.
      */
     public function testChangedRegionTrendRecordsDiffScopeWithoutCrossScopeDelta(): void
     {
@@ -90,9 +90,9 @@ final class AnalyseCliBaselineTest extends CliTestCase
     /**
      * Verify analyse command generates and applies baseline.
      *
-     * @throws JsonException
+     * @throws JsonException - When the CLI report cannot be decoded as JSON.
      *
-     * @return void
+     * @return void - Asserts explicit baseline creation and suppression of the recorded finding.
      */
     public function testAnalyseCommandGeneratesAndAppliesBaseline(): void
     {
@@ -155,9 +155,9 @@ final class AnalyseCliBaselineTest extends CliTestCase
     }
 
     /**
-     * Verify analyse command rejects invalid baseline JSON.
+     * Verify analyse rejects a baseline with an invalid schema version.
      *
-     * @return void
+     * @return void - Asserts a baseline-schema diagnostic and usage-error exit.
      */
     public function testAnalyseCommandRejectsInvalidBaselineJson(): void
     {
@@ -190,7 +190,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
     /**
      * Verify a legacy v1 baseline fails closed with a regenerate instruction instead of parsing silently.
      *
-     * @return void
+     * @return void - Asserts refusal of a v1 baseline and advice to regenerate it.
      */
     public function testAnalyseCommandFailsClosedOnLegacyV1Baseline(): void
     {
@@ -228,7 +228,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
      * Verify every command a v1-baseline refusal prints actually works against a v1 file at the default filename, so
      * no refusal sends the user to another refusal.
      *
-     * @return void
+     * @return void - Asserts that every suggested recovery command succeeds against the rejected v1 file.
      */
     public function testEveryCommandAV1RefusalPrintsWorks(): void
     {
@@ -240,7 +240,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
             $v1Baseline = '{"schemaVersion":"gruff.baseline.v1","findings":[]}';
             file_put_contents($project . '/gruff-baseline.json', $v1Baseline);
 
-            // Each route a user can take with a v1 file, and the refusal it meets first.
+            // Each tested v1-baseline route and the refusal it meets first.
             $refusals = [
                 ['analyse', 'src', '--baseline', 'gruff-baseline.json'],
                 ['analyse', 'src', '--migrate-baseline', 'gruff-baseline.json', '--generate-baseline', 'migrated.json'],
@@ -256,7 +256,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
                 self::assertSame(2, $refusal->getExitCode(), $refusalText);
                 self::assertStringNotContainsString('--migrate-baseline gruff-baseline.json', $refusalText, 'A v1 file cannot be migrated.');
 
-                // Every backticked gruff-php command the refusal prints is advice the user will follow.
+                // Extract every backticked gruff-php command so the test can verify the printed recovery advice.
                 preg_match_all('/`gruff-php ([^`]+)`/', $refusalText, $matches);
                 $advisedCommands = [...$advisedCommands, ...$matches[1]];
             }
@@ -281,9 +281,9 @@ final class AnalyseCliBaselineTest extends CliTestCase
     /**
      * Verify analyse command writes and auto applies default baseline file.
      *
-     * @throws JsonException
+     * @throws JsonException - When the CLI report cannot be decoded as JSON.
      *
-     * @return void
+     * @return void - Asserts default-path baseline generation and automatic suppression on the next run.
      */
     public function testAnalyseCommandWritesAndAutoAppliesDefaultBaselineFile(): void
     {
@@ -347,9 +347,9 @@ final class AnalyseCliBaselineTest extends CliTestCase
     /**
      * Verify analyse command skips auto baseline with no baseline flag.
      *
-     * @throws JsonException
+     * @throws JsonException - When the CLI report cannot be decoded as JSON.
      *
-     * @return void
+     * @return void - Asserts that disabling the default baseline exposes the finding and omits baseline metadata.
      */
     public function testAnalyseCommandSkipsAutoBaselineWithNoBaselineFlag(): void
     {
@@ -399,9 +399,9 @@ final class AnalyseCliBaselineTest extends CliTestCase
     /**
      * Verify analyse command shows new findings after baseline generation.
      *
-     * @throws JsonException
+     * @throws JsonException - When the CLI report cannot be decoded as JSON.
      *
-     * @return void
+     * @return void - Asserts suppression of recorded debt while findings in a new file remain visible.
      */
     public function testAnalyseCommandShowsNewFindingsAfterBaselineGeneration(): void
     {
@@ -461,9 +461,9 @@ final class AnalyseCliBaselineTest extends CliTestCase
     /**
      * Verify analyse command reports stale baseline entries.
      *
-     * @throws JsonException
+     * @throws JsonException - When the CLI report cannot be decoded as JSON.
      *
-     * @return void
+     * @return void - Asserts that fixing the recorded finding marks one baseline entry stale.
      */
     public function testAnalyseCommandReportsStaleBaselineEntries(): void
     {
@@ -515,7 +515,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
     /**
      * Verify analyse command rejects no baseline combined with baseline.
      *
-     * @return void
+     * @return void - Asserts rejection of conflicting baseline-selection flags.
      */
     public function testAnalyseCommandRejectsNoBaselineCombinedWithBaseline(): void
     {
@@ -546,7 +546,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
     /**
      * Verify analyse command rejects baseline combined with generate baseline.
      *
-     * @return void
+     * @return void - Asserts rejection of simultaneous baseline loading and generation.
      */
     public function testAnalyseCommandRejectsBaselineCombinedWithGenerateBaseline(): void
     {
@@ -577,9 +577,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
     /**
      * Verify resolving a baselined finding reports it as a resolved bucket and lists it only with the flag.
      *
-     * @throws JsonException
-     *
-     * @return void
+     * @return void - Asserts resolved counts and opt-in resolved-entry details in text and Markdown.
      */
     public function testBaselineIncludeAbsentListsResolvedEntries(): void
     {
@@ -613,9 +611,9 @@ final class AnalyseCliBaselineTest extends CliTestCase
     /**
      * Verify a new finding and a still-matching finding land in the new and unchanged buckets.
      *
-     * @throws JsonException
+     * @throws JsonException - When the CLI report cannot be decoded as JSON.
      *
-     * @return void
+     * @return void - Asserts that existing debt stays unchanged and an added file creates new findings.
      */
     public function testBaselineMovementCountsNewAndUnchanged(): void
     {
@@ -644,9 +642,9 @@ final class AnalyseCliBaselineTest extends CliTestCase
     /**
      * Verify a line inserted above a baselined finding leaves the accepted debt suppressed.
      *
-     * @throws JsonException
+     * @throws JsonException - When the CLI report cannot be decoded as JSON.
      *
-     * @return void
+     * @return void - Asserts that a source-line shift preserves baseline suppression and movement counts.
      */
     public function testLineShiftAboveBaselinedFindingKeepsItSuppressed(): void
     {
@@ -684,11 +682,11 @@ final class AnalyseCliBaselineTest extends CliTestCase
     }
 
     /**
-     * Verify a review stays on its `@var` assertion when an earlier assertion of the same variable starts warning.
+     * Verify a review stays on its @var assertion when an earlier assertion of the same variable starts warning.
      *
-     * @throws JsonException
+     * @throws JsonException - When the CLI report cannot be decoded as JSON.
      *
-     * @return void
+     * @return void - Asserts that the earlier newly bare annotation is new while the later review stays bound.
      */
     public function testEarlierVarAssertionThatStartsWarningDoesNotInheritTheReview(): void
     {
@@ -752,16 +750,16 @@ final class AnalyseCliBaselineTest extends CliTestCase
     /**
      * Verify --fail-on-new trips on instances beyond a group's accepted count and passes within it.
      *
-     * @throws JsonException
+     * @throws JsonException - When the CLI report cannot be decoded as JSON.
      *
-     * @return void
+     * @return void - Asserts a failing gate above the accepted count and zero new findings within it.
      */
     public function testFailOnNewGatesOnGroupCountOverflow(): void
     {
         $project = $this->createBaselineProject();
 
         try {
-            // Two anonymous classes sharing an undocumented method name emit two error findings
+            // Two anonymous classes sharing an undocumented method name emit two findings
             // with identical (file, ruleId, message) identity, so they land in one baseline group.
             file_put_contents(
                 $project . '/src/Handlers.php',
@@ -815,13 +813,12 @@ final class AnalyseCliBaselineTest extends CliTestCase
     }
 
     /**
-     * Write a one-row v3 baseline reviewing the anonymous-class handler findings, which share one identity because both methods
-     * carry the symbol `class@anonymous::handle()`.
+     * Write a one-row v3 baseline for the shared anonymous-class handler identity used by the count-overflow test.
      *
      * @param string $project       - Fixture project root the baseline is written into.
      * @param int    $acceptedCount - Reviewed occurrence count for the shared identity.
      *
-     * @return void
+     * @return void - Writes the requested accepted count for the shared handler identity.
      */
     private function writeHandlerGroupBaseline(string $project, int $acceptedCount): void
     {
@@ -840,9 +837,9 @@ final class AnalyseCliBaselineTest extends CliTestCase
     /**
      * Verify changed-only runs do not mark unscanned baseline entries absent.
      *
-     * @throws JsonException
+     * @throws JsonException - When the CLI report cannot be decoded as JSON.
      *
-     * @return void
+     * @return void - Asserts that a diff run reports new findings without marking unscanned debt absent.
      */
     public function testChangedOnlyBaselineDoesNotMarkUnscannedEntriesAbsent(): void
     {
@@ -879,9 +876,9 @@ final class AnalyseCliBaselineTest extends CliTestCase
      * Run the analyse CLI inside a project directory and return the finished process.
      *
      * @param string       $project - Working directory the binary runs in, so relative paths resolve against it.
-     * @param list<string> $args    - CLI arguments passed after the binary.
+     * @param list<string> $args    - CLI arguments passed after the binary; command failures fail the test.
      *
-     * @return Process - Completed analyse process.
+     * @return Process - Completed CLI process after its successful exit has been asserted.
      */
     private function runInProject(string $project, array $args): Process
     {
@@ -896,9 +893,9 @@ final class AnalyseCliBaselineTest extends CliTestCase
      * Run git inside a fixture project.
      *
      * @param string       $project - Fixture repository root.
-     * @param list<string> $args    - Git arguments.
+     * @param list<string> $args    - Git arguments executed in the fixture repository.
      *
-     * @return void
+     * @return void - Asserts that the fixture Git command completes successfully.
      */
     private function gitInProject(string $project, array $args): void
     {

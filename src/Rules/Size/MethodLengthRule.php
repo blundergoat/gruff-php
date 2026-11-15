@@ -21,12 +21,12 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 
 /**
- * Flags a method, function, or closure whose logical body runs long, since a callable that spans many
- * statements is usually doing more than one job and is hard to read top to bottom.
+ * Reports methods, named functions and closures whose logical statement-line count exceeds the configured budget.
+ * Counts distinct start lines of non-Nop statements found inside each body.
  *
- * Runs per file over every callable, counting logical lines - distinct start lines of non-`Nop`
- * statements inside the body - against the threshold (default error above 100). Multi-line constructor
- * calls, fluent builders, and array literals count as one logical line per statement boundary. See ADR-012.
+ * Statements sharing a start line count once; nested callable bodies also contribute statement start lines.
+ * The default threshold is 100 lines; lower-band findings are advisory under LimitBand.
+ * See ADR-012 for the counting contract.
  */
 final readonly class MethodLengthRule implements RuleInterface
 {
@@ -55,12 +55,12 @@ final readonly class MethodLengthRule implements RuleInterface
     }
 
     /**
-     * Reports each callable whose logical line count runs over the configured budget.
+     * Reports methods, functions and closures that exceed the logical-line budget.
      *
-     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit containing the callable bodies to measure.
+     * @param RuleContext $ruleContext - Supplies the effective thresholds for this rule.
      *
-     * @return list<Finding> - Findings for long callables.
+     * @return list<Finding> - One finding per measured callable above its limit; empty when none qualify.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -71,9 +71,9 @@ final readonly class MethodLengthRule implements RuleInterface
 
         $findings = [];
 
-        // Measure each method, function, and closure in the file.
+
         foreach ($nodes as $node) {
-            // Only real callables are measured.
+
             if (!$node instanceof ClassMethod && !$node instanceof Function_ && !$node instanceof Closure) {
                 continue;
             }
@@ -81,7 +81,7 @@ final readonly class MethodLengthRule implements RuleInterface
             $startLine = $node->getStartLine();
             $endLine   = $node->getEndLine();
 
-            // Skip a synthetic node with no line span.
+            // A callable without a source span cannot anchor a finding, so leave it unreported.
             if ($startLine < 0 || $endLine < 0) {
                 continue;
             }
@@ -89,7 +89,7 @@ final readonly class MethodLengthRule implements RuleInterface
             $length         = NodeIndex::logicalStatementLineCount($node);
             $thresholdMatch = $settings->highValueThresholdMatch($length);
 
-            // A callable within budget is fine, so skip it.
+
             if ($thresholdMatch === null) {
                 continue;
             }
@@ -138,7 +138,7 @@ final readonly class MethodLengthRule implements RuleInterface
      */
     private function resolveSymbol(Node $node): string
     {
-        // A method is qualified by its owning type name.
+
         if ($node instanceof ClassMethod) {
             $parent    = $node->getAttribute('parent');
             $className = $parent instanceof Node\Stmt\Class_
@@ -147,14 +147,14 @@ final readonly class MethodLengthRule implements RuleInterface
                 ? ($parent->name?->toString() ?? 'class@anonymous')
                 : null;
 
-            // Qualify with the owning type when known; an anonymous class leaves just the bare method name.
+            // Anonymous classes use class@anonymous; a missing or unsupported parent leaves the method unqualified.
             return $className !== null
                 ? sprintf('%s::%s()', $className, $node->name->toString())
                 : $node->name->toString() . '()';
         }
 
         if ($node instanceof Function_) {
-            // A free function is identified by its own name alone.
+
             return $node->name->toString() . '()';
         }
 
@@ -171,7 +171,7 @@ final readonly class MethodLengthRule implements RuleInterface
      */
     private function formatNumber(int|float $number): string
     {
-        // A genuine fraction keeps its decimals; a whole value is shown without them.
+
         if (is_float($number) && floor($number) !== $number) {
             return (string) $number;
         }

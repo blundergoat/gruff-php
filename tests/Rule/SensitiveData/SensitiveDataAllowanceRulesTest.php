@@ -17,8 +17,9 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers sensitive-data allowance precision: real secrets and real personal data keep reporting.
- * Synthetic PII, such as a reserved-domain email or a `fake` street address, passes the built-in allowances.
+ * Covers sensitive-data allowance precision for secret and contact-data fixtures.
+ * Positive cases compare JWT, AWS-key and realistic PII findings with exact source lines.
+ * Synthetic PII cases expect no findings from the built-in reserved-domain and address-marker allowances.
  */
 final class SensitiveDataAllowanceRulesTest extends TestCase
 {
@@ -28,7 +29,7 @@ final class SensitiveDataAllowanceRulesTest extends TestCase
     /** Real-secret counter-fixture whose JWT and AWS key must always flag under their dedicated rules. */
     private const SECRET_FIXTURE = 'tests/Fixtures/SensitiveData/secret-counter-shapes.php';
 
-    /** Realistic PII counter-fixture: every value in it must always flag. */
+    /** PII counter-fixture whose exact expected finding lines are supplied by the data provider. */
     private const PII_REALISTIC_FIXTURE = 'tests/Fixtures/SensitiveData/pii-realistic.php';
 
     /** Synthetic PII shapes covered by the reserved-domain and marker-word allowances. */
@@ -37,17 +38,16 @@ final class SensitiveDataAllowanceRulesTest extends TestCase
     /**
      * List fixture/rule pairs with the exact lines each rule must flag.
      *
-     * @return array<string, array{0: string, 1: string, 2: list<int>}> - dataset name to fixture path, rule id, and the exact ascending lines the
-     *                       rule must flag (empty when the fixture must stay quiet)
+     * @return array<string, array{0: string, 1: string, 2: list<int>}> - Named fixture/rule cases with sorted lines; empty lines expect no findings.
      */
     public static function fixtureLineExpectations(): array
     {
         return [
             'JWT literal flags under the dedicated JWT rule'                         => [self::SECRET_FIXTURE, JwtTokenRule::ID, [9]],
             'AWS key id flags under the dedicated AWS rule'                          => [self::SECRET_FIXTURE, AwsAccessKeyRule::ID, [8]],
-            // 8-12: a mailto link, an email after a realm, one in a URL path, a near mirror and a subdomain mirror are mailboxes.
+            // A mailto link, an email after a realm, one in a URL path, a near mirror and a subdomain mirror must still produce findings.
             'realistic email, address, and phone PII flags'                          => [self::PII_REALISTIC_FIXTURE, PiiTestFixtureRule::ID, [5, 6, 7, 8, 9, 10, 11, 12]],
-            // 9-13: realm values (plain and escaped), URL userinfo and a local part that repeats its domain are not mailboxes.
+            // Realm values, URL userinfo and a local part that repeats its domain are exempt from mailbox findings.
             'reserved-domain emails and marker addresses pass the PII gate'          => [self::PII_SYNTHETIC_FIXTURE, PiiTestFixtureRule::ID, []],
         ];
     }
@@ -59,7 +59,7 @@ final class SensitiveDataAllowanceRulesTest extends TestCase
      * @param string    $ruleId - Rule whose findings are isolated.
      * @param list<int> $expectedLines - Lines the rule must flag, in ascending order.
      *
-     * @return void
+     * @return void - Asserts the selected rule's sorted finding lines equal the supplied list.
      */
     #[DataProvider('fixtureLineExpectations')]
     public function testFixtureLinesFlagExactly(string $fixturePath, string $ruleId, array $expectedLines): void

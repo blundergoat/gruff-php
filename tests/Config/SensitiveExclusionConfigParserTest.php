@@ -12,20 +12,16 @@ use JsonException;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
- * Covers the `sensitiveExclusions:` config block a user writes to accept a reviewed sensitive-data
- * finding.
- *
- * The accepted shapes prove a narrow scope survives loading with its rationale intact; the rejected
- * shapes are the numbered rejections of the family suppression contract, each of which must stop the
- * user's run with a message naming the entry index and the offending key rather than quietly hiding
- * findings. Users exercise these paths whenever a project config accepts a synthetic credential.
+ * Checks which sensitiveExclusions entries the real configuration loader accepts or rejects.
+ * Accepted cases check stored fields, entry order, and the empty result when the block is absent.
+ * Rejected cases expect ConfigException messages containing the supplied diagnostic text.
  */
 final class SensitiveExclusionConfigParserTest extends ConfigLoaderTestCase
 {
     /**
-     * Valid entry every rejection row starts from, so a row states only the field under test.
+     * Supplies valid defaults so entryJson() can isolate an overridden or additional field.
      *
-     * @var array<string, string>
+     * @var array<string, string> - Default rule, path, and rationale used by entryJson().
      */
     private const VALID_ENTRY = [
         'rule'   => 'sensitive-data.aws-access-key',
@@ -34,10 +30,10 @@ final class SensitiveExclusionConfigParserTest extends ConfigLoaderTestCase
     ];
 
     /**
-     * Verifies a reviewed entry loads with its rule, path, and rationale intact and no symbol.
+     * Verifies a file-scoped entry loads with its rule, path, and rationale intact and no symbol.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts one entry's rule, path, reason, and null symbol.
+     * @throws JsonException - If encoding a configuration fixture as JSON fails.
      */
     public function testLoadsFileScopedExclusion(): void
     {
@@ -55,10 +51,10 @@ final class SensitiveExclusionConfigParserTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Verifies an optional symbol is accepted and narrows the entry below file scope.
+     * Verifies that an optional symbol is retained on a loaded exclusion.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts one loaded entry with the supplied symbol.
+     * @throws JsonException - If encoding a configuration fixture as JSON fails.
      */
     public function testLoadsSymbolScopedExclusion(): void
     {
@@ -74,11 +70,10 @@ final class SensitiveExclusionConfigParserTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Verifies two entries with different scopes both survive loading, in configuration order, so
-     * each owns its own audit index.
+     * Verifies that two configured exclusions load in the supplied rule order.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts two entries and their rule IDs in configuration order.
+     * @throws JsonException - If encoding a configuration fixture as JSON fails.
      */
     public function testLoadsTwoIndependentExclusions(): void
     {
@@ -93,9 +88,9 @@ final class SensitiveExclusionConfigParserTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Verifies an omitted block leaves the run with nothing suppressed, so the section stays opt-in.
+     * Verifies that a standalone config without sensitiveExclusions loads an empty exclusion list.
      *
-     * @return void
+     * @return void - Asserts that the config produces no sensitive exclusions.
      */
     public function testOmittedBlockSuppressesNothing(): void
     {
@@ -103,14 +98,14 @@ final class SensitiveExclusionConfigParserTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Verifies each rejected shape stops the user's run with its exact actionable message, and that
-     * the message names the term the cross-port acceptance cases require a reader to see.
+     * Checks that an invalid exclusion makes configuration loading raise ConfigException.
+     * The expected message text must name the required term and occur in the exception message.
      *
-     * @param string $configJson - Inline JSON config carrying the rejected `sensitiveExclusions` shape.
-     * @param string $expectedMessage - Exact message the user must receive for this case.
-     * @param string $requiredMention - Term the family case file requires the diagnostic to name.
+     * @param string $configJson - Inline JSON config carrying the rejected sensitiveExclusions shape.
+     * @param string $expectedMessage - Text that the thrown ConfigException message must contain.
+     * @param string $requiredMention - Term the expected message text must contain.
      *
-     * @return void
+     * @return void - Asserts the required term and expects ConfigException with the specified message text.
      */
     #[DataProvider('rejectedExclusionProvider')]
     public function testRejectsInvalidExclusion(string $configJson, string $expectedMessage, string $requiredMention): void
@@ -126,11 +121,10 @@ final class SensitiveExclusionConfigParserTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Provides one row per numbered rejection in the family suppression contract, so a failed row
-     * identifies which guarantee broke.
+     * Supplies invalid exclusion configurations and diagnostic expectations for the loader test.
      *
-     * @return array<string, array{string, string, string}> - config JSON, exact expected message, and the term the diagnostic must mention.
-     * @throws JsonException
+     * @return array<string, array{string, string, string}> - Named rows of config JSON, required message text, and a required term.
+     * @throws JsonException - If encoding a configuration fixture as JSON fails.
      */
     public static function rejectedExclusionProvider(): array
     {
@@ -142,10 +136,10 @@ final class SensitiveExclusionConfigParserTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Rejections 1 to 4: `rule` must name exactly one known sensitive-data rule id.
+     * Provide cases for rejecting values that do not name one known sensitive-data rule ID.
      *
-     * @return array<string, array{string, string, string}> - config JSON, exact expected message, and the term the diagnostic must mention.
-     * @throws JsonException
+     * @return array<string, array{string, string, string}> - Named rows of config JSON, required message text, and a required term.
+     * @throws JsonException - If encoding a configuration fixture as JSON fails.
      */
     private static function ruleRejections(): array
     {
@@ -178,10 +172,10 @@ final class SensitiveExclusionConfigParserTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Rejection 5: `path` must name exactly one project-relative file.
+     * Provide cases for rejecting paths that do not name exactly one project-relative file.
      *
-     * @return array<string, array{string, string, string}> - config JSON, exact expected message, and the term the diagnostic must mention.
-     * @throws JsonException
+     * @return array<string, array{string, string, string}> - Named rows of config JSON, required message text, and a required term.
+     * @throws JsonException - If encoding a configuration fixture as JSON fails.
      */
     private static function pathRejections(): array
     {
@@ -204,10 +198,10 @@ final class SensitiveExclusionConfigParserTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Rejections 6 to 8: unsupported keys, a missing rationale, and a duplicated scope.
+     * Provide cases for rejecting unsupported keys, missing rationales, and duplicate scopes.
      *
-     * @return array<string, array{string, string, string}> - config JSON, exact expected message, and the term the diagnostic must mention.
-     * @throws JsonException
+     * @return array<string, array{string, string, string}> - Named rows of config JSON, required message text, and a required term.
+     * @throws JsonException - If encoding a configuration fixture as JSON fails.
      */
     private static function entryRejections(): array
     {
@@ -253,13 +247,12 @@ final class SensitiveExclusionConfigParserTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Builds a one-entry config from the valid entry with the supplied keys overridden or added, so
-     * a rejection row changes exactly one thing.
+     * Builds a one-entry rejection fixture from valid defaults and supplied field changes.
      *
      * @param array<string, string> $overrides - Entry keys to override or add.
      *
-     * @return string - inline JSON config carrying exactly one `sensitiveExclusions` entry.
-     * @throws JsonException
+     * @return string - inline JSON config carrying exactly one sensitiveExclusions entry.
+     * @throws JsonException - If encoding a configuration fixture as JSON fails.
      */
     private static function entryJson(array $overrides): string
     {
@@ -267,12 +260,12 @@ final class SensitiveExclusionConfigParserTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Encodes a whole `sensitiveExclusions` block as the inline JSON the loader reads.
+     * Encodes a whole sensitiveExclusions block as the inline JSON the loader reads.
      *
      * @param list<array<string, string>> $entries - Entries to encode, in configuration order.
      *
-     * @return string - inline JSON config carrying the supplied entries under `sensitiveExclusions`.
-     * @throws JsonException
+     * @return string - inline JSON config carrying the supplied entries under sensitiveExclusions.
+     * @throws JsonException - If JSON encoding of the entries fails.
      */
     private static function configJson(array $entries): string
     {
@@ -284,7 +277,7 @@ final class SensitiveExclusionConfigParserTest extends ConfigLoaderTestCase
      *
      * @param string $configJson - Inline JSON config to write to disk and load.
      *
-     * @return list<SensitiveExclusion> - the loaded exclusions in configuration order; empty when the config declared none.
+     * @return list<SensitiveExclusion> - Resolved exclusions in configuration order; an omitted block retains any inherited entries.
      */
     private function loadExclusions(string $configJson): array
     {

@@ -7,26 +7,21 @@ namespace GruffPhp\Tests\Config;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Provides shared helpers for config loader tests.
+ * Shares temporary configuration-file setup between config-loader test classes.
+ * Checks temporary-file creation and writes through PHPUnit assertions.
+ * Supports explicit filename suffixes and optional schema-version injection.
  */
 abstract class ConfigLoaderTestCase extends TestCase
 {
     /**
-     * Write a temporary configuration file for loader assertions.
+     * Writes a temporary config file, optionally adding schemaVersion for compact fixture inputs.
+     * Disable injection to test a missing version; existing schemaVersion text leaves contents unchanged.
      *
-     * Auto-injects `schemaVersion: gruff-php.config.v0.1` when missing so
-     * pre-M11 tests keep their compact inline configs without each test
-     * needing to repeat the field. Tests that exercise the
-     * missing-schemaVersion error path pass `$shouldInjectSchemaVersion = false`
-     * so the contents reach disk verbatim; tests that exercise the
-     * wrong-schemaVersion error path include a non-canonical value
-     * explicitly and the auto-injection sees `schemaVersion` and skips.
+     * @param string $contents - Config file contents passed through the optional schema helper.
+     * @param string $suffix - Filename suffix appended to the generated temporary path; empty retains that path.
+     * @param bool $shouldInjectSchemaVersion - Whether to run schema injection before writing the file.
      *
-     * @param string $contents - Config file contents.
-     * @param string $suffix - File suffix.
-     * @param bool   $shouldInjectSchemaVersion - When false, write contents verbatim (used by schemaVersion-rejection tests).
-     *
-     * @return string - absolute on-disk path of the freshly written temp config file, ready to feed a ConfigLoader
+     * @return string - Absolute path of the written configuration file.
      */
     protected function writeTempConfig(string $contents, string $suffix = '.yaml', bool $shouldInjectSchemaVersion = true): string
     {
@@ -49,16 +44,16 @@ abstract class ConfigLoaderTestCase extends TestCase
     }
 
     /**
-     * Prepend the canonical schemaVersion when the test contents omit it.
+     * Prepend the canonical schemaVersion when the test contents contain no schemaVersion text.
      *
      * @param string $contents - Raw config contents supplied by the test.
      *
-     * @return string - the config body guaranteed to carry a schemaVersion; returned unchanged when one was already present
+     * @return string - Config text containing the schemaVersion term; existing occurrences leave the text unchanged.
      */
     private function ensureSchemaVersion(string $contents): string
     {
         if (str_contains($contents, 'schemaVersion')) {
-            // Test already declares a schemaVersion (often a wrong one on purpose); leave it untouched.
+            // The test already contains schemaVersion text, often an intentionally wrong value, so leave it untouched.
             return $contents;
         }
 
@@ -68,12 +63,12 @@ abstract class ConfigLoaderTestCase extends TestCase
         if ($trimmed !== '' && $trimmed[0] === '{') {
             $decoded = json_decode($contents, true);
             if (is_array($decoded)) {
-                // Inline JSON config: splice schemaVersion in as the first key, keeping the original payload.
+
                 return (string)json_encode(['schemaVersion' => $version] + $decoded, JSON_THROW_ON_ERROR);
             }
         }
 
-        // YAML (or non-JSON) contents: prepend the schemaVersion line above the test's original body.
+
         return sprintf("schemaVersion: %s\n%s", $version, $contents);
     }
 }

@@ -9,15 +9,9 @@ use GruffPhp\Results\Finding\DeclarationInventory;
 use GruffPhp\Results\Finding\Finding;
 
 /**
- * Reconciles a fresh scan against the debt the user already reviewed, so only genuinely new problems stop the run.
- *
- * This is the engine behind `gruff-php analyse --baseline gruff-baseline.json`. Each live finding is classified in this order:
- * - not eligible: a sensitive finding, which no baseline entry may hide;
- * - collision: an identity covering two declarations, reported and never hidden;
- * - unchanged: within the count the user reviewed for that identity, hidden from the failing set;
- * - new: absent from the baseline or beyond its count, still fails the run.
- *
- * Section 13 exclusions are removed before findings reach this class, so an excluded finding never competes for a label here.
+ * Reconciles a scan with reviewed baseline counts, keeping unsuppressed findings available for scoring.
+ * Ineligible findings and collisions stay visible; other findings within the reviewed count are suppressed and excess findings remain new.
+ * Full scans also report absent reviewed occurrences; diff-scoped scans skip that comparison.
  *
  * @phpstan-type Collision array{identity: string, ruleId: string, path: string, subjects: list<string>}
  * @phpstan-type IdentityGroup array{findings: list<Finding>, positions: array<string, true>, subjects: list<string>, ruleId: string, path: string}
@@ -31,16 +25,16 @@ final readonly class BaselineFilter
      *
      * @param BaselineData  $baseline - The debt the user previously reviewed, one row per identity.
      * @param list<Finding> $findings - This run's live findings; empty means nothing to match, so every reviewed row resolves on a full scan.
-     * @param bool          $hasDiffScope - True when the scan covered only changed files, which turns off resolved-debt detection because unscanned files would look falsely resolved.
-     * @param DeclarationInventory|null $inventory - Scanned variable occurrences per file, so a variable's ordinal counts every occurrence; null ranks among findings alone.
+     * @param bool $hasDiffScope - True to skip absent-debt detection because unscanned files cannot prove resolution.
+     * @param DeclarationInventory|null $inventory - Scanned variable positions for stable ordinals; null ranks variables from findings only.
      *
-     * @return array{findings: list<Finding>, new: list<Finding>, unchanged: list<Finding>, statuses: array<int, string>, collisions: list<Collision>, report: BaselineReport} - "findings" is the gated set
-     *                         the user must still act on (new, collision, and not-eligible findings in scan order), "unchanged" the hidden ones, and "report" the movement summary.
-     * @throws BaselineException When the baseline was written by another port, or a finding cannot be identified.
+     * @return array{findings: list<Finding>, new: list<Finding>, unchanged: list<Finding>, statuses: array<int, string>, collisions: list<Collision>, report: BaselineReport}
+     *     - findings: new/collision/ineligible in scan order; unchanged: hidden findings; statuses, collisions; report: movement.
+     * @throws BaselineException - When the baseline was written by another port.
      */
     public function apply(BaselineData $baseline, array $findings, bool $hasDiffScope, ?DeclarationInventory $inventory = null): array
     {
-        // A baseline written by another port is refused before matching: applying it would report every row resolved and invite a destructive regenerate.
+        // Reject another port's baseline before its unmatched identities can be misreported as resolved debt.
         if ($baseline->toolLanguage !== BaselineIdentity::TOOL_LANGUAGE) {
             throw new BaselineException(
                 "Baseline {$baseline->path} was written by {$baseline->toolLanguage} and this run is " . BaselineIdentity::TOOL_LANGUAGE
@@ -51,14 +45,14 @@ final readonly class BaselineFilter
         $reviewedByIdentity = $baseline->byIdentity();
         $classification     = $this->classify($findings, $reviewedByIdentity, $inventory);
         $partition          = $this->partition($findings, $classification['statuses']);
-        // Only a full-project scan can prove reviewed debt was fixed; a diff-scoped run never opened the unchanged files, so it records the check as skipped.
+        // Skip absent-debt detection for diff-scoped runs because unscanned files would look resolved.
         $resolved = $hasDiffScope ? ['entries' => [], 'occurrences' => 0] : $this->resolvedSurplus($reviewedByIdentity, $classification);
 
         return [
             'findings'   => $partition['gated'],
             'new'        => $partition['new'],
             'unchanged'  => $partition['unchanged'],
-            // The status per finding travels out too, so a surface can report what the baseline made of each one.
+
             'statuses'   => $classification['statuses'],
             'collisions' => $classification['collisions'],
             'report'     => new BaselineReport(
@@ -78,21 +72,21 @@ final readonly class BaselineFilter
     }
 
     /**
-     * Labels every finding: sensitive ones not eligible before any lookup, then each identity group spent against its reviewed count.
+     * Labels findings without an identity as ineligible, detects identity collisions, and spends each remaining group against its reviewed count.
      *
      * @param list<Finding>                $findings - This run's live findings.
      * @param array<string, BaselineEntry> $reviewedByIdentity - The baseline's rows indexed by identity.
-     * @param DeclarationInventory|null $inventory - Scanned variable occurrences per file, so a variable's ordinal counts every occurrence; null ranks among findings alone.
+     * @param DeclarationInventory|null $inventory - Scanned variable positions for stable ordinals; null ranks only the supplied findings.
      *
-     * @return Classification - Status per `spl_object_id`, the identity groups, every collision, and the collided identities.
-     * @throws BaselineException When a finding cannot be identified.
+     * @return Classification - Status per spl_object_id, the identity groups, every collision, and the collided identities.
+     * @throws BaselineException - When a finding cannot be identified.
      */
     private function classify(array $findings, array $reviewedByIdentity, ?DeclarationInventory $inventory): array
     {
         $groups   = [];
         $statuses = [];
 
-        // Sensitive findings are labelled before any lookup, so no reviewed row can reach a secret; everything else is bucketed by identity.
+
         foreach ($this->groupEligibleFindings($findings, $inventory) as $identity => $group) {
             $groups[$identity] = $group;
         }
@@ -122,7 +116,7 @@ final readonly class BaselineFilter
 
             $reviewedCount = isset($reviewedByIdentity[$identity]) ? $reviewedByIdentity[$identity]->count : 0;
 
-            // The reviewed count is spent lowest line first, so two ports hide the same occurrences for identical input rather than merely the same number.
+            // Spend reviewed counts in line/column order so suppression is stable for occurrences at distinct locations.
             foreach ($this->spendOrder($group['findings']) as $position => $finding) {
                 $statuses[spl_object_id($finding)] = $position < $reviewedCount ? 'unchanged' : 'new';
             }
@@ -135,10 +129,10 @@ final readonly class BaselineFilter
      * Buckets every eligible finding by its identity, remembering the declarations and subjects each identity covers.
      *
      * @param list<Finding> $findings - This run's live findings.
-     * @param DeclarationInventory|null $inventory - Scanned variable occurrences per file, so a variable's ordinal counts every occurrence; null ranks among findings alone.
+     * @param DeclarationInventory|null $inventory - Scanned variable positions for stable ordinals; null ranks only the supplied findings.
      *
      * @return array<string, IdentityGroup> - Identity to its occurrences; a sensitive finding appears in no group.
-     * @throws BaselineException When a finding cannot be identified.
+     * @throws BaselineException - When a finding cannot be identified.
      */
     private function groupEligibleFindings(array $findings, ?DeclarationInventory $inventory): array
     {
@@ -165,7 +159,7 @@ final readonly class BaselineFilter
     }
 
     /**
-     * Orders one identity's occurrences by line then column; an unlocated finding sorts last.
+     * Orders occurrences by line, then column; missing lines use PHP_INT_MAX and missing columns use zero.
      *
      * @param list<Finding> $groupFindings - Occurrences sharing one identity.
      *
@@ -185,9 +179,9 @@ final readonly class BaselineFilter
      * Splits the findings into the hidden set and the gated set, in scan order so the user's report lists them deterministically.
      *
      * @param list<Finding>      $findings - This run's live findings.
-     * @param array<int, string> $statuses - Status per `spl_object_id`.
+     * @param array<int, string> $statuses - Status per spl_object_id().
      *
-     * @return Partition - The partition and its counts.
+     * @return Partition - Scan-ordered gated, new, and unchanged lists, plus collision and ineligible counts.
      */
     private function partition(array $findings, array $statuses): array
     {
@@ -196,7 +190,7 @@ final readonly class BaselineFilter
         foreach ($findings as $finding) {
             $status = $statuses[spl_object_id($finding)] ?? 'new';
 
-            // Only an unchanged finding leaves the gated set; a collision or a sensitive finding stays visible and still fails the run.
+            // Only unchanged findings are suppressed; collisions and ineligible findings remain available for scoring.
             if ($status === 'unchanged') {
                 $partition['unchanged'][] = $finding;
                 continue;
@@ -217,10 +211,10 @@ final readonly class BaselineFilter
     }
 
     /**
-     * Finds every reviewed identity with fewer live occurrences than reviewed, which is debt the user has since fixed.
+     * Reports reviewed occurrence counts missing from non-colliding identities in the current scan.
      *
      * @param array<string, BaselineEntry> $reviewedByIdentity - The baseline's rows indexed by identity.
-     * @param Classification               $classification - The identity groups and collided identities from `classify()`.
+     * @param Classification               $classification - The identity groups and collided identities from classify().
      *
      * @return array{entries: list<BaselineEntry>, occurrences: int} - One resolved row per identity with its surplus, and the surplus total.
      */

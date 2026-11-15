@@ -26,7 +26,9 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers SARIF report rendering contracts.
+ * Tests SARIF rule metadata, finding locations, severity levels, and baseline fingerprints.
+ * Compares schema identifiers and finding rule IDs with native JSON output.
+ * Uses decoded payload assertions to inspect populated and unscored reports.
  *
  * @phpstan-type JsonScalar bool|float|int|object|string|null
  * @phpstan-type JsonLevel8 array<array-key, JsonScalar>
@@ -45,8 +47,8 @@ final class SarifReporterTest extends TestCase
     /**
      * Verify SARIF output preserves native report identity while exposing code-scanning metadata.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts registry metadata, result identity and location, and run properties.
+     * @throws JsonException - If decoding the rendered SARIF or native JSON fails.
      */
     public function testSarifReporterEmitsRegistryRulesResultIdentityAndRunProperties(): void
     {
@@ -122,7 +124,7 @@ final class SarifReporterTest extends TestCase
         self::assertSame($expectedStartColumn, $region['startColumn'] ?? null);
         self::assertSame($expectedEndLine, $region['endLine'] ?? null);
         $partialFingerprints = $this->stringKeyedArray($result, 'partialFingerprints');
-        // Code scanning groups alerts by the ratified durable identity, the same name baseline matching reads.
+        // Code scanning groups alerts by the stable finding identity also used for baseline matching.
         self::assertSame(
             BaselineIdentity::identityOf($finding, 1),
             $this->stringValue($partialFingerprints, 'gruffFingerprint'),
@@ -151,10 +153,10 @@ final class SarifReporterTest extends TestCase
     }
 
     /**
-     * Verify empty reports stay valid SARIF while omitting absent score data.
+     * Verify an empty report has no results, retains registry rules, and omits score and grade properties.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts empty results, a registry rule, the schema identifier, and absent score fields.
+     * @throws JsonException - If decoding the rendered SARIF fails.
      */
     public function testSarifReporterHandlesEmptyReportAndOmittedScore(): void
     {
@@ -179,8 +181,8 @@ final class SarifReporterTest extends TestCase
      * @param Severity $severity - Finding severity to render.
      * @param string   $level    - Expected SARIF level.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts the rendered result level matches the supplied severity case.
+     * @throws JsonException - If decoding the rendered SARIF fails.
      */
     #[DataProvider('severityLevels')]
     public function testSarifReporterMapsSeverityLevels(Severity $severity, string $level): void
@@ -196,8 +198,7 @@ final class SarifReporterTest extends TestCase
     /**
      * Provide SARIF severity examples for reporter tests.
      *
-     * @return iterable<string, array{0: Severity, 1: string}> - data-provider cases keyed by case name, each pairing a finding severity with its
-     *                          expected SARIF level
+     * @return iterable<string, array{0: Severity, 1: string}> - Named pairs of finding severity and expected SARIF level.
      */
     public static function severityLevels(): iterable
     {
@@ -207,10 +208,10 @@ final class SarifReporterTest extends TestCase
     }
 
     /**
-     * Verify one code-scanning alert survives a line shift, because the fingerprint carries no line.
+     * Verify symbol-less findings at different lines receive the same SARIF fingerprint.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts equal fingerprints for the two line values.
+     * @throws JsonException - If decoding the rendered SARIF fails.
      */
     public function testSarifFingerprintSurvivesALineShift(): void
     {
@@ -231,13 +232,11 @@ final class SarifReporterTest extends TestCase
     }
 
     /**
-     * Verify two occurrences of one variable symbol in a file get the two ordinals the baseline gives them.
+     * Verify separate occurrences of the same variable use the baseline's report-wide ordinal assignments.
+     * Their fingerprints must differ so the occurrences retain distinct identities.
      *
-     * The reporter ranked each finding on its own, so both `$value` findings took ordinal 1 and shared one
-     * code-scanning alert while the baseline kept them apart as `$value#1` and `$value#2`.
-     *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts each fingerprint matches its assigned ordinal and the fingerprints differ.
+     * @throws JsonException - If decoding the rendered SARIF fails.
      */
     public function testSarifRanksVariableSymbolsAcrossTheReport(): void
     {
@@ -256,10 +255,10 @@ final class SarifReporterTest extends TestCase
     }
 
     /**
-     * Verify a lone warning on a later `@var` takes the ordinal its place in the source gives it, the one the baseline stores.
+     * Verify a lone finding on the later @var occurrence receives ordinal 2 from the scanned source.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts the fingerprint matches the later occurrence's baseline identity with ordinal 2.
+     * @throws JsonException - If decoding the rendered SARIF fails.
      */
     public function testSarifRanksAVariableAgainstTheScannedSource(): void
     {
@@ -282,11 +281,11 @@ final class SarifReporterTest extends TestCase
     }
 
     /**
-     * Build a variable-symbol finding, the one kind PHP lets a file carry at several declarations.
+     * Build an advisory documentation finding for an occurrence of the variable $value.
      *
-     * @param int $line - Line of the occurrence; it decides the variable's ordinal.
+     * @param int $line - Line of the occurrence used when assigning declaration ordinals.
      *
-     * @return Finding - A documentation finding on `$value`.
+     * @return Finding - A documentation finding on $value.
      */
     private function variableFinding(int $line): Finding
     {
@@ -304,10 +303,10 @@ final class SarifReporterTest extends TestCase
     }
 
     /**
-     * Verify a sensitive finding carries no fingerprints at all, so no secret gets a durable name in code scanning.
+     * Verify the sensitive-data finding has no partialFingerprints property in its SARIF result.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts the partialFingerprints property is absent.
+     * @throws JsonException - If decoding the rendered SARIF fails.
      */
     public function testSarifPublishesNoFingerprintForASensitiveFinding(): void
     {
@@ -328,10 +327,10 @@ final class SarifReporterTest extends TestCase
     }
 
     /**
-     * Verify non-registry mutation findings receive deterministic fallback driver rules.
+     * Verify the escaped-mutant finding receives a fallback driver rule linked from its SARIF result.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts the fallback rule fields and mutation result metadata.
+     * @throws JsonException - If decoding the rendered SARIF fails.
      */
     public function testSarifReporterEmitsFallbackRuleForMutationFinding(): void
     {
@@ -379,8 +378,8 @@ final class SarifReporterTest extends TestCase
     /**
      * Verify optional regions and additional path shapes render without fabricated data.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts normalized path strings, an omitted region, and the supplied start line.
+     * @throws JsonException - If decoding the rendered SARIF fails.
      */
     public function testSarifReporterHandlesOptionalRegionsAndAdditionalPathShapes(): void
     {
@@ -405,10 +404,10 @@ final class SarifReporterTest extends TestCase
     }
 
     /**
-     * Verify SARIF and native JSON preserve the same report identity over one report instance.
+     * Verify SARIF and native JSON share the schema identifier, finding count, and ordered rule IDs.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts matching schema identifiers, result counts, and rule-ID sequences.
+     * @throws JsonException - If decoding either rendered document fails.
      */
     public function testSarifReporterPreservesNativeJsonSchemaAndFindingCount(): void
     {
@@ -436,6 +435,8 @@ final class SarifReporterTest extends TestCase
     }
 
     /**
+     * Build an unscored or explicitly scored SARIF report fixture for renderer assertions.
+     *
      * @param list<Finding>    $findings - Findings to attach to the report.
      * @param ScoreReport|null $score    - Precomputed score, or null to let assertions exercise an unscored report.
      *
@@ -464,7 +465,7 @@ final class SarifReporterTest extends TestCase
      * Build a focused finding for SARIF renderer tests.
      *
      * @param string   $ruleId   - Emitted as the SARIF ruleId; defaulted so tests override only what they assert.
-     * @param string   $filePath - Artifact path the SARIF location should reference, relative to the scanned root.
+     * @param string   $filePath - Artifact path to render; may contain backslashes, leading ./ segments, or a Windows drive.
      * @param int|null $line     - One-based location line; null exercises rendering when a finding has no line.
      * @param Severity $severity - Drives the mapped SARIF result level; varied to check the severity-to-level mapping.
      *
@@ -489,9 +490,11 @@ final class SarifReporterTest extends TestCase
     }
 
     /**
-     * @param JsonArray $payload - SARIF payload.
+     * Extract the first run from a decoded SARIF payload, failing if it is missing or not an array.
      *
-     * @return JsonArray - the single run object at runs[0], holding the tool driver, results, and run properties
+     * @param JsonArray $payload - Decoded document whose runs field must contain at least one array-valued entry.
+     *
+     * @return JsonArray - The first run's array payload; additional runs are ignored.
      */
     private function sarifRun(array $payload): array
     {
@@ -499,11 +502,11 @@ final class SarifReporterTest extends TestCase
     }
 
     /**
-     * Extract the physical location object from a SARIF result fixture.
+     * Extract the physicalLocation array from the first location in a SARIF result.
      *
-     * @param mixed $result - One decoded SARIF result object; mixed because it arrives straight from json_decode.
+     * @param mixed $result - Decoded result whose locations field must begin with an entry containing a physicalLocation array.
      *
-     * @return JsonArray - the physicalLocation object under the result's first location, holding the artifact URI and optional region
+     * @return JsonArray - The first location's physicalLocation array; missing or non-array nodes fail the test.
      */
     private function physicalLocation(mixed $result): array
     {
@@ -516,10 +519,12 @@ final class SarifReporterTest extends TestCase
     }
 
     /**
-     * @param string $json - Rendered SARIF document to decode; expected to be a single top-level JSON object.
+     * Decode a rendered report and assert that the decoded value is an array.
      *
-     * @return JsonArray - the decoded document as a string-keyed array so callers can index named top-level fields
-     * @throws JsonException
+     * @param string $json - Rendered SARIF or native JSON document to decode.
+     *
+     * @return JsonArray - The decoded array with its original keys; non-array top-level values fail the test.
+     * @throws JsonException - If JSON decoding fails.
      */
     private function decode(string $json): array
     {
@@ -529,7 +534,9 @@ final class SarifReporterTest extends TestCase
     }
 
     /**
-     * @param JsonArray $payload - Source array.
+     * Read an array-valued field and reindex it for positional assertions.
+     *
+     * @param JsonArray $payload - Decoded payload containing the requested field.
      * @param string    $key     - Key whose value must itself be an array; the test fails if it is absent or scalar.
      *
      * @return list<JsonValue> - the child array re-indexed as a 0-based list so positional access ignores the original keys
@@ -543,30 +550,31 @@ final class SarifReporterTest extends TestCase
     }
 
     /**
-     * Normalize a decoded JSON value or keyed child to an array payload.
+     * Validate and return a decoded array, optionally selecting a child by key.
      *
      * @param mixed       $payload - Decoded JSON node; mixed because it comes from json_decode, and non-arrays fail.
      * @param string|null $key     - When set, descend into that child first; null treats $payload itself as the target.
      *
-     * @return JsonArray - the resolved node narrowed to a JSON object, after the test has failed on any non-array or scalar leaf
+     * @return JsonArray - The validated array with its keys preserved, including empty arrays and integer-keyed lists.
      */
     private function stringKeyedArray(mixed $payload, ?string $key = null): array
     {
         $payloadValue = $key === null && is_array($payload) ? $payload : (is_array($payload) ? ($payload[$key] ?? null) : null);
         $this->assertJsonArray($payloadValue);
-        // assertJsonArray is a @phpstan-assert guard, so static analysis only narrows $payloadValue to JsonArray
-        // on this path; an empty or non-object node has already failed the test rather than reaching here.
+        // The assertJsonArray() annotation narrows $payloadValue to JsonArray after recursive validation.
+
         return $payloadValue;
     }
 
     /**
-     * Assert that decoded SARIF contains an object at the requested key.
+     * Assert that a value is an array whose nested leaves match the JsonScalar alias.
+     * Keys are not constrained, and nested arrays may be empty.
      *
-     * @param mixed $payload - Value under test; passes only when it is an array whose leaves are all JSON scalars.
+     * @param mixed $payload - Array to validate recursively; empty arrays and object leaves are accepted.
      *
      * @phpstan-assert JsonArray $payload
      *
-     * @return void
+     * @return void - Asserts nested arrays contain only null, scalar, or object leaves.
      */
     private function assertJsonArray(mixed $payload): void
     {
@@ -591,17 +599,19 @@ final class SarifReporterTest extends TestCase
     }
 
     /**
-     * @param JsonArray $payload - Source array.
+     * Read a string-valued field, failing the test if the field is missing or has another type.
+     *
+     * @param JsonArray $payload - Decoded payload containing the requested field.
      * @param string    $key     - Key whose value must be a string; the test fails if it is missing or non-string.
      *
-     * @return string - the string value at $key, after the assertion has failed the test on a missing or non-string field
+     * @return string - The value at $key; an empty string is accepted.
      */
     private function stringValue(array $payload, string $key): string
     {
         $payloadValue = $payload[$key] ?? null;
         self::assertIsString($payloadValue);
-        // assertIsString doubles as the type narrowing static analysis needs here: a missing or non-string field
-        // has already failed the test, so reaching this point means the looked-up value is genuinely a string.
+        // The assertion also narrows the value to string for static analysis.
+
         return $payloadValue;
     }
 }

@@ -11,37 +11,36 @@ use PhpParser\Node\Stmt\For_;
 use PhpParser\Node\Stmt\Foreach_;
 
 /**
- * Computes the candidate local-variable sets the identifier-quality rule judges, one function-like scope at
- * a time.
+ * Collects candidate locals and loop/catch name sets for identifier-quality checks within one function-like scope.
+ * Local candidates use occurrence counts; loop sets include for-initializer references and direct foreach bindings.
  *
- * Provides the frequently-used locals worth naming well, the variables a rule should exempt because a loop
- * or catch clause introduced them, and the generic loop variables whose long bodies still deserve a better
- * name. Every query is scoped so a nested closure's variables never leak into the enclosing function.
+ * Generic foreach names become reportable at the body-statement threshold, except for the canonical key/value bindings.
+ * Nested callable bodies are excluded from the supplied scope's descendants and from initializer traversal.
  */
 final readonly class IdentifierQualityScopeLocals
 {
     /**
-     * Selects the local variables used often enough to be worth judging for name quality.
+     * Selects local variables meeting the occurrence threshold after name exclusions.
      *
-     * @param FunctionLikeScope   $scope - Scope whose declared locals are the candidate set.
-     * @param int                 $minScopeReferences - Read-count floor; locals used fewer times are too transient.
+     * @param FunctionLikeScope $scope - Scope whose local variable nodes are the candidate set.
+     * @param int $minScopeReferences - Minimum body occurrences, including assignment targets.
      * @param array<string, true> $excludedNames - Names already exempted by surrounding rule logic.
      *
-     * @return array<string, Variable> - local variables keyed by name after exclusions and read-count filtering
+     * @return array<string, Variable> - local variables keyed by name after exclusions and occurrence-count filtering
      */
     public static function localVariableNames(FunctionLikeScope $scope, int $minScopeReferences, array $excludedNames): array
     {
         $counts    = self::localVariableReferenceCounts($scope);
         $variables = [];
 
-        // Weigh each local the scope declares.
+
         foreach ($scope->localVariables as $name => $variable) {
-            // Skip a name that surrounding rule logic already exempted.
+
             if (isset($excludedNames[$name])) {
                 continue;
             }
 
-            // Keep only locals read often enough to be worth naming carefully.
+
             if (($counts[$name] ?? 0) >= $minScopeReferences) {
                 $variables[$name] = $variable;
             }
@@ -51,28 +50,28 @@ final readonly class IdentifierQualityScopeLocals
     }
 
     /**
-     * Lists the variables introduced by loop constructs.
+     * Collects variable names referenced in for initializers or bound directly by foreach loops.
      *
-     * @param FunctionLikeScope $scope - Scope to scan for loop-induction and foreach key/value variables.
+     * @param FunctionLikeScope $scope - Scope to scan for initializer references and direct foreach key/value bindings.
      *
-     * @return array<string, true> - loop-introduced variables keyed by name
+     * @return array<string, true> - loop-related names, including non-target initializer references, keyed by name
      */
     public static function loopVariables(FunctionLikeScope $scope): array
     {
         $variables = [];
 
-        // Look at each for and foreach loop in the scope.
+
         foreach (self::nodesInScope($scope, static fn(Node $node): bool => $node instanceof For_ || $node instanceof Foreach_) as $loop) {
-            // A for loop's init clause can declare induction variables.
+
             if ($loop instanceof For_) {
                 self::collectVariablesByName($loop->init, $variables);
             }
 
-            // A foreach binds its key and value variables.
+
             if ($loop instanceof Foreach_) {
-                // Record each bound key or value name.
+
                 foreach ([$loop->keyVar, $loop->valueVar] as $variable) {
-                    // Only a plainly named variable can be tracked by name.
+
                     if ($variable instanceof Variable && is_string($variable->name)) {
                         $variables[$variable->name] = true;
                     }
@@ -94,14 +93,14 @@ final readonly class IdentifierQualityScopeLocals
     {
         $variables = [];
 
-        // Look at each catch clause in the scope.
+
         foreach (self::nodesInScope($scope, static fn(Node $node): bool => $node instanceof Catch_) as $catch) {
             // The predicate already guarantees this; the guard narrows the type for the analyzer.
             if (!$catch instanceof Catch_) {
                 continue;
             }
 
-            // Record the named exception variable when the clause has one.
+
             if ($catch->var instanceof Variable && is_string($catch->var->name)) {
                 $variables[$catch->var->name] = true;
             }
@@ -126,27 +125,27 @@ final readonly class IdentifierQualityScopeLocals
     ): array {
         $variables = [];
 
-        // Look at each foreach loop in the scope.
+
         foreach (self::nodesInScope($scope, static fn(Node $node): bool => $node instanceof Foreach_) as $foreach) {
-            // The predicate already guarantees this; the guard narrows the type for the analyzer.
+            // Static analysis does not infer the predicate's narrowed type; remove this guard when it does.
             if (!$foreach instanceof Foreach_) {
                 continue;
             }
 
-            // A short body, or the canonical key/value idiom, needs no better name.
+            // Short bodies and the canonical key/value shape are exempt from generic-name findings.
             if (count($foreach->stmts) < $loopBodyThreshold || self::isCanonicalMapLoop($foreach)) {
                 continue;
             }
 
-            // Weigh the loop's key and value variables.
+
             foreach ([$foreach->keyVar, $foreach->valueVar] as $variable) {
-                // Skip anything without a plain string name.
+
                 if (!$variable instanceof Variable || !is_string($variable->name)) {
                     continue;
                 }
 
                 $name = strtolower($variable->name);
-                // Flag only the names configured as generic.
+
                 if (in_array($name, $genericTokens, true)) {
                     $variables[$variable->name] ??= $variable;
                 }
@@ -157,7 +156,7 @@ final readonly class IdentifierQualityScopeLocals
     }
 
     /**
-     * Reports whether a foreach loop uses the canonical `$key => $value` map-iteration idiom.
+     * Reports whether a foreach loop uses the canonical $key => $value map-iteration idiom.
      *
      * @param Foreach_ $foreach - Loop to test against the key/value idiom.
      *
@@ -165,7 +164,7 @@ final readonly class IdentifierQualityScopeLocals
      */
     private static function isCanonicalMapLoop(Foreach_ $foreach): bool
     {
-        // True only for the exact `$key => $value` shape, the one idiom where those generic names read as intentional.
+        // The rule exempts only the exact $key => $value shape from generic-name findings.
         return $foreach->keyVar instanceof Variable
             && $foreach->valueVar instanceof Variable
             && $foreach->keyVar->name === 'key'
@@ -173,19 +172,19 @@ final readonly class IdentifierQualityScopeLocals
     }
 
     /**
-     * Counts the local-variable references inside one function-like scope.
+     * Counts named variable occurrences in the scope body, including assignment targets.
      *
      * @param FunctionLikeScope $scope - Scope whose variable occurrences are tallied.
      *
-     * @return array<string, int> - local variable read counts keyed by variable name
+     * @return array<string, int> - occurrence counts keyed by variable name, including parameters and locals
      */
     private static function localVariableReferenceCounts(FunctionLikeScope $scope): array
     {
         $counts = [];
 
-        // Tally every variable occurrence in the scope.
+
         foreach (self::nodesInScope($scope, static fn(Node $node): bool => $node instanceof Variable) as $variable) {
-            // Count only plainly named variables.
+
             if ($variable instanceof Variable && is_string($variable->name)) {
                 $counts[$variable->name] = ($counts[$variable->name] ?? 0) + 1;
             }
@@ -200,16 +199,16 @@ final readonly class IdentifierQualityScopeLocals
      * @param array<Node>         $nodes - AST nodes to scan for variable references.
      * @param array<string, true> $variables - Output set keyed by variable name.
      *
-     * @return void
+     * @return void - Adds plainly named variables to the supplied name set.
      */
     private static function collectVariablesByName(array $nodes, array &$variables): void
     {
         $walker = new IdentifierAstWalker();
-        // Walk each supplied node in turn.
+
         foreach ($nodes as $node) {
-            // Record each variable the scope-bounded walker finds beneath it.
+
             foreach ($walker->nodesMatching([$node], static fn(Node $candidate): bool => $candidate instanceof Variable) as $variable) {
-                // Keep only plainly named variables.
+
                 if ($variable instanceof Variable && is_string($variable->name)) {
                     $variables[$variable->name] = true;
                 }
@@ -229,9 +228,9 @@ final readonly class IdentifierQualityScopeLocals
     {
         $matches = [];
 
-        // Filter the pre-walked descendants down to the caller's matches.
+
         foreach ($scope->bodyDescendants as $node) {
-            // Keep the nodes the predicate accepts.
+
             if ($predicate($node)) {
                 $matches[] = $node;
             }

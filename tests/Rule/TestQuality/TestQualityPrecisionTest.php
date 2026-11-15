@@ -21,16 +21,20 @@ use PhpParser\ParserFactory;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
-/** Proves test-role, fixture-control and SUT-prefix boundaries through the real parsed rules. */
+/**
+ * Checks SUT name matching, framework expectations, and loop-failure context in parsed tests.
+ * Runs production rules against inert PHP snippets with resolved names and parent links.
+ * Asserts finding severities or counts without executing the fixture methods.
+ */
 final class TestQualityPrecisionTest extends TestCase
 {
     /**
-     * Accepts method prefixes without promoting a low-confidence mismatch to an error.
+     * Checks quiet SUT-name matches and advisory findings for a named but uncalled subject.
      *
      * @param string         $name     - PHPUnit test name from the supported camelCase heuristic.
      * @param string         $body     - Visible SUT calls and assertion source.
      * @param list<Severity> $expected - Finding severities; empty means the heuristic stays quiet.
-     * @return void
+     * @return void - Asserts the ordered finding severities for the supplied test name and body.
      */
     #[DataProvider('sutPrefixCases')]
     public function testSutPrefixAndSeverity(string $name, string $body, array $expected): void
@@ -42,9 +46,9 @@ final class TestQualityPrecisionTest extends TestCase
     }
 
     /**
-     * Reproduces field-report prefixes and retains a named-but-uncalled subject control.
+     * Supplies SUT-name matching cases and an advisory control with no matching subject call in the supplied source.
      *
-     * @return iterable<string, array{string, string, list<Severity>}> - Test names, calls and expected finding severities.
+     * @return iterable<string, array{string, string, list<Severity>}> - Test names, source bodies, and expected finding severities.
      */
     public static function sutPrefixCases(): iterable
     {
@@ -56,11 +60,11 @@ final class TestQualityPrecisionTest extends TestCase
     }
 
     /**
-     * Recognizes framework expectations while retaining unresolved or unexecuted lookalikes.
+     * Distinguishes direct framework expectation calls from stored callables and foreign or rebound lookalikes.
      *
-     * @param string $body     - Inert test statements containing the candidate expectation.
+     * @param string $body     - Inert test statements containing an expectation or lookalike.
      * @param int    $expected - Number of assertion-free findings.
-     * @return void
+     * @return void - Asserts the assertion-free finding count for the supplied body.
      */
     #[DataProvider('expectationCases')]
     public function testObservableFrameworkExpectations(string $body, int $expected): void
@@ -70,9 +74,9 @@ final class TestQualityPrecisionTest extends TestCase
     }
 
     /**
-     * Supplies observed deprecation, Prophecy and fluent JSON shapes with binding controls.
+     * Supplies deprecation expectation, Prophecy, and fluent JSON source shapes with binding controls.
      *
-     * @return iterable<string, array{string, int}> - Complete expectation bodies and warning counts.
+     * @return iterable<string, array{string, int}> - Test bodies and expected assertion-free finding counts.
      */
     public static function expectationCases(): iterable
     {
@@ -94,7 +98,7 @@ final class TestQualityPrecisionTest extends TestCase
      *
      * @param string $body     - Inert loop source containing the candidate assertion.
      * @param int    $expected - Number of loop assertions that still need case context.
-     * @return void
+     * @return void - Asserts the context-finding count for the supplied loop body.
      */
     #[DataProvider('loopContextCases')]
     public function testLoopFailureContext(string $body, int $expected): void
@@ -106,7 +110,7 @@ final class TestQualityPrecisionTest extends TestCase
     /**
      * Supplies bound-value diagnostics, singleton and exit cases beside repeated-failure controls.
      *
-     * @return iterable<string, array{string, int}> - Loop bodies and expected context-warning counts.
+     * @return iterable<string, array{string, int}> - Loop bodies and expected failure-context finding counts.
      */
     public static function loopContextCases(): iterable
     {

@@ -5,22 +5,21 @@ declare(strict_types=1);
 namespace GruffPhp\Results\Baseline;
 
 /**
- * The baseline decisions for one `gruff-php analyse` run, frozen while the command line is parsed.
+ * Immutable baseline paths and overwrite choices for one analysis run.
  *
- * The command layer fills this in from `--baseline`, `--generate-baseline`, `--migrate-baseline`, and `--no-baseline`, then hands it to
- * `BaselineApplication`, which decides whether the run hides reviewed findings, records the current findings, or shows everything.
+ * The command layer supplies these options to `BaselineApplication`.
+ * Generation takes precedence over application; migration is considered only during generation.
  */
 final readonly class BaselineApplicationOptions
 {
     /**
-     * Freezes the baseline choices for one analyse run.
+     * Captures the baseline choices for one analyse run.
      *
-     * @param string|null $baselinePath - Baseline whose reviewed findings this run hides; null when none applies, so every finding is shown.
-     * @param bool        $isBaselineExplicit - True when the user typed `--baseline`; false when the path is the discovered project default.
-     * @param string|null $generateBaselinePath - Path to write a fresh baseline to; null on a normal run. Any path here wins over applying one.
-     * @param string|null $migrateBaselinePath - 0.5 baseline whose reviewed findings are carried into $generateBaselinePath; null when generating from the scan alone.
-     * @param bool        $shouldForceBaselineOverwrite - True when the user passed --force and means to overwrite a 0.5
-     *                                                    baseline at the default path; false keeps their retreat copy.
+     * @param string|null $baselinePath - Existing baseline to apply when not generating; null skips application.
+     * @param bool $isBaselineExplicit - Whether the baseline path came from an explicit --baseline option.
+     * @param string|null $generateBaselinePath - Output path for generation; null skips generation, which otherwise takes precedence.
+     * @param string|null $migrateBaselinePath - 0.5 input used during generation; null generates solely from current findings.
+     * @param bool $shouldForceBaselineOverwrite - Allow overwriting an older schema at the default filename; false keeps the overwrite guard.
      */
     public function __construct(
         public ?string $baselinePath,

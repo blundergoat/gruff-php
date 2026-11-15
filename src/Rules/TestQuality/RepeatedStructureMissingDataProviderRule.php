@@ -23,10 +23,9 @@ use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
 /**
- * Flags three or more test methods in a class whose bodies share the same call and control-flow shape but
- * carry no data provider - a sign the same scenario is copy-pasted with different literals and would read
- * better as one parametrised test. The default groupFindings mode compares full syntax under family
- * contract section 16. Both modes run per class and honour path exemptions. Advisory, low confidence.
+ * Groups three or more tests per named class as data-provider candidates, with advisory severity and low confidence.
+ * By default it compares full syntax, attributes and annotations with eligible literal values normalized under family contract section 16.
+ * Legacy mode compares selected call and control-flow tokens; both modes honor configured path exemptions.
  */
 final readonly class RepeatedStructureMissingDataProviderRule implements RuleInterface
 {
@@ -74,7 +73,7 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
      * Reports repeated test bodies that look like data-provider candidates.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext  - Supplies ignoredPathPatterns, which skip files, and groupFindings, which groups repeated tests by class.
      *
      * @return list<Finding> - Findings for repeated test structures.
      */
@@ -95,7 +94,7 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
         $nodeFinder = new NodeFinder();
         $findings   = [];
 
-        // Weigh every class declaration in the file.
+
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Class_::class) as $class) {
             $className = $class->name?->toString();
             // An anonymous class has no name to report against.
@@ -105,9 +104,9 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
 
             $groups = [];
 
-            // Inspect each test method's body shape.
+
             foreach ($class->getMethods() as $classMethod) {
-                // Only real test methods are grouped by shape.
+
                 if (!TestQualityNodeHelper::isTestMethod($classMethod)) {
                     continue;
                 }
@@ -128,7 +127,7 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
                 $groups[$shape][] = $classMethod;
             }
 
-            // Weigh each group of identically shaped tests.
+
             foreach ($groups as $methods) {
                 // Only a large enough group is worth collapsing into a provider.
                 if (count($methods) < self::MIN_GROUP_SIZE) {
@@ -163,7 +162,7 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
     }
 
     /**
-     * Reports complete groups under section 16, keeping each class a separate test container.
+     * Reports complete groups while keeping each class a separate test container.
      *
      * @param AnalysisUnit $unit - Parsed file whose test methods are compared.
      * @return list<Finding> - One finding per qualifying group, ordered by its first method.
@@ -238,11 +237,11 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
     }
 
     /**
-     * Recognises methods already driven by PHPUnit case data or a literal table loop.
+     * Recognises methods with supported case-data markers or a top-level literal-array loop.
      *
-     * @param Stmt\ClassMethod $method     - Test whose attributes and annotations declare case data.
-     * @param list<Stmt>       $statements - Its non-empty top-level statements.
-     * @return bool - Whether consolidation into another table would repeat an existing table.
+     * @param Stmt\ClassMethod $method - Test whose attributes and annotations are checked for case-data markers.
+     * @param list<Stmt> $statements - Top-level statements inspected for literal-array loops.
+     * @return bool - True for a supported case-data marker or a recognized top-level literal-array loop.
      */
     private function isGroupTableDriven(Stmt\ClassMethod $method, array $statements): bool
     {
@@ -254,7 +253,7 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
             }
         }
 
-        // A dataProvider or testWith annotation already supplies case data.
+        // A dataProvider or testWith annotation marks the method as case-driven for this heuristic.
         if (preg_match('/^@(?:dataProvider|testWith)\b/im', implode("\n", $this->annotationTags($method))) === 1) {
             return true;
         }
@@ -276,11 +275,11 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
     }
 
     /**
-     * Recognises a top-level table loop over an inline array or a preceding local array assignment.
+     * Matches foreach over an inline array or a variable tracked as assigned array syntax.
      *
-     * @param Stmt                $statement      - Statement that may iterate case rows.
-     * @param array<string, bool> $tableVariables - Whether each latest local assignment was an array literal.
-     * @return bool - True when the iterable has a known literal table shape.
+     * @param Stmt $statement - Top-level statement checked for a foreach loop.
+     * @param array<string, bool> $tableVariables - Tracked top-level assignments; true marks an array literal.
+     * @return bool - True for an inline array iterable or a variable marked as an array literal.
      */
     private function isLiteralTableLoop(Stmt $statement, array $tableVariables): bool
     {
@@ -295,7 +294,7 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
     }
 
     /**
-     * Keeps annotation entries in source order while leaving prose out of the attribute comparison.
+     * Collects PHPDoc tags in source order, appending following nonblank lines to the latest tag.
      *
      * @param Stmt\ClassMethod $method - Method whose PHPDoc may carry runner annotations.
      * @return list<string> - Trimmed annotation entries, including wrapped argument text.
@@ -303,9 +302,12 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
     private function annotationTags(Stmt\ClassMethod $method): array
     {
         $text = $method->getDocComment()?->getText() ?? '';
+        // Exclude docblock delimiters before collecting tag lines and their continuations.
         $text = preg_replace('/^\/\*\*|\*\/$/', '', $text) ?? $text;
         $tags = [];
+        // \R splits on any newline sequence, so CRLF docblocks yield one entry per line.
         foreach (preg_split('/\R/', $text) ?: [] as $line) {
+            // Strip indentation, the leading star and at most one following whitespace character, so a tag line starts with @.
             $line = trim(preg_replace('/^\s*\*\s?/', '', $line) ?? $line);
             if (str_starts_with($line, '@')) {
                 $tags[] = $line;
@@ -318,19 +320,19 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
     }
 
     /**
-     * Serializes syntax while retaining declarations, payload strings and selector literals.
+     * Builds syntax keys, preserving PHPDoc and literal values inside function and class-like declarations.
+     * Attribute arguments, array keys and indices, and strings containing ASCII whitespace retain their literal values.
+     * Other eligible literals are normalized by kind; Nop entries in arrays and other comments are excluded.
      *
-     * getSubNodeNames excludes comments, source positions and parent links, so this visits only the body.
-     *
-     * @param mixed $node              - Syntax node, node list or scalar field value.
-     * @param bool  $keepLiterals      - Retain every literal inside declarations, attributes, keys or indices.
-     * @param bool  $keepDocumentation - Retain PHPDoc throughout a declaration subtree.
+     * @param mixed $node - Syntax node, node list or scalar field value.
+     * @param bool $keepLiterals - Preserve literal values throughout this subtree.
+     * @param bool $keepDocumentation - Retain PHPDoc throughout a declaration subtree.
      * @return string - Structural comparison key; local names, calls and statement order stay significant.
      */
     private function groupShape(mixed $node, bool $keepLiterals = false, bool $keepDocumentation = false): string
     {
         if ($node instanceof Node) {
-            // A declaration cannot become case data; a closure remains an expression, but its attributes stay exact.
+            // This heuristic does not treat declaration contents as case data; a closure remains an expression, but its attributes stay exact.
             $keepDocumentation = $keepDocumentation || $node instanceof Stmt\Function_ || $node instanceof Stmt\ClassLike;
             $keepLiterals      = $keepLiterals || $keepDocumentation || $node instanceof Node\Attribute;
 
@@ -354,8 +356,8 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
     /**
      * Normalizes eligible literal values; other node kinds need structural traversal.
      *
-     * @param Node $node         - Possible literal node.
-     * @param bool $keepLiterals - Retain the literal value in an attribute or selector.
+     * @param Node $node - Syntax node checked for a supported scalar or constant literal.
+     * @param bool $keepLiterals - Retain the exact literal value when true.
      * @return string|null - Literal shape, or null when this is not a supported literal.
      */
     private function literalShape(Node $node, bool $keepLiterals): ?string
@@ -400,7 +402,7 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
      * Reports whether a project-configured path exemption applies.
      *
      * @param string       $displayPath - File path under analysis; matched after backslashes are normalised to slashes.
-     * @param list<string> $patterns    - Glob patterns for accepted test shapes.
+     * @param list<string> $patterns    - Glob patterns for paths exempt from this rule.
      *
      * @return bool - True when the display path matches an ignored pattern.
      */
@@ -408,10 +410,10 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
     {
         $normalizedPath = str_replace('\\', '/', $displayPath);
 
-        // Weigh the display path against each configured exemption glob.
+
         foreach ($patterns as $pattern) {
             if (fnmatch($pattern, $normalizedPath, FNM_NOESCAPE)) {
-                // First matching glob is enough to exempt the path; no need to test the rest.
+
                 return true;
             }
         }
@@ -420,20 +422,20 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
     }
 
     /**
-     * Reports whether a test method already declares a data provider.
+     * Reports whether a test method has a DataProvider attribute or @dataProvider text.
      *
-     * @param Stmt\ClassMethod $classMethod - Test method whose attributes and docblock are scanned for a provider.
+     * @param Stmt\ClassMethod $classMethod - Test method scanned for a DataProvider attribute or @dataProvider text.
      *
-     * @return bool - True when an attribute or docblock data provider is present.
+     * @return bool - True when a DataProvider attribute or @dataProvider text is present.
      */
     private function usesDataProvider(Stmt\ClassMethod $classMethod): bool
     {
-        // Read the method's attributes for a DataProvider.
+
         foreach ($classMethod->attrGroups as $group) {
-            // One group can hold several attributes.
+
             foreach ($group->attrs as $attr) {
                 if (strtolower($attr->name->getLast()) === 'dataprovider') {
-                    // A #[DataProvider] attribute already drives this method, so it is exempt from the heuristic.
+                    // A #[DataProvider] marker exempts this method from the repetition heuristic.
                     return true;
                 }
             }
@@ -443,18 +445,18 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
     }
 
     /**
-     * Reduces a test body to a structure fingerprint of its call and control-flow shape.
+     * Builds a fingerprint from selected call and control-flow nodes in traversal order.
      *
      * @param list<Node> $stmts      - Statements of one test method body; the unit being fingerprinted.
      * @param NodeFinder $nodeFinder - Finder shared across the class scan so one instance serves every method.
      *
-     * @return string - Structure fingerprint for comparison across tests.
+     * @return string - Ordered tokens, or an empty string when no selected node is found; literal values and nesting are omitted.
      */
     private function fingerprint(array $stmts, NodeFinder $nodeFinder): string
     {
         $tokens = [];
 
-        // Walk the body's calls and control-flow nodes in order.
+
         foreach ($nodeFinder->find($stmts, static fn (Node $node): bool => $node instanceof Expr\New_
             || $node instanceof Expr\FuncCall
             || $node instanceof Expr\MethodCall
@@ -474,17 +476,17 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
     /**
      * Returns a stable fingerprint token for a structural AST node.
      *
-     * @param Node $node - One structural node from a test body; call targets fold into the token, plain shapes do not.
+     * @param Node $node - Structural node from a test body; written call targets refine the token, while unhandled nodes use their class.
      *
-     * @return string - Fingerprint token.
+     * @return string - Stable token used to compare structural test shapes.
      */
     private function tokenFor(Node $node): string
     {
-        // A construction folds in its class name.
+
         if ($node instanceof Expr\New_) {
             $class = $node->class instanceof Name ? $node->class->toString() : 'expr';
 
-            // Fold the constructed class in so `new A` and `new B` fingerprint as distinct shapes.
+            // Fold the constructed class in so new A and new B fingerprint as distinct shapes.
             return 'new:' . $class;
         }
 
@@ -498,15 +500,15 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
             return 'method:' . (TestQualityNodeHelper::callName($node) ?? 'expr');
         }
 
-        // A static call folds in both class and method.
+
         if ($node instanceof Expr\StaticCall) {
             $class = $node->class instanceof Name ? $node->class->toString() : 'expr';
 
-            // Fold both class and method so distinct static calls stay distinguishable in the fingerprint.
+            // Fold written class and method names into the fingerprint; dynamic parts use the stable placeholder.
             return 'static:' . $class . '::' . (TestQualityNodeHelper::callName($node) ?? 'expr');
         }
 
-        // Control-flow nodes (if/foreach/return/throw) carry no comparable name, so their class alone is the token.
+        // Nodes without a handled comparable name use their class as the stable token.
         return $node::class;
     }
 }

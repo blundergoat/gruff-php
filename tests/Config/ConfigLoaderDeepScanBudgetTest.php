@@ -8,18 +8,16 @@ use GruffPhp\Engine\Config\ConfigLoader;
 use GruffPhp\Rules\RuleRegistry;
 
 /**
- * Covers how a project configures the bounded deep-scan budget before any file is parsed.
- *
- * The loader decides whether the guard runs at all and which bounds it carries, so these cases check the family
- * defaults a user gets with no configuration, and the replacement or disabling of either bound from the
- * `deepScanBudget` block. Split from ConfigLoaderTest so neither class exceeds the family public-method threshold.
+ * Covers default and explicit deep-scan budget configuration.
+ * Checks the default line and byte limits with the budget enabled.
+ * Checks a disabled configured budget with replacement limits and a config override marker.
  */
 final class ConfigLoaderDeepScanBudgetTest extends ConfigLoaderTestCase
 {
     /**
      * Verify the family deep-scan limits are active by default.
      *
-     * @return void
+     * @return void - Asserts an enabled budget, 20,000 lines, 2,000,000 bytes, and the default override marker.
      */
     public function testLoadsDefaultDeepScanBudget(): void
     {
@@ -34,9 +32,9 @@ final class ConfigLoaderDeepScanBudgetTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Verify config may replace or disable either structural-analysis bound.
+     * Verify config can disable the deep-scan budget while replacing both limits.
      *
-     * @return void
+     * @return void - Asserts a disabled budget, limits of 123 lines and 456 bytes, and the config override marker.
      */
     public function testLoadsDeepScanBudgetConfig(): void
     {

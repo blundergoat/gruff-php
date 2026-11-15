@@ -46,7 +46,7 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Warning at high confidence: a bare local @var is an unambiguous documentation gap, so it should be loud.
+        // Use warning severity at high confidence because a local @var without a reason leaves a clear documentation gap.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Var annotation description',
@@ -61,26 +61,26 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
     /**
      * Reports each local var assertion that names a type without explaining why it is needed.
      *
-     * @param AnalysisUnit $analysisUnit - parsed unit to inspect
-     * @param RuleContext $ruleContext - rule context for this analysis pass
+     * @param AnalysisUnit $analysisUnit - Parsed file supplying source text, statement nodes, and finding locations.
+     * @param RuleContext $ruleContext - Required by the rule interface; unused by this check.
      *
      * @return list<Finding> - one finding per bare local var assertion; empty when every assertion carries a reason
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        // Fast bail: nothing to find when the file has no @var tag.
+
         if (!str_contains($analysisUnit->source, '@var')) {
-            // No @var anywhere means no annotation to judge, so report nothing.
+
             return [];
         }
 
-        // AST-driven detection: PhpParser attaches each docblock to the immediately following
-        // statement/declaration. A `@var` docblock on a property/method declaration documents
-        // the declaration itself - not a local variable assertion - even when attribute groups
-        // sit between the docblock and the property/function keyword. Walking the AST keeps
-        // this distinction reliable; a token-stream walker has to skip past `T_ATTRIBUTE` tokens
-        // by counting brackets, which is the "Heuristic rules overmatch nested syntax shapes"
-        // footgun documented at `.goat-flow/learning-loop/footguns/rules.md`.
+        // AST nodes distinguish declaration docblocks from local assertions even when attributes precede a declaration.
+
+
+
+
+
+
         $definition = $this->definition();
         $findings   = [];
         $nodeFinder = new NodeFinder();
@@ -90,16 +90,16 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
             static fn(Node $node): bool => $node->getDocComment() instanceof Doc,
         );
 
-        // Weigh each node that carries a docblock.
+
         foreach ($candidates as $node) {
             $doc = $node->getDocComment();
-            // Skip a node whose docblock vanished between find and read.
+
             if (!$doc instanceof Doc) {
                 continue;
             }
 
             $docText = $doc->getText();
-            // Only a docblock with a var assertion is in scope.
+
             if (!str_contains($docText, '@var')) {
                 continue;
             }
@@ -109,7 +109,7 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
                 continue;
             }
 
-            // Report each bare assertion the docblock carries.
+
             foreach ($this->bareVarAnnotations($docText) as $variable) {
                 $findings[] = new Finding(
                     ruleId:      $definition->id,
@@ -133,14 +133,13 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
     /**
      * Reports whether a docblock documents a declaration (exempt) rather than a local var assertion.
      *
-     * @param Node $node - AST node carrying the @var docblock; a declaration node means the tag documents that
-     *                   declaration rather than a local assertion, so it is exempt from this rule.
+     * @param Node $node - Node carrying the @var docblock; declaration annotations are exempt from this rule.
      *
      * @return bool - true when the docblock documents a declaration (exempt); false for a local @var assertion to judge.
      */
     private function isDeclarationNode(Node $node): bool
     {
-        // A @var on any of these declaration shapes documents the declaration, not a local assertion to flag.
+
         return $node instanceof Property
                || $node instanceof ClassMethod
                || $node instanceof Function_
@@ -155,24 +154,23 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
      *
      * @param string $docText - raw docblock text, including the comment markers
      *
-     * @return list<string> - variable names whose local var assertion stated a type but no reason; empty
-     *   when the docblock carries any prose line
+     * @return list<string> - Variable names from bare @var tags; empty when the docblock contains any prose line.
      */
     private function bareVarAnnotations(string $docText): array
     {
         $descriptiveLines = [];
         $bareVariables    = [];
 
-        // Weigh each line of the docblock.
+        // Split the docblock into physical lines so tags and shared prose can be classified separately.
         foreach (preg_split('/\R/', $docText) ?: [] as $line) {
             $line = trim($line, " \t\n\r\0\x0B/*");
 
-            // Skip blank lines.
+
             if ($line === '') {
                 continue;
             }
 
-            // A non-tag line is prose that already explains the docblock.
+            // Treat non-tag content as a shared explanation for the docblock.
             if (!str_starts_with($line, '@')) {
                 $descriptiveLines[] = $line;
                 continue;
@@ -183,7 +181,7 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
                 continue;
             }
 
-            // A trailing explanation means this assertion already states its reason.
+            // Treat trailing content after the variable name as this assertion's reason.
             if (trim($matches['description']) !== '') {
                 continue;
             }
@@ -192,11 +190,11 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
         }
 
         if ($descriptiveLines !== []) {
-            // Any prose line already explains the docblock, so suppress every bare-@var finding for it.
+            // Shared non-tag content suppresses every bare-@var finding for this docblock.
             return [];
         }
 
-        // Only tag-only docblocks reach here, so surface the variables whose @var carried no reason.
+
         return $bareVariables;
     }
 }

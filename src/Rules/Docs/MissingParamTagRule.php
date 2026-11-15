@@ -22,16 +22,12 @@ use PhpParser\Node\Stmt\Function_;
 use PhpParser\NodeFinder;
 
 /**
- * Flags a documented method or function whose parameters have no matching `@param` tag, so the user keeps
- * the documented contract in step with the signature at any visibility.
+ * Flags documented callable parameters that lack an `@param` tag so documentation stays aligned with signatures.
+ * Ordinary docblock skeletons are exempt; constructor skeletons still owe tags for promoted parameters.
  *
- * Runs per file over documented function-likes that carry contract prose or tags. A constructor skeleton
- * also enforces tags for promoted parameters only, keeping property documentation under one rule without
- * changing ordinary skeleton parameters. An override owes no tag for a parameter its inherited contract
- * documents: one the same-file overridden method declares and documents at the same position, or every
- * parameter when `{@inheritdoc}` or `#[\Override]` points at a contract in another file. Constructors never
- * inherit. A depth-aware parser reads the documented parameter names, tolerating multi-line array shapes.
- * Advisory, high confidence.
+ * Overrides may reuse same-file ancestor tags by name or position, or an inheritance marker for a contract outside this file.
+ * Constructors never inherit parameter docs. Multi-line array shapes are supported; named closures and arrows follow `everyCallable`.
+ * Advisory severity, high confidence.
  */
 final readonly class MissingParamTagRule implements RuleInterface
 {
@@ -48,14 +44,14 @@ final readonly class MissingParamTagRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id:              self::ID,
-            name:            'Missing @param tag',
-            description:     'Flags a documented method or function missing an @param tag for one of its parameters; with `everyCallable`, also closures and arrow functions bound to a name, read from the docblock above the assignment.',
-            pillar:          Pillar::Documentation,
-            tier:            RuleTier::V01,
-            defaultSeverity: Severity::Advisory,
-            confidence:      Confidence::High,
-            defaultOptions:     [DocumentedCallables::EVERY_CALLABLE => false],
+            id:                 self::ID,
+            name:               'Missing @param tag',
+            description:        'Flags a documented method or function missing an @param tag for one of its parameters; with `everyCallable`, also closures and arrow functions bound to a name, read from the docblock above the assignment.',
+            pillar:             Pillar::Documentation,
+            tier:               RuleTier::V01,
+            defaultSeverity:    Severity::Advisory,
+            confidence:         Confidence::High,
+            defaultOptions:     [DocumentedCallables::EVERY_CALLABLE => true],
             optionDescriptions: [DocumentedCallables::EVERY_CALLABLE => DocumentedCallables::EVERY_CALLABLE_DESCRIPTION],
         );
     }
@@ -64,13 +60,13 @@ final readonly class MissingParamTagRule implements RuleInterface
      * Reports undocumented parameters for contract-bearing docblocks and promoted parameters in constructor skeletons.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext  - Context passed to callable selection for this rule.
      *
      * @return list<Finding> - Findings for missing parameter tags.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $definition = $this->definition();
+        $definition        = $this->definition();
         $nodeFinder        = new NodeFinder();
         $inheritanceHelper = new DocsInheritanceHelper();
 
@@ -79,7 +75,6 @@ final readonly class MissingParamTagRule implements RuleInterface
         // Check every method and function in the file, plus bound closures when everyCallable is on.
         foreach (DocumentedCallables::inUnit($analysisUnit, $ruleContext, $definition) as ['node' => $node, 'doc' => $docComment, 'symbol' => $symbol]) {
 
-            // Skip a callable with no docblock or no parameters to document.
             if ($docComment === null || $node->params === []) {
                 continue;
             }
@@ -101,7 +96,6 @@ final readonly class MissingParamTagRule implements RuleInterface
                 inheritanceHelper: $inheritanceHelper,
             );
 
-            // Report each signature parameter that owes its own tag.
             foreach ($owingParams as $paramName => $param) {
                 $findings[] = new Finding(
                     ruleId:      $definition->id,
@@ -123,10 +117,10 @@ final readonly class MissingParamTagRule implements RuleInterface
     }
 
     /**
-     * Extracts the parameter names documented by `@param` tags. Depth-aware so multi-line array shapes match
-     * the closing documented variable even when it sits on a different line from the `@param` token.
+     * Extracts parameter names from @param tags.
+     * Depth-aware scanning finds a multi-line array shape's variable on a later line.
      *
-     * @param string $docText - Raw docblock text.
+     * @param string $docText - Raw docblock text to scan for input-parameter tags.
      *
      * @return list<string> - Parameter names found in the docblock.
      */
@@ -137,30 +131,23 @@ final readonly class MissingParamTagRule implements RuleInterface
         $length     = strlen($stripped);
         $position   = 0;
 
-        // Walk the docblock, finding each param tag in turn.
         while ($position < $length) {
             $tagPosition = strpos($stripped, '@param', $position);
-            // No more param tags left to read.
             if ($tagPosition === false) {
                 break;
             }
 
             $position = $tagPosition + strlen('@param');
 
-            // Require a word boundary after `@param`. Otherwise `@param-out`,
-            // `@param-immutable`, etc. (which document output-only or constraint
-            // semantics, not an input parameter) would be treated as `@param`
-            // and falsely suppress the missing-input-tag finding.
+            // Only plain `@param` documents an input; accepting output or constraint tags would hide a missing input tag.
             if ($position < $length) {
                 $next = $stripped[$position];
-                // A following word character marks a different tag such as param-out.
                 if ($next === '-' || ctype_alnum($next) || $next === '_') {
                     continue;
                 }
             }
 
             $varName = self::scanForParamVariable($stripped, $length, $position);
-            // Record the variable this tag documents.
             if ($varName !== null) {
                 $paramNames[] = $varName;
             }
@@ -170,33 +157,29 @@ final readonly class MissingParamTagRule implements RuleInterface
     }
 
     /**
-     * Walks forward from a `@param` token through balanced `{} <> [] ()` brackets and returns the
-     * first parameter variable token reached at depth zero. Stops at the next `@tag` (next docblock entry) or
-     * end of input.
+     * Walks forward from a parameter tag while tracking balanced braces and brackets.
+     * Returns the first parameter variable token reached at depth zero.
+     * Stops at the next depth-zero at-sign or the end of input.
      *
      * @param string $stripped - Docblock text with `/**`, ` * `, and `*\/` framing removed.
      * @param int    $length   - Pre-computed `strlen($stripped)` to avoid recomputation per call.
      * @param int    $position - Cursor position (mutated to point past the matched variable).
      *
-     * @return string|null - Variable name when found, null when the `@param` tag has no closing variable token.
+     * @return string|null - Variable name when found; null when none appears before the stop point.
      */
     private static function scanForParamVariable(string $stripped, int $length, int &$position): ?string
     {
         $depth = 0;
-        // Scan forward through balanced brackets for the parameter variable.
         while ($position < $length) {
             $character = $stripped[$position];
 
-            // An opening bracket enters a type shape.
             if ($character === '{' || $character === '<' || $character === '[' || $character === '(') {
                 $depth++;
                 $position++;
                 continue;
             }
 
-            // A closing bracket leaves the type shape.
             if ($character === '}' || $character === '>' || $character === ']' || $character === ')') {
-                // Never let depth go negative on an unbalanced bracket.
                 if ($depth > 0) {
                     $depth--;
                 }
@@ -205,7 +188,7 @@ final readonly class MissingParamTagRule implements RuleInterface
             }
 
             if ($depth === 0 && $character === '@') {
-                // Reached the next tag before a variable; this @param has no input name.
+                // Another depth-zero at-sign appears before a variable, so this parameter tag has no input name.
                 return null;
             }
 
@@ -223,9 +206,7 @@ final readonly class MissingParamTagRule implements RuleInterface
     }
 
     /**
-     * Removes docblock framing (`/**`, ` * `, `*\/`) so the result reads as flat prose for the
-     * depth-aware parser. Newlines are preserved so multi-line bracketed shapes keep their line breaks
-     * for caller inspection; only the per-line `*` decoration is stripped.
+     * Removes docblock framing for the depth-aware parameter parser, preserving newlines in multi-line type shapes.
      *
      * @param string $docText - Raw docblock text including its `/**`, ` * `, and `*\/` framing.
      *
@@ -233,9 +214,11 @@ final readonly class MissingParamTagRule implements RuleInterface
      */
     private static function stripDocFraming(string $docText): string
     {
+        // Trim the opener, including runs such as /***, and the closing */; interior text is untouched.
         $stripped = preg_replace('/^\s*\/\*\*+/', '', $docText) ?? '';
         $stripped = preg_replace('/\*\/\s*$/', '', $stripped) ?? '';
 
+        // Remove leading whitespace, a star and at most one following whitespace character; matches can consume newlines.
         return preg_replace('/^\s*\*\s?/m', '', $stripped) ?? '';
     }
 
@@ -243,14 +226,13 @@ final readonly class MissingParamTagRule implements RuleInterface
      * Returns the parameters that owe an `@param` tag of their own.
      *
      * @param ClassMethod|Function_|Closure|ArrowFunction $node              - Documented function-like being checked.
-     * @param bool                  $hasContractDoc    - Whether its docblock carries a contract rather than a skeleton.
-     * @param list<string>          $documentedParams  - Parameter names its own docblock already documents.
-     * @param list<Node\Stmt>       $statements        - The unit's statements, searched for the overridden method.
-     * @param NodeFinder            $nodeFinder        - Shared finder reused across nodes.
-     * @param DocsInheritanceHelper $inheritanceHelper - Resolves same-file ancestors and inheritance markers.
+     * @param bool                                        $hasContractDoc    - Whether its docblock carries a contract rather than a skeleton.
+     * @param list<string>                                $documentedParams  - Parameter names its own docblock already documents.
+     * @param list<Node\Stmt>                             $statements        - The unit's statements, searched for the overridden method.
+     * @param NodeFinder                                  $nodeFinder        - Shared finder reused across nodes.
+     * @param DocsInheritanceHelper                       $inheritanceHelper - Resolves same-file ancestors and inheritance markers.
      *
-     * @return array<string, Node\Param> - owing parameters keyed by name, in signature order; a skeleton owes only its
-     *   promoted parameters, and a parameter its own docblock or an inherited contract documents owes nothing
+     * @return array<string, Node\Param> - Missing own or inherited tags, keyed by name in signature order; skeletons owe promoted parameters only.
      */
     private function paramsOwingTags(
         ClassMethod|Function_|Closure|ArrowFunction $node,
@@ -261,7 +243,7 @@ final readonly class MissingParamTagRule implements RuleInterface
         DocsInheritanceHelper $inheritanceHelper,
     ): array {
         $owing = [];
-        // Weigh each plainly named signature parameter; a skeleton keeps its promoted properties only.
+        // A contract docblock requires every missing named parameter tag; a skeleton requires tags only for promoted properties.
         foreach ($node->params as $param) {
             $paramName = $this->paramName($param);
             if ($paramName !== null && ($hasContractDoc || $param->isPromoted()) && !in_array($paramName, $documentedParams, true)) {
@@ -276,17 +258,16 @@ final readonly class MissingParamTagRule implements RuleInterface
     }
 
     /**
-     * Returns the parameters of a method that an inherited contract already documents.
+     * Find names covered by inherited method docs; constructors own their signature and promoted-property docs.
+     * Same-file ancestors cover documented names or positions; an ancestor's inheritance marker covers its declared positions.
+     * Without a resolved ancestor method, a valid marker covers every named parameter; non-method callables return none.
      *
      * @param ClassMethod|Function_|Closure|ArrowFunction $node              - Documented function-like with at least one undocumented parameter.
-     * @param list<Node\Stmt>       $statements        - The unit's statements, searched for the overridden method.
-     * @param NodeFinder            $nodeFinder        - Shared finder reused across nodes.
-     * @param DocsInheritanceHelper $inheritanceHelper - Resolves same-file ancestors and inheritance markers.
+     * @param list<Node\Stmt>                             $statements        - The unit's statements, searched for the overridden method.
+     * @param NodeFinder                                  $nodeFinder        - Shared finder reused across nodes.
+     * @param DocsInheritanceHelper                       $inheritanceHelper - Resolves same-file ancestors and inheritance markers.
      *
-     * @return list<string> - this method's parameter names the same-file overridden method both declares and documents,
-     *   matched by name or, for a renamed parameter, by position; or every name when `{@inheritdoc}` or `#[\Override]` points at a contract in another file; empty
-     *   for a function, a constructor (PHP inherits no constructor signature, and a promoted parameter declares a
-     *   property only this class can document), or a method with no inherited contract
+     * @return list<string> - Parameter names already covered by inheritance; empty when no inherited contract applies.
      */
     private function inheritedParamNames(
         ClassMethod|Function_|Closure|ArrowFunction $node,
@@ -301,19 +282,19 @@ final readonly class MissingParamTagRule implements RuleInterface
         $ownNames       = array_map($this->paramName(...), $node->params);
         $ancestorMethod = $inheritanceHelper->sameFileAncestorMethod($node, $statements, $nodeFinder);
         if (!$ancestorMethod instanceof ClassMethod) {
-            // The contract lives in another file, so a marker the class can honour stands in for every parameter.
+            // With no same-file ancestor to inspect, an inheritance marker stands in for every named parameter.
             return $inheritanceHelper->hasInheritanceMarker($node) ? array_values(array_filter($ownNames, is_string(...))) : [];
         }
 
-        // A visible ancestor that inherits its own contract through a marker covers every position it declares.
+        // A same-file ancestor with an inheritance marker is treated as covering every named position it declares.
         $ancestorDocumented = $inheritanceHelper->hasInheritanceMarker($ancestorMethod)
             ? array_filter(array_map($this->paramName(...), $ancestorMethod->params), is_string(...))
             : $this->extractParamNames($ancestorMethod->getDocComment()?->getText() ?? '');
         $ancestorNames = array_map($this->paramName(...), $ancestorMethod->params);
         $inherited     = [];
 
-        // A parameter the ancestor also declares is matched by name; a renamed one by its position. Either way it is
-        // inherited only when the ancestor documents it, and one the override adds past the signature is owed here.
+        // A parameter the ancestor also declares is matched by name; a renamed one is matched by position.
+        // It is inherited only when the ancestor documents it; parameters added past that signature remain owed here.
         foreach ($ownNames as $position => $ownName) {
             $ancestorName = in_array($ownName, $ancestorNames, true) ? $ownName : ($ancestorNames[$position] ?? null);
             if ($ownName !== null && $ancestorName !== null && in_array($ancestorName, $ancestorDocumented, true)) {
@@ -367,15 +348,13 @@ final readonly class MissingParamTagRule implements RuleInterface
      */
     private function hasContractDoc(string $docText): bool
     {
-        // Weigh each line of the docblock.
+        // \R splits on any newline sequence, so CRLF docblocks are read line by line too.
         foreach (preg_split('/\R/', $docText) ?: [] as $line) {
             $line = trim($line, " \t\n\r\0\x0B/*");
-            // Blank and tag lines are not contract prose.
             if ($line === '' || str_starts_with($line, '@')) {
                 continue;
             }
 
-            // A non-empty, non-tag line is prose: the docblock states a contract.
             return true;
         }
 

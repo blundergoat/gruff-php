@@ -22,14 +22,12 @@ use PhpParser\Node\Stmt\Function_;
 use PhpParser\NodeFinder;
 
 /**
- * Flags a documented method or function that omits an explicit `@return` tag, so the user gets a complete
- * contract - every documented callable states what it hands back, even when that is void or never.
+ * Flags documented methods and named functions without an explicit @return tag, including void and never returns.
+ * Constructors and destructors are exempt.
  *
- * Runs per file over documented function-likes, skipping constructors and destructors (which have no
- * meaningful return) and an override whose inherited contract already declares the return: the same-file method
- * it overrides carries `@return`, or `{@inheritdoc}` or `#[\Override]` points at a contract in another file.
- * Advisory, high confidence. The companion return-comment rule then checks the tag actually describes the value
- * rather than restating the type.
+ * The first matching same-file direct ancestor method exempts an override if it has @return or a valid inheritance marker.
+ * When no such method is found, a valid marker on the current method supplies the exemption.
+ * Advisory severity and high confidence apply; docs.return-comment checks descriptions separately.
  */
 final readonly class MissingReturnTagRule implements RuleInterface
 {
@@ -57,10 +55,10 @@ final readonly class MissingReturnTagRule implements RuleInterface
     }
 
     /**
-     * Reports each documented function-like declaration that lacks an `@return` tag.
+     * Reports documented functions and methods other than constructors and destructors that lack a local or inherited `@return` contract.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext - Unused; the rule interface requires it, and this rule reads no options or project root.
      *
      * @return list<Finding> - Findings for missing return tags.
      */
@@ -73,9 +71,9 @@ final readonly class MissingReturnTagRule implements RuleInterface
 
         $findings = [];
 
-        // Check every method and function in the file.
+
         foreach ($nodes as $node) {
-            /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
+            /** @var ClassMethod|Function_ $node - NodeIndex limits this scan to methods and named functions. */
             // A constructor or destructor has no meaningful return to document.
             if ($node instanceof ClassMethod && in_array($node->name->toString(), ['__construct', '__destruct'], true)) {
                 continue;
@@ -90,7 +88,7 @@ final readonly class MissingReturnTagRule implements RuleInterface
 
             $docText = $docComment->getText();
 
-            // A docblock that already declares its return contract is fine.
+
             if (str_contains($docText, '@return')) {
                 continue;
             }
@@ -120,16 +118,14 @@ final readonly class MissingReturnTagRule implements RuleInterface
     }
 
     /**
-     * Reports whether an inherited contract already declares a method's return.
+     * Reports whether a same-file ancestor or an inheritance marker supplies a method's return contract.
      *
-     * @param ClassMethod           $classMethod       - Documented method without its own `@return` tag.
-     * @param list<Node\Stmt>       $statements        - The unit's statements, searched for the overridden method.
-     * @param NodeFinder            $nodeFinder        - Shared finder reused across nodes.
+     * @param ClassMethod $classMethod - Documented method without its own @return tag.
+     * @param list<Node\Stmt> $statements - Unit statements searched for a direct ancestor method.
+     * @param NodeFinder $nodeFinder - Shared finder reused across nodes.
      * @param DocsInheritanceHelper $inheritanceHelper - Resolves same-file ancestors and inheritance markers.
      *
-     * @return bool - true when the same-file method it overrides declares `@return`, or, with no such method in this
-     *   file, when `{@inheritdoc}` or `#[\Override]` points at a contract declared elsewhere; false otherwise, so a
-     *   visible ancestor without the tag, or a marker in a class with nothing to inherit, still reports
+     * @return bool - True for an ancestor's @return or valid marker, or the method's valid marker when no ancestor method is found.
      */
     private function isReturnInherited(
         ClassMethod $classMethod,

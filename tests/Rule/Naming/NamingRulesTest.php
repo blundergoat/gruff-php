@@ -18,15 +18,16 @@ use GruffPhp\Rules\RuleRegistry;
 use GruffPhp\Engine\Source\SourceFile;
 
 /**
- * Covers the naming rule pack: generic method names, single-char and Hungarian variables with sensible exemptions, boolean prefixes, class-file
- * mismatch, identifier tokenisation, and identifier quality across closures and arrow scopes.
+ * Exercises short-variable, confusing-name, test-naming, class/file, and identifier-quality rules through parsed fixtures.
+ * Checks reported names, exclusions, metadata, remediation, and configurable loop-body thresholds.
+ * Includes closure and arrow-function attribution checks alongside fixture-analysis helpers.
  */
 final class NamingRulesTest extends NamingRuleTestCase
 {
     /**
-     * Verify single char variables detected.
+     * Ordinary single-character variables remain reportable by the short-variable rule.
      *
-     * @return void
+     * @return void - Asserts that x and a appear among reported variables.
      */
     public function testSingleCharVariablesDetected(): void
     {
@@ -38,9 +39,9 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
-     * Verify loop counters excluded.
+     * Loop-counter variables remain exempt from short-variable findings.
      *
-     * @return void
+     * @return void - Asserts that i and j are absent from reported variables.
      */
     public function testLoopCountersExcluded(): void
     {
@@ -52,9 +53,9 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
-     * Verify catch variable excluded.
+     * Catch variables remain exempt from short-variable findings.
      *
-     * @return void
+     * @return void - Asserts that e is absent from reported variables.
      */
     public function testCatchVariableExcluded(): void
     {
@@ -65,9 +66,9 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
-     * Verify confusing standalone class names.
+     * Standalone Helper and Util class names produce confusing-name findings.
      *
-     * @return void
+     * @return void - Asserts that Helper and Util appear among reported symbols.
      */
     public function testConfusingStandaloneClassNames(): void
     {
@@ -79,9 +80,9 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
-     * Verify domain specific class names not flagged.
+     * Domain-specific UserService and OrderRepository class names remain exempt.
      *
-     * @return void
+     * @return void - Asserts that UserService and OrderRepository are absent from reported symbols.
      */
     public function testDomainSpecificClassNamesNotFlagged(): void
     {
@@ -93,9 +94,9 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
-     * Verify mixed test naming detected.
+     * Mixing test-method naming styles produces one fixture-level consistency finding.
      *
-     * @return void
+     * @return void - Asserts one finding with symbol MixedTestNamingFixture.
      */
     public function testMixedTestNamingDetected(): void
     {
@@ -106,9 +107,9 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
-     * Verify consistent test naming not flagged.
+     * The consistently named fixture remains exempt when its file also contains mixed test naming.
      *
-     * @return void
+     * @return void - Asserts that ConsistentTestNamingFixture is absent from reported symbols.
      */
     public function testConsistentTestNamingNotFlagged(): void
     {
@@ -119,9 +120,9 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
-     * Verify class file mismatch.
+     * The lowercase clean.php fixture receives file-rename-only remediation for its class mismatch.
      *
-     * @return void
+     * @return void - Asserts one CleanNamingFixture finding with a file-rename-only remediation.
      */
     public function testClassFileMismatch(): void
     {
@@ -129,14 +130,14 @@ final class NamingRulesTest extends NamingRuleTestCase
 
         self::assertCount(1, $findings);
         self::assertSame('CleanNamingFixture', $findings[0]->symbol);
-        // A lowercase stem is not a class name, so only the file rename is offered.
+        // The rule offers a class rename only for an uppercase-first alphanumeric stem.
         self::assertSame('Rename the file to CleanNamingFixture.php so it matches the class it declares.', $findings[0]->remediation);
     }
 
     /**
-     * Verify class file mismatch offers the class rename only when the file stem is already a StudlyCaps class name.
+     * Check rename advice for Widget.php and gadget_widget.php against the Gadget class.
      *
-     * @return void
+     * @return void - Asserts a class-rename alternative for Widget.php and file-rename-only advice for gadget_widget.php.
      */
     public function testClassFileMismatchOffersClassRenameOnlyForStudlyCapsStem(): void
     {
@@ -152,9 +153,9 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
-     * Verify class file mismatch skips non classlike config filenames.
+     * Check class/file mismatch handling for the PHP-CS-Fixer configuration file.
      *
-     * @return void
+     * @return void - Asserts no class/file mismatch findings for .php-cs-fixer.dist.php.
      */
     public function testClassFileMismatchSkipsNonClasslikeConfigFilenames(): void
     {
@@ -178,7 +179,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     /**
      * Verify identifier quality finds placeholder generic and numbered names.
      *
-     * @return void
+     * @return void - Asserts the listed name variants, string metadata fields, and shared remediation text.
      */
     public function testIdentifierQualityFindsPlaceholderGenericAndNumberedNames(): void
     {
@@ -218,7 +219,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     /**
      * Verify identifier quality exempts common noise sources.
      *
-     * @return void
+     * @return void - Asserts that each named exclusion is absent from identifierName metadata.
      */
     public function testIdentifierQualityExemptsCommonNoiseSources(): void
     {
@@ -235,9 +236,9 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
-     * Verify identifier quality skips the lone parameter of single-arg wide-typed non-void helpers.
+     * Verify generic parameter-name exemptions for the helper-signature fixture.
      *
-     * @return void
+     * @return void - Asserts that value is omitted for stringValue and fingerprint but reported for tag, transform, and describe.
      */
     public function testIdentifierQualitySkipsGenericByPurposeHelpers(): void
     {
@@ -252,7 +253,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
-     * Build `symbol|identifier` rows for identifier-quality findings with a reported name.
+     * Build pipe-delimited symbol and identifier rows for identifier-quality findings with a reported name.
      *
      * @param list<\GruffPhp\Results\Finding\Finding> $findings - Identifier-quality findings from a fixture.
      *
@@ -274,9 +275,9 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
-     * Verify identifier quality metadata is specific.
+     * Check metadata for the first reported item identifier.
      *
-     * @return void
+     * @return void - Asserts variable/generic classification, item tokens and matched token, and advisory severity.
      */
     public function testIdentifierQualityMetadataIsSpecific(): void
     {
@@ -295,9 +296,9 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
-     * Verify generic foreach variables report only once the configured body threshold is reached.
+     * Check loop-variable reports at body thresholds of four and five statements.
      *
-     * @return void
+     * @return void - Asserts long-loop item and row reports at 4 but not 5, plus short-loop and map exclusions at 4.
      */
     public function testIdentifierQualityFlagsGenericLoopVariablesAtConfiguredBodyThreshold(): void
     {
@@ -317,9 +318,9 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
-     * Verify closure and arrow scopes are checked without leaking into the parent method.
+     * Check selected naming findings in closure, arrow, and parent-method scopes.
      *
-     * @return void
+     * @return void - Asserts closure foo/tmp and arrow x reports, with no parent-method foo or x report.
      */
     public function testClosureAndArrowScopesAreCoveredByNamingRules(): void
     {
@@ -334,9 +335,9 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
-     * Verify clean fixture has no naming findings except file mismatch.
+     * Verify that no other naming rule reports on the clean fixture.
      *
-     * @return void
+     * @return void - Asserts no naming findings remain after class/file mismatch findings are excluded.
      */
     public function testCleanFixtureHasNoNamingFindingsExceptFileMismatch(): void
     {
@@ -357,7 +358,7 @@ final class NamingRulesTest extends NamingRuleTestCase
      *
      * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options - Identifier-quality rule option overrides.
      *
-     * @return list<\GruffPhp\Results\Finding\Finding> - identifier-quality findings only, in discovery order; empty when the options suppress every report
+     * @return list<\GruffPhp\Results\Finding\Finding> - Identifier-quality findings in registry report order; empty when none survive.
      */
     private function identifierQualityFindingsWithOptions(array $options): array
     {
@@ -381,8 +382,7 @@ final class NamingRulesTest extends NamingRuleTestCase
      *
      * @param string $fixture - fixture basename under the naming fixtures dir, parsed then run through the full rule pack
      *
-     * @return list<\GruffPhp\Results\Finding\Finding> - every finding the default rule pack raises against the fixture, in discovery order; empty when the
-     *                                         fixture is clean
+     * @return list<\GruffPhp\Results\Finding\Finding> - Default-rule findings in registry report order; empty when none survive.
      */
     private function analyseFixture(string $fixture): array
     {
@@ -396,6 +396,8 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
+     * Check for a finding with the required rule, exact metadata value, and symbol prefix.
+     *
      * @param list<\GruffPhp\Results\Finding\Finding> $findings - Findings to search for a matching rule, metadata value, and symbol prefix.
      * @param string                          $ruleId - rule the finding must come from; others are skipped
      * @param string                          $metadataKey - finding metadata entry to match on, such as the reported identifier name
@@ -429,8 +431,7 @@ final class NamingRulesTest extends NamingRuleTestCase
      *
      * @param list<\GruffPhp\Results\Finding\Finding> $findings - Naming findings to group by reported variable name.
      *
-     * @return array<string, list<string>> - reported symbols bucketed by variable name; a name maps to repeated symbols when reported more than
-     *                       once, and absent keys mean that variable was never flagged
+     * @return array<string, list<string>> - Symbols by variable name, retaining duplicates; skips non-string names and null symbols.
      */
     private function reportedVariableSymbolsByName(array $findings): array
     {

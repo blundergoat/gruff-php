@@ -16,26 +16,24 @@ use GruffPhp\Results\Scoring\ScoreCalculator;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Pins the behaviours the ratified family scoring contract fixes.
- *
- * The cross-port suite (`family-check --suite scoring`) proves the same properties for all five ports
- * at once, but it runs from the specification repository and needs every port built. These tests fail
- * here, in gruff-php's own gate, the moment one of them breaks.
+ * Checks scoring results using fixed finding fixtures and evaluated-file counts.
+ * Covers scaling, penalties, applicability, rounding, clustering, and rule attribution.
+ * Also verifies that report serialization preserves the calculated composite and scoring metadata.
  */
 final class M06ContractTest extends TestCase
 {
-    /** Evaluated-file denominator every fixture scores against; ten keeps the derived numbers legible. */
+    /** Base evaluated-file denominator; ten keeps the derived numbers legible. */
     private const EVALUATED_FILES = 10;
 
     /**
-     * Builds one finding with an explicit weight so a test can state what it expects.
+     * Builds one finding with severity and confidence inputs for score assertions.
      *
      * @param string      $ruleId - Native rule identifier, the ratified attribution key.
      * @param Pillar      $pillar - Pillar the finding lands in.
      * @param Severity    $severity - Severity driving the ratified weight.
      * @param Confidence  $confidence - Confidence multiplying that weight.
      * @param string      $filePath - Project-relative path.
-     * @param string|null $symbol - Qualified symbol, or null for a file-level finding.
+     * @param string|null $symbol - Qualified symbol for clustering; null leaves the finding unclustered.
      * @param int|null    $line - Reported line, which the cluster key deliberately ignores.
      *
      * @return Finding - One finding ready to score.
@@ -63,13 +61,10 @@ final class M06ContractTest extends TestCase
     }
 
     /**
-     * Duplicating a project must not move its grade.
+     * Quadrupling finding counts and evaluated files preserves the composite score in this fixture.
+     * Both grow proportionally, leaving finding density unchanged.
      *
-     * This is the property the ratified shape exists to deliver: duplication doubles the findings and
-     * the evaluated files together, so the density they make is unchanged. The retired absolute-sum
-     * shape failed it - a 4x duplication of identical code cost gruff-php nearly ten composite points.
-     *
-     * @return void
+     * @return void - Asserts that the original and quadrupled runs have non-null, equal composite scores.
      */
     public function testScaleIsNotAnAutomaticPenalty(): void
     {
@@ -90,9 +85,9 @@ final class M06ContractTest extends TestCase
     }
 
     /**
-     * Doubling a project must not move its grade either, which is the same property at the smaller factor.
+     * Doubling finding counts and evaluated files preserves the composite score in this fixture.
      *
-     * @return void
+     * @return void - Asserts that the original and doubled runs have non-null, equal composite scores.
      */
     public function testScaleIsNotAnAutomaticPenaltyWhenDoubled(): void
     {
@@ -108,9 +103,9 @@ final class M06ContractTest extends TestCase
     }
 
     /**
-     * Adding a finding without adding a file can only worsen its own pillar.
+     * Adding the security error lowers security and composite scores at a fixed file count.
      *
-     * @return void
+     * @return void - Asserts lower security and composite scores and an unchanged documentation score.
      */
     public function testMonotonicityAtAFixedDenominator(): void
     {
@@ -152,7 +147,7 @@ final class M06ContractTest extends TestCase
     /**
      * A reachable clean pillar scores 100; a run that evaluated nothing scores nothing at all.
      *
-     * @return void
+     * @return void - Asserts perfect applicable clean pillars and null grades and composite when no files were evaluated.
      */
     public function testApplicabilityKeepsNullApartFromPerfect(): void
     {
@@ -177,9 +172,9 @@ final class M06ContractTest extends TestCase
     }
 
     /**
-     * Ties round away from zero, matching the four sibling ports.
+     * Grade::fromScore() rounds the tested positive scores to two decimal places.
      *
-     * @return void
+     * @return void - Asserts the expected scores for 53.125, 97.681818, and 100.0.
      */
     public function testSerializationRoundsToTwoDecimalsAwayFromZero(): void
     {
@@ -189,12 +184,10 @@ final class M06ContractTest extends TestCase
     }
 
     /**
-     * Correlated findings on one symbol bill once, whatever lines they report.
+     * Correlated findings for the same file and symbol share a weight despite different reported lines.
+     * Including the line in the cluster key would charge the same cause twice.
      *
-     * Correlated rules disagree about which line to report, so a line in the cluster key would split
-     * one root cause into two and bill it twice.
-     *
-     * @return void
+     * @return void - Asserts shared penalties, one cluster without a line field, and no cluster for distinct symbols.
      */
     public function testClusteringKeysOnSymbolWithoutLineIdentity(): void
     {
@@ -234,7 +227,7 @@ final class M06ContractTest extends TestCase
     /**
      * Every rule that produced a finding owes exactly one row, sorted by its native identifier.
      *
-     * @return void
+     * @return void - Asserts sorted native rule IDs with per-rule finding counts and confidence-weighted totals.
      */
     public function testRuleAttributionIsKeyedByNativeRuleId(): void
     {
@@ -258,9 +251,9 @@ final class M06ContractTest extends TestCase
     }
 
     /**
-     * The composite a person reads and the one a script reads come from one calculation.
+     * Serializing the report retains its calculated composite and scoring metadata.
      *
-     * @return void
+     * @return void - Asserts the payload's composite matches the report and retains the file count and scored pillars.
      */
     public function testMachineViewPublishesTheScoredComposite(): void
     {

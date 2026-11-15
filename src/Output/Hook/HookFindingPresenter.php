@@ -8,14 +8,9 @@ use GruffPhp\Results\Finding\Finding;
 use JsonException;
 
 /**
- * Shapes internal `Finding` objects into the `gruff.hook.v2` finding entries the `hook` command
- * emits to an editor or coding agent.
- *
- * This is the last pass before a finding leaves the tool: it copies the reportable fields, fills in
- * a default remediation line when the rule offered none, and rewrites raw threshold metadata into
- * the uniform `measured`/`threshold`/`unit`/`direction` shape a consumer can render as "you are at
- * N, the limit is M" without knowing which rule fired. It also sorts a batch worst-first so the
- * caller shows the most serious findings at the top of its list.
+ * Converts findings to `gruff.hook.v2` entries for editor and agent consumers.
+ * Supplies fallback remediation and threshold metadata defaults while preserving rule-provided metadata.
+ * Orders presented batches by severity, then location and rule ID.
  */
 final readonly class HookFindingPresenter
 {
@@ -29,7 +24,7 @@ final readonly class HookFindingPresenter
      * @param string|null $baselineStatus - What an applied baseline made of this finding; null when no baseline was applied.
      *
      * @return array<string, mixed> - JSON-ready hook finding entry with `metadata` always an object, never an empty list.
-     * @throws JsonException When the fingerprint cannot be encoded.
+     * @throws JsonException - When the fingerprint cannot be encoded.
      */
     public function toArray(Finding $finding, ?string $stableIdentity, int $symbolOrdinal = 0, ?string $baselineStatus = null): array
     {
@@ -53,7 +48,7 @@ final readonly class HookFindingPresenter
             'fingerprint'    => $finding->fingerprint(),
         ];
 
-        // With no metadata to report, swap the empty array for an object so the JSON shows `"metadata": {}` and a consumer can always treat it as a keyed map, never a list.
+        // Encode empty metadata as a JSON object so consumers receive a keyed map.
         if ($payload['metadata'] === []) {
             $payload['metadata'] = (object)[];
         }
@@ -62,23 +57,21 @@ final readonly class HookFindingPresenter
     }
 
     /**
-     * Returns the span end every v2 finding carries, repeating the start line when the rule reported no span.
-     *
-     * A consumer locating a finding cannot treat an absent end as a single line by guessing, so the contract makes the
-     * field required and the single-line case explicit.
+     * Reports a valid span end for the hook payload, falling back to the start line.
+     * A missing start line yields null even if an end line was supplied.
      *
      * @param Finding $finding - The finding whose span end is being reported.
      *
-     * @return int|null - The last line the finding covers; null only when the finding names no line at all.
+     * @return int|null - End line, or the start for an absent or reversed end; null without a start line.
      */
     private function endLine(Finding $finding): ?int
     {
-        // Without a start line there is no span to state, and `line` is null for the same reason.
+
         if ($finding->line === null) {
             return null;
         }
 
-        // An unset or reversed end means the finding occupies its start line alone, which the contract says to spell out.
+
         return $finding->endLine !== null && $finding->endLine >= $finding->line ? $finding->endLine : $finding->line;
     }
 
@@ -113,19 +106,18 @@ final readonly class HookFindingPresenter
     }
 
     /**
-     * Rewrites a threshold rule's raw metadata into the uniform `measured`/`threshold`/`unit`/`direction`
-     * shape the hook contract promises, so a consumer can render the measurement against its limit without
-     * knowing the rule. Non-threshold findings pass straight through.
+     * Adds measured, threshold, unit, and direction defaults when metadata has a non-null threshold.
+     * Rule-provided values override these defaults; missing or null thresholds leave metadata unchanged.
      *
-     * @param Finding $finding - The finding whose metadata is being normalised for the hook payload.
+     * @param Finding $finding - Finding whose metadata is prepared for the hook payload.
      *
-     * @return array<string, mixed> - The normalised shape for a threshold finding, or the rule's raw metadata untouched for a non-threshold one; empty when the rule attached none, which a consumer shows as a finding with no measured detail.
+     * @return array<string, mixed> - Original metadata, enriched with defaults only for a non-null threshold.
      */
     private function metadata(Finding $finding): array
     {
         $metadata = $finding->metadata;
 
-        // A finding with no `threshold` key is not a limit breach - a naming or docs rule, say - so hand its metadata back untouched rather than inventing measured and limit fields.
+
         if (!isset($metadata['threshold'])) {
             return $metadata;
         }
@@ -147,27 +139,27 @@ final readonly class HookFindingPresenter
      *
      * @param Finding $finding - The finding whose threshold measurement is being extracted.
      *
-     * @return bool|float|int|string|null - The measured value to display; null when none was found, so the consumer shows the limit with no measured figure beside it.
+     * @return bool|float|int|string|null - First preferred scalar or fallback number; null when neither is present.
      */
     private function measuredValue(Finding $finding): bool|float|int|string|null
     {
-        // First try the metadata keys this rule is known to store its measurement under, since those hold the measurement worth showing.
+
         foreach ($this->measuredKeys($finding->ruleId) as $key) {
             $value = $finding->metadata[$key] ?? null;
-            // Take the first known key that actually holds a scalar; that is the measurement the consumer will render.
+
             if (is_bool($value) || is_float($value) || is_int($value) || is_string($value)) {
                 return $value;
             }
         }
 
-        // No known key matched, so scan the rest of the metadata for any numeric value we can report instead.
+
         foreach ($finding->metadata as $key => $value) {
-            // Skip the limit and its type - those describe the boundary, not how far past it the code went.
+            // Skip the limit and its type; they describe the boundary, not the observed value.
             if ($key === 'threshold' || $key === 'thresholdType') {
                 continue;
             }
 
-            // Any remaining number is a fair stand-in for the measurement, so surface the first one found.
+
             if (is_float($value) || is_int($value)) {
                 return $value;
             }

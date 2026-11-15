@@ -18,7 +18,8 @@ use GruffPhp\Results\Finding\Finding;
 final readonly class SensitiveExclusionFilter
 {
     /**
-     * Reason a user reads on each sensitive-data `builtInTestPath[...]` audit row; every port publishes these exact words (FAMILY-CONTRACT.md section 13a).
+     * Reason on each sensitive-data `builtInTestPath[...]` audit row.
+     * Every port publishes these exact words (FAMILY-CONTRACT.md section 13a).
      */
     public const BUILT_IN_TEST_PATH_REASON = 'Test, fixture and example files hold sample credentials, so sensitive-data rules skip them by path.';
 
@@ -35,7 +36,7 @@ final readonly class SensitiveExclusionFilter
     /**
      * Directory names, compared case-insensitively, that make a path test code, e.g. `Tests/Unit/` or `examples/`.
      *
-     * @var list<string>
+     * @var list<string> - Lowercase directory segments that trigger the built-in test-path skip.
      */
     private const BUILT_IN_TEST_PATH_DIRECTORIES = ['test', 'tests', '__tests__', 'spec', 'testdata', 'fixtures', 'examples'];
 
@@ -48,11 +49,11 @@ final readonly class SensitiveExclusionFilter
      * Hides one run's accepted findings and returns the rest with the audit rows a reviewer reads in the report.
      * The user's own entries claim findings first, then the built-in test-path skip takes what is left.
      *
-     * @param list<Finding>                $findings   - Findings produced by the run, in report order.
-     * @param list<SensitiveExclusion>     $exclusions - Validated exclusions in configuration order, so a position is its audit index.
-     * @param InlineSuppressionFilter|null $inline     - Section 13c's comment and repeated-claim filter, applied last; null applies only the exclusions and the test-path skip.
+     * @param list<Finding> $findings - Findings produced by the run, in report order.
+     * @param list<SensitiveExclusion> $exclusions - Validated exclusions in configuration order, so a position is its audit index.
+     * @param InlineSuppressionFilter|null $inline - Section 13c filter applied last; null skips comment suppression and claim merging.
      *
-     * @return SensitiveExclusionResult - surviving findings, audit rows, and the findings section 13c removed; no rows means no configured entry or built-in or section 13c removal
+     * @return SensitiveExclusionResult - Survivors, audit rows (empty if nothing was configured or removed), and section 13c removals.
      */
     public function apply(array $findings, array $exclusions, ?InlineSuppressionFilter $inline = null): SensitiveExclusionResult
     {
@@ -63,7 +64,7 @@ final readonly class SensitiveExclusionFilter
         foreach ($findings as $finding) {
             $matchedIndex = $this->matchingEntryIndex($finding, $exclusions);
 
-            // No entry claimed this finding, so it keeps reporting exactly as it would with no config at all.
+
             if ($matchedIndex === null) {
                 $survivors[] = $finding;
                 continue;
@@ -81,8 +82,7 @@ final readonly class SensitiveExclusionFilter
 
     /**
      * Hides sensitive-data and security findings in test, fixture and example files, and publishes one audit row per hidden file and rule.
-     *
-     * A user scanning a project with sample keys or a deliberate `shell_exec` in `tests/fixtures/` sees `builtInTestPath[...]` rows instead of findings.
+     * A sample key or deliberate `shell_exec` in `tests/fixtures/` produces a `builtInTestPath[...]` row instead of a finding.
      * The skip is never silent, and the fixture-PII rule keeps reading these files (FAMILY-CONTRACT.md section 13a).
      *
      * @param SensitiveExclusionResult $result - Findings and audit rows left after the user's exclusions.
@@ -94,9 +94,9 @@ final readonly class SensitiveExclusionFilter
         $skippedCountByFileAndRule = [];
         $survivors                 = [];
 
-        // Each finding either stays in the report or is folded into its file's audit row.
+
         foreach ($result->findings as $finding) {
-            // Only the two pillars' findings in a test, fixture or example file are skipped, and never the fixture-PII rule.
+
             if (self::isSkippedOnTestPaths($finding->ruleId) && self::isBuiltInTestPath($finding->filePath)) {
                 $fileAndRule                             = $finding->filePath . "\0" . $finding->ruleId;
                 $skippedCountByFileAndRule[$fileAndRule] = ($skippedCountByFileAndRule[$fileAndRule] ?? 0) + 1;
@@ -113,7 +113,7 @@ final readonly class SensitiveExclusionFilter
         // A consumer tells built-in rows from configured ones by `source: "built-in"`, never by index.
         $nextIndex = 0;
 
-        // One row per file and rule, which text output shows as `builtInTestPath[tests/keys.php] sensitive-data.aws-access-key: 2`.
+
         foreach ($skippedCountByFileAndRule as $fileAndRule => $count) {
             [$filePath, $ruleId] = explode("\0", (string)$fileAndRule, 2);
             $summaries[]         = new SensitiveExclusionSummary(
@@ -148,25 +148,25 @@ final readonly class SensitiveExclusionFilter
     }
 
     /**
-     * Reports whether a finding's file is test, fixture or example code, e.g. `tests/Unit/KeysTest.php` or `examples/demo.php`.
+     * Reports whether a finding path matches a built-in test, fixture or example directory or file-name pattern.
      *
      * @param string $filePath - Project-relative display path of the finding's file, as the report prints it.
      *
-     * @return bool - true for a directory named in the family list, compared case-insensitively, or a test-file base name
+     * @return bool - True when a directory matches the family list case-insensitively or the base name matches the test-file pattern.
      */
     public static function isBuiltInTestPath(string $filePath): bool
     {
         $segments = explode('/', str_replace('\\', '/', $filePath));
         $baseName = (string)array_pop($segments);
 
-        // Any directory on the path, compared case-insensitively, can make it a test, fixture or example path.
+
         foreach ($segments as $directory) {
             if (in_array(strtolower($directory), self::BUILT_IN_TEST_PATH_DIRECTORIES, true)) {
                 return true;
             }
         }
 
-        // Otherwise the file name alone must mark a test, e.g. `KeysTest.php`, `keys_test.go` or `keys.spec.ts`.
+        // With no matching directory, the base name must match the test-file pattern for the path to be skipped.
         return preg_match(self::BUILT_IN_TEST_FILE_NAME_PATTERN, $baseName) === 1;
     }
 

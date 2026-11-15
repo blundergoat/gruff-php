@@ -16,15 +16,10 @@ use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Token;
 
 /**
- * Reports a comment that holds disabled PHP code, which reviewers must read past and nobody runs.
+ * Flags plain comments whose retained lines contribute at least two code signals in total.
  *
- * A user who left `// $result = $service->process($input);` above a rewrite gets one advisory on that comment.
- * Each comment line is scored for code signals (assignments, method calls, control keywords); two or more report it.
- *
- * Comments that explain rather than disable code stay quiet:
- * - a line that reads as prose, such as "It future replace str_getcsv with $dbi->fetchSingleRow(...);";
- * - a no-op `$v = $v;`, or an example ending in `...`;
- * - a restatement of the assignment below in another form, such as the branchy version of branchless arithmetic.
+ * Signals include assignments, method calls, and selected keywords; recognized prose and placeholder lines contribute none.
+ * Docblocks and comments matching the token-based heuristic for restating the next assignment are skipped.
  */
 final readonly class CommentedOutCodeRule implements RuleInterface
 {
@@ -34,14 +29,14 @@ final readonly class CommentedOutCodeRule implements RuleInterface
     public const ID = 'waste.commented-out-code';
 
     /**
-     * Bytes of source read after a comment to find the statement it may restate; long enough for a chained call over several lines.
+     * Maximum source bytes inspected after a comment when looking for an assignment it may restate.
      */
     private const FOLLOWING_CODE_WINDOW = 2000;
 
     /**
      * Compound assignment operators, such as `+=` and `??=`, which assign as surely as `=`.
      *
-     * @var list<int>
+     * @var list<int> - Token IDs accepted when identifying assignment targets.
      */
     private const COMPOUND_ASSIGNMENTS = [
         T_PLUS_EQUAL, T_MINUS_EQUAL, T_MUL_EQUAL, T_DIV_EQUAL, T_CONCAT_EQUAL, T_MOD_EQUAL, T_AND_EQUAL, T_OR_EQUAL,
@@ -51,7 +46,7 @@ final readonly class CommentedOutCodeRule implements RuleInterface
     /**
      * Control keywords and non-assignment operators that set a restatement apart from the line below it.
      *
-     * @var list<int|string>
+     * @var list<int|string> - Token IDs and literal operators used to compare a comment with the following assignment.
      */
     private const OPERATOR_TOKENS = [
         '+', '-', '*', '/', '%', '|', '^', '~', '<', '>', '!', '.', '?', T_POW, T_SL, T_SR, T_IS_EQUAL, T_IS_IDENTICAL,
@@ -85,21 +80,21 @@ final readonly class CommentedOutCodeRule implements RuleInterface
     }
 
     /**
-     * Reports each comment that reads as disabled code rather than an explanation.
+     * Reports plain comments that meet the code-signal threshold and are not recognized as restatements.
      *
      * @param AnalysisUnit $analysisUnit - Parsed file the user asked to analyse.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext - Unused; the rule interface requires it, and this rule reads no options or project root.
      *
-     * @return list<Finding> - One advisory per disabled-code comment; empty when every comment is prose, a docblock or a restatement.
+     * @return list<Finding> - One advisory per comment passing both heuristic checks; empty when none qualify.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
         $findings   = [];
 
-        // The parser keeps only comment tokens, so every token here is a comment of some kind.
+
         foreach ($analysisUnit->tokens as $token) {
-            // Docblocks document an API; only line and block comments can hold disabled code.
+            // Treat docblocks as documentation even when they contain code examples.
             if (!$this->isPlainComment($token)) {
                 continue;
             }
@@ -107,14 +102,14 @@ final readonly class CommentedOutCodeRule implements RuleInterface
             $text = $token->text;
             $line = $token->line;
 
-            // A `/**` block outside a declaration is still documentation, never disabled code.
+            // A documentation-style opener remains exempt even when lexed as a plain comment.
             if (str_starts_with(trim($text), '/**')) {
                 continue;
             }
 
             $commentBody = $this->commentBody($text);
 
-            // Code-shaped text reports, unless it explains the assignment right below it in another form.
+            // Code-shaped text reports unless the token heuristic matches it to the following assignment.
             if ($this->looksLikeDisabledCode($commentBody) && !$this->restatesAssignmentBelow($commentBody, $analysisUnit->source, $token->pos + strlen($text))) {
                 $findings[] = new Finding(
                     ruleId:      $definition->id,
@@ -134,11 +129,11 @@ final readonly class CommentedOutCodeRule implements RuleInterface
     }
 
     /**
-     * Reports whether a token is a plain line or block comment rather than a docblock.
+     * Reports whether a parser token has the plain-comment token kind.
      *
-     * @param Token $token - Comment token from the parsed file.
+     * @param Token $token - Token to classify from the parser's retained token list.
      *
-     * @return bool - True for a plain comment; false for a `/**` docblock.
+     * @return bool - True only for T_COMMENT; false for docblocks and all other token kinds.
      */
     private function isPlainComment(Token $token): bool
     {
@@ -147,19 +142,19 @@ final readonly class CommentedOutCodeRule implements RuleInterface
     }
 
     /**
-     * Returns a comment's text without its line-comment slashes or block-comment delimiters.
+     * Removes slash-based comment delimiters and leading block-comment decoration.
      *
      * @param string $text - Raw comment token text.
      *
-     * @return string - Trimmed comment body; empty for a comment holding only markers.
+     * @return string - Trimmed body; empty when only slash-based markers, block decoration, and whitespace remain.
      */
     private function commentBody(string $text): string
     {
-        // Strip the surrounding `/*` and `*/` of a block comment.
+        // Remove delimiters only at token boundaries so slash content inside the block comment remains available for scoring.
         $text = preg_replace('/^\/\*+\s*|\s*\*+\/$/', '', $text) ?? $text;
-        // Strip the leading `*` decoration from each block-comment line.
+        // Normalize block-comment decoration so each line is scored from its content rather than its leading star.
         $text = preg_replace('/^\s*\*\s?/m', '', $text) ?? $text;
-        // Strip the leading `//` from each line comment.
+        // Normalize line-comment markers so both comment styles feed the same scoring heuristic.
         $text = preg_replace('/^\/\/\s?/m', '', $text) ?? $text;
 
         return trim($text);
@@ -168,27 +163,27 @@ final readonly class CommentedOutCodeRule implements RuleInterface
     /**
      * Reports whether a comment body carries enough code signals to read as disabled code.
      *
-     * @param string $commentBody - Comment text without its markers.
+     * @param string $commentBody - Comment text after commentBody has stripped the supported markers.
      *
-     * @return bool - True at two or more signals; false for short comments, blank comments and prose.
+     * @return bool - True for bodies of at least five bytes with at least two signals across non-exempt lines; false otherwise.
      */
     private function looksLikeDisabledCode(string $commentBody): bool
     {
-        // A body under five characters, such as `// $x`, is too short to be a statement.
+
         if (strlen($commentBody) < 5) {
             return false;
         }
 
         $commentLines = array_filter(explode("\n", $commentBody), static fn (string $commentLine): bool => trim($commentLine) !== '');
 
-        // A comment holding only blank lines has nothing to score.
+
         if ($commentLines === []) {
             return false;
         }
 
         $codeSignals = 0;
 
-        // Each line is scored on its own, so prose lines in a block do not add to a disabled line's score.
+        // Recognized prose and placeholder lines do not contribute to the comment's combined score.
         foreach ($commentLines as $commentLine) {
             $commentLine = trim($commentLine);
             $lineSignals = 0;
@@ -224,13 +219,13 @@ final readonly class CommentedOutCodeRule implements RuleInterface
     }
 
     /**
-     * Reports whether a comment line reads as prose or a placeholder rather than a statement.
+     * Checks a comment line for the token patterns treated as prose or placeholders.
      *
      * Nested `// notes` at the end of a line are ignored, so `$canAccess = true; // Admins can view all` still reads as code.
      *
      * @param string $commentLine - Trimmed comment line.
      *
-     * @return bool - True for two bare words in a row, a no-op `$v = $v;`, or an example ending in `...`.
+     * @return bool - True for trailing ellipsis, a lone `$v = $v;`, or T_STRING followed by T_STRING or a numeric/string literal; false otherwise.
      */
     private function readsAsProseOrPlaceholder(string $commentLine): bool
     {
@@ -247,10 +242,10 @@ final readonly class CommentedOutCodeRule implements RuleInterface
             return true;
         }
 
-        // Two bare words in a row, or a word before a literal as in "returns 09", is a sentence, never a PHP statement.
+        // Adjacent names or a name before a literal, such as "returns 09", are treated as prose.
         foreach ($lineTokens as $index => $token) {
             $nextToken = $lineTokens[$index + 1] ?? null;
-            // A keyword lexes as its own token, so only plain words pair up here.
+            // A keyword alone is not evidence of prose because PHP statements use keywords.
             if ($token->id === T_STRING && $nextToken instanceof Token && $nextToken->is([T_STRING, T_LNUMBER, T_DNUMBER, T_CONSTANT_ENCAPSED_STRING])) {
                 return true;
             }
@@ -260,28 +255,27 @@ final readonly class CommentedOutCodeRule implements RuleInterface
     }
 
     /**
-     * Reports whether a comment restates, in a different form, the assignment directly below it.
+     * Checks whether a comment meets the token heuristic for restating the following assignment.
      *
-     * The comment must assign the same target, use at least two variables that all appear below, call nothing the line lacks,
-     * and carry an operator or keyword the line lacks, such as `if` above branchless arithmetic; an older version of the line has none.
+     * A match uses the target and two shared non-$this variables, adds an operator or keyword, and adds no call name missing from the assignment.
      *
-     * @param string $commentBody - Comment text without its markers.
+     * @param string $commentBody - Comment text after commentBody has stripped the supported markers.
      * @param string $source - Full file text.
      * @param int    $commentEnd - Byte offset just past the comment.
      *
-     * @return bool - True when the comment documents an equivalent form of the next assignment; false keeps the finding.
+     * @return bool - True when the token checks recognize a restatement; false leaves the comment eligible for a finding.
      */
     private function restatesAssignmentBelow(string $commentBody, string $source, int $commentEnd): bool
     {
         $assignmentTokens = $this->assignmentBelow($source, $commentEnd);
         $commentTokens    = $this->meaningfulTokens($commentBody);
-        // With no assignment below, or nothing lexable in the comment, there is nothing to compare.
+
         if ($assignmentTokens === [] || $commentTokens === []) {
             return false;
         }
 
         $commentTargets = [];
-        // Collect the variables the comment assigns to.
+
         foreach ($commentTokens as $index => $token) {
             $previousToken = $commentTokens[$index - 1] ?? null;
             $isMember      = $previousToken instanceof Token && $previousToken->is([T_DOUBLE_COLON, T_OBJECT_OPERATOR, T_NULLSAFE_OBJECT_OPERATOR]);
@@ -301,13 +295,12 @@ final readonly class CommentedOutCodeRule implements RuleInterface
     }
 
     /**
-     * Returns the assignment statement right below a comment, up to its semicolon.
+     * Returns the immediately following simple variable assignment, including its semicolon, within the lookahead window.
      *
      * @param string $source - Full file text.
      * @param int    $commentEnd - Byte offset just past the comment.
      *
-     * @return list<Token> - tokens of `$target = ...;`; empty when the next code is another comment, not an assignment to a variable,
-     *               or opens or closes a block before its semicolon
+     * @return list<Token> - Tokens through the semicolon; empty for a non-assignment, intervening comment, top-level brace, or exhausted lookahead.
      */
     private function assignmentBelow(string $source, int $commentEnd): array
     {
@@ -325,7 +318,7 @@ final readonly class CommentedOutCodeRule implements RuleInterface
                 ')', ']' => -1,
                 default => 0,
             };
-            // The statement ends here.
+
             if ($bracketDepth === 0 && $token->text === ';') {
                 return array_slice($followingTokens, 0, $index + 1);
             }
@@ -385,18 +378,17 @@ final readonly class CommentedOutCodeRule implements RuleInterface
     }
 
     /**
-     * Lists the distinct function and method names called in a token list.
+     * Lists distinct function and method call-name candidates in a token list.
      *
      * @param list<Token> $tokens - Meaningful tokens of a comment or statement.
      *
-     * @return list<string> - lower-cased names directly followed by `(`; empty when nothing is called
+     * @return list<string> - Lowercase T_STRING texts followed by an opening parenthesis; empty when none qualify.
      */
     private function calledFunctionNames(array $tokens): array
     {
         $calledNames = [];
-        // A bare name followed by `(` is a call, such as `substr(` or `->add(`.
         foreach ($tokens as $index => $token) {
-            // Keywords lex as their own tokens, so only real function and method names are collected.
+            // Keywords use other token kinds, so they are excluded from these candidates.
             if ($token->id === T_STRING && ($tokens[$index + 1] ?? null)?->text === '(') {
                 $calledNames[] = strtolower($token->text);
             }
@@ -415,9 +407,9 @@ final readonly class CommentedOutCodeRule implements RuleInterface
     private function operatorsAndKeywords(array $tokens): array
     {
         $found = [];
-        // Each token that is an operator or control keyword is recorded once.
+
         foreach ($tokens as $token) {
-            // PHP lexes `&` as one of two tokens depending on what follows; both mean bitwise and here.
+            // Normalize PHP's two ampersand token kinds so both compare as `&`.
             if ($token->is([T_AMPERSAND_FOLLOWED_BY_VAR_OR_VARARG, T_AMPERSAND_NOT_FOLLOWED_BY_VAR_OR_VARARG])) {
                 $found[] = '&';
             } elseif ($token->is(self::OPERATOR_TOKENS)) {

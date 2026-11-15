@@ -15,30 +15,18 @@ use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
 /**
- * Shared AST helpers that back every security rule - taint tracking, receiver/class resolution, argument
- * unwrapping, and the branch-reachability model that decides when an earlier write can hide a finding.
- *
- * Rules delegate here so `gruff-php analyse --pillar security` applies one consistent notion of "request
- * input", "same-scope taint", and "skippable write" across header injection, XSS, SSRF, and the rest.
- * All methods are static and side-effect free; taint analysis is bounded to a single function-like scope.
+ * Shared AST helpers for security rules: request-input tracking, argument lookup and class-name matching.
+ * Same-scope taint tracking follows local assignments before an inspected expression.
+ * Branch helpers classify whether an earlier write can be skipped before a sink.
  */
 final class SecurityNodeHelper
 {
     /**
-     * Global sink functions mapped to the parameter names PHP declares for them, in declared order.
+     * Parameter-name aliases for the leading global-function arguments inspected by security rules.
+     * Named arguments are matched before positional arguments; unmapped slots retain positional lookup.
+     * A slot can accept alternative spellings, such as sqlsrv_query's sql and tsql.
      *
-     * PHP 8 accepts named arguments for internal functions, so `header(header: $target)` puts the value a
-     * rule reads in no positional slot at all. Position-only matching resolves that call to null and the
-     * sink goes unreported, which is why every function a security rule reads an argument from is listed
-     * here: `sinkArgumentValue()` asks for the slot by name first, then falls back to position. Each list
-     * carries the leading parameters the rules actually read, not every trailing option.
-     *
-     * Each slot lists every spelling that resolves it. Bundled extensions were checked against PHP's own
-     * reflected signatures; the handful that ship no reflectable declaration here (`sqlsrv_query`) list every
-     * documented spelling instead of betting on one, which costs nothing because a name that does not exist
-     * simply never matches.
-     *
-     * @var array<string, list<list<string>>>
+     * @var array<string, list<list<string>>> - Function names mapped to ordered lists of accepted parameter names.
      */
     private const SINK_PARAMETERS = [
         'apache_getenv'         => [['variable']],
@@ -95,15 +83,9 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Reports whether a node is one of the assignment shapes local taint tracking understands.
-     *
-     * This decides which writes every security sink sees when a user runs, for example,
-     * `gruff-php analyse src --include-rule security.header-injection`. Concat assignment
-     * is tracked because appending request input taints a value exactly like assigning it.
-     * Reference assignment is deliberately NOT tracked: `=&` creates an alias whose later
-     * writes flow both ways, which last-write-wins tracking would classify backwards, so
-     * aliased flows stay out of scope rather than mislead the user. Arithmetic operators
-     * stay out until a concrete sink justifies them.
+     * Identifies assignment shapes supported by local taint tracking.
+     * Concat appends can taint a value; reference aliases are excluded because later writes can flow through either name.
+     * Arithmetic assignments are outside this model.
      *
      * @param Node $node - Candidate node from a scope walk.
      *
@@ -120,8 +102,7 @@ final class SecurityNodeHelper
      *
      * @param Expr\Assign|Expr\AssignOp\Concat $assignment - Assignment node from a scope walk.
      *
-     * @return string|null - the written variable name, or null for property/offset/dynamic targets that local
-     *                     taint tracking does not model
+     * @return string|null - Written local name, or null for property, offset or dynamic targets.
      */
     public static function assignmentTargetName(Expr\Assign|Expr\AssignOp\Concat $assignment): ?string
     {
@@ -131,22 +112,21 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Resolves a non-namespaced function call to its lower-case name.
+     * Returns the lower-case name from a statically named call whose syntax has one name part.
      *
-     * @param FuncCall $call - Function call node to inspect.
+     * @param FuncCall $call - Call checked for a static function name with one name part.
      *
-     * @return string|null - lower-cased global function name, or null for dynamic or namespaced calls that cannot match
+     * @return string|null - Lower-cased one-part function name, or null for dynamic or multi-part calls.
      */
     public static function globalFunctionName(FuncCall $call): ?string
     {
         if (!$call->name instanceof Name) {
-            // A dynamic callee (variable/expression) has no static name to match against the rule's allowlist.
             return null;
         }
 
         $parts = $call->name->getParts();
         if (count($parts) !== 1) {
-            // Namespaced calls are not the global builtins these rules guard, so they never match.
+            // Multi-part calls do not match the built-in names modeled by these rules.
             return null;
         }
 
@@ -196,21 +176,18 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Returns one argument of a global function call, matching the parameter name PHP declares for that slot.
+     * Returns a function argument using parameter names mapped for a statically named one-part callee before positional lookup.
+     * Unmapped names, slots, and dynamic or multi-part callees use positional lookup.
      *
-     * Rules call this instead of `argumentValue()` whenever the callee is a global function, so a sink written
-     * with named arguments resolves to the same expression as the positional form. An unmapped function or a
-     * dynamic callee simply keeps positional matching.
+     * @param FuncCall $call - Function call whose argument is read from its mapped name or positional slot.
+     * @param int $index - Zero-based parameter position the rule wants.
      *
-     * @param FuncCall $call - Global function call whose argument is being read.
-     * @param int      $index - Zero-based parameter position the rule wants.
-     *
-     * @return Expr|null - Argument value, or null when the call omits that parameter entirely
+     * @return Expr|null - Argument value, or null when absent or represented only by a placeholder.
      */
     public static function sinkArgumentValue(FuncCall $call, int $index): ?Expr
     {
         $functionName = self::globalFunctionName($call);
-        // Without a mapped declaration there is no name to match on, so the positional path decides alone.
+
         $parameterNames = $functionName === null ? [] : (self::SINK_PARAMETERS[$functionName][$index] ?? []);
 
         return self::argumentValue($call->args, $index, $parameterNames);
@@ -243,14 +220,14 @@ final class SecurityNodeHelper
     /**
      * Reports whether a node statically represents a false-like value.
      *
-     * @param Node $node - Node to inspect.
+     * @param Node $node - Expression checked for the supported disabled-flag literals.
      *
-     * @return bool - true when the node is the literal `false` or integer 0 (the disabled-flag values rules look for)
+     * @return bool - true when the node is the literal false or integer 0 (the disabled-flag values rules look for)
      */
     public static function isFalseLike(Node $node): bool
     {
         if ($node instanceof Expr\ConstFetch) {
-            // The literal `false` keyword (case-insensitive) is the disabled-flag value rules look for.
+
             return strtolower($node->name->toString()) === 'false';
         }
 
@@ -264,39 +241,36 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Reports whether an expression reads from user-input superglobals.
+     * Detects request-superglobal references and names tracked as tainted by earlier same-scope assignments.
      *
-     * Also follows simple same-scope local assignments before the inspected
-     * expression so sinks catch `$next = $_GET["next"]; header($next);`.
+     * @param Node $node - Expression searched for direct or same-scope request taint.
      *
-     * @param Node $node - Node tree to inspect.
-     *
-     * @return bool - true when the tree reads request input directly or via a same-scope laundered local; false if clean
+     * @return bool - True when the tree contains a request-superglobal reference or a tracked tainted variable; false otherwise.
      */
     public static function containsUserInput(Node $node): bool
     {
         if (self::containsDirectUserInput($node)) {
-            // A direct superglobal read is request-tainted with no further analysis needed.
+
             return true;
         }
 
-        // Otherwise fall back to the costlier same-scope flow analysis for laundered locals.
+
         return self::containsTaintedLocal($node);
     }
 
     /**
-     * Reports whether a node tree directly reads a request superglobal.
+     * Reports whether a node tree contains a request-superglobal reference.
      *
-     * @param Node $node - Node tree to inspect.
+     * @param Node $node - Expression subtree searched for request-superglobal references.
      *
-     * @return bool - true when the tree directly reads a request superglobal; false ignores laundered locals
+     * @return bool - True when a request superglobal is found; indirect local assignments are not followed.
      */
     private static function containsDirectUserInput(Node $node): bool
     {
         $nodeFinder = new NodeFinder();
 
         return $nodeFinder->findFirst($node, static function (Node $candidate): bool {
-                // A variable whose name is one of the request superglobals is the attacker-controlled source.
+
                 return $candidate instanceof Expr\Variable
                        && is_string($candidate->name)
                        && in_array($candidate->name, self::userInputSuperglobals(), true);
@@ -304,17 +278,17 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Reports whether a node reads a local that was assigned request data earlier in the same scope.
+     * Reports whether a node reads a local assigned request data earlier in the same function-like scope.
      *
-     * @param Node $node - Node tree to inspect.
+     * @param Node $node - Sink expression checked for references to earlier-tainted locals.
      *
-     * @return bool - true when the node reads a local filled from request input by an earlier same-scope assignment
+     * @return bool - True when an enclosing function-like scope has an earlier request-tainted assignment to a local the node reads.
      */
     private static function containsTaintedLocal(Node $node): bool
     {
         $referencedVariables = self::referencedVariableNames($node);
         if ($referencedVariables === []) {
-            // No local variables to trace, so there is nothing that could have been laundered from a superglobal.
+
             return false;
         }
 
@@ -332,21 +306,21 @@ final class SecurityNodeHelper
 
         $sinkPosition = $node->getStartFilePos();
         if ($sinkPosition < 0) {
-            // A missing byte offset means we cannot order assignments before the sink; stay safe and bail.
+            // Without a byte offset, assignment order is unknown and this check reports no local taint.
             return false;
         }
 
         $taintedVariables = self::taintedVariableNamesBefore(array_values($statements), $scope, $sinkPosition);
 
-        // A sink that reads any tainted local is carrying laundered request data.
+
         foreach ($referencedVariables as $variableName) {
             if (isset($taintedVariables[$variableName])) {
-                // The sink reads a local that an earlier same-scope assignment filled from request input.
+
                 return true;
             }
         }
 
-        // None of the referenced locals were tainted before the sink, so the expression is clean.
+
         return false;
     }
 
@@ -413,31 +387,31 @@ final class SecurityNodeHelper
     /**
      * Reports whether a node references a known tainted variable.
      *
-     * @param Node                $node - Node tree to inspect.
+     * @param Node                $node - Expression tree searched for names in the current taint set.
      * @param array<string, true> $taintedVariables - Tainted local-variable names known at the current sink or assignment.
      *
-     * @return bool - true when the tree reads any name in $taintedVariables, propagating taint to this expression
+     * @return bool - true when the tree contains any statically named variable present in $taintedVariables
      */
     private static function hasTaintedVariableReference(Node $node, array $taintedVariables): bool
     {
-        // Any referenced name that is already tainted pulls request data into this expression.
+
         foreach (self::referencedVariableNames($node) as $variableName) {
             if (isset($taintedVariables[$variableName])) {
-                // The expression reads an already-tainted local, so taint propagates to this assignment.
+
                 return true;
             }
         }
 
-        // The expression touches no known-tainted local, so it does not carry request input forward.
+
         return false;
     }
 
     /**
-     * Returns the non-superglobal variable names referenced by a node tree.
+     * Returns distinct statically named variables, excluding the configured request-input superglobals.
      *
-     * @param Node $node - Node tree to inspect.
+     * @param Node $node - Expression tree searched for statically named local variables.
      *
-     * @return list<string> - deduplicated local variable names touched by the tree, superglobals excluded; empty when none
+     * @return list<string> - Distinct eligible names in traversal order; empty when none are found.
      */
     private static function referencedVariableNames(Node $node): array
     {
@@ -445,20 +419,20 @@ final class SecurityNodeHelper
         $nodeFinder = new NodeFinder();
         $variables  = $nodeFinder->find($node, static fn(Node $candidate): bool => $candidate instanceof Expr\Variable);
 
-        // Collect every variable leaf the finder returned beneath the tree.
+
         foreach ($variables as $variable) {
             // Guard the finder's loose node type before reading the name.
             if (!$variable instanceof Expr\Variable) {
                 continue;
             }
 
-            // Keep plainly named locals only; superglobals are sources, not laundered aliases.
+
             if (is_string($variable->name) && !in_array($variable->name, self::userInputSuperglobals(), true)) {
                 $names[$variable->name] = true;
             }
         }
 
-        // Deduplicated local names only; superglobals are excluded since they are sources, not laundered locals.
+
         return array_keys($names);
     }
 
@@ -475,7 +449,6 @@ final class SecurityNodeHelper
         $ancestorIds = [];
         $parent      = $node->getAttribute('parent');
 
-        // Record every ancestor up to (excluding) the scope boundary.
         while ($parent instanceof Node && $parent !== $scopeBoundary) {
             $ancestorIds[spl_object_id($parent)] = true;
             $parent                              = $parent->getAttribute('parent');
@@ -485,12 +458,8 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Reports whether a finding can still reach the report without this earlier write running.
-     *
-     * A write inside a branch the sink does not share may be skipped on the path that
-     * reaches the sink, so trackers let such writes add evidence toward a finding but
-     * never erase what an earlier write established. A write inside the sink's own
-     * branch chain always runs before the sink and counts as unconditional.
+     * Reports whether the structural model treats an earlier write as optional on a path to the sink.
+     * Optional writes may add taint evidence but cannot erase evidence established before them.
      *
      * @param Node            $node - Write/event node whose reachability is being classified.
      * @param Node            $sink - Sink node whose runtime path must be reached.
@@ -503,13 +472,12 @@ final class SecurityNodeHelper
     {
         $parent = $node->getAttribute('parent');
 
-        // Walk outward from the write until the sink's scope boundary is reached.
         while ($parent instanceof Node && $parent !== $scopeBoundary) {
-            // A skipping ancestor means the CLI must not let this write erase a possible finding.
+            // A potentially skipping ancestor means the CLI must keep earlier taint evidence for a possible finding.
             if (self::isPotentialSkippingConstruct($parent)) {
                 $parentId = spl_object_id($parent);
 
-                // If the sink is outside this branch, users can reach the sink without this write.
+                // A branch not shared by the sink makes the write optional in this structural model.
                 if (!isset($sinkAncestorIds[$parentId])) {
                     return true;
                 }
@@ -527,11 +495,11 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Reports whether a node can skip code that would affect a user-facing finding.
+     * Reports whether the structural model classifies a node as potentially skipping code relevant to a finding.
      *
      * @param Node $node - Candidate ancestor node between a write and sink.
      *
-     * @return bool - true when this ancestor can make the write optional before the sink
+     * @return bool - true when the model treats this ancestor as making the write optional before the sink
      */
     private static function isPotentialSkippingConstruct(Node $node): bool
     {
@@ -572,7 +540,7 @@ final class SecurityNodeHelper
     /**
      * Identifies which if-chain body a node belongs to for reporting decisions.
      *
-     * Conditions return null because they run before the body the user can reach.
+     * Conditions and unrelated descendants return null because they do not identify a branch body.
      *
      * @param Node     $node - Descendant candidate.
      * @param Stmt\If_ $ifStatement - If-chain ancestor to classify against.
@@ -584,24 +552,19 @@ final class SecurityNodeHelper
         $current = $node;
         $parent  = $current->getAttribute('parent');
 
-        // Climb toward the shared if-chain, then classify which branch body this node sits in.
         while ($parent instanceof Node) {
-            // Once the shared if-chain is reached, classify the direct child branch.
             if ($parent === $ifStatement) {
-                // The main if body is one possible path to the user-facing sink.
+                // Distinct keys let the caller recognise mutually exclusive branch bodies.
                 if (in_array($current, $ifStatement->stmts, true)) {
                     return 'if';
                 }
 
-                // Each elseif body is a separate path in the report's runtime story.
                 foreach ($ifStatement->elseifs as $elseIf) {
-                    // A matching elseif node means the write and sink may be mutually exclusive.
                     if ($current === $elseIf) {
                         return 'elseif:' . spl_object_id($elseIf);
                     }
                 }
 
-                // The else body is the fallback path a user can reach when earlier tests fail.
                 if ($ifStatement->else instanceof Stmt\Else_ && $current === $ifStatement->else) {
                     return 'else:' . spl_object_id($ifStatement->else);
                 }
@@ -618,19 +581,19 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Returns the function, method, or closure scope containing a node.
+     * Finds the nearest function-like node in the parent chain, including the starting node itself.
      *
-     * @param Node $node - Node whose containing function-like scope is needed.
+     * @param Node $node - Starting node whose own type and parent chain are inspected.
      *
-     * @return FunctionLike|null - nearest enclosing function/method/closure, or null when the node lives at file scope
+     * @return FunctionLike|null - Nearest function-like node, or null when the chain contains none.
      */
     public static function enclosingFunctionLike(Node $node): ?FunctionLike
     {
-        // Climb the parent chain to the nearest function-like owner.
+
         $current = $node;
         while ($current instanceof Node) {
             if ($current instanceof FunctionLike) {
-                // The nearest enclosing function/method/closure; this is the scope taint analysis is bounded to.
+
                 return $current;
             }
 
@@ -638,7 +601,7 @@ final class SecurityNodeHelper
             $current = $parent instanceof Node ? $parent : null;
         }
 
-        // Walked past the top of the tree without a function-like ancestor: the node lives at file scope.
+
         return null;
     }
 
@@ -647,14 +610,14 @@ final class SecurityNodeHelper
      *
      * @param Node $node - Node tree to inspect.
      *
-     * @return bool - true when the tree builds a string via `.` concatenation or interpolation, which can splice in untrusted data
+     * @return bool - true when the tree builds a string with the period operator or interpolation, which may splice in untrusted data
      */
     public static function containsConcatOrInterpolation(Node $node): bool
     {
         $nodeFinder = new NodeFinder();
 
         return $nodeFinder->findFirst($node, static function (Node $candidate): bool {
-                // A `.` concatenation or a "$var" interpolated string is the dynamic-construction signal.
+
                 return $candidate instanceof Expr\BinaryOp\Concat
                        || $candidate instanceof Scalar\Encapsed;
             }) instanceof Node;
@@ -664,7 +627,7 @@ final class SecurityNodeHelper
      * Lists the outermost concatenations and interpolated strings under a root, skipping any inside an opaque operand.
      *
      * @param Node                 $root     - Expression whose string constructions are wanted.
-     * @param callable(Node): bool $isOpaque - Reports an operand that escapes its whole argument, which is never weighed.
+     * @param callable(Node): bool $isOpaque - Identifies an operand whose descendants are excluded because it escapes its complete argument.
      *
      * @return list<Node> - Constructions whose parent is not itself a construction and that sit inside no opaque operand.
      */
@@ -675,7 +638,7 @@ final class SecurityNodeHelper
                 return false;
             }
             $node = $candidate;
-            // An escaper receives everything under it as one value, so nothing inside it is a construction of the root.
+            // An escaper handles its argument as one value, so nested constructions are excluded from the root's inspection.
             while ($node !== $root && ($node = $node->getAttribute('parent')) instanceof Node) {
                 if ($isOpaque($node)) {
                     return false;
@@ -687,11 +650,12 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Lists a construction's operands in source order, descending into nested concatenations and interpolations.
+     * Flattens concatenations in source order and expands interpolated strings into their immediate parts.
+     * Other nodes are returned as a single operand.
      *
-     * @param Node $construction - Concatenation or interpolated string.
+     * @param Node $construction - Node whose string-construction operands are needed.
      *
-     * @return list<Node> - Literal strings and interpolated-string parts, and every other operand expression whole.
+     * @return list<Node> - Ordered operands; empty for an interpolated string with no parts.
      */
     public static function flattenedOperands(Node $construction): array
     {
@@ -722,11 +686,11 @@ final class SecurityNodeHelper
     }
 
     /**
-     * Reports whether literal text leaves a quote open, so the next spliced value lands inside that quote.
+     * Reports whether this heuristic finds an unmatched tracked quote before the next spliced value.
      *
      * @param string $text                        - Literal text spliced before the value.
      * @param string $quotes                      - Quote characters to track, such as single and double quotes.
-     * @param bool   $isBackslashEscapeInSingle   - Whether a backslash escapes inside single quotes, as in SQL but not in a shell.
+     * @param bool   $isBackslashEscapeInSingle   - Whether this heuristic skips a backslash and its next character inside single quotes.
      *
      * @return bool - True when one of the quotes is still open at the end of the text.
      */
@@ -736,8 +700,7 @@ final class SecurityNodeHelper
         $length = strlen($text);
         for ($index = 0; $index < $length; $index++) {
             $character = $text[$index];
-            // A backslash escapes the next character, except inside single quotes when $isBackslashEscapeInSingle is
-            // false, as in a shell.
+            // Skip the next character after a backslash unless the heuristic treats it as literal inside single quotes.
             if ($character === '\\' && ($open !== "'" || $isBackslashEscapeInSingle)) {
                 $index++;
                 continue;
@@ -755,7 +718,7 @@ final class SecurityNodeHelper
      *
      * @param mixed $node - Candidate node or parent attribute.
      *
-     * @return bool - True for a `.` concatenation or a double-quoted string with interpolation.
+     * @return bool - True for concatenations or interpolated strings, regardless of their quote syntax.
      */
     private static function isStringConstruction(mixed $node): bool
     {
@@ -797,7 +760,7 @@ final class SecurityNodeHelper
      */
     public static function methodName(Expr\MethodCall|Expr\StaticCall $call): ?string
     {
-        // A computed method name (e.g. $obj->$method()) has no static string to resolve.
+
         if (!$call->name instanceof Identifier) {
             return null;
         }
@@ -815,7 +778,7 @@ final class SecurityNodeHelper
     public static function className(Node $class): ?string
     {
         if (!$class instanceof Name) {
-            // Anonymous classes and dynamic `new $cls` have no static name to resolve.
+
             return null;
         }
 
@@ -825,7 +788,7 @@ final class SecurityNodeHelper
             return strtolower($resolvedName->toString());
         }
 
-        // No resolver attribute (unresolved pass): fall back to the name as written in source.
+
         return strtolower($class->toString());
     }
 
@@ -839,24 +802,24 @@ final class SecurityNodeHelper
      */
     public static function hasMatchingClassName(Node $class, array $classNames): bool
     {
-        // Matching is deliberately name-based (short names match FQCN tails and vice versa): a userland
-        // class sharing a built-in's short name matches too. Callers accept name evidence, not resolved
-        // types, so imported and fully-qualified spellings keep matching without a name-resolution pass.
+        // Match normalized names or short-target namespace tails; user-defined classes can share a built-in name.
+
+
         $resolvedName = self::className($class);
         if ($resolvedName === null) {
-            // An unresolvable class name can never equal a configured target, so it cannot match.
+
             return false;
         }
 
-        // Weigh the resolved name against each configured target.
+
         foreach ($classNames as $className) {
             $normalized = strtolower(ltrim($className, '\\'));
-            // An exact match on the normalised name is a direct hit.
+
             if ($resolvedName === $normalized) {
                 return true;
             }
 
-            // A short target also matches when it is the final segment of the resolved FQCN.
+
             if (!str_contains($normalized, '\\') && str_ends_with($resolvedName, '\\' . $normalized)) {
                 return true;
             }
@@ -878,7 +841,7 @@ final class SecurityNodeHelper
 
         return $nodeFinder->findFirst($node, static function (Node $candidate): bool {
                 if (!$candidate instanceof Scalar\String_) {
-                    // Only literal strings can be inspected for a scheme; non-literals are never a URL match here.
+
                     return false;
                 }
 

@@ -10,24 +10,22 @@ use GruffPhp\Engine\Source\SourceDiscovery;
 use GruffPhp\Engine\Source\SourceDiscoveryResult;
 
 /**
- * Turns the paths a user asked to scan into parsed, ready-to-analyse source files.
- *
- * The first real step of any scan: it discovers the files under the requested paths, parses each one,
- * and records what went wrong (missing paths, parse errors) so the summary and report can tell the
- * user which files were skipped. Offers a batch `load()` and a memory-frugal streaming `discover()`.
+ * Discovers requested source files and records missing-path diagnostics for an analysis run.
+ * `load()` also parses each discovered file and carries fatal errors and nonfatal notes into the source set.
+ * `discover()` leaves parsing to the caller, allowing units to be processed and released one at a time.
  */
 final readonly class AnalysisSourceLoader
 {
     /**
-     * Discovers and parses every requested file in one pass - the simple path for smaller scans.
+     * Loads discovered files as analysis units, retaining each unit and its diagnostics for batch analysis.
      *
-     * @param string                                                                    $projectRoot          - Root used for source discovery and parsing.
-     * @param list<string>                                                              $paths                - Project-relative paths requested by the CLI.
-     * @param bool                                                                      $shouldIncludeIgnored - Whether files matching default ignore patterns are included.
-     * @param list<string>                                                              $ignoredPathPatterns  - Configured path patterns to skip unless ignored files are included.
-     * @param array{enabled: bool, maxLines: int, maxBytes: int, override: string}|null $deepScanBudget       - Effective structural-analysis budget.
+     * @param string $projectRoot - Root used for source discovery and parsing.
+     * @param list<string> $paths - Project-relative paths requested by the CLI.
+     * @param bool $shouldIncludeIgnored - Whether discovery bypasses optional default and Git ignore filters.
+     * @param list<string> $ignoredPathPatterns - Configured patterns excluded even when ignored files are requested.
+     * @param array{enabled: bool, maxLines: int, maxBytes: int, override: string}|null $deepScanBudget - Structural-analysis limits.
      *
-     * @return AnalysisSourceSet - discovered files, their parsed units, and missing-path plus parse-error diagnostics
+     * @return AnalysisSourceSet - Discovered files, retained units, and missing-path or parser diagnostics.
      */
     public function load(
         string $projectRoot,
@@ -41,12 +39,12 @@ final readonly class AnalysisSourceLoader
         $diagnostics     = $this->missingPathDiagnostics($discoveryResult);
         $analysisUnits   = [];
 
-        // Parse each discovered file into an analysis unit the rules can inspect.
+
         foreach ($discoveryResult->files as $file) {
             $unit            = $phpFileParser->parse($file, $deepScanBudget);
             $analysisUnits[] = $unit;
 
-            // Surface any parse errors as diagnostics, so the user learns a file was skipped rather than clean.
+
             foreach ($unit->diagnostics as $diagnostic) {
                 $diagnostics[] = new RunDiagnostic(
                     type:     $diagnostic->type,
@@ -62,18 +60,14 @@ final readonly class AnalysisSourceLoader
     }
 
     /**
-     * Discovers sources without parsing them, so the caller can stream one file at a time.
+     * Discovers files and missing paths without parsing, allowing the caller to process units one at a time.
      *
-     * Preferred over load() for large scans: parsing then releasing each unit individually keeps peak
-     * memory near a single file's worth instead of holding every AST at once.
+     * @param string $projectRoot - Root used for source discovery.
+     * @param list<string> $paths - Project-relative paths requested by the CLI.
+     * @param bool $shouldIncludeIgnored - Whether discovery bypasses optional default and Git ignore filters.
+     * @param list<string> $ignoredPathPatterns - Configured patterns excluded even when ignored files are requested.
      *
-     * @param string       $projectRoot          - Root used for source discovery.
-     * @param list<string> $paths                - Project-relative paths requested by the CLI.
-     * @param bool         $shouldIncludeIgnored - Whether files matching default ignore patterns are included.
-     * @param list<string> $ignoredPathPatterns  - Configured path patterns to skip unless ignored files are included.
-     *
-     * @return array{discovery: SourceDiscoveryResult, diagnostics: list<RunDiagnostic>} - unparsed discovery result paired with missing-path
-     *                          diagnostics; the caller parses each file itself
+     * @return array{discovery: SourceDiscoveryResult, diagnostics: list<RunDiagnostic>} - Unparsed files and missing-path diagnostics.
      */
     public function discover(
         string $projectRoot,
@@ -90,16 +84,16 @@ final readonly class AnalysisSourceLoader
     }
 
     /**
-     * Turns paths that vanished between argument parsing and discovery into user-facing diagnostics.
+     * Creates one diagnostic for each missing path reported by source discovery.
      *
      * @param SourceDiscoveryResult $sourceDiscoveryResult - Discovery output; each missing path yields one diagnostic.
      *
-     * @return list<RunDiagnostic> - one missing-path diagnostic per vanished input path, in discovery order; empty when every path resolved
+     * @return list<RunDiagnostic> - One diagnostic per reported missing path, in discovery order; empty when none are missing.
      */
     private function missingPathDiagnostics(SourceDiscoveryResult $sourceDiscoveryResult): array
     {
         $diagnostics = [];
-        // One diagnostic per path the user named that no longer exists, so the run reports it as missing.
+
         foreach ($sourceDiscoveryResult->missingPaths as $missingPath) {
             $diagnostics[] = new RunDiagnostic(
                 type:    'missing-path',

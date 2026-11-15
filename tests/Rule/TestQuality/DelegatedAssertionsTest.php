@@ -19,22 +19,21 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Checks the warnings developers receive when test assertions live behind another invocation.
- *
- * Authored examples prove same-class delegation and Doctrine's resolved deprecation expectation.
- * Uncalled helpers, nested closures and shadowed vendor methods retain assertion-free warnings.
+ * Checks no-assertions findings for test methods that delegate their checks.
+ * Parsed fixtures cover same-class helper calls and resolved Doctrine deprecation expectations.
+ * Uncalled helpers, unused closures and shadowed vendor methods retain findings.
  */
 final class DelegatedAssertionsTest extends TestCase
 {
     /**
-     * Parses one test class and checks whether its entry method still needs an assertion warning.
+     * Parses one fixture class and checks its entry method's no-assertions finding count.
      *
      * @param string $members          - Helper methods and trait declarations; empty means the class has no helper evidence.
      * @param string $body             - Entry test body, parsed as data without running any fixture method.
-     * @param int    $expectedWarnings - Zero requires recognized invoked assertion evidence.
-     * @param string $imports          - Optional name bindings; empty leaves vendor short names unresolved.
+     * @param int    $expectedWarnings - Expected no-assertions finding count for the entry method.
+     * @param string $imports          - Fixture preamble of imports, traits or namespaces; empty adds none.
      * @param bool   $usesPartialCall  - True models an uninvoked partial callback without requiring newer parser syntax.
-     * @return void
+     * @return void - Asserts the rule emits the expected number of findings for the parsed fixture.
      */
     #[DataProvider('delegationCases')]
     public function testDelegatedExpectation(string $members, string $body, int $expectedWarnings, string $imports = '', bool $usesPartialCall = false): void
@@ -62,7 +61,7 @@ final class DelegatedAssertionsTest extends TestCase
     {
         $parser    = (new ParserFactory())->createForNewestSupportedVersion();
         $traverser = new NodeTraverser(new NameResolver(null, ['replaceNodes' => false]), new ParentConnectingVisitor());
-        /** @var list<Stmt> $statements Parsed declarations; an empty source contributes no executable statements. */
+        /** @var list<Stmt> $statements - Parsed declarations; an empty source contributes no executable statements. */
         $statements = $traverser->traverse($parser->parse($source) ?? []);
         // A developer can prepare a partial callback without executing the helper's assertions.
         if ($usesPartialCall) {

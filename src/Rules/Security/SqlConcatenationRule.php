@@ -23,14 +23,12 @@ use PhpParser\Node\Scalar;
 use PhpParser\NodeFinder;
 
 /**
- * Flags a SQL string assembled by concatenating or interpolating dynamic data into a query - the classic
- * SQL-injection shape - so the user moves the value to a bound parameter before it reaches the database.
+ * Flags SQL assembled from unsafe dynamic data by concatenation or interpolation so callers can move values to bound parameters.
+ * Supported method and procedural sinks require a SQL keyword in the literal fragments; findings are medium-confidence warnings.
  *
- * Runs per file over supported query methods and procedural database functions whose SQL argument splices in a
- * non-allowlisted dynamic part and whose literal fragments contain a SQL keyword. `prepare()` templates,
- * allowlisted identifier interpolation (`$wpdb->prefix`) and escaped operands - an `(int)` cast, and phpMyAdmin's
- * `->quoteString()` value escaper and `Util::backquote()` identifier escaper - are recognised. Warning, medium
- * confidence.
+ * Inspection unwraps prepare() templates and performs shallow assignment inspection for procedural query variables.
+ * Allowlisted property fetches, such as $wpdb->prefix, are exempt when the local binding checks do not reject the receiver.
+ * Direct (int), ->quoteString() and Util::backquote() operands are exempt; the quote escapers must sit outside an open quote.
  */
 final class SqlConcatenationRule implements RuleInterface
 {
@@ -40,20 +38,17 @@ final class SqlConcatenationRule implements RuleInterface
     public const ID = 'security.sql-concatenation';
 
     /**
-     * Method names that run a raw SQL string as their first argument.
+     * Method names treated as SQL sinks with the query in the first positional argument.
      *
-     * @var list<string>
+     * @var list<string> - Case-insensitive names matched on method and static calls.
      */
     private const QUERY_METHODS = ['exec', 'query', 'raw', 'select'];
 
     /**
-     * Procedural SQL sinks mapped to the position carrying the query string.
+     * Maps supported procedural sinks to their zero-based query argument positions.
+     * Named arguments use SecurityNodeHelper::SINK_PARAMETERS; sqlArgumentForSink() also handles one-argument pg_query().
      *
-     * The parameter name each position answers to lives in SecurityNodeHelper::SINK_PARAMETERS, so a named
-     * argument resolves through the same table every other security rule uses rather than a local copy.
-     * pg_query() also accepts the query as its sole argument; sqlArgumentForSink() handles that overload.
-     *
-     * @var array<string, int>
+     * @var array<string, int> - Query positions passed to SecurityNodeHelper::sinkArgumentValue().
      */
     private const PROCEDURAL_SQL_ARGUMENTS = [
         'mysqli_query' => 1,
@@ -113,10 +108,10 @@ final class SqlConcatenationRule implements RuleInterface
     }
 
     /**
-     * Reports each query call whose SQL argument splices in an unsafe dynamic part.
+     * Reports recognised query-call shapes whose SQL arguments match the unsafe-dynamic-part heuristic.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext  - Supplies receiver names whose property fetches pass the local-shadow check.
      *
      * @return list<Finding> - Findings for heuristic SQL concatenation.
      */
@@ -129,11 +124,11 @@ final class SqlConcatenationRule implements RuleInterface
             $analysisUnit,
             [Expr\MethodCall::class, Expr\StaticCall::class, Expr\FuncCall::class],
         );
-        // Restrict findings to APIs whose SQL-argument contract is known.
+        // Restrict candidates to recognised query names and their configured SQL argument positions.
         foreach ($queryCallCandidates as $queryCall) {
-            /** @var Expr\MethodCall|Expr\StaticCall|Expr\FuncCall $queryCall NodeIndex restricts these classes. */
+            /** @var Expr\MethodCall|Expr\StaticCall|Expr\FuncCall $queryCall - NodeIndex restricts these classes. */
             $sqlArgument = $this->sqlArgumentForSink($queryCall);
-            // Flag a supported query sink whose SQL argument splices in unsafe dynamic data.
+
             if ($sqlArgument !== null
                 && $this->isInjectableSqlConstruction(
                     $this->sqlConstructionSubject($sqlArgument, $queryCall, $analysisUnit),
@@ -149,15 +144,15 @@ final class SqlConcatenationRule implements RuleInterface
     }
 
     /**
-     * Selects the SQL argument from a supported query sink.
+     * Selects the SQL argument from a recognised query-call shape.
      *
-     * @param Expr\MethodCall|Expr\StaticCall|Expr\FuncCall $queryCall - Candidate whose API determines the SQL position.
+     * @param Expr\MethodCall|Expr\StaticCall|Expr\FuncCall $queryCall - Candidate whose recognised name determines the SQL position.
      *
-     * @return Expr|null - SQL argument for a supported sink, otherwise null.
+     * @return Expr|null - SQL argument, or null for unsupported calls, missing arguments or callable placeholders.
      */
     private function sqlArgumentForSink(Expr\MethodCall|Expr\StaticCall|Expr\FuncCall $queryCall): ?Expr
     {
-        // Method/static query APIs consistently take SQL as their first argument.
+
         if ($queryCall instanceof Expr\MethodCall || $queryCall instanceof Expr\StaticCall) {
             if (!$queryCall->name instanceof Identifier
                 || !in_array(strtolower($queryCall->name->toString()), self::QUERY_METHODS, true)
@@ -186,21 +181,15 @@ final class SqlConcatenationRule implements RuleInterface
     }
 
     /**
-     * Selects the expression to inspect for a query call's first argument.
+     * Selects a query's SQL expression, inspecting a prepare() template instead of its bound values.
+     * For procedural sinks, tries one preceding assignment in the same scope; other tracked assignments and skippable writes block it.
+     * Method and static sinks retain direct-argument inspection because wrapper-specific quoting semantics are unknown.
      *
-     * When the argument's root expression is a prepare() call the parameterisation already covers its
-     * bound values, so inspection moves to the template argument - which still flags when it
-     * interpolates anything beyond allowlisted parts. prepare() is never skipped wholesale.
+     * @param Expr $sqlArgument - SQL value passed to the query API.
+     * @param Expr\MethodCall|Expr\StaticCall|Expr\FuncCall $querySink - API call that consumes the SQL value.
+     * @param AnalysisUnit $analysisUnit - Unit owning the call and candidate local assignment.
      *
-     * For a curated procedural sink, a plain local is followed through one same-scope assignment only when it
-     * is the variable's sole write before the sink. Existing method/static sinks keep their direct-argument
-     * behaviour so wrapper-specific quoting APIs are not reclassified by this procedural coverage change.
-     *
-     * @param Expr                                          $sqlArgument  - SQL value passed to the query API.
-     * @param Expr\MethodCall|Expr\StaticCall|Expr\FuncCall $querySink    - API call that consumes the SQL value.
-     * @param AnalysisUnit                                  $analysisUnit - Unit owning the call and candidate local assignment.
-     *
-     * @return Expr - prepare() template, shallow local value, or original argument.
+     * @return Expr - prepare() template, tracked assignment's right-hand expression, or original argument.
      */
     private function sqlConstructionSubject(
         Expr $sqlArgument,
@@ -229,20 +218,20 @@ final class SqlConcatenationRule implements RuleInterface
     }
 
     /**
-     * Selects a prepare() call's SQL template without treating parameterisation as a blanket exemption.
+     * Selects the first expression argument from a method or static call named prepare().
      *
      * @param Expr $subject - Direct query argument or shallow assigned value.
      *
-     * @return Expr - prepare() template when present, otherwise the original expression.
+     * @return Expr - First expression argument of a call named prepare(), otherwise the original expression.
      */
     private function preparedSqlTemplate(Expr $subject): Expr
     {
-        // A prepare() call already binds its values, so inspect its template instead.
+
         if (($subject instanceof Expr\MethodCall || $subject instanceof Expr\StaticCall)
             && SecurityNodeHelper::methodName($subject) === 'prepare'
         ) {
             $template = SecurityNodeHelper::argumentValue($subject->args, 0);
-            // Use the template when prepare() supplies one.
+
             if ($template instanceof Expr) {
                 return $template;
             }
@@ -318,7 +307,7 @@ final class SqlConcatenationRule implements RuleInterface
      * Collects writes to one local before a sink, excluding writes owned by nested function-like scopes.
      *
      * @param list<Node\Stmt>   $scopeStatements   - Statements belonging to the sink's scope.
-     * @param string            $queryVariableName - Plain local name without the leading `$`.
+     * @param string            $queryVariableName - Plain local name without a leading dollar sign.
      * @param FunctionLike|null $sinkScope         - Function-like owning the sink, or null for file scope.
      * @param int               $sinkFilePosition  - Byte offset that every eligible write must precede.
      *
@@ -362,7 +351,7 @@ final class SqlConcatenationRule implements RuleInterface
      * @param Expr   $assignmentTarget - Direct, offset, or destructuring target from a preceding write.
      * @param string $queryVariableName - Local query name without the leading `$`.
      *
-     * @return bool - True when the write makes one-hop query provenance ambiguous at the sink.
+     * @return bool - True when the target writes the named local, one of its offsets, or a destructured occurrence.
      */
     private function isVariableWrittenByAssignmentTarget(Expr $assignmentTarget, string $queryVariableName): bool
     {
@@ -389,38 +378,34 @@ final class SqlConcatenationRule implements RuleInterface
     }
 
     /**
-     * Reports whether an expression assembles SQL with unsafe dynamic parts.
+     * Reports whether an expression matches the rule's heuristic for SQL containing an unrecognised dynamic part.
      *
-     * @param Expr         $subject - Expression under inspection (first argument or prepare() template).
+     * @param Expr         $subject - SQL argument, prepare() template, or shallow local value under inspection.
      * @param list<string> $safeReceivers - Variable names whose property fetches are safe identifier interpolation.
      * @param AnalysisUnit $analysisUnit - Unit owning the expression, used to reject local receiver shadows.
      *
-     * @return bool - True when a concatenation/interpolation splices a non-allowlisted dynamic part into
-     *                fragments that contain at least one SQL keyword (the SQL keyword pattern gate).
+     * @return bool - True when a string construction has an unrecognised dynamic part and its literal fragments contain a SQL keyword.
      */
     private function isInjectableSqlConstruction(Expr $subject, array $safeReceivers, AnalysisUnit $analysisUnit): bool
     {
         if (!$this->hasUnsafeDynamicPart($subject, $safeReceivers, $analysisUnit)) {
-            // Every dynamic part is allowlisted identifier interpolation (or there is no string construction at all).
+
             return false;
         }
 
-        // SQL-shape gate: without a word-bounded SQL keyword in the literal fragments this is not a SQL sink.
+        // Require a word-bounded SQL keyword in literal fragments before this rule treats the expression as SQL.
         return preg_match(self::SQL_KEYWORD_PATTERN, implode(' ', $this->literalFragments($subject))) === 1;
     }
 
     /**
-     * Reports whether any string construction splices in a non-allowlisted dynamic part.
-     *
-     * An escaped operand counts only in a construction that reaches the SQL argument without passing through another
-     * call, such as sprintf(), which can splice other values around it; inside such a call only literal fragments and
-     * allowlisted receivers pass.
+     * Finds dynamic operands not covered by recognised exemptions in concatenations and interpolated strings.
+     * Escaped operands qualify only without an intervening call; wrappers such as sprintf() admit only literals and allowlisted receivers.
      *
      * @param Expr         $subject - Expression under inspection.
      * @param list<string> $safeReceivers - Variable names whose property fetches are safe identifier interpolation.
      * @param AnalysisUnit $analysisUnit - Unit owning the expression, used to reject local receiver shadows.
      *
-     * @return bool - True when any string construction in the subtree carries an unsafe dynamic part.
+     * @return bool - True when any string construction in the subtree contains a dynamic part not covered by a recognised exemption.
      */
     private function hasUnsafeDynamicPart(Expr $subject, array $safeReceivers, AnalysisUnit $analysisUnit): bool
     {
@@ -434,7 +419,7 @@ final class SqlConcatenationRule implements RuleInterface
                     $literalText .= $part->value;
                     continue;
                 }
-                // One dynamic part that is neither escaped where it stands nor allowlisted makes the construction unsafe.
+
                 if (!($isDirect && $this->isEscapedAt($part, $literalText))
                     && !($part instanceof Expr && $this->isSafeInterpolationPart($part, $safeReceivers, $analysisUnit))) {
                     return true;
@@ -446,13 +431,12 @@ final class SqlConcatenationRule implements RuleInterface
     }
 
     /**
-     * Reports whether a spliced operand is escaped for the position it is spliced at.
+     * Reports whether a spliced operand qualifies for the rule's escaped-operand exemption at its position.
      *
      * @param Node   $part        - Operand of the construction.
      * @param string $literalText - Literal text spliced before it in the same construction.
      *
-     * @return bool - True for an (int) cast anywhere, and for quoteString() or backquote() outside an open quote, because
-     *                each supplies its own quotes, and the first of them would close an already open quote.
+     * @return bool - True for an (int) cast, or a recognised quote escaper outside any open single, double or backtick quote.
      */
     private function isEscapedAt(Node $part, string $literalText): bool
     {
@@ -461,17 +445,17 @@ final class SqlConcatenationRule implements RuleInterface
     }
 
     /**
-     * Reports whether a dynamic part is allowlisted identifier interpolation.
+     * Reports whether a dynamic part passes the allowlisted-identifier heuristic.
      *
      * @param Expr         $part - Dynamic part spliced into the string construction.
-     * @param list<string> $safeReceivers - Variable names whose property fetches are safe identifier interpolation.
+     * @param list<string> $safeReceivers - Variable names configured for identifier interpolation.
      * @param AnalysisUnit $analysisUnit - Unit owning the expression, used to reject local receiver shadows.
      *
-     * @return bool - True for a property fetch on an unshadowed allowlisted variable ($wpdb->prefix and friends).
+     * @return bool - True for a property fetch on a configured variable that the local-shadow check does not reject.
      */
     private function isSafeInterpolationPart(Expr $part, array $safeReceivers, AnalysisUnit $analysisUnit): bool
     {
-        // Only a property fetch on an allowlisted receiver variable can be safe identifier interpolation.
+
         if (!$part instanceof Expr\PropertyFetch
             || !$part->var instanceof Expr\Variable
             || !is_string($part->var->name)
@@ -484,12 +468,9 @@ final class SqlConcatenationRule implements RuleInterface
     }
 
     /**
-     * Reports whether a spliced operand is escaped for SQL.
-     *
-     * Matching is by name only and case-insensitive: ->quoteString() on any receiver and Util::backquote() from any
-     * namespace. They are trusted because phpMyAdmin's DatabaseInterface::quoteString() quotes the connection-escaped
-     * string and its Util::backquote() doubles every backquote inside the identifier; a same-named helper elsewhere
-     * is trusted too.
+     * Recognises integer casts and SQL escaper calls by syntax and case-insensitive name.
+     * quoteString() matches any receiver; Util::backquote() matches any namespace, without verifying the callee's implementation.
+     * First-class callable references do not qualify.
      *
      * @param Node $operand - Operand of a SQL concatenation or interpolation.
      *
@@ -501,27 +482,27 @@ final class SqlConcatenationRule implements RuleInterface
             return true;
         }
 
-        // ->quoteString() returns a quoted, connection-escaped string literal.
+
         if (($operand instanceof Expr\MethodCall || $operand instanceof Expr\NullsafeMethodCall)
             && !$operand->isFirstClassCallable()
             && $operand->name instanceof Identifier && $operand->name->toLowerString() === 'quotestring') {
             return true;
         }
 
-        // Util::backquote() returns a backquoted identifier with embedded backquotes doubled.
+
         return $operand instanceof Expr\StaticCall && !$operand->isFirstClassCallable()
             && $operand->class instanceof Node\Name && strtolower($operand->class->getLast()) === 'util'
             && $operand->name instanceof Identifier && $operand->name->toLowerString() === 'backquote';
     }
 
     /**
-     * Reports whether a local binding makes an allowlisted receiver name untrustworthy.
+     * Reports whether the rule recognises a local binding of an allowlisted receiver name.
      *
-     * @param string       $receiverName - Variable name without the leading `$`.
+     * @param string       $receiverName - Variable name without the leading dollar sign.
      * @param Expr         $part - Property fetch whose source position is the sink boundary.
      * @param AnalysisUnit $analysisUnit - Unit owning the expression.
      *
-     * @return bool - True when the receiver is a parameter or was locally assigned before the interpolation.
+     * @return bool - True when the receiver is a parameter or the rule finds a same-scope assignment before the sink.
      */
     private function isReceiverLocallyShadowed(string $receiverName, Expr $part, AnalysisUnit $analysisUnit): bool
     {
@@ -545,19 +526,17 @@ final class SqlConcatenationRule implements RuleInterface
                                                 && $candidate->getStartFilePos() < $sinkPosition,
         );
 
-        // Weigh each earlier assignment in scope.
         foreach ($assignments as $assignment) {
-            // Only an assignment node can rebind the receiver.
             if (!($assignment instanceof Expr\Assign || $assignment instanceof Expr\AssignOp || $assignment instanceof Expr\AssignRef)) {
                 continue;
             }
 
-            // An assignment in a nested scope does not rebind this variable.
+            // Nested function-like assignments are outside this scope's local-binding heuristic.
             if (SecurityNodeHelper::enclosingFunctionLike($assignment) !== $scope) {
                 continue;
             }
 
-            // A local assignment to the receiver name shadows the trusted global.
+            // A same-scope assignment makes the rule treat the trusted global as shadowed.
             if ($assignment->var instanceof Expr\Variable && $assignment->var->name === $receiverName) {
                 return true;
             }
@@ -569,16 +548,16 @@ final class SqlConcatenationRule implements RuleInterface
     /**
      * Reports whether a function-like declares a parameter with the given name.
      *
-     * @param string       $name - Variable name without the leading `$`.
+     * @param string       $name - Variable name without the leading dollar sign.
      * @param FunctionLike $scope - Function-like to inspect.
      *
      * @return bool - True when the name is bound as a parameter.
      */
     private function isParameterName(string $name, FunctionLike $scope): bool
     {
-        // Check each declared parameter.
+
         foreach ($scope->getParams() as $parameter) {
-            // A parameter of that name is the binding we are looking for.
+
             if ($parameter->var instanceof Expr\Variable && $parameter->var->name === $name) {
                 return true;
             }
@@ -599,9 +578,9 @@ final class SqlConcatenationRule implements RuleInterface
         $fragments  = [];
         $nodeFinder = new NodeFinder();
 
-        // Gather each literal and interpolated fragment under the expression.
+
         foreach ($nodeFinder->find($subject, static fn(Node $candidate): bool => $candidate instanceof Scalar\String_ || $candidate instanceof InterpolatedStringPart) as $literal) {
-            // Read the fragment's literal text.
+
             if ($literal instanceof Scalar\String_ || $literal instanceof InterpolatedStringPart) {
                 $fragments[] = $literal->value;
             }
@@ -616,7 +595,7 @@ final class SqlConcatenationRule implements RuleInterface
      * @param AnalysisUnit $analysisUnit - Unit being scanned; supplies the display path recorded on the finding.
      * @param Node         $node - Query call flagged as concatenating SQL; its start line locates the finding.
      *
-     * @return Finding - Security finding.
+     * @return Finding - Medium-confidence warning located at the query call's source line.
      */
     private function finding(AnalysisUnit $analysisUnit, Node $node): Finding
     {

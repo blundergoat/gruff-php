@@ -35,18 +35,19 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers the test-quality rule pack across PHPUnit and Pest: assertion smells, eager tests, SUT-not-called, oversized methods, unused mocks,
- * global-state leaks, repeated structures, and per-rule severity options.
+ * Covers test-quality rules using parsed PHPUnit and Pest fixtures.
+ * Asserts finding counts, selected symbols, candidate metadata, and advisory severity.
+ * Exercises the default registry, calibration configuration, and explicit rule options.
  */
 final class TestQualityRulesTest extends TestCase
 {
-    /** Project root used by filesystem and CLI tests. */
+    /** Project root for fixture paths, configuration loading, and rule context. */
     private const PROJECT_ROOT = __DIR__ . '/../../..';
 
     /**
-     * Verify PHPUnit and pest test scopes support no assertion checks.
+     * Count NoAssertionsRule findings across the combined PHPUnit and Pest fixtures.
      *
-     * @return void
+     * @return void - Asserts four NoAssertionsRule findings across the two fixtures.
      */
     public function testPhpUnitAndPestTestScopesSupportNoAssertionChecks(): void
     {
@@ -61,7 +62,7 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Verify mechanics smells are detected.
      *
-     * @return void
+     * @return void - Asserts three reflection findings and one each for provider annotations, snapshots, and setup bloat.
      */
     public function testMechanicsSmellsAreDetected(): void
     {
@@ -77,7 +78,7 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Verify advanced heuristic smells are detected.
      *
-     * @return void
+     * @return void - Asserts one test-length finding, one missing-SUT finding, and three naming findings.
      */
     public function testAdvancedHeuristicSmellsAreDetected(): void
     {
@@ -85,14 +86,14 @@ final class TestQualityRulesTest extends TestCase
 
         self::assertRuleCount(TestLongerThanSutRule::ID, 1, $findings);
         self::assertRuleCount(SutNotCalledRule::ID, 1, $findings);
-        // 1 mixed-style class finding (MixedNamingQualityTest) + 2 poor-name method findings (PoorlyNamedTest::testProcessOrderWorks, ::testProcessOrder1)
+        // MixedNamingQualityTest mixes styles; PoorlyNamedTest contains testProcessOrderWorks and testProcessOrder1.
         self::assertRuleCount(TestNamingConsistencyRule::ID, 3, $findings);
     }
 
     /**
-     * Verify SUT-not-called only flags leading method-style test names.
+     * Checks the heuristic fixture's single SUT-not-called finding and its test-method symbol.
      *
-     * @return void
+     * @return void - Asserts one finding for SutNotCalledHeuristicTest::testCalculateTotalReturnsExpectedValue().
      */
     public function testSutNotCalledOnlyFlagsLeadingMethodStyleTestNames(): void
     {
@@ -106,9 +107,9 @@ final class TestQualityRulesTest extends TestCase
     }
 
     /**
-     * Verify non candidate cases are not flagged by selected rules.
+     * Checks that the ten selected content-based rules emit no findings for the non-candidate fixture.
      *
-     * @return void
+     * @return void - Asserts zero findings for the ten listed rule IDs.
      */
     public function testNonCandidateCasesAreNotFlaggedBySelectedRules(): void
     {
@@ -124,18 +125,18 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(RepeatedStructureMissingDataProviderRule::ID, 0, $findings);
         self::assertRuleCount(TestdoxReadabilityRule::ID, 0, $findings);
         self::assertRuleCount(MockingDomainObjectRule::ID, 0, $findings);
-        // The phpunit-* rules are project-level (they fire on .phpunit.xml.dist at the project root),
-        // not source-file rules, so they're intentionally excluded from this fixture-content assertion.
+        // The phpunit-* rules inspect project-root configuration, so these fixture-content checks exclude them.
+
     }
 
     /**
-     * Verify each single-rule fixture emits exactly the expected finding count.
+     * Checks each fixture's finding count for the selected rule.
      *
      * @param string $fixture       - Fixture path under tests/Fixtures/TestQuality to analyse.
      * @param string $ruleId        - Rule identifier whose findings are counted.
      * @param int    $expectedCount - Exact number of findings the rule must emit on the fixture.
      *
-     * @return void
+     * @return void - Asserts the selected rule's total, without checking individual finding identities.
      */
     #[DataProvider('singleRuleFixtureProvider')]
     public function testSingleRuleFixtureEmitsExpectedCount(string $fixture, string $ruleId, int $expectedCount): void
@@ -144,8 +145,7 @@ final class TestQualityRulesTest extends TestCase
     }
 
     /**
-     * Provide single-rule fixtures paired with the exact finding count each rule must emit. Each exact count also
-     * pins the negative half of the fixture (the allowed shapes that must stay unflagged).
+     * Supplies fixtures, selected rule IDs, and expected totals for aggregate finding-count assertions.
      *
      * @return array<string, array{0: string, 1: string, 2: int}> - Rows of fixture path, rule id, and expected finding count.
      */
@@ -160,9 +160,9 @@ final class TestQualityRulesTest extends TestCase
     }
 
     /**
-     * Verify static-analysis-redundant candidates carry evidence and leave behavior clean.
+     * Checks candidate variants, evidence symbols, advisory severity, and confidence metadata.
      *
-     * @return void
+     * @return void - Asserts six candidates, their metadata lists, and each candidate's severity, confidence, and message marker.
      */
     public function testStaticAnalysisRedundantCandidatesDetectedWithEvidence(): void
     {
@@ -204,9 +204,9 @@ final class TestQualityRulesTest extends TestCase
     }
 
     /**
-     * Verify static-analysis-redundant candidates do not duplicate neighbouring rule ownership.
+     * Checks that neighbouring rules retain ownership without redundant-test findings.
      *
-     * @return void
+     * @return void - Asserts zero redundant-test findings alongside each expected neighbouring-rule count.
      */
     public function testStaticAnalysisRedundantCandidatesRespectNeighbouringRules(): void
     {
@@ -215,9 +215,9 @@ final class TestQualityRulesTest extends TestCase
     }
 
     /**
-     * Verify repeated structure missing data provider detected and data provider users ignored.
+     * Checks two repeated-structure groups with per-group symbols and method metadata.
      *
-     * @return void
+     * @return void - Asserts both groups' symbols, method lists, and sizes, plus the first group's message marker.
      */
     public function testRepeatedStructureMissingDataProviderDetectedAndDataProviderUsersIgnored(): void
     {
@@ -247,9 +247,9 @@ final class TestQualityRulesTest extends TestCase
     }
 
     /**
-     * Verify testdox readability fires by default and with explicit config.
+     * Checks one readability finding under both the default and explicit configurations.
      *
-     * @return void
+     * @return void - Asserts one TestdoxReadabilityRule finding under each configuration.
      */
     public function testTestdoxReadabilityFiresByDefaultAndWithExplicitConfig(): void
     {
@@ -276,7 +276,7 @@ final class TestQualityRulesTest extends TestCase
      * @param int           $expectedCount - Exact number of findings the rule must emit.
      * @param list<Finding> $findings      - Findings to filter down to the requested rule id.
      *
-     * @return void
+     * @return void - Asserts the filtered count without checking finding symbols or metadata.
      */
     private static function assertRuleCount(string $ruleId, int $expectedCount, array $findings): void
     {
@@ -288,13 +288,13 @@ final class TestQualityRulesTest extends TestCase
     }
 
     /**
-     * Assert the static-analysis-redundant rule stays silent while a neighbouring rule solely owns the fixture's smell.
+     * Checks a neighbouring rule's count and the absence of redundant-test findings.
      *
-     * @param string $fixture     - Fixture path whose neighbouring-rule ownership is verified.
-     * @param string $ownerRuleId - Rule identifier expected to solely own the fixture's smell.
-     * @param int    $ownerCount  - Exact number of findings the owning rule must emit.
+     * @param string $fixture     - Fixture path analysed for the selected rule counts.
+     * @param string $ownerRuleId - Neighbouring rule whose findings are counted.
+     * @param int    $ownerCount  - Exact expected finding count for the neighbouring rule.
      *
-     * @return void
+     * @return void - Asserts those two counts without excluding findings from other rules.
      */
     private function assertSmellOwnedSolelyByNeighbour(string $fixture, string $ownerRuleId, int $ownerCount): void
     {
@@ -310,7 +310,7 @@ final class TestQualityRulesTest extends TestCase
      * @param list<Finding> $findings - Findings whose metadata should be inspected.
      * @param string        $key      - Metadata key to read.
      *
-     * @return list<string> - String values sorted ascending.
+     * @return list<string> - Strings sorted lexically, with duplicates retained; missing or non-string values are omitted.
      */
     private function stringMetadataValues(array $findings, string $key): array
     {
@@ -327,10 +327,10 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Analyse test-quality fixtures and return findings for assertions.
      *
-     * @param string              $path   - Single fixture path to analyse.
+     * @param string              $path   - Fixture path relative to the project root.
      * @param AnalysisConfig|null $config - Overriding config, or null to enable the default-off calibration rules.
      *
-     * @return list<Finding> - every finding emitted across all rules for the single fixture; empty when nothing fired
+     * @return list<Finding> - Enabled-rule findings for the fixture and project context; empty when none are emitted.
      */
     private function analysePath(string $path, ?AnalysisConfig $config = null): array
     {
@@ -340,10 +340,10 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Analyse test-quality fixtures and return findings for assertions.
      *
-     * @param list<string>        $paths  - Fixture paths to parse and analyse together.
+     * @param list<string>        $paths  - Fixture paths relative to the project root, parsed and analysed together.
      * @param AnalysisConfig|null $config - Overriding config, or null to enable the default-off calibration rules.
      *
-     * @return list<Finding> - every finding the default registry emits across the combined fixtures; empty when nothing fired
+     * @return list<Finding> - Enabled-rule findings from the combined fixtures and project context; empty when none are emitted.
      */
     private function analysePaths(array $paths, ?AnalysisConfig $config = null): array
     {
@@ -360,9 +360,9 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Parse the requested path into an analysis unit.
      *
-     * @param string $path - Filesystem path.
+     * @param string $path - Fixture path relative to the project root.
      *
-     * @return AnalysisUnit - the parsed fixture, carrying the project-root-relative path as its display name
+     * @return AnalysisUnit - Unit using $path as its display name; read or parse failures appear in its diagnostics.
      */
     private function unitForPath(string $path): AnalysisUnit
     {

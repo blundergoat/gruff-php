@@ -19,10 +19,10 @@ final class PhysicalCommentAttachment
      * Report whether a comment occupies only comment text and ends directly above an owner.
      *
      * @param Comment $comment - Parser-attached comment whose physical placement is being proven.
-     * @param Node    $owner - Statement or declaration the comment is expected to explain.
-     * @param string  $source - Complete file source used to inspect text around the comment token.
+     * @param Node $owner - Statement or declaration the comment is expected to explain.
+     * @param string $source - Complete file source used to inspect text around the comment token.
      *
-     * @return bool - True only when indentation precedes the comment and no executable code follows it before the owner.
+     * @return bool - True when the comment ends on the preceding line, its span is comment-only, and the owner gap is whitespace.
      */
     public static function isOwnLineImmediatelyAbove(Comment $comment, Node $owner, string $source): bool
     {
@@ -60,7 +60,7 @@ final class PhysicalCommentAttachment
      * Split a class body into unbroken runs of one declaration kind: consecutive declarations of that kind with
      * no blank line between them. Comments between declarations keep a run; any other statement ends it.
      *
-     * @template T of Node\Stmt
+     * @template T of Node\Stmt - Declaration statement subtype selected for each returned run.
      *
      * @param array<Node\Stmt> $statements - Class-body statements in source order.
      * @param class-string<T>  $kind - Declaration class whose runs are wanted.
@@ -74,7 +74,7 @@ final class PhysicalCommentAttachment
         $currentRun = [];
 
         foreach ($statements as $statement) {
-            // Another kind of statement ends the run in progress.
+
             if (!$statement instanceof $kind) {
                 if ($currentRun !== []) {
                     $runs[] = $currentRun;
@@ -83,7 +83,7 @@ final class PhysicalCommentAttachment
                 continue;
             }
 
-            // A blank line above this declaration starts a new run.
+
             if ($currentRun !== [] && !self::hasNoBlankLineBetween($currentRun[count($currentRun) - 1], $statement, $source)) {
                 $runs[]     = $currentRun;
                 $currentRun = [];
@@ -103,14 +103,14 @@ final class PhysicalCommentAttachment
      *
      * @param Node   $owner - Declaration whose parser-attached comments are checked.
      * @param string $source - Complete file source used to reject detached and trailing comments.
-     * @param bool   $isDocblockRequired - When true, only a `/** ... *\/` docblock counts as the declaration's own.
+     * @param bool   $isDocblockRequired - When true, only a PHPDoc block counts as the declaration's own.
      *
      * @return bool - True when an own-line comment of the requested kind sits immediately above the declaration.
      */
     public static function hasOwnComment(Node $owner, string $source, bool $isDocblockRequired): bool
     {
         foreach ($owner->getComments() as $comment) {
-            // A trailing or detached comment belongs to whatever it follows, not to this declaration.
+            // Parser attachment alone does not establish physical ownership.
             if ((!$isDocblockRequired || $comment instanceof Doc) && self::isOwnLineImmediatelyAbove($comment, $owner, $source)) {
                 return true;
             }

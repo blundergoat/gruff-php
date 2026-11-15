@@ -18,18 +18,20 @@ use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputOption;
 
 /**
- * Covers dashboard HTTP request validation: host header allowlist, oversized request lines and header blocks, and per-route method restrictions.
+ * Covers dashboard HTTP request validation through paired local sockets.
+ * Checks host handling and request-line, header-count, and header-byte limits.
+ * Assertions cover status markers for selected GET, HEAD, and POST requests.
  */
 final class DashboardRequestHandlerTest extends TestCase
 {
     /**
-     * Verify rejects malformed or disallowed host headers.
+     * Check status markers for rejected hosts and incomplete headers.
      *
      * @param string $request - Raw request bytes to send.
-     * @param string $statusLine - Expected HTTP status line.
+     * @param string $statusLine - Status-line text expected in the response.
      * @param bool   $shouldCloseWrite - Whether to close the client write side after sending.
      *
-     * @return void
+     * @return void - Asserts that the response contains the expected status-line text.
      */
     #[DataProvider('rejectedHostRequestProvider')]
     public function testRejectsMalformedOrDisallowedHostHeaders(string $request, string $statusLine, bool $shouldCloseWrite = false): void
@@ -42,7 +44,7 @@ final class DashboardRequestHandlerTest extends TestCase
     /**
      * Provide rejected host request cases for parameterized tests.
      *
-     * @return array<string, array{string, string, 2?: bool}> - keyed test cases; each row is raw request bytes, the expected status line, and an optional flag to half-close the write side
+     * @return array<string, array{string, string, 2?: bool}> - Named requests, expected status text, and optional flags to half-close writes.
      */
     public static function rejectedHostRequestProvider(): array
     {
@@ -55,9 +57,9 @@ final class DashboardRequestHandlerTest extends TestCase
     }
 
     /**
-     * Verify rejects oversized request line.
+     * Check the rejection status for an oversized request line.
      *
-     * @return void
+     * @return void - Asserts that the response contains the HTTP 431 status text.
      */
     public function testRejectsOversizedRequestLine(): void
     {
@@ -67,9 +69,9 @@ final class DashboardRequestHandlerTest extends TestCase
     }
 
     /**
-     * Verify rejects oversized headers.
+     * Check the rejection status when the request includes too many headers.
      *
-     * @return void
+     * @return void - Asserts that the response contains the HTTP 431 status text.
      */
     public function testRejectsOversizedHeaders(): void
     {
@@ -84,9 +86,9 @@ final class DashboardRequestHandlerTest extends TestCase
     }
 
     /**
-     * Verify rejects oversized header block by bytes.
+     * Check the rejection status for a header block exceeding the byte limit.
      *
-     * @return void
+     * @return void - Asserts that the response contains the HTTP 431 status text.
      */
     public function testRejectsOversizedHeaderBlockByBytes(): void
     {
@@ -96,9 +98,9 @@ final class DashboardRequestHandlerTest extends TestCase
     }
 
     /**
-     * Verify allows dashboard health scan head and rejects post.
+     * Check status markers for GET routes, a HEAD request, and POST to /scan.
      *
-     * @return void
+     * @return void - Asserts HTTP 200 text for the GET and HEAD cases and HTTP 405 text for POST /scan.
      */
     public function testAllowsDashboardHealthScanHeadAndRejectsPost(): void
     {
@@ -112,7 +114,7 @@ final class DashboardRequestHandlerTest extends TestCase
     /**
      * Return the dashboard response for a raw HTTP request.
      *
-     * @param string $request - Raw HTTP request.
+     * @param string $request - Bytes written to the client socket before the handler runs.
      * @param bool   $shouldCloseWrite - When true, half-close the write side to exercise truncated-request handling.
      *
      * @return string - the exact bytes the handler wrote back to the socket, including status line and body
@@ -166,7 +168,7 @@ final class DashboardRequestHandlerTest extends TestCase
     /**
      * Build an empty console input fixture.
      *
-     * @return ArrayInput - empty input carrying only the option definitions the handler reads, with no arguments supplied
+     * @return ArrayInput - Input with a paths argument and dashboard options; no values are explicitly supplied.
      */
     private function input(): ArrayInput
     {
@@ -183,7 +185,7 @@ final class DashboardRequestHandlerTest extends TestCase
     }
 
     /**
-     * Create a fake gruff-php executable for dashboard tests.
+     * Create a fake gruff-php script for dashboard tests.
      *
      * @return string - filesystem path to a freshly written temp stub script that prints fixed HTML in place of the real gruff binary
      */

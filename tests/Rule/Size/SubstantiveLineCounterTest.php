@@ -16,15 +16,16 @@ use Symfony\Component\Finder\Finder;
 use WeakReference;
 
 /**
- * Proves the optimized substantive-line counter stays identical to a plain repeated-replacement masking of
- * comment tokens and parsed attribute groups.
+ * Compares substantive-line counts with repeated-replacement masking across PHP fixtures and class-like spans.
+ * Exercises CRLF comments, range bounds, repeated calls, empty input, raw text, and a syntax error.
+ * Checks collection of a counted unit and recounting after eviction and source release.
  */
 final class SubstantiveLineCounterTest extends TestCase
 {
     /**
      * Compare every PHP fixture and every parsed class-like span with the pre-optimization algorithm.
      *
-     * @return void
+     * @return void - Asserts matching counts for each fixture and at least one class-like span overall.
      */
     public function testMatchesReferenceAcrossEveryPhpFixtureAndClassLikeSpan(): void
     {
@@ -61,7 +62,7 @@ final class SubstantiveLineCounterTest extends TestCase
     /**
      * Verify CRLF comments, trailing comments, invalid ranges, and repeated calls retain exact behaviour.
      *
-     * @return void
+     * @return void - Asserts a count of five and reference-matching range counts across repeated calls.
      */
     public function testPreservesMaskingBoundsAndRepeatedCalls(): void
     {
@@ -94,7 +95,7 @@ final class SubstantiveLineCounterTest extends TestCase
     /**
      * Verify empty, token-free, and syntax-error units preserve their established fallbacks.
      *
-     * @return void
+     * @return void - Asserts zero for empty input, two for raw text, and the reference count after a parse error.
      */
     public function testHandlesEmptyRawAndSyntaxErrorUnits(): void
     {
@@ -122,7 +123,7 @@ final class SubstantiveLineCounterTest extends TestCase
     /**
      * Verify a cached prefix cannot keep an otherwise unreachable analysis unit alive.
      *
-     * @return void
+     * @return void - Asserts that the counted unit's weak reference clears after unset and cycle collection.
      */
     public function testDoesNotRetainCachedAnalysisUnit(): void
     {
@@ -138,9 +139,9 @@ final class SubstantiveLineCounterTest extends TestCase
     }
 
     /**
-     * Verify explicit eviction removes source-derived data while the released unit shell remains reachable.
+     * Verify counting a retained unit after eviction and source release yields zero.
      *
-     * @return void
+     * @return void - Asserts the count changes from two to zero after eviction and source release.
      */
     public function testEvictsCachedPrefixBeforeUnitRelease(): void
     {
@@ -190,7 +191,7 @@ final class SubstantiveLineCounterTest extends TestCase
      *
      * @param string $source - PHP source to parse.
      *
-     * @return AnalysisUnit - Parsed inline unit.
+     * @return AnalysisUnit - Source and diagnostics for inline.php; its temporary file is removed before return.
      */
     private function parseInline(string $source): AnalysisUnit
     {
@@ -219,13 +220,13 @@ final class SubstantiveLineCounterTest extends TestCase
     }
 
     /**
-     * Count a range with the original array-slice bounds behaviour.
+     * Count a reference range with a clamped offset and the original requested span length.
      *
      * @param AnalysisUnit $analysisUnit - Unit whose source and tokens are inspected.
-     * @param int          $startLine    - Requested inclusive start line.
-     * @param int          $endLine      - Requested inclusive end line.
+     * @param int          $startLine    - Inclusive start; offsets before the source clamp to its first line.
+     * @param int          $endLine      - Inclusive end used with the requested start to calculate the slice length.
      *
-     * @return int - Reference substantive-line count for the requested range.
+     * @return int - Reference count; zero for a nonpositive slice length or an offset past the source.
      */
     private function referenceCountRange(AnalysisUnit $analysisUnit, int $startLine, int $endLine): int
     {
@@ -238,7 +239,7 @@ final class SubstantiveLineCounterTest extends TestCase
     /**
      * Reproduce the masking with plain repeated replacement: comment tokens, then parsed attribute groups.
      *
-     * @param AnalysisUnit $analysisUnit - Unit whose comment tokens and attribute groups are blanked in place.
+     * @param AnalysisUnit $analysisUnit - Unit supplying source, comment tokens, and parsed attribute offsets.
      *
      * @return list<string> - Source lines with comment and attribute bytes replaced by spaces except for newlines.
      */
@@ -251,11 +252,12 @@ final class SubstantiveLineCounterTest extends TestCase
                 continue;
             }
 
+            // Blank every character except newlines, so the comment keeps its line count.
             $blanked = preg_replace('/[^\n]/', ' ', $token->text) ?? $token->text;
             $masked  = substr_replace($masked, $blanked, $token->pos, strlen($token->text));
         }
 
-        // Attribute lines are free like comment lines (FAMILY-CONTRACT section 12).
+        // Attribute syntax is ignored like comment text, so attribute-only lines do not count.
         foreach ((new NodeFinder())->findInstanceOf($analysisUnit->statements, AttributeGroup::class) as $attributeGroup) {
             $start   = $attributeGroup->getStartFilePos();
             $length  = $attributeGroup->getEndFilePos() - $start + 1;
@@ -269,7 +271,7 @@ final class SubstantiveLineCounterTest extends TestCase
     /**
      * Count non-blank lines in a reference mask.
      *
-     * @param list<string> $lines - Masked source lines.
+     * @param list<string> $lines - Masked source lines whose non-blank entries are counted.
      *
      * @return int - Number of non-blank lines.
      */

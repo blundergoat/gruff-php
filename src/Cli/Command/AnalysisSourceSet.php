@@ -10,11 +10,9 @@ use GruffPhp\Engine\Source\SourceDiscoveryResult;
 use GruffPhp\Engine\Source\SourceFile;
 
 /**
- * The parsed sources for one analysis run - units, diagnostics, and discovery metadata.
- *
- * Sits between source loading and rule execution: it holds the parsed `AnalysisUnit`s the rules
- * inspect, the diagnostics (like parse errors) surfaced to the user, and the discovery result behind
- * the "N discovered / parsed / ignored / missing" counts shown in the summary and report.
+ * Carries discovery metadata, diagnostics, and file counts for one analysis run.
+ * Batch runs retain analysis units; streaming runs can supply counts after releasing those units.
+ * Parsed-file coverage includes text inputs; the scoring denominator counts only PHP inputs without fatal parse errors.
  */
 final readonly class AnalysisSourceSet
 {
@@ -34,7 +32,7 @@ final readonly class AnalysisSourceSet
      * @param list<AnalysisUnit>    $analysisUnits   - Parsed analysis units, possibly released.
      * @param list<RunDiagnostic>   $diagnostics     - Diagnostics emitted while loading sources.
      * @param int|null              $parsedFileCount - Pre-computed parsed-file count for streaming flows; null derives it live from the units.
-     * @param int|null              $evaluatedFileCount - Pre-computed ratified scoring denominator for streaming flows; null derives it live.
+     * @param int|null              $evaluatedFileCount - Pre-computed eligible PHP-file count for streaming flows; null derives it live.
      */
     public function __construct(
         public SourceDiscoveryResult $discovery,
@@ -66,13 +64,10 @@ final readonly class AnalysisSourceSet
      * @return int - Number of units without parse diagnostics.
      */
     /**
-     * Counts the PHP files this run actually evaluated - the ratified scoring denominator.
+     * Counts PHP inputs without fatal parse errors for the scoring denominator.
+     * Text-only inputs contribute to parsedFileCount() but do not enter this denominator.
      *
-     * Deliberately narrower than parsedFileCount(), which also counts the text inputs raw-text rules
-     * read: a README is scanned but carries no PHP to score, so including it would divide real
-     * findings by files no PHP rule ever evaluated and quietly flatter every project holding docs.
-     *
-     * @return int - PHP files that parsed successfully; zero means nothing was evaluated and no score can be reported.
+     * @return int - The supplied streaming count, or the count of retained PHP units without fatal parse errors.
      */
     public function evaluatedFileCount(): int
     {
@@ -88,12 +83,11 @@ final readonly class AnalysisSourceSet
     }
 
     /**
-     * Counts every file this run parsed successfully, including the text inputs raw-text rules read.
+     * Counts supported inputs accepted without fatal parse diagnostics.
+     * Uses a supplied streaming count when present; otherwise derives coverage from retained units.
+     * The scoring denominator is the narrower evaluatedFileCount().
      *
-     * This is the coverage number the user sees beside the scan; the ratified scoring denominator is
-     * the narrower evaluatedFileCount().
-     *
-     * @return int - Files that parsed without error, of any supported type.
+     * @return int - Coverage count, including text inputs and PHP files with nonfatal budget notes.
      */
     public function parsedFileCount(): int
     {
@@ -103,8 +97,8 @@ final readonly class AnalysisSourceSet
             return $this->explicitParsedFileCount;
         }
 
-        // No pre-computed count, so the units are still in memory: derive it by excluding
-        // units that failed to parse, matching how non-streaming callers measure coverage.
+
+
         return count(array_filter(
             $this->analysisUnits,
             static fn (AnalysisUnit $analysisUnit): bool => !$analysisUnit->hasParseErrors(),

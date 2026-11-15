@@ -10,30 +10,25 @@ use PhpParser\Node\AttributeGroup;
 use WeakMap;
 
 /**
- * Shared code-line counting for the file, class and test length rules: blank lines,
- * comment-only lines and attribute-only lines are free (FAMILY-CONTRACT section 12, search `Code lines in
- * every line count`), so required documentation can never push a file, class or test over a budget.
- *
- * Comment tokens and parsed attribute groups are masked out of the source (newlines preserved) before
- * counting non-blank lines, so a line holding both code and a trailing comment or an attribute still counts.
- * Units without parser tokens fall back to counting non-blank raw lines; syntax-error units can retain
- * tokens and receive the same comment masking, but have no parsed attributes to mask.
+ * Counts substantive lines for file, class, and test length rules under FAMILY-CONTRACT section 12: Code lines in every line count.
+ * Masks comment tokens and located attribute groups with spaces, preserving newlines; blank masked lines do not count.
+ * With no spans, raw non-blank lines count; syntax-error units can retain comment tokens but have no parsed attributes.
  */
 final class SubstantiveLineCounter
 {
     /**
      * Cumulative substantive-line counts keyed by analysis-unit identity.
      *
-     * @var WeakMap<AnalysisUnit, list<int>>|null
+     * @var WeakMap<AnalysisUnit, list<int>>|null - Prefix counts with a leading zero, or null before cache initialization.
      */
     private static ?WeakMap $prefixCache = null;
 
     /**
      * Counts the substantive lines of the whole unit.
      *
-     * @param AnalysisUnit $analysisUnit - Unit whose source and comment tokens are inspected.
+     * @param AnalysisUnit $analysisUnit - Unit whose source, comment tokens, and parsed attributes are inspected.
      *
-     * @return int - Number of non-blank lines after comment masking.
+     * @return int - Non-blank line count after comment and attribute masking; zero when no code remains.
      */
     public static function countAll(AnalysisUnit $analysisUnit): int
     {
@@ -43,13 +38,13 @@ final class SubstantiveLineCounter
     }
 
     /**
-     * Counts the substantive lines inside one inclusive 1-based line range.
+     * Counts substantive lines in an inclusive 1-based range, stopping at the source end.
      *
-     * @param AnalysisUnit $analysisUnit - Unit whose source and comment tokens are inspected.
+     * @param AnalysisUnit $analysisUnit - Unit whose source, comment tokens, and parsed attributes are inspected.
      * @param int          $startLine    - First line of the range, 1-based inclusive.
      * @param int          $endLine      - Last line of the range, 1-based inclusive.
      *
-     * @return int - Number of non-blank lines after comment masking within the range.
+     * @return int - Masked non-blank line count; zero for reversed ranges or starts past the source.
      */
     public static function countRange(AnalysisUnit $analysisUnit, int $startLine, int $endLine): int
     {
@@ -58,7 +53,7 @@ final class SubstantiveLineCounter
         $startIndex      = max(0, $startLine - 1);
         $requestedLength = max(0, $endLine - $startLine + 1);
 
-        // Preserve the original array-slice bounds: an empty or out-of-source range contributes nothing.
+
         if ($requestedLength === 0 || $startIndex >= $lineCount) {
             return 0;
         }
@@ -73,7 +68,7 @@ final class SubstantiveLineCounter
      *
      * @param AnalysisUnit $analysisUnit - Unit to remove from the substantive-line cache.
      *
-     * @return void
+     * @return void - Removes the unit's cached counts, leaving an uninitialized cache untouched.
      */
     public static function evictUnit(AnalysisUnit $analysisUnit): void
     {
@@ -88,7 +83,7 @@ final class SubstantiveLineCounter
      *
      * Prefix index zero is always zero; index N stores the substantive count through source line N.
      *
-     * @param AnalysisUnit $analysisUnit - Unit whose comment-masked source is counted.
+     * @param AnalysisUnit $analysisUnit - Unit whose source is counted after comment and attribute masking.
      *
      * @return list<int> - Cumulative substantive-line counts with a leading zero.
      */
@@ -97,7 +92,7 @@ final class SubstantiveLineCounter
         self::$prefixCache ??= new WeakMap();
         $cached = self::$prefixCache[$analysisUnit] ?? null;
         if ($cached !== null) {
-            // A hit means this unit's mask and every range count are already represented by the prefix.
+
             return $cached;
         }
 
@@ -105,7 +100,7 @@ final class SubstantiveLineCounter
         $prefix = [0];
 
         foreach (self::maskedLines($analysisUnit) as $line) {
-            // A line is substantive when anything beyond whitespace survives the comment mask.
+
             if (trim($line) !== '') {
                 ++$count;
             }
@@ -122,9 +117,9 @@ final class SubstantiveLineCounter
      *
      * Shared by both counting entry points and by rules that add their own per-line exclusions.
      *
-     * @param AnalysisUnit $analysisUnit - Unit whose comment tokens and attribute groups are blanked.
+     * @param AnalysisUnit $analysisUnit - Unit whose comment tokens and attribute groups with usable offsets are blanked.
      *
-     * @return list<string> - Source lines with comment and attribute text replaced by spaces.
+     * @return list<string> - Source lines with each located comment or attribute span replaced by spaces.
      */
     public static function maskedLines(AnalysisUnit $analysisUnit): array
     {
@@ -134,19 +129,19 @@ final class SubstantiveLineCounter
         // Copy source and masked spans in order so each source byte is visited at most once.
         foreach (self::freeSpans($analysisUnit) as [$start, $end]) {
             $masked .= substr($analysisUnit->source, $sourceOffset, $start - $sourceOffset);
+            // Blank every character except newlines, so the masked span keeps its line count.
             $masked .= preg_replace('/[^\n]/', ' ', substr($analysisUnit->source, $start, $end - $start)) ?? '';
             $sourceOffset = $end;
         }
 
-        // Preserve the untouched tail after the final masked span.
+
         $masked .= substr($analysisUnit->source, $sourceOffset);
 
         return explode("\n", $masked);
     }
 
     /**
-     * Lists the byte spans that never count as code, merged and in source order: every comment token and
-     * every parsed attribute group from its `#[` to its closing `]`.
+     * Lists merged, source-ordered spans for comment tokens and parsed attribute groups with usable offsets.
      *
      * @param AnalysisUnit $analysisUnit - Unit whose comment tokens and attribute groups are read.
      *

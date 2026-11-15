@@ -16,14 +16,16 @@ use PhpParser\Node\Stmt;
 final readonly class TestQualityScope
 {
     /**
-     * @param string      $symbol - Stable display symbol for the discovered test scope.
-     * @param string      $name - Test method or Pest description name.
-     * @param int         $line - First source line of the test scope.
-     * @param int|null    $endLine - Last source line of the test scope, or null when the parser could not locate the scope's end.
-     * @param list<Stmt>  $statements - Statements executed by the test scope.
-     * @param Node        $node - AST node that owns the test scope.
-     * @param bool        $isPest - Whether the scope came from a Pest test call.
-     * @param string|null $className - Enclosing PHPUnit class name, or null for a Pest or top-level scope with no class.
+     * Stores the metadata and AST node for a discovered test scope.
+     *
+     * @param string $symbol - Stable display symbol for the discovered test scope.
+     * @param string $name - Test method or Pest description name.
+     * @param int $line - First source line of the test scope.
+     * @param int|null $endLine - Last scope line, or null to make lineCount() use one line.
+     * @param list<Stmt> $statements - Top-level AST statements forming the test body.
+     * @param Node $node - AST node that owns the test scope.
+     * @param bool $isPest - Whether the scope came from a Pest test call.
+     * @param string|null $className - Named enclosing class, or null for Pest scopes, anonymous classes, or missing class context.
      */
     public function __construct(
         public string $symbol,
@@ -38,18 +40,14 @@ final readonly class TestQualityScope
     }
 
     /**
-     * Returns the line a finding on this scope should report.
+     * Returns the source line used to anchor a finding on this scope.
+     * Methods use DeclarationLine::of(); other scopes retain their stored start line.
      *
-     * `$line` is where the scope's span starts, attribute groups included, because the span is what the length
-     * and range rules measure. A PHP 8 attribute is a sub-node of the method it decorates, so reporting that
-     * span start points the reader at `#[DataProvider(...)]` instead of at the test. The declaration itself is
-     * what a finding names.
-     *
-     * @return int - 1-based source line of the declaration, never the line of one of its attributes.
+     * @return int - Method declaration anchor or stored scope start; an inline attribute can share the returned line.
      */
     public function anchorLine(): int
     {
-        // Only a method scope can carry attributes; a Pest closure's span already starts at its test() call.
+
         return $this->node instanceof Stmt\ClassMethod ? DeclarationLine::of($this->node) : $this->line;
     }
 
