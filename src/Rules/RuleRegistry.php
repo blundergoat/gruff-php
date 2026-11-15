@@ -158,9 +158,11 @@ final class RuleRegistry
     private readonly WeakMap $enabledRulesByConfig;
 
     /**
+     * Indexes rule instances by id for ordered lookup.
+     *
      * @param list<RuleInterface|ProjectRuleInterface> $rules - Rule instances to index by id.
      *
-     * @throws InvalidArgumentException When two rules declare the same id.
+     * @throws InvalidArgumentException - When two rules declare the same id.
      */
     public function __construct(array $rules)
     {
@@ -343,8 +345,8 @@ final class RuleRegistry
      *
      * @param string $ruleId - Rule identifier to look up.
      *
-     * @return RuleInterface|ProjectRuleInterface - the shared rule instance registered under this id; never null (throws on miss)
-     * @throws InvalidArgumentException When the rule id is unknown.
+     * @return RuleInterface|ProjectRuleInterface - the shared registered rule instance resolved from this id; never null (throws on miss)
+     * @throws InvalidArgumentException - When the rule id is unknown.
      */
     public function get(string $ruleId): RuleInterface|ProjectRuleInterface
     {
@@ -357,8 +359,7 @@ final class RuleRegistry
      *
      * @param AnalysisConfig $config - Config used to filter registered rules.
      *
-     * @return list<RuleInterface|ProjectRuleInterface> - rules passing both per-rule toggle and selection filter, id-sorted; empty when config
-     *                                                  disables all
+     * @return list<RuleInterface|ProjectRuleInterface> - Rules allowed by both config filters in registry order; empty when all are disabled.
      */
     public function enabledRules(AnalysisConfig $config): array
     {
@@ -370,8 +371,7 @@ final class RuleRegistry
      *
      * @param AnalysisConfig $config - Config used to filter registered rules.
      *
-     * @return list<RuleInterface|ProjectRuleInterface> - rules passing both per-rule toggle and selection filter, id-sorted; empty when config
-     *                                                  disables all
+     * @return list<RuleInterface|ProjectRuleInterface> - Rules allowed by both config filters in registry order; empty when all are disabled.
      */
     private function filterEnabledRules(AnalysisConfig $config): array
     {
@@ -426,13 +426,10 @@ final class RuleRegistry
     }
 
     /**
-     * Reports whether the enabled rule set is fully streaming-capable.
+     * Reports whether enabled rules can run unit by unit without buffering the full project.
+     * This requires every enabled project rule to implement ProjectRuleAccumulator; per-unit rules already qualify.
      *
-     * A rule set is streaming-capable when every enabled project rule
-     * implements ProjectRuleAccumulator. Per-unit rules are always
-     * streaming-friendly.
-     *
-     * @param RuleContext $ruleContext - Rule execution context.
+     * @param RuleContext $ruleContext - Supplies the config used to select enabled rules.
      *
      * @return bool - true when the run can stream unit-by-unit; false when a legacy project rule forces buffering all units
      */
@@ -450,9 +447,9 @@ final class RuleRegistry
     /**
      * Initialises the project-rule accumulators before a streaming analysis pass.
      *
-     * @param RuleContext $ruleContext - Rule execution context.
+     * @param RuleContext $ruleContext - Supplies config and state to each enabled accumulator.
      *
-     * @return void
+     * @return void - Enabled accumulators are prepared for a new project.
      */
     public function beginStreaming(RuleContext $ruleContext): void
     {
@@ -464,14 +461,11 @@ final class RuleRegistry
     }
 
     /**
-     * Runs every enabled per-unit rule and accumulator against a single unit.
-     *
-     * Use together with beginStreaming() and endStreaming() to drive a
-     * parse → analyse → release pipeline that keeps peak memory close to
-     * one unit's worth on large codebases.
+     * Processes one unit through eligible enabled per-unit rules and streaming accumulators.
+     * Use between beginStreaming() and endStreaming() when callers process and release units one at a time.
      *
      * @param AnalysisUnit            $analysisUnit       - Parsed unit to analyse.
-     * @param RuleContext             $ruleContext        - Rule execution context.
+     * @param RuleContext             $ruleContext        - Supplies config and state to per-unit rules and accumulators.
      * @param RuleRunnerObserver|null $ruleRunnerObserver - Optional per-rule timing hook.
      *
      * @return list<Finding> - file-scoped findings for this unit only; accumulator output is deferred to endStreaming()
@@ -491,7 +485,7 @@ final class RuleRegistry
      * Runs only the per-unit (file-scoped) rules against a single unit.
      *
      * @param AnalysisUnit            $analysisUnit       - Parsed unit to analyse.
-     * @param RuleContext             $ruleContext        - Rule execution context.
+     * @param RuleContext             $ruleContext        - Supplies config and state to each selected per-unit rule.
      * @param RuleRunnerObserver|null $ruleRunnerObserver - Optional per-rule timing hook.
      *
      * @return list<Finding> - findings from per-unit rules in rule-execution order, not yet deduped or final-sorted
@@ -501,7 +495,7 @@ final class RuleRegistry
         RuleContext         $ruleContext,
         ?RuleRunnerObserver $ruleRunnerObserver,
     ): array {
-        // A file that failed to parse has no reliable AST for the rules to read.
+        // A file that failed to parse produces no per-unit findings because its AST is unreliable.
         if ($analysisUnit->hasParseErrors()) {
             return [];
         }
@@ -509,7 +503,7 @@ final class RuleRegistry
         $findings = [];
         $isPhp    = $analysisUnit->file->isPhp();
 
-        // Run every enabled rule that applies to this unit.
+        // Non-PHP and deep-scan-bounded units run only rules that do not require a complete PHP AST.
         foreach ($this->enabledRules($ruleContext->config) as $rule) {
             if (!$rule instanceof RuleInterface) {
                 continue;
@@ -540,13 +534,13 @@ final class RuleRegistry
     }
 
     /**
-     * Pushes one unit through every enabled streaming project rule.
+     * Feeds a parseable unit to each compatible enabled streaming accumulator.
      *
      * @param AnalysisUnit            $analysisUnit       - Parsed unit to accumulate.
-     * @param RuleContext             $ruleContext        - Rule execution context.
+     * @param RuleContext             $ruleContext        - Supplies config and state to each selected accumulator.
      * @param RuleRunnerObserver|null $ruleRunnerObserver - Optional per-rule timing hook.
      *
-     * @return void
+     * @return void - The eligible accumulators receive the unit directly.
      */
     private function accumulateForUnit(
         AnalysisUnit        $analysisUnit,
@@ -559,7 +553,7 @@ final class RuleRegistry
         }
 
         $isPhp = $analysisUnit->file->isPhp();
-        // Feed the unit to every enabled streaming accumulator.
+        // Non-PHP and deep-scan-bounded units contribute only to source-text accumulators.
         foreach ($this->enabledRules($ruleContext->config) as $rule) {
             if (!$rule instanceof ProjectRuleAccumulator) {
                 continue;
@@ -586,7 +580,7 @@ final class RuleRegistry
     /**
      * Finalises the project-rule accumulators and returns their findings after streaming completes.
      *
-     * @param RuleContext             $ruleContext        - Rule execution context.
+     * @param RuleContext             $ruleContext        - Context used to select and flush each enabled accumulator.
      * @param RuleRunnerObserver|null $ruleRunnerObserver - Optional per-rule timing hook.
      *
      * @return list<Finding> - project-level findings flushed from accumulator state; empty when no accumulators ran or matched
@@ -597,7 +591,6 @@ final class RuleRegistry
     ): array {
         $findings = [];
 
-        // Flush every enabled accumulator's project-level findings.
         foreach ($this->enabledRules($ruleContext->config) as $rule) {
             if (!$rule instanceof ProjectRuleAccumulator) {
                 continue;
@@ -619,10 +612,8 @@ final class RuleRegistry
     }
 
     /**
-     * Applies the canonical ordering and dedupe pass to a streaming run's
-     * collected findings. Callers that drive analyseUnit() / endStreaming()
-     * themselves should call this once at the end so the output matches
-     * the non-streaming analyse() flow byte-for-byte.
+     * Deduplicates and orders findings collected from analyseUnit() and endStreaming().
+     * Call once after a caller-driven streaming pass to match analyse() output ordering and deduplication.
      *
      * @param list<Finding> $findings - Raw findings collected by the streaming analysis path.
      *
@@ -654,10 +645,10 @@ final class RuleRegistry
      * Runs all enabled file and project rules against parsed units.
      *
      * @param list<AnalysisUnit>      $units                           - Parsed units to analyse with file-scoped rules.
-     * @param RuleContext             $ruleContext                     - Rule execution context.
-     * @param list<AnalysisUnit>|null $projectUnits                    - Parsed units available to project-level rules.
+     * @param RuleContext             $ruleContext                     - Context passed through every file and project rule execution path.
+     * @param list<AnalysisUnit>|null $projectUnits                    - Separate project-rule units; null reuses $units for project analysis.
      * @param RuleRunnerObserver|null $ruleRunnerObserver              - Optional per-rule timing hook; default analyse runs leave this null.
-     * @param bool                    $shouldReleaseUnitsAfterAnalysis - Whether units can release AST contents after analysis.
+     * @param bool                    $shouldReleaseUnitsAfterAnalysis - Requests release when no separate project units or legacy rule needs them.
      *
      * @return list<Finding> - all per-unit, accumulator, and legacy project findings, deduped and in canonical report order
      */
@@ -712,10 +703,9 @@ final class RuleRegistry
     /**
      * Returns the enabled project rules that still need the full unit list.
      *
-     * @param RuleContext $ruleContext - Rule execution context.
+     * @param RuleContext $ruleContext - Supplies the config used to select rules without accumulator support.
      *
-     * @return list<ProjectRuleInterface> - enabled project rules lacking accumulator support, which must run with the full unit list; empty when all
-     *                                    stream
+     * @return list<ProjectRuleInterface> - Enabled project rules without accumulator support; empty when every project rule can stream.
      */
     private function legacyProjectRules(RuleContext $ruleContext): array
     {
@@ -734,10 +724,10 @@ final class RuleRegistry
      *
      * @param list<ProjectRuleInterface> $rules              - Project rules to run.
      * @param list<AnalysisUnit>         $contextUnits       - Candidate units available to project rules.
-     * @param RuleContext                $ruleContext        - Rule execution context.
+     * @param RuleContext                $ruleContext        - Context passed to each supplied project rule during analysis.
      * @param RuleRunnerObserver|null    $ruleRunnerObserver - Optional per-rule timing hook.
      *
-     * @return list<Finding> - findings from the supplied legacy project rules; empty when no parse-clean PHP units remain to analyse
+     * @return list<Finding> - findings from the supplied legacy project rules; empty when no parse-clean, unbounded PHP units remain eligible
      */
     private function runLegacyProjectRules(
         array               $rules,
@@ -752,7 +742,7 @@ final class RuleRegistry
                                                  && $analysisUnit->file->isPhp(),
                                          ));
 
-        // No parse-clean PHP units means the project rules have nothing to inspect.
+        // Without a parse-clean PHP unit eligible for deep analysis, project rules have nothing to inspect.
         if ($analyseableUnits === []) {
             return [];
         }
@@ -831,7 +821,6 @@ final class RuleRegistry
             }
 
             $priority = self::NAMING_RULE_PRIORITY[$finding->ruleId];
-            // Keep this finding only when its rule outranks the best seen for the identifier.
             if (!isset($bestByIdentifier[$key]) || $priority < $bestByIdentifier[$key]['priority']) {
                 $bestByIdentifier[$key] = ['index' => $index, 'priority' => $priority];
             }

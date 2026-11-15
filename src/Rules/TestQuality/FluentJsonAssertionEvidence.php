@@ -21,11 +21,11 @@ final class FluentJsonAssertionEvidence
     private const ASSERTABLE_JSON = 'illuminate\testing\fluent\assertablejson';
 
     /**
-     * Finds a fluent value check that the test actually executes.
+     * Finds a supported fluent value check within the test's own callable scope.
      *
-     * @param TestQualityScope $scope - Test method or Pest callback whose checks are evaluated.
+     * @param TestQualityScope $scope - Test method or Pest callback whose method calls are inspected.
      * @param AnalysisUnit     $unit  - Parsed declarations used to reject a local vendor-class replacement.
-     * @return bool - True when a supported check uses a still-bound vendor JSON builder.
+     * @return bool - True when a supported check's receiver resolves syntactically to the exact vendor fromArray factory.
      */
     public static function hasExpectation(TestQualityScope $scope, AnalysisUnit $unit): bool
     {
@@ -55,7 +55,7 @@ final class FluentJsonAssertionEvidence
      * @param Expr             $receiver - Receiver of the actual where check; chained checks retain their original root.
      * @param TestQualityScope $scope    - Owning body containing possible local assignments.
      * @param int              $before   - Source offset of the check; later assignments cannot establish this receiver.
-     * @return bool - True when the receiver originates from the exact vendor fromArray factory.
+     * @return bool - True when the receiver syntax traces to a fromArray call on the expected AssertableJson class name.
      */
     private static function isJsonReceiver(Expr $receiver, TestQualityScope $scope, int $before): bool
     {

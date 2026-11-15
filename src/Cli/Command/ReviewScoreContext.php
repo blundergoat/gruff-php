@@ -17,7 +17,7 @@ final readonly class ReviewScoreContext
      * Pairs the current composite with the denominator it was produced from.
      *
      * @param float|null $currentScore - Composite for the current run, or null when it evaluated nothing and has no score.
-     * @param int        $evaluatedFiles - Ratified denominator for the current run, reused to score the base side.
+     * @param int        $evaluatedFiles - Evaluated-file count for the current run, reused to score the base side.
      */
     public function __construct(
         public ?float $currentScore,

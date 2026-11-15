@@ -21,7 +21,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 final class MigrateConfigCommand extends Command
 {
     /**
-     * Declares the command's name, description, and the three options a user can pass.
+     * Declares the command's name, description, and user-facing options.
      *
      * @return void - Nothing; the command definition is registered on this instance as a side effect.
      */
@@ -36,12 +36,12 @@ final class MigrateConfigCommand extends Command
     }
 
     /**
-     * Reads the named config, rewrites it, and puts the result where the user asked.
+     * Reads the named config, reports migration changes, and writes the migrated text unless this is a dry run.
      *
-     * @param InputInterface  $input  - Console input; the `--config`, `--output`, and `--dry-run` options are read.
+     * @param InputInterface  $input  - Console input; the --config, --output, and --dry-run options are read.
      * @param OutputInterface $output - Console output; carries the change summary and any error.
      *
-     * @return int - Symfony exit code; SUCCESS after writing or a dry run, INVALID on a missing or refused path.
+     * @return int - SUCCESS after writing or a dry run, INVALID for a missing or refused path, or FAILURE when writing fails.
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
