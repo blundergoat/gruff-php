@@ -128,7 +128,7 @@ final class RuleRegressionSnapshotTest extends TestCase
 
 
         self::assertSame(
-            '9063c0e250507729f8c2205e39eabf16c0d732960a00b0fd5c4f225d626eea03',
+            'fbad4ebfe2de691443acfc89d53d5c0062c0e16941b5b4af29b285f7324028a7',
             hash('sha256', $json),
         );
     }

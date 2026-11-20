@@ -34,7 +34,7 @@ use PhpParser\Node\Stmt\Trait_;
 /**
  * Flags placeholder, wholly generic, and weak numbered names across declarations, parameters, properties, and eligible locals.
  * Callable-name exemptions leave parameters and locals checked; helper exemptions suppress only generic parameter findings.
- * Loop and callback exemptions depend on context and body size; vocabulary is configurable, with advisory severity and medium confidence.
+ * Loop and callback exemptions depend on context and body size; vocabulary is configurable, with advisory severity and low confidence.
  */
 final readonly class IdentifierQualityRule implements RuleInterface
 {
@@ -136,7 +136,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
             pillar:          Pillar::Naming,
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence:      Confidence::Medium,
+            confidence:      Confidence::Low,
             defaultOptions:  [
                 'placeholderNames' => self::DEFAULT_PLACEHOLDER_NAMES,
                 'genericTokens' => self::DEFAULT_GENERIC_TOKENS,

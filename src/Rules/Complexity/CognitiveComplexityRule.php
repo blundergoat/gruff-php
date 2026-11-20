@@ -58,8 +58,18 @@ final readonly class CognitiveComplexityRule implements RuleInterface
             pillar:            Pillar::Complexity,
             tier:              RuleTier::V01,
             defaultSeverity:   Severity::Error,
-            confidence:        Confidence::High,
+            confidence:        Confidence::Low,
             severityThreshold: new SeverityThreshold(20, Severity::Error),
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A series of shallow `if` checks for requirements, polyfills, or optional output can score high because each check adds to the function\'s total.',
+                    'mitigation' => 'Keep each check beside the action it controls so the full sequence can be read in execution order.',
+                ],
+                [
+                    'shape'      => 'A function with explicit branches for types, body modes, failure cases, or null comparisons can score high as branch points and nesting penalties add up.',
+                    'mitigation' => 'Keep parallel cases together and trace each branch to its outcome, including early `return` and `continue` paths.',
+                ],
+            ],
         );
     }
 

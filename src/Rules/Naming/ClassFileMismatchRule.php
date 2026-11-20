@@ -48,7 +48,17 @@ final readonly class ClassFileMismatchRule implements RuleInterface
             pillar:          Pillar::Naming,
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence:      Confidence::High,
+            confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A legacy class name can join directory names and the file stem with `_`, and the rule compares that entire declared name with the stem.',
+                    'mitigation' => 'Move the directory segments into a namespace, name the class after the file stem, and preserve the legacy name with `class_alias()` if callers still use it.',
+                ],
+                [
+                    'shape'      => 'A script, fixture, or type-assertion file can be reported when its stem matches `/^[A-Za-z_][A-Za-z0-9_]*$/` and its sole named class-like declaration has a different name.',
+                    'mitigation' => 'If the supporting type is shared, move it to a file whose stem matches its declared name and load it from the original role-based file.',
+                ],
+            ],
         );
     }
 

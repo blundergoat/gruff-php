@@ -31,7 +31,7 @@ use PhpParser\Node\Stmt\Trait_;
  * Blank lines and non-property statements end a run.
  *
  * Meaningful attached // or # comments count only with acceptLineComments enabled.
- * Advisory severity and medium confidence reflect team-dependent documentation needs.
+ * Advisory severity reflects team-dependent documentation needs; confidence is high from the rule's measured precision.
  */
 final readonly class MissingPropertyPhpdocRule implements RuleInterface
 {
@@ -56,7 +56,7 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
     /**
      * Describes the missing-property-PHPDoc rule for the registry and reports.
      *
-     * @return RuleDefinition - Rule metadata and defaults (advisory severity, medium confidence).
+     * @return RuleDefinition - Rule metadata and defaults (advisory severity, high confidence).
      */
     public function definition(): RuleDefinition
     {
@@ -67,7 +67,7 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
             pillar:             Pillar::Documentation,
             tier:               RuleTier::V01,
             defaultSeverity:    Severity::Advisory,
-            confidence:         Confidence::Medium,
+            confidence:         Confidence::High,
             defaultOptions:     ['acceptLineComments' => false],
             description:        'Requires declared properties to explain their purpose with PHPDoc, where a docblock above the first property of an unbroken run covers the run unless another property in it has its own; an opt-in toggle also accepts meaningful attached line comments.',
             optionDescriptions: [

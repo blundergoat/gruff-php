@@ -50,6 +50,46 @@ closures, and arrow functions.
 JSON, hook, and SARIF transport these fields. Text and Markdown keep their
 existing finding presentation in 0.5.2.
 
+## Confidence evidence
+
+A rule's confidence follows its measured precision: high at an error-adjusted score of 0.85 or more, medium from 0.70, low below, and a raise needs the lower bound of its 95% interval to clear the new band. These default-on rules have no measurement that sets their confidence, so the value below is inherited, not measured:
+
+| Rule | Confidence | Measurement |
+|---|---|---|
+| `dead-code.unused-private-constant` | high | insufficient |
+| `docs.missing-constant-phpdoc` | medium | insufficient |
+| `docs.missing-readme` | high | unmeasured |
+| `docs.missing-throws-tag` | medium | insufficient |
+| `docs.return-comment` | high | too-few |
+| `docs.todo-density` | high | insufficient |
+| `modernisation.readonly-property-candidate` | medium | insufficient |
+| `naming.test-naming-consistency` | high | insufficient |
+| `security.dependency-composer-script` | medium | unmeasured |
+| `security.extract-compact-user-input` | medium | unmeasured |
+| `security.permissive-cors` | medium | unmeasured |
+| `security.process-command-construction` | medium | insufficient |
+| `security.reflected-xss` | medium | insufficient |
+| `security.request-controlled-url` | medium | unmeasured |
+| `security.unsafe-archive-extraction` | medium | unmeasured |
+| `security.unsafe-xml-loading` | medium | unmeasured |
+| `sensitive-data.api-key-pattern` | high | too-few |
+| `sensitive-data.aws-access-key` | high | too-few |
+| `sensitive-data.gcp-service-account-key` | high | too-few |
+| `sensitive-data.jwt-token` | medium | too-few |
+| `sensitive-data.private-key` | high | too-few |
+| `test-quality.data-provider-annotation` | high | insufficient |
+| `test-quality.empty-data-provider` | high | insufficient |
+| `test-quality.mocking-domain-object` | low | unmeasured |
+| `test-quality.naming-consistency` | high | insufficient |
+| `test-quality.phpunit-coverage-source-missing` | medium | unmeasured |
+| `test-quality.phpunit-deprecations-not-fatal` | high | unmeasured |
+| `test-quality.phpunit-strict-flags-missing` | high | unmeasured |
+| `test-quality.private-reflection` | high | insufficient |
+| `test-quality.static-analysis-redundant-test` | high | unmeasured |
+| `test-quality.trivial-snapshot` | medium | unmeasured |
+| `waste.empty-method` | high | insufficient |
+| `waste.unused-import` | high | insufficient |
+
 ## Summary By Pillar
 
 | Pillar | Rules |
@@ -71,8 +111,8 @@ existing finding presentation in 0.5.2.
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
 | --- | --- | --- | --- | --- |
-| `complexity.cognitive` | Cognitive complexity | `error` | `high` | yes |
-| `complexity.cyclomatic` | Cyclomatic complexity | `warning` | `high` | yes |
+| `complexity.cognitive` | Cognitive complexity | `error` | `low` | yes |
+| `complexity.cyclomatic` | Cyclomatic complexity | `warning` | `medium` | yes |
 | `complexity.halstead-volume` | Halstead volume | `advisory` | `medium` | no |
 | `complexity.nesting-depth` | Maximum nesting depth | `error` | `high` | yes |
 
@@ -108,13 +148,13 @@ branchy `if` version of branchless arithmetic. An older version of the line belo
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
 | --- | --- | --- | --- | --- |
-| `docs.bare-phpdoc-tags` | Bare PHPDoc tags | `advisory` | `medium` | yes |
+| `docs.bare-phpdoc-tags` | Bare PHPDoc tags | `advisory` | `high` | yes |
 | `docs.missing-class-phpdoc` | Missing class PHPDoc | `advisory` | `high` | yes |
 | `docs.missing-constant-phpdoc` | Missing constant PHPDoc | `advisory` | `medium` | yes |
 | `docs.missing-file-phpdoc` | Missing file PHPDoc | `advisory` | `medium` | yes |
 | `docs.missing-param-tag` | Missing @param tag | `advisory` | `high` | yes |
 | `docs.missing-phpdoc` | Missing method PHPDoc | `error` | `high` | yes |
-| `docs.missing-property-phpdoc` | Missing property PHPDoc | `advisory` | `medium` | yes |
+| `docs.missing-property-phpdoc` | Missing property PHPDoc | `advisory` | `high` | yes |
 | `docs.missing-readme` | Missing README | `warning` | `high` | yes |
 | `docs.missing-return-tag` | Missing @return tag | `advisory` | `high` | yes |
 | `docs.missing-throws-tag` | Missing @throws tag | `advisory` | `medium` | yes |
@@ -176,7 +216,7 @@ run. The default is false, so a docblock is required.
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
 | --- | --- | --- | --- | --- |
-| `complexity.maintainability-index` | Maintainability index | `advisory` | `medium` | yes |
+| `complexity.maintainability-index` | Maintainability index | `advisory` | `low` | yes |
 
 An exact same-class named callback is also a contract boundary. The rule
 recognises PHP first-class callable syntax and two-element callable arrays whose
@@ -231,9 +271,9 @@ is a deliberate lifecycle or integration contract.
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
 | --- | --- | --- | --- | --- |
 | `naming.abbreviation-allowlist` | Abbreviation allowlist | `advisory` | `high` | yes |
-| `naming.class-file-mismatch` | Class/file name mismatch | `warning` | `high` | yes |
+| `naming.class-file-mismatch` | Class/file name mismatch | `warning` | `medium` | yes |
 | `naming.confusing-name` | Confusing standalone class name | `advisory` | `medium` | yes |
-| `naming.identifier-quality` | Identifier quality | `advisory` | `medium` | yes |
+| `naming.identifier-quality` | Identifier quality | `advisory` | `low` | yes |
 | `naming.short-variable` | Short variable name | `advisory` | `high` | yes |
 | `naming.test-naming-consistency` | Test method naming consistency | `advisory` | `high` | yes |
 
@@ -290,7 +330,7 @@ still fire.
 | `security.dependency-composer-script` | Composer install-time shell script | `warning` | `medium` | yes |
 | `security.dependency-composer-vcs` | Composer VCS repository | `warning` | `medium` | no |
 | `security.disabled-ssl-verification` | Disabled SSL verification | `warning` | `high` | no |
-| `security.error-suppression` | Error suppression operator | `warning` | `high` | yes |
+| `security.error-suppression` | Error suppression operator | `warning` | `medium` | yes |
 | `security.extract-compact-user-input` | extract or compact on request data | `warning` | `medium` | yes |
 | `security.header-injection` | Header injection risk | `warning` | `medium` | no |
 | `security.permissive-cors` | Permissive CORS with credentials | `warning` | `medium` | yes |

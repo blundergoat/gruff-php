@@ -83,8 +83,18 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
             pillar:            Pillar::Complexity,
             tier:              RuleTier::V01,
             defaultSeverity:   Severity::Warning,
-            confidence:        Confidence::High,
+            confidence:        Confidence::Medium,
             severityThreshold: new SeverityThreshold(20, Severity::Warning),
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A sequence of independent `if` checks for options, fallbacks, validation, or cleanup can score high because each check and any enclosing loop adds a decision.',
+                    'mitigation' => 'Keep each check beside the action or diagnostic it controls so each path can be verified in execution order.',
+                ],
+                [
+                    'shape'      => 'A validator can exceed the cyclomatic complexity threshold through a series of independent `if` checks, each with a clear diagnostic.',
+                    'mitigation' => 'For adjacent checks that use the same lower-bound comparison, put each value, minimum, and diagnostic in an ordered array and apply the comparison in one `foreach` loop.',
+                ],
+            ],
         );
     }
 

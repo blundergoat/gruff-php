@@ -51,7 +51,7 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
             pillar:            Pillar::Maintainability,
             tier:              RuleTier::V01,
             defaultSeverity:   Severity::Advisory,
-            confidence:        Confidence::Medium,
+            confidence:        Confidence::Low,
             severityThreshold: new SeverityThreshold(35, Severity::Advisory),
             falsePositiveShapes: [
                 [

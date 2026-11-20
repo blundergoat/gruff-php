@@ -37,7 +37,7 @@
     },
     "score": {
         "composite": {
-            "score": 85.68,
+            "score": 85.72,
             "grade": "B"
         },
         "clusters": [],
@@ -50,12 +50,12 @@
             {
                 "ruleId": "naming.class-file-mismatch",
                 "findings": 1,
-                "weight": 4
+                "weight": 3
             },
             {
                 "ruleId": "naming.identifier-quality",
                 "findings": 1,
-                "weight": 0.75
+                "weight": 0.5
             },
             {
                 "ruleId": "size.file-length",
@@ -124,13 +124,13 @@
             {
                 "pillar": "naming",
                 "applicable": true,
-                "score": 51.03,
+                "score": 51.39,
                 "grade": "F",
                 "findings": 2,
                 "advisory": 1,
                 "warning": 1,
                 "error": 0,
-                "penalty": 4.75
+                "penalty": 3.5
             },
             {
                 "pillar": "documentation",
@@ -191,13 +191,13 @@
         "topOffenders": [
             {
                 "file": "tests/Fixtures/Source/mixed/alpha.php",
-                "score": 50.51,
+                "score": 50.58,
                 "grade": "F",
                 "findings": 4,
                 "advisory": 2,
                 "warning": 2,
                 "error": 0,
-                "penalty": 9.75,
+                "penalty": 8.5,
                 "maxLines": 11
             }
         ],
@@ -244,7 +244,7 @@
             "pillar": "naming",
             "secondaryPillars": [],
             "tier": "v0.1",
-            "confidence": "high",
+            "confidence": "medium",
             "remediation": "Rename the file to Alpha.php so it matches the class it declares.",
             "fingerprint": "3b9c556468b6bc15",
             "stableIdentity": "106e7b2df944f9fd",
@@ -280,7 +280,7 @@
             "pillar": "naming",
             "secondaryPillars": [],
             "tier": "v0.1",
-            "confidence": "medium",
+            "confidence": "low",
             "remediation": "Rename the identifier to describe its domain role or action. If the name is intentional, add it to `rules.naming.identifier-quality.options.ignoredNames` in `.gruff-php.yaml`, or remove the token from `placeholderNames` or `genericTokens` when your project does not treat it as a placeholder.",
             "fingerprint": "25633f1c266ca38f",
             "stableIdentity": "f726935116318593",

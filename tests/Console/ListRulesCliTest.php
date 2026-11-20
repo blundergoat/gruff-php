@@ -186,7 +186,7 @@ final class ListRulesCliTest extends CliTestCase
         self::assertSame(0, $exitCode, $process->getErrorOutput());
 
         self::assertCount(84, $rules);
-        self::assertCount(41, $mediumOrLowRules);
+        self::assertCount(43, $mediumOrLowRules);
         self::assertSame([], $withoutGuidance);
         self::assertSame([], $blankGuidance);
         self::assertNotEmpty($shapelessRules);

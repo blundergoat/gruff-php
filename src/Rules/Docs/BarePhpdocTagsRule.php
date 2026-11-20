@@ -22,7 +22,7 @@ use PhpParser\Node\Stmt\Function_;
  * Flags methods and named functions whose PHPDoc contains only bare param/return tags, with no descriptive prose.
  * A block qualifies when every non-empty content line is such a tag and none has a description.
  *
- * Closures are not scanned; an advisory at medium confidence allows for deliberately type-only documentation.
+ * Closures are not scanned; the rule stays advisory because type-only documentation can be deliberate.
  */
 final readonly class BarePhpdocTagsRule implements RuleInterface
 {
@@ -34,11 +34,11 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
     /**
      * Describes the bare-PHPDoc-tag rule for the registry and reports.
      *
-     * @return RuleDefinition - Rule metadata and defaults (advisory severity, medium confidence).
+     * @return RuleDefinition - Rule metadata and defaults (advisory severity, high confidence).
      */
     public function definition(): RuleDefinition
     {
-        // Advisory at medium confidence: a tags-only docblock can be deliberate on a trivial unit, so this nudges
+        // Advisory: a tags-only docblock can be deliberate on a trivial unit, so this nudges
         // toward describing intent rather than gating a build.
         return new RuleDefinition(
             id:                  self::ID,
@@ -46,7 +46,7 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
             pillar:              Pillar::Documentation,
             tier:                RuleTier::V01,
             defaultSeverity:     Severity::Advisory,
-            confidence:          Confidence::Medium,
+            confidence:          Confidence::High,
             falsePositiveShapes: [
                 [
                     'shape' => 'A docblock that exists only to carry precise @param/@return types a static analyser requires, with no prose anywhere.',
