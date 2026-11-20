@@ -14,9 +14,8 @@ use Symfony\Component\Console\Output\OutputInterface;
 /**
  * Backs the `gruff-php dashboard` command - the interactive browser UI for analysis.
  *
- * Validates the user's launch flags (project root, host, port, scan timeout, config and baseline
- * options), then starts a local HTTP server they drive from a browser: pick paths and options in a
- * form, hit scan, read the rendered report. The interactive alternative to one-shot `analyse`.
+ * Validates the initial project root, port, and scan timeout before starting the HTTP server.
+ * Passes the remaining launch options to the dashboard request context for browser-driven scans.
  */
 final class DashboardCommand extends Command
 {
@@ -31,9 +30,9 @@ final class DashboardCommand extends Command
     private const DEFAULT_PORT = 8765;
 
     /**
-     * Registers the dashboard command's flags and help - everything the user types after `gruff-php dashboard`.
+     * Registers the paths argument, dashboard-specific options, and help text for gruff-php dashboard.
      *
-     * @return void
+     * @return void - Configures the dashboard arguments, options, and help text.
      */
     protected function configure(): void
     {
@@ -49,6 +48,7 @@ final class DashboardCommand extends Command
             ->addOption('fail-on', null, InputOption::VALUE_REQUIRED, 'Finding severity that fails the scan: advisory, warning, error, or none.', default: 'none')
             ->addOption('config', null, InputOption::VALUE_REQUIRED, 'Initial gruff YAML config path (.yaml or .yml).')
             ->addOption('no-config', null, InputOption::VALUE_NONE, 'Skip auto-applying the default .gruff-php.yaml file for dashboard scans.')
+            ->addOption('deep-scan-budget', null, InputOption::VALUE_REQUIRED, 'Bound structural analysis as <lines>:<bytes>, or disable it with off.')
             ->addOption('diff', null, InputOption::VALUE_NONE, 'Start the dashboard in diff-only scan mode.')
             ->addOption(
                 'baseline',
@@ -66,7 +66,7 @@ final class DashboardCommand extends Command
      * @param InputInterface  $input  - Parsed dashboard arguments and options: paths, host, port, and scan flags.
      * @param OutputInterface $output - Destination for validation error messages shown before the server starts.
      *
-     * @return int - Symfony command exit code.
+     * @return int - Validation failure status, or the dashboard server's exit status after startup.
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
@@ -82,7 +82,7 @@ final class DashboardCommand extends Command
         $dashboardStateFactory = new DashboardStateFactory();
         $projectRoot           = $dashboardStateFactory->initialProjectRoot($input, $cwd);
 
-        // The user pointed --project at something that isn't a real directory: reject as misconfiguration.
+
         if ($projectRoot === null) {
             $output->writeln('<error>Initial --project/--project-root must resolve to an existing directory.</error>');
 
@@ -91,14 +91,14 @@ final class DashboardCommand extends Command
 
         $port = $this->port($input, $output);
 
-        // --port wasn't a valid 1-65535 number (port() already said why): stop as invalid usage.
+
         if ($port === false) {
             return Command::INVALID;
         }
 
         $scanTimeout = $this->scanTimeout($input, $output);
 
-        // --scan-timeout wasn't a non-negative integer (scanTimeout() already said why): stop as invalid usage.
+
         if ($scanTimeout === false) {
             return Command::INVALID;
         }
@@ -111,7 +111,7 @@ final class DashboardCommand extends Command
             explicitConfigPath: $dashboardStateFactory->optionalStringOption($input, 'config'),
             shouldSkipConfig:   (bool) $input->getOption('no-config'),
         );
-        // The first-run "create a config?" prompt handled the user itself, so return whatever it decided.
+
         if ($promptExitCode !== null) {
             return $promptExitCode;
         }
@@ -124,18 +124,18 @@ final class DashboardCommand extends Command
     }
 
     /**
-     * Validates the `--port` option, returning false (after a message) when it isn't a bindable port.
+     * Validates that `--port` is a decimal integer in the range 1-65535, reporting invalid input.
      *
      * @param InputInterface  $input  - Source of the raw --port option, expected to be a digit string.
-     * @param OutputInterface $output - Destination for the validation error shown when the port is out of range.
+     * @param OutputInterface $output - Destination for errors about the option's syntax or range.
      *
-     * @return int|false - Valid port; false when `--port` wasn't a bindable 1-65535 integer (the reason is already printed).
+     * @return int|false - Port number in range, or false after reporting invalid input; availability is not checked.
      */
     private function port(InputInterface $input, OutputInterface $output): int|false
     {
         $rawPort = $input->getOption('port');
 
-        // A non-digit --port (e.g. `--port=abc`) can't be a TCP port, so reject it rather than coerce it to 0.
+
         if (!is_string($rawPort) || !ctype_digit($rawPort)) {
             $output->writeln('<error>--port must be an integer from 1 to 65535.</error>');
 
@@ -144,7 +144,7 @@ final class DashboardCommand extends Command
 
         $port = (int) $rawPort;
 
-        // Ports outside 1-65535 can't be bound, so reject now instead of letting the bind fail later.
+
         if ($port < 1 || $port > 65535) {
             $output->writeln('<error>--port must be an integer from 1 to 65535.</error>');
 
@@ -166,7 +166,7 @@ final class DashboardCommand extends Command
     {
         $rawTimeout = $input->getOption('scan-timeout');
 
-        // A non-digit --scan-timeout can't be a timeout, so flag it invalid, distinct from the 0 "disable" value.
+
         if (!is_string($rawTimeout) || !ctype_digit($rawTimeout)) {
             $output->writeln('<error>--scan-timeout must be a non-negative integer.</error>');
 
@@ -186,7 +186,7 @@ final class DashboardCommand extends Command
      */
     private function gruffBinary(): string
     {
-        // Resolve the binary relative to this file so child scans use this package's gruff-php, not one on PATH.
+
         return dirname(__DIR__, 3) . '/bin/gruff-php';
     }
 }

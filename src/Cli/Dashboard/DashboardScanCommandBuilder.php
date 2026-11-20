@@ -42,11 +42,11 @@ final readonly class DashboardScanCommandBuilder
         // Tokenise into quoted paths (group 1, for names with spaces) or bare paths (group 2).
         preg_match_all('/"((?:\\\\.|[^"\\\\])*)"|(\S+)/', $paths, $matches, PREG_SET_ORDER);
 
-        // Walk each token the form supplied, unwrapping quoted paths back into plain filesystem paths.
+
         foreach ($matches as $match) {
             $quotedPath = $match[1] ?? '';
             $path       = $quotedPath !== '' ? $this->unescapeQuotedPath($quotedPath) : ($match[2] ?? '');
-            // Drop empty tokens so a stray space can't smuggle a phantom path into the scan.
+
             if ($path !== '') {
                 $parsedPaths[] = $path;
             }
@@ -57,14 +57,15 @@ final readonly class DashboardScanCommandBuilder
     }
 
     /**
-     * Undoes only the \" and \\ escapes the dashboard tokenizer added, leaving the real path untouched.
+     * Decodes escaped double quotes and backslashes inside a quoted path, leaving other backslashes intact.
      *
      * @param string $quotedPath - Raw inner text of a double-quoted token, still carrying \" and \\ escapes.
      *
-     * @return string - decoded path with the wrapper \" and \\ escapes resolved; inner content otherwise untouched
+     * @return string - Path with escaped double quotes and backslashes decoded; unchanged if replacement fails.
      */
     private function unescapeQuotedPath(string $quotedPath): string
     {
+        // Drop the backslash from each \" or \\ escape; a backslash before any other character stays.
         $unescapedPath = preg_replace('/\\\\(["\\\\])/', '$1', $quotedPath);
 
         // preg_replace returns null only on engine error; fall back to the input so a path is always produced.
@@ -72,13 +73,13 @@ final readonly class DashboardScanCommandBuilder
     }
 
     /**
-     * Assembles the full analyse argv from the user's sanitised dashboard form choices.
+     * Builds analyse argv for an HTML report, passing path operands after the -- separator.
      *
-     * @param list<string>          $paths - Source paths selected in the dashboard form; appended after `--`.
-     * @param array<string, string> $state - Sanitised dashboard form state used to build analyse flags.
+     * @param list<string>          $paths - Source paths selected in the dashboard form; appended after the -- separator.
+     * @param array<string, string> $state - Dashboard form values used to select flags and option arguments.
      *
      * @phpstan-param array{project: string, paths: string, scanScope: string, failOn: string, config: string, baseline: string, noBaseline: string,
-     *                noConfig: string, includeIgnored: string, reportInteractive: string} $state
+     *                noConfig: string, deepScanBudget: string, includeIgnored: string, reportInteractive: string} $state - Dashboard form fields.
      *
      * @return list<string> - full argv for the analyse run: PHP binary, gruff binary, flags, then path operands after the -- separator
      */
@@ -86,7 +87,7 @@ final readonly class DashboardScanCommandBuilder
     {
         $command = [PHP_BINARY, $this->gruffBinary, 'analyse', '--format', 'html', '--fail-on', $state['failOn']];
 
-        // Config choice: honour the user's "no config" toggle first, else pass any explicit non-default config file.
+
         if ($state['noConfig'] === '1') {
             $command[] = '--no-config';
         } elseif ($state['config'] !== '' && $state['config'] !== ConfigLoader::DEFAULT_CONFIG_FILE) {
@@ -94,7 +95,12 @@ final readonly class DashboardScanCommandBuilder
             $command[] = $state['config'];
         }
 
-        // Baseline choice: skip the baseline entirely, or point the scan at the baseline file the user named.
+        if ($state['deepScanBudget'] !== '') {
+            $command[] = '--deep-scan-budget';
+            $command[] = $state['deepScanBudget'];
+        }
+
+
         if ($state['noBaseline'] === '1') {
             $command[] = '--no-baseline';
         } elseif ($state['baseline'] !== '') {
@@ -102,22 +108,22 @@ final readonly class DashboardScanCommandBuilder
             $command[] = $state['baseline'];
         }
 
-        // The user ticked "include ignored files", so widen the scan past the usual ignore rules.
+
         if ($state['includeIgnored'] === '1') {
             $command[] = '--include-ignored';
         }
 
-        // The user asked for the interactive HTML report instead of the plain static one.
+
         if ($state['reportInteractive'] === '1') {
             $command[] = '--report-interactive';
         }
 
-        // Scope set to "diff": scan only what changed rather than the whole project.
+
         if ($state['scanScope'] === 'diff') {
             $command[] = '--diff';
         }
 
-        // Everything after `--` is a path operand, so user paths can never be mistaken for flags.
+        // Everything after the -- separator is a path operand, so user paths can never be mistaken for flags.
         $command[] = '--';
         array_push($command, ...$paths);
 

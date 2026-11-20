@@ -14,12 +14,13 @@ use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
+use GruffPhp\Rules\Size\SubstantiveLineCounter;
 use PhpParser\Node\Stmt;
 
 /**
- * Flags a PHPUnit `setUp()` that is both over the line cap and longer than the class's average test method
- * - shared setup heavy enough that each test's real intent is hidden behind it. Runs per test class; the
- * minimum-lines cap is tunable. Advisory, medium confidence - a heavy setUp is sometimes deliberate.
+ * Flags a PHPUnit setUp() whose substantive line count reaches the configured minimum and exceeds
+ * the class's average test-method length. Runs per class with at least one recognised test method.
+ * Advisory, medium confidence: a large shared fixture can be deliberate.
  */
 final readonly class SetupBloatRule implements RuleInterface
 {
@@ -31,11 +32,11 @@ final readonly class SetupBloatRule implements RuleInterface
     /**
      * Describes the setup-bloat rule for the registry and reports.
      *
-     * @return RuleDefinition - Rule metadata and defaults.
+     * @return RuleDefinition - Setup-bloat metadata with advisory severity, medium confidence, and the default setup-line threshold.
      */
     public function definition(): RuleDefinition
     {
-        // Advisory at medium confidence: a heavy setUp may be deliberate, so this nudges rather than gates.
+        // A heavy setUp may be deliberate, so the rule defaults to a medium-confidence advisory.
         return new RuleDefinition(
             id:                self::ID,
             name:              'Setup bloat',
@@ -44,14 +45,20 @@ final readonly class SetupBloatRule implements RuleInterface
             defaultSeverity:   Severity::Advisory,
             confidence:        Confidence::Medium,
             defaultThresholds: ['minSetupLines' => 8],
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A class of short, focused tests over one expensive fixture, where the setUp is long only because the tests are deliberately small.',
+                    'mitigation' => 'The comparison is against the class\'s average test length, so a suite of one-line tests trips it; raise this rule\'s minSetupLines threshold.',
+                ],
+            ],
         );
     }
 
     /**
-     * Reports setUp() methods that are longer than the average test method.
+     * Reports setUp() methods at or above the minimum length and longer than the class's average test.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext - Supplies the minSetupLines threshold.
      *
      * @return list<Finding> - Findings for oversized setup methods.
      */
@@ -61,33 +68,34 @@ final readonly class SetupBloatRule implements RuleInterface
         $minSetupLines = (int) $ruleContext->settingsFor($definition)->numericThreshold('minSetupLines');
         $findings      = [];
 
-        // Weigh every test class in the file.
+
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Class_::class) as $class) {
             $setup          = null;
             $testLineCounts = [];
 
-            // Find the setUp() method and measure each test method's length.
+
             foreach ($class->getMethods() as $method) {
-                // The setUp() method is the shared fixture under scrutiny.
+
                 if ($method->name->toString() === 'setUp') {
                     $setup = $method;
                     continue;
                 }
 
-                // Record the span of each real test method for the average.
+
                 if (TestQualityNodeHelper::isTestMethod($method)) {
-                    $testLineCounts[] = max(1, $method->getEndLine() - $method->getStartLine() + 1);
+                    $testLineCounts[] = max(1, SubstantiveLineCounter::countRange($analysisUnit, $method->getStartLine(), $method->getEndLine()));
                 }
             }
 
-            // Need both a setUp() and at least one test to compare against.
+
             if (!$setup instanceof Stmt\ClassMethod || $testLineCounts === []) {
                 continue;
             }
 
-            $setupLines       = max(1, $setup->getEndLine() - $setup->getStartLine() + 1);
+            // Code lines only (FAMILY-CONTRACT section 12): comments, attributes and blank lines are free on both sides.
+            $setupLines       = max(1, SubstantiveLineCounter::countRange($analysisUnit, $setup->getStartLine(), $setup->getEndLine()));
             $averageTestLines = array_sum($testLineCounts) / count($testLineCounts);
-            // Only flag a setUp() that is over the cap and longer than the typical test.
+
             if ($setupLines < $minSetupLines || $setupLines <= $averageTestLines) {
                 continue;
             }

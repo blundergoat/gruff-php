@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\Security;
 
-use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Config\ConfigLoader;
 use GruffPhp\Results\Finding\Confidence;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Pillar;
@@ -20,6 +20,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * Covers the syntax-only framework-misconfiguration security rules:
  * permissive CORS (wildcard origin + credentials) and forced error display.
+ * Guard fixtures distinguish accepted suppressions from look-alike conditions.
  */
 final class FrameworkSecurityRulesTest extends TestCase
 {
@@ -29,13 +30,16 @@ final class FrameworkSecurityRulesTest extends TestCase
     /** Fixture with unsafe CORS and debug-mode toggles. */
     private const MISCONFIG_FIXTURE = 'tests/Fixtures/Security/framework-misconfig.php';
 
+    /** Fixture with guarded display toggles and their look-alikes. */
+    private const DEBUG_GUARDS_FIXTURE = 'tests/Fixtures/Security/debug-mode-guards.php';
+
     /** Fixture with only safe CORS postures. */
     private const CORS_SAFE_FIXTURE = 'tests/Fixtures/Security/framework-cors-safe.php';
 
     /**
      * Verify wildcard CORS plus credentials in one scope fires once.
      *
-     * @return void
+     * @return void - Asserts one warning with security pillar and medium confidence.
      */
     public function testWildcardCorsWithCredentialsDetected(): void
     {
@@ -50,7 +54,7 @@ final class FrameworkSecurityRulesTest extends TestCase
     /**
      * Verify a wildcard origin and credentials in different scopes do not fire.
      *
-     * @return void
+     * @return void - Asserts no permissive-CORS findings for the safe fixture.
      */
     public function testScopedAndPublicCorsDoNotFire(): void
     {
@@ -58,9 +62,9 @@ final class FrameworkSecurityRulesTest extends TestCase
     }
 
     /**
-     * Verify only truthy display-error toggles fire.
+     * Verify the fixture reports both error-display directives.
      *
-     * @return void
+     * @return void - Asserts two findings covering display_errors and display_startup_errors.
      */
     public function testForcedErrorDisplayDetected(): void
     {
@@ -74,9 +78,25 @@ final class FrameworkSecurityRulesTest extends TestCase
     }
 
     /**
+     * Verify recognised SAPI and opt-in constant guards suppress error-display findings in the fixture.
+     * Unguarded and unsupported guard cases retain their expected finding locations.
+     *
+     * @return void - Asserts the exact ordered finding locations in the guard fixture.
+     */
+    public function testGuardedErrorDisplayStaysQuiet(): void
+    {
+        $findings = $this->findingsForRule(self::DEBUG_GUARDS_FIXTURE, DebugModeEnabledRule::ID);
+
+        self::assertSame(
+            [51, 65, 79, 93, 133, 147, 159, 171, 184, 199, 211],
+            array_map(static fn(Finding $finding): ?int => $finding->line, $findings),
+        );
+    }
+
+    /**
      * Analyse a fixture and return findings for one rule.
      *
-     * @param string $displayPath - Fixture display path.
+     * @param string $displayPath - Fixture path used for source loading and finding display.
      * @param string $ruleId - Rule identifier to filter for.
      *
      * @return list<Finding> - findings emitted by the named rule for the fixture; empty when the rule did not fire
@@ -89,7 +109,9 @@ final class FrameworkSecurityRulesTest extends TestCase
                                                      SourceFile::TYPE_PHP,
                                                  ));
         $registry = RuleRegistry::defaults();
-        $findings = $registry->analyse([$unit], new RuleContext(self::PROJECT_ROOT, AnalysisConfig::fromRegistry($registry)));
+        // debug-mode-enabled is opt-in, so the test config turns it on.
+        $config   = (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/enable-default-off-rules.yaml', $registry);
+        $findings = $registry->analyse([$unit], new RuleContext(self::PROJECT_ROOT, $config));
 
         return array_values(array_filter($findings, static fn(Finding $finding): bool => $finding->ruleId === $ruleId));
     }

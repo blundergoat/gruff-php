@@ -10,14 +10,13 @@ use GruffPhp\Results\Finding\Pillar;
 use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
+use GruffPhp\Rules\Naming\IdentifierTokenizer;
 
 /**
- * Shared string and finding helpers the sensitive-data scanners lean on - comment-range lookup,
- * offset-to-line conversion, value redaction, dummy/placeholder detection, path classification, Shannon
- * entropy, and a common finding builder.
+ * Shared detector utilities turn matched source into safe, consistently located sensitive findings.
  *
- * Centralising these keeps every secret scanner redacting, skipping comments, and scoring entropy the same
- * way. Pure static utility; the only state is a per-unit comment-range cache keyed by display path.
+ * Scanners use them for comment ranges, line lookup, fixed markers, placeholder checks, paths, and finding construction.
+ * The helpers are static and side-effect free except for an immutable per-file comment-range cache.
  */
 final class SecretScannerHelper
 {
@@ -29,13 +28,13 @@ final class SecretScannerHelper
     private static array $commentRangeCache = [];
 
     /**
-     * Lists the key-name fragments every scanner treats as secret context.
+     * Lists the key-name fragments used by hasSensitiveContext().
      *
-     * @return list<string> - upper-cased key-name fragments shared by every scanner as secret context
+     * @return list<string> - Uppercase substrings used for case-insensitive secret-context checks.
      */
     public static function sensitiveKeyFragments(): array
     {
-        // The shared allowlist of key-name fragments every scanner treats as secret-context; edit here to widen all.
+
         return ['API_KEY', 'KEY', 'PASSWORD', 'PASS', 'SECRET', 'TOKEN', 'PRIVATE'];
     }
 
@@ -51,23 +50,17 @@ final class SecretScannerHelper
         $cacheKey = $analysisUnit->file->displayPath;
 
         if (isset(self::$commentRangeCache[$cacheKey])) {
-            // Reuse the per-unit scan; ranges are immutable for a given source, so recomputing would only cost time.
             return self::$commentRangeCache[$cacheKey];
         }
 
         $ranges = [];
 
-        // Record the byte span of every comment token in the unit.
         foreach ($analysisUnit->tokens as $token) {
-            // Both line comments and doc comments count as comment spans.
             if ($token->id === T_COMMENT || $token->id === T_DOC_COMMENT) {
                 $ranges[] = [$token->pos, $token->getEndPos()];
             }
         }
 
-        // Comment token spans never change once a source is parsed, so memoise the computed ranges in
-        // $commentRangeCache keyed by $cacheKey; a repeat commentRanges() call for the same unit returns the
-        // cached list instead of re-walking the whole token stream.
         return self::$commentRangeCache[$cacheKey] = $ranges;
     }
 
@@ -81,15 +74,15 @@ final class SecretScannerHelper
      */
     public static function isInsideComment(int $offset, array $ranges): bool
     {
-        // Test the offset against each comment span.
+
         foreach ($ranges as [$start, $end]) {
             if ($offset >= $start && $offset < $end) {
-                // Half-open interval: the match starts inside this comment span, so the caller must skip it.
+
                 return true;
             }
         }
 
-        // Offset sits in no comment span, so it is live source the caller should keep scanning.
+
         return false;
     }
 
@@ -103,91 +96,168 @@ final class SecretScannerHelper
      */
     public static function lineNumberForOffset(string $source, int $offset): int
     {
-        // Newlines before the offset, plus one, give the 1-based line findings and editors expect.
+
         return substr_count(substr($source, 0, $offset), "\n") + 1;
     }
 
     /**
-     * Builds a redacted preview of a secret value (length only, or first 4 + last 4 chars over 8 chars).
+     * Prefixes that identify placeholder-like tokens in the dummy-value heuristic.
      *
-     * @param string $secretValue - Sensitive value to redact for reporting.
-     *
-     * @return string - redacted preview (length marker, or first/last 4 chars) safe to embed in findings and reports
+     * @var list<string> - Lowercase prefixes checked against token starts.
      */
-    public static function redactedPreview(string $secretValue): string
+    private const PLACEHOLDER_WORDS = ['changeme', 'dummy', 'example', 'fake', 'placeholder', 'redacted', 'sample', 'test'];
+
+    /**
+     * The seventeen marker categories FAMILY-CONTRACT.md section 5 ratifies. Nothing outside this list can reach a
+     * marker, so a detector name the family never ratified degrades to the bare marker instead of inventing one.
+     *
+     * @var list<string> - Categories accepted by categoryMarker().
+     */
+    private const RATIFIED_MARKER_CATEGORIES = [
+        'private-key', 'jwt', 'aws-access-key', 'github-token', 'slack-token', 'stripe-live-key', 'google-api-key',
+        'anthropic-api-key', 'npm-token', 'gitlab-token', 'gcp-service-account', 'email', 'phone', 'payment-card',
+        'ssn', 'medicare', 'mrn',
+    ];
+
+    /**
+     * Returns the bare zero-payload marker, shown when a detector classified nothing more specific.
+     * A provider pattern with no ratified category, or a malformed connection scheme, falls back to it: neither names a class the user can act on.
+     *
+     * @return string - non-empty classification-only marker with no value-derived characters or length
+     */
+    public static function fixedSecretMarker(): string
     {
-        $length = strlen($secretValue);
-        if ($length <= 8) {
-            // Too short to show any edge without leaking most of it, so disclose only the length.
-            return sprintf('<redacted:%d chars>', $length);
+        return '[redacted]';
+    }
+
+    /**
+     * Returns the most specific marker for a classified match, unconditionally.
+     *
+     * @param string|null $category - Ratified category the detector classified; null or an unratified name yields the bare marker.
+     *
+     * @return string - [redacted:<category>] for a ratified category; [redacted] otherwise
+     */
+    public static function categoryMarker(?string $category): string
+    {
+        // An unratified name would put this port outside the closed family grammar, so it degrades rather than invents.
+        if ($category === null || !in_array($category, self::RATIFIED_MARKER_CATEGORIES, true)) {
+            return self::fixedSecretMarker();
         }
 
-        // Show only the first and last 4 chars: enough to recognise the value, never enough to reconstruct it.
-        return sprintf('%s...%s (redacted, %d chars)', substr($secretValue, 0, 4), substr($secretValue, -4), $length);
+        return sprintf('[redacted:%s]', $category);
     }
 
     /**
-     * Builds a `KEY=<redacted:N chars>` string for env-style secret findings.
+     * Returns a connection marker containing the lowercased scheme accepted by the calling detector.
      *
-     * @param string $key - Environment-style key name.
-     * @param string $secretValue - Sensitive value associated with the key.
+     * @param string $scheme - URL scheme captured by a detector; callers must restrict it to supported schemes.
      *
-     * @return string - `KEY=<redacted:N chars>` with the key kept visible and only the value's byte length disclosed
+     * @return string - [redacted:connection-string:<scheme>], or the bare marker when the scheme is malformed
      */
-    public static function redactedKeyValue(string $key, string $secretValue): string
+    public static function connectionStringMarker(string $scheme): string
     {
-        // Keep the key visible for context but disclose only the value's length, never any of its bytes.
-        return sprintf('%s=<redacted:%d chars>', $key, strlen($secretValue));
+        $normalised = strtolower($scheme);
+
+        // A scheme outside the shape the grammar allows would leak whatever the pattern happened to capture.
+        if (preg_match('/^[a-z][a-z0-9+.-]*$/', $normalised) !== 1) {
+            return self::fixedSecretMarker();
+        }
+
+        return sprintf('[redacted:connection-string:%s]', $normalised);
     }
 
     /**
-     * Reports whether a value looks like a placeholder rather than a real secret (changeme / dummy / etc.).
+     * SHA-256 digests of the 20 values vendors publish as documentation samples, so code that pastes one from a README never reports.
      *
-     * @param string $secretValue - Candidate sensitive value.
+     * They cover AWS and jwt.io examples, fourteen published test cards and Google's reCAPTCHA v2 test site key.
+     * Digests keep the literals out of this source (FAMILY-CONTRACT.md section 5).
      *
-     * @return bool - true when the value is empty, low-cardinality, or a placeholder, so the caller suppresses it
+     * @var list<string> - SHA-256 digests compared with the complete candidate value.
      */
-    public static function isLikelyDummyValue(string $secretValue): bool
+    private const DOCUMENTED_SAMPLE_DIGESTS = [
+        '03b970ed8171d73b58bbc9a5c72e3e4eec28503b56b3bb400a0801857dd45614',
+        '19ff47cc8024c133d5845d3f8938caca289929031e7d508c3adf7adff177f0c2',
+        '1a5d44a2dca19669d72edf4c4f1c27c4c1ca4b4408fbb17f6ce4ad452d78ddb3',
+        '1c9d38ed26cd808fa3b02b9b3b988a7caf474e2e42d95789c0fe07e267c80d8f',
+        '2f725bbd1f405a1ed0336abaf85ddfeb6902a9984a76fd877c3b5cc3b5085a82',
+        '304945e91de3deff52a61d08733141d72dd42ec9d47972f1060534d54c0c7f90',
+        '3a134ef77d4e2e4cdad2d2945ff1f76c1a23296c93c851f6244220a8cedea130',
+        '477bba133c182267fe5f086924abdc5db71f77bfc27f01f2843f2cdc69d89f05',
+        '51a4ae4c6ae999146474a67cbcb3b05fbcf4c17ab683043a066459da95513ea8',
+        '53a8fc816e63b7a5ccd17aaff93f28bcf13abbf418209dcd93947722d7c326ba',
+        '576c15a8072461c216efb9bd7306a6fc6039b43a6763c4c1a05930a2dd7b788f',
+        '78314b11be2e581549ac1c4f616563fad3fdf0c3b71678f6e2299182080e0598',
+        '7f75367e7881255134e1375e723d1dea8ad5f6a4fdb79d938df1f1754a830606',
+        '9bbef19476623ca56c17da75fd57734dbf82530686043a6e491c6d71befe8f6e',
+        'c6ea27c534f993d31f0aef882e3d200e7b87470c379ae79c8f9b19d3bd363dc9',
+        'd79449f462cec9af0d857c3e1af888d4fa8bbdaa511b9eaaafcd2805c4ea6471',
+        'd8086d483c15c711ebba19f966b97d3c2adcba74025ff8d7e07c3698c9531deb',
+        'dd13cdf9af9dd3baf46ce96aecd7163cabf381ccb21e63f15f0fa10b1c663fa9',
+        'e21b597ba6b9cafa59d9ebc4d65c0385f5eb3fa56abab2607fa76589ad849a33',
+        'f41e7ca4a3d71c4f047581f2ae2d6a8dbb8c58e51a020fa227edc724474aab6e',
+    ];
+
+    /**
+     * Reports whether a matched value is, exactly and whole, a vendor-documented sample such as AWS's documented example key.
+     *
+     * @param string $matchedValue - The whole matched value, already stripped of quotes and surrounding whitespace.
+     *
+     * @return bool - true when the value is a documented sample, so the user sees no finding for it; false for anything else
+     */
+    public static function isDocumentedSample(string $matchedValue): bool
     {
-        $normalized = strtolower(trim($secretValue, "\"' \t\r\n"));
-        if ($normalized === '') {
-            // An empty or quote-only literal carries no secret, so treat it as a placeholder and suppress.
+        return in_array(hash('sha256', $matchedValue), self::DOCUMENTED_SAMPLE_DIGESTS, true);
+    }
+
+    /**
+     * Treats samples, empty values, placeholder-prefixed tokens and normalized values with at most two distinct characters as dummies.
+     * Token prefixes match alphanumeric runs and, by default, identifier words; embedded substrings alone do not match.
+     * Disabling identifier splitting preserves whole alphanumeric runs but still excludes exact documented samples.
+     *
+     * @param string $secretValue - Candidate value, trimmed of surrounding quotes, spaces, tabs and line breaks.
+     * @param bool $shouldSplitIdentifierWords - Whether to add camelCase, acronym and digit-run tokens to the alphanumeric runs.
+     *
+     * @return bool - True when the caller should suppress the candidate as a sample, empty value or likely placeholder.
+     */
+    public static function isLikelyDummyValue(string $secretValue, bool $shouldSplitIdentifierWords = true): bool
+    {
+        $trimmed    = trim($secretValue, "\"' \t\r\n");
+        // A vendor-documented sample, e.g. AWS's example key id pasted from its docs, is not a credential, whichever rule matched it.
+        if (self::isDocumentedSample($trimmed)) {
             return true;
         }
 
-        // Check the value for any known placeholder word.
-        foreach (['changeme', 'dummy', 'example', 'fake', 'placeholder', 'redacted', 'sample', 'test'] as $marker) {
-            if (str_contains($normalized, $marker)) {
-                // A known placeholder word anywhere in the value marks it as documentation, not a live credential.
-                return true;
+        $normalized = strtolower($trimmed);
+        if ($normalized === '') {
+
+            return true;
+        }
+
+        // Runs of letters and digits, split on every other character.
+        $tokens = preg_split('/[^a-z0-9]+/', $normalized, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        if ($shouldSplitIdentifierWords) {
+            $tokens = [...$tokens, ...(new IdentifierTokenizer())->tokenize($trimmed)];
+        }
+
+
+        foreach ($tokens as $token) {
+            foreach (self::PLACEHOLDER_WORDS as $word) {
+                if (str_starts_with($token, $word)) {
+                    return true;
+                }
             }
         }
 
-        // One or two distinct characters (e.g. "aaaa", "xxxxxxxx") cannot be a real secret; treat as a placeholder.
+
         return count(array_unique(str_split($normalized))) <= 2;
     }
 
     /**
-     * Reports whether the file's basename is `.env` or a `.env.*` variant.
+     * Identifies paths containing a lowercase test or fixture directory segment.
      *
-     * @param string $displayPath - Project-relative path being scanned.
+     * @param string $displayPath - Path to inspect; Windows directory separators are normalized.
      *
-     * @return bool - true when the basename is `.env` or a `.env.*` variant; callers relax dummy-value filtering
-     */
-    public static function isEnvFile(string $displayPath): bool
-    {
-        $basename = basename($displayPath);
-
-        // Match `.env` and variants like `.env.local`; callers relax dummy-value filtering for these files.
-        return $basename === '.env' || str_starts_with($basename, '.env.');
-    }
-
-    /**
-     * Reports whether the path lives under a test or fixtures directory (test, tests, fixture, fixtures).
-     *
-     * @param string $displayPath - Project-relative path being scanned.
-     *
-     * @return bool - true when any path segment is a test or fixtures directory; callers downgrade secrets found there
+     * @return bool - True for a /test/, /tests/, /fixture/ or /fixtures/ segment; matching is case-sensitive.
      */
     public static function isTestPath(string $displayPath): bool
     {
@@ -200,69 +270,42 @@ final class SecretScannerHelper
     }
 
     /**
-     * Reports whether a line names an upper-cased secret-context fragment (API_KEY, PASSWORD, etc.).
+     * Checks a source line for secret-context fragments, ignoring case.
      *
-     * @param string $line - Source line being scanned.
+     * @param string $line - Source line whose text is searched for the shared fragments.
      *
-     * @return bool - true when the line contains a secret-context fragment that raises detector confidence
+     * @return bool - True when any fragment occurs as a substring, including inside a longer word.
      */
     public static function hasSensitiveContext(string $line): bool
     {
         $upperLine = strtoupper($line);
 
-        // Check the line for any secret-context fragment.
+
         foreach (self::sensitiveKeyFragments() as $fragment) {
             if (str_contains($upperLine, $fragment)) {
-                // A secret-context fragment on the line raises confidence that a nearby literal is a credential.
+
                 return true;
             }
         }
 
-        // No secret-context fragment present, so the line gives the detector no reason to escalate.
+
         return false;
     }
 
     /**
-     * Computes the Shannon entropy of a string in bits per character.
+     * Builds a warning-level sensitive-data finding after the caller has applied detection exclusions.
+     * Caller-supplied text and the display marker are copied unchanged and must already be safe for reports.
      *
-     * @param string $secretValue - Candidate secret value.
+     * @param AnalysisUnit $analysisUnit - Supplies the display path attached to the finding.
+     * @param string $ruleId - Rule identifier attached to the finding.
+     * @param string $message - Report message copied verbatim; must not contain the matched value.
+     * @param int $line - One-based source line locating the detected match.
+     * @param Confidence $confidence - Detector-selected confidence copied to the finding.
+     * @param string $detector - Detector name stored in metadata.
+     * @param string $displayMarker - Non-empty classification-only marker; callers must enforce the permitted grammar.
+     * @param string $remediation - Remediation text copied verbatim into the finding.
      *
-     * @return float - bits-per-character Shannon entropy; callers compare it against a threshold to flag secret-shaped literals
-     */
-    public static function entropy(string $secretValue): float
-    {
-        $length = strlen($secretValue);
-        if ($length === 0) {
-            // An empty string carries zero Shannon entropy by definition; returning here also keeps the
-            // per-character probability quotient $count / $length well-defined, since $length is its divisor.
-            return 0.0;
-        }
-
-        $counts  = count_chars($secretValue, 1);
-        $entropy = 0.0;
-
-        // Sum each character's contribution to the total entropy.
-        foreach ($counts as $count) {
-            $probability = $count / $length;
-            $entropy     -= $probability * log($probability, 2);
-        }
-
-        return $entropy;
-    }
-
-    /**
-     * Builds a sensitive-data finding with a redacted preview and detector metadata.
-     *
-     * @param AnalysisUnit $analysisUnit - Parsed unit that owns the finding.
-     * @param string       $ruleId - Sensitive-data rule identifier.
-     * @param string       $message - Human-readable finding message.
-     * @param int          $line - Source line for the detected secret.
-     * @param Confidence   $confidence - Confidence level assigned by the detector.
-     * @param string       $detector - Detector name written to finding metadata.
-     * @param string       $preview - Redacted preview written to finding metadata.
-     * @param string       $remediation - Suggested remediation text for the finding.
-     *
-     * @return Finding - a SensitiveData/Warning finding carrying the detector name and redacted preview in metadata
+     * @return Finding - Warning finding in the SensitiveData pillar, with detector and preview metadata.
      */
     public static function finding(
         AnalysisUnit $analysisUnit,
@@ -271,7 +314,7 @@ final class SecretScannerHelper
         int          $line,
         Confidence   $confidence,
         string       $detector,
-        string       $preview,
+        string       $displayMarker,
         string       $remediation,
     ): Finding {
         return new Finding(
@@ -286,7 +329,7 @@ final class SecretScannerHelper
             remediation: $remediation,
             metadata:    [
                              'detector' => $detector,
-                             'preview'  => $preview,
+                             'preview'  => $displayMarker,
                          ],
         );
     }

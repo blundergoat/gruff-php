@@ -7,26 +7,20 @@ namespace GruffPhp\Results\Mutation;
 use GruffPhp\Engine\Analysis\RunDiagnostic;
 
 /**
- * The single handoff between running Infection and turning its output into mutation feedback.
+ * Captures the exit status and output of an Infection invocation for the mutation builder.
+ * The runner supplies a diagnostic when executable resolution fails before a process is started.
  *
- * `InfectionRunner` shells out to Infection for `gruff-php analyse --infection-run` and packs
- * everything that invocation produced into this readonly value: the process exit code, its
- * captured stdout and stderr, and an optional diagnostic. `MutationAnalysisBuilder` reads its exit
- * code and diagnostic the moment the run returns to decide what the user sees - go on to read the
- * on-disk mutation report, or show a "could not run Infection" note when the tool never started. Reach for it whenever
- * mutation analysis needs the raw outcome of one Infection run gathered in one place.
+ * A result without a diagnostic still needs a fresh, parseable report before analysis can continue.
  */
 final readonly class InfectionRunResult
 {
     /**
-     * Bundles one Infection run's outcome so the mutation builder can tell a real run from one that never
-     * started - it reads this object's exit code and diagnostic, then parses the on-disk report for scores. Filled by the runner both when Infection finished and when it never
-     * started - for example when `gruff-php analyse --infection-run` can't resolve the `--infection-bin` executable.
+     * Stores the runner's captured outcome and optional executable-resolution diagnostic.
      *
-     * @param int                $exitCode - Exit status Infection returned; `0` when the run passed the configured thresholds, non-zero when it failed or errored, and `2` as the stand-in when the process reported none.
-     * @param string             $output - Captured stdout, retained for diagnostics only - no consumer parses it (Infection runs with `--log-verbosity=none`, and the per-file report is read from the on-disk JSON); empty when the run produced no output.
-     * @param string             $errorOutput - Captured stderr; empty on a clean run, and carrying Infection's failure text when the run went wrong.
-     * @param RunDiagnostic|null $diagnostic - Set only when the run could not complete normally (say a missing Infection binary); null means Infection actually ran, so the builder goes on to read the on-disk report (which may still fail its freshness gate and yield a `mutation-run-error`) rather than surfacing a start-up error here.
+     * @param int $exitCode - Process exit status, or 2 for an unresolved executable or absent exit status.
+     * @param string $output - Captured standard output; empty when none was captured.
+     * @param string $errorOutput - Captured standard error; empty when none was captured.
+     * @param RunDiagnostic|null $diagnostic - Runner failure diagnostic; null leaves report freshness checking to the builder.
      */
     public function __construct(
         public int $exitCode,

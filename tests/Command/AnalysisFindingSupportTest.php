@@ -13,15 +13,16 @@ use GruffPhp\Results\Finding\Severity;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers project-rule finding scoping in AnalysisFindingSupport, including the empty discovered-file edge case
- * where a scoped run must not leak whole-project findings it never loaded.
+ * Covers project-rule finding scoping in AnalysisFindingSupport.
+ * Checks retained rule IDs and file paths for empty and populated requested-file sets.
+ * Checks that an empty project-rule list leaves the supplied findings unchanged.
  */
 final class AnalysisFindingSupportTest extends TestCase
 {
     /**
      * Verify an empty discovered-file set drops project-rule findings instead of leaking whole-project context.
      *
-     * @return void
+     * @return void - Asserts that only the non-project rule ID remains.
      */
     public function testFilterProjectRuleFindingsDropsProjectFindingsWhenNoFilesDiscovered(): void
     {
@@ -46,7 +47,7 @@ final class AnalysisFindingSupportTest extends TestCase
     /**
      * Verify project-rule findings stay scoped to the requested files when files are discovered.
      *
-     * @return void
+     * @return void - Asserts the retained paths are the requested project file and the other-rule file.
      */
     public function testFilterProjectRuleFindingsKeepsProjectFindingsInsideRequestedFiles(): void
     {
@@ -72,7 +73,7 @@ final class AnalysisFindingSupportTest extends TestCase
     /**
      * Verify findings pass through untouched when no project rules are enabled.
      *
-     * @return void
+     * @return void - Asserts that filtering returns the original findings array.
      */
     public function testFilterProjectRuleFindingsReturnsAllWhenNoProjectRules(): void
     {

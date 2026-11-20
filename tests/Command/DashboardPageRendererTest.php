@@ -8,8 +8,9 @@ use GruffPhp\Cli\Dashboard\DashboardPageRenderer;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers dashboard HTML rendering: escaping, checkbox state markers, metadata payload injection around the body tag, JSON-encoding fallback, and
- * error-page formatting.
+ * Covers dashboard HTML escaping, selected controls, and report iframe markup.
+ * Checks metadata insertion with and without a body tag, plus JSON-encoding fallback.
+ * Checks escaped error text and the displayed exit code and duration.
  */
 final class DashboardPageRendererTest extends TestCase
 {
@@ -19,19 +20,20 @@ final class DashboardPageRendererTest extends TestCase
     /**
      * Verify dashboard HTML preserves shell structure and escaped form state.
      *
-     * @return void
+     * @return void - Asserts expected shell fragments, escaped inputs, selected controls, and iframe attributes.
      */
     public function testDashboardHtmlRendersEscapedControlsInOrder(): void
     {
         $html = $this->renderer()->dashboardHtml($this->state([
-                                                                  'project'           => '/tmp/gruff <root>',
-                                                                  'paths'             => 'src tests',
-                                                                  'scanScope'         => 'diff',
-                                                                  'failOn'            => 'warning',
-                                                                  'config'            => '.gruff "quoted".yaml',
-                                                                  'baseline'          => 'base&line.json',
-                                                                  'noBaseline'        => '1',
-                                                                  'includeIgnored'    => '',
+                                                                  'project' => '/tmp/gruff <root>',
+                                                                  'paths' => 'src tests',
+                                                                  'scanScope' => 'diff',
+                                                                  'failOn' => 'warning',
+                                                                  'config' => '.gruff "quoted".yaml',
+                                                                  'baseline' => 'base&line.json',
+                                                                  'noBaseline' => '1',
+                                                                  'deepScanBudget' => '20000:2000000',
+                                                                  'includeIgnored' => '',
                                                                   'reportInteractive' => '1',
                                                               ]));
 
@@ -41,11 +43,12 @@ final class DashboardPageRendererTest extends TestCase
         self::assertStringContainsString('<div class="scan-summary" aria-label="Scan status"><div class="scan-status"><span>Status</span><strong id="scan-status" aria-live="polite">Ready</strong></div><div class="scan-command"><span>Last scan</span><div class="scan-meta-line"><code id="scan-meta">Not run</code><button type="button" id="copy-scan-meta">Copy</button></div></div></div>', $html);
         self::assertStringContainsString('<form id="scan-form" method="get" action="/"><div class="field-stack"><label>Project root<input name="project" value="/tmp/gruff &lt;root&gt;" placeholder=""></label><label>Paths<input name="paths" value="src tests" placeholder=""></label></div>', $html);
         self::assertStringContainsString('<div class="field-grid"><label>Config path<input name="config" value=".gruff &quot;quoted&quot;.yaml" placeholder=".gruff-php.yaml"></label><label>Baseline<input name="baseline" value="base&amp;line.json" placeholder="gruff-baseline.json"></label></div>', $html);
+        self::assertStringContainsString('<label>Deep-scan budget<input name="deepScanBudget" value="20000:2000000" placeholder="20000:2000000 or off"></label>', $html);
         self::assertStringContainsString('<div class="field-grid"><label>Scan scope<select name="scanScope"><option value="full">whole branch</option><option value="diff" selected>diff only</option></select></label>', $html);
         self::assertStringContainsString('<label>Fail on<select name="failOn"><option value="none">none</option><option value="advisory">advisory</option><option value="warning" selected>warning</option><option value="error">error</option></select></label></div><div class="option-grid">', $html);
         self::assertStringContainsString('<div class="option-grid"><label class="check"><input type="checkbox" name="noConfig" value="1"><span>skip config</span></label><label class="check"><input type="checkbox" name="noBaseline" value="1" checked><span>skip baseline</span></label><label class="check"><input type="checkbox" name="includeIgnored" value="1"><span>include ignored</span></label><label class="check"><input type="checkbox" name="reportInteractive" value="1" checked><span>interactive findings</span></label></div>', $html);
         self::assertStringContainsString('</label></div><div class="panel-actions"><button type="button" id="refresh">Refresh</button><button type="submit" id="run-scan">Run scan</button></div></form></section><iframe id="report-frame"', $html);
-        self::assertStringContainsString('data-initial-src="/scan?project=%2Ftmp%2Fgruff%20%3Croot%3E&amp;paths=src%20tests&amp;scanScope=diff&amp;failOn=warning&amp;config=.gruff%20%22quoted%22.yaml&amp;baseline=base%26line.json&amp;noBaseline=1&amp;noConfig=&amp;includeIgnored=&amp;reportInteractive=1"', $html);
+        self::assertStringContainsString('data-initial-src="/scan?project=%2Ftmp%2Fgruff%20%3Croot%3E&amp;paths=src%20tests&amp;scanScope=diff&amp;failOn=warning&amp;config=.gruff%20%22quoted%22.yaml&amp;baseline=base%26line.json&amp;noBaseline=1&amp;noConfig=&amp;deepScanBudget=20000%3A2000000&amp;includeIgnored=&amp;reportInteractive=1"', $html);
         self::assertStringContainsString('srcdoc="&lt;!DOCTYPE html&gt;&lt;html lang=&quot;en-NZ&quot;&gt;&lt;head&gt;&lt;meta charset=&quot;UTF-8&quot;&gt;&lt;style&gt;body{margin:0;background:#0d0c0a;color:#f3e9d2;', $html);
         self::assertStringEndsWith('copyScanMeta.addEventListener(\'click\',copyMeta);setTimeout(run,0);</script></body></html>', $html);
     }
@@ -53,7 +56,7 @@ final class DashboardPageRendererTest extends TestCase
     /**
      * Verify include-ignored checkbox state is rendered when selected.
      *
-     * @return void
+     * @return void - Asserts that the include-ignored checkbox has the checked attribute.
      */
     public function testDashboardHtmlMarksIncludeIgnoredWhenSelected(): void
     {
@@ -65,7 +68,7 @@ final class DashboardPageRendererTest extends TestCase
     /**
      * Verify no-config checkbox state is rendered when selected.
      *
-     * @return void
+     * @return void - Asserts that the no-config checkbox has the checked attribute.
      */
     public function testDashboardHtmlMarksNoConfigWhenSelected(): void
     {
@@ -77,7 +80,7 @@ final class DashboardPageRendererTest extends TestCase
     /**
      * Verify scan metadata is injected after the body tag with a complete payload.
      *
-     * @return void
+     * @return void - Asserts payload fields, encoded project text, insertion position, and notification script text.
      */
     public function testInjectDashboardMetadataEmbedsPayloadAfterBodyTag(): void
     {
@@ -104,7 +107,7 @@ final class DashboardPageRendererTest extends TestCase
     /**
      * Verify scan metadata is prepended when a report body tag is unavailable.
      *
-     * @return void
+     * @return void - Asserts that metadata precedes the original fragment and contains the formatted command.
      */
     public function testInjectDashboardMetadataPrependsPayloadWithoutBodyTag(): void
     {
@@ -122,9 +125,9 @@ final class DashboardPageRendererTest extends TestCase
     }
 
     /**
-     * Verify invalid metadata strings fall back to the minimal completion payload.
+     * Verify an invalid UTF-8 project root produces the minimal completion payload.
      *
-     * @return void
+     * @return void - Asserts that decoded metadata contains only the completion type.
      */
     public function testInjectDashboardMetadataFallsBackWhenJsonEncodingFails(): void
     {
@@ -143,7 +146,7 @@ final class DashboardPageRendererTest extends TestCase
     /**
      * Verify dashboard error HTML escapes untrusted message and detail text.
      *
-     * @return void
+     * @return void - Asserts escaped text, the supplied exit code and duration, and the error document's boundaries.
      */
     public function testErrorHtmlEscapesMessageDetailAndReportsTiming(): void
     {
@@ -172,8 +175,7 @@ final class DashboardPageRendererTest extends TestCase
      * @param array<string, string> $overrides - Values to override.
      *
      * @return array{project: string, paths: string, scanScope: string, failOn: string, config: string, baseline: string, noBaseline: string,
-     *                        noConfig: string, includeIgnored: string, reportInteractive: string} - every form field defaulted, with the caller's
-     *                        overrides merged on top so each test asserts on a fully populated state
+     *                        noConfig: string, deepScanBudget: string, includeIgnored: string, reportInteractive: string} - Merged dashboard state.
      */
     private function state(array $overrides = []): array
     {
@@ -186,6 +188,7 @@ final class DashboardPageRendererTest extends TestCase
                                                                                                                                                                                                                                                           'baseline' => '',
                                                                                                                                                                                                                                                                    'noBaseline' => '',
                                                                                                                                                                                                                                                                                                                             'noConfig' => '',
+                                                                                                                                                                                                                                                                                                                                                 'deepScanBudget' => '',
                                                                                                                                                                                                                                                                                                                                                  'includeIgnored' => '',
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           'reportInteractive' => '',
                            ], $overrides);
@@ -196,13 +199,12 @@ final class DashboardPageRendererTest extends TestCase
      *
      * @param string $html - HTML containing the metadata script.
      *
-     * @return array<string, int|string> - the JSON payload pulled from the meta script tag, decoded and asserted to contain only string keys mapping
-     *                       to int or string values
+     * @return array<string, int|string> - Decoded payload after asserting string keys and integer or string values.
      */
     private function metadataPayload(string $html): array
     {
         $pattern = '~<script id="gruff-dashboard-meta" type="application/json">(?P<payload>.*?)</script>~';
-        // Extract the dashboard metadata JSON payload from the rendered script tag.
+        // Use the metadata script's id and type to avoid treating ordinary dashboard scripts as payload data.
         $matched = preg_match($pattern, $html, $matches);
 
         self::assertSame(1, $matched);

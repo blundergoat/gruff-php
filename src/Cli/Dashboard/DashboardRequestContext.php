@@ -7,20 +7,19 @@ namespace GruffPhp\Cli\Dashboard;
 use Symfony\Component\Console\Input\InputInterface;
 
 /**
- * Immutable per-run settings shared by every dashboard request handler.
+ * Stores launch settings shared by dashboard request handlers for one server run.
  *
- * Created once when the user launches `gruff-php dashboard`: it carries where the server is bound,
- * which project it scans, and the directory it launched from, so each incoming browser request works
- * from the same fixed context instead of re-deriving it per hit.
+ * Created by the dashboard command with the bind address, launch directory, default project, and scan timeout.
+ * Submitted forms may select a different project without changing these defaults.
  */
 final readonly class DashboardRequestContext
 {
     /**
-     * Capture request-level state shared by dashboard handlers.
+     * Capture launch settings shared by dashboard handlers.
      *
      * @param InputInterface $input       - Console input used to seed dashboard state.
      * @param string         $launchRoot  - Shell working directory that launched the dashboard.
-     * @param string         $projectRoot - Active project root for scan requests.
+     * @param string         $projectRoot - Default project root; a submitted scan form may select another project.
      * @param float|null     $scanTimeout - Scan timeout in seconds; null means no limit was set, so scans run untimed.
      * @param string         $bindHost    - Hostname or address bound by the dashboard server.
      * @param int            $bindPort    - Port bound by the dashboard server.

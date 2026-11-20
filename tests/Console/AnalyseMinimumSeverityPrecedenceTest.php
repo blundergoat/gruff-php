@@ -8,9 +8,9 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
 /**
- * Verifies the ADR-015 precedence chain for the analyse command's --fail-on resolution.
- *
- * CLI flag > config.minimumSeverity.analyse > binary default (advisory).
+ * Exercises the ADR-015 failure-threshold precedence cases for analyse.
+ * The config and explicit CLI cases check warning output and exit codes.
+ * The no-config case checks the exit code when --fail-on is omitted.
  */
 final class AnalyseMinimumSeverityPrecedenceTest extends TestCase
 {
@@ -20,14 +20,9 @@ final class AnalyseMinimumSeverityPrecedenceTest extends TestCase
     private const PROJECT_ROOT = __DIR__ . '/../..';
 
     /**
-     * Verify config minimumSeverity.analyse > binary default when --fail-on is omitted.
+     * Checks that a configured error threshold allows reported warnings when --fail-on is omitted.
      *
-     * The fixture sets `minimumSeverity.analyse: error` and configures the
-     * size.file-length rule to emit warning findings. Without --fail-on, the
-     * config-supplied error threshold wins and warning findings do not trigger
-     * exit 1.
-     *
-     * @return void
+     * @return void - Asserts exit 0 and the size.file-length warning for the fixture.
      */
     public function testConfigErrorThresholdSuppressesWarningExit(): void
     {
@@ -42,17 +37,13 @@ final class AnalyseMinimumSeverityPrecedenceTest extends TestCase
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-        self::assertStringContainsString('[warning] size.file-length', $process->getOutput());
+        self::assertStringContainsString('[warning] tests/Fixtures/Source/mixed/alpha.php:1 size.file-length', $process->getOutput());
     }
 
     /**
-     * Verify CLI --fail-on wins over the config-supplied threshold.
+     * Checks that --fail-on warning overrides the fixture's configured error threshold.
      *
-     * Same fixture as above, but the user passes --fail-on warning. The CLI
-     * flag overrides the config's error threshold and warning findings now
-     * trigger exit 1.
-     *
-     * @return void
+     * @return void - Asserts exit 1 and the size.file-length warning with the CLI override.
      */
     public function testCliFlagWarningOverridesConfigErrorThreshold(): void
     {
@@ -69,17 +60,13 @@ final class AnalyseMinimumSeverityPrecedenceTest extends TestCase
         $process->run();
 
         self::assertSame(1, $process->getExitCode());
-        self::assertStringContainsString('[warning] size.file-length', $process->getOutput());
+        self::assertStringContainsString('[warning] tests/Fixtures/Source/mixed/alpha.php:1 size.file-length', $process->getOutput());
     }
 
     /**
-     * Verify the binary default for analyse is advisory (per ADR-015).
+     * Checks the no-config invocation without an explicit failure threshold.
      *
-     * Running with --no-config and no --fail-on uses registry defaults and
-     * the new binary advisory threshold. The mixed fixture has at least one
-     * advisory-tier finding under registry defaults, so the run exits 1.
-     *
-     * @return void
+     * @return void - Asserts exit 1 for the mixed-source fixture.
      */
     public function testNoConfigBinaryDefaultIsAdvisoryAndFailsOnFindings(): void
     {

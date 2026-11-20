@@ -10,8 +10,9 @@ use RuntimeException;
 use Symfony\Component\Process\Process;
 
 /**
- * Base class for CLI integration tests; provides baseline project scaffolding, temp directories, package-tree copying, port allocation, and HTTP
- * server helpers.
+ * Shared filesystem and report assertions for CLI integration tests.
+ * Builds baseline and security fixtures and copies package trees into isolated projects.
+ * Dashboard helpers allocate local TCP ports and wait for an HTTP health response.
  */
 abstract class CliTestCase extends TestCase
 {
@@ -38,27 +39,55 @@ abstract class CliTestCase extends TestCase
     }
 
     /**
-     * Decode a finished CLI process's stdout as the JSON report object.
+     * Decode the CLI process's stdout and assert the report array has string keys.
      *
      * @param Process $process - Completed CLI process whose stdout holds the JSON report.
      *
-     * @return array<string, mixed> - the decoded report keyed by its string field names; empty array when stdout held an empty JSON object
-     * @throws JsonException
+     * @return array<string, mixed> - Report fields; empty JSON objects and arrays both decode to an empty array.
+     * @throws JsonException - When stdout is invalid JSON or exceeds the decoder's depth limit.
      */
     protected function decodeJsonOutput(Process $process): array
     {
         $decoded = json_decode($process->getOutput(), true, 512, JSON_THROW_ON_ERROR);
 
-        self::assertIsArray($decoded);
+        return $this->decodedJsonObject($decoded);
+    }
 
-        $report = [];
+    /**
+     * Assert that a decoded value is an array with string keys.
+     *
+     * @param mixed $value - Decoded value to check; non-arrays and integer-keyed arrays fail assertions.
+     *
+     * @return array<string, mixed> - The same entries; an empty array is accepted without establishing its JSON origin.
+     */
+    protected function decodedJsonObject(mixed $value): array
+    {
+        self::assertIsArray($value);
 
-        foreach ($decoded as $key => $value) {
+        $object = [];
+        foreach ($value as $key => $entryValue) {
             self::assertIsString($key);
-            $report[$key] = $value;
+            $object[$key] = $entryValue;
         }
 
-        return $report;
+        return $object;
+    }
+
+    /**
+     * Traverse decoded report keys, asserting an array with string keys at each selected value.
+     *
+     * @param array<string, mixed> $payload - Report array to traverse; returned unchanged when no keys are supplied.
+     * @param string ...$keys - Ordered field names; missing or null values fail the array assertion.
+     *
+     * @return array<string, mixed> - Selected array, or the unchanged payload when no keys are given.
+     */
+    protected function decodedJsonObjectAt(array $payload, string ...$keys): array
+    {
+        foreach ($keys as $key) {
+            $payload = $this->decodedJsonObject($payload[$key] ?? null);
+        }
+
+        return $payload;
     }
 
     /**
@@ -76,16 +105,46 @@ abstract class CliTestCase extends TestCase
     }
 
     /**
+     * Copy the synthetic-secrets fixture into a temporary project's src/ directory for secret-rule CLI tests.
+     * Use a production-style path so the built-in test-path filter does not hide secret findings.
+     *
+     * @return string - Root of the temporary project; the caller removes it with removeDir().
+     */
+    protected function syntheticSecretsProject(): string
+    {
+        $project = $this->tempDir();
+        self::assertTrue(mkdir($project . '/src'));
+        self::assertTrue(copy(self::PROJECT_ROOT . '/tests/Fixtures/SensitiveData/synthetic-secrets.php', $project . '/src/synthetic-secrets.php'));
+
+        return $project;
+    }
+
+    /**
+     * Copies the cumulative-security fixture into a temporary project's src/, so security rules read it as production code.
+     * A test that needs security findings uses this, because every security rule skips tests/ and Fixtures/ paths.
+     *
+     * @return string - Root of the temporary project; the caller removes it with removeDir().
+     */
+    protected function cumulativeSecurityProject(): string
+    {
+        $project = $this->tempDir();
+        self::assertTrue(mkdir($project . '/src'));
+        self::assertTrue(copy(self::PROJECT_ROOT . '/tests/Fixtures/Security/cumulative-security.php', $project . '/src/cumulative-security.php'));
+
+        return $project;
+    }
+
+    /**
      * Remove a temporary directory tree.
      *
-     * @param string $path - Filesystem path.
+     * @param string $path - Root of the temporary directory tree.
      *
-     * @return void
+     * @return void - Attempts recursive cleanup; non-directory paths are left unchanged.
      */
     protected function removeDir(string $path): void
     {
         if (!is_dir($path)) {
-            // Nothing to remove when the path was never created or already gone.
+
             return;
         }
 
@@ -112,10 +171,10 @@ abstract class CliTestCase extends TestCase
     /**
      * Copy the package tree into an isolated test project.
      *
-     * @param string $source - Source directory.
-     * @param string $destination - Destination directory.
+     * @param string $source - Package root whose retained entries are copied.
+     * @param string $destination - New fixture root to create; it must not already exist.
      *
-     * @return void
+     * @return void - Creates the filtered fixture tree and asserts each directory creation and file copy succeeds.
      */
     protected function copyPackageTree(string $source, string $destination): void
     {
@@ -143,7 +202,7 @@ abstract class CliTestCase extends TestCase
                         }
                     }
 
-                    // Keep every other entry; it belongs in the copied package tree.
+
                     return true;
                 },
             ),
@@ -171,7 +230,7 @@ abstract class CliTestCase extends TestCase
      * Return an unused local TCP port for dashboard tests.
      *
      * @return int - an OS-assigned ephemeral TCP port that was free at allocation time and is no longer bound, for the dashboard test to bind
-     * @throws RuntimeException When the helper cannot complete the fixture operation.
+     * @throws RuntimeException - When socket creation fails or its bound address lacks a readable port.
      */
     protected function unusedPort(): int
     {
@@ -200,7 +259,7 @@ abstract class CliTestCase extends TestCase
         $name = stream_socket_get_name($server, false);
         fclose($server);
 
-        // Extract the assigned TCP port from the bound socket name.
+        // The socket name's trailing decimal component is the OS-assigned port the dashboard test will bind.
         if (!is_string($name) || !preg_match('/:(\d+)$/', $name, $matches)) {
             throw new RuntimeException('Unable to read allocated test port.');
         }
@@ -209,12 +268,12 @@ abstract class CliTestCase extends TestCase
     }
 
     /**
-     * Wait for the dashboard HTTP server to accept connections.
+     * Wait until the dashboard health response contains the expected HTTP 200 status text.
      *
-     * @param int     $port - Local TCP port.
-     * @param Process $process - Dashboard server process.
+     * @param int $port - Local TCP port serving the dashboard.
+     * @param Process $process - Started server process checked for premature exit.
      *
-     * @return void
+     * @return void - Returns on the expected status text, or fails if the process exits or the readiness check times out.
      */
     protected function waitForHttpServer(int $port, Process $process): void
     {
@@ -229,11 +288,12 @@ abstract class CliTestCase extends TestCase
                 $response = $this->fetchHttp($port, '/health');
 
                 if (str_contains($response, "HTTP/1.1 200 OK\r\n")) {
-                    // A TCP connect can succeed before the request handler is wired; only a 200 from
-                    // /health proves the full pipeline serves, so later dashboard requests cannot race startup.
+                    // Treat the expected /health status text as readiness; a TCP connection alone is not enough for this test.
+
                     return;
                 }
             } catch (RuntimeException) {
+                // Connection/read failures can precede startup; retry quietly because exit/timeout reports the server output.
                 usleep(50_000);
             }
         } while (microtime(true) < $deadline);
@@ -244,11 +304,11 @@ abstract class CliTestCase extends TestCase
     /**
      * Fetch a raw response from the local dashboard server.
      *
-     * @param int    $port - Local TCP port.
-     * @param string $path - Filesystem path.
+     * @param int $port - Local dashboard port to connect to.
+     * @param string $path - HTTP request target sent after GET, including any query string.
      *
-     * @return string - the raw HTTP response text including the status line, headers, and body for the caller to inspect
-     * @throws RuntimeException When the helper cannot complete the fixture operation.
+     * @return string - Raw socket bytes, which may be empty or partial; HTTP structure and timeout status are not validated.
+     * @throws RuntimeException - When connecting fails or reading returns false.
      */
     protected function fetchHttp(int $port, string $path): string
     {

@@ -17,12 +17,9 @@ use ReflectionFunction;
 use ReflectionParameter;
 
 /**
- * Covers the sink parameter table the security rules resolve named arguments through.
- *
- * A wrong name here does more than miss a finding. Argument lookup hands back whichever argument carries the
- * name it is given, so a name belonging to another slot returns the wrong expression and can invent a finding
- * on safe code. Each case feeds a call the parameter name PHP itself reports and asserts the table routes it
- * to the slot the rules ask for, which keeps the table honest against the runtime rather than against memory.
+ * Checks the security sink parameter table against PHP's reflected function signatures.
+ * A name mapped to the wrong slot can select an unrelated expression and cause a false finding.
+ * Named-argument probes check each available function's mapped slots; a minimum row count prevents empty coverage.
  */
 final class SecurityNodeHelperTest extends TestCase
 {
@@ -30,10 +27,9 @@ final class SecurityNodeHelperTest extends TestCase
     private const MINIMUM_REFLECTABLE_SLOTS = 30;
 
     /**
-     * Provide each mapped sink slot together with the parameter name PHP declares at that position.
+     * Provide mapped slots for available functions using reflected names or an absent-parameter marker.
      *
-     * @return array<string, array{string, int, string}> - rows of function name, slot index, and PHP's declared
-     *                       parameter name; functions this build does not ship are skipped, having no signature to report
+     * @return array<string, array{string, int, string}> - Rows of function, slot and declared name; 'absent' marks a missing parameter.
      */
     public static function reflectableSinkSlots(): array
     {
@@ -65,9 +61,9 @@ final class SecurityNodeHelperTest extends TestCase
      *
      * @param string $function - Mapped global sink function.
      * @param int    $index - Slot index the security rules read from that function.
-     * @param string $declaredName - Parameter name PHP reports at that position.
+     * @param string $declaredName - Parameter name reported at that position; 'absent' makes the case fail when the configured slot is missing.
      *
-     * @return void
+     * @return void - Asserts the requested slot resolves to the supplied probe variable.
      */
     #[DataProvider('reflectableSinkSlots')]
     public function testDeclaredParameterNameResolvesToItsMappedSlot(string $function, int $index, string $declaredName): void
@@ -83,7 +79,7 @@ final class SecurityNodeHelperTest extends TestCase
     /**
      * Verify enough slots reflect that the per-slot cases cannot all be skipped without notice.
      *
-     * @return void
+     * @return void - Asserts at least the configured minimum number of reflected slot cases.
      */
     public function testReflectableSlotCoverageIsNotVacuous(): void
     {
@@ -95,7 +91,7 @@ final class SecurityNodeHelperTest extends TestCase
      *
      * @param string $source - Single call statement written without the opening tag.
      *
-     * @return FuncCall - Parsed call node carrying the probe argument.
+     * @return FuncCall - First function-call node found; the assertion fails if no call is present.
      */
     private static function parseCall(string $source): FuncCall
     {

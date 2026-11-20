@@ -8,12 +8,9 @@ use PhpParser\Node;
 use PhpParser\Node\Stmt;
 
 /**
- * One child-statement block yielded by `StmtChildVisitor::childBlocks()`.
- *
- * Rules iterate child blocks to recurse into nested control-flow without
- * repeating the per-statement-type field access. The `owner` reference lets
- * rules that need extras (an if condition, a catch type list, a switch case
- * label) reach the parent node without re-dispatching on `instanceof`.
+ * Represents one child-statement block yielded by StmtChildVisitor::childBlocks().
+ * Rules use its kind and statements to recurse through control flow without repeating node-type dispatch.
+ * The owner exposes related data such as conditions, catch types, and case labels.
  */
 final readonly class StmtChildBlock
 {
@@ -25,7 +22,7 @@ final readonly class StmtChildBlock
     public const KIND_ELSE_BODY = 'else-body';
     /** Body inside a `for`/`foreach`/`while`/`do` loop. */
     public const KIND_LOOP_BODY = 'loop-body';
-    /** Body inside one `case` of a `switch`. */
+    /** Statements in one switch case or default arm. */
     public const KIND_SWITCH_CASE = 'switch-case-body';
     /** Body inside the `try { ... }` block. */
     public const KIND_TRY_BODY = 'try-body';
@@ -37,9 +34,9 @@ final readonly class StmtChildBlock
     /**
      * Wraps one child-statement block with its role and a back-reference to the owning node.
      *
-     * @param string      $kind - One of the `KIND_*` constants identifying the block role.
+     * @param string      $kind - One of the KIND_* constants identifying the block role.
      * @param array<Stmt> $statements - Statements inside the block, as PhpParser yields them.
-     * @param Node        $owner - Owning node (Stmt, Else_, ElseIf_, Case_, Catch_, or Finally_) - gives rules access to extras.
+     * @param Node        $owner - Owning node (Stmt, Else_, ElseIf_, Case_, Catch_, or Finally_) that exposes branch-specific data to rules.
      */
     public function __construct(
         public string $kind,

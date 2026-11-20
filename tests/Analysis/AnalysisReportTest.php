@@ -13,23 +13,23 @@ use GruffPhp\Results\Finding\Severity;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers the AnalysisReport aggregation accessors used by triage views,
- * specifically the per-rule count buckets surfaced for M08's rule-grouped
- * triage workflow.
+ * Tests the per-rule finding summaries returned by AnalysisReport.
+ * Checks severity counts and ordering by descending total.
+ * Checks rule ID ordering when totals tie.
  */
 final class AnalysisReportTest extends TestCase
 {
     /**
      * Verify findingCountsByRule sums severities per rule and ranks rules by total.
      *
-     * @return void
+     * @return void - Asserts exact severity buckets and descending totals for three rules.
      */
     public function testFindingCountsByRuleAggregatesAndRanks(): void
     {
         $report = $this->reportFor([
-                                       $this->finding('docs.missing-public-phpdoc', Severity::Advisory),
-                                       $this->finding('docs.missing-public-phpdoc', Severity::Warning),
-                                       $this->finding('docs.missing-public-phpdoc', Severity::Advisory),
+                                       $this->finding('docs.missing-phpdoc', Severity::Advisory),
+                                       $this->finding('docs.missing-phpdoc', Severity::Warning),
+                                       $this->finding('docs.missing-phpdoc', Severity::Advisory),
                                        $this->finding('size.method-length', Severity::Error),
                                        $this->finding('size.method-length', Severity::Error),
                                        $this->finding('alpha.rule', Severity::Advisory),
@@ -37,7 +37,7 @@ final class AnalysisReportTest extends TestCase
 
         self::assertSame(
             [
-                ['ruleId' => 'docs.missing-public-phpdoc', 'total' => 3, 'advisory' => 2, 'warning' => 1, 'error' => 0],
+                ['ruleId' => 'docs.missing-phpdoc', 'total' => 3, 'advisory' => 2, 'warning' => 1, 'error' => 0],
                 ['ruleId' => 'size.method-length', 'total' => 2, 'advisory' => 0, 'warning' => 0, 'error' => 2],
                 ['ruleId' => 'alpha.rule', 'total' => 1, 'advisory' => 1, 'warning' => 0, 'error' => 0],
             ],
@@ -48,7 +48,7 @@ final class AnalysisReportTest extends TestCase
     /**
      * Verify ties on total sort by rule id ascending for deterministic output.
      *
-     * @return void
+     * @return void - Asserts alphabetical rule IDs for equal totals.
      */
     public function testFindingCountsByRuleBreaksTotalTiesByRuleId(): void
     {

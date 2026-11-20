@@ -9,17 +9,20 @@ use GruffPhp\Cli\Command\CheckIgnoreCommand;
 use GruffPhp\Cli\Dashboard\DashboardCommand;
 use GruffPhp\Cli\Command\HookCommand;
 use GruffPhp\Cli\Command\InitCommand;
+use GruffPhp\Cli\Command\MigrateConfigCommand;
 use GruffPhp\Cli\Command\ListRulesCommand;
 use GruffPhp\Cli\Command\ReportCommand;
 use GruffPhp\Cli\Command\SummaryCommand;
 use Symfony\Component\Console\Application as SymfonyApplication;
+use Symfony\Component\Console\Exception\ExceptionInterface as ConsoleException;
+use Symfony\Component\Console\Exception\RuntimeException as ConsoleRuntimeException;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * The gruff-php CLI entry point - wires every subcommand into Symfony Console.
- *
- * This is what `bin/gruff-php` boots: it registers the commands a user can type (`analyse`,
- * `summary`, `report`, `dashboard`, `init`, `hook`, `list-rules`, `check-ignore`) and stamps the
- * tool name and version shown in `--help` and on every report header.
+ * Registers the gruff-php command set with Symfony Console.
+ * Supplies the name and version used by the console application.
+ * Rewraps escaping Symfony Console exceptions with code 2 while retaining their messages.
  */
 final class Application extends SymfonyApplication
 {
@@ -31,25 +34,45 @@ final class Application extends SymfonyApplication
     /**
      * Version shown by `--version` and stamped onto every report the user sees.
      */
-    public const VERSION = '0.5.2';
+    public const VERSION = '0.6.0';
 
     /**
-     * Registers the full command surface so every `gruff-php <command>` a user types is wired up.
+     * Registers the Gruff commands available through the gruff-php entry point.
      */
     public function __construct()
     {
         parent::__construct(self::NAME, self::VERSION);
 
-        // Every subcommand a user can run; each entry becomes one `gruff-php <name>` invocation.
         $this->addCommands([
             new AnalyseCommand(),
             new CheckIgnoreCommand(),
             new DashboardCommand(),
             new HookCommand(),
             new InitCommand(),
+            new MigrateConfigCommand(),
             new ListRulesCommand(),
             new ReportCommand(),
             new SummaryCommand(),
         ]);
+    }
+
+    /**
+     * Runs the requested command and rethrows Symfony Console exceptions with code 2.
+     * Preserves each exception's message and cause for the caller.
+     *
+     * @param InputInterface $input - Command line passed to Symfony for command selection and execution.
+     * @param OutputInterface $output - Destination passed to Symfony for command output.
+     *
+     * @return int - Exit code returned by Symfony when no Console exception escapes.
+     * @throws ConsoleRuntimeException - When a Console exception escapes command selection or execution.
+     */
+    public function doRun(InputInterface $input, OutputInterface $output): int
+    {
+        try {
+            return parent::doRun($input, $output);
+        } catch (ConsoleException $usageError) {
+            // Symfony's message stays verbatim while the wrapper sets exit code 2 and retains the original exception as its cause.
+            throw new ConsoleRuntimeException($usageError->getMessage(), 2, $usageError);
+        }
     }
 }

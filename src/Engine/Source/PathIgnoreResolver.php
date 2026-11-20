@@ -7,10 +7,9 @@ namespace GruffPhp\Engine\Source;
 use Symfony\Component\Process\Process;
 
 /**
- * Single source of truth for whether a path is ignored and why.
- *
- * Both source discovery and the check-ignore command resolve exclusions through
- * this engine so analysis and pre-flight checks can never disagree.
+ * Shares path-exclusion rules between source discovery and the check-ignore command.
+ * Configured globs, VCS internals, default directories, and minified files are classified here.
+ * Git rule lookup is separate so callers can combine it with their discovery strategy.
  */
 final readonly class PathIgnoreResolver
 {
@@ -25,7 +24,7 @@ final readonly class PathIgnoreResolver
     public const SOURCE_DEFAULT = 'default';
 
     /**
-     * A path matched a built-in generated/lock filename such as composer.lock.
+     * A path matched generated-file handling outside the default directory policy.
      */
     public const SOURCE_GENERATED = 'generated';
 
@@ -35,38 +34,38 @@ final readonly class PathIgnoreResolver
     public const SOURCE_GITIGNORE = 'gitignore';
 
     /** @var list<string> */
-    private const IGNORED_DIRECTORIES = [
-        '.fleet',
+    private const VCS_DIRECTORIES = [
         '.git',
-        '.goat-flow/logs',
-        '.goat-flow/scratchpad',
-        '.goat-flow/tasks',
-        '.gruff-cache',
         '.hg',
-        '.idea',
-        '.phpunit.cache',
         '.svn',
-        '.vscode',
-        'build',
-        'cache',
-        'coverage',
-        'dist',
-        'generated',
-        'node_modules',
-        'tmp',
-        'var/cache',
-        'vendor',
     ];
 
     /** @var list<string> */
-    private const IGNORED_FILENAMES = [
-        'bun.lockb',
-        'composer.lock',
-        'npm-shrinkwrap.json',
-        'package-lock.json',
-        'pnpm-lock.yaml',
-        'yarn.lock',
+    private const FALLBACK_DIRECTORIES = [
+        '.fleet',
+        '.gruff-cache',
+        '.idea',
+        '.phpunit.cache',
+        '.vscode',
+        'build',
+        'coverage',
+        'node_modules',
+        'var/cache',
     ];
+
+    /**
+     * Directories treated as dependency copies or build output under FAMILY-CONTRACT.md section 7.
+     * They match at any depth and ignore ASCII case, even when a governing `.gitignore` exists.
+     * `build` and `coverage` remain fallback-only directories.
+     *
+     * @var list<string>
+     */
+    private const THIRD_PARTY_DIRECTORIES = ['bower_components', 'dist', 'third-party', 'third_party', 'vendor', 'vendors'];
+
+    /**
+     * Pattern recorded for a minified file such as `jquery.min.js`, which section 7 skips as generated.
+     */
+    public const MINIFIED_FILE_PATTERN = '*.min.*';
 
     /**
      * Wraps the project root the resolver evaluates Git ignore rules against.
@@ -78,17 +77,16 @@ final readonly class PathIgnoreResolver
     }
 
     /**
-     * Decides whether a path is ignored and why, applying config, built-in, and generated exclusions in
-     * priority order - the one place discovery and check-ignore agree on what gets skipped.
-     *
-     * Configured paths.ignore is authoritative and is applied even when ignored
-     * files are otherwise included; default and generated exclusions are skipped
-     * when ignored files are requested.
+     * Applies configured ignores and VCS exclusions before considering caller overrides and default exclusions.
+     * Explicit files and include-ignored bypass third-party, build-output, minified-file, and fallback-directory exclusions.
+     * Git ignore rules are queried separately through `gitIgnoreRule()`; this method never queries Git.
      *
      * @param string       $displayPath - Project-relative display path used for glob and directory matching.
-     * @param string       $absolutePath - Absolute path used for filename matching.
+     * @param string       $absolutePath - Absolute path used for directory detection and ancestor `.gitignore` checks.
      * @param list<string> $configuredPatterns - Configured paths.ignore glob patterns.
-     * @param bool         $shouldIncludeIgnored - When true, the built-in default/generated ignores are bypassed for this run.
+     * @param bool         $shouldIncludeIgnored - When true, bypass non-config, non-VCS exclusions.
+     * @param bool         $isExplicitFile - When true, the caller requested this existing file directly.
+     * @param bool|null    $isDirectory - Directory status; null asks the filesystem, so supply it explicitly for nonexistent paths.
      *
      * @return IgnoreDecision - Whether the path is ignored and, if so, the source and pattern behind it.
      */
@@ -97,6 +95,8 @@ final readonly class PathIgnoreResolver
         string $absolutePath,
         array $configuredPatterns,
         bool $shouldIncludeIgnored,
+        bool $isExplicitFile = false,
+        ?bool $isDirectory = null,
     ): IgnoreDecision {
         $configuredPattern = $this->matchedConfiguredPattern($displayPath, $configuredPatterns);
         // The user's own paths.ignore wins first and always, even when they asked to include ignored files.
@@ -105,27 +105,52 @@ final readonly class PathIgnoreResolver
             return IgnoreDecision::ignored(self::SOURCE_CONFIG, $configuredPattern);
         }
 
-        // With ignored files requested, skip the built-in exclusions below (config above was already honoured).
-        if ($shouldIncludeIgnored) {
-            // Requesting ignored files bypasses only the built-in default/generated exclusions below.
+        $vcsDirectory = $this->matchedVcsDirectory($displayPath);
+        if ($vcsDirectory !== null) {
+            return IgnoreDecision::ignored(self::SOURCE_DEFAULT, $vcsDirectory);
+        }
+
+        if ($shouldIncludeIgnored || $isExplicitFile) {
             return IgnoreDecision::notIgnored();
         }
 
+        $isDirectory ??= is_dir($absolutePath);
+        $thirdPartyDirectory = self::matchedThirdPartyDirectory($displayPath, $isDirectory);
+        // A committed copy is still someone else's code, so these classes skip whatever the .gitignore says.
+        if ($thirdPartyDirectory !== null) {
+            return IgnoreDecision::ignored(self::SOURCE_DEFAULT, $thirdPartyDirectory);
+        }
+
+        if (!$isDirectory && self::isMinifiedName(basename(str_replace('\\', '/', $displayPath)))) {
+            return IgnoreDecision::ignored(self::SOURCE_DEFAULT, self::MINIFIED_FILE_PATTERN);
+        }
+
         $defaultDirectory = $this->matchedDefaultDirectory($displayPath);
-        // Next, a built-in tool or dependency directory like vendor or node_modules.
-        if ($defaultDirectory !== null) {
-            // A built-in tool/vendor directory match is the next exclusion source after config.
+        if ($defaultDirectory !== null && $this->shouldApplyFallbackAt($absolutePath)) {
             return IgnoreDecision::ignored(self::SOURCE_DEFAULT, $defaultDirectory);
         }
 
-        $generatedFilename = $this->matchedGeneratedFilename($absolutePath);
-        // Last, a known generated or lock file such as composer.lock.
-        if ($generatedFilename !== null) {
-            // A known generated/lock filename is the last built-in exclusion before falling through.
-            return IgnoreDecision::ignored(self::SOURCE_GENERATED, $generatedFilename);
+        return IgnoreDecision::notIgnored();
+    }
+
+    /**
+     * Finds an always-blocked VCS directory component in a path.
+     *
+     * @param string $displayPath - Project-relative display path being tested.
+     *
+     * @return string|null - The matching VCS token, or null when the path is outside VCS internals.
+     */
+    public function matchedVcsDirectory(string $displayPath): ?string
+    {
+        $segments = explode('/', trim(str_replace('\\', '/', $displayPath), '/'));
+
+        foreach ($segments as $segment) {
+            if (in_array($segment, self::VCS_DIRECTORIES, true)) {
+                return $segment;
+            }
         }
 
-        return IgnoreDecision::notIgnored();
+        return null;
     }
 
     /**
@@ -141,11 +166,11 @@ final readonly class PathIgnoreResolver
     {
         $normalizedDisplayPath = str_replace('\\', '/', $displayPath);
 
-        // Test the path against each configured pattern, taking the first that matches.
+
         foreach ($patterns as $pattern) {
-            // First matching glob wins - return it so callers can report which rule excluded the path.
+
             if ($this->matchesPathPattern($normalizedDisplayPath, $pattern)) {
-                // First matching glob wins; return it verbatim so callers can report which rule excluded the path.
+
                 return $pattern;
             }
         }
@@ -154,27 +179,27 @@ final readonly class PathIgnoreResolver
     }
 
     /**
-     * Finds which built-in ignored directory (vendor, node_modules, ...) a path sits under, or null
-     * when it is not inside one - how gruff skips dependency and tooling trees by default.
+     * Finds the first fallback-directory token present in a path, in fallback-list order.
+     * A match alone does not exclude the path; decide() checks caller overrides and .gitignore presence.
      *
      * @param string $displayPath - Project-relative display path being tested.
      *
-     * @return string|null - The matching directory token; null when the path is not default-ignored.
+     * @return string|null - Matching fallback token, or null when none is present in the path.
      */
     public function matchedDefaultDirectory(string $displayPath): ?string
     {
         $normalizedDisplayPath = str_replace('\\', '/', $displayPath);
         $segments              = explode('/', trim($normalizedDisplayPath, '/'));
 
-        // Test the path's segments against each built-in ignored directory.
-        foreach (self::IGNORED_DIRECTORIES as $ignoredDirectory) {
+
+        foreach (self::FALLBACK_DIRECTORIES as $ignoredDirectory) {
             $ignoredSegments = explode('/', $ignoredDirectory);
             $ignoredCount    = count($ignoredSegments);
 
             for ($i = 0, $max = count($segments) - $ignoredCount; $i <= $max; $i++) {
-                // The ignored directory appears somewhere in the path, so the whole path is excluded.
+
                 if (array_slice($segments, $i, $ignoredCount) === $ignoredSegments) {
-                    // A matched directory token anywhere in the path excludes it; return the token that matched.
+
                     return $ignoredDirectory;
                 }
             }
@@ -184,19 +209,79 @@ final readonly class PathIgnoreResolver
     }
 
     /**
-     * Reports whether a path is a known generated or lock file (composer.lock, package-lock.json, ...)
-     * that gruff skips wherever it sits, or null when it is not one.
+     * Finds the outermost third-party or build-output directory on a path, lowercased over ASCII.
+     * A file's own name is not a directory: a/Vendor/X.php yields vendor, while a file named dist does not match.
      *
-     * @param string $absolutePath - Absolute filesystem path being tested.
+     * @param string $displayPath - Project-relative display path being tested.
+     * @param bool   $isDirectory - Whether the path itself is a directory, which makes its own name eligible.
      *
-     * @return string|null - The matching filename; null when the path is not a known generated artifact.
+     * @return string|null - The matched directory name in lowercase; null when no directory on the path is in the class.
      */
-    public function matchedGeneratedFilename(string $absolutePath): ?string
+    private static function matchedThirdPartyDirectory(string $displayPath, bool $isDirectory): ?string
     {
-        $basename = basename($absolutePath);
+        $segments = explode('/', trim(str_replace('\\', '/', $displayPath), '/'));
+        // A file's last segment is its own name, never a directory.
+        if (!$isDirectory) {
+            array_pop($segments);
+        }
 
-        // Match on the bare filename only, so a generated artifact is ignored wherever it sits in the tree.
-        return in_array($basename, self::IGNORED_FILENAMES, true) ? $basename : null;
+
+        foreach ($segments as $segment) {
+            $lowered = strtr($segment, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz');
+            if (in_array($lowered, self::THIRD_PARTY_DIRECTORIES, true)) {
+                return $lowered;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Reports whether a base name uses .min. before its final extension; jquery.min.js matches, but app.min.js.map and admin.mini.php do not.
+     * Comparison lowercases ASCII A-Z only, so JQUERY.MIN.JS matches while non-ASCII look-alikes do not, consistently across ports.
+     *
+     * @param string $fileName - Base name of the candidate file.
+     *
+     * @return bool - True when the name marks a minified file.
+     */
+    public static function isMinifiedName(string $fileName): bool
+    {
+        // Match .min. plus one final dot-free extension after lowercasing ASCII A-Z.
+        return preg_match('/\\.min\\.[^.]+$/D', strtr($fileName, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz')) === 1;
+    }
+
+    /**
+     * Checks whether fallback exclusions apply because no governing ancestor .gitignore is present.
+     * Paths outside the resolved project root use fallback exclusions without inspecting their ancestors.
+     *
+     * @param string $absolutePath - Candidate path, resolved when possible before its parent chain is inspected.
+     *
+     * @return bool - True for paths outside the root, or when no governing ancestor .gitignore is found.
+     */
+    private function shouldApplyFallbackAt(string $absolutePath): bool
+    {
+        $root      = rtrim(str_replace('\\', '/', realpath($this->projectRoot) ?: $this->projectRoot), '/');
+        $candidate = str_replace('\\', '/', realpath($absolutePath) ?: $absolutePath);
+        $parent    = rtrim(str_replace('\\', '/', dirname($candidate)), '/');
+
+        if ($parent !== $root && !str_starts_with($parent, $root . '/')) {
+            return true;
+        }
+
+        while (true) {
+            if (is_file($parent . '/.gitignore')) {
+                return false;
+            }
+            if ($parent === $root) {
+                return true;
+            }
+
+            $next = rtrim(str_replace('\\', '/', dirname($parent)), '/');
+            if ($next === $parent) {
+                return true;
+            }
+            $parent = $next;
+        }
     }
 
     /**
@@ -214,14 +299,12 @@ final readonly class PathIgnoreResolver
 
         // A non-zero exit is git's "not ignored" answer, not an error to surface.
         if ($process->getExitCode() !== 0) {
-            // Non-zero exit is git's "not ignored" signal; report no rule rather than treating it as an error.
             return null;
         }
 
         $output = trim($process->getOutput());
         // Git confirmed the ignore but named no rule, so use the pathspec itself as the label.
         if ($output === '') {
-            // Git confirmed the ignore but gave no rule text, so fall back to the pathspec as the rule label.
             return $pathspec;
         }
 
@@ -230,16 +313,15 @@ final readonly class PathIgnoreResolver
         $rule  = explode(':', $parts[0]);
         $patternText = trim((string) end($rule));
 
-        // Prefer the parsed pattern; fall back to the pathspec when parsing yielded an empty rule.
         return $patternText === '' ? $pathspec : $patternText;
     }
 
     /**
-     * Tests whether a path matches a glob-style ignore pattern, supporting `*`, `**`, and `?`, so
-     * configured ignores behave the way a user expects from .gitignore-style globs.
+     * Matches a normalized path against configured globs supporting *, **, and ?.
+     * Literal paths match descendants; appending /** to a literal directory path also matches the directory itself.
      *
-     * @param string $displayPath - Project-relative path to test; backslashes and edge slashes are normalized here.
-     * @param string $pattern - Glob with `*` (within a segment), `**` (across segments), and `?` placeholders.
+     * @param string $displayPath - Path with separators already normalized to /; edge slashes are trimmed here.
+     * @param string $pattern - Glob with * within a segment, ** across segments, and ? placeholders.
      *
      * @return bool - True when the normalized path matches the pattern.
      */
@@ -248,22 +330,22 @@ final readonly class PathIgnoreResolver
         $normalizedPattern = trim(str_replace('\\', '/', $pattern), '/');
         $normalizedPath    = trim($displayPath, '/');
 
-        // A trailing `/**` matches a directory and everything nested under it.
+        // A trailing /** matches a directory and everything nested under it.
         if (str_ends_with($normalizedPattern, '/**')) {
             $directoryPrefix = substr($normalizedPattern, 0, -3);
-            // The path is that directory itself or sits inside it, so it matches.
+
             if ($directoryPrefix !== '' && ($normalizedPath === $directoryPrefix || str_starts_with($normalizedPath, $directoryPrefix . '/'))) {
                 return true;
             }
         }
 
-        // A plain literal or directory-prefix match needs no glob work, so short-circuit here.
+
         if ($normalizedPattern === $normalizedPath || str_starts_with($normalizedPath, $normalizedPattern . '/')) {
-            // A literal or directory-prefix match needs no glob, so short-circuit before building the regex.
+
             return true;
         }
 
-        // Otherwise translate the glob into a regex and test the path against it.
+        // Anchors require a whole-path match; single-star and question-mark globs stay within a segment, while double-star may cross segments.
         $regex = '#^' . strtr(preg_quote($normalizedPattern, '#'), [
             '\\*\\*' => '.*',
             '\\*' => '[^/]*',

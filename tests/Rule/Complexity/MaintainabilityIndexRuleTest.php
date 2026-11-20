@@ -17,7 +17,9 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers maintainability index computation, threshold stability, rounded metadata, and fractional-threshold preservation in finding messages.
+ * Checks maintainability indices for methods in the cognitive complexity fixture.
+ * Asserts the default advisory threshold, rounded metadata and fractional threshold text.
+ * Verifies that selected test and fixture display paths suppress findings.
  */
 final class MaintainabilityIndexRuleTest extends TestCase
 {
@@ -27,9 +29,9 @@ final class MaintainabilityIndexRuleTest extends TestCase
     private MaintainabilityIndexRule $rule;
 
     /**
-     * Prepare parser fixtures before each rule test.
+     * Give each test an independent maintainability rule and parser.
      *
-     * @return void
+     * @return void - Initializes the parser and rule properties with fresh instances.
      */
     protected function setUp(): void
     {
@@ -40,8 +42,7 @@ final class MaintainabilityIndexRuleTest extends TestCase
     /**
      * Provide index cases for parameterized tests.
      *
-     * @return array<string, array{string, float}> - data-provider rows keyed by case label, each pairing a fixture method name with its
-     *                       hand-computed expected maintainability index
+     * @return array<string, array{string, float}> - Labelled rows pairing a fixture method name with its expected maintainability index.
      */
     public static function indexProvider(): array
     {
@@ -69,7 +70,7 @@ final class MaintainabilityIndexRuleTest extends TestCase
      * @param string $methodName - Fixture method name.
      * @param float  $expectedIndex - Expected maintainability index.
      *
-     * @return void
+     * @return void - Asserts the selected method's index matches the supplied expectation within 0.000000001.
      */
     #[DataProvider('indexProvider')]
     public function testMaintainabilityIndexMatchesExpected(string $methodName, float $expectedIndex): void
@@ -82,7 +83,7 @@ final class MaintainabilityIndexRuleTest extends TestCase
     /**
      * Verify default maintainability thresholds stay stable.
      *
-     * @return void
+     * @return void - Asserts an empty default threshold map and an advisory severity threshold of 35.
      */
     public function testDefinitionThresholdsAreStable(): void
     {
@@ -95,9 +96,9 @@ final class MaintainabilityIndexRuleTest extends TestCase
     }
 
     /**
-     * Verify low maintainability findings include rounded metadata.
+     * Verify rounded metadata and threshold text for the selected deeplyNested finding.
      *
-     * @return void
+     * @return void - Asserts index 64.3, error threshold 65 and matching message text in the selected finding.
      */
     public function testFindingsIncludeRoundedMetadata(): void
     {
@@ -120,9 +121,9 @@ final class MaintainabilityIndexRuleTest extends TestCase
     }
 
     /**
-     * Verify fractional threshold values are preserved in messages.
+     * Verify the oneIf finding retains the fractional warning threshold in its message.
      *
-     * @return void
+     * @return void - Asserts the selected finding exists and its message includes the warning threshold 80.5.
      */
     public function testFractionalThresholdIsPreservedInMessage(): void
     {
@@ -142,9 +143,28 @@ final class MaintainabilityIndexRuleTest extends TestCase
     }
 
     /**
+     * Verify a file in the family's test-path class reports no maintainability finding.
+     *
+     * @return void - Asserts the source-path control emits findings and each tested test or fixture path emits none.
+     */
+    public function testTestPathFilesReportNothing(): void
+    {
+        $config = AnalysisConfig::fromRegistry(\GruffPhp\Rules\RuleRegistry::defaults())->withRuleSettings(
+            MaintainabilityIndexRule::ID,
+            new RuleSettings(true, ['warning' => 200, 'error' => 35]),
+        );
+        $context = new RuleContext(__DIR__ . '/../../..', $config);
+
+        self::assertNotSame([], $this->rule->analyse($this->parseFixture(), $context));
+        foreach (['tests/Unit/CognitiveTest.php', 'src/Fixtures/cognitive.php', 'app/CognitiveTest.php'] as $displayPath) {
+            self::assertSame([], $this->rule->analyse($this->parseFixture($displayPath), $context), $displayPath);
+        }
+    }
+
+    /**
      * Return a named method from the cognitive fixture.
      *
-     * @param AnalysisUnit $analysisUnit - Parsed fixture.
+     * @param AnalysisUnit $analysisUnit - Parsed fixture whose statements are searched for the named method.
      * @param string       $methodName - Fixture method name.
      *
      * @return ClassMethod - the fixture's AST node whose name matches $methodName; fails the test when no such method exists
@@ -155,7 +175,7 @@ final class MaintainabilityIndexRuleTest extends TestCase
 
         foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, ClassMethod::class) as $method) {
             if ($method->name->toString() === $methodName) {
-                // Fixture method names are unique, so the first match is the node under test; stop scanning here.
+                // Fixture method names are unique, so the first match is the node under test.
                 return $method;
             }
         }
@@ -166,12 +186,14 @@ final class MaintainabilityIndexRuleTest extends TestCase
     /**
      * Parse the cognitive fixture into an analysis unit.
      *
-     * @return AnalysisUnit - parsed cognitive fixture carrying its repo-relative display path, ready for rule analysis
+     * @param string $displayPath - Path the unit reports; a source path by default, since test paths report nothing.
+     *
+     * @return AnalysisUnit - parsed cognitive fixture carrying the given display path, ready for rule analysis
      */
-    private function parseFixture(): AnalysisUnit
+    private function parseFixture(string $displayPath = 'src/Complexity/cognitive.php'): AnalysisUnit
     {
         $path = __DIR__ . '/../../Fixtures/Complexity/cognitive.php';
 
-        return $this->parser->parse(new SourceFile($path, 'tests/Fixtures/Complexity/cognitive.php'));
+        return $this->parser->parse(new SourceFile($path, $displayPath));
     }
 }

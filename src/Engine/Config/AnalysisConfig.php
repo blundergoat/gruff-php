@@ -6,18 +6,15 @@ namespace GruffPhp\Engine\Config;
 
 use GruffPhp\Output\Reporter\FailThreshold;
 use GruffPhp\Output\Reporter\FailThresholds;
+use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Rules\RuleRegistry;
 use InvalidArgumentException;
 
 /**
- * The single, resolved configuration a run analyses against, after defaults and the user's config file
- * have been merged.
+ * Holds the resolved settings used throughout one user analysis after defaults and file configuration are merged.
  *
- * Everything the user can tune - which rules run and at what thresholds, the PHP version floor, ignore
- * patterns, naming allowlists, secret allowances, and the exit-code gates - ends up here as one
- * immutable object the whole run reads from. It is built from registry defaults (`fromRegistry`) then
- * layered with the user's settings; the `with*()` methods return adjusted copies rather than mutating,
- * so config stays a stable snapshot for the duration of a run.
+ * It carries rules, thresholds, PHP version, paths, naming allowances, sensitive-data exclusions, and display settings.
+ * `with*()` methods return copies, keeping the user's effective configuration stable for the entire run.
  */
 final readonly class AnalysisConfig
 {
@@ -26,32 +23,39 @@ final readonly class AnalysisConfig
      */
     public const DEFAULT_MINIMUM_PHP_VERSION = 8.3;
 
+    /** Default line ceiling for structural PHP analysis. */
+    public const DEFAULT_DEEP_SCAN_MAX_LINES = 20_000;
+
+    /** Default byte ceiling for structural PHP analysis. */
+    public const DEFAULT_DEEP_SCAN_MAX_BYTES = 2_000_000;
+
     /**
-     * Universal-programming abbreviations seeded into every config so naming.abbreviation-allowlist
-     * does not flood with terms a maintainer would never bother to allowlist by hand. Project-specific
-     * vocabulary (domain acronyms) belongs in the user's `allowlists.acceptedAbbreviations` instead.
-     * `InitCommand::DEFAULT_ACCEPTED_ABBREVIATIONS` references this constant so the two cannot drift.
+     * Common programming abbreviations seeded by fromRegistry() for the naming rules.
+     * Project vocabulary can replace this list through allowlists.acceptedAbbreviations.
+     * InitCommand references this constant to keep generated and runtime defaults aligned.
      *
-     * @var list<string>
+     * @var list<string> - Default abbreviations used by fromRegistry() and InitCommand.
      */
     public const DEFAULT_ACCEPTED_ABBREVIATIONS = [
-        'age', 'app', 'db', 'dto', 'fs', 'id', 'io', 'key', 'log', 'max', 'min', 'now', 'raw', 'rx', 'tx', 'ui', 'url', 'utc',
+        'age', 'app', 'db', 'fs', 'id', 'io', 'key', 'log', 'max', 'min', 'now', 'raw', 'rx', 'tx', 'ui', 'url',
     ];
 
     /**
      * Assembles the effective config from resolved rule settings and run-wide options, refusing a PHP
      * floor gruff cannot support.
      *
-     * @param array<string, RuleSettings>  $rules - Effective settings keyed by rule id.
-     * @param float                        $minimumPhpVersion - Minimum PHP version used by version-sensitive rules.
-     * @param RuleSelection                $ruleSelection - Include/exclude rule selection for the run.
-     * @param list<string>                 $ignoredPathPatterns - Path patterns skipped during discovery.
-     * @param list<string>                 $acceptedAbbreviations - Abbreviations accepted by naming rules.
-     * @param list<string>                 $allowedSecretPreviews - Secret previews explicitly allowed by config.
+     * @param array<string, RuleSettings> $rules - Effective settings keyed by rule id.
+     * @param float $minimumPhpVersion - Minimum PHP version used by version-sensitive rules.
+     * @param RuleSelection $ruleSelection - Include/exclude rule selection for the run.
+     * @param list<string> $ignoredPathPatterns - Path patterns skipped during discovery.
+     * @param list<string> $acceptedAbbreviations - Abbreviations accepted by naming rules.
      * @param array<string, FailThreshold> $minimumSeverity - Per-command exit-code thresholds, keyed by command name.
-     * @param FailThresholds|null          $failureConditions - Severity-bucketed count gate from failureConditions config; null when the user set none.
+     * @param FailThresholds|null $failureConditions - Severity count gate; null means no configured failureConditions block.
+     * @param list<SensitiveExclusion> $sensitiveExclusions - Reviewed exclusions in configuration order; empty applies no exclusions.
+     * @param array{enabled: bool, maxLines: int, maxBytes: int, override: 'default'|'config'|'cli'} $deepScanBudget - Budget and winning source.
+     * @param Severity|null $displayFloor - Lowest displayed severity; null imposes no filter through this setting.
      *
-     * @throws InvalidArgumentException When the PHP version floor is below 7.4.
+     * @throws InvalidArgumentException - When the PHP version floor is below 7.4.
      */
     public function __construct(
         private array           $rules,
@@ -59,11 +63,18 @@ final readonly class AnalysisConfig
         private RuleSelection   $ruleSelection = new RuleSelection(),
         private array           $ignoredPathPatterns = [],
         private array           $acceptedAbbreviations = [],
-        private array           $allowedSecretPreviews = [],
         private array           $minimumSeverity = [],
         private ?FailThresholds $failureConditions = null,
+        private array           $sensitiveExclusions = [],
+        private array           $deepScanBudget = [
+            'enabled' => true,
+            'maxLines' => self::DEFAULT_DEEP_SCAN_MAX_LINES,
+            'maxBytes' => self::DEFAULT_DEEP_SCAN_MAX_BYTES,
+            'override' => 'default',
+        ],
+        private ?Severity       $displayFloor = null,
     ) {
-        // gruff cannot reason about PHP older than 7.4, so a lower floor is rejected outright.
+
         if ($this->minimumPhpVersion < 7.4) {
             throw new InvalidArgumentException('Minimum PHP version must be at least 7.4.');
         }
@@ -81,7 +92,7 @@ final readonly class AnalysisConfig
     {
         $rules = [];
 
-        // Seed each registered rule with its own default enablement, thresholds, and options.
+
         foreach ($registry->all() as $rule) {
             $definition             = $rule->definition();
             $rules[$definition->id] = new RuleSettings(
@@ -102,27 +113,27 @@ final readonly class AnalysisConfig
      * @param string $ruleId - Rule identifier to read.
      *
      * @return RuleSettings - effective settings for the rule; never null, since an unknown id throws instead.
-     * @throws InvalidArgumentException When the rule id is unknown.
+     * @throws InvalidArgumentException - When the rule id is unknown.
      */
     public function ruleSettings(string $ruleId): RuleSettings
     {
         return $this->rules[$ruleId]
-               // An unknown rule id means a caller bug, so throw rather than invent settings.
+
                ?? throw new InvalidArgumentException(sprintf('Unknown rule id "%s".', $ruleId));
     }
 
     /**
      * Returns a copy with one rule's settings swapped in, used as config is layered rule by rule.
      *
-     * @param string       $ruleId - Rule identifier to replace.
+     * @param string       $ruleId   - Rule identifier to replace.
      * @param RuleSettings $settings - New settings for the rule.
      *
      * @return self - Config carrying the updated rule settings.
-     * @throws InvalidArgumentException When the rule id is unknown.
+     * @throws InvalidArgumentException - When the rule id is unknown.
      */
     public function withRuleSettings(string $ruleId, RuleSettings $settings): self
     {
-        // Only a rule that already exists can be overridden; an unknown id is a caller bug.
+
         if (!isset($this->rules[$ruleId])) {
             throw new InvalidArgumentException(sprintf('Unknown rule id "%s".', $ruleId));
         }
@@ -136,9 +147,10 @@ final readonly class AnalysisConfig
             $this->ruleSelection,
             $this->ignoredPathPatterns,
             $this->acceptedAbbreviations,
-            $this->allowedSecretPreviews,
             $this->minimumSeverity,
             $this->failureConditions,
+            $this->sensitiveExclusions,
+            $this->deepScanBudget,
         );
     }
 
@@ -167,16 +179,17 @@ final readonly class AnalysisConfig
             $this->ruleSelection,
             $this->ignoredPathPatterns,
             $this->acceptedAbbreviations,
-            $this->allowedSecretPreviews,
             $this->minimumSeverity,
             $this->failureConditions,
+            $this->sensitiveExclusions,
+            $this->deepScanBudget,
         );
     }
 
     /**
      * Exposes every rule's effective settings, keyed by rule id - what the run iterates to execute rules.
      *
-     * @return array<string, RuleSettings> - every rule's effective settings keyed by rule id; never empty, since the registry seeds one entry per rule.
+     * @return array<string, RuleSettings> - Effective settings keyed by rule id; empty when no settings were supplied.
      */
     public function rules(): array
     {
@@ -208,16 +221,17 @@ final readonly class AnalysisConfig
             $ruleSelection,
             $this->ignoredPathPatterns,
             $this->acceptedAbbreviations,
-            $this->allowedSecretPreviews,
             $this->minimumSeverity,
             $this->failureConditions,
+            $this->sensitiveExclusions,
+            $this->deepScanBudget,
         );
     }
 
     /**
-     * Reads the glob patterns discovery skips, so a run only ever scans what the user wants scanned.
+     * Reads the additional path patterns configured for discovery to skip.
      *
-     * @return list<string> - glob patterns discovery skips; empty means scan every path the discovery roots reach.
+     * @return list<string> - Configured ignore patterns; empty adds no exclusions through this setting.
      */
     public function ignoredPathPatterns(): array
     {
@@ -239,9 +253,10 @@ final readonly class AnalysisConfig
             $this->ruleSelection,
             $ignoredPathPatterns,
             $this->acceptedAbbreviations,
-            $this->allowedSecretPreviews,
             $this->minimumSeverity,
             $this->failureConditions,
+            $this->sensitiveExclusions,
+            $this->deepScanBudget,
         );
     }
 
@@ -249,8 +264,7 @@ final readonly class AnalysisConfig
      * Reads the abbreviations naming rules treat as whole words, so a project's known short forms are
      * not flagged as bad names.
      *
-     * @return list<string> - abbreviations naming rules treat as words; the single stored list (built-in seed or the user's wholesale replacement),
-     *                      never a merge of both.
+     * @return list<string> - Stored allowlist, without merging defaults; empty adds no accepted abbreviations.
      */
     public function acceptedAbbreviations(): array
     {
@@ -272,42 +286,10 @@ final readonly class AnalysisConfig
             $this->ruleSelection,
             $this->ignoredPathPatterns,
             $acceptedAbbreviations,
-            $this->allowedSecretPreviews,
             $this->minimumSeverity,
             $this->failureConditions,
-        );
-    }
-
-    /**
-     * Reads the redacted secret previews the user has cleared, so sensitive-data rules stop flagging
-     * the known false positives.
-     *
-     * @return list<string> - redacted secret previews cleared as false positives; sensitive-data rules suppress findings matching these, empty means
-     *                      suppress none.
-     */
-    public function allowedSecretPreviews(): array
-    {
-        return $this->allowedSecretPreviews;
-    }
-
-    /**
-     * Returns a copy with a different allowed-secret-preview list.
-     *
-     * @param list<string> $allowedSecretPreviews - Secret previews explicitly allowed by config.
-     *
-     * @return self - Config carrying the updated allowed secret preview list.
-     */
-    public function withAllowedSecretPreviews(array $allowedSecretPreviews): self
-    {
-        return new self(
-            $this->rules,
-            $this->minimumPhpVersion,
-            $this->ruleSelection,
-            $this->ignoredPathPatterns,
-            $this->acceptedAbbreviations,
-            $allowedSecretPreviews,
-            $this->minimumSeverity,
-            $this->failureConditions,
+            $this->sensitiveExclusions,
+            $this->deepScanBudget,
         );
     }
 
@@ -339,10 +321,45 @@ final readonly class AnalysisConfig
             $this->ruleSelection,
             $this->ignoredPathPatterns,
             $this->acceptedAbbreviations,
-            $this->allowedSecretPreviews,
             $minimumSeverity,
             $this->failureConditions,
+            $this->sensitiveExclusions,
+            $this->deepScanBudget,
+            $this->displayFloor,
         );
+    }
+
+    /**
+     * Returns a copy carrying the report's display floor, the configuration form of the family's `--min-severity`.
+     *
+     * @param Severity $displayFloor - Lowest severity a report shows; it never changes an exit code, a score, or a baseline.
+     *
+     * @return self - Config carrying the display floor the reporter applies.
+     */
+    public function withDisplayFloor(Severity $displayFloor): self
+    {
+        return new self(
+            $this->rules,
+            $this->minimumPhpVersion,
+            $this->ruleSelection,
+            $this->ignoredPathPatterns,
+            $this->acceptedAbbreviations,
+            $this->minimumSeverity,
+            $this->failureConditions,
+            $this->sensitiveExclusions,
+            $this->deepScanBudget,
+            $displayFloor,
+        );
+    }
+
+    /**
+     * Reads the configured display floor, so a report can hide what the project asked it to hide.
+     *
+     * @return Severity|null - Configured display floor, or null when this setting imposes no severity filter.
+     */
+    public function displayFloor(): ?Severity
+    {
+        return $this->displayFloor;
     }
 
     /**
@@ -370,9 +387,93 @@ final readonly class AnalysisConfig
             $this->ruleSelection,
             $this->ignoredPathPatterns,
             $this->acceptedAbbreviations,
-            $this->allowedSecretPreviews,
             $this->minimumSeverity,
             $failureConditions,
+            $this->sensitiveExclusions,
+            $this->deepScanBudget,
+        );
+    }
+
+    /**
+     * Reads the reviewed sensitive-data exclusions that may hide a finding, each carrying the
+     * rationale its author wrote and each counted in the report's audit rows.
+     *
+     * @return list<SensitiveExclusion> - Exclusions in configuration order; each position is its audit index; empty adds none through this setting.
+     */
+    public function sensitiveExclusions(): array
+    {
+        return $this->sensitiveExclusions;
+    }
+
+    /**
+     * Returns a copy carrying a different set of sensitive-data exclusions.
+     *
+     * @param list<SensitiveExclusion> $sensitiveExclusions - Validated exclusions in configuration order.
+     *
+     * @return self - Config carrying the updated sensitive-data exclusions.
+     */
+    public function withSensitiveExclusions(array $sensitiveExclusions): self
+    {
+        return new self(
+            $this->rules,
+            $this->minimumPhpVersion,
+            $this->ruleSelection,
+            $this->ignoredPathPatterns,
+            $this->acceptedAbbreviations,
+            $this->minimumSeverity,
+            $this->failureConditions,
+            $sensitiveExclusions,
+            $this->deepScanBudget,
+        );
+    }
+
+    /**
+     * Reads the effective structural-analysis budget and whether defaults, config, or CLI supplied it.
+     *
+     * @return array{enabled: bool, maxLines: int, maxBytes: int, override: 'default'|'config'|'cli'} - Effective bounds and their source.
+     */
+    public function deepScanBudget(): array
+    {
+        return $this->deepScanBudget;
+    }
+
+    /**
+     * Returns a copy carrying a validated structural-analysis budget.
+     *
+     * @param bool $enabled - Whether the size guard runs; false disables only the size limit check.
+     * @param int $maxLines - Line count above which deep script analysis is skipped; must be positive.
+     * @param int $maxBytes - Byte count above which deep script analysis is skipped; must be positive.
+     * @param string $override - Source that supplied the effective value; must be default, config, or cli.
+     *
+     * @return self - A copy carrying the budget; the receiver is left unchanged.
+     *
+     * @throws InvalidArgumentException - When either bound is below 1, or the override names a layer other than default, config, or cli.
+     */
+    public function withDeepScanBudget(bool $enabled, int $maxLines, int $maxBytes, string $override): self
+    {
+        if ($maxLines < 1 || $maxBytes < 1) {
+            throw new InvalidArgumentException('Deep-scan limits must be positive integers.');
+        }
+
+        if (!in_array($override, ['default', 'config', 'cli'], true)) {
+            throw new InvalidArgumentException('Deep-scan override must be default, config, or cli.');
+        }
+
+        return new self(
+            $this->rules,
+            $this->minimumPhpVersion,
+            $this->ruleSelection,
+            $this->ignoredPathPatterns,
+            $this->acceptedAbbreviations,
+            $this->minimumSeverity,
+            $this->failureConditions,
+            $this->sensitiveExclusions,
+            [
+                'enabled' => $enabled,
+                'maxLines' => $maxLines,
+                'maxBytes' => $maxBytes,
+                'override' => $override,
+            ],
         );
     }
 }

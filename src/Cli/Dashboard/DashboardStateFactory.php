@@ -22,44 +22,44 @@ final class DashboardStateFactory
     /**
      * Seeds the dashboard form the first time the user opens it, straight from their launch flags.
      *
-     * @param InputInterface $input - Console input used to seed dashboard controls.
+     * @param InputInterface $input       - Console input used to seed dashboard controls.
      * @param string         $projectRoot - Active project root for the dashboard.
      *
      * @return array{project: string, paths: string, scanScope: string, failOn: string, config: string, baseline: string, noBaseline: string,
-     *                        noConfig: string, includeIgnored: string, reportInteractive: string} - initial form control values for an unsubmitted
+     *                        noConfig: string, deepScanBudget: string, includeIgnored: string, reportInteractive: string} - initial form control values for an unsubmitted
      *                        dashboard, with CLI options applied and checkbox flags as "1"/"0" strings
      */
     public function defaultQuery(InputInterface $input, string $projectRoot): array
     {
-        /** @var list<string> $paths The command definition declares a variadic paths argument. */
-        $paths     = $input->getArgument('paths');
-        $baseline  = $input->hasParameterOption('--baseline', true)
+        /** @var list<string> $paths - The command definition declares a variadic paths argument. */
+        $paths    = $input->getArgument('paths');
+        $baseline = $input->hasParameterOption('--baseline', true)
             ? ($this->optionalStringOption($input, 'baseline') ?? 'gruff-baseline.json')
             : '';
         // No launch paths means "scan the whole project", so fall back to '.' before quoting for the form field.
         $pathState = implode(' ', array_map($this->pathToken(...), $paths === [] ? ['.'] : $paths));
 
         return [
-            'project'           => $projectRoot,
-            'paths'             => $pathState,
-            'scanScope'         => $input->hasParameterOption('--diff', true) ? 'diff' : 'full',
-            'failOn'            => $this->resolveDashboardFailOn($input, $projectRoot),
-            'config'            => $this->optionalStringOption($input, 'config') ?? ConfigLoader::DEFAULT_CONFIG_FILE,
-            'baseline'          => $baseline,
-            'noBaseline'        => (bool)$input->getOption('no-baseline') ? '1' : '0',
-            'noConfig'          => (bool)$input->getOption('no-config') ? '1' : '0',
-            'includeIgnored'    => (bool)$input->getOption('include-ignored') ? '1' : '0',
+            'project' => $projectRoot,
+            'paths' => $pathState,
+            'scanScope' => $input->hasParameterOption('--diff', true) ? 'diff' : 'full',
+            'failOn' => $this->resolveDashboardFailOn($input, $projectRoot),
+            'config' => $this->optionalStringOption($input, 'config') ?? ConfigLoader::DEFAULT_CONFIG_FILE,
+            'baseline' => $baseline,
+            'noBaseline' => (bool)$input->getOption('no-baseline') ? '1' : '0',
+            'noConfig' => (bool)$input->getOption('no-config') ? '1' : '0',
+            'deepScanBudget' => $this->optionalStringOption($input, 'deep-scan-budget') ?? '',
+            'includeIgnored' => (bool)$input->getOption('include-ignored') ? '1' : '0',
             'reportInteractive' => '0',
         ];
     }
 
     /**
-     * Re-encodes a path so the form field survives the round-trip back through the scan tokenizer.
+     * Encodes a console path for the dashboard field; an empty path is later treated as absent.
      *
      * @param string $path - Console path argument.
      *
-     * @return string - the path re-encoded so DashboardScanCommandBuilder::parsePaths() round-trips it intact, quoted and escaped only when it
-     *                contains characters the tokenizer would split on
+     * @return string - Encoded token; non-empty paths round-trip intact, while an empty path is later treated as absent.
      */
     private function pathToken(string $path): string
     {
@@ -74,11 +74,10 @@ final class DashboardStateFactory
     /**
      * Chooses the dashboard's starting project root from the user's --project flags or the launch dir.
      *
-     * @param InputInterface $input - Console input containing the optional project override.
+     * @param InputInterface $input      - Console input containing the optional project override.
      * @param string         $launchRoot - Shell working directory that launched the dashboard.
      *
-     * @return string|null - canonical project root chosen from --project-root/--project/launchRoot; null when the resolved path is not an existing
-     *                     directory
+     * @return string|null - Canonical directory from --project-root, then --project, then $launchRoot; null if resolution fails.
      */
     public function initialProjectRoot(InputInterface $input, string $launchRoot): ?string
     {
@@ -92,12 +91,12 @@ final class DashboardStateFactory
     /**
      * Merges a submitted dashboard form over the launch defaults, producing the state a scan runs from.
      *
-     * @param InputInterface        $input - Console input used to seed dashboard defaults.
+     * @param InputInterface        $input       - Console input used to seed dashboard defaults.
      * @param string                $projectRoot - Active project root for the dashboard.
-     * @param array<string, string> $query - Request query values from the dashboard form.
+     * @param array<string, string> $query       - Request query values from the dashboard form.
      *
      * @return array{project: string, paths: string, scanScope: string, failOn: string, config: string, baseline: string, noBaseline: string,
-     *                        noConfig: string, includeIgnored: string, reportInteractive: string} - merged form state where submitted query values
+     *                        noConfig: string, deepScanBudget: string, includeIgnored: string, reportInteractive: string} - merged form state where submitted query values
      *                        override defaults and checkbox flags resolve to "1"/"0" strings
      */
     public function state(InputInterface $input, string $projectRoot, array $query): array
@@ -107,15 +106,16 @@ final class DashboardStateFactory
         $isSubmittedForm = $query !== [];
 
         return [
-            'project'           => $query['project'] ?? $defaults['project'],
-            'paths'             => $query['paths'] ?? $defaults['paths'],
-            'scanScope'         => $scanScope === 'diff' ? 'diff' : 'full',
-            'failOn'            => $query['failOn'] ?? $defaults['failOn'],
-            'config'            => $query['config'] ?? $defaults['config'],
-            'baseline'          => $query['baseline'] ?? $defaults['baseline'],
-            'noBaseline'        => $this->checkboxState('noBaseline', $query, $defaults, $isSubmittedForm),
-            'noConfig'          => $this->checkboxState('noConfig', $query, $defaults, $isSubmittedForm),
-            'includeIgnored'    => $this->checkboxState('includeIgnored', $query, $defaults, $isSubmittedForm),
+            'project' => $query['project'] ?? $defaults['project'],
+            'paths' => $query['paths'] ?? $defaults['paths'],
+            'scanScope' => $scanScope === 'diff' ? 'diff' : 'full',
+            'failOn' => $query['failOn'] ?? $defaults['failOn'],
+            'config' => $query['config'] ?? $defaults['config'],
+            'baseline' => $query['baseline'] ?? $defaults['baseline'],
+            'noBaseline' => $this->checkboxState('noBaseline', $query, $defaults, $isSubmittedForm),
+            'noConfig' => $this->checkboxState('noConfig', $query, $defaults, $isSubmittedForm),
+            'deepScanBudget' => $query['deepScanBudget'] ?? $defaults['deepScanBudget'],
+            'includeIgnored' => $this->checkboxState('includeIgnored', $query, $defaults, $isSubmittedForm),
             'reportInteractive' => $this->checkboxState('reportInteractive', $query, $defaults, $isSubmittedForm),
         ];
     }
@@ -123,17 +123,16 @@ final class DashboardStateFactory
     /**
      * Reads one dashboard checkbox back from the submitted form, honouring HTML's "absent means off".
      *
-     * @param string                $key - Checkbox state key (such as noBaseline) to resolve.
-     * @param array<string, string> $query - Raw request query; an unchecked HTML checkbox is absent, not "0".
-     * @param array<string, string> $defaults - Initial state used only before the first submission.
-     * @param bool                  $isSubmittedForm - True once any query value was posted, so a missing box means off.
+     * @param string                $key             - Checkbox state key (such as noBaseline) to resolve.
+     * @param array<string, string> $query           - Raw request query; an unchecked HTML checkbox is absent, not "0".
+     * @param array<string, string> $defaults - Initial state used when this request has no query values.
+     * @param bool $isSubmittedForm - True when this request has any query values, so a missing box means off.
      *
-     * @return string - "1" when the box resolves to checked, else "0"; an absent key on a submitted form reads as off, falling back to the default
-     *                only before the first submission
+     * @return string - "1" or "0"; absent keys use defaults only when $isSubmittedForm is false.
      */
     private function checkboxState(string $key, array $query, array $defaults, bool $isSubmittedForm): string
     {
-        // The form sent this key explicitly; normalise anything other than "1" to off.
+
         if (array_key_exists($key, $query)) {
             return $query[$key] === '1' ? '1' : '0';
         }
@@ -143,14 +142,14 @@ final class DashboardStateFactory
             return '0';
         }
 
-        // No submission yet, so fall back to the initial default for this control.
+
         return $defaults[$key] === '1' ? '1' : '0';
     }
 
     /**
      * Canonicalises a project path and confirms it exists, so scans never point at a missing directory.
      *
-     * @param string $project - Project path from the request or command input.
+     * @param string $project  - Project path from the request or command input.
      * @param string $baseRoot - Base directory used for relative project paths.
      *
      * @return string|null - realpath-canonicalised absolute directory when it exists, or null signalling an invalid or missing project root
@@ -164,13 +163,12 @@ final class DashboardStateFactory
     }
 
     /**
-     * Picks the dashboard's initial `--fail-on` by precedence: explicit flag, then config, then `none`.
+     * Chooses the initial dashboard threshold; a present --fail-on flag bypasses configuration.
      *
-     * @param InputInterface $input - Console input for the dashboard command.
-     * @param string         $projectRoot - Active project root resolved from --project/--project-root.
+     * @param InputInterface $input       - Console input for the dashboard command.
+     * @param string $projectRoot - Active project root used to load the initial dashboard threshold.
      *
-     * @return string - fail-on threshold from the precedence chain (explicit flag, then config, then "none"), never null so the form always has an
-     *                initial value
+     * @return string - With --fail-on, its non-empty string value or "none"; otherwise the configured threshold or "none".
      */
     private function resolveDashboardFailOn(InputInterface $input, string $projectRoot): string
     {
@@ -183,21 +181,17 @@ final class DashboardStateFactory
     }
 
     /**
-     * Best-effort read of `minimumSeverity.dashboard` from the project config to seed the initial form.
+     * Reads failOn.dashboard from configuration resolved against the selected project root.
+     * Invalid configuration leaves the initial form usable by falling back to the caller's default.
      *
-     * Config errors are swallowed on purpose: the request handler re-loads the same config and reports
-     * them, so this lookup just seeds the initial form value and returns null to fall back to the default.
-     * The config is read from the resolved project root, not the shell's cwd, so launching from outside
-     * the target project still reads the right `.gruff-php.yaml`.
-     *
-     * @param InputInterface $input - Console input for the dashboard command.
+     * @param InputInterface $input       - Console input for the dashboard command.
      * @param string         $projectRoot - Resolved project root to load config from.
      *
-     * @return string|null - configured minimumSeverity.dashboard value, or null when --no-config is set, the key is unset, or config loading failed
+     * @return string|null - Configured dashboard threshold; null if config is disabled, loading fails, or no threshold is set.
      */
     private function loadConfigFailThreshold(InputInterface $input, string $projectRoot): ?string
     {
-        // The user asked to skip config, so there is nothing to read a threshold from.
+
         if ((bool)$input->getOption('no-config')) {
             return null;
         }
@@ -206,7 +200,7 @@ final class DashboardStateFactory
             $config = (new ConfigLoader($projectRoot, ConfigLoader::packageRoot()))
                 ->load($this->optionalStringOption($input, 'config'), RuleRegistry::defaults());
         } catch (ConfigException) {
-            // Swallow config errors: the request handler re-loads config and reports them; this lookup just seeds the form.
+            // Invalid config must not block the form; return null so the caller can use its default threshold.
             return null;
         }
 
@@ -214,17 +208,16 @@ final class DashboardStateFactory
     }
 
     /**
-     * Reads a non-empty string option, collapsing "unset" and "" so callers can `??` a single fallback.
+     * Reads a non-empty string option, returning null for unset, empty or non-string values so callers can use one fallback.
      *
      * @param InputInterface $input - Console input to read.
-     * @param string         $name - Option name without leading dashes.
+     * @param string         $name  - Option name without leading dashes.
      *
-     * @return string|null - the option's non-empty string value, or null collapsing both "undefined on this command" and "" so callers can ?? a
-     *                     single fallback
+     * @return string|null - Non-empty string option, or null when the option is undefined, empty, or not a string.
      */
     public function optionalStringOption(InputInterface $input, string $name): ?string
     {
-        // The option isn't defined on this command at all, so there's nothing to read.
+
         if (!$input->hasOption($name)) {
             return null;
         }

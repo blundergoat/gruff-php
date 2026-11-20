@@ -14,8 +14,9 @@ use Symfony\Component\Console\Input\StringInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 
 /**
- * Covers CLI rule-filter validation order: an unknown --include-rule/--exclude-rule id must fail as a usage error before the missing-config init
- * prompt may run (and write `.gruff-php.yaml`) for a run that was already doomed by invalid input.
+ * Verifies analyse and report reject an unknown --include-rule before offering config initialization.
+ * A consenting input stream makes an early prompt visible through prompt text or config creation.
+ * Checks the usage-error exit code, the unknown-rule message, no prompt text, and no generated config.
  */
 final class RuleFilterPromptOrderTest extends TestCase
 {
@@ -27,7 +28,7 @@ final class RuleFilterPromptOrderTest extends TestCase
     /**
      * Verify analyse rejects an unknown rule filter before offering the init prompt.
      *
-     * @return void
+     * @return void - Asserts the analyse usage error, missing prompt text, and absent config file.
      */
     public function testAnalyseRejectsUnknownRuleFilterBeforeInitPrompt(): void
     {
@@ -37,7 +38,7 @@ final class RuleFilterPromptOrderTest extends TestCase
     /**
      * Verify report rejects an unknown rule filter before offering the init prompt.
      *
-     * @return void
+     * @return void - Asserts the report usage error, missing prompt text, and absent config file.
      */
     public function testReportRejectsUnknownRuleFilterBeforeInitPrompt(): void
     {
@@ -45,16 +46,12 @@ final class RuleFilterPromptOrderTest extends TestCase
     }
 
     /**
-     * Run the command with an unknown --include-rule id and a consenting interactive stream in a config-less project.
-     *
-     * Locks the ordering regression where the init offer ran before rule-filter
-     * validation: answering "y" wrote `.gruff-php.yaml`, then the run exited
-     * with the unknown-rule usage error anyway - a side effect after invalid
-     * CLI input.
+     * Assert an unknown --include-rule is rejected before a missing-config init offer.
+     * A consenting answer stream exposes an early prompt through output or config creation.
      *
      * @param string $commandName - Console command under test (analyse or report).
      *
-     * @return void
+     * @return void - Asserts a usage error, the unknown-rule message, no prompt text, and no default config.
      */
     private function assertRejectsUnknownRuleFilterBeforeInitPrompt(string $commandName): void
     {
@@ -105,7 +102,7 @@ final class RuleFilterPromptOrderTest extends TestCase
      *
      * @param callable(string): void $callable - Closure that receives the project root.
      *
-     * @return void
+     * @return void - Invokes CWD restoration and project cleanup in finally after the callback, including when it throws.
      */
     private function withTemporaryProject(callable $callable): void
     {
@@ -128,12 +125,12 @@ final class RuleFilterPromptOrderTest extends TestCase
      *
      * @param string $path - Absolute path to remove.
      *
-     * @return void
+     * @return void - Asserts successful traversal and deletion; does nothing for paths that are not directories.
      */
     private function removeTempDirectory(string $path): void
     {
         if (!is_dir($path)) {
-            // Already gone (or never created), so there is nothing to recurse into.
+
             return;
         }
 

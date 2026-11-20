@@ -15,8 +15,9 @@ use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputOption;
 
 /**
- * Covers dashboard scan caching: source-fingerprint and content-hash invalidation, diff and include-ignored bypass, config/baseline change
- * invalidation, and error rendering for empty or timed-out scans.
+ * Covers dashboard scan caching using temporary projects and stub scanner scripts.
+ * Checks source edits, config and baseline changes, and requests that bypass the cache.
+ * Also checks error text for invalid project roots, empty output, and timeouts.
  */
 final class DashboardScanRunnerTest extends TestCase
 {
@@ -26,7 +27,7 @@ final class DashboardScanRunnerTest extends TestCase
     /**
      * Remove temporary projects created by tests.
      *
-     * @return void
+     * @return void - Removes project directories registered by projectDir().
      */
     protected function tearDown(): void
     {
@@ -38,7 +39,7 @@ final class DashboardScanRunnerTest extends TestCase
     /**
      * Verify full scans are cached until source fingerprints change.
      *
-     * @return void
+     * @return void - Asserts cache reuse before a source edit, a new scan afterward, and a metadata marker in the first result.
      */
     public function testFullScanUsesCacheUntilSourceFingerprintChanges(): void
     {
@@ -61,7 +62,7 @@ final class DashboardScanRunnerTest extends TestCase
     /**
      * Verify diff and include-ignored scans bypass the dashboard cache.
      *
-     * @return void
+     * @return void - Asserts that the two diff requests and two include-ignored requests invoke the stub four times.
      */
     public function testDiffAndIncludeIgnoredScansBypassCache(): void
     {
@@ -80,7 +81,7 @@ final class DashboardScanRunnerTest extends TestCase
     /**
      * Verify config and baseline file changes invalidate cached full scans.
      *
-     * @return void
+     * @return void - Asserts cache reuse before a config edit and new scans after that edit and baseline creation.
      */
     public function testConfigAndBaselineChangesInvalidateFullScanCache(): void
     {
@@ -105,9 +106,9 @@ final class DashboardScanRunnerTest extends TestCase
     }
 
     /**
-     * Verify same-size same-mtime file edits invalidate cached full scans.
+     * Verify a source rewrite produces a new full-scan result.
      *
-     * @return void
+     * @return void - Asserts that the result and invocation count advance after the source rewrite.
      */
     public function testContentHashInvalidatesSameSizeSameMtimeChanges(): void
     {
@@ -129,9 +130,9 @@ final class DashboardScanRunnerTest extends TestCase
     }
 
     /**
-     * Verify no-config and no-baseline remove those files from cache invalidation.
+     * Verify config and baseline creation preserves a cached src scan when both are disabled.
      *
-     * @return void
+     * @return void - Asserts reuse after config and baseline files are created with both exclusions enabled.
      */
     public function testNoConfigAndNoBaselineIgnoreConfigFileChangesForCache(): void
     {
@@ -153,7 +154,7 @@ final class DashboardScanRunnerTest extends TestCase
     /**
      * Verify invalid project roots render a dashboard error.
      *
-     * @return void
+     * @return void - Asserts that the returned HTML contains the invalid-directory message and exit code 2.
      */
     public function testInvalidProjectRootRendersError(): void
     {
@@ -168,7 +169,7 @@ final class DashboardScanRunnerTest extends TestCase
     /**
      * Verify empty scan output renders stderr detail.
      *
-     * @return void
+     * @return void - Asserts that the returned HTML contains the missing-output message and the stub's stderr detail.
      */
     public function testEmptyScanOutputRendersErrorDetail(): void
     {
@@ -183,7 +184,7 @@ final class DashboardScanRunnerTest extends TestCase
     /**
      * Verify timed out scan processes render a dashboard error.
      *
-     * @return void
+     * @return void - Asserts that the returned HTML contains the missing-output message and timeout detail.
      */
     public function testTimedOutScanRendersErrorDetail(): void
     {
@@ -199,9 +200,9 @@ final class DashboardScanRunnerTest extends TestCase
     /**
      * Build a runner fixture.
      *
-     * @param string $binary - Fake gruff-php binary path.
+     * @param string $binary - Stub script path supplied to the runner for scan requests.
      *
-     * @return DashboardScanRunner - runner wired to the fake binary so scans run hermetically without the real CLI
+     * @return DashboardScanRunner - Runner that uses the supplied binary path for scan subprocesses.
      */
     private function runner(string $binary): DashboardScanRunner
     {
@@ -211,7 +212,7 @@ final class DashboardScanRunnerTest extends TestCase
     /**
      * Build a request context for a project.
      *
-     * @param string $project - Project root.
+     * @param string $project - Project directory used as both the scan root and launch root.
      *
      * @return DashboardRequestContext - loopback request context rooted at the project with a short scan timeout
      */
@@ -223,7 +224,7 @@ final class DashboardScanRunnerTest extends TestCase
     /**
      * Build dashboard console input defaults.
      *
-     * @return ArrayInput - empty input carrying only the option definitions the runner reads from the request
+     * @return ArrayInput - Input with a paths argument and dashboard options; no values are explicitly supplied.
      */
     private function input(): ArrayInput
     {
@@ -257,9 +258,9 @@ final class DashboardScanRunnerTest extends TestCase
     /**
      * Create a fake gruff-php executable.
      *
-     * @param string $mode - Fake executable mode.
+     * @param string $mode - 'empty' writes stderr, 'slow' delays, and every other value emits counted HTML.
      *
-     * @return string - filesystem path to the executable stub whose output matches the requested mode (counter/empty/slow)
+     * @return string - Filesystem path to the executable stub generated for the requested mode.
      */
     private function fakeGruffBinary(string $mode): string
     {
@@ -286,14 +287,14 @@ PHP,
     /**
      * Recursively remove a temporary directory.
      *
-     * @param string $directory - Directory to remove.
+     * @param string $directory - Directory tree to delete; paths that are not directories are left alone.
      *
-     * @return void
+     * @return void - Deletes directory contents and the directory itself, or does nothing for a non-directory.
      */
     private function removeDir(string $directory): void
     {
         if (!is_dir($directory)) {
-            // Nothing to remove when the dir was never created; keep teardown idempotent.
+            // No directory remains, so repeated teardown stays harmless.
             return;
         }
 

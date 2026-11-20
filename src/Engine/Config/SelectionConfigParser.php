@@ -9,13 +9,11 @@ use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Rules\RuleRegistry;
 
 /**
- * Parses the `selection` config block into the include and exclude filters that decide which rules run.
+ * Parses the `selection` block into include and exclude filters that decide which rules run.
+ * Validates keys and named tiers, pillars, and rule ids before building a RuleSelection.
  *
- * A user narrows their scan by writing a `selection:` block - include only certain tiers, pillars, or
- * rules, or exclude some. This turns that raw YAML into a validated `RuleSelection`: it rejects unknown
- * keys, checks every named tier, pillar, and rule id actually exists, and bounds how deeply nested a
- * value can be - so a typo in the selection block becomes a clear config error the user can fix, not a
- * silently misapplied filter.
+ * Nested arrays are limited to four levels within each selection value; malformed input raises a config error.
+ * Retired rule ids are stored under their current ids so filters match current findings.
  *
  * @phpstan-type ConfigScalar bool|float|int|object|string|null
  * @phpstan-type ConfigValue ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key,
@@ -25,23 +23,23 @@ use GruffPhp\Rules\RuleRegistry;
 final readonly class SelectionConfigParser
 {
     /**
-     * Wires in the string-list parser used to decode each selection sub-list.
+     * Creates a selection parser that validates each configured list through the supplied parser.
      *
-     * @param StringListConfigParser $stringListConfigParser - Parser used for scalar/list selection values.
+     * @param StringListConfigParser $stringListConfigParser - Parser that validates selection values as lists of non-empty strings.
      */
     public function __construct(private StringListConfigParser $stringListConfigParser = new StringListConfigParser())
     {
     }
 
     /**
-     * Turns the raw `selection` block into validated include and exclude filters, rejecting unknown keys
+     * Turns the raw selection block into validated include and exclude filters, rejecting unknown keys
      * and invalid names before the run trusts them.
      *
      * @param ConfigValue  $decodedValue - Raw selection config value.
      * @param RuleRegistry $registry - Registry used to validate selected rule ids.
      *
      * @return RuleSelection - the include/exclude filters (tiers, pillars, rule ids) deciding which rules apply.
-     * @throws ConfigException When the selection config has unknown keys or invalid values.
+     * @throws ConfigException - When the selection config has unknown keys or invalid values.
      */
     public function parse(object|array|string|int|float|bool|null $decodedValue, RuleRegistry $registry): RuleSelection
     {
@@ -58,18 +56,16 @@ final readonly class SelectionConfigParser
     }
 
     /**
-     * Rejects any unrecognised key in the selection block, so a misspelled key fails loudly instead of
-     * being silently ignored.
+     * Rejects any unrecognised key in the selection block, so a misspelled key fails loudly instead of being silently ignored.
      *
      * @param ConfigObject $selection - Decoded selection block whose keys are validated before per-list parsing.
      *
-     * @return void
+     * @return void - Returns when every key belongs to the supported selection-key set.
      */
     private function assertKnownKeys(array $selection): void
     {
-        // Check each key the user wrote against the handful the selection block supports.
+
         foreach (array_keys($selection) as $key) {
-            // An unrecognised key is almost always a typo, so name it in the error rather than ignore it.
             if (!in_array($key, ['tiers', 'pillars', 'rules', 'excludePillars', 'excludeRules'], true)) {
                 throw new ConfigException(sprintf('Unknown config key "selection.%s".', $key));
             }
@@ -79,22 +75,21 @@ final readonly class SelectionConfigParser
     /**
      * Reads and validates the included tier names, so a run only ever filters by tiers that exist.
      *
-     * @param ConfigObject $selection - Decoded selection block; an absent `tiers` key means no tier filter.
+     * @param ConfigObject $selection - Decoded selection block; an absent tiers key means no tier filter.
      *
      * @return list<string> - included tier names, each a valid RuleTier; empty when no tier filter is configured.
      */
     private function tiers(array $selection): array
     {
-        // No `tiers` key means the user set no tier filter, so return an empty list.
         if (!array_key_exists('tiers', $selection)) {
             return [];
         }
 
         $tiers = $this->stringListConfigParser->parse($this->configValue($selection['tiers']), 'selection.tiers', false, false);
 
-        // Check each named tier is a real one before trusting it.
+
         foreach ($tiers as $tier) {
-            // An unknown tier name is a config mistake, so reject it by name.
+
             if (RuleTier::tryFrom($tier) === null) {
                 throw new ConfigException(sprintf('Unknown rule tier "selection.tiers.%s".', $tier));
             }
@@ -104,8 +99,7 @@ final readonly class SelectionConfigParser
     }
 
     /**
-     * Reads and validates one pillar list (include or exclude), so a run only filters by pillars that
-     * exist.
+     * Validates one include or exclude list so selection filters name existing pillars.
      *
      * @param ConfigObject $selection - Decoded selection block; the named key decides include versus exclude semantics.
      * @param string       $key - Which selection sub-list to read, 'pillars' (include) or 'excludePillars'.
@@ -121,9 +115,9 @@ final readonly class SelectionConfigParser
 
         $pillars = $this->stringListConfigParser->parse($this->configValue($selection[$key]), 'selection.' . $key, false, false);
 
-        // Check each named pillar is a real one before trusting it.
+
         foreach ($pillars as $pillar) {
-            // An unknown pillar name is a config mistake, so reject it by name.
+
             if (Pillar::tryFrom($pillar) === null) {
                 throw new ConfigException(sprintf('Unknown pillar "selection.%s.%s".', $key, $pillar));
             }
@@ -140,7 +134,7 @@ final readonly class SelectionConfigParser
      * @param string       $key - Which selection sub-list to read, 'rules' (include) or 'excludeRules'.
      * @param RuleRegistry $registry - Source of truth for valid rule ids; unknown ids are rejected.
      *
-     * @return list<string> - configured rule ids for this include/exclude side, each recognised by the registry; empty when the key is absent.
+     * @return list<string> - this side's rule ids, each known to the registry, a retired id replaced by its current one; empty when the key is absent
      */
     private function ruleIds(array $selection, string $key, RuleRegistry $registry): array
     {
@@ -151,37 +145,38 @@ final readonly class SelectionConfigParser
 
         $ruleIds = $this->stringListConfigParser->parse($this->configValue($selection[$key]), 'selection.' . $key, false, false);
 
-        // Check each rule id is one the registry knows before trusting it.
+
         foreach ($ruleIds as $ruleId) {
-            // An unknown rule id is a config mistake, so reject it by name.
+
             if (!$registry->has($ruleId)) {
                 throw new ConfigException(sprintf('Unknown rule id "%s" in "selection.%s".', $ruleId, $key));
             }
         }
 
-        return $ruleIds;
+        // A 0.5 config may still list a retired id; the selection stores its replacement so it filters today's findings.
+        return array_map(RuleRegistry::canonicalRuleId(...), $ruleIds);
     }
 
     /**
-     * Confirms the selection block is an object (not a list or scalar) and normalises it, so the per-key
-     * readers can rely on its shape.
+     * Requires a string-keyed selection map, accepting an empty array as an empty block.
+     * Validates nested values before the per-key readers use the block.
      *
-     * @param ConfigValue $decodedValue - Raw decoded `selection` value before object-shape validation.
+     * @param ConfigValue $decodedValue - Raw decoded selection value before object-shape validation.
      *
-     * @return ConfigObject - the selection normalised to a string-keyed object the per-key readers expect.
+     * @return ConfigObject - The validated string-keyed array used by the per-key readers.
      */
     private function requireObject(object|array|string|int|float|bool|null $decodedValue): array
     {
-        // The selection has to be a keyed object; a bare list or scalar is the wrong shape.
+
         if (!is_array($decodedValue) || ($decodedValue !== [] && array_is_list($decodedValue))) {
             throw new ConfigException('Config key "selection" must be an object.');
         }
 
         $normalizedSelection = [];
 
-        // Validate and normalise each key/value the user wrote.
+
         foreach ($decodedValue as $key => $decodedItem) {
-            // A non-string key means the block is not the object shape selection needs.
+
             if (!is_string($key)) {
                 throw new ConfigException('Config key "selection" must be an object.');
             }
@@ -195,13 +190,13 @@ final readonly class SelectionConfigParser
     /**
      * Normalises one decoded selection value into the supported shape, recursing into arrays.
      *
-     * @param mixed $decodedValue - One raw YAML/JSON-decoded value, scalar or nested array, to validate.
+     * @param mixed $decodedValue - One decoded value to validate; arrays and object leaves are supported.
      *
-     * @return ConfigValue - the validated value: a depth-limited nested array, or a single accepted scalar leaf.
+     * @return ConfigValue - Validated array with at most four levels, or an accepted scalar, object, or null leaf.
      */
     private function configValue(mixed $decodedValue): array|bool|float|int|object|string|null
     {
-        // Arrays are validated element by element; a scalar is checked on its own.
+
         if (is_array($decodedValue)) {
             return $this->configArray($decodedValue);
         }
@@ -210,15 +205,15 @@ final readonly class SelectionConfigParser
     }
 
     /**
-     * Confirms one leaf value is a YAML/JSON-compatible scalar, rejecting anything gruff cannot store.
+     * Accepts supported non-array leaves without converting them or inspecting object contents.
      *
-     * @param mixed $decodedValue - One decoded leaf value; anything not YAML/JSON-compatible is rejected.
+     * @param mixed $decodedValue - Candidate leaf; scalar values, objects, and null are accepted.
      *
-     * @return ConfigScalar - the accepted leaf returned verbatim; null is preserved as a legitimate config value.
+     * @return ConfigScalar - The accepted scalar, object, or null value, returned unchanged.
      */
     private function configScalar(mixed $decodedValue): bool|float|int|object|string|null
     {
-        // Only plain scalars (and null) are valid config leaves; anything else is rejected.
+
         if (is_bool($decodedValue) || is_float($decodedValue) || is_int($decodedValue) || is_object($decodedValue) || is_string($decodedValue) || $decodedValue === null) {
             return $decodedValue;
         }
@@ -238,7 +233,7 @@ final readonly class SelectionConfigParser
     {
         $normalizedSelectionValues = [];
 
-        // Validate each element, recursing into the next nesting level when it is itself an array.
+
         foreach ($decodedSelectionValues as $key => $decodedItem) {
             $normalizedSelectionValues[$key] = is_array($decodedItem) ? $this->configArrayDepth2($decodedItem) : $this->configScalar($decodedItem);
         }
@@ -251,14 +246,13 @@ final readonly class SelectionConfigParser
      *
      * @param array<array-key, mixed> $decodedSelectionValues - Decoded selection subtree at the second supported nesting level.
      *
-     * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>> - the validated second-level subtree,
-     *                          keys preserved, deeper arrays recursed.
+     * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>> - Validated subtree with keys preserved.
      */
     private function configArrayDepth2(array $decodedSelectionValues): array
     {
         $normalizedSelectionValues = [];
 
-        // Validate each element, recursing one level deeper for nested arrays.
+
         foreach ($decodedSelectionValues as $key => $decodedItem) {
             $normalizedSelectionValues[$key] = is_array($decodedItem) ? $this->configArrayDepth3($decodedItem) : $this->configScalar($decodedItem);
         }
@@ -271,14 +265,13 @@ final readonly class SelectionConfigParser
      *
      * @param array<array-key, mixed> $decodedSelectionValues - Decoded selection subtree at the third supported nesting level.
      *
-     * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar>> - the validated third-level subtree, keys preserved, deeper arrays
-     *                          recursed.
+     * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar>> - Validated third-level subtree with original keys.
      */
     private function configArrayDepth3(array $decodedSelectionValues): array
     {
         $normalizedSelectionValues = [];
 
-        // Validate each element, recursing into the final allowed level for nested arrays.
+
         foreach ($decodedSelectionValues as $key => $decodedItem) {
             $normalizedSelectionValues[$key] = is_array($decodedItem) ? $this->configArrayDepth4($decodedItem) : $this->configScalar($decodedItem);
         }
@@ -287,18 +280,18 @@ final readonly class SelectionConfigParser
     }
 
     /**
-     * Validates the deepest allowed level, where every element must be a scalar - any further nesting is
-     * rejected as too deep.
+     * Validates the deepest allowed array level, accepting scalar, object, and null leaves.
+     * Further arrays are rejected as too deeply nested.
      *
      * @param array<array-key, mixed> $decodedSelectionValues - Decoded selection subtree at the final supported nesting level.
      *
-     * @return array<array-key, ConfigScalar> - the deepest subtree, scalar leaves only, keys preserved; any further nesting is rejected.
+     * @return array<array-key, ConfigScalar> - Validated leaves with keys preserved; nested arrays are rejected.
      */
     private function configArrayDepth4(array $decodedSelectionValues): array
     {
         $normalizedSelectionValues = [];
 
-        // At the deepest allowed level every element must be a scalar leaf.
+
         foreach ($decodedSelectionValues as $key => $decodedItem) {
             // An array here would be a fifth level of nesting, deeper than gruff supports.
             if (is_array($decodedItem)) {

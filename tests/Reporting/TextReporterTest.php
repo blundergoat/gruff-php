@@ -15,15 +15,16 @@ use GruffPhp\Output\Reporter\TextReporter;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers the output-volume hint that points users at `summary` when an analyse run
- * crosses the high-watermark for flat-list browsability. See M08.
+ * Covers the text reporter's output-volume hint and handling of remediation metadata.
+ * Builds synthetic advisory findings for a single discovered and parsed file.
+ * Checks that Apply metadata leaves the rendered text unchanged.
  */
 final class TextReporterTest extends TestCase
 {
     /**
      * Verify the hint is suppressed when finding count is below the threshold.
      *
-     * @return void
+     * @return void - Asserts that both footer hint fragments are absent for five findings.
      */
     public function testFooterHintIsSuppressedBelowThreshold(): void
     {
@@ -36,9 +37,9 @@ final class TextReporterTest extends TestCase
     }
 
     /**
-     * Verify the hint surfaces when the finding count reaches the threshold.
+     * Verify the hint surfaces for a report containing 60 findings.
      *
-     * @return void
+     * @return void - Asserts both threshold hint fragments appear for 60 findings.
      */
     public function testFooterHintAppearsAtThreshold(): void
     {
@@ -53,7 +54,7 @@ final class TextReporterTest extends TestCase
     /**
      * Verify action metadata does not alter the family-frozen text finding block.
      *
-     * @return void
+     * @return void - Asserts equal renderings and the absence of remediationAction and APPLY text.
      */
     public function testRemediationActionMetadataDoesNotChangeTextOutput(): void
     {
@@ -70,19 +71,19 @@ final class TextReporterTest extends TestCase
     }
 
     /**
-     * Build a synthetic AnalysisReport with the requested number of findings.
+     * Build an advisory-only report for one discovered and parsed file.
      *
-     * @param int                  $findingCount - Number of synthetic findings to embed.
-     * @param array<string, bool|float|int|string|null|array<array-key, bool|float|int|string|null>> $metadata - Machine-readable fields attached to every synthetic finding; empty keeps findings unclassified.
+     * @param int                  $findingCount - Requested finding count; zero or negative produces no findings.
+     * @param array<string, bool|float|int|string|null|array<array-key, bool|float|int|string|null>> $metadata - Shared fields; empty adds none.
      *
-     * @return AnalysisReport - report carrying exactly $findingCount advisory findings over one discovered/parsed file, exit code 0
+     * @return AnalysisReport - Report for one file with max(0, $findingCount) advisory findings and exit code 0.
      */
     private function reportWithFindings(int $findingCount, array $metadata = []): AnalysisReport
     {
         $findings = [];
         for ($index = 0; $index < $findingCount; $index++) {
             $findings[] = new Finding(
-                ruleId:     'docs.missing-public-phpdoc',
+                ruleId:     'docs.missing-phpdoc',
                 message:    'Example finding.',
                 filePath:   'src/Example.php',
                 line:       $index + 1,

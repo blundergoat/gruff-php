@@ -8,14 +8,16 @@ use GruffPhp\Output\Reporter\OutputFormat;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers OutputFormat::isMachineReadable: every analyse format except the human-oriented text report counts as machine-readable.
+ * Tests OutputFormat::isMachineReadable across all declared format cases.
+ * Text must return false and every other case must return true.
+ * A failure includes the format value to identify the mismatched case.
  */
 final class OutputFormatTest extends TestCase
 {
     /**
      * Verify only the text format reads as human-oriented; all others are machine-readable.
      *
-     * @return void
+     * @return void - Asserts false for Text and true for every other declared format case.
      */
     public function testOnlyTextFormatIsNotMachineReadable(): void
     {

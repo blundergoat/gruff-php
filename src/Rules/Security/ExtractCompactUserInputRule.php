@@ -17,11 +17,9 @@ use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Node\Expr;
 
 /**
- * Flags an `extract()` or `compact()` call whose data comes from the request, the shape that lets an
- * attacker spawn arbitrary local variables - so the user maps request fields explicitly instead.
- *
- * Runs per file, matching global extract/compact calls whose first argument reaches user input. Warning,
- * medium confidence - a request-fed call is a likely variable-injection sink, not a certain one.
+ * Flags `extract()` and `compact()` call shapes whose first argument matches the request-data heuristic.
+ * `extract()` imports locals; `compact()` exports existing locals named by its arguments.
+ * Emits medium-confidence warnings without proving variable injection or inspecting later `compact()` arguments.
  */
 final class ExtractCompactUserInputRule implements RuleInterface
 {
@@ -37,7 +35,7 @@ final class ExtractCompactUserInputRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Medium confidence: a request-fed extract/compact is a likely variable-injection sink, not certain.
+        // Medium confidence: request-data reachability does not prove that these calls introduce a vulnerability.
         return new RuleDefinition(
             id:              self::ID,
             name:            'extract or compact on request data',
@@ -45,31 +43,37 @@ final class ExtractCompactUserInputRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A compact() call naming fixed local variables, one of which was assigned from request data earlier in the same scope.',
+                    'mitigation' => 'compact() and extract() share one taint check although compact() exports names the code chose; keep the explicit name list and accept the finding.',
+                ],
+            ],
         );
     }
 
     /**
-     * Reports each `extract()` or `compact()` call reached by request data.
+     * Reports `extract()` or `compact()` calls whose first argument is traced to request data.
      *
-     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Source unit supplying call nodes and their assignment context.
+     * @param RuleContext $ruleContext - Unused; the rule interface requires it, and this rule reads no options or project root.
      *
-     * @return list<Finding> - One finding per extract/compact call reached by request data.
+     * @return list<Finding> - One finding per matching call; empty when no first argument is recognized as request-fed.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $findings = [];
 
-        // Check every function call in the file.
+
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
             $name = SecurityNodeHelper::globalFunctionName($call);
-            // Only extract() and compact() import a whole variable table.
+
             if ($name === null || !in_array($name, ['compact', 'extract'], true)) {
                 continue;
             }
 
             $firstArg = SecurityNodeHelper::sinkArgumentValue($call, 0);
-            // A call with no request-controlled input is safe, so skip it.
+
             if ($firstArg === null || !SecurityNodeHelper::containsUserInput($firstArg)) {
                 continue;
             }

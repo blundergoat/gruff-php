@@ -75,3 +75,44 @@ function exerciseProcOpenArgumentVectors(string $target): void
     proc_open(command: ['/bin/sh', '-c', 'ping -c 1 ' . $target], descriptor_spec: [], pipes: $shellPipes);
     proc_open(command: ['/bin/sh', '-lc', 'ping -c 1 ' . $target], descriptor_spec: [], pipes: $loginShellPipes);
 }
+
+function escapeSplicedSinkValues(mysqli $conn, object $dbi, string $file, string $flag, string $pid, string $id): void
+{
+    shell_exec('convert ' . escapeshellarg($file) . ' out.png');
+    shell_exec('convert ' . escapeshellarg($file) . ' ' . $flag);
+    shell_exec(sprintf('file %s', escapeshellarg(('-' === $file[0] ? './' : '') . $file)));
+    exec('kill ' . (int) $pid);
+    exec('kill ' . $pid);
+    shell_exec('convert ' . escapeshellcmd($file));
+    mysqli_query($conn, 'SELECT * FROM users WHERE id = ' . (int) $id);
+    mysqli_query($conn, 'SELECT * FROM ' . Util::backquote($id) . ' WHERE name = ' . $dbi->quoteString($id));
+    mysqli_query($conn, 'SELECT * FROM users WHERE name LIKE ' . $dbi->quoteString('%' . $id . '%'));
+    mysqli_query($conn, 'SELECT * FROM ' . Util::backquote($id) . ' WHERE id = ' . $id);
+    mysqli_query($conn, "SELECT * FROM users WHERE name = '" . $dbi->quote($id) . "'");
+    exec(sprintf('convert ' . escapeshellarg($file) . ' -resize %s out.png', $flag));
+    exec('convert "' . escapeshellarg($file) . '" out.png');
+    mysqli_query($conn, sprintf('SELECT * FROM ' . Util::backquote($id) . " WHERE name = '%s'", $id));
+    mysqli_query($conn, "SELECT * FROM users WHERE name = '" . $dbi->quoteString($id) . "'");
+}
+
+function codeChosenWords(string $link, string $target, bool $isDirectory, string $raw): void
+{
+    $mode = $isDirectory ? 'J' : 'H';
+    exec("mklink /{$mode} " . escapeshellarg($link) . ' ' . escapeshellarg($target));
+    $listing = '-la';
+    exec('ls ' . $listing);
+    $spaced = $isDirectory ? '-a -b' : '-c';
+    exec('ls ' . $spaced);
+    $quote = "'";
+    exec('echo ' . $quote . escapeshellarg($raw));
+    $mixed = $isDirectory ? 'J' : $raw;
+    exec('mklink /' . $mixed);
+    $short = $raw ?: 'J';
+    exec('mklink /' . $short);
+    $matched = 'J';
+    preg_match('/(J|H)/', $raw, $matched);
+    exec('mklink /' . $matched);
+    $later = 'J';
+    exec('mklink /' . $later);
+    $later = $raw;
+}

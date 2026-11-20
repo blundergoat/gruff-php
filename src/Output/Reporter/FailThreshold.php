@@ -7,18 +7,14 @@ namespace GruffPhp\Output\Reporter;
 use GruffPhp\Results\Finding\Severity;
 
 /**
- * The severity gate behind `gruff-php analyse --fail-on <level>`: it names the lowest finding
- * severity allowed to fail a run. A user reaches for this when wiring gruff into CI or a
- * pre-commit hook and choosing how strict the gate should be - `--fail-on warning` lets advisory
- * notes slide but fails on warnings and errors, while `--fail-on none` still reports every finding
- * yet never breaks the build. `fromInput()` turns the raw flag value the user typed into one of
- * these cases, and `isTriggeredBy()` answers, finding by finding, whether that gate has tripped.
+ * Selects the finding severity that triggers an analyse failure gate.
+ * Warning includes warnings and errors; none disables severity-based failure without suppressing findings.
+ * fromInput() parses exact values, and isTriggeredBy() compares one finding's severity.
  */
 enum FailThreshold: string
 {
     /**
-     * The `--fail-on none` choice: every finding is still reported, but the run always exits
-     * clean - for a user who wants the scores without ever letting the gate fail CI.
+     * Disables severity-based failure; other command errors can still produce a non-zero exit status.
      */
     case None = 'none';
 
@@ -46,13 +42,12 @@ enum FailThreshold: string
      *
      * @param string $rawInput - Raw `--fail-on` text the user typed; an empty or unknown value matches no case.
      *
-     * @return self|null - Matching threshold; null when the text is none of the four names
-     *                     (e.g. `--fail-on loud`), which the caller reports as a usage error.
+     * @return self|null - Exact matching threshold; null for empty, unknown, or differently cased input.
      */
     public static function fromInput(string $rawInput): ?self
     {
-        // Match the exact text the user passed to `--fail-on` against the four known names;
-        // anything else (say `--fail-on loud`) falls through to null for the caller to reject.
+
+
         return match ($rawInput) {
             self::None->value => self::None,
             self::Advisory->value => self::Advisory,
@@ -68,12 +63,11 @@ enum FailThreshold: string
      *
      * @param Severity $severity - Severity of the finding being weighed against this threshold.
      *
-     * @return bool - True when the finding is at or above the threshold and should fail the run;
-     *                false when it is allowed through and the run may still pass.
+     * @return bool - True when this gate rejects the severity; false for none or a severity below its floor.
      */
     public function isTriggeredBy(Severity $severity): bool
     {
-        // Each gate names a severity floor: this finding fails only when it is at least as severe as the threshold.
+
         return match ($this) {
             self::None => false,
             self::Advisory => true,

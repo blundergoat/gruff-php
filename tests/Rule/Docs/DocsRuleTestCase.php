@@ -12,7 +12,9 @@ use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Provides shared fixture helpers for documentation rule tests.
+ * Provides parsing and analysis helpers for documentation rule tests.
+ * Fixture helpers analyse files under tests/Fixtures/Docs using the default registry.
+ * Inline-source helpers use temporary files and return findings for one selected rule.
  */
 abstract class DocsRuleTestCase extends TestCase
 {
@@ -20,9 +22,9 @@ abstract class DocsRuleTestCase extends TestCase
     private PhpFileParser $parser;
 
     /**
-     * Prepare parser fixtures before each rule test.
+     * Create the parser used by the fixture analysis helpers.
      *
-     * @return void
+     * @return void - Stores a fresh parser for each test.
      */
     protected function setUp(): void
     {
@@ -33,10 +35,9 @@ abstract class DocsRuleTestCase extends TestCase
      * Analyse documentation fixtures and return findings for assertions.
      *
      * @param string $fixture - Fixture filename under tests/Fixtures/Docs.
-     * @param ?AnalysisConfig $config - Optional analysis config; defaults to the full default-registry config.
+     * @param ?AnalysisConfig $config - Config selecting enabled rules; null uses registry defaults.
      *
-     * @return list<\GruffPhp\Results\Finding\Finding> - every finding the default rule set raises against the fixture, unfiltered; empty when the fixture is
-     *                                         clean
+     * @return list<\GruffPhp\Results\Finding\Finding> - All enabled-rule findings under the effective config; empty when none are reported.
      */
     protected function analyseFixture(string $fixture, ?AnalysisConfig $config = null): array
     {
@@ -48,13 +49,13 @@ abstract class DocsRuleTestCase extends TestCase
     }
 
     /**
-     * Analyse documentation fixtures and return findings for assertions.
+     * Analyse a documentation fixture and retain findings for one rule.
      *
      * @param string $fixture - Fixture filename under tests/Fixtures/Docs.
      * @param string $ruleId - Rule id to keep; findings from every other rule are discarded.
-     * @param ?AnalysisConfig $config - Optional analysis config; defaults to the full default-registry config.
+     * @param ?AnalysisConfig $config - Config selecting enabled rules; null uses registry defaults.
      *
-     * @return list<\GruffPhp\Results\Finding\Finding> - findings from the named rule only, in encounter order; empty when that rule raises nothing
+     * @return list<\GruffPhp\Results\Finding\Finding> - Selected-rule findings in registry report order; empty when that rule reports none.
      */
     protected function analyseRule(string $fixture, string $ruleId, ?AnalysisConfig $config = null): array
     {
@@ -99,7 +100,7 @@ abstract class DocsRuleTestCase extends TestCase
     /**
      * Parse the named fixture into an analysis unit.
      *
-     * @param string $filename - Fixture filename.
+     * @param string $filename - Fixture filename under tests/Fixtures/Docs.
      *
      * @return \GruffPhp\Engine\Parser\AnalysisUnit - parsed fixture with a repo-relative display path so finding output matches a real checkout
      */

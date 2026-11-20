@@ -8,25 +8,22 @@ use GruffPhp\Results\Finding\Severity;
 use LogicException;
 
 /**
- * One rule's resolved settings for a run - whether it is on, its thresholds, its options, and how its
- * findings score.
+ * Holds one rule's resolved enablement, thresholds, options, and scoring settings for a run.
+ * Rules read these settings after configuration loading and merging.
  *
- * After config is loaded and merged, every rule ends up with one of these. It is what a rule reads to
- * behave the way the user asked: the numeric thresholds that decide advisory-vs-warning-vs-error, any
- * rule-specific options, an optional single-threshold override, and whether the rule's findings should
- * inform without denting the score. The threshold-matching helpers here turn a measured value into the
- * severity the user configured.
+ * Threshold helpers map measured values to the configured severity, including a single-threshold override.
+ * Score exclusion lets findings inform the user without lowering the composite score.
  */
 final readonly class RuleSettings
 {
     /**
      * Captures one rule's resolved enablement, thresholds, options, and scoring behaviour for a run.
      *
-     * @param bool                                                                         $enabled - Whether the rule should run for this config.
-     * @param array<string, int|float>                                                     $thresholds - Named numeric thresholds available to the rule.
+     * @param bool $enabled - Whether the rule should run for this config.
+     * @param array<string, int|float> $thresholds - Named numeric thresholds available to the rule.
      * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options - Rule-specific option values from config.
-     * @param SeverityThreshold|null                                                       $severityThreshold - Optional single threshold/severity override; null uses the rule's warning/error thresholds instead.
-     * @param bool                                                                         $excludeFromScore - When true, the rule still runs and surfaces findings in reports but its findings do not penalise the composite score. See ADR-016.
+     * @param SeverityThreshold|null $severityThreshold - A single threshold and severity; null uses warning/error thresholds.
+     * @param bool $excludeFromScore - True keeps findings in reports while excluding them from composite scoring; see ADR-016.
      */
     public function __construct(
         public bool $enabled,
@@ -48,20 +45,33 @@ final readonly class RuleSettings
     }
 
     /**
+     * Returns the lowest limit that a "higher is worse" measurement must exceed before it reports.
+     *
+     * @return int|float - The single-threshold override when one is set, otherwise the warning threshold.
+     */
+    public function lowestHighValueThreshold(): int|float
+    {
+        // A single-threshold override replaces the ladder, so it is the only limit in force.
+        if ($this->severityThreshold instanceof SeverityThreshold) {
+            return $this->severityThreshold->threshold;
+        }
+
+        return $this->numericThreshold('warning');
+    }
+
+    /**
      * Reads a named numeric threshold the rule relies on, failing loudly if config left it missing or
      * non-numeric - a rule misconfiguration, not a user-facing input error.
      *
      * @param string $name - Threshold key to read.
-     * @throws LogicException When the configured value is missing or non-numeric.
+     * @throws LogicException - When the configured value is missing or non-numeric.
      *
      * @return int|float - The configured threshold value.
      */
     public function numericThreshold(string $name): int|float
     {
-        // Read the named threshold if config supplied one.
         $thresholdValue = $this->thresholds[$name] ?? null;
 
-        // A missing or non-numeric threshold is a rule misconfiguration, so fail loudly rather than guess.
         if (!is_int($thresholdValue) && !is_float($thresholdValue)) {
             throw new LogicException(sprintf('Missing numeric threshold "%s".', $name));
         }
@@ -75,13 +85,12 @@ final readonly class RuleSettings
      *
      * @param int|float $measuredValue - Measured rule value to compare.
      *
-     * @return ThresholdMatch|null - The matching severity and threshold; null when the value is within budget, meaning the rule passes with nothing to report.
+     * @return ThresholdMatch|null - Breached severity and threshold; null when the measurement is within budget.
      */
     public function highValueThresholdMatch(int|float $measuredValue): ?ThresholdMatch
     {
         // A single-threshold override replaces the ladder: only a value strictly past it counts as a breach.
         if ($this->severityThreshold instanceof SeverityThreshold) {
-            // Single-threshold override: breach only once the value strictly exceeds it.
             return $measuredValue > $this->severityThreshold->threshold
                 ? new ThresholdMatch($this->severityThreshold->threshold, $this->severityThreshold->severity)
                 : null;
@@ -90,7 +99,6 @@ final readonly class RuleSettings
         $warningThreshold = $this->numericThreshold('warning');
         // At or under the warning threshold the metric is fine, so there is nothing to report.
         if ($measuredValue <= $warningThreshold) {
-            // Metric is within budget; null is the rule's "passes, nothing to report" signal to callers.
             return null;
         }
 
@@ -110,13 +118,12 @@ final readonly class RuleSettings
      *
      * @param int|float $measuredValue - Measured rule value to compare.
      *
-     * @return ThresholdMatch|null - The matching severity and threshold; null when the value meets the floor, meaning the rule passes with nothing to report.
+     * @return ThresholdMatch|null - Breached severity and threshold; null when the measurement meets the floor.
      */
     public function lowValueThresholdMatch(int|float $measuredValue): ?ThresholdMatch
     {
         // A single-threshold override replaces the ladder: only a value strictly below it counts as a breach.
         if ($this->severityThreshold instanceof SeverityThreshold) {
-            // Single-threshold override: breach only once the value falls strictly below it.
             return $measuredValue < $this->severityThreshold->threshold
                 ? new ThresholdMatch($this->severityThreshold->threshold, $this->severityThreshold->severity)
                 : null;
@@ -125,7 +132,6 @@ final readonly class RuleSettings
         $warningThreshold = $this->numericThreshold('warning');
         // At or above the warning floor the metric is fine, so there is nothing to report.
         if ($measuredValue >= $warningThreshold) {
-            // Metric meets the required floor; null is the rule's "passes, nothing to report" signal to callers.
             return null;
         }
 
@@ -143,18 +149,16 @@ final readonly class RuleSettings
      * Reads a rule-specific option by name in its raw type, failing loudly when config never set it.
      *
      * @param string $name - Option key to read.
-     * @throws LogicException When the option key is missing.
+     * @throws LogicException - When the option key is missing.
      *
      * @return int|float|bool|string|array<array-key, int|float|bool|string> - The configured option value in its raw union type.
      */
     public function option(string $name): int|float|bool|string|array
     {
-        // A rule asking for an option config never set is a misconfiguration, so fail loudly.
         if (!array_key_exists($name, $this->options)) {
             throw new LogicException(sprintf('Missing option "%s".', $name));
         }
 
-        // The rule's configured option value in its raw union type; callers narrow it (see stringListOption).
         return $this->options[$name];
     }
 
@@ -163,7 +167,7 @@ final readonly class RuleSettings
      * that is not actually a string list.
      *
      * @param string $name - Option key to read.
-     * @throws LogicException When the option value is not a list of strings.
+     * @throws LogicException - When the option value is not a list of strings.
      *
      * @return list<string> - The option's string values; empty list when the option was never set.
      */
@@ -179,7 +183,6 @@ final readonly class RuleSettings
 
         $stringOptions = [];
 
-        // Confirm every element is a string before handing the list back.
         foreach ($optionValue as $optionItem) {
             // A non-string element means the list was configured wrong, so fail loudly.
             if (!is_string($optionItem)) {
@@ -189,7 +192,6 @@ final readonly class RuleSettings
             $stringOptions[] = $optionItem;
         }
 
-        // The option's configured string values; an unset option yields the empty list, not an error.
         return $stringOptions;
     }
 }

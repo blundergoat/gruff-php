@@ -14,56 +14,42 @@ use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Engine\Parser\PhpFileParser;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\RuleRegistry;
-use GruffPhp\Rules\TestQuality\ConditionalTestLogicRule;
 use GruffPhp\Rules\TestQuality\DataProviderAnnotationRule;
-use GruffPhp\Rules\TestQuality\EagerTestRule;
 use GruffPhp\Rules\TestQuality\EmptyDataProviderRule;
 use GruffPhp\Rules\TestQuality\ExceptionTypeOnlyRule;
-use GruffPhp\Rules\TestQuality\ExcessiveMockingRule;
-use GruffPhp\Rules\TestQuality\ExtendsProductionClassRule;
 use GruffPhp\Rules\TestQuality\GlobalStateMutationRule;
 use GruffPhp\Rules\TestQuality\LoopAssertionWithoutMessageRule;
-use GruffPhp\Rules\TestQuality\MagicNumberAssertionRule;
 use GruffPhp\Rules\TestQuality\MockingDomainObjectRule;
-use GruffPhp\Rules\TestQuality\MockOnlyTestRule;
-use GruffPhp\Rules\TestQuality\MockWithoutExpectationRule;
-use GruffPhp\Rules\TestQuality\MultipleAaaCyclesRule;
-use GruffPhp\Rules\TestQuality\MysteryGuestRule;
 use GruffPhp\Rules\TestQuality\NoAssertionsRule;
 use GruffPhp\Rules\TestQuality\PrivateReflectionRule;
 use GruffPhp\Rules\TestQuality\RepeatedStructureMissingDataProviderRule;
 use GruffPhp\Rules\TestQuality\SetupBloatRule;
-use GruffPhp\Rules\TestQuality\SkippedWithoutReasonRule;
-use GruffPhp\Rules\TestQuality\SleepInTestRule;
 use GruffPhp\Rules\TestQuality\StaticAnalysisRedundantTestRule;
 use GruffPhp\Rules\TestQuality\SutNotCalledRule;
-use GruffPhp\Rules\TestQuality\TautologicalTypeAssertionRule;
 use GruffPhp\Rules\TestQuality\TestdoxReadabilityRule;
 use GruffPhp\Rules\TestQuality\TestLongerThanSutRule;
-use GruffPhp\Rules\TestQuality\TestMethodTooLongRule;
 use GruffPhp\Rules\TestQuality\TestNamingConsistencyRule;
-use GruffPhp\Rules\TestQuality\TrivialAssertionRule;
 use GruffPhp\Rules\TestQuality\TrivialSnapshotRule;
-use GruffPhp\Rules\TestQuality\UnusedMockRule;
 use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers the test-quality rule pack across PHPUnit and Pest: assertion smells, eager tests, SUT-not-called, oversized methods, unused mocks,
- * global-state leaks, repeated structures, and per-rule severity options.
+ * Covers test-quality rules using parsed PHPUnit and Pest fixtures.
+ * Asserts finding counts, selected symbols, candidate metadata, and advisory severity.
+ * Exercises the default registry, calibration configuration, and explicit rule options.
  */
 final class TestQualityRulesTest extends TestCase
 {
-    /** Project root used by filesystem and CLI tests. */
+    /** Project root for fixture paths, configuration loading, and rule context. */
     private const PROJECT_ROOT = __DIR__ . '/../../..';
 
     /**
-     * Verify PHPUnit and pest test scopes support no assertion and trivial assertion checks.
+     * Count NoAssertionsRule findings across the combined PHPUnit and Pest fixtures.
      *
-     * @return void
+     * @return void - Asserts four NoAssertionsRule findings across the two fixtures.
      */
-    public function testPhpUnitAndPestTestScopesSupportNoAssertionAndTrivialAssertionChecks(): void
+    public function testPhpUnitAndPestTestScopesSupportNoAssertionChecks(): void
     {
         $findings = $this->analysePaths([
                                             'tests/Fixtures/TestQuality/phpunit-core-smells.php',
@@ -71,168 +57,43 @@ final class TestQualityRulesTest extends TestCase
                                         ]);
 
         self::assertRuleCount(NoAssertionsRule::ID, 4, $findings);
-        self::assertRuleCount(TrivialAssertionRule::ID, 2, $findings);
-    }
-
-    /**
-     * Verify core control flow and flakiness smells are detected.
-     *
-     * @return void
-     */
-    public function testCoreControlFlowAndFlakinessSmellsAreDetected(): void
-    {
-        $findings = $this->analysePath('tests/Fixtures/TestQuality/phpunit-core-smells.php');
-
-        self::assertRuleCount(ConditionalTestLogicRule::ID, 1, $findings);
-        // sleep + time + microtime + new DateTime('now') + new DateTimeImmutable() - frozen DateTime is not flagged
-        self::assertRuleCount(SleepInTestRule::ID, 5, $findings);
     }
 
     /**
      * Verify mechanics smells are detected.
      *
-     * @return void
+     * @return void - Asserts three reflection findings and one each for provider annotations, snapshots, and setup bloat.
      */
     public function testMechanicsSmellsAreDetected(): void
     {
         $findings = $this->analysePath('tests/Fixtures/TestQuality/phpunit-mechanics-smells.php');
 
-        self::assertRuleCount(ExcessiveMockingRule::ID, 1, $findings);
-        self::assertRuleCount(MockOnlyTestRule::ID, 1, $findings);
-        self::assertRuleCount(MysteryGuestRule::ID, 1, $findings);
-        self::assertRuleCount(MagicNumberAssertionRule::ID, 1, $findings);
         // ReflectionMethod + ReflectionClass + Closure::bind - one finding per test scope
         self::assertRuleCount(PrivateReflectionRule::ID, 3, $findings);
         self::assertRuleCount(DataProviderAnnotationRule::ID, 1, $findings);
         self::assertRuleCount(TrivialSnapshotRule::ID, 1, $findings);
         self::assertRuleCount(SetupBloatRule::ID, 1, $findings);
-        self::assertRuleCount(SkippedWithoutReasonRule::ID, 1, $findings);
     }
 
     /**
      * Verify advanced heuristic smells are detected.
      *
-     * @return void
+     * @return void - Asserts one test-length finding, one missing-SUT finding, and three naming findings.
      */
     public function testAdvancedHeuristicSmellsAreDetected(): void
     {
         $findings = $this->analysePath('tests/Fixtures/TestQuality/phpunit-advanced-smells.php');
 
-        self::assertRuleCount(EagerTestRule::ID, 1, $findings);
         self::assertRuleCount(TestLongerThanSutRule::ID, 1, $findings);
         self::assertRuleCount(SutNotCalledRule::ID, 1, $findings);
-        // 1 mixed-style class finding (MixedNamingQualityTest) + 2 poor-name method findings (PoorlyNamedTest::testProcessOrderWorks, ::testProcessOrder1)
+        // MixedNamingQualityTest mixes styles; PoorlyNamedTest contains testProcessOrderWorks and testProcessOrder1.
         self::assertRuleCount(TestNamingConsistencyRule::ID, 3, $findings);
     }
 
     /**
-     * Verify eager test ignores result observation calls after a single act.
+     * Checks the heuristic fixture's single SUT-not-called finding and its test-method symbol.
      *
-     * @return void
-     */
-    public function testEagerTestIgnoresResultObservationCallsAfterSingleAct(): void
-    {
-        $findings = array_values(array_filter(
-                                     $this->analysePath('tests/Fixtures/TestQuality/eager-test-observation-cases.php'),
-                                     static fn(Finding $finding): bool => $finding->ruleId === EagerTestRule::ID,
-                                 ));
-
-        self::assertCount(1, $findings);
-        self::assertSame('MultipleBehaviorQualityTest::testProcessesOrderAndSendsReceipt()', $findings[0]->symbol);
-    }
-
-    /**
-     * Verify eager-test reports real multi-act cases with stable metadata.
-     *
-     * @return void
-     */
-    public function testEagerTestReportsRealMultiActCasesWithStableMetadata(): void
-    {
-        $findings = $this->eagerMutationFindings();
-        $symbols  = array_map(static fn(Finding $finding): ?string => $finding->symbol, $findings);
-
-        self::assertSame([
-                             'EagerPositiveMutationCasesTest::testProcessesOrderAndSendsReceipt()',
-                             'EagerPositiveMutationCasesTest::testStaticServiceHandlesTwoBehaviors()',
-                             'EagerPositiveMutationCasesTest::testNewServiceHandlesTwoBehaviors()',
-                             'EagerPositiveMutationCasesTest::testPropertyServiceHandlesTwoBehaviors()',
-                             'EagerPositiveMutationCasesTest::testObservationNamedMethodsStillCountOnDomainReceiver()',
-                             'EagerPositiveMutationCasesTest::testSkipsNoiseBeforeRealSutCalls()',
-                             'EagerPositiveMutationCasesTest::testSkipsResultObservationBeforeRealSutCalls()',
-                             'EagerPositiveMutationCasesTest::testDomainStartWaitStopMethodsAreSutCalls()',
-                             'EagerPositiveMutationCasesTest::testReceiverCaseIsNormalisedForVariables()',
-                             'EagerPositiveMutationCasesTest::testReceiverCaseIsNormalisedForStaticCalls()',
-                             'EagerPositiveMutationCasesTest::testReceiverCaseIsNormalisedForNewExpressions()',
-                             'EagerPositiveMutationCasesTest::testReceiverCaseIsNormalisedForProperties()',
-                             'EagerPositiveMutationCasesTest::testKnownReceiverNonObservationMethodsStillCount()',
-                             'EagerPositiveMutationCasesTest::testLargestReceiverTieKeepsFirstReceiver()',
-                         ], $symbols);
-
-        $expectedAssertionCount = 3;
-        self::assertSame($expectedAssertionCount, $findings[0]->metadata['assertions'] ?? null);
-        self::assertSame(['processorder', 'sendreceipt', 'audittrailwritten'], $findings[0]->metadata['sutCalls'] ?? null);
-        self::assertSame(['processorder', 'sendreceipt'], $findings[1]->metadata['sutCalls'] ?? null);
-        self::assertSame(['getstatus', 'hasreceipt'], $findings[4]->metadata['sutCalls'] ?? null);
-        self::assertSame(['processorder', 'sendreceipt'], $findings[13]->metadata['sutCalls'] ?? null);
-    }
-
-    /**
-     * Verify eager-test ignores assertion, harness, and observation noise.
-     *
-     * @return void
-     */
-    public function testEagerTestIgnoresAssertionHarnessAndObservationNoise(): void
-    {
-        $findings = $this->eagerMutationFindings();
-        $symbols  = array_map(static fn(Finding $finding): ?string => $finding->symbol, $findings);
-
-        self::assertNotContains('EagerNegativeMutationCasesTest::testTwoAssertionMultiActStaysBelowDefaultThreshold()', $symbols);
-        self::assertNotContains('EagerNegativeMutationCasesTest::testAssertionHelperCallsDoNotBecomeSutCalls()', $symbols);
-        self::assertNotContains('EagerNegativeMutationCasesTest::testDirectThisHelpersDoNotBecomeSutCalls()', $symbols);
-        self::assertNotContains('EagerNegativeMutationCasesTest::testAssertionNamedCollaboratorCallsDoNotBecomeSutCalls()', $symbols);
-        self::assertNotContains('EagerNegativeMutationCasesTest::testNestedSutCallsInsideAssertionsAreObservations()', $symbols);
-        self::assertNotContains('EagerNegativeMutationCasesTest::testMockExpectationCallsDoNotBecomeSutCalls()', $symbols);
-        self::assertNotContains('EagerNegativeMutationCasesTest::testGenericSetTimeoutIsSetupNotSutExercise()', $symbols);
-        self::assertNotContains('EagerNegativeMutationCasesTest::testProcessHarnessCallsDoNotBecomeSutExercise()', $symbols);
-        self::assertNotContains('EagerNegativeMutationCasesTest::testUppercaseProcessHarnessReceiverIsStillRecognised()', $symbols);
-        self::assertNotContains('EagerNegativeMutationCasesTest::testResultVariableObservationsDoNotBecomeSutExercise()', $symbols);
-        self::assertNotContains('EagerNegativeMutationCasesTest::testKnownObservationReceiversDoNotBecomeSutExercise()', $symbols);
-        self::assertNotContains('EagerNegativeMutationCasesTest::testCountObservationDoesNotPairWithNonObservationOnKnownReceiver()', $symbols);
-        self::assertNotContains('EagerNegativeMutationCasesTest::testDistinctStaticReceiversDoNotCollapseTogether()', $symbols);
-        self::assertNotContains('EagerNegativeMutationCasesTest::testDistinctVariableReceiversDoNotCollapseTogether()', $symbols);
-        self::assertNotContains('EagerNegativeMutationCasesTest::testDistinctNewReceiversDoNotCollapseTogether()', $symbols);
-        self::assertNotContains('EagerNegativeMutationCasesTest::testDistinctPropertyNamesDoNotCollapseTogether()', $symbols);
-        self::assertNotContains('EagerNegativeMutationCasesTest::testDistinctPropertyOwnersDoNotCollapseTogether()', $symbols);
-        self::assertNotContains('EagerNegativeMutationCasesTest::testSecondResultVariableObservationsRemainSkipped()', $symbols);
-        self::assertNotContains('EagerNegativeMutationCasesTest::testResultVariablesAfterNonVariableAssignmentRemainSkipped()', $symbols);
-        self::assertNotContains('EagerNegativeMutationCasesTest::testChainedResultVariableObservationsRemainSkipped()', $symbols);
-    }
-
-    /**
-     * Verify eager-test treats fractional assertion thresholds as integer minima.
-     *
-     * @return void
-     */
-    public function testEagerTestCastsFractionalAssertionThreshold(): void
-    {
-        $registry = RuleRegistry::defaults();
-        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
-            EagerTestRule::ID,
-            new RuleSettings(true, ['minAssertions' => 2.5]),
-        );
-        $findings = array_values(array_filter(
-                                     $this->analysePath('tests/Fixtures/TestQuality/eager-test-mutation-cases.php', $config),
-                                     static fn(Finding $finding): bool => $finding->ruleId === EagerTestRule::ID,
-                                 ));
-        $symbols  = array_map(static fn(Finding $finding): ?string => $finding->symbol, $findings);
-
-        self::assertContains('EagerNegativeMutationCasesTest::testTwoAssertionMultiActStaysBelowDefaultThreshold()', $symbols);
-    }
-
-    /**
-     * Verify SUT-not-called only flags leading method-style test names.
-     *
-     * @return void
+     * @return void - Asserts one finding for SutNotCalledHeuristicTest::testCalculateTotalReturnsExpectedValue().
      */
     public function testSutNotCalledOnlyFlagsLeadingMethodStyleTestNames(): void
     {
@@ -246,61 +107,36 @@ final class TestQualityRulesTest extends TestCase
     }
 
     /**
-     * Verify magic number assertion ignores contextual numeric contracts.
+     * Checks that the ten selected content-based rules emit no findings for the non-candidate fixture.
      *
-     * @return void
-     */
-    public function testMagicNumberAssertionIgnoresContextualNumericContracts(): void
-    {
-        $findings = array_values(array_filter(
-                                     $this->analysePath('tests/Fixtures/TestQuality/magic-number-assertion-heuristic.php'),
-                                     static fn(Finding $finding): bool => $finding->ruleId === MagicNumberAssertionRule::ID,
-                                 ));
-
-        self::assertCount(1, $findings);
-        self::assertSame('MagicNumberHeuristicTest::testOpaqueBusinessNumberIsFlagged()', $findings[0]->symbol);
-    }
-
-    /**
-     * Verify non candidate cases are not flagged by selected rules.
-     *
-     * @return void
+     * @return void - Asserts zero findings for the ten listed rule IDs.
      */
     public function testNonCandidateCasesAreNotFlaggedBySelectedRules(): void
     {
         $findings = $this->analysePath('tests/Fixtures/TestQuality/non-candidates.php');
 
         self::assertRuleCount(DataProviderAnnotationRule::ID, 0, $findings);
-        self::assertRuleCount(SkippedWithoutReasonRule::ID, 0, $findings);
-        self::assertRuleCount(ConditionalTestLogicRule::ID, 0, $findings);
-        self::assertRuleCount(SleepInTestRule::ID, 0, $findings);
         self::assertRuleCount(NoAssertionsRule::ID, 0, $findings);
-        self::assertRuleCount(ExtendsProductionClassRule::ID, 0, $findings);
         self::assertRuleCount(EmptyDataProviderRule::ID, 0, $findings);
-        self::assertRuleCount(TestMethodTooLongRule::ID, 0, $findings);
         self::assertRuleCount(LoopAssertionWithoutMessageRule::ID, 0, $findings);
-        self::assertRuleCount(UnusedMockRule::ID, 0, $findings);
         self::assertRuleCount(ExceptionTypeOnlyRule::ID, 0, $findings);
         self::assertRuleCount(StaticAnalysisRedundantTestRule::ID, 0, $findings);
-        self::assertRuleCount(TautologicalTypeAssertionRule::ID, 0, $findings);
         self::assertRuleCount(GlobalStateMutationRule::ID, 0, $findings);
-        self::assertRuleCount(MockWithoutExpectationRule::ID, 0, $findings);
         self::assertRuleCount(RepeatedStructureMissingDataProviderRule::ID, 0, $findings);
-        self::assertRuleCount(MultipleAaaCyclesRule::ID, 0, $findings);
         self::assertRuleCount(TestdoxReadabilityRule::ID, 0, $findings);
         self::assertRuleCount(MockingDomainObjectRule::ID, 0, $findings);
-        // The phpunit-* rules are project-level (they fire on .phpunit.xml.dist at the project root),
-        // not source-file rules, so they're intentionally excluded from this fixture-content assertion.
+        // The phpunit-* rules inspect project-root configuration, so these fixture-content checks exclude them.
+
     }
 
     /**
-     * Verify each single-rule fixture emits exactly the expected finding count.
+     * Checks each fixture's finding count for the selected rule.
      *
-     * @param string $fixture - Fixture path under tests/Fixtures/TestQuality to analyse.
-     * @param string $ruleId - Rule identifier whose findings are counted.
+     * @param string $fixture       - Fixture path under tests/Fixtures/TestQuality to analyse.
+     * @param string $ruleId        - Rule identifier whose findings are counted.
      * @param int    $expectedCount - Exact number of findings the rule must emit on the fixture.
      *
-     * @return void
+     * @return void - Asserts the selected rule's total, without checking individual finding identities.
      */
     #[DataProvider('singleRuleFixtureProvider')]
     public function testSingleRuleFixtureEmitsExpectedCount(string $fixture, string $ruleId, int $expectedCount): void
@@ -309,40 +145,24 @@ final class TestQualityRulesTest extends TestCase
     }
 
     /**
-     * Provide single-rule fixtures paired with the exact finding count each rule must emit. Each exact count also
-     * pins the negative half of the fixture (the allowed shapes that must stay unflagged).
+     * Supplies fixtures, selected rule IDs, and expected totals for aggregate finding-count assertions.
      *
      * @return array<string, array{0: string, 1: string, 2: int}> - Rows of fixture path, rule id, and expected finding count.
      */
     public static function singleRuleFixtureProvider(): array
     {
         return [
-            'extends-production flags production-class and unconfigured base parents' => ['tests/Fixtures/TestQuality/extends-production.php', ExtendsProductionClassRule::ID, 2],
-            'test-method-too-long flags one oversized method' => ['tests/Fixtures/TestQuality/test-method-too-long.php', TestMethodTooLongRule::ID, 1],
             'empty-data-provider flags two empty providers' => ['tests/Fixtures/TestQuality/empty-data-provider.php', EmptyDataProviderRule::ID, 2],
             'loop-assertion-without-message flags three messageless loop assertions' => ['tests/Fixtures/TestQuality/loop-assertion-without-message.php', LoopAssertionWithoutMessageRule::ID, 3],
-            'unused-mock flags two unused mocks' => ['tests/Fixtures/TestQuality/unused-mock.php', UnusedMockRule::ID, 2],
             'exception-type-only flags one type-only expectation' => ['tests/Fixtures/TestQuality/exception-type-only.php', ExceptionTypeOnlyRule::ID, 1],
             'global-state-mutation flags three leaks in the leaky class' => ['tests/Fixtures/TestQuality/global-state-mutation.php', GlobalStateMutationRule::ID, 3],
         ];
     }
 
     /**
-     * Verify tautological type assertion detected and cross class assertions allowed.
+     * Checks candidate variants, evidence symbols, advisory severity, and confidence metadata.
      *
-     * @return void
-     */
-    public function testTautologicalTypeAssertionDetectedAndCrossClassAssertionsAllowed(): void
-    {
-        $findings = $this->analysePath('tests/Fixtures/TestQuality/tautological-type-assertion.php');
-
-        self::assertRuleCount(TautologicalTypeAssertionRule::ID, 2, $findings);
-    }
-
-    /**
-     * Verify static-analysis-redundant candidates carry evidence and leave behavior clean.
-     *
-     * @return void
+     * @return void - Asserts six candidates, their metadata lists, and each candidate's severity, confidence, and message marker.
      */
     public function testStaticAnalysisRedundantCandidatesDetectedWithEvidence(): void
     {
@@ -384,65 +204,35 @@ final class TestQualityRulesTest extends TestCase
     }
 
     /**
-     * Verify static-analysis-redundant candidates do not duplicate neighbouring rule ownership.
+     * Checks that neighbouring rules retain ownership without redundant-test findings.
      *
-     * @return void
+     * @return void - Asserts zero redundant-test findings alongside each expected neighbouring-rule count.
      */
     public function testStaticAnalysisRedundantCandidatesRespectNeighbouringRules(): void
     {
-        $this->assertSmellOwnedSolelyByNeighbour('tests/Fixtures/TestQuality/tautological-type-assertion.php', TautologicalTypeAssertionRule::ID, 2);
         $this->assertSmellOwnedSolelyByNeighbour('tests/Fixtures/TestQuality/exception-type-only.php', ExceptionTypeOnlyRule::ID, 1);
         $this->assertSmellOwnedSolelyByNeighbour('tests/Fixtures/TestQuality/phpunit-mechanics-smells.php', PrivateReflectionRule::ID, 3);
     }
 
     /**
-     * Verify mock without expectation detected with variant severities.
+     * Checks two repeated-structure groups with per-group symbols and method metadata.
      *
-     * @return void
-     */
-    public function testMockWithoutExpectationDetectedWithVariantSeverities(): void
-    {
-        $findings = $this->analysePath('tests/Fixtures/TestQuality/mock-without-expectation.php');
-
-        self::assertRuleCount(MockWithoutExpectationRule::ID, 3, $findings);
-
-        $mockFindings = array_values(array_filter(
-                                         $findings,
-                                         static fn(Finding $finding): bool => $finding->ruleId === MockWithoutExpectationRule::ID,
-                                     ));
-        $variants     = array_values(array_filter(
-                                         array_map(static fn(Finding $finding): mixed => $finding->metadata['variant'] ?? null, $mockFindings),
-                                         'is_string',
-                                     ));
-        $variables    = array_values(array_filter(
-                                         array_map(static fn(Finding $finding): mixed => $finding->metadata['variable'] ?? null, $mockFindings),
-                                         'is_string',
-                                     ));
-
-        sort($variants);
-        self::assertSame(['dead-mock', 'dead-mock', 'stub-only'], $variants);
-        self::assertContains('bareProphecy', $variables);
-        self::assertNotContains('assertedProphecy', $variables);
-        self::assertNotContains('returningProphecy', $variables);
-        self::assertNotContains('expectedProphecy', $variables);
-        self::assertNotContains('singleCallProphecy', $variables);
-        self::assertNotContains('countedProphecy', $variables);
-        self::assertNotContains('observedProphecy', $variables);
-        self::assertNotContains('forbiddenProphecy', $variables);
-        self::assertNotContains('throwingProphecy', $variables);
-        self::assertNotContains('callbackProphecy', $variables);
-        self::assertNotContains('fake', $variables);
-    }
-
-    /**
-     * Verify repeated structure missing data provider detected and data provider users ignored.
-     *
-     * @return void
+     * @return void - Asserts both groups' symbols, method lists, and sizes, plus the first group's message marker.
      */
     public function testRepeatedStructureMissingDataProviderDetectedAndDataProviderUsersIgnored(): void
     {
+        $registry = RuleRegistry::defaults();
+        $config = (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/enable-default-off-rules.yaml', $registry);
+        $settings = $config->ruleSettings(RepeatedStructureMissingDataProviderRule::ID);
+        $config = $config->withRuleSettings(RepeatedStructureMissingDataProviderRule::ID, new RuleSettings(
+            enabled: $settings->enabled,
+            thresholds: $settings->thresholds,
+            options: array_replace($settings->options, ['groupFindings' => false]),
+            severityThreshold: $settings->severityThreshold,
+            excludeFromScore: $settings->excludeFromScore,
+        ));
         $findings = array_values(array_filter(
-                                     $this->analysePath('tests/Fixtures/TestQuality/repeated-structure-missing-data-provider.php'),
+                                     $this->analysePath('tests/Fixtures/TestQuality/repeated-structure-missing-data-provider.php', $config),
                                      static fn(Finding $finding): bool => $finding->ruleId === RepeatedStructureMissingDataProviderRule::ID,
                                  ));
 
@@ -457,86 +247,17 @@ final class TestQualityRulesTest extends TestCase
     }
 
     /**
-     * Verify multiple AAA cycles fires by default and with explicit config.
+     * Checks one readability finding under both the default and explicit configurations.
      *
-     * @return void
-     */
-    public function testMultipleAaaCyclesFiresByDefaultAndWithExplicitConfig(): void
-    {
-        $defaultFindings = $this->analysePath('tests/Fixtures/TestQuality/multiple-aaa-cycles.php');
-        self::assertRuleCount(MultipleAaaCyclesRule::ID, 1, $defaultFindings);
-
-        $registry           = RuleRegistry::defaults();
-        $config             = (new ConfigLoader(self::PROJECT_ROOT))->load(
-            'tests/Fixtures/Config/enable-multiple-aaa-cycles.yaml',
-            $registry,
-        );
-        $configuredFindings = $this->analysePaths(
-            ['tests/Fixtures/TestQuality/multiple-aaa-cycles.php'],
-            $config,
-        );
-
-        self::assertRuleCount(MultipleAaaCyclesRule::ID, 1, $configuredFindings);
-    }
-
-    /**
-     * Verify multiple AAA cycles does not double count inline act assert after act statement.
-     *
-     * @return void
-     */
-    public function testMultipleAaaCyclesDoesNotDoubleCountInlineActAssertAfterActStatement(): void
-    {
-        $registry = RuleRegistry::defaults();
-        $settings = AnalysisConfig::fromRegistry($registry)->ruleSettings(MultipleAaaCyclesRule::ID);
-        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
-            MultipleAaaCyclesRule::ID,
-            new RuleSettings(true, ['minCycles' => 1], $settings->options),
-        );
-        $findings = array_values(array_filter(
-                                     $this->analysePath('tests/Fixtures/TestQuality/multiple-aaa-cycles.php', $config),
-                                     static fn(Finding $finding): bool => $finding->ruleId === MultipleAaaCyclesRule::ID
-                                                                          && $finding->symbol === 'MultipleAaaCyclesTest::testActThenInlineActAssertCountsAsOneCycle()',
-                                 ));
-
-        self::assertCount(1, $findings);
-        self::assertSame(1, $findings[0]->metadata['cycles']);
-    }
-
-    /**
-     * Verify multiple AAA cycles can exempt accepted broad contract-test files.
-     *
-     * @return void
-     */
-    public function testMultipleAaaCyclesHonoursIgnoredPathPatterns(): void
-    {
-        $registry = RuleRegistry::defaults();
-        $settings = AnalysisConfig::fromRegistry($registry)->ruleSettings(MultipleAaaCyclesRule::ID);
-        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
-            MultipleAaaCyclesRule::ID,
-            new RuleSettings(
-                true,
-                $settings->thresholds,
-                array_merge($settings->options, ['ignoredPathPatterns' => ['tests/Fixtures/TestQuality/*']]),
-            ),
-        );
-
-        $findings = $this->analysePath('tests/Fixtures/TestQuality/multiple-aaa-cycles.php', $config);
-
-        self::assertRuleCount(MultipleAaaCyclesRule::ID, 0, $findings);
-    }
-
-    /**
-     * Verify testdox readability fires by default and with explicit config.
-     *
-     * @return void
+     * @return void - Asserts one TestdoxReadabilityRule finding under each configuration.
      */
     public function testTestdoxReadabilityFiresByDefaultAndWithExplicitConfig(): void
     {
         $defaultFindings = $this->analysePath('tests/Fixtures/TestQuality/testdox-readability.php');
         self::assertRuleCount(TestdoxReadabilityRule::ID, 1, $defaultFindings);
 
-        $registry           = RuleRegistry::defaults();
-        $config             = (new ConfigLoader(self::PROJECT_ROOT))->load(
+        $registry = RuleRegistry::defaults();
+        $config   = (new ConfigLoader(self::PROJECT_ROOT))->load(
             'tests/Fixtures/Config/enable-testdox-readability.yaml',
             $registry,
         );
@@ -551,11 +272,11 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Assert the expected test-quality finding count for a rule.
      *
-     * @param string        $ruleId - Rule identifier whose findings are counted.
+     * @param string        $ruleId        - Rule identifier whose findings are counted.
      * @param int           $expectedCount - Exact number of findings the rule must emit.
-     * @param list<Finding> $findings - Findings to filter down to the requested rule id.
+     * @param list<Finding> $findings      - Findings to filter down to the requested rule id.
      *
-     * @return void
+     * @return void - Asserts the filtered count without checking finding symbols or metadata.
      */
     private static function assertRuleCount(string $ruleId, int $expectedCount, array $findings): void
     {
@@ -567,13 +288,13 @@ final class TestQualityRulesTest extends TestCase
     }
 
     /**
-     * Assert the static-analysis-redundant rule stays silent while a neighbouring rule solely owns the fixture's smell.
+     * Checks a neighbouring rule's count and the absence of redundant-test findings.
      *
-     * @param string $fixture - Fixture path whose neighbouring-rule ownership is verified.
-     * @param string $ownerRuleId - Rule identifier expected to solely own the fixture's smell.
-     * @param int    $ownerCount - Exact number of findings the owning rule must emit.
+     * @param string $fixture     - Fixture path analysed for the selected rule counts.
+     * @param string $ownerRuleId - Neighbouring rule whose findings are counted.
+     * @param int    $ownerCount  - Exact expected finding count for the neighbouring rule.
      *
-     * @return void
+     * @return void - Asserts those two counts without excluding findings from other rules.
      */
     private function assertSmellOwnedSolelyByNeighbour(string $fixture, string $ownerRuleId, int $ownerCount): void
     {
@@ -587,9 +308,9 @@ final class TestQualityRulesTest extends TestCase
      * Return sorted string metadata values for stable assertions.
      *
      * @param list<Finding> $findings - Findings whose metadata should be inspected.
-     * @param string        $key - Metadata key to read.
+     * @param string        $key      - Metadata key to read.
      *
-     * @return list<string> - String values sorted ascending.
+     * @return list<string> - Strings sorted lexically, with duplicates retained; missing or non-string values are omitted.
      */
     private function stringMetadataValues(array $findings, string $key): array
     {
@@ -606,10 +327,10 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Analyse test-quality fixtures and return findings for assertions.
      *
-     * @param string              $path - Single fixture path to analyse.
-     * @param AnalysisConfig|null $config - Overriding config, or null to use the registry defaults.
+     * @param string              $path   - Fixture path relative to the project root.
+     * @param AnalysisConfig|null $config - Overriding config, or null to enable the default-off calibration rules.
      *
-     * @return list<Finding> - every finding emitted across all rules for the single fixture; empty when nothing fired
+     * @return list<Finding> - Enabled-rule findings for the fixture and project context; empty when none are emitted.
      */
     private function analysePath(string $path, ?AnalysisConfig $config = null): array
     {
@@ -617,43 +338,31 @@ final class TestQualityRulesTest extends TestCase
     }
 
     /**
-     * Build eager mutation findings for the test-quality rule.
-     *
-     * @return list<Finding> - only EagerTestRule findings from the mutation fixture, in source order; empty when none fire
-     */
-    private function eagerMutationFindings(): array
-    {
-        return array_values(array_filter(
-                                $this->analysePath('tests/Fixtures/TestQuality/eager-test-mutation-cases.php'),
-                                static fn(Finding $finding): bool => $finding->ruleId === EagerTestRule::ID,
-                            ));
-    }
-
-    /**
      * Analyse test-quality fixtures and return findings for assertions.
      *
-     * @param list<string>        $paths - Fixture paths to parse and analyse together.
-     * @param AnalysisConfig|null $config - Overriding config, or null to use the registry defaults.
+     * @param list<string>        $paths  - Fixture paths relative to the project root, parsed and analysed together.
+     * @param AnalysisConfig|null $config - Overriding config, or null to enable the default-off calibration rules.
      *
-     * @return list<Finding> - every finding the default registry emits across the combined fixtures; empty when nothing fired
+     * @return list<Finding> - Enabled-rule findings from the combined fixtures and project context; empty when none are emitted.
      */
     private function analysePaths(array $paths, ?AnalysisConfig $config = null): array
     {
         $registry = RuleRegistry::defaults();
         $units    = array_map(fn(string $path): AnalysisUnit => $this->unitForPath($path), $paths);
+        $config ??= (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/enable-default-off-rules.yaml', $registry);
 
         return $registry->analyse(
             $units,
-            new RuleContext(self::PROJECT_ROOT, $config ?? AnalysisConfig::fromRegistry($registry)),
+            new RuleContext(self::PROJECT_ROOT, $config),
         );
     }
 
     /**
      * Parse the requested path into an analysis unit.
      *
-     * @param string $path - Filesystem path.
+     * @param string $path - Fixture path relative to the project root.
      *
-     * @return AnalysisUnit - the parsed fixture, carrying the project-root-relative path as its display name
+     * @return AnalysisUnit - Unit using $path as its display name; read or parse failures appear in its diagnostics.
      */
     private function unitForPath(string $path): AnalysisUnit
     {

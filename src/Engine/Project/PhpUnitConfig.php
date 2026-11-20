@@ -7,12 +7,9 @@ namespace GruffPhp\Engine\Project;
 use SimpleXMLElement;
 
 /**
- * A project's loaded PHPUnit configuration - the parsed XML plus where it was found.
- *
- * Some test-quality rules need to know how the project runs its tests, so gruff finds the PHPUnit
- * config and parses it once into this object. Rules read the XML root from here (for example to check
- * bootstrap or coverage settings), and the display path lets any finding point the user back at the
- * config file.
+ * Carries a project's parsed PHPUnit XML and the configuration file's paths.
+ * Test-quality rules read the root element to inspect settings such as coverage and strictness flags.
+ * The display path lets findings identify the configuration file.
  */
 final readonly class PhpUnitConfig
 {

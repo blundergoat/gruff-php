@@ -17,11 +17,9 @@ use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Node\Expr;
 
 /**
- * Flags the `@` error-suppression operator, which silences whatever failure the expression hits and leaves
- * the user staring at a blank result with no clue why an operation quietly did nothing.
- *
- * Runs per file over every suppression node. Warning, high confidence - the operator is an unambiguous AST
- * node, and modernisation is a secondary pillar since explicit error handling is the modern replacement.
+ * Flags each `@` error-suppression node with one warning; confidence is medium because a suppression whose failure the code then checks is often deliberate.
+ * Does not establish whether the expression fails or which diagnostics are suppressed.
+ * Recommends explicit error handling, with modernisation as a secondary pillar.
  */
 final class ErrorSuppressionRule implements RuleInterface
 {
@@ -37,15 +35,25 @@ final class ErrorSuppressionRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // High confidence: the `@` operator is an unambiguous AST node, so the gate can rely on this warning.
+        // Medium confidence: the operator is an unambiguous AST node, but a suppression whose failed result is checked nearby is often deliberate.
         return new RuleDefinition(
             id:               self::ID,
             name:             'Error suppression operator',
             pillar:           Pillar::Security,
             tier:             RuleTier::V01,
             defaultSeverity:  Severity::Warning,
-            confidence:       Confidence::High,
+            confidence:       Confidence::Medium,
             secondaryPillars: [Pillar::Modernisation],
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A connection or read call prefixed with `@` is reported even when nearby code checks and handles the failed result.',
+                    'mitigation' => 'Keep the result check beside the call and trace the failure to its diagnostic, fallback, or loop exit.',
+                ],
+                [
+                    'shape'      => 'The rule flags `@` on a deprecation replay or a best-effort `chmod` even when the surrounding code documents why suppression is intentional.',
+                    'mitigation' => 'Keep the reason beside the call so readers can verify that the replay preserves the original suppression or that execution can continue if `chmod` fails.',
+                ],
+            ],
         );
     }
 
@@ -53,7 +61,7 @@ final class ErrorSuppressionRule implements RuleInterface
      * Reports each `@`-suppressed expression that can hide a runtime failure.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext - Unused; the rule interface requires it, and this rule reads no options or project root.
      *
      * @return list<Finding> - One finding per `@`-suppressed expression in the unit.
      */
@@ -61,7 +69,7 @@ final class ErrorSuppressionRule implements RuleInterface
     {
         $findings = [];
 
-        // Flag every `@`-suppressed expression in the file.
+
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\ErrorSuppress::class) as $node) {
             $findings[] = new Finding(
                 ruleId:           self::ID,
@@ -71,7 +79,7 @@ final class ErrorSuppressionRule implements RuleInterface
                 severity:         Severity::Warning,
                 pillar:           Pillar::Security,
                 tier:             RuleTier::V01,
-                confidence:       Confidence::High,
+                confidence:       $this->definition()->confidence,
                 remediation:      'Handle the specific failure mode explicitly instead of suppressing errors with @.',
                 secondaryPillars: [Pillar::Modernisation],
             );

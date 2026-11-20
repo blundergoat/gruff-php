@@ -4,19 +4,19 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\DeadCode;
 
-use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Config\ConfigLoader;
 use GruffPhp\Engine\Parser\PhpFileParser;
 use GruffPhp\Rules\DeadCode\UnusedPrivateConstantRule;
 use GruffPhp\Rules\DeadCode\UnusedPrivateMethodRule;
-use GruffPhp\Rules\DeadCode\UnusedPrivatePropertyRule;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\RuleRegistry;
 use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers dead-code detection: unused/used private methods (with magic and protected exclusions), unused/used/never-read private properties
- * (including promoted constructor properties), and unused private constants across class-like scopes.
+ * Checks private-method and private-constant findings across class, trait and enum fixtures.
+ * Covers used members, excluded visibility and conservative handling of dynamic dispatch.
+ * Uses fixture configuration to enable private-method analysis in the default registry.
  */
 final class DeadCodeRulesTest extends TestCase
 {
@@ -24,9 +24,9 @@ final class DeadCodeRulesTest extends TestCase
     private PhpFileParser $parser;
 
     /**
-     * Prepare parser fixtures before each rule test.
+     * Create the parser used by the fixture analysis helpers.
      *
-     * @return void
+     * @return void - Stores a fresh parser for each test.
      */
     protected function setUp(): void
     {
@@ -36,7 +36,7 @@ final class DeadCodeRulesTest extends TestCase
     /**
      * Verify unused private methods detected.
      *
-     * @return void
+     * @return void - Asserts that exactly the two expected unused private methods are reported.
      */
     public function testUnusedPrivateMethodsDetected(): void
     {
@@ -52,7 +52,7 @@ final class DeadCodeRulesTest extends TestCase
     /**
      * Verify used private method not flagged.
      *
-     * @return void
+     * @return void - Asserts that the expected directly called and callable-referenced methods are absent from findings.
      */
     public function testUsedPrivateMethodNotFlagged(): void
     {
@@ -68,9 +68,10 @@ final class DeadCodeRulesTest extends TestCase
     }
 
     /**
-     * Verify dynamic private dispatch suppresses delete guidance while precise cases keep reporting.
+     * Check that computed same-class dispatch suppresses private-method findings in that scope.
+     * Literal names and foreign receivers leave unrelated unused methods reportable.
      *
-     * @return void
+     * @return void - Asserts the expected reported and suppressed symbols and exactly four findings.
      */
     public function testDynamicPrivateDispatchSuppressesOnlyItsOwnClassLike(): void
     {
@@ -87,7 +88,7 @@ final class DeadCodeRulesTest extends TestCase
         // A string-literal dynamic name resolves precisely, so siblings still report...
         self::assertNotContains('LiteralDynamicCaller::invokeExact()', $symbols);
         self::assertContains('LiteralDynamicCaller::stillUnused()', $symbols);
-        // ...dynamic calls on foreign receivers never suppress, and enums join the precise handling.
+        // A foreign receiver leaves its caller's unused method reportable; the enum's literal call leaves its unused sibling reportable.
         self::assertContains('ForeignDispatcher::neverCalled()', $symbols);
         self::assertNotContains('Signal::labelFor()', $symbols);
         self::assertContains('Signal::unusedInEnum()', $symbols);
@@ -95,9 +96,9 @@ final class DeadCodeRulesTest extends TestCase
     }
 
     /**
-     * Verify magic methods excluded.
+     * Verify the fixture's private constructor is absent from private-method findings.
      *
-     * @return void
+     * @return void - Asserts that UnusedPrivateMethodFixture::__construct() is not reported.
      */
     public function testMagicMethodsExcluded(): void
     {
@@ -108,9 +109,9 @@ final class DeadCodeRulesTest extends TestCase
     }
 
     /**
-     * Verify protected method not checked.
+     * Verify the protected fixture method is absent from private-method findings.
      *
-     * @return void
+     * @return void - Asserts that UnusedPrivateMethodFixture::protectedMethod() is not reported.
      */
     public function testProtectedMethodNotChecked(): void
     {
@@ -121,101 +122,9 @@ final class DeadCodeRulesTest extends TestCase
     }
 
     /**
-     * Verify unused private property detected.
-     *
-     * @return void
-     */
-    public function testUnusedPrivatePropertyDetected(): void
-    {
-        $findings = $this->analyseRule('unused-private-property.php', UnusedPrivatePropertyRule::ID);
-
-        self::assertGreaterThanOrEqual(2, count($findings));
-
-        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
-        self::assertContains('UnusedPrivatePropertyFixture::$totallyUnused', $symbols);
-        self::assertContains('UnusedPrivatePropertyFixture::$neverRead', $symbols);
-    }
-
-    /**
-     * Verify used property not flagged.
-     *
-     * @return void
-     */
-    public function testUsedPropertyNotFlagged(): void
-    {
-        $findings = $this->analyseRule('unused-private-property.php', UnusedPrivatePropertyRule::ID);
-
-        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
-        self::assertNotContains('UnusedPrivatePropertyFixture::$usedProp', $symbols);
-    }
-
-    /**
-     * Verify public property not checked.
-     *
-     * @return void
-     */
-    public function testPublicPropertyNotChecked(): void
-    {
-        $findings = $this->analyseRule('unused-private-property.php', UnusedPrivatePropertyRule::ID);
-
-        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
-        self::assertNotContains('UnusedPrivatePropertyFixture::$publicProp', $symbols);
-    }
-
-    /**
-     * Verify never read property distinguished.
-     *
-     * @return void
-     */
-    public function testNeverReadPropertyDistinguished(): void
-    {
-        $findings = $this->analyseRule('unused-private-property.php', UnusedPrivatePropertyRule::ID);
-
-        $neverRead = array_values(array_filter(
-                                      $findings,
-                                      static fn($finding) => $finding->symbol === 'UnusedPrivatePropertyFixture::$neverRead',
-                                  ));
-
-        self::assertCount(1, $neverRead);
-        self::assertStringContainsString('written but never read', $neverRead[0]->message);
-    }
-
-    /**
-     * Verify promoted private property detected when never read.
-     *
-     * @return void
-     */
-    public function testPromotedPrivatePropertyDetectedWhenNeverRead(): void
-    {
-        $findings = $this->analyseRule('unused-private-property.php', UnusedPrivatePropertyRule::ID);
-
-        $neverRead = array_values(array_filter(
-                                      $findings,
-                                      static fn($finding) => $finding->symbol === 'PromotedPrivatePropertyFixture::$neverReadPromoted',
-                                  ));
-
-        self::assertCount(1, $neverRead);
-        self::assertStringContainsString('written but never read', $neverRead[0]->message);
-    }
-
-    /**
-     * Verify used promoted private property not flagged.
-     *
-     * @return void
-     */
-    public function testUsedPromotedPrivatePropertyNotFlagged(): void
-    {
-        $findings = $this->analyseRule('unused-private-property.php', UnusedPrivatePropertyRule::ID);
-
-        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
-        self::assertNotContains('PromotedPrivatePropertyFixture::$usedPromoted', $symbols);
-        self::assertNotContains('PromotedPrivatePropertyFixture::$publicPromoted', $symbols);
-    }
-
-    /**
      * Verify unused private constants detected across class, trait, and enum scopes.
      *
-     * @return void
+     * @return void - Asserts that exactly the expected class, trait and enum constants are reported.
      */
     public function testUnusedPrivateConstantsDetected(): void
     {
@@ -232,7 +141,7 @@ final class DeadCodeRulesTest extends TestCase
     /**
      * Verify literal private constant reads are not flagged.
      *
-     * @return void
+     * @return void - Asserts that constants referenced by literal reads and defaults are absent from findings.
      */
     public function testUsedPrivateConstantsNotFlagged(): void
     {
@@ -252,7 +161,7 @@ final class DeadCodeRulesTest extends TestCase
     /**
      * Verify non-private constants and dynamic-name scopes are not flagged.
      *
-     * @return void
+     * @return void - Asserts that the listed non-private, inherited and dynamically addressed constants are absent.
      */
     public function testNonPrivateAndDynamicConstantsNotFlagged(): void
     {
@@ -267,15 +176,14 @@ final class DeadCodeRulesTest extends TestCase
     }
 
     /**
-     * Verify clean file has no dead code findings.
+     * Verify the clean fixture has no private-method or private-constant findings.
      *
-     * @return void
+     * @return void - Asserts that combining the two selected rules' findings yields an empty list.
      */
     public function testCleanFileHasNoDeadCodeFindings(): void
     {
         $findings = array_merge(
             $this->analyseRule('clean.php', UnusedPrivateMethodRule::ID),
-            $this->analyseRule('clean.php', UnusedPrivatePropertyRule::ID),
             $this->analyseRule('clean.php', UnusedPrivateConstantRule::ID),
         );
 
@@ -285,17 +193,17 @@ final class DeadCodeRulesTest extends TestCase
     /**
      * Analyse dead-code fixtures and return findings for assertions.
      *
-     * @param string $fixture - fixture filename under Fixtures/DeadCode to parse and run the full registry against.
-     * @param string $ruleId  - rule id to isolate; the full pass runs but only this rule's findings come back, so a
-     *                        fixture exercising several dead-code shapes can be asserted one rule at a time.
+     * @param string $fixture - Fixture filename under tests/Fixtures/DeadCode.
+     * @param string $ruleId - Rule ID whose findings are retained after configured registry analysis.
      *
-     * @return list<\GruffPhp\Results\Finding\Finding> - findings from $ruleId alone, re-indexed for positional assertions.
+     * @return list<\GruffPhp\Results\Finding\Finding> - Reindexed findings for the selected rule; empty when none are reported.
      */
     private function analyseRule(string $fixture, string $ruleId): array
     {
         $unit     = $this->parseFixture($fixture);
         $registry = RuleRegistry::defaults();
-        $config   = AnalysisConfig::fromRegistry($registry);
+        // dead-code.unused-private-method ships off by default (ADR-034); its tests enable it as a project would.
+        $config   = (new ConfigLoader(__DIR__ . '/../../..'))->load('tests/Fixtures/Config/enable-default-off-rules.yaml', $registry);
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
         return array_values(array_filter($findings, static fn($finding) => $finding->ruleId === $ruleId));
@@ -304,7 +212,7 @@ final class DeadCodeRulesTest extends TestCase
     /**
      * Parse the named fixture into an analysis unit.
      *
-     * @param string $filename - Fixture filename.
+     * @param string $filename - Fixture filename under tests/Fixtures/DeadCode.
      *
      * @return \GruffPhp\Engine\Parser\AnalysisUnit - parsed fixture carrying the repo-relative display path the rules report findings against
      */

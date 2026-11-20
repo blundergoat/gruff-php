@@ -6,6 +6,7 @@ namespace GruffPhp\Tests\Rule\SensitiveData;
 
 use GruffPhp\Engine\Config\AnalysisConfig;
 use GruffPhp\Engine\Config\ConfigLoader;
+use GruffPhp\Engine\Config\RuleSettings;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Engine\Parser\PhpFileParser;
@@ -14,21 +15,22 @@ use GruffPhp\Rules\RuleRegistry;
 use GruffPhp\Rules\SensitiveData\ApiKeyPatternRule;
 use GruffPhp\Rules\SensitiveData\AwsAccessKeyRule;
 use GruffPhp\Rules\SensitiveData\DatabaseUrlPasswordRule;
-use GruffPhp\Rules\SensitiveData\HardcodedEnvValueRule;
-use GruffPhp\Rules\SensitiveData\HighEntropyStringRule;
 use GruffPhp\Rules\SensitiveData\JwtTokenRule;
-use GruffPhp\Rules\SensitiveData\PhiPatternRule;
 use GruffPhp\Rules\SensitiveData\PiiTestFixtureRule;
 use GruffPhp\Rules\SensitiveData\PrivateKeyRule;
+use GruffPhp\Rules\SensitiveData\SecretScannerHelper;
 use GruffPhp\Engine\Source\SourceDiscovery;
 use GruffPhp\Engine\Source\SourceFile;
 use JsonException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers sensitive-data detection: credentials with redacted previews, PHI/PII profiles, config-file scanning, dummy/placeholder allowlisting,
- * comment-context skipping, high-entropy false-positive avoidance, and CLI report redaction.
+ * Covers the safe sensitive-data findings users receive from source, config, fixtures, and CLI reports.
+ *
+ * Scenarios protect fixed markers, PII context, placeholders, comments, occurrence counts, and renderer containment.
+ * Users exercise these paths when source analysis or a rendered report encounters credential-like content.
  */
 final class SensitiveDataRulesTest extends TestCase
 {
@@ -36,11 +38,11 @@ final class SensitiveDataRulesTest extends TestCase
     private const PROJECT_ROOT = __DIR__ . '/../../..';
 
     /**
-     * Verify credential patterns are detected with redacted previews.
+     * Checks detector counts, literal secretValues() matches in messages and JSON-encoded metadata, and preview syntax.
      *
-     * @return void
+     * @return void - Asserts expected counts, no literal matches, and no string previews rejected by the marker regex.
      */
-    public function testCredentialPatternsAreDetectedWithRedactedPreviews(): void
+    public function testCredentialPatternsAreDetectedWithFixedPreviews(): void
     {
         $findings = $this->analysePath('tests/Fixtures/SensitiveData/synthetic-secrets.php');
 
@@ -48,8 +50,6 @@ final class SensitiveDataRulesTest extends TestCase
         self::assertRuleCount(ApiKeyPatternRule::ID, 14, $findings);
         self::assertRuleCount(JwtTokenRule::ID, 1, $findings);
         self::assertRuleCount(DatabaseUrlPasswordRule::ID, 1, $findings);
-        self::assertRuleCount(HardcodedEnvValueRule::ID, 1, $findings);
-        self::assertRuleCount(HighEntropyStringRule::ID, 3, $findings);
         self::assertRuleCount(PrivateKeyRule::ID, 1, $findings);
 
         $messages      = implode("\n", array_map(static fn(Finding $finding): string => $finding->message, $findings));
@@ -62,12 +62,35 @@ final class SensitiveDataRulesTest extends TestCase
 
         self::assertSame([], $messageLeaks, 'Finding messages should not leak secret values.');
         self::assertSame([], $metadataLeaks, 'Finding metadata should not leak secret values.');
+
+        $unexpectedDisplayMarkers = array_values(array_filter($findings, self::isMarkerOutsideGrammar(...)));
+        self::assertSame([], $unexpectedDisplayMarkers, 'Every sensitive marker must stay inside the ratified grammar, with no secret-derived edges or lengths.');
+    }
+
+    /**
+     * Checks a string preview against redaction-marker syntax derived from FAMILY-CONTRACT.md section 5.
+     * The pattern admits the bare marker, the listed categories, and a connection marker with a scheme-shaped suffix.
+     * Rejection indicates invalid marker syntax; it does not establish that the marker contains matched secret text.
+     *
+     * @param Finding $finding - Sensitive-data finding whose metadata preview marker is judged.
+     *
+     * @return bool - true when the marker is outside the grammar; a finding with no string marker is never outside it
+     */
+    private static function isMarkerOutsideGrammar(Finding $finding): bool
+    {
+        $marker = $finding->metadata['preview'] ?? null;
+        $grammar = '/^\[redacted(?::(?:private-key|jwt|aws-access-key|github-token|slack-token|stripe-live-key'
+                   . '|google-api-key|anthropic-api-key|npm-token|gitlab-token|gcp-service-account|email|phone'
+                   . '|payment-card|ssn|medicare|mrn|connection-string:[a-z][a-z0-9+.-]*))?\]$/';
+
+        // A finding carrying no string marker has nothing to judge, so the grammar cannot reject it.
+        return is_string($marker) && preg_match($grammar, $marker) !== 1;
     }
 
     /**
      * Verify config like files are discovered and scanned as text.
      *
-     * @return void
+     * @return void - Asserts text discovery, an empty AST without parse errors, and one database-URL finding.
      */
     public function testConfigLikeFilesAreDiscoveredAndScannedAsText(): void
     {
@@ -85,27 +108,24 @@ final class SensitiveDataRulesTest extends TestCase
         $findings = $this->analyseUnits([$unit]);
 
         self::assertRuleCount(DatabaseUrlPasswordRule::ID, 1, $findings);
-        self::assertRuleCount(HardcodedEnvValueRule::ID, 1, $findings);
-        self::assertRuleCount(HighEntropyStringRule::ID, 1, $findings);
     }
 
     /**
-     * Verify PHI and PII profiles are detected in fixture data.
+     * Checks the profile-data fixture with PII detection enabled through the registry helper.
      *
-     * @return void
+     * @return void - Asserts exactly three PII-rule findings without checking their individual classifications.
      */
     public function testPhiAndPiiProfilesAreDetectedInFixtureData(): void
     {
         $findings = $this->analysePath('tests/Fixtures/SensitiveData/profile-data.json');
 
-        self::assertRuleCount(PhiPatternRule::ID, 5, $findings);
         self::assertRuleCount(PiiTestFixtureRule::ID, 3, $findings);
     }
 
     /**
-     * Verify allowed dummy values are not flagged.
+     * Verifies the safe-dummy fixture has no sensitive-data findings.
      *
-     * @return void
+     * @return void - Asserts the filtered sensitive-data finding list is empty.
      */
     public function testAllowedDummyValuesAreNotFlagged(): void
     {
@@ -113,14 +133,63 @@ final class SensitiveDataRulesTest extends TestCase
                                      $this->analysePath('tests/Fixtures/SensitiveData/safe-dummy-values.php'),
                                      static fn(Finding $finding): bool => str_starts_with($finding->ruleId, 'sensitive-data.'),
                                  ));
+        $reported = array_map(static fn(Finding $finding): string => $finding->ruleId . ':' . $finding->line, $findings);
 
-        self::assertSame([], $findings);
+        // AWS's documented example key is exempt as a vendor sample under FAMILY-CONTRACT.md section 5.
+        self::assertSame([], $reported);
     }
 
     /**
-     * Verify matches inside PHP comments are skipped for opt-in pattern rules but private-key still fires.
+     * Checks stock development pairs on loopback and single-label hosts against other credential cases.
+     * The fixture expects findings for a stock pair on a dotted host and a non-stock password on localhost.
      *
-     * @return void
+     * @return void - Asserts only the dotted-host and non-stock-password cases produce findings.
+     */
+    public function testStockDevelopmentCredentialsOnLocalHostsAreNotReported(): void
+    {
+        // Assembled here, so this file holds no whole credential-shaped URL; the stock words themselves are not secrets.
+        $realPassword = 'Vq7' . 'mZ2' . 'kP9';
+        $source       = implode("\n", [
+            '<?php',
+            "\$a = '" . 'postgresql://' . 'postgres:postgres' . "@localhost:5432/app';",
+            "\$b = '" . 'mysql://' . 'root:root' . "@127.0.0.1/app';",
+            "\$c = '" . 'postgres://' . 'user:pass' . "@[::1]:5432/app';",
+            "\$d = '" . 'redis://' . 'Guest:Secret' . "@db:6379';",
+            "\$e = '" . 'postgres://' . 'postgres:postgres' . "@db.example.com/app';",
+            "\$f = '" . 'postgres://' . 'postgres:' . $realPassword . "@localhost/app';",
+            '',
+        ]);
+        $unit     = new AnalysisUnit(new SourceFile(__FILE__, 'config.php', SourceFile::TYPE_TEXT), $source, [], [], []);
+        $context  = new RuleContext(self::PROJECT_ROOT, AnalysisConfig::fromRegistry(RuleRegistry::defaults()));
+        $findings = (new DatabaseUrlPasswordRule())->analyse($unit, $context);
+
+        self::assertSame([6, 7], array_map(static fn(Finding $finding): ?int => $finding->line, $findings));
+    }
+
+    /**
+     * Checks fully X-masked AWS key bodies alongside a synthetic key whose body only ends in X.
+     * The fully masked cases are suppressed, while the partly X-filled case remains reportable.
+     *
+     * @return void - Asserts only the partly X-filled fixture line is reported.
+     */
+    public function testAwsKeyWhoseWholeBodyIsXIsReadAsMasked(): void
+    {
+        $masked   = str_repeat('X', 16);
+        $source   = "aws_access_key_id = AKIA{$masked}\n"
+            . "aws_session_key_id = ASIA{$masked}\n"
+            . 'aws_partly_masked_id = AKIA' . 'IOSFODNN' . str_repeat('X', 8) . "\n";
+        $unit     = new AnalysisUnit(new SourceFile(__FILE__, 'config.env', SourceFile::TYPE_TEXT), $source, [], [], []);
+        $context  = new RuleContext(self::PROJECT_ROOT, AnalysisConfig::fromRegistry(RuleRegistry::defaults()));
+        $findings = (new AwsAccessKeyRule())->analyse($unit, $context);
+
+        self::assertSame([3], array_map(static fn(Finding $finding): ?int => $finding->line, $findings));
+    }
+
+    /**
+     * Verifies the PHP-comment fixture is silent for API keys, AWS keys, JWTs, database URLs, and PII.
+     * A private-key finding remains expected in that fixture.
+     *
+     * @return void - Asserts zero findings for those five rules and one for the private-key rule.
      */
     public function testInCommentMatchesAreSkippedExceptPrivateKey(): void
     {
@@ -130,230 +199,104 @@ final class SensitiveDataRulesTest extends TestCase
         self::assertRuleCount(AwsAccessKeyRule::ID, 0, $findings);
         self::assertRuleCount(JwtTokenRule::ID, 0, $findings);
         self::assertRuleCount(DatabaseUrlPasswordRule::ID, 0, $findings);
-        self::assertRuleCount(HardcodedEnvValueRule::ID, 0, $findings);
-        self::assertRuleCount(HighEntropyStringRule::ID, 0, $findings);
-        self::assertRuleCount(PhiPatternRule::ID, 0, $findings);
         self::assertRuleCount(PiiTestFixtureRule::ID, 0, $findings);
         self::assertRuleCount(PrivateKeyRule::ID, 1, $findings);
     }
 
     /**
-     * Verify hardcoded env value requires secret like value evidence.
+     * Verify the AWS and JWT rules ignore their documented samples while the AWS rule reports the live-shaped key.
+     * The FAMILY-CONTRACT section 5 samples and live-shaped key are assembled so this file stores no complete value.
      *
-     * @return void
+     * @return void - Asserts the filtered AWS and JWT findings contain only the live-shaped AWS key.
      */
-    public function testHardcodedEnvValueRequiresSecretLikeValueEvidence(): void
+    public function testDocumentedSamplesAreNotReported(): void
     {
-        $path = tempnam(sys_get_temp_dir(), 'gruff-safe-env-');
+        $path = tempnam(sys_get_temp_dir(), 'gruff-documented-samples-');
         self::assertIsString($path);
         $path   .= '.php';
-        $source = "<?php\n\n"
-                  . 'const QBO_ACCESS_TOKEN_EXPIRES_AT = ' . var_export('accessTokenExpiresAt', true) . ";\n"
-                  . 'const QBO_REFRESH_TOKEN_VALID_PERIOD = ' . var_export('refreshTokenValidationPeriod', true) . ";\n"
-                  . 'const ACCESS_TOKEN_PAYMENTS_KEY = ' . var_export('AirwallexApiRequester.payments', true) . ";\n"
-                  . '$header = ' . var_export('AUTH_MODE_X_' . 'API_KEY=x-api-key', true) . ";\n"
-                  . '$prefix = ' . var_export('TOKEN_CACHE_' . 'KEY_PREFIX=voice.' . 'olb.oauth_token.pg_', true) . ";\n"
-                  . '$formId = ' . var_export('OLB_VOICE_CSRF_' . 'TOKEN_ID=olb_voice_agent', true) . ";\n"
-                  . '$secret = ' . var_export('API_TOKEN=' . 'qR8vT3mK6p' . 'L9xS2nD4eG', true) . ";\n";
-        self::assertNotFalse(file_put_contents($path, $source));
-
-        try {
-            $unit     = (new PhpFileParser())->parse(new SourceFile($path, 'tests/Fixtures/SensitiveData/inline-env-values.php'));
-            $findings = array_values(array_filter(
-                                         $this->analyseUnits([$unit]),
-                                         static fn(Finding $finding): bool => $finding->ruleId === HardcodedEnvValueRule::ID,
-                                     ));
-
-            self::assertCount(1, $findings);
-            self::assertStringContainsString('API_TOKEN', $findings[0]->message);
-        } finally {
-            self::assertTrue(unlink($path));
-        }
-    }
-
-    /**
-     * Verify route and URL path literals are not treated as high-entropy secrets.
-     *
-     * @return void
-     */
-    public function testHighEntropyRoutePathsAreNotFlagged(): void
-    {
-        $path = tempnam(sys_get_temp_dir(), 'gruff-route-entropy-');
-        self::assertIsString($path);
-        $path   .= '.php';
-        $secret = 'M7qP2vL9' . 'xZ4aB8nC' . '3dF6gH1j' . 'K5mN0rS2' . 'tV9wY4zQ';
-        $source = "<?php\n\n"
-                  . '$help = ' . var_export('/hc/en-au/sections/360005188513-Appointments', true) . ";\n"
-                  . '$report = ' . var_export('/hc/en-au/sections/360005149694-Communication-Report', true) . ";\n"
-                  . '$secret = ' . var_export($secret, true) . ";\n";
-        self::assertNotFalse(file_put_contents($path, $source));
-
-        try {
-            $unit     = (new PhpFileParser())->parse(new SourceFile($path, 'tests/Fixtures/SensitiveData/inline-route-entropy.php'));
-            $findings = array_values(array_filter(
-                                         $this->analyseUnits([$unit]),
-                                         static fn(Finding $finding): bool => $finding->ruleId === HighEntropyStringRule::ID,
-                                     ));
-
-            self::assertCount(1, $findings);
-            self::assertStringContainsString('M7qP', $findings[0]->message);
-        } finally {
-            self::assertTrue(unlink($path));
-        }
-    }
-
-    /**
-     * Verify opaque dotted tokens stay entropy-eligible while JWTs remain the JWT rule's alone.
-     *
-     * @return void
-     */
-    public function testDottedOpaqueTokensAreEntropyEligibleWhileJwtsStayDelegated(): void
-    {
-        $tempPath = tempnam(sys_get_temp_dir(), 'gruff-dotted-token-entropy-');
-        self::assertIsString($tempPath);
-        $path = $tempPath . '.php';
-        self::assertTrue(rename($tempPath, $path));
-        // Both tokens are concatenated from short chunks so this test file's own source never
-        // matches gruff's secret scanners; only the generated fixture carries the full literals.
-        $opaqueToken = 'vTr4K2mQ.9fXZ81beLKw' . '72mYh37Rp.hV5c2LqN8d' . 'WjS6xTAGy';
-        $sampleJwt   = 'eyJhbGciOiJIUzI1NiIs' . 'InR5cCI6IkpXVCJ9.eyJ' . 'zdWIiOiIxMjM0NTY3ODkw' . 'In0.dozjgNryP4J3jVmN' . 'Hl0w5N65nCX63nCz';
-        $source      = "<?php\n\n"
-                  . '$sessionToken = ' . var_export($opaqueToken, true) . ";\n"
-                  . '$sampleJwt = ' . var_export($sampleJwt, true) . ";\n"
-                  . '$routeName = ' . var_export('authentication.permissions.middleware-groups', true) . ";\n"
-                  . '$versionLabel = ' . var_export('3.11.4-security-hardening-release-notes', true) . ";\n"
-                  . '$metricsDomain = ' . var_export('telemetry.blundergoat-analytics.example', true) . ";\n"
-                  . '$archivePath = ' . var_export('storage/app.private/uploads.tmp/archive-name.tar.gz', true) . ";\n";
-        try {
-            self::assertNotFalse(file_put_contents($path, $source));
-
-            $unit        = (new PhpFileParser())->parse(new SourceFile($path, 'tests/Fixtures/SensitiveData/inline-dotted-token-entropy.php'));
-            $findings    = $this->analyseUnits([$unit]);
-            $highEntropy = array_values(array_filter(
-                                            $findings,
-                                            static fn(Finding $finding): bool => $finding->ruleId === HighEntropyStringRule::ID,
-                                        ));
-            $jwtFindings = array_values(array_filter(
-                                            $findings,
-                                            static fn(Finding $finding): bool => $finding->ruleId === JwtTokenRule::ID,
-                                        ));
-
-            // The opaque dotted token reports as high entropy only; the JWT reports under the JWT rule only
-            // (no double report); the dotted route, version, domain, and path literals all stay silent.
-            self::assertCount(1, $highEntropy);
-            self::assertSame(3, $highEntropy[0]->line);
-            self::assertStringContainsString('vTr4', $highEntropy[0]->message);
-            self::assertCount(1, $jwtFindings);
-            self::assertSame(4, $jwtFindings[0]->line);
-        } finally {
-            self::assertTrue(unlink($path));
-        }
-    }
-
-    /**
-     * Verify gruff configuration path literals are not treated as high-entropy secrets.
-     *
-     * @return void
-     */
-    public function testHighEntropyGruffConfigPathsAreNotFlagged(): void
-    {
-        $path = tempnam(sys_get_temp_dir(), 'gruff-config-path-entropy-');
-        self::assertIsString($path);
-        $path   .= '.php';
-        $secret = 'M7qP2vL9' . 'xZ4aB8nC' . '3dF6gH1j' . 'K5mN0rS2' . 'tV9wY4zQ';
-        $source = "<?php\n\n"
-                  . '$configPath = ' . var_export('rules.naming.identifier-quality.excludeFromScore', true) . ";\n"
-                  . '$secret = ' . var_export($secret, true) . ";\n";
-        self::assertNotFalse(file_put_contents($path, $source));
-
-        try {
-            $unit     = (new PhpFileParser())->parse(new SourceFile($path, 'tests/Fixtures/SensitiveData/inline-config-path-entropy.php'));
-            $findings = array_values(array_filter(
-                                         $this->analyseUnits([$unit]),
-                                         static fn(Finding $finding): bool => $finding->ruleId === HighEntropyStringRule::ID,
-                                     ));
-
-            self::assertCount(1, $findings);
-            self::assertStringContainsString('M7qP', $findings[0]->message);
-        } finally {
-            self::assertTrue(unlink($path));
-        }
-    }
-
-    /**
-     * Verify medical terminology metadata is not treated as embedded secret material.
-     *
-     * @return void
-     */
-    public function testHighEntropyMedicalStandardMetadataIsNotFlagged(): void
-    {
-        $path = tempnam(sys_get_temp_dir(), 'gruff-medical-entropy-');
-        self::assertIsString($path);
-        $path   .= '.php';
-        $secret = 'M7qP2vL9' . 'xZ4aB8nC' . '3dF6gH1j' . 'K5mN0rS2' . 'tV9wY4zQ';
-        $source = "<?php\n\n"
-                  . '$metadata = ' . var_export('{"ConceptCode":"A","CodeSystemOID":"2.16.840.1.113883.5.83","CodeSystemCode":"PH_ObservationInterpretation_HL7_V3","ValueSetCode":"PHVS_ObservationInterpretation_HL7_V3"}', true) . ";\n"
-                  . '$secret = ' . var_export($secret, true) . ";\n";
-        self::assertNotFalse(file_put_contents($path, $source));
-
-        try {
-            $unit     = (new PhpFileParser())->parse(new SourceFile($path, 'tests/Fixtures/SensitiveData/inline-medical-entropy.php'));
-            $findings = array_values(array_filter(
-                                         $this->analyseUnits([$unit]),
-                                         static fn(Finding $finding): bool => $finding->ruleId === HighEntropyStringRule::ID,
-                                     ));
-
-            self::assertCount(1, $findings);
-            self::assertStringContainsString('M7qP', $findings[0]->message);
-        } finally {
-            self::assertTrue(unlink($path));
-        }
-    }
-
-    /**
-     * Verify placeholder PHI examples are suppressed without muting real-looking values.
-     *
-     * @return void
-     */
-    public function testPhiPlaceholderExamplesAreNotFlagged(): void
-    {
-        $path = tempnam(sys_get_temp_dir(), 'gruff-phi-placeholder-');
-        self::assertIsString($path);
-        $path                .= '.md';
-        $placeholderMedicare = '2345 ' . '67890 ' . '1';
-        $realMedicare        = '2123 ' . '45678 ' . '1';
-        $source              = implode("\n", [
-            sprintf('"medicare_number": { "value": "%s", "confidence": "high", "source_snippet": "Medicare: %s" },', $placeholderMedicare, $placeholderMedicare),
-            '$VOUCHER->set(\'PatientFundMembershipNum\', \'123456789\');',
-            sprintf('"patient_medicare": "%s"', $realMedicare),
-            '',
+        $example = 'AKIA' . 'IOSFODNN7' . 'EXAMPLE';
+        $live    = 'AKIA' . 'Q7R2M8N4' . 'P6T9V1X3';
+        $jwtSampleToken     = implode('.', [
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9',
+            'eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ',
+            'SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c',
         ]);
+        $source  = "<?php\n\n"
+                   . '$example = ' . var_export($example, true) . ";\n"
+                   . '$live = ' . var_export($live, true) . ";\n"
+                   . '$token = ' . var_export($jwtSampleToken, true) . ";\n";
         self::assertNotFalse(file_put_contents($path, $source));
 
         try {
-            $unit     = (new PhpFileParser())->parse(new SourceFile($path, 'docs/examples/inline-phi-placeholder.md', SourceFile::TYPE_TEXT));
+            $unit     = (new PhpFileParser())->parse(new SourceFile($path, 'src/documented-samples.php'));
             $findings = array_values(array_filter(
                                          $this->analyseUnits([$unit]),
-                                         static fn(Finding $finding): bool => $finding->ruleId === PhiPatternRule::ID,
-                                     ));
+                                         static fn(Finding $finding): bool => in_array($finding->ruleId, [AwsAccessKeyRule::ID, JwtTokenRule::ID], true),
+            ));
 
-            self::assertCount(1, $findings);
-            self::assertSame(3, $findings[0]->line);
+            self::assertSame([[AwsAccessKeyRule::ID, 4]], array_map(static fn(Finding $finding): array => [$finding->ruleId, $finding->line], $findings));
         } finally {
             self::assertTrue(unlink($path));
         }
+    }
+
+    /**
+     * Provides token-boundary, dummy-value, and documented-sample cases for the placeholder filter.
+     *
+     * @return array<string, array{0: string, 1: bool, 2: bool}> - Cases: candidate, identifier-splitting flag, expected dummy classification.
+     */
+    public static function placeholderValueCases(): array
+    {
+        return [
+            // An internal placeholder substring must not by itself classify a value as a dummy.
+            'latest is not test'         => ['latestReleaseCredentialZq7Xw2Lp9', true, false],
+            'contest is not test'        => ['contest', true, false],
+            'attestation is not test'    => ['attestation', true, false],
+            // Glued, camelCase, snake_case, and separated placeholders remain classified as dummy values.
+            'digit-suffixed changeme'    => ['changeme123', true, true],
+            'camelCase fake'             => ['fakeToken', true, true],
+            'PascalCase changeme'        => ['ChangeMe', true, true],
+            'separated example'          => ['example-password', true, true],
+            'snake_case test'            => ['my_test_secret', true, true],
+            'low-cardinality filler'     => ['xxxxxxxx', true, true],
+            'empty literal'              => ['', true, true],
+            // A placeholder prefix marks a glued dummy value even without a separator.
+            'unbroken testkey'           => ['TESTKEY', true, true],
+            'glued testpass'             => ['testpass99', true, true],
+            'glued example placeholder'  => ['sk_live_exampleplaceholder', true, true],
+            // AWS's documented example key, assembled so this file never holds it, is a documented sample however it is split.
+            'aws example key, words'     => ['AKIA' . 'IOSFODNN7' . 'EXAMPLE', true, true],
+            'aws example key, whole run' => ['AKIA' . 'IOSFODNN7' . 'EXAMPLE', false, true],
+            // A live-shaped key without a placeholder prefix must remain a non-dummy candidate.
+            'live-shaped key, whole run' => ['AKIA' . 'Q7R2M8N4' . 'P6T9V1X3', false, false],
+        ];
+    }
+
+    /**
+     * Verify the placeholder filter matches words that begin a token rather than any substring.
+     *
+     * @param string $candidateValue             - Candidate value handed to the filter.
+     * @param bool   $shouldSplitIdentifierWords - Whether identifier word boundaries also split tokens.
+     * @param bool   $isPlaceholder              - Expected dummy classification from the helper.
+     *
+     * @return void - Asserts the helper's dummy classification matches each supplied expectation.
+     */
+    #[DataProvider('placeholderValueCases')]
+    public function testPlaceholderWordsMustBeginAToken(string $candidateValue, bool $shouldSplitIdentifierWords, bool $isPlaceholder): void
+    {
+        self::assertSame($isPlaceholder, SecretScannerHelper::isLikelyDummyValue($candidateValue, $shouldSplitIdentifierWords));
     }
 
     /**
      * Verify secret rules respect detector selection config.
      *
-     * @return void
+     * @return void - Asserts JWT findings are disabled while one AWS finding remains.
      */
     public function testSecretRulesRespectDetectorSelectionConfig(): void
     {
         $registry = RuleRegistry::defaults();
         $config   = (new ConfigLoader(self::PROJECT_ROOT))->load(
-            'tests/Fixtures/Config/disable-high-entropy.yaml',
+            'tests/Fixtures/Config/disable-jwt-token.yaml',
             $registry,
         );
         $findings = $this->analyseUnits(
@@ -361,15 +304,15 @@ final class SensitiveDataRulesTest extends TestCase
             $config,
         );
 
-        self::assertRuleCount(HighEntropyStringRule::ID, 0, $findings);
+        self::assertRuleCount(JwtTokenRule::ID, 0, $findings);
         self::assertRuleCount(AwsAccessKeyRule::ID, 1, $findings);
     }
 
     /**
-     * Verify CLI text and JSON reports do not leak full secrets.
+     * Checks CLI text and JSON for literal occurrences of the synthetic values listed by secretValues().
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Requires decodable JSON, no listed literal matches in either report, and the substring 'redacted' in each.
+     * @throws JsonException - If the CLI's JSON report cannot be decoded.
      */
     public function testCliTextAndJsonReportsDoNotLeakFullSecrets(): void
     {
@@ -395,7 +338,7 @@ final class SensitiveDataRulesTest extends TestCase
      * @param int           $expectedCount - Findings the rule must report for this fixture.
      * @param list<Finding> $findings - Full analysis output to filter by rule id.
      *
-     * @return void
+     * @return void - Asserts the filtered finding count equals the expected count.
      */
     private static function assertRuleCount(string $ruleId, int $expectedCount, array $findings): void
     {
@@ -411,7 +354,7 @@ final class SensitiveDataRulesTest extends TestCase
      *
      * @param string $path - Project-relative fixture path to parse and scan.
      *
-     * @return list<Finding> - every rule finding for the fixture, in registry order; empty when nothing flagged
+     * @return list<Finding> - Finalized findings ordered by file, line, rule ID, and message; empty when none remain.
      */
     private function analysePath(string $path): array
     {
@@ -422,9 +365,9 @@ final class SensitiveDataRulesTest extends TestCase
      * Analyse sensitive-data fixtures and return findings for assertions.
      *
      * @param list<AnalysisUnit> $units - Pre-parsed units to run the default rule set over.
-     * @param ?AnalysisConfig    $config - Override config; null applies the registry defaults.
+     * @param ?AnalysisConfig $config - Explicit settings, or null to enable database-URL and PII rules on registry defaults.
      *
-     * @return list<Finding> - aggregated findings the default rule set produced across the units; empty when none fired
+     * @return list<Finding> - Finalized findings from the configured registry; empty when none remain.
      */
     private function analyseUnits(array $units, ?AnalysisConfig $config = null): array
     {
@@ -432,14 +375,40 @@ final class SensitiveDataRulesTest extends TestCase
 
         return $registry->analyse(
             $units,
-            new RuleContext(self::PROJECT_ROOT, $config ?? AnalysisConfig::fromRegistry($registry)),
+            new RuleContext(self::PROJECT_ROOT, $config ?? self::configWithOptInSensitiveRules($registry)),
         );
+    }
+
+    /**
+     * Builds the default config with the opt-in sensitive-data rules switched on, as a project that enables them would.
+     *
+     * @param RuleRegistry $registry - Default registry the config is seeded from.
+     *
+     * @return AnalysisConfig - Registry defaults with database-URL-password and PII-fixture detection enabled.
+     */
+    private static function configWithOptInSensitiveRules(RuleRegistry $registry): AnalysisConfig
+    {
+        $config = AnalysisConfig::fromRegistry($registry);
+
+        // Both ship off by default; enabling them here mirrors a project that sets enabled: true for each.
+        foreach ([DatabaseUrlPasswordRule::ID, PiiTestFixtureRule::ID] as $ruleId) {
+            $settings = $config->ruleSettings($ruleId);
+            $config   = $config->withRuleSettings($ruleId, new RuleSettings(
+                true,
+                $settings->thresholds,
+                $settings->options,
+                $settings->severityThreshold,
+                $settings->excludeFromScore,
+            ));
+        }
+
+        return $config;
     }
 
     /**
      * Parse the requested path into an analysis unit.
      *
-     * @param string $path - Filesystem path.
+     * @param string $path - Project-relative fixture path, prefixed with PROJECT_ROOT before reading.
      *
      * @return AnalysisUnit - the parsed unit, typed PHP for .php paths and plain text otherwise
      */
@@ -455,26 +424,29 @@ final class SensitiveDataRulesTest extends TestCase
     /**
      * Run text and JSON reports over the secret fixtures.
      *
-     * @return array{string, string} - the same fixtures rendered twice: human-readable text first, machine JSON second, so the leak check can scan
-     *                       both surfaces
+     * @return array{string, string} - Reports for the same fixtures, with CLI text first and JSON second.
      */
     private function secretLeakReports(): array
     {
+        // The realistic-PII fixture supplies findings whose matches must render redacted; the URL credentials in the other two are userinfo, not PII.
         $paths = [
             'tests/Fixtures/SensitiveData/synthetic-secrets.php',
             'tests/Fixtures/SensitiveData/config-secrets.json',
+            'tests/Fixtures/SensitiveData/pii-realistic.php',
         ];
 
         return [
-            $this->runGruff(['analyse', ...$paths, '--fail-on', 'none', '--no-config']),
-            $this->runGruff(['analyse', ...$paths, '--format', 'json', '--fail-on', 'none', '--no-config']),
+            $this->runGruff(['analyse', ...$paths, '--fail-on', 'none', '--config', 'tests/Fixtures/Config/enable-default-off-rules.yaml']),
+            $this->runGruff(['analyse', ...$paths, '--format', 'json', '--fail-on', 'none', '--config', 'tests/Fixtures/Config/enable-default-off-rules.yaml']),
         ];
     }
 
     /**
+     * Runs the CLI as a user would and returns the rendered report for leak-safety assertions.
+     *
      * @param list<string> $arguments - CLI arguments appended after the gruff binary path.
      *
-     * @return string - the gruff CLI's stdout; stderr is dropped and a non-zero exit already fails the test before returning
+     * @return string - CLI stdout after a zero-exit assertion; failure diagnostics include both stderr and stdout.
      */
     private function runGruff(array $arguments): string
     {
@@ -493,7 +465,7 @@ final class SensitiveDataRulesTest extends TestCase
      */
     private function secretValues(): array
     {
-        // Canonical secrets the leak check hunts for; split by concatenation so this file isn't flagged.
+        // Keep each complete credential pattern out of this source while returning the canonical values used by leak checks.
         return [
             'AKIA' . 'Z9Y8X7W6V5U4T3R2',
             'sk_live_' . '51N7uQbP0JZ6r' . 'T9vL3mK8sX2y',

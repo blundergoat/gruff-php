@@ -46,24 +46,34 @@ final class UnsafeUnserializeRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::Medium,
+            // Off unless a project sets enabled: true: precision-floor M02 found it right on 2 of 8 judged findings, too few
+            // to establish its precision floor, so it is off by default rather than deleted (ADR-034).
+            isEnabledByDefault: false,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'An unserialize() of trusted internal data, such as a value the application wrote to its own cache or database.',
+                    'mitigation' => 'Any non-literal payload is reported regardless of provenance, so pass [\'allowed_classes\' => false], which is recognised as safe, or store the value as JSON.',
+                ],
+            ],
         );
     }
 
     /**
-     * Reports each `unserialize()` call that can hydrate untrusted data.
+     * Reports unserialize() calls whose resolved payload is not a literal string.
+     * Calls with a recognised options guard are skipped.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext $ruleContext - Unused; the rule interface requires it, and this rule reads no options or project root.
      *
-     * @return list<Finding> - Findings for unsafe unserialize calls; empty when none take untrusted input.
+     * @return list<Finding> - One finding per matched call; empty when no call meets the heuristic.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $findings = [];
 
-        // Check every function call in the file.
+
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
-            // Only a global unserialize() is an object-hydration sink.
+
             if (SecurityNodeHelper::globalFunctionName($call) !== 'unserialize') {
                 continue;
             }
@@ -74,7 +84,7 @@ final class UnsafeUnserializeRule implements RuleInterface
                 continue;
             }
 
-            // Object hydration disabled by allowed_classes => false is already safe.
+            // For this rule, a literal allowed_classes => false option suppresses the object-hydration finding.
             if ($this->hasAllowedClassesFalse($call)) {
                 continue;
             }
@@ -96,11 +106,11 @@ final class UnsafeUnserializeRule implements RuleInterface
     }
 
     /**
-     * Reports whether the call disables object hydration via `allowed_classes => false`.
+     * Reports whether a literal options array contains allowed_classes => false.
      *
      * @param Expr\FuncCall $call - unserialize() call whose second argument is checked for an options array.
      *
-     * @return bool - True when object deserialization has been disabled by options.
+     * @return bool - True when the literal option disables application-class hydration for this rule.
      */
     private function hasAllowedClassesFalse(Expr\FuncCall $call): bool
     {
@@ -110,20 +120,20 @@ final class UnsafeUnserializeRule implements RuleInterface
             return false;
         }
 
-        // Weigh each key in the options array.
+
         foreach ($options->items as $item) {
-            // Only a string key can be the allowed_classes option.
+
             if (!$item->key instanceof Scalar\String_) {
                 continue;
             }
 
             if ($item->key->value === 'allowed_classes' && SecurityNodeHelper::isFalseLike($item->value)) {
-                // allowed_classes => false disables object hydration entirely, which neutralises the gadget-chain risk.
+                // For this rule, allowed_classes => false suppresses the gadget-chain finding.
                 return true;
             }
         }
 
-        // The options array exists but never sets allowed_classes to false, so object hydration is still possible.
+        // No literal disabling option was recognised; retain the call as a heuristic candidate.
         return false;
     }
 }

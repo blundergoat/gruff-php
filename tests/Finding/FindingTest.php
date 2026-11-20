@@ -15,14 +15,16 @@ use GruffPhp\Results\Finding\Severity;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers serialisation of Finding into the documented stable shape.
+ * Covers finding serialisation, remediation metadata, and identity comparisons.
+ * Checks position-sensitive fingerprints against identities that survive line shifts.
+ * Exercises hook suppression when remediation metadata is the only change.
  */
 final class FindingTest extends TestCase
 {
     /**
-     * Verify serializes stable finding shape.
+     * Checks the complete serialised finding payload and the format of both hashes.
      *
-     * @return void
+     * @return void - Asserts field values and 16-character lowercase hexadecimal hashes.
      */
     public function testSerializesStableFindingShape(): void
     {
@@ -68,7 +70,7 @@ final class FindingTest extends TestCase
     /**
      * Verify remediation metadata round-trips without becoming part of finding identity.
      *
-     * @return void
+     * @return void - Asserts action metadata, metadata round-tripping, and equality of both identity hashes.
      */
     public function testRemediationMetadataIsAdditiveAndIdentityNeutral(): void
     {
@@ -102,7 +104,7 @@ final class FindingTest extends TestCase
     /**
      * Verify hook new-only filtering ignores additive remediation metadata.
      *
-     * @return void
+     * @return void - Asserts equal hook identities, no retained findings, and one suppression.
      */
     public function testHookBaselineIdentityIgnoresRemediationMetadata(): void
     {
@@ -133,7 +135,7 @@ final class FindingTest extends TestCase
     /**
      * Verify stableIdentity ignores line shifts when symbol is set.
      *
-     * @return void
+     * @return void - Asserts equal stable identities and different fingerprints after the line shift.
      */
     public function testStableIdentitySurvivesLineShiftsWhenSymbolIsSet(): void
     {
@@ -145,9 +147,9 @@ final class FindingTest extends TestCase
     }
 
     /**
-     * Verify stableIdentity falls back to message text when symbol is null.
+     * Checks line-shift invariance when neither finding has a symbol.
      *
-     * @return void
+     * @return void - Asserts equal stable identities and different fingerprints for null-symbol findings.
      */
     public function testStableIdentityFallsBackToMessageWhenSymbolIsNull(): void
     {
@@ -161,7 +163,7 @@ final class FindingTest extends TestCase
     /**
      * Verify stableIdentity diverges across different rule IDs even at the same symbol.
      *
-     * @return void
+     * @return void - Asserts different stable identities for different rule IDs at one symbol.
      */
     public function testStableIdentityDifferentRuleIdsProduceDifferentValues(): void
     {
@@ -172,12 +174,9 @@ final class FindingTest extends TestCase
     }
 
     /**
-     * Verify two findings of the same rule on the same symbol but with different
-     * messages stay distinct. `docs.missing-param-tag` emits one finding per
-     * missing parameter under the same method symbol — those must not collapse
-     * to one identity in external diff tooling.
+     * Checks that different missing-parameter messages produce distinct stable identities at the same symbol.
      *
-     * @return void
+     * @return void - Asserts different stable identities for the two missing-parameter findings.
      */
     public function testStableIdentitySeparatesSameSymbolFindingsByMessage(): void
     {
@@ -211,10 +210,10 @@ final class FindingTest extends TestCase
      * Build a Finding fixture for stable-identity tests.
      *
      * @param int         $line - Source line the fixture finding points at; varied across cases to probe identity.
-     * @param string|null $symbol - Enclosing symbol, or null when the finding is file-level rather than scoped.
-     * @param string      $ruleId - Rule the finding was raised under; defaulted so cases vary only line and symbol.
+     * @param string|null $symbol - Symbol used by identity checks; null creates a finding without a symbol.
+     * @param string      $ruleId - Rule assigned to the fixture; defaults to size.file-length.
      *
-     * @return Finding - a fully populated Size/Warning fixture whose fingerprint and stableIdentity the tests compare
+     * @return Finding - Size/Warning fixture with a fixed message and path; endLine is ten lines after line.
      */
     private function finding(
         int     $line,

@@ -12,49 +12,36 @@ use GruffPhp\Results\Finding\Severity;
 use InvalidArgumentException;
 
 /**
- * The immutable description of one rule - its id, name, pillar, severity, defaults, thresholds, and the
- * help text `list-rules` shows - that the registry and reports read to load, run, and explain it.
+ * The immutable description of one rule: identity, quality metadata, configuration defaults, and help text.
+ * Rules return it from definition() so the registry, findings, and rule listings share the same metadata.
  *
- * Every rule returns one of these from definition(). It is the single source of truth for how a rule is
- * named in findings and config, what its out-of-the-box severity and thresholds are, and what the user
- * sees when they inspect it. The constructor validates the id shape and rejects a rule that declares
- * both threshold forms (ADR-008).
+ * The constructor validates ids, rejects blank threshold and option names, and forbids mixing threshold forms (ADR-008).
  */
 final readonly class RuleDefinition
 {
     /**
      * Builds a validated rule definition, rejecting a malformed id or a rule that mixes threshold forms.
      *
-     * @param string                                                                       $id - Stable rule identifier used in
-     *                                                                                                          findings and config.
-     * @param string                                                                       $name - Human-readable rule name.
-     * @param Pillar                                                                       $pillar - Primary quality pillar for the rule.
-     * @param RuleTier                                                                     $tier - Rule catalogue tier.
-     * @param Severity                                                                     $defaultSeverity - Severity used when config does not
-     *                                                                                                          override it.
-     * @param Confidence                                                                   $confidence - Default confidence assigned to rule
-     *                                                                                                          findings.
-     * @param array<string, int|float>                                                     $defaultThresholds - Named numeric thresholds for rule
-     *                                                                                                          settings (legacy tiered shape; mutually exclusive with
-     *                                                                                                          $severityThreshold per ADR-008).
-     * @param list<Pillar>                                                                 $secondaryPillars - Additional pillars affected by the
-     *                                                                                                          rule.
-     * @param bool                                                                         $isEnabledByDefault - Whether the rule runs unless disabled
-     *                                                                                                          by config.
-     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $defaultOptions - Rule-specific default option values.
-     * @param string                                                                       $description - Longer display description for rule
-     *                                                                                                          listings.
-     * @param SeverityThreshold|null                                                       $severityThreshold - Single threshold + severity default
-     *                                                                                                          (ADR-008/ADR-009 shape); mutually
-     *                                                                                                          exclusive with $defaultThresholds.
-     * @param array<string, string>                                                        $optionDescriptions - One-line semantic description per
-     *                                                                                                          option key; surfaced by `list-rules <id>`.
-     * @param list<array{shape: string, mitigation: string}>                               $falsePositiveShapes - Documented false-positive patterns and
-     *                                                                                                          how to mitigate them; surfaced by
-     *                                                                                                          `list-rules <id>`. Empty when no
-     *                                                                                                          patterns have been catalogued yet.
+     * @param string     $id - Stable rule identifier used in findings and config.
+     * @param string     $name - Human-readable rule name and fallback display description.
+     * @param Pillar     $pillar - Primary quality pillar for the rule.
+     * @param RuleTier   $tier - Rule catalogue tier.
+     * @param Severity   $defaultSeverity - Severity used when config does not override it.
+     * @param Confidence $confidence - Default confidence assigned to rule findings.
      *
-     * @throws InvalidArgumentException When the rule id, threshold names, or option names are invalid.
+     * @param array<string, int|float> $defaultThresholds - Named numeric defaults; mutually exclusive with $severityThreshold.
+     * @param list<Pillar>             $secondaryPillars - Additional pillars affected by the rule.
+     * @param bool                     $isEnabledByDefault - Whether registry defaults enable this rule.
+     *
+     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $defaultOptions - Default values keyed by option name.
+     *
+     * @param string                 $description - Display description; an empty string makes description() return $name.
+     * @param SeverityThreshold|null $severityThreshold - Single threshold/severity default; mutually exclusive with $defaultThresholds.
+     * @param array<string, string>  $optionDescriptions - Help text keyed by option name for rule listings.
+     *
+     * @param list<array{shape: string, mitigation: string}> $falsePositiveShapes - Known false-positive patterns and their mitigations.
+     *
+     * @throws InvalidArgumentException - For invalid ids, blank threshold or option names, or mixed threshold forms.
      */
     public function __construct(
         public string             $id,
@@ -107,7 +94,7 @@ final readonly class RuleDefinition
      */
     public function description(): string
     {
-        // An empty description means none was configured, so the name doubles as the display text.
+
         return $this->description !== '' ? $this->description : $this->name;
     }
 }

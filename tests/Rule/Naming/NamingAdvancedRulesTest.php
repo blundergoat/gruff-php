@@ -11,14 +11,16 @@ use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\RuleRegistry;
 
 /**
- * Covers configurable and mutation-focused naming rule behavior.
+ * Covers identifier-quality configuration, accepted abbreviations, and generic value parameters.
+ * Pins the mutation fixture's finding metadata and messages.
+ * Checks callback-body and local-reference thresholds through reported identifier names.
  */
 final class NamingAdvancedRulesTest extends NamingRuleTestCase
 {
     /**
      * Verify identifier quality can be tuned with config and accepted abbreviations.
      *
-     * @return void
+     * @return void - Asserts ignored and accepted names are absent while foo and temp remain reported.
      */
     public function testIdentifierQualityCanBeTunedWithConfigAndAcceptedAbbreviations(): void
     {
@@ -55,7 +57,7 @@ final class NamingAdvancedRulesTest extends NamingRuleTestCase
     /**
      * Verify plain value parameters are not hidden behind the generic-name ignore list.
      *
-     * @return void
+     * @return void - Asserts value and inputValue parameters are reported with the generic variant.
      */
     public function testIdentifierQualityFlagsGenericValueParameters(): void
     {
@@ -96,7 +98,7 @@ PHP, IdentifierQualityRule::ID);
     /**
      * Verify identifier quality mutation fixture reports stable kinds and messages.
      *
-     * @return void
+     * @return void - Asserts the ordered finding tuples, including symbols, metadata, and messages.
      */
     public function testIdentifierQualityMutationFixtureFindingsAreStable(): void
     {
@@ -135,9 +137,10 @@ PHP, IdentifierQualityRule::ID);
     }
 
     /**
-     * Verify the sole parameter of short iteration callbacks gets the loop escape hatch while long or non-iteration callbacks still flag.
+     * Verify generic names on sole parameters of short inline iteration callbacks are exempt.
+     * Check that the fixture's at-threshold and non-iteration callbacks report their generic parameters.
      *
-     * @return void
+     * @return void - Asserts item is absent and entry and data are present in the callback fixture's findings.
      */
     public function testIdentifierQualityAppliesLoopThresholdToIterationCallbackParameters(): void
     {
@@ -155,7 +158,7 @@ PHP, IdentifierQualityRule::ID);
     /**
      * Verify identifier quality honours local-variable reference thresholds.
      *
-     * @return void
+     * @return void - Asserts which fixture locals remain reported when minScopeReferences is two.
      */
     public function testIdentifierQualityHonoursLocalVariableReferenceThreshold(): void
     {

@@ -5,27 +5,28 @@ declare(strict_types=1);
 namespace GruffPhp\Results\Baseline;
 
 /**
- * Immutable bundle of the three baseline decisions for a single `gruff-php analyse` run: whether
- * to apply an existing baseline, whether that baseline was named by the user or picked up as the
- * project default, and whether to write a fresh baseline instead. The command layer fills this in
- * from the user's `--baseline`, `--generate-baseline`, and `--no-baseline` flags, then hands it to
- * `BaselineApplication`. That reader decides whether the run suppresses already-accepted findings,
- * records the current findings as accepted debt, or shows every finding untouched.
+ * Immutable baseline paths and overwrite choices for one analysis run.
+ *
+ * The command layer supplies these options to `BaselineApplication`.
+ * Generation takes precedence over application; migration is considered only during generation.
  */
 final readonly class BaselineApplicationOptions
 {
     /**
-     * Freezes the baseline choices for one analyse run, built while parsing the user's command-line
-     * flags and read later when the run decides how to treat findings it has seen before.
+     * Captures the baseline choices for one analyse run.
      *
-     * @param string|null $baselinePath - Path of the baseline file whose recorded findings this run suppresses; null when no baseline applies (a plain run or `--no-baseline`), so every finding is shown.
-     * @param bool        $isBaselineExplicit - True when the user typed `--baseline` themselves, false when the path is the auto-adopted project default; only decides whether the baseline report is labelled explicit or default.
-     * @param string|null $generateBaselinePath - Path to write a fresh baseline to, recording the current findings as accepted debt; null on a normal run that writes nothing, and any path here takes precedence over applying a baseline.
+     * @param string|null $baselinePath - Existing baseline to apply when not generating; null skips application.
+     * @param bool $isBaselineExplicit - Whether the baseline path came from an explicit --baseline option.
+     * @param string|null $generateBaselinePath - Output path for generation; null skips generation, which otherwise takes precedence.
+     * @param string|null $migrateBaselinePath - 0.5 input used during generation; null generates solely from current findings.
+     * @param bool $shouldForceBaselineOverwrite - Allow overwriting an older schema at the default filename; false keeps the overwrite guard.
      */
     public function __construct(
         public ?string $baselinePath,
         public bool $isBaselineExplicit,
         public ?string $generateBaselinePath,
+        public ?string $migrateBaselinePath = null,
+        public bool $shouldForceBaselineOverwrite = false,
     ) {
     }
 }

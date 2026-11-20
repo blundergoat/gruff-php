@@ -15,7 +15,9 @@ use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers method-length thresholds (warning/error), multiline-call collapsing, closure-as-method counting, and disabled-rule suppression.
+ * Covers method-length thresholds with short, long and closure fixtures.
+ * Asserts warning and error findings, callable symbols and the long method's measured line count.
+ * Checks that multiline-call and disabled-rule cases produce no method-length findings.
  */
 final class MethodLengthRuleTest extends TestCase
 {
@@ -25,9 +27,9 @@ final class MethodLengthRuleTest extends TestCase
     private PhpFileParser $parser;
 
     /**
-     * Prepare parser fixtures before each rule test.
+     * Create a fresh rule and parser for each test.
      *
-     * @return void
+     * @return void - Initializes the rule and parser used by fixture helpers.
      */
     protected function setUp(): void
     {
@@ -38,7 +40,7 @@ final class MethodLengthRuleTest extends TestCase
     /**
      * Verify no findings for short methods.
      *
-     * @return void
+     * @return void - Asserts an empty finding list for the short-method fixture.
      */
     public function testNoFindingsForShortMethods(): void
     {
@@ -50,11 +52,12 @@ final class MethodLengthRuleTest extends TestCase
     /**
      * Verify warning for method above warning threshold.
      *
-     * @return void
+     * @return void - Asserts one warning with the expected rule ID, symbol and 31-line measurement.
      */
     public function testWarningForMethodAboveWarningThreshold(): void
     {
-        $findings = $this->analyse('long-method.php', ['warning' => 30, 'error' => 60]);
+        // The 31-line method exceeds the upper-band boundary of 30, so it retains warning severity.
+        $findings = $this->analyse('long-method.php', ['warning' => 20, 'error' => 60]);
 
         self::assertCount(1, $findings);
         self::assertSame(MethodLengthRule::ID, $findings[0]->ruleId);
@@ -66,7 +69,7 @@ final class MethodLengthRuleTest extends TestCase
     /**
      * Verify error for method above error threshold.
      *
-     * @return void
+     * @return void - Asserts one error finding for LongMethodFixture::warningMethod().
      */
     public function testErrorForMethodAboveErrorThreshold(): void
     {
@@ -80,9 +83,9 @@ final class MethodLengthRuleTest extends TestCase
     }
 
     /**
-     * Verify multiline call counts as one logical line.
+     * Verify the multiline-call fixture stays below the configured reporting threshold.
      *
-     * @return void
+     * @return void - Asserts no findings for the multiline-call fixture at the configured thresholds.
      */
     public function testMultilineCallCountsAsOneLogicalLine(): void
     {
@@ -94,7 +97,7 @@ final class MethodLengthRuleTest extends TestCase
     /**
      * Verify closure counted as method.
      *
-     * @return void
+     * @return void - Asserts one warning finding with a non-null symbol beginning with Closure@.
      */
     public function testClosureCountedAsMethod(): void
     {
@@ -109,7 +112,7 @@ final class MethodLengthRuleTest extends TestCase
     /**
      * Verify disabled rule produces no findings.
      *
-     * @return void
+     * @return void - Asserts the registry emits no method-length findings when the rule is disabled.
      */
     public function testDisabledRuleProducesNoFindings(): void
     {
@@ -127,10 +130,10 @@ final class MethodLengthRuleTest extends TestCase
     }
 
     /**
-     * Analyse fixture paths and return findings for assertions.
+     * Analyse one size fixture with the supplied thresholds.
      *
      * @param string             $fixture - Fixture filename under tests/Fixtures/Size to scan.
-     * @param array<string, int> $thresholds - Rule option overrides applied before the fixture runs.
+     * @param array<string, int> $thresholds - Warning and error thresholds used for this fixture.
      *
      * @return list<\GruffPhp\Results\Finding\Finding> - findings the rule raised for the fixture; empty when nothing tripped the thresholds
      */
@@ -150,7 +153,7 @@ final class MethodLengthRuleTest extends TestCase
     /**
      * Parse the named fixture into an analysis unit.
      *
-     * @param string $filename - Fixture filename.
+     * @param string $filename - Filename appended to tests/Fixtures/Size/.
      *
      * @return \GruffPhp\Engine\Parser\AnalysisUnit - the parsed fixture ready for the rule to analyse, carrying the repo-relative display path
      */

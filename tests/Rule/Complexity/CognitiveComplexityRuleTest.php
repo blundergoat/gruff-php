@@ -18,8 +18,9 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers cognitive complexity counting on fixtures, threshold stability, no-finding cases, warning emission, and same-operator boolean chain
- * collapsing.
+ * Checks cognitive complexity scores against named fixture methods.
+ * Covers default thresholds, emitted finding metadata and boolean-operator runs.
+ * Distinguishes advisory guard-clause findings from nested and fall-through branching.
  */
 final class CognitiveComplexityRuleTest extends TestCase
 {
@@ -29,9 +30,9 @@ final class CognitiveComplexityRuleTest extends TestCase
     private PhpFileParser $parser;
 
     /**
-     * Prepare parser fixtures before each rule test.
+     * Give each test an independent cognitive-complexity rule and parser.
      *
-     * @return void
+     * @return void - Initializes the rule and parser used by the test methods.
      */
     protected function setUp(): void
     {
@@ -40,10 +41,9 @@ final class CognitiveComplexityRuleTest extends TestCase
     }
 
     /**
-     * Provide method cc cases for parameterized tests.
+     * Supply expected cognitive-complexity scores for fixture methods.
      *
-     * @return array<string, array{string, int}> - data-provider rows keyed by case label; each row is the fixture method name paired with its
-     *                       expected cognitive score
+     * @return array<string, array{string, int}> - Named rows pairing fixture method names with expected cognitive scores.
      */
     public static function methodCcProvider(): array
     {
@@ -57,17 +57,19 @@ final class CognitiveComplexityRuleTest extends TestCase
             'deeply nested'                   => ['deeplyNested', 11],
             'while boolean condition'         => ['whileWithBooleanCondition', 2],
             'do while boolean condition'      => ['doWhileWithBooleanCondition', 2],
-            'try catch finally branches'      => ['tryCatchFinallyBranches', 5],
-            'jumps and goto'                  => ['jumpsAndGoto', 12],
+            'try catch finally branches'      => ['tryCatchFinallyBranches', 4],
+            'jumps and goto'                  => ['jumpsAndGoto', 8],
             'logical keyword chain'           => ['logicalKeywordChain', 3],
             'expression and return ternaries' => ['expressionAndReturnTernaries', 4],
-            'closure and arrow function'      => ['closureAndArrowFunction', 4],
-            'elseif and nested branches'      => ['elseifAndNestedBranches', 8],
-            'switch with nested cases'        => ['switchWithNestedCases', 8],
+            'closure and arrow function'      => ['closureAndArrowFunction', 3],
+            'elseif and nested branches'      => ['elseifAndNestedBranches', 7],
+            'switch with nested cases'        => ['switchWithNestedCases', 4],
+            'non-guard still nests'           => ['nonGuardStillNests', 6],
+            'guard needs no else'             => ['guardNeedsNoElse', 5],
             'short ternary'                   => ['shortTernary', 3],
             'plain return'                    => ['plainReturn', 1],
             // Match mirrors cognitive switch: one increment for the construct plus recursive arm scoring,
-            // with no per-arm cost. Cyclomatic complexity intentionally differs: it charges every arm.
+            // with no per-arm cost. The shared cyclomatic count used by the maintainability index charges each arm condition.
             'match with two arms'             => ['matchTwoArms', 1],
             'match with six arms'             => ['matchSixArms', 1],
             'nested match'                    => ['matchNested', 3],
@@ -83,7 +85,7 @@ final class CognitiveComplexityRuleTest extends TestCase
      * @param string $methodName - Fixture method name.
      * @param int    $expectedCc - Expected cognitive complexity.
      *
-     * @return void
+     * @return void - Asserts the named fixture method exists and has the supplied cognitive score.
      */
     #[DataProvider('methodCcProvider')]
     public function testCognitiveCountMatchesExpected(string $methodName, int $expectedCc): void
@@ -107,9 +109,9 @@ final class CognitiveComplexityRuleTest extends TestCase
     }
 
     /**
-     * Verify no findings for simple methods.
+     * Require simple.php to produce no cognitive-complexity findings at warning 15 and error 30.
      *
-     * @return void
+     * @return void - Asserts an empty finding list for simple.php at warning 15 and error 30.
      */
     public function testNoFindingsForSimpleMethods(): void
     {
@@ -119,9 +121,9 @@ final class CognitiveComplexityRuleTest extends TestCase
     }
 
     /**
-     * Verify warning for high cognitive complexity.
+     * Verify the deeply nested fixture's complexity, threshold metadata and reported end line.
      *
-     * @return void
+     * @return void - Asserts the deeplyNested finding's score, threshold metadata and end line.
      */
     public function testWarningForHighCognitiveComplexity(): void
     {
@@ -148,7 +150,7 @@ final class CognitiveComplexityRuleTest extends TestCase
     /**
      * Verify a match-bearing method trips a lowered threshold and reports its computed score.
      *
-     * @return void
+     * @return void - Asserts matchNested has complexity 3 in both metadata and message.
      */
     public function testMatchComplexityTripsLoweredThresholdWithReportedValue(): void
     {
@@ -167,7 +169,7 @@ final class CognitiveComplexityRuleTest extends TestCase
     /**
      * Verify default threshold metadata stays stable.
      *
-     * @return void
+     * @return void - Asserts no default threshold map and an error severity threshold of 20.
      */
     public function testDefinitionThresholdsAreStable(): void
     {
@@ -182,7 +184,7 @@ final class CognitiveComplexityRuleTest extends TestCase
     /**
      * Verify boolean chain collapsing.
      *
-     * @return void
+     * @return void - Asserts scores 2 and 3 for the same-operator and mixed-operator fixture methods.
      */
     public function testBooleanChainCollapsing(): void
     {
@@ -210,9 +212,9 @@ final class CognitiveComplexityRuleTest extends TestCase
     }
 
     /**
-     * Verify flat guard-clause validation is lower severity than nested equivalent branching.
+     * Verify flat guard-clause validation is lower severity than nested branching.
      *
-     * @return void
+     * @return void - Asserts advisory guard-clause metadata and error severity for nested branching.
      */
     public function testFlatGuardClauseComplexityIsAdvisoryButNestedLogicStaysSevere(): void
     {
@@ -233,19 +235,20 @@ final class CognitiveComplexityRuleTest extends TestCase
     /**
      * Verify flat fall-through branches that do work (not early-exit guards) keep their branching severity.
      *
-     * @return void
+     * @return void - Asserts telemetryBuilder remains a warning with the branching shape.
      */
     public function testFlatFallThroughBranchesAreNotDowngradedToAdvisory(): void
     {
-        $findings = $this->analyse('guard-clauses.php', ['warning' => 4, 'error' => 14]);
+        // A warning tier of 3 puts telemetryBuilder's complexity of 5 in the upper band, where the shape alone decides severity.
+        $findings = $this->analyse('guard-clauses.php', ['warning' => 3, 'error' => 14]);
 
         $bySymbol = [];
         foreach ($findings as $finding) {
             $bySymbol[$finding->symbol ?? ''] = $finding;
         }
 
-        // telemetryBuilder is flat but falls through (no return/throw/exit), so it is branching complexity
-        // rather than a guard clause and must not be downgraded to advisory regardless of branch count.
+        // The branches do not exit early, so the fixture keeps branching severity at this threshold.
+
         self::assertSame(Severity::Warning, $bySymbol['GuardClauseComplexityFixture::telemetryBuilder()']->severity ?? null);
         self::assertSame('branching', $bySymbol['GuardClauseComplexityFixture::telemetryBuilder()']->metadata['complexityShape'] ?? null);
     }
@@ -254,8 +257,7 @@ final class CognitiveComplexityRuleTest extends TestCase
      * Analyse complexity fixtures and return findings for assertions.
      *
      * @param string             $fixture    - fixture filename under Fixtures/Complexity to parse and run.
-     * @param array<string, int> $thresholds - warning/error cutoffs keyed by level; sets where the rule starts
-     *                                       emitting, so a test can force or suppress findings on the same fixture.
+     * @param array<string, int> $thresholds - warning/error cutoffs applied to the fixture's rule run.
      *
      * @return list<\GruffPhp\Results\Finding\Finding> - findings the rule emits under those thresholds, to assert on.
      */
@@ -274,9 +276,9 @@ final class CognitiveComplexityRuleTest extends TestCase
     /**
      * Parse the named fixture into an analysis unit.
      *
-     * @param string $filename - Fixture filename.
+     * @param string $filename - Filename resolved under tests/Fixtures/Complexity/.
      *
-     * @return \GruffPhp\Engine\Parser\AnalysisUnit - parsed fixture carrying its statements and the repo-relative display path the rule reports against
+     * @return \GruffPhp\Engine\Parser\AnalysisUnit - Fixture contents, statements and diagnostics with a repository-relative display path.
      */
     private function parseFixture(string $filename): \GruffPhp\Engine\Parser\AnalysisUnit
     {

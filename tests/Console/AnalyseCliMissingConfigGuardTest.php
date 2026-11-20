@@ -9,8 +9,9 @@ use Symfony\Component\Process\InputStream;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers the analyse CLI's missing-config prompt guard: config-less runs with piped (non-TTY) stdin neither hang on the init prompt nor write
- * `.gruff-php.yaml` from piped data that happens to start with "y".
+ * Covers the missing-config prompt guard for analyse runs with piped stdin.
+ * The tests check prompt absence on stderr and prevent config creation from piped input.
+ * An open, silent pipe must let analyse finish within the timeout.
  */
 final class AnalyseCliMissingConfigGuardTest extends CliTestCase
 {
@@ -20,13 +21,9 @@ final class AnalyseCliMissingConfigGuardTest extends CliTestCase
     private const HANG_GUARD_TIMEOUT_SECONDS = 30;
 
     /**
-     * Verify piped input starting with "y" does not answer the init prompt or write config.
+     * Verify a piped "y" leaves config absent and omits the init prompt from stderr.
      *
-     * Locks the regression where a config-less `analyse --format json` without
-     * -n consumed the first piped line as the prompt answer and silently wrote
-     * `.gruff-php.yaml` into the scanned repo.
-     *
-     * @return void
+     * @return void - Asserts exit zero, no generated config, and a gruff.analysis.v3 JSON report.
      */
     public function testPipedYesLineDoesNotWriteConfigFile(): void
     {
@@ -51,19 +48,16 @@ final class AnalyseCliMissingConfigGuardTest extends CliTestCase
             self::assertFileDoesNotExist($project . '/.gruff-php.yaml');
             self::assertStringNotContainsString(MissingConfigPrompt::PROMPT_TEXT, $process->getErrorOutput());
             $report = $this->decodeJsonOutput($process);
-            self::assertSame('gruff.analysis.v2', $report['schemaVersion']);
+            self::assertSame('gruff.analysis.v3', $report['schemaVersion']);
         } finally {
             $this->removeDir($project);
         }
     }
 
     /**
-     * Verify an open-but-silent stdin pipe no longer blocks a config-less analyse run.
+     * Verify analyse finishes within the timeout while an input pipe remains open and silent.
      *
-     * Locks the regression where the init prompt waited forever in fgets on a
-     * pipe that never sends a line (job runners, captured subprocesses).
-     *
-     * @return void
+     * @return void - Asserts exit zero, no generated config, and no init prompt on stderr.
      */
     public function testOpenSilentStdinPipeDoesNotBlockAnalyse(): void
     {

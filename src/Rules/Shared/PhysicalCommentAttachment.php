@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GruffPhp\Rules\Shared;
 
 use PhpParser\Comment;
+use PhpParser\Comment\Doc;
 use PhpParser\Node;
 
 /**
@@ -18,10 +19,10 @@ final class PhysicalCommentAttachment
      * Report whether a comment occupies only comment text and ends directly above an owner.
      *
      * @param Comment $comment - Parser-attached comment whose physical placement is being proven.
-     * @param Node    $owner - Statement or declaration the comment is expected to explain.
-     * @param string  $source - Complete file source used to inspect text around the comment token.
+     * @param Node $owner - Statement or declaration the comment is expected to explain.
+     * @param string $source - Complete file source used to inspect text around the comment token.
      *
-     * @return bool - True only when indentation precedes the comment and no executable code follows it before the owner.
+     * @return bool - True when the comment ends on the preceding line, its span is comment-only, and the owner gap is whitespace.
      */
     public static function isOwnLineImmediatelyAbove(Comment $comment, Node $owner, string $source): bool
     {
@@ -53,6 +54,92 @@ final class PhysicalCommentAttachment
         $between   = substr($source, $commentEnd + 1, $ownerStart - $commentEnd - 1);
 
         return self::isCommentOnlyLine($lineText) && trim($between) === '';
+    }
+
+    /**
+     * Split a class body into unbroken runs of one declaration kind: consecutive declarations of that kind with
+     * no blank line between them. Comments between declarations keep a run; any other statement ends it.
+     *
+     * @template T of Node\Stmt - Declaration statement subtype selected for each returned run.
+     *
+     * @param array<Node\Stmt> $statements - Class-body statements in source order.
+     * @param class-string<T>  $kind - Declaration class whose runs are wanted.
+     * @param string           $source - Complete file source used to find blank lines between declarations.
+     *
+     * @return list<non-empty-list<T>> - Runs in source order; a declaration standing alone is a run of one.
+     */
+    public static function unbrokenRuns(array $statements, string $kind, string $source): array
+    {
+        $runs       = [];
+        $currentRun = [];
+
+        foreach ($statements as $statement) {
+
+            if (!$statement instanceof $kind) {
+                if ($currentRun !== []) {
+                    $runs[] = $currentRun;
+                }
+                $currentRun = [];
+                continue;
+            }
+
+
+            if ($currentRun !== [] && !self::hasNoBlankLineBetween($currentRun[count($currentRun) - 1], $statement, $source)) {
+                $runs[]     = $currentRun;
+                $currentRun = [];
+            }
+            $currentRun[] = $statement;
+        }
+
+        if ($currentRun !== []) {
+            $runs[] = $currentRun;
+        }
+
+        return $runs;
+    }
+
+    /**
+     * Report whether a declaration has a comment of its own ending on the line directly above it.
+     *
+     * @param Node   $owner - Declaration whose parser-attached comments are checked.
+     * @param string $source - Complete file source used to reject detached and trailing comments.
+     * @param bool   $isDocblockRequired - When true, only a PHPDoc block counts as the declaration's own.
+     *
+     * @return bool - True when an own-line comment of the requested kind sits immediately above the declaration.
+     */
+    public static function hasOwnComment(Node $owner, string $source, bool $isDocblockRequired): bool
+    {
+        foreach ($owner->getComments() as $comment) {
+            // Parser attachment alone does not establish physical ownership.
+            if ((!$isDocblockRequired || $comment instanceof Doc) && self::isOwnLineImmediatelyAbove($comment, $owner, $source)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Report whether no blank line separates two declarations; comments between them are allowed.
+     *
+     * @param Node   $previous - Earlier declaration.
+     * @param Node   $next - Declaration directly after it in the same body.
+     * @param string $source - Complete file source.
+     *
+     * @return bool - True when the gap between the two holds no blank physical line (empty or only spaces and tabs).
+     */
+    private static function hasNoBlankLineBetween(Node $previous, Node $next, string $source): bool
+    {
+        $gapStart = $previous->getEndFilePos() + 1;
+        $gapEnd   = $next->getStartFilePos();
+
+        // Missing parser offsets cannot prove the gap, so the two declarations are kept apart.
+        if ($gapStart <= 0 || $gapEnd < $gapStart) {
+            return false;
+        }
+
+        // A blank line is a line break, then only spaces or tabs, then another line break.
+        return preg_match('/\n[ \t]*\r?\n/', substr($source, $gapStart, $gapEnd - $gapStart)) !== 1;
     }
 
     /**

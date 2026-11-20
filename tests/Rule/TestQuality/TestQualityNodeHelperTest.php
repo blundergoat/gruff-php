@@ -15,8 +15,9 @@ use PhpParser\Node\Stmt;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers test-file detection, PHPUnit/Pest scope discovery, method classification (attributes/annotations/parents/detached), assertion-call
- * recognition, argument-literal helpers, and mock creation/verification detection.
+ * Covers test-file detection and PHPUnit/Pest scope discovery.
+ * Checks method classification for attributes, annotations, parent classes, and detached nodes.
+ * Checks assertion calls, argument literals, and mock creation/verification detection.
  */
 final class TestQualityNodeHelperTest extends TestCase
 {
@@ -24,9 +25,9 @@ final class TestQualityNodeHelperTest extends TestCase
     private PhpFileParser $parser;
 
     /**
-     * Prepare parser fixtures before each helper test.
+     * Create a fresh parser for each helper test.
      *
-     * @return void
+     * @return void - Initializes the parser used to read fixture source.
      */
     protected function setUp(): void
     {
@@ -36,7 +37,7 @@ final class TestQualityNodeHelperTest extends TestCase
     /**
      * Verify PHPUnit file detection handles paths and conventional suffixes.
      *
-     * @return void
+     * @return void - Asserts recognition of test-directory paths and test suffixes, with a non-test path rejected.
      */
     public function testLooksLikePhpUnitTestFileRecognisesPathsAndSuffixes(): void
     {
@@ -48,9 +49,9 @@ final class TestQualityNodeHelperTest extends TestCase
     }
 
     /**
-     * Verify PHPUnit and Pest scopes are discovered in source order.
+     * Verify PHPUnit and Pest scopes are discovered in source order for the current fixture.
      *
-     * @return void
+     * @return void - Asserts the fixture's source-order sequence, selected metadata, and identical results on repeated lookup.
      */
     public function testScopesDiscoversPhpUnitAndPestTestsInSourceOrder(): void
     {
@@ -83,9 +84,9 @@ final class TestQualityNodeHelperTest extends TestCase
     }
 
     /**
-     * Verify test method classification requires an attribute, annotation, or TestCase parent.
+     * Verify marked methods and test-prefixed TestCase methods are recognized, while an unmarked detached method is rejected.
      *
-     * @return void
+     * @return void - Asserts attribute matching, accepted test methods, class lookup, and detached/null rejection.
      */
     public function testMethodClassificationHandlesAttributesAnnotationsParentsAndDetachedNodes(): void
     {
@@ -110,7 +111,7 @@ final class TestQualityNodeHelperTest extends TestCase
     /**
      * Verify calls and assertion calls are classified with lower-case names.
      *
-     * @return void
+     * @return void - Asserts lowercase call names, the assertion subset, and rejection of the helper call.
      */
     public function testCallsAndAssertionCallsClassifyNames(): void
     {
@@ -130,45 +131,9 @@ final class TestQualityNodeHelperTest extends TestCase
     }
 
     /**
-     * Verify trivial assertion detection covers PHPUnit and Pest literal idioms.
-     *
-     * @return void
-     */
-    public function testTrivialAssertionDetectionCoversPhpUnitAndPestLiterals(): void
-    {
-        $scope   = $this->scopesByName()['testTrivialAssertions'];
-        $results = [];
-
-        foreach (TestQualityNodeHelper::assertionCalls($scope) as $call) {
-            $name = TestQualityNodeHelper::callName($call);
-            if ($name === 'expect') {
-                continue;
-            }
-
-            self::assertIsString($name, 'every iterated assertion call should resolve to a string name');
-            $results[] = [$name, TestQualityNodeHelper::isTrivialAssertion($call)];
-        }
-
-        self::assertSame([
-                             ['asserttrue', true],
-                             ['assertfalse', true],
-                             ['assertequals', true],
-                             ['assertsame', true],
-                             ['assertsame', false],
-                             ['tobetrue', true],
-                             ['tobefalse', true],
-                             ['tobe', true],
-                             ['toequal', true],
-                             ['tobe', false],
-                             ['tobetrue', false],
-                             ['tobefalse', false],
-                         ], $results);
-    }
-
-    /**
      * Verify the assertion detector recognises the expanded Pest expectation API.
      *
-     * @return void
+     * @return void - Asserts recognition of named non-expect calls, a minimum detection count, and selected names.
      */
     public function testAssertionCallDetectionCoversExpandedPestExpectations(): void
     {
@@ -208,21 +173,21 @@ final class TestQualityNodeHelperTest extends TestCase
     }
 
     /**
-     * Verify argument, literal, Pest-chain, and magic-number helpers.
+     * Verify argument, literal, and Pest-chain helpers.
      *
-     * @return void
+     * @return void - Asserts argument and literal results, dynamic-call handling, the Pest expectation value type, and name normalization.
      */
     public function testArgumentLiteralPestAndMagicNumberHelpers(): void
     {
-        $scope               = $this->scopesByName()['testLiteralAndMagicNumbers'];
-        $calls               = TestQualityNodeHelper::calls($scope);
-        $helperCall          = $this->firstNamedCall($calls, 'helper');
-        $dynamicCall         = array_values(array_filter(
+        $scope       = $this->scopesByName()['testLiteralAndMagicNumbers'];
+        $calls       = TestQualityNodeHelper::calls($scope);
+        $helperCall  = $this->firstNamedCall($calls, 'helper');
+        $dynamicCall = array_values(array_filter(
                                                 $calls,
                                                 static fn(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool => $call instanceof Expr\FuncCall
                                                                                                                         && TestQualityNodeHelper::functionName($call) === null,
                                             ))[0] ?? null;
-        $integerHelperCall   = array_values(array_filter(
+        $integerHelperCall = array_values(array_filter(
                                                 $calls,
                                                 static fn(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool => TestQualityNodeHelper::callName($call) === 'helper'
                                                                                                                         && TestQualityNodeHelper::literalValue(TestQualityNodeHelper::firstArgValue($call)) === 2,
@@ -253,14 +218,6 @@ final class TestQualityNodeHelperTest extends TestCase
         self::assertSame('dynamic', TestQualityNodeHelper::literalValue(TestQualityNodeHelper::firstArgValue($dynamicCall)));
         self::assertFalse(TestQualityNodeHelper::isAssertionCall($dynamicCall));
         self::assertNull(TestQualityNodeHelper::literalValue(TestQualityNodeHelper::firstArgValue($unknownConstantCall)));
-        self::assertNull(TestQualityNodeHelper::isAssertionMagicNumber($integerHelperCall));
-
-        $magicNumbers = array_values(array_filter(array_map(
-                                                      static fn(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): ?int => TestQualityNodeHelper::isAssertionMagicNumber($call),
-                                                      TestQualityNodeHelper::assertionCalls($scope),
-                                                  ), static fn(?int $magicNumber): bool => $magicNumber !== null));
-
-        self::assertSame([2, 4, 3], $magicNumbers);
 
         $pestTerminal = array_values(array_filter(
                                          $calls,
@@ -274,9 +231,9 @@ final class TestQualityNodeHelperTest extends TestCase
     }
 
     /**
-     * Verify mock creation and verification helper lists stay intentional.
+     * Verify mock-creation and verification classification for the fixture's calls.
      *
-     * @return void
+     * @return void - Asserts the expected creation and verification names and excludes the unrelated run call.
      */
     public function testMockCreationAndVerificationHelpers(): void
     {
@@ -302,7 +259,6 @@ final class TestQualityNodeHelperTest extends TestCase
 
         self::assertSame([
                              'createmock',
-                             'createstub',
                              'getmockbuilder',
                              'mock',
                              'partialmock',
@@ -339,7 +295,7 @@ final class TestQualityNodeHelperTest extends TestCase
      *
      * @param string $displayPath - Project-relative display path.
      *
-     * @return AnalysisUnit - a body-less unit carrying only the display path, for exercising path handling without real source
+     * @return AnalysisUnit - An empty unit with the supplied display path and this test file as its filesystem path.
      */
     private function unitWithDisplayPath(string $displayPath): AnalysisUnit
     {
@@ -365,7 +321,7 @@ final class TestQualityNodeHelperTest extends TestCase
     /**
      * Return the class method node owned by a scope.
      *
-     * @param TestQualityScope $scope - Scope to inspect.
+     * @param TestQualityScope $scope - Helper fixture scope whose node must be a class method.
      *
      * @return Stmt\ClassMethod - the scope's node narrowed to a class method; the test fails first if it is any other node
      */
@@ -379,8 +335,8 @@ final class TestQualityNodeHelperTest extends TestCase
     /**
      * Return the first call with the requested normalised name.
      *
-     * @param list<Expr\FuncCall|Expr\MethodCall|Expr\StaticCall> $calls - Calls to inspect.
-     * @param string                                              $name - Normalised call name.
+     * @param list<Expr\FuncCall|Expr\MethodCall|Expr\StaticCall> $calls - Candidate calls searched for the requested name.
+     * @param string                                              $name  - Normalised call name.
      *
      * @return Expr\FuncCall|Expr\MethodCall|Expr\StaticCall - the first call matching the name; the test fails if none matches
      */

@@ -51,35 +51,34 @@ final readonly class UnusedImportRule implements RuleInterface
     }
 
     /**
-     * Reports each import alias that never appears once its own `use` line is blanked out.
+     * Reports each alias from a non-group use statement that never appears once those statements' lines are blanked out.
      *
-     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Unit whose AST supplies use statements and whose source is searched for alias references.
+     * @param RuleContext  $ruleContext - Unused; the rule interface requires it, and this rule reads no options or project root.
      *
-     * @return list<Finding> - One finding per import alias unused after its own import line is ignored.
+     * @return list<Finding> - One finding per such alias with no whole-word match in the remaining source.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
         $uses       = NodeIndex::nodesOf($analysisUnit, Use_::class);
 
-        // No imports to check, so skip the source-text scan entirely rather than blank a file with no use lines.
+
         if ($uses === []) {
             return [];
         }
 
-        /** @var list<Use_> $useStatements NodeFinder returns only use statement nodes for this query. */
+        /** @var list<Use_> $useStatements - NodeFinder-compatible Use_ nodes returned by the shared index for source-line removal. */
         $useStatements     = $uses;
         $sourceWithoutUses = $this->removeUseStatements($analysisUnit->source, $useStatements);
         $findings          = [];
 
-        // Check every import statement in the file.
+
         foreach ($useStatements as $use) {
-            // A single `use` line can import several names.
             foreach ($use->uses as $useUse) {
                 $alias = $useUse->getAlias()->toString();
 
-                // Search for the import alias as a whole token outside the use statement itself.
+                // Require a whole-word alias so longer identifiers do not count, after removing declarations that would otherwise match themselves.
                 if (preg_match('/\b' . preg_quote($alias, '/') . '\b/', $sourceWithoutUses) === 1) {
                     continue;
                 }
@@ -107,27 +106,26 @@ final readonly class UnusedImportRule implements RuleInterface
     /**
      * Blanks out the source lines occupied by imports so the alias search cannot match an import's own line.
      *
-     * Lines are replaced with empty strings rather than removed so every other
-     * line keeps its original 1-based number for any later position lookup.
+     * Empty line replacements preserve the original line numbers of surviving source text.
      *
      * @param string     $source - Full source text of the unit, used only as the haystack to blank and scan.
-     * @param list<Use_> $uses - Import statements whose line spans must be erased before the alias search.
+     * @param list<Use_> $uses - Import statements whose positively positioned line spans are blanked before the alias search.
      *
-     * @return string - Source text with each import statement's lines replaced by empty strings.
+     * @return string - Source with positively positioned import line spans blanked while retaining the original line count.
      */
     private function removeUseStatements(string $source, array $uses): string
     {
         $lines = explode("\n", $source);
 
-        // Erase the line span of each import.
+
         foreach ($uses as $use) {
             $startLine = $use->getStartLine();
             $endLine   = $use->getEndLine();
 
-            // Only blank a real, positioned line span.
+            // Import nodes without positive source positions leave the search text unchanged.
             if ($startLine > 0 && $endLine > 0) {
                 for ($i = $startLine - 1; $i < $endLine; $i++) {
-                    // Guard against a line index past the end of the source.
+
                     if (isset($lines[$i])) {
                         $lines[$i] = '';
                     }
@@ -135,7 +133,6 @@ final readonly class UnusedImportRule implements RuleInterface
             }
         }
 
-        // Re-join with "\n" so line offsets are preserved; the result is searched, never written back to disk.
         return implode("\n", $lines);
     }
 

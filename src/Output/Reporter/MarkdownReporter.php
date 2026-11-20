@@ -9,29 +9,26 @@ use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Scoring\PillarScore;
 
 /**
- * Turns a finished analysis run into a GitHub-flavoured Markdown document - the report a user
- * gets from `gruff-php analyse --format markdown`. Composes, in order, the headline summary
- * (grade, findings, and baseline or mutation notes), the branch-review section, the per-pillar
- * scores table, and the grouped findings list. Findings sit inside collapsible `<details>` blocks
- * so the output stays skimmable when it lands in a pull-request comment or an editor's Markdown
- * preview. Reach for this format when the verdict needs to travel as a shareable document rather
- * than terminal text (`--format text`) or machine JSON (`--format json`).
+ * Renders a completed analysis as the Markdown document requested by `gruff-php analyse --format markdown`.
+ * The document contains the summary, diagnostics when present, branch review, pillar scores, and displayed findings.
+ * Severity groups use expandable `<details>` blocks, making the report suitable for pull-request comments.
  */
 final readonly class MarkdownReporter
 {
     /**
-     * Assembles the full Markdown document a user gets from `--format markdown`, stitching the
-     * summary, branch review, pillars, and findings sections together in the order they read.
+     * Assembles the full Markdown document a user gets from --format markdown, stitching the
+     * summary, diagnostics, branch review, pillars, and findings sections together in the order they read.
      *
      * @param AnalysisReport $report - Analysis report to render.
      *
-     * @return string - the complete Markdown document (summary, branch review, pillars, findings) with a single trailing newline
+     * @return string - the complete Markdown document (summary, diagnostics, branch review, pillars, findings) with a single trailing newline
      */
     public function render(AnalysisReport $report): string
     {
         $lines = [];
 
         $this->appendSummary($lines, $report);
+        $this->appendDiagnostics($lines, $report);
         $this->appendBranchReviewSection($lines, $report);
         $this->appendPillarSection($lines, $report);
         $this->appendFindingsSection($lines, $report);
@@ -40,15 +37,42 @@ final readonly class MarkdownReporter
     }
 
     /**
-     * Writes the headline block the user reads first: overall grade, scope, and finding totals, then
-     * whichever optional notes this run produced - failure reason, new-findings count, baseline,
-     * mutation, branch review, score drivers, diff scope, and display filters among them. Each note is
-     * emitted only when the run actually generated it.
+     * Adds every run diagnostic to the shareable document, including nonfatal bounded-scan notes.
      *
-     * @param list<string>   $lines - Markdown lines being built.
+     * @param list<string> $lines - Markdown lines being built.
+     * @param AnalysisReport $report - Completed report whose run diagnostics are appended.
+     *
+     * @return void - Appends the diagnostics section to $lines; leaves it unchanged when diagnostics are empty.
+     */
+    private function appendDiagnostics(array &$lines, AnalysisReport $report): void
+    {
+        if ($report->diagnostics === []) {
+            return;
+        }
+
+        $lines[] = '';
+        $lines[] = '## Diagnostics';
+        $lines[] = '';
+        foreach ($report->diagnostics as $diagnostic) {
+            $location = $diagnostic->filePath ?? $diagnostic->path;
+            if ($location !== null && $diagnostic->filePath !== null && $diagnostic->line !== null) {
+                $location .= ':' . $diagnostic->line;
+            }
+
+            $lines[] = $location === null
+                ? sprintf('- `%s` %s', $diagnostic->type, $diagnostic->message)
+                : sprintf('- `%s` `%s` %s', $diagnostic->type, $location, $diagnostic->message);
+        }
+    }
+
+    /**
+     * Writes the headline grade, scope, and finding totals, followed by the report's optional notes.
+     * Includes available gate results, score drivers, diff and filter context, baseline details, mutation results, and branch review.
+     *
+     * @param list<string>   $lines  - Markdown lines being built.
      * @param AnalysisReport $report - Analysis report to render.
      *
-     * @return void
+     * @return void - Appends the headline block and available run notes to $lines.
      */
     private function appendSummary(array &$lines, AnalysisReport $report): void
     {
@@ -59,32 +83,32 @@ final readonly class MarkdownReporter
             $lines,
             '# gruff-php report',
             '',
-            sprintf('**Grade:** %s (%s/100)', $score === null ? 'n/a' : $score->composite->letter, $score === null ? 'n/a' : sprintf('%.2f', $score->composite->score)),
+            sprintf('**Grade:** %s (%s/100)', $score?->composite->letter ?? 'n/a', $score?->composite === null ? 'n/a' : sprintf('%.2f', $score->composite->score)),
             sprintf('**Scope:** %s', $score === null ? 'full-project' : $score->scope),
             sprintf('**Findings:** %d total, %d error, %d warning, %d advisory', $counts['total'], $counts['error'], $counts['warning'], $counts['advisory']),
         );
 
-        // The run tripped a fail-on threshold, so name the reason rather than leave the reader guessing why it failed.
+
         if ($report->failureReason !== null) {
             $lines[] = sprintf('**Failed:** %s.', $report->failureReason->message());
         }
 
-        // A new-findings gate is active (a `--fail-on-new` run over a baseline or `--diff-vs`), so surface how many findings are genuinely new to act on.
+        // A non-null count means the new-findings gate was active.
         if ($report->newFindingsCount !== null) {
             $lines[] = sprintf('**New findings:** %d', $report->newFindingsCount);
         }
 
-        // Scoring only produces a grade when there were files to grade; when it did, explain what moved the grade.
+
         if ($score !== null) {
             $lines[] = sprintf('**Score drivers:** %s', $score->explanation);
         }
 
-        // The user narrowed the scan to a diff, so state which slice of code the grade actually covers.
+
         if ($report->diff !== null && $report->diff->active) {
             $lines[] = sprintf('**Diff scope:** %s', $report->diff->message);
         }
 
-        // Display filters hide some findings from the list, so warn the reader that the score and exit code still use the whole scored finding set, not just what's shown.
+        // Display filtering hides list entries without changing the findings used for the score or exit code.
         if ($report->filters !== null && $report->filters->isActive()) {
             $lines[] = sprintf(
                 '**Display filters:** `%s`; score and exit code use the scored finding set.',
@@ -102,19 +126,19 @@ final readonly class MarkdownReporter
                 $report->baseline->path,
             );
 
-            // The user asked to see resolved debt and some exists, so open a collapsed block listing what got fixed.
+
             if ($report->shouldListAbsentBaseline && $report->baseline->staleEntries !== []) {
                 $lines[] = '';
                 $lines[] = '<details><summary>Resolved baseline entries</summary>';
                 $lines[] = '';
-                // One bullet per resolved finding group, listed inside the collapsed block so the PR comment stays tidy.
+
                 foreach ($report->baseline->staleEntries as $resolvedEntry) {
                     $lines[] = sprintf(
                         '- `%s` %s (resolved %d): %s',
                         $resolvedEntry->ruleId,
-                        $resolvedEntry->filePath,
+                        $resolvedEntry->path,
                         $resolvedEntry->count,
-                        $resolvedEntry->message,
+                        $resolvedEntry->subject,
                     );
                 }
                 $lines[] = '';
@@ -122,12 +146,12 @@ final readonly class MarkdownReporter
             }
         }
 
-        // Mutation testing ran this time, so hand off to the mutation block for its own summary lines.
+
         if ($report->mutation !== null) {
             $this->appendMutationSummary($lines, $report);
         }
 
-        // This was a branch review, so headline how many findings the branch introduced, removed, or left unchanged.
+
         if ($report->review !== null) {
             $lines[] = sprintf(
                 '**Branch review:** base `%s`, %d introduced, %d removed, %d unchanged',
@@ -141,24 +165,23 @@ final readonly class MarkdownReporter
     }
 
     /**
-     * Lists the up-to-five rules that improved most and the up-to-five that regressed most between
-     * the base branch and the user's branch. Placed just before the pillar scores so a rule-level
-     * swing stays visible even when the composite grade barely moves and hides the churn.
+     * Lists up to five rules per ranking: the largest net finding-count decreases and the largest increases.
+     * Adds these rankings to the summary when a branch review has nonzero rule deltas.
      *
-     * @param list<string>   $lines - Markdown lines being built.
+     * @param list<string>   $lines  - Markdown lines being built.
      * @param AnalysisReport $report - Analysis report to render.
      *
-     * @return void
+     * @return void - Appends available improved and regressed rankings to $lines; leaves it unchanged without net deltas.
      */
     private function appendRuleDeltas(array &$lines, AnalysisReport $report): void
     {
-        // Without a branch review there is no base-vs-branch comparison, so there are no deltas to surface.
+
         if ($report->review === null) {
             return;
         }
 
         $rows = $report->review->perRuleDelta();
-        // No rule shifted between the base and the user's branch, so there is nothing to rank here.
+        // Only net changes are ranked; offsetting additions and removals produce no row.
         if ($rows === []) {
             return;
         }
@@ -170,7 +193,7 @@ final readonly class MarkdownReporter
             5,
         );
 
-        // At least one rule got better, so print the improved leaderboard with the biggest drops first.
+
         if ($improved !== []) {
             $lines[] = sprintf(
                 '**Top %d improved:** %s',
@@ -182,7 +205,7 @@ final readonly class MarkdownReporter
             );
         }
 
-        // At least one rule got worse, so print the regressed leaderboard the reviewer should look at first.
+
         if ($regressed !== []) {
             $lines[] = sprintf(
                 '**Top %d regressed:** %s',
@@ -199,14 +222,14 @@ final readonly class MarkdownReporter
      * Adds the mutation-testing block - MSI percentages, the per-status tally, and a note about
      * context-only statuses - so the user can see how thoroughly their tests killed injected mutants.
      *
-     * @param list<string>   $lines - Markdown lines being built.
+     * @param list<string>   $lines  - Markdown lines being built.
      * @param AnalysisReport $report - Analysis report to render.
      *
-     * @return void
+     * @return void - Appends mutation details to $lines; leaves it unchanged when no mutation result is available.
      */
     private function appendMutationSummary(array &$lines, AnalysisReport $report): void
     {
-        // Mutation testing did not run this time, so skip the block rather than show zeroed-out statistics.
+
         if ($report->mutation === null) {
             return;
         }
@@ -220,10 +243,10 @@ final readonly class MarkdownReporter
             $mutation->survivedCount(),
             $mutation->report->totalMutants(),
         );
-        $lines[]  = sprintf('**Mutation statuses:** %s.', $this->mutationStatusSummary($mutation->report->statusCounts()));
+        $lines[] = sprintf('**Mutation statuses:** %s.', $this->mutationStatusSummary($mutation->report->statusCounts()));
 
         $contextStatuses = $this->mutationContextSummary($mutation->report->statusCounts());
-        // Some mutants landed in context-only statuses, so add the note explaining they are not survived findings.
+
         if ($contextStatuses !== null) {
             $lines[] = sprintf(
                 '**Mutation context-only statuses:** %s. These do not create `mutation.survived-mutant` findings.',
@@ -236,10 +259,10 @@ final readonly class MarkdownReporter
      * Renders the "Branch Review" heading and, when a review ran, the introduced/removed/unchanged
      * finding groups - the section a user opens to see exactly what their branch changed.
      *
-     * @param list<string>   $lines - Markdown lines being built.
+     * @param list<string>   $lines  - Markdown lines being built.
      * @param AnalysisReport $report - Analysis report to render.
      *
-     * @return void
+     * @return void - Appends the branch-review section, using "Not enabled." when no review is available.
      */
     private function appendBranchReviewSection(array &$lines, AnalysisReport $report): void
     {
@@ -247,11 +270,11 @@ final readonly class MarkdownReporter
         $lines[] = '## Branch Review';
         $lines[] = '';
 
-        // No branch review was requested, so the section says so plainly instead of sitting empty.
+
         if ($report->review === null) {
             $lines[] = 'Not enabled.';
         } else {
-            // A review ran, so split the branch's findings into what it introduced, removed, and left unchanged.
+
             $this->appendFindingGroups($lines, 'Introduced findings', $report->review->introduced);
             $this->appendFindingGroups($lines, 'Removed findings', $report->review->removed);
             $this->appendFindingGroups($lines, 'Unchanged findings', $report->review->unchanged);
@@ -259,16 +282,12 @@ final readonly class MarkdownReporter
     }
 
     /**
-     * Writes the seven-column Pillars table - one row per quality pillar - so the user
-     * can compare naming, complexity, security, and the rest at a glance. Rows come from
-     * {@see pillarSummaryRows()}: each applicable pillar shows its grade, score to two decimals,
-     * findings, and per-severity counts, ordered by findings then pillar name. Counts and scores are
-     * read straight from the existing {@see PillarScore} entries, never recomputed here.
+     * Renders applicable pillar scores and per-severity counts as a Markdown table.
      *
-     * @param list<string>   $lines - Markdown lines being built.
+     * @param list<string>   $lines  - Markdown lines that receive the pillar table.
      * @param AnalysisReport $report - Analysis report to render.
      *
-     * @return void
+     * @return void - Appends the pillar table to $lines, using a placeholder row when no applicable pillars exist.
      */
     private function appendPillarSection(array &$lines, AnalysisReport $report): void
     {
@@ -283,14 +302,14 @@ final readonly class MarkdownReporter
             '| --- | --- | ---: | ---: | ---: | ---: | ---: |',
         );
 
-        // No pillar applied to the scanned code (usually an unscored run), so render a single placeholder row.
+
         if ($rows === []) {
             $lines[] = '| _(none)_ |  |  |  |  |  |  |';
 
             return;
         }
 
-        // One table row per pillar, escaping any pipe in the text so a stray `|` can't break the Markdown columns.
+        // Escape pipe characters in pillar text so they cannot split the Markdown table into extra columns.
         foreach ($rows as $pillar) {
             $lines[] = sprintf(
                 '| %s | %s | %s | %d | %d | %d | %d |',
@@ -316,15 +335,15 @@ final readonly class MarkdownReporter
      */
     private function pillarSummaryRows(AnalysisReport $report): array
     {
-        // A run with nothing to grade has no score, so hand back no pillars and let the caller show the placeholder.
+
         if ($report->score === null) {
             return [];
         }
 
         $rows = [];
-        // Walk every scored pillar, keeping only the ones that actually applied to the user's code.
+
         foreach ($report->score->pillars as $pillar) {
-            // This pillar had no rules that applied to the scanned files, so leave it out of the table.
+
             if (!$pillar->applicable) {
                 continue;
             }
@@ -333,7 +352,7 @@ final readonly class MarkdownReporter
         }
 
         usort($rows, static function (PillarScore $left, PillarScore $right): int {
-            // Order by finding count so the busiest pillar leads; equal counts fall back to name for a stable order.
+
             return $right->findings <=> $left->findings ?: strcmp($left->pillar, $right->pillar);
         });
 
@@ -341,13 +360,13 @@ final readonly class MarkdownReporter
     }
 
     /**
-     * Renders the "Findings" section the user scrolls to for specifics: either the grouped list of
-     * every current finding, or a plain "No findings." line when the scan came back clean.
+     * Renders the Findings section from the findings included in the report.
+     * An empty list displays "No findings."; other entries are grouped by severity and file.
      *
-     * @param list<string>   $lines - Markdown lines being built.
+     * @param list<string>   $lines  - Markdown lines being built.
      * @param AnalysisReport $report - Analysis report to render.
      *
-     * @return void
+     * @return void - Appends the Findings heading and either the grouped list or its empty-list message to $lines.
      */
     private function appendFindingsSection(array &$lines, AnalysisReport $report): void
     {
@@ -355,11 +374,11 @@ final readonly class MarkdownReporter
         $lines[] = '## Findings';
         $lines[] = '';
 
-        // A clean scan has nothing to list, so tell the user plainly rather than print an empty section.
+
         if ($report->findings === []) {
             $lines[] = 'No findings.';
         } else {
-            // There are findings, so group them by severity and file, reusing the section's own heading.
+
             $this->appendFindingGroups($lines, 'Current findings', $report->findings, hasHeading: false);
         }
     }
@@ -374,10 +393,10 @@ final readonly class MarkdownReporter
      */
     private function findingLine(Finding $finding): string
     {
-        // With no line number, the location the user sees is just the file path; otherwise it gains a `:line` suffix.
+
         $location = $finding->line === null ? $finding->filePath : $finding->filePath . ':' . $finding->line;
-        // A symbol (the offending function, method, or class name) is tacked on only when the finding actually names one.
-        $symbol   = $finding->symbol === null ? '' : sprintf(' `%s`', $finding->symbol);
+
+        $symbol = $finding->symbol === null ? '' : sprintf(' `%s`', $finding->symbol);
 
         return sprintf(
             '- **%s** `%s` %s%s - %s',
@@ -391,25 +410,25 @@ final readonly class MarkdownReporter
 
     /**
      * Renders one collapsible group of findings - the shared block behind both the branch-review
-     * lists and the main findings section. Sorts findings into error/warning/advisory `<details>`
-     * blocks and then by file, so the user can expand just the severity they care about.
+     * lists and the main findings section. Sorts findings into error/warning/advisory collapsible
+     * sections and then by file, so the user can expand just the severity they care about.
      *
-     * @param list<string>  $lines - Markdown lines being built; mutated in place with the rendered group.
-     * @param string        $title - Section heading text, emitted only when $hasHeading is true.
-     * @param list<Finding> $findings - Findings to group by severity then file path; an empty list renders "None.".
+     * @param list<string>  $lines      - Markdown lines being built; mutated in place with the rendered group.
+     * @param string        $title      - Section heading text, emitted only when $hasHeading is true.
+     * @param list<Finding> $findings   - Findings to group by severity then file path; an empty list renders "None.".
      * @param bool          $hasHeading - Whether to print the section heading; false for the inline current-findings.
      *
-     * @return void
+     * @return void - Appends the optional heading and severity groups to $lines, or "None." for an empty list.
      */
     private function appendFindingGroups(array &$lines, string $title, array $findings, bool $hasHeading = true): void
     {
-        // The branch-review lists want their own sub-heading; the main findings block passes false to reuse its section header.
+
         if ($hasHeading) {
             $lines[] = sprintf('### %s', $title);
             $lines[] = '';
         }
 
-        // This group came back empty, so mark it "None." and stop rather than open an empty details block.
+
         if ($findings === []) {
             $lines[] = 'None.';
             $lines[] = '';
@@ -418,14 +437,14 @@ final readonly class MarkdownReporter
         }
 
         $groups = [];
-        // Bucket each finding by severity and then by file, the two axes the user browses the report along.
+
         foreach ($findings as $finding) {
             $groups[$finding->severity->value][$finding->filePath][] = $finding;
         }
 
-        // Walk severities worst-first so errors sit at the top of what the user sees.
+
         foreach (['error', 'warning', 'advisory'] as $severity) {
-            // Nothing at this severity in this group, so skip straight to the next band.
+
             if (!isset($groups[$severity])) {
                 continue;
             }
@@ -435,12 +454,12 @@ final readonly class MarkdownReporter
             $lines[] = sprintf('<details open><summary>%s (%d)</summary>', ucfirst($severity), $count);
             $lines[] = '';
 
-            // One bold sub-heading per file, then its findings, so the user can scan file by file within a severity.
+
             foreach ($groups[$severity] as $file => $fileFindings) {
                 $lines[] = sprintf('**%s**', $file);
                 $lines[] = '';
 
-                // Emit every finding for this file as its own Markdown bullet.
+
                 foreach ($fileFindings as $finding) {
                     $lines[] = $this->findingLine($finding);
                 }
@@ -454,22 +473,22 @@ final readonly class MarkdownReporter
     }
 
     /**
-     * Flattens the mutation status tally into the single comma-separated `status=count` line the
+     * Flattens the mutation status tally into the single comma-separated status=count line the
      * user reads under "Mutation statuses".
      *
-     * @param array<string, int> $counts - Mutation status counts keyed by status label; empty means no mutants ran.
+     * @param array<string, int> $counts - Counts keyed by status label; an empty map renders "none".
      *
-     * @return string - comma-joined `status=count` pairs in the map's order; the literal "none" when no mutants ran
+     * @return string - Comma-joined status=count pairs in map order, or "none" for an empty map.
      */
     private function mutationStatusSummary(array $counts): string
     {
-        // No mutants ran, so show the literal word rather than leave the user an empty status line.
+
         if ($counts === []) {
             return 'none';
         }
 
         $parts = [];
-        // Render each status and its count in the order the mutation report recorded them.
+
         foreach ($counts as $status => $count) {
             $parts[] = sprintf('%s=%d', $status, $count);
         }
@@ -483,16 +502,16 @@ final readonly class MarkdownReporter
      *
      * @param array<string, int> $counts - Mutation status counts keyed by status label; only context-only statuses are emitted.
      *
-     * @return string|null - comma-joined `status=count` pairs for context-only statuses; null tells the caller to omit the line when none occurred
+     * @return string|null - comma-joined status=count pairs for context-only statuses; null tells the caller to omit the line when none occurred
      */
     private function mutationContextSummary(array $counts): ?string
     {
         $parts = [];
 
-        // Look only at the context-only statuses, ignoring killed or escaped mutants counted elsewhere in the mutation summary.
+
         foreach (['not covered', 'error', 'syntax error', 'ignored', 'skipped'] as $status) {
             $count = $counts[$status] ?? 0;
-            // Include a status in the note only when it actually occurred, keeping the line to what really happened.
+
             if ($count > 0) {
                 $parts[] = sprintf('%s=%d', $status, $count);
             }

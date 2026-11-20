@@ -5,16 +5,19 @@ declare(strict_types=1);
 namespace GruffPhp\Engine\Analysis;
 
 /**
- * A non-finding note from a run - something that went wrong or is worth telling the user, but is not a
- * code-quality finding.
- *
- * Not everything gruff needs to report is a rule violation: a file that would not parse, a missing
- * Infection binary, a misused flag. These are captured as run diagnostics so the reporters can show
- * them alongside the findings, each tagged with a type and pointed at the relevant file, line, or input
- * path when there is one.
+ * Carries a run diagnostic separately from code-quality findings.
+ * Its type and message can include optional file, line or input-path context.
+ * Diagnostics are fatal by default; non-fatal notes carry an explicit serialized marker.
  */
 final readonly class RunDiagnostic
 {
+    /**
+     * The one type every surface publishes when it cannot read the changed-region scope it was asked to analyse,
+     * whatever flag asked for it (FAMILY-CONTRACT.md section 6). Analyse and the hook share it so one failure
+     * cannot carry two names.
+     */
+    public const string CHANGED_REGION_TYPE = 'changed-region';
+
     /**
      * Captures one non-finding diagnostic - its category, message, and whatever location context exists.
      *
@@ -36,11 +39,10 @@ final readonly class RunDiagnostic
     }
 
     /**
-     * Flattens the diagnostic into the JSON shape reports emit, so an editor or CI sees the same note a
-     * person reads in the terminal.
+     * Flattens the diagnostic into the JSON shape emitted by reports.
      *
-     * @return array{type: string, message: string, file: string|null, line: int|null, path: string|null, invalidatesRun?: false} - report-ready
-     *                     snapshot; invalidatesRun is emitted only for a non-fatal diagnostic because older consumers treat all existing types as fatal.
+     * @return array{type: string, message: string, file: string|null, line: int|null, path: string|null, invalidatesRun?: false} - Report fields;
+     *     invalidatesRun is false for non-fatal diagnostics and omitted for fatal ones.
      */
     public function toArray(): array
     {
@@ -52,7 +54,7 @@ final readonly class RunDiagnostic
             'path'    => $this->path,
         ];
 
-        // Existing diagnostic types remain wire-compatible; only the new non-fatal case needs an explicit marker.
+        // Fatal diagnostics omit the marker for wire compatibility; non-fatal diagnostics set it to false.
         if (!$this->isFatal) {
             $diagnostic['invalidatesRun'] = false;
         }

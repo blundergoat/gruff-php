@@ -14,12 +14,10 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\SourceTextRuleInterface;
 
 /**
- * Flags source text that carries a PEM private-key header (`-----BEGIN ... PRIVATE KEY-----`), so the user
- * can pull committed key material out of the repository and rotate it.
+ * Flags PEM private-key headers in raw source so callers can locate and rotate committed key material.
  *
- * A source-text rule: it scans the raw file rather than the AST, so keys in heredocs, comments, or fixtures
- * are all caught. Only the header is reported - the key body is never stored in a finding. Warning
- * severity, high confidence, since a PEM armor header is an unambiguous signal.
+ * Heredocs, comments and fixtures are scanned; no complete key body is required.
+ * Findings carry a fixed marker, never the matched header or key body, with warning severity and high confidence.
  */
 final readonly class PrivateKeyRule implements SourceTextRuleInterface
 {
@@ -35,7 +33,7 @@ final readonly class PrivateKeyRule implements SourceTextRuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Warning, high confidence: a PEM private-key header is an unambiguous signal, rarely a false positive.
+
         return new RuleDefinition(
             id:              self::ID,
             name:            'Private key material',
@@ -47,35 +45,36 @@ final readonly class PrivateKeyRule implements SourceTextRuleInterface
     }
 
     /**
-     * Reports each PEM private-key header found in the raw source, with the key body redacted.
+     * Reports each supported private-key armor header so users can review possible key material.
+     * The finding stores only the fixed marker; neither the header nor body reaches report metadata.
      *
-     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Supplies raw source for the header scan.
+     * @param RuleContext $ruleContext - Required by the rule interface; unused by this scanner.
      *
-     * @return list<\GruffPhp\Results\Finding\Finding> - One finding per private-key header; the key body is not stored.
+     * @return list<\GruffPhp\Results\Finding\Finding> - One finding per supported header, including in comments; empty when none match.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         if (!str_contains($analysisUnit->source, '-----BEGIN ')) {
-            // Without a PEM armor prefix the key regex cannot match, so skip the scan entirely.
+
             return [];
         }
 
-        // Match every PEM private-key armor header, capturing each one's byte offset.
+        // Supported private-key armor headers identify report locations without capturing any key body.
         preg_match_all('/-----BEGIN (?:RSA |DSA |EC |OPENSSH |PGP )?PRIVATE KEY-----/', $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
         $findings = [];
-        // Report each private-key header the scan turned up.
+
         foreach ($matches[0] as $match) {
-            [$header, $offset] = $match;
-            $findings[]        = SecretScannerHelper::finding(
+            [, $offset] = $match;
+            $findings[] = SecretScannerHelper::finding(
                 analysisUnit: $analysisUnit,
                 ruleId:       self::ID,
                 message:      'Private key block header detected; key body is redacted.',
                 line:         SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
                 confidence:   Confidence::High,
                 detector:     'private-key-header',
-                preview:      $header,
+                displayMarker: SecretScannerHelper::categoryMarker('private-key'),
                 remediation:  'Remove private keys from source and rotate the key if it was real.',
             );
         }

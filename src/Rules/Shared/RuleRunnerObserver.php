@@ -13,12 +13,12 @@ namespace GruffPhp\Rules\Shared;
 interface RuleRunnerObserver
 {
     /**
-     * Records that one rule's analyse() call against a single unit finished, with how long it took.
+     * Record the elapsed time of one completed rule operation.
      *
      * @param string $ruleId - Rule identifier as declared in the rule's RuleDefinition.
-     * @param int    $durationNs - Wall-clock nanoseconds the rule spent in analyse().
+     * @param int $durationNs - Elapsed nanoseconds for the completed rule operation.
      *
-     * @return void
+     * @return void - Records timing information for one completed rule operation.
      */
     public function onRuleExecuted(string $ruleId, int $durationNs): void;
 }

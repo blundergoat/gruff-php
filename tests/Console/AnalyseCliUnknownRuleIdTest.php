@@ -8,15 +8,16 @@ use JsonException;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers the analyse CLI's unknown-rule-id config compatibility: configs naming unknown or retired rule ids warn on stderr and keep running instead
- * of hard-failing.
+ * Covers analyse compatibility with unknown and retired rule IDs in configuration.
+ * Checks stderr warnings and successful exits for ignored configuration entries.
+ * Execution filters use a separate contract: unknown IDs produce usage-error reports.
  */
 final class AnalyseCliUnknownRuleIdTest extends CliTestCase
 {
     /**
      * Verify analyse warns on stderr and still runs when config names an unknown rule id.
      *
-     * @return void
+     * @return void - Asserts exit 0, the unknown-rule warning on stderr, and no config-error marker on stdout.
      */
     public function testAnalyseCommandWarnsAndRunsWithUnknownRuleIdConfig(): void
     {
@@ -42,9 +43,9 @@ final class AnalyseCliUnknownRuleIdTest extends CliTestCase
     }
 
     /**
-     * Verify analyse keeps working for configs that still carry every retired project-rule block.
+     * Checks compatibility with the four retired project-rule blocks carried by the fixture.
      *
-     * @return void
+     * @return void - Asserts exit 0, a stderr warning for each listed retired rule, and no config-error marker on stdout.
      */
     public function testAnalyseCommandWarnsAndRunsWithRetiredProjectRuleBlocks(): void
     {
@@ -82,8 +83,8 @@ final class AnalyseCliUnknownRuleIdTest extends CliTestCase
     /**
      * Verify unknown --include-rule values are rejected instead of narrowing the run to zero rules.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts exit 2 and the usage-error message naming the unknown include-rule ID.
+     * @throws JsonException - If decoding the command's stdout as JSON fails.
      */
     public function testAnalyseCommandRejectsUnknownIncludeRuleFilter(): void
     {
@@ -93,8 +94,8 @@ final class AnalyseCliUnknownRuleIdTest extends CliTestCase
     /**
      * Verify unknown --exclude-rule values are rejected instead of pretending to exclude a rule.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts exit 2 and the usage-error message naming the unknown exclude-rule ID.
+     * @throws JsonException - If decoding the command's stdout as JSON fails.
      */
     public function testAnalyseCommandRejectsUnknownExcludeRuleFilter(): void
     {
@@ -106,8 +107,8 @@ final class AnalyseCliUnknownRuleIdTest extends CliTestCase
      *
      * @param string $option - CLI filter option to exercise.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts exit 2 and the first diagnostic's usage-error type and option-specific message.
+     * @throws JsonException - If decoding the command's stdout as JSON fails.
      */
     private function assertUnknownExecutionRuleFilter(string $option): void
     {

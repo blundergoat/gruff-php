@@ -16,12 +16,10 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Question\ConfirmationQuestion;
 
 /**
- * Offers to run `gruff-php init` when a user starts a scan in a project that has no config yet.
+ * Offers to run `gruff-php init` before a scan when neither supported project config file exists.
  *
- * First-run helper wired into the top of every scan command: when someone types `gruff-php analyse`
- * (or `summary`, `dashboard`, …) in a project with no `.gruff-php.yaml`, this asks whether to
- * scaffold one and dispatches `init` on a yes. It stays silent for non-interactive, machine-readable,
- * or already-configured runs, so it never blocks CI or corrupts JSON/SARIF output.
+ * Interactive callers can accept the offer to scaffold config in the resolved project root.
+ * Non-interactive runs and caller-designated machine-readable formats skip the offer.
  */
 final readonly class MissingConfigPrompt
 {
@@ -37,9 +35,9 @@ final readonly class MissingConfigPrompt
      *
      * @param InputInterface          $input - Console input for the calling command.
      * @param OutputInterface         $output - Console output for the calling command.
-     * @param SymfonyApplication|null $symfonyApplication - Console application used to dispatch init; null means init can't be offered, so the prompt is skipped.
+     * @param SymfonyApplication|null $symfonyApplication - Application used to run init; null skips the offer.
      * @param string                  $projectRoot - Project root used to look for an existing config.
-     * @param string|null             $explicitConfigPath - Explicit --config path; null when the user gave none (only then is the init offer considered).
+     * @param string|null $explicitConfigPath - Explicit --config path; any non-null value skips the offer.
      * @param bool                    $shouldSkipConfig - Whether the caller passed --no-config.
      * @param bool                    $isMachineReadableFormat - Whether the caller renders a machine-parsed payload, which suppresses the prompt.
      * @param (callable(): bool)|null $stdinTtyProbe - Test seam overriding the real-STDIN TTY probe; null probes STDIN itself.
@@ -64,7 +62,7 @@ final readonly class MissingConfigPrompt
         if ($isMachineReadableFormat) {
             return null;
         }
-        // The caller opted out of interaction (-n/--quiet), so never block a piped or CI run on a prompt.
+        // The caller used -n/--no-interaction, so never block a piped or CI run on a prompt.
         if (!$input->isInteractive()) {
             return null;
         }
@@ -117,13 +115,13 @@ final readonly class MissingConfigPrompt
     }
 
     /**
-     * Reports whether a y/N answer can actually be read, so the offer is only shown when someone (or
-     * a test's own stream) is actually there to respond to it.
+     * Allows an explicit input stream or, without one, a positive STDIN TTY check.
+     * This permits prompting without verifying that an answer is already available.
      *
      * @param InputInterface          $input - Console input for the calling command.
      * @param (callable(): bool)|null $stdinTtyProbe - Test seam overriding the real-STDIN TTY probe; null probes STDIN itself.
      *
-     * @return bool - True when the prompt has an input source that can answer it.
+     * @return bool - True for a non-null explicit stream or a positive STDIN TTY probe.
      */
     private static function hasAnswerableInput(InputInterface $input, ?callable $stdinTtyProbe): bool
     {
@@ -132,7 +130,7 @@ final readonly class MissingConfigPrompt
             return true;
         }
 
-        // A test supplied its own probe, so consult it instead of the process's real STDIN.
+
         if ($stdinTtyProbe !== null) {
             return $stdinTtyProbe();
         }
@@ -141,8 +139,7 @@ final readonly class MissingConfigPrompt
     }
 
     /**
-     * Probes whether the process's real STDIN is a terminal - the fallback check for whether a live
-     * user is present to answer the prompt.
+     * Probes whether the process's real STDIN is a terminal as the fallback eligibility check for an interactive prompt.
      *
      * @return bool - True when STDIN exists and is a TTY.
      */
@@ -163,8 +160,7 @@ final readonly class MissingConfigPrompt
     }
 
     /**
-     * Picks the stream that carries the prompt and dispatched init output, keeping interactive chatter
-     * on STDERR so machine-readable STDOUT payloads (JSON, SARIF, HTML) stay uncorrupted.
+     * Routes prompt and init output to STDERR when a separate error stream is available.
      *
      * @param OutputInterface $output - Console output supplied by the caller.
      *
@@ -177,7 +173,7 @@ final readonly class MissingConfigPrompt
             return $output->getErrorOutput();
         }
 
-        // No separate error stream available, so fall back to the caller's single output stream.
+
         return $output;
     }
 }

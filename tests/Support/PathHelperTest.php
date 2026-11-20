@@ -8,14 +8,16 @@ use GruffPhp\Support\PathHelper;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers absolute-path detection, dot-segment canonicalisation, and relative-path normalisation across Unix, UNC, and drive-letter inputs.
+ * Tests absolute-path detection for Unix, UNC, and drive-letter inputs.
+ * Checks root resolution and dot-segment reduction for representative paths.
+ * Checks that relative-path normalization preserves a Unix absolute file path.
  */
 final class PathHelperTest extends TestCase
 {
     /**
      * Verify absolute path detection supports Unix, UNC, and drive-letter inputs.
      *
-     * @return void
+     * @return void - Asserts supported absolute forms and rejects a relative path and a drive-relative path.
      */
     public function testIsAbsoluteRecognizesSupportedAbsoluteForms(): void
     {
@@ -28,9 +30,9 @@ final class PathHelperTest extends TestCase
     }
 
     /**
-     * Verify relative paths resolve against roots without rewriting absolute paths.
+     * Verify root resolution for a relative path and separator normalization for a Windows absolute path.
      *
-     * @return void
+     * @return void - Asserts a rooted relative result and a separator-normalized absolute result.
      */
     public function testResolveAgainstPreservesAbsolutePaths(): void
     {
@@ -39,9 +41,9 @@ final class PathHelperTest extends TestCase
     }
 
     /**
-     * Verify canonical fallback collapses dot segments in paths that do not exist.
+     * Verify dot-segment reduction for Unix, drive-letter, and relative path inputs.
      *
-     * @return void
+     * @return void - Asserts the expected path after dot-segment reduction for each input.
      */
     public function testCanonicalCollapsesDotSegmentsWhenPathDoesNotExist(): void
     {
@@ -51,9 +53,9 @@ final class PathHelperTest extends TestCase
     }
 
     /**
-     * Verify display path normalization keeps absolute paths absolute.
+     * Verify leading './' removal while preserving the tested Unix absolute file path.
      *
-     * @return void
+     * @return void - Asserts the normalized relative path and unchanged absolute file path.
      */
     public function testNormalizeRelativeDoesNotStripAbsoluteRoots(): void
     {

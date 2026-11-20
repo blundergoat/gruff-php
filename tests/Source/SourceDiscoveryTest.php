@@ -9,8 +9,9 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers source discovery: deterministic non-git scanning, git-aware visibility, ignore overrides, lockfile exclusion, glob patterns, missing-path
- * reporting, and canonical deduplication.
+ * Covers deterministic non-Git scanning and Git-aware visibility.
+ * Checks ignore overrides, lockfile eligibility, glob patterns, and missing-path reporting.
+ * Checks canonical deduplication of equivalent absolute and relative requests.
  */
 final class SourceDiscoveryTest extends TestCase
 {
@@ -20,7 +21,7 @@ final class SourceDiscoveryTest extends TestCase
     /**
      * Remove temporary discovery projects created by tests.
      *
-     * @return void
+     * @return void - Cleans up project directories registered by tempDir().
      */
     protected function tearDown(): void
     {
@@ -30,9 +31,9 @@ final class SourceDiscoveryTest extends TestCase
     }
 
     /**
-     * Verify discovers PHP files deterministically and ignores default directories.
+     * Verify non-Git discovery sorts PHP paths and excludes vendor and build directories.
      *
-     * @return void
+     * @return void - Asserts the exact discovered paths, vendor and build exclusions, and no missing inputs.
      */
     public function testNonGitDiscoveryDiscoversPhpFilesDeterministicallyAndIgnoresDefaultDirectories(): void
     {
@@ -48,20 +49,43 @@ final class SourceDiscoveryTest extends TestCase
 
         self::assertSame([
                              'alpha.php',
+                             'cache/ignored.php',
+                             'generated/ignored.php',
                              'nested/beta.php',
                          ], array_map(static fn($file): string => $file->displayPath, $result->files));
 
         self::assertContains('vendor', $result->ignoredPaths);
-        self::assertContains('cache', $result->ignoredPaths);
         self::assertContains('build', $result->ignoredPaths);
-        self::assertContains('generated', $result->ignoredPaths);
         self::assertSame([], $result->missingPaths);
+    }
+
+    /**
+     * Verify a walked minified file is listed only when gruff-php would scan it.
+     * Vendored code is skipped as one directory even under a .gitignore (FAMILY-CONTRACT.md section 7).
+     *
+     * @return void - Asserts discovered files and ignored paths for the minified and vendor fixtures.
+     */
+    public function testWalkListsEligibleMinifiedFilesAndSkipsVendorUnderAGitignore(): void
+    {
+        $root = $this->tempDir();
+        $this->writeFile($root, '.gitignore', "*.log\n");
+        $this->writeFile($root, 'alpha.php', "<?php\n");
+        $this->writeFile($root, 'Vendor/acme/Copied.php', "<?php\n");
+        $this->writeFile($root, 'config/settings.min.json', "{}\n");
+        $this->writeFile($root, 'public/jquery.min.js', "var a=1;\n");
+
+        $result = (new SourceDiscovery($root))->discover(['.']);
+
+        // gruff-php scans .gitignore as text, so it is listed beside the one PHP file.
+        self::assertSame(['.gitignore', 'alpha.php'], array_map(static fn($file): string => $file->displayPath, $result->files));
+        // gruff-php never scans .js, so the minified script is unsupported rather than listed as ignored.
+        self::assertSame(['Vendor', 'config/settings.min.json'], $result->ignoredPaths);
     }
 
     /**
      * Verify Git worktree discovery follows Git visibility and nested ignore files.
      *
-     * @return void
+     * @return void - Asserts tracked and untracked visible paths, nested exclusions, and no missing inputs.
      */
     public function testGitWorkTreeDiscoveryUsesGitVisibleFilesAndNestedIgnores(): void
     {
@@ -105,23 +129,23 @@ final class SourceDiscoveryTest extends TestCase
                              '.codex/config.toml',
                              '.github/workflows/ci.yml',
                              '.gitignore',
+                             '.goat-flow/tasks/.gitignore',
+                             '.goat-flow/tasks/README.md',
                              'src/Tracked.php',
                              'src/Untracked.php',
                          ], $paths);
         self::assertNotContains('.claude/settings.local.json', $paths);
         self::assertNotContains('.goat-flow/dashboard-state.json', $paths);
-        self::assertNotContains('.goat-flow/tasks/.gitignore', $paths);
-        self::assertNotContains('.goat-flow/tasks/README.md', $paths);
         self::assertNotContains('.goat-flow/tasks/M41.md', $paths);
         self::assertSame([], $result->missingPaths);
     }
 
     /**
-     * Verify include-ignored opts Git worktrees back into filesystem traversal.
+     * Verify an explicit supported file bypasses Git ignore rules.
      *
-     * @return void
+     * @return void - Asserts the ignored file is discovered with either flag setting and the default ignore list is empty.
      */
-    public function testIncludeIgnoredScansGitIgnoredFilesThroughFilesystem(): void
+    public function testExplicitSupportedFileBypassesGitIgnoreRules(): void
     {
         $this->requireGit();
 
@@ -132,17 +156,17 @@ final class SourceDiscoveryTest extends TestCase
         $this->writeFile($root, 'secret.local.json', "{}\n");
 
         $default = (new SourceDiscovery($root))->discover(['secret.local.json']);
-        self::assertSame([], $default->files);
-        self::assertContains('secret.local.json', $default->ignoredPaths);
+        self::assertSame(['secret.local.json'], array_map(static fn($file): string => $file->displayPath, $default->files));
+        self::assertSame([], $default->ignoredPaths);
 
         $included = (new SourceDiscovery($root))->discover(['secret.local.json'], shouldIncludeIgnored: true);
         self::assertSame(['secret.local.json'], array_map(static fn($file): string => $file->displayPath, $included->files));
     }
 
     /**
-     * Verify can include ignored directories explicitly.
+     * Verify ignored directories can be included explicitly.
      *
-     * @return void
+     * @return void - Asserts that the include-ignored result contains the vendor and build fixture files.
      */
     public function testCanIncludeIgnoredDirectoriesExplicitly(): void
     {
@@ -161,38 +185,38 @@ final class SourceDiscoveryTest extends TestCase
     }
 
     /**
-     * Verify default ignores well known lockfile names.
+     * Verify lockfile names do not override ordinary extension eligibility.
      *
-     * @return void
+     * @return void - Asserts package-lock.json is discovered and composer.lock is omitted.
      */
-    public function testDefaultIgnoresWellKnownLockfileNames(): void
+    public function testLockfilesFollowOrdinaryExtensionEligibility(): void
     {
         $root   = $this->fixtureRoot('mixed');
         $result = (new SourceDiscovery($root))->discover(['.']);
 
         $paths = array_map(static fn($file): string => $file->displayPath, $result->files);
-        self::assertNotContains('package-lock.json', $paths, 'package-lock.json must be ignored by default.');
-        self::assertNotContains('composer.lock', $paths, 'composer.lock must be ignored by default.');
+        self::assertContains('package-lock.json', $paths, 'Eligible JSON lockfiles must be scanned.');
+        self::assertNotContains('composer.lock', $paths, 'Unsupported .lock files remain extension-ineligible.');
     }
 
     /**
-     * Verify explicit lockfile path is still ignored without include flag.
+     * Verify an explicit eligible lockfile is scanned without an include flag.
      *
-     * @return void
+     * @return void - Asserts package-lock.json is the sole discovered file and no ignored paths are reported.
      */
-    public function testExplicitLockfilePathIsStillIgnoredWithoutIncludeFlag(): void
+    public function testExplicitEligibleLockfileIsScannedWithoutIncludeFlag(): void
     {
         $root   = $this->fixtureRoot('mixed');
         $result = (new SourceDiscovery($root))->discover(['package-lock.json']);
 
-        self::assertSame([], $result->files);
-        self::assertContains('package-lock.json', $result->ignoredPaths);
+        self::assertSame(['package-lock.json'], array_map(static fn($file): string => $file->displayPath, $result->files));
+        self::assertSame([], $result->ignoredPaths);
     }
 
     /**
      * Verify configured ignores use project relative glob patterns.
      *
-     * @return void
+     * @return void - Asserts configured exclusions still apply when built-in ignores are bypassed.
      */
     public function testConfiguredIgnoresUseProjectRelativeGlobPatterns(): void
     {
@@ -215,9 +239,9 @@ final class SourceDiscoveryTest extends TestCase
     }
 
     /**
-     * Verify reports missing paths.
+     * Verify missing paths are reported.
      *
-     * @return void
+     * @return void - Asserts the missing operand is reported and makes hasInputErrors() true.
      */
     public function testReportsMissingPaths(): void
     {
@@ -229,9 +253,9 @@ final class SourceDiscoveryTest extends TestCase
     }
 
     /**
-     * Verify source discovery classifies PHP, text config, env, and unsupported files.
+     * Verify source discovery classifies supported PHP and text files while skipping unsupported files.
      *
-     * @return void
+     * @return void - Asserts file types, isPhp() results, and no input errors when an empty operand selects the root.
      */
     public function testClassifiesSupportedSourceTypesAndSkipsUnsupportedFiles(): void
     {
@@ -271,7 +295,7 @@ final class SourceDiscoveryTest extends TestCase
     /**
      * Verify duplicate absolute and relative requests collapse to canonical files.
      *
-     * @return void
+     * @return void - Asserts three equivalent requests produce one displayed file path.
      */
     public function testCanonicalisesDuplicateAbsoluteAndRelativeRequests(): void
     {
@@ -284,11 +308,11 @@ final class SourceDiscoveryTest extends TestCase
     }
 
     /**
-     * Verify default ignores nested root paths and configured question-mark globs.
+     * Verify control metadata stays scannable while configured question-mark globs remain authoritative.
      *
-     * @return void
+     * @return void - Asserts the metadata file is discovered and src/A.php and src/B.php are ignored by src/?.php.
      */
-    public function testDefaultAndConfiguredIgnorePatternsAreAppliedToNestedPaths(): void
+    public function testControlMetadataAndConfiguredIgnorePatternsAtNestedPaths(): void
     {
         $root = $this->tempDir();
         self::assertTrue(mkdir($root . '/src', 0777, true));
@@ -299,8 +323,7 @@ final class SourceDiscoveryTest extends TestCase
 
         $result = (new SourceDiscovery($root))->discover(['.'], configuredIgnorePatterns: ['src/?.php']);
 
-        self::assertSame([], $result->files);
-        self::assertContains('.goat-flow/logs', $result->ignoredPaths);
+        self::assertSame(['.goat-flow/logs/ignored.php'], array_map(static fn($file): string => $file->displayPath, $result->files));
         self::assertContains('src/A.php', $result->ignoredPaths);
         self::assertContains('src/B.php', $result->ignoredPaths);
     }
@@ -308,7 +331,7 @@ final class SourceDiscoveryTest extends TestCase
     /**
      * Verify ignored path details carry the source category and matching pattern.
      *
-     * @return void
+     * @return void - Asserts configured and default exclusions retain their source categories and matching patterns.
      */
     public function testIgnoredPathDetailsCarrySourceAndPattern(): void
     {
@@ -330,7 +353,7 @@ final class SourceDiscoveryTest extends TestCase
     /**
      * Resolve a source-discovery fixture root.
      *
-     * @param string $name - Fixture name.
+     * @param string $name - Subdirectory name resolved under tests/Fixtures/Source.
      *
      * @return string - canonical absolute path to the fixture root with symlinks resolved
      */
@@ -361,7 +384,7 @@ final class SourceDiscoveryTest extends TestCase
     /**
      * Require the git executable for Git worktree discovery tests.
      *
-     * @return void
+     * @return void - Skips the current test when git --version fails.
      */
     private function requireGit(): void
     {
@@ -376,10 +399,10 @@ final class SourceDiscoveryTest extends TestCase
     /**
      * Run a git command inside a temporary fixture project.
      *
-     * @param string       $root - Fixture root.
-     * @param list<string> $args - Git arguments.
+     * @param string       $root - Working directory for the Git command.
+     * @param list<string> $args - Arguments passed after the git executable name.
      *
-     * @return void
+     * @return void - Asserts that the Git command exits with status zero.
      */
     private function runGit(string $root, array $args): void
     {
@@ -392,11 +415,11 @@ final class SourceDiscoveryTest extends TestCase
     /**
      * Write a fixture file, creating parent directories as needed.
      *
-     * @param string $root - Fixture root.
+     * @param string $root - Base directory for the project-relative file path.
      * @param string $path - Project-relative file path.
-     * @param string $contents - File contents.
+     * @param string $contents - Bytes written to the fixture file.
      *
-     * @return void
+     * @return void - Creates missing parent directories and writes the fixture contents.
      */
     private function writeFile(string $root, string $path, string $contents): void
     {
@@ -413,14 +436,14 @@ final class SourceDiscoveryTest extends TestCase
     /**
      * Remove a temporary directory tree.
      *
-     * @param string $path - Directory path.
+     * @param string $path - Directory tree to remove; non-directory paths are left untouched.
      *
-     * @return void
+     * @return void - Deletes the directory tree when it exists; child directory symlinks are unlinked.
      */
     private function removeDir(string $path): void
     {
         if (!is_dir($path)) {
-            // Nothing to remove when the path was never created or already gone.
+
             return;
         }
 

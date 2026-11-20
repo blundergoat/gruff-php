@@ -15,73 +15,265 @@ use GruffPhp\Output\Reporter\FailThreshold;
 use GruffPhp\Output\Reporter\FailThresholds;
 use GruffPhp\Output\Reporter\OutputFormat;
 use GruffPhp\Rules\RuleRegistry;
+use GruffPhp\Support\PathHelper;
 use Symfony\Component\Console\Application as SymfonyApplication;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * Turns everything typed after `gruff-php analyse` into one validated setup object, or the first
- * usage or config error the invocation tripped.
- *
- * Every `analyse` run passes through here before a single file is scanned: it parses and
- * range-checks the flags (`--format`, `--fail-on`, `--mutation-budget`, `--include-rule`), rejects
- * contradictory pairs with a one-line message, offers to write a starter config on a first run,
- * then loads the project config and folds any CLI overrides into the final rule selection. A ready
- * result lets the command scan at once; an error result stops it and shows the user how to fix the
- * command instead of emitting a misleading report.
+ * Resolves scan targets, validates options, and loads configuration before analysis starts.
+ * May offer to initialize missing project configuration, then applies profile and CLI rule selections.
+ * Returns a ready setup, the first detected error, or an exit code when initialization fails.
  */
 final readonly class AnalyseCommandSetupBuilder
 {
     /**
-     * Entry point the `analyse` command calls first: capture the working directory the user launched
-     * from, then hand off to the full validation pass. Returns a ready setup or the error they must fix.
+     * Resolve the launch directory and project root, then validate the run configuration.
+     * Re-anchor target and baseline paths before preparing the setup.
      *
-     * @param InputInterface           $input - Symfony console input for the analyse command.
-     * @param OutputInterface          $output - Symfony console output for the optional first-run init prompt.
-     * @param SymfonyApplication|null  $symfonyApplication - Console application used to dispatch `init`; null skips the first-run config offer.
+     * @param InputInterface          $input              - Symfony console input for the analyse command.
+     * @param OutputInterface         $output             - Symfony console output for the optional first-run init prompt.
+     * @param SymfonyApplication|null $symfonyApplication - Console application used to dispatch init; null skips the first-run config offer.
      *
-     * @return AnalyseCommandSetupResult - Ready-to-scan setup when the directory is known, otherwise a plain error result.
+     * @return AnalyseCommandSetupResult - Ready setup, a setup error, or an early exit after failed configuration initialization.
      */
     public function build(
         InputInterface $input,
         OutputInterface $output,
         ?SymfonyApplication $symfonyApplication,
     ): AnalyseCommandSetupResult {
-        $projectRoot = getcwd();
+        $launchDirectory = getcwd();
 
-        // Every scanned and reported path is resolved against the launch directory; if the shell can't
-        // name it (say it was deleted mid-session), stop rather than scan an unknown location.
-        if ($projectRoot === false) {
+        // The launch directory is unavailable, so stop before resolving targets against an unknown location.
+
+        if ($launchDirectory === false) {
             return AnalyseCommandSetupResult::plainError(
                 '<error>Unable to determine current working directory.</error>',
                 Command::FAILURE,
             );
         }
 
-        return $this->buildSetup($input, $output, $symfonyApplication, $projectRoot);
+        /** @var list<string> $requestedPaths - Path operands exactly as typed, before any root resolution. */
+        $requestedPaths = (array) $input->getArgument('paths');
+        $projectRoot = self::projectRootFromTargets($launchDirectory, $requestedPaths);
+
+        // Targets without a common filesystem ancestor cannot share the report's project root.
+        if ($projectRoot === null) {
+            return AnalyseCommandSetupResult::plainError(
+                '<error>scan targets do not share a filesystem root</error>',
+                Command::INVALID,
+            );
+        }
+
+        $input->setArgument('paths', self::targetsForRoot($launchDirectory, $projectRoot, $requestedPaths));
+
+        // A baseline path means what the user typed from the launch directory, as the targets do.
+        foreach (['baseline', 'generate-baseline', 'migrate-baseline'] as $baselineOption) {
+            $typedPath = $input->hasOption($baselineOption) ? $input->getOption($baselineOption) : null;
+
+            // A bare --baseline names the default file at the project root, so only a typed path is rewritten.
+            if (is_string($typedPath) && $typedPath !== '') {
+                $input->setOption($baselineOption, self::pathForRoot($launchDirectory, $projectRoot, $typedPath));
+            }
+        }
+
+        return $this->buildSetup(
+            $input,
+            $output,
+            $symfonyApplication,
+            $projectRoot,
+            self::targetOutsideLaunchDirectory($launchDirectory, $requestedPaths),
+        );
     }
 
     /**
-     * The validation gauntlet each run walks in the order the user feels it: check every flag, offer a
-     * first-run config, load the project config, then fold in any CLI rule overrides. Stops at the
-     * first problem with a message the user can act on rather than a half-finished report.
+     * Find the first resolvable target outside the launch directory when multiple targets were requested.
+     * The caller uses it to reject multi-target scans not contained by the launch directory.
+     * Unresolved targets are left for discovery to diagnose.
      *
-     * @param InputInterface          $input - Symfony console input for the analyse command.
-     * @param OutputInterface         $output - Console output used for the optional first-run init prompt.
-     * @param SymfonyApplication|null $symfonyApplication - Console application used to dispatch `init`; null skips the first-run config offer.
-     * @param string                  $projectRoot - Working directory the run is anchored to, already known to be readable.
+     * @param string       $launchDirectory - Working directory the command was started from.
+     * @param list<string> $paths           - Scan targets as typed on the command line.
      *
-     * @return AnalyseCommandSetupResult - Ready setup when every check passes, otherwise the first usage or config error hit.
+     * @return string|null - First resolvable outside target in a multi-target request, or null when none is found.
+     */
+    private static function targetOutsideLaunchDirectory(string $launchDirectory, array $paths): ?string
+    {
+
+        if (count($paths) < 2) {
+            return null;
+        }
+
+        foreach ($paths as $path) {
+            $absolute = self::isAbsolutePath($path) ? $path : $launchDirectory . DIRECTORY_SEPARATOR . $path;
+            $resolved = realpath($absolute);
+            // Leave unresolved targets for discovery rather than rejecting them as outside the launch directory.
+            if ($resolved === false) {
+                continue;
+            }
+
+            // Multi-target scans require launch-directory containment, even when the targets share another ancestor.
+            if (!self::isSameOrDescendant($resolved, $launchDirectory)) {
+                return $path;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Anchor relative scan targets to the launch directory when the selected project root differs.
+     * This preserves their meaning when discovery resolves operands against the project root.
+     *
+     * @param string       $launchDirectory - Working directory the command was started from.
+     * @param string       $projectRoot     - Root chosen by projectRootFromTargets().
+     * @param list<string> $paths           - Scan targets as typed on the command line.
+     *
+     * @return list<string> - Targets unchanged when both directories match; otherwise relative paths anchored to the launch directory.
+     */
+    public static function targetsForRoot(string $launchDirectory, string $projectRoot, array $paths): array
+    {
+
+        if ($launchDirectory === $projectRoot) {
+            return $paths;
+        }
+
+        return array_map(
+            static fn(string $path): string => self::isAbsolutePath($path) ? $path : $launchDirectory . DIRECTORY_SEPARATOR . $path,
+            $paths,
+        );
+    }
+
+    /**
+     * Preserve a CLI path's launch-directory meaning when the selected project root differs.
+     * Use a root-relative path where possible, or an absolute path when the target lies outside the project.
+     *
+     * @param string $launchDirectory - Working directory the command was started from.
+     * @param string $projectRoot     - Root chosen by projectRootFromTargets().
+     * @param string $path            - The path as typed on the command line.
+     *
+     * @return string - Original path when no rewrite is needed; otherwise a root-relative or absolute path to the same target.
+     */
+    public static function pathForRoot(string $launchDirectory, string $projectRoot, string $path): string
+    {
+
+        if ($launchDirectory === $projectRoot || PathHelper::isAbsolute($path)) {
+            return $path;
+        }
+
+        $target = PathHelper::canonical(PathHelper::resolveAgainst($launchDirectory, $path));
+
+        return PathHelper::relativeToRoot($target, $projectRoot) ?? $target;
+    }
+
+    /**
+     * Choose a project root from the common ancestor of targets that realpath() can resolve.
+     * Keep the launch directory when all resolved targets lie within it or no target resolves.
+     * For outside targets, use their common directory ancestor; a file contributes its containing directory.
+     *
+     * @param string       $launchDirectory - Working directory the command was started from.
+     * @param list<string> $paths           - CLI scan targets; empty or wholly unresolved lists use the launch directory.
+     *
+     * @return string|null - Selected directory, or null when resolved targets have no common filesystem ancestor.
+     */
+    public static function projectRootFromTargets(string $launchDirectory, array $paths): ?string
+    {
+
+        if ($paths === []) {
+            return $launchDirectory;
+        }
+
+        $common = null;
+
+        foreach ($paths as $path) {
+            $absolute = self::isAbsolutePath($path) ? $path : $launchDirectory . DIRECTORY_SEPARATOR . $path;
+            $resolved = realpath($absolute);
+
+            if ($resolved === false) {
+                continue;
+            }
+
+
+            $directory = is_dir($resolved) ? $resolved : dirname($resolved);
+
+            // The first target sets the starting answer; later ones can only widen it.
+            if ($common === null) {
+                $common = $directory;
+                continue;
+            }
+
+            while (!self::isSameOrDescendant($directory, $common)) {
+                $parent = dirname($common);
+                // Reaching a filesystem root without containing this target means no common ancestor exists.
+                if ($parent === $common) {
+                    return null;
+                }
+                $common = $parent;
+            }
+        }
+
+        // Keep the launch directory when targets stay inside it or none resolve, so config, ignores, and baselines retain their anchor.
+
+        if ($common === null || self::isSameOrDescendant($common, $launchDirectory)) {
+            return $launchDirectory;
+        }
+
+        return $common;
+    }
+
+    /**
+     * Report whether a path already names a location on its own, so it needs no launch-directory prefix.
+     *
+     * @param string $path - Path as typed on the command line; empty is treated as relative.
+     *
+     * @return bool - True for a POSIX path such as /srv/app or a Windows path such as C:\app.
+     */
+    private static function isAbsolutePath(string $path): bool
+    {
+        // A Windows absolute path is a drive letter, a colon, then either slash: C:\app or C:/app.
+        return $path !== '' && ($path[0] === '/' || preg_match('#^[A-Za-z]:[\\\\/]#', $path) === 1);
+    }
+
+    /**
+     * Compares directory path strings for equality or a whole-segment ancestor prefix.
+     * The separator boundary keeps /work/apidocs outside the /work/api prefix.
+     *
+     * @param string $candidate - Directory being tested.
+     * @param string $ancestor  - Directory that may contain it.
+     *
+     * @return bool - True when the paths match or candidate has ancestor as a whole-segment prefix.
+     */
+    private static function isSameOrDescendant(string $candidate, string $ancestor): bool
+    {
+
+        if ($candidate === $ancestor) {
+            return true;
+        }
+
+        return str_starts_with($candidate, rtrim($ancestor, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR);
+    }
+
+    /**
+     * Validate options, offer first-run configuration, and build the settings used for analysis.
+     * Return the first detected setup error, or an early exit when configuration initialization fails.
+     *
+     * @param InputInterface          $input              - Symfony console input for the analyse command.
+     * @param OutputInterface         $output             - Console output used for the optional first-run init prompt.
+     * @param SymfonyApplication|null $symfonyApplication - Console application used to dispatch init; null skips the first-run config offer.
+     * @param string                  $projectRoot        - Root selected for target resolution and configuration discovery.
+     * @param string|null             $outsideTarget      - First of several targets outside the launch directory, or null.
+     *
+     * @return AnalyseCommandSetupResult - Ready setup, the first detected setup error, or an early initialization exit.
      */
     private function buildSetup(
         InputInterface $input,
         OutputInterface $output,
         ?SymfonyApplication $symfonyApplication,
         string $projectRoot,
+        ?string $outsideTarget,
     ): AnalyseCommandSetupResult {
         $options = AnalyseCommandOptions::fromInput($input);
-        // The user passed `--no-config` and `--config` together; obeying one would silently ignore the
+        // The user passed --no-config and --config together; obeying one would silently ignore the
         // other, so reject the contradictory pair before anything else.
         if ($options->usageError() === '--no-config cannot be combined with --config.') {
             return AnalyseCommandSetupResult::plainError(
@@ -91,15 +283,14 @@ final readonly class AnalyseCommandSetupBuilder
         }
 
         $formatResult = $this->format($input->getOption('format'));
-        // `--format` named something we can't render (e.g. `--format=xml`), so `$formatResult` is the
+        // --format named an unsupported renderer, such as --format=xml, so the resolved value is the
         // usage-error string; show it instead of starting a scan that can't be printed.
         if (!$formatResult instanceof OutputFormat) {
             return AnalyseCommandSetupResult::plainError($formatResult, Command::INVALID);
         }
 
         $failThreshold = $this->failThreshold($input->getOption('fail-on'));
-        // `--fail-on` wasn't one of the accepted severities, so echo the bad value back rather than
-        // guessing which gate the user meant.
+        // --fail-on was not an accepted severity, so echo the bad value instead of guessing which gate the user meant.
         if (!$failThreshold instanceof FailThreshold) {
             return AnalyseCommandSetupResult::reportError(
                 $this->usageReport(
@@ -113,7 +304,7 @@ final readonly class AnalyseCommandSetupBuilder
         }
 
         $mutationBudget = $this->mutationBudget($input->getOption('mutation-budget'));
-        // `--mutation-budget` was set to something other than a whole number, so we can't tell how many
+        // --mutation-budget was set to something other than a whole number, so we cannot tell how many
         // surviving mutants the user is willing to tolerate.
         if ($mutationBudget === false) {
             return AnalyseCommandSetupResult::reportError(
@@ -127,10 +318,28 @@ final readonly class AnalyseCommandSetupBuilder
             );
         }
 
+        // A multi-target request escaped the launch directory; report this policy error through the selected format.
+
+        if ($outsideTarget !== null) {
+            return AnalyseCommandSetupResult::reportError(
+                $this->usageReport(
+                    $options,
+                    $formatResult,
+                    $failThreshold->value,
+                    sprintf(
+                        'Target "%s" is outside the launch directory; gruff-php analyses several targets only from a directory that contains them all.',
+                        $outsideTarget,
+                    ),
+                    'target-error',
+                ),
+                $formatResult,
+            );
+        }
+
         $options    = $options->withMutationBudget($mutationBudget);
         $usageError = $options->usageError();
-        // Some other flag combination still doesn't hang together (for instance `--changed-only` without
-        // the `--diff-vs` it needs, or two mutually exclusive diff selectors); surface the specific reason so the user can fix that one flag.
+        // Another flag combination is invalid, such as --changed-only without --diff-vs or two mutually exclusive
+        // diff selectors; surface the specific reason so the user can fix the offending flag.
         if ($usageError !== null) {
             return AnalyseCommandSetupResult::reportError(
                 $this->usageReport($options, $formatResult, $failThreshold->value, $usageError),
@@ -140,8 +349,8 @@ final readonly class AnalyseCommandSetupBuilder
 
         $registry        = RuleRegistry::defaults();
         $ruleFilterError = $this->ruleFilterError($registry, $options->includeRules, $options->excludeRules);
-        // `--include-rule` or `--exclude-rule` named an id no rule owns, which would quietly filter to
-        // nothing; name the typo instead of running an empty scan the user would misread as clean.
+        // Unknown includes can omit intended checks; unknown excludes leave intended checks enabled.
+
         if ($ruleFilterError !== null) {
             return AnalyseCommandSetupResult::reportError(
                 $this->usageReport($options, $formatResult, $failThreshold->value, $ruleFilterError),
@@ -150,7 +359,7 @@ final readonly class AnalyseCommandSetupBuilder
         }
 
         $profileIncludeError = $this->profileIncludeRuleError($registry, $options);
-        // The user paired `--profile` with an `--include-rule` from a pillar that profile never scores,
+        // The user paired --profile with an --include-rule from a pillar that profile never scores,
         // so the finding could never move the grade; explain both ways out.
         if ($profileIncludeError !== null) {
             return AnalyseCommandSetupResult::reportError(
@@ -168,14 +377,14 @@ final readonly class AnalyseCommandSetupBuilder
             shouldSkipConfig:        $options->noConfig,
             isMachineReadableFormat: $formatResult->isMachineReadable(),
         );
-        // First run in a project with no config: the init offer already ran to a verdict, so stop and
-        // pass its exit code straight back to the shell.
+        // Initialization failed after the first-run offer, so return its exit code without starting analysis.
+
         if ($promptExitCode !== null) {
             return AnalyseCommandSetupResult::exitCode($promptExitCode);
         }
 
         $options      = $options->withDefaultBaseline($projectRoot);
-        $configLoader = new ConfigLoader($projectRoot, ConfigLoader::packageRoot());
+        $configLoader = new ConfigLoader($projectRoot, ConfigLoader::packageRoot(), shouldResolveFromLaunchDir: true);
         $configResult = $this->config(
             options:       $options,
             registry:      $registry,
@@ -188,11 +397,11 @@ final readonly class AnalyseCommandSetupBuilder
         if ($configResult instanceof AnalysisReport) {
             return AnalyseCommandSetupResult::reportError($configResult, $formatResult);
         }
-        $failThreshold        = $this->resolveFailThresholdWithConfig($input, $configResult, $failThreshold);
-        $failThresholds       = $this->resolveFailThresholds($input, $configResult, $failThreshold);
-        $referenceError       = $this->newFindingsReferenceError($options, $failThresholds);
+        $failThreshold  = $this->resolveFailThresholdWithConfig($input, $configResult, $failThreshold);
+        $failThresholds = $this->resolveFailThresholds($input, $configResult, $failThreshold);
+        $referenceError = $this->newFindingsReferenceError($options, $failThresholds);
         // A new-findings gate is armed but nothing defines "new" yet; tell the user to add a baseline or
-        // `--diff-vs <ref>` before the gate can mean anything.
+        // --diff-vs <ref> before the gate can mean anything.
         if ($referenceError !== null) {
             return AnalyseCommandSetupResult::reportError(
                 $this->usageReport(
@@ -206,13 +415,12 @@ final readonly class AnalyseCommandSetupBuilder
             );
         }
         $profileRuleSelection = $options->profileRuleSelection();
-        // A profile such as `--profile security` narrows execution to its own pillars; swap that
-        // selection in over whatever the config chose.
+        // --profile security narrows execution to its own pillars, overriding the config's rule selection.
         if ($profileRuleSelection !== null) {
             $configResult = $configResult->withRuleSelection($profileRuleSelection);
         }
-        // The user hand-picked rules with `--include-rule`/`--exclude-rule`; apply those choices on top of
-        // the configured selection (include-only narrows to them; exclude drops just those).
+        // Explicit includes replace the selection with those ids; without includes, CLI excludes extend the existing exclusions.
+
         if ($options->includeRules !== [] || $options->excludeRules !== []) {
             $configResult = $configResult->withRuleSelection(
                 $this->refinedSelection($configResult->ruleSelection(), $options->includeRules, $options->excludeRules),
@@ -232,25 +440,18 @@ final readonly class AnalyseCommandSetupBuilder
     }
 
     /**
-     * Works out the final rule set once `--include-rule`/`--exclude-rule` are in play, so the run
-     * honours exactly what the user chose to focus on or drop.
+     * Apply CLI rule filters to a selection already resolved from configuration and profile.
+     * Explicit includes replace that selection, including its exclusions; otherwise merge only the CLI exclusions.
      *
-     * Mirrors the hook command's selection refinement: --include-rule means "run
-     * only these ids", so it must narrow to exactly those rules because
-     * RuleSelection::allows() ORs tier/pillar/rule includes and inheriting the
-     * config's tiers/pillars would widen the focused run. A bare --exclude-rule
-     * keeps the configured selection and only drops the named rules, so a
-     * configured selection.rules narrowing is not widened to the whole rule set.
-     *
-     * @param RuleSelection $existing - Selection already resolved from config and profile.
+     * @param RuleSelection $existing     - Selection already resolved from config and profile.
      * @param list<string>  $includeRules - CLI --include-rule ids; when non-empty they focus the run.
-     * @param list<string>  $excludeRules - CLI --exclude-rule ids dropped on top of the existing selection.
+     * @param list<string>  $excludeRules - CLI exclusions applied to explicit includes or merged with existing exclusions.
      *
      * @return RuleSelection - Focused selection for --include-rule, or the existing selection plus excludes.
      */
     private function refinedSelection(RuleSelection $existing, array $includeRules, array $excludeRules): RuleSelection
     {
-        // `--include-rule` means "run only these ids", so focus on exactly them and drop the inherited
+        // --include-rule means "run only these ids", so focus on exactly them and drop the inherited
         // tiers and pillars that would otherwise widen the run back out.
         if ($includeRules !== []) {
             return new RuleSelection(rules: $includeRules, excludeRules: $excludeRules);
@@ -266,14 +467,11 @@ final readonly class AnalyseCommandSetupBuilder
     }
 
     /**
-     * Rejects an `--include-rule` whose pillar the active profile never scores, before any file is read.
-     *
-     * A command like `gruff-php analyse --profile security --include-rule docs.missing-public-phpdoc`
-     * fails fast here: without this gate it would print a docs error while the user's grade stayed a
-     * security-only 100, which reads as a contradiction. A bare `--exclude-rule` stays a plain narrowing.
+     * Reject explicit includes from pillars the selected profile does not score.
+     * This prevents requested rules from producing findings that cannot affect the profile's grade.
      *
      * @param RuleRegistry          $registry - Registry resolving rule ids to their definitions.
-     * @param AnalyseCommandOptions $options - Validated options carrying the profile and include filters.
+     * @param AnalyseCommandOptions $options  - Validated options carrying the profile and include filters.
      *
      * @return string|null - Usage error naming the first out-of-profile include, or null when compatible.
      */
@@ -289,18 +487,14 @@ final readonly class AnalyseCommandSetupBuilder
     }
 
     /**
-     * Builds the usage error shown when `--include-rule` ids fall outside a profile's scored pillars.
+     * Rejects the first included rule outside the profile's scored pillars, using wording shared with ReportCommand.
      *
-     * Shared with `ReportCommand` so both commands reject the same incoherent combinations with
-     * identical wording, and report can do it before its own init prompt runs.
-     *
-     * @param RuleRegistry         $registry - Registry resolving rule ids to their definitions; ids must already be validated.
-     * @param string               $profile - Requested profile name, echoed into the error message.
+     * @param RuleRegistry                           $registry            - Resolves rule ids to definitions; ids must already be validated.
+     * @param string                                 $profile             - Requested profile name, echoed into the error message.
      * @param list<\GruffPhp\Results\Finding\Pillar> $profileScorePillars - Pillars the profile's composite counts.
-     * @param list<string>         $includeRuleIds - Requested --include-rule ids.
+     * @param list<string>                           $includeRuleIds      - Requested --include-rule ids.
      *
-     * @return string|null - usage error naming the first out-of-profile include and both remedies, or null when
-     *                     every include belongs to a scored pillar (including the no-includes case)
+     * @return string|null - Error with both remedies for the first incompatible include; null when all includes match or the list is empty.
      */
     public static function outOfProfileIncludeError(
         RuleRegistry $registry,
@@ -309,14 +503,14 @@ final readonly class AnalyseCommandSetupBuilder
         array        $includeRuleIds,
     ): ?string {
         $profilePillarNames = [];
-        // Build the profile wording the user sees in the usage error.
+
         foreach ($profileScorePillars as $profileScorePillar) {
             $profilePillarNames[] = $profileScorePillar->value;
         }
         $profilePillarsLabel = self::formatPillarList($profilePillarNames);
         $profilePillarIds    = implode('/', $profilePillarNames);
 
-        // Check each requested rule against the pillars the profile's grade actually counts.
+
         foreach ($includeRuleIds as $ruleId) {
             $pillar = $registry->get($ruleId)->definition()->pillar;
             // An unscored pillar would emit findings the grade ignores; tell the user both ways out.
@@ -337,8 +531,7 @@ final readonly class AnalyseCommandSetupBuilder
     }
 
     /**
-     * Joins pillar names into the readable list the usage error reads aloud, so the message names them
-     * as "a", "a and b", or "a, b and c" instead of a raw array.
+     * Format pillar names as a readable list for the usage error.
      *
      * @param list<string> $pillarNames - Pillar names in display order; an empty list reads as "no".
      *
@@ -346,12 +539,12 @@ final readonly class AnalyseCommandSetupBuilder
      */
     private static function formatPillarList(array $pillarNames): string
     {
-        // Empty profile wording should read plainly if a future profile scores no pillars.
+
         if ($pillarNames === []) {
             return 'no';
         }
 
-        // A single pillar needs no joining words in the CLI message.
+
         if (count($pillarNames) === 1) {
             return $pillarNames[0];
         }
@@ -362,22 +555,22 @@ final readonly class AnalyseCommandSetupBuilder
     }
 
     /**
-     * Catches a mistyped `--include-rule`/`--exclude-rule` id before it silently narrows the run to no
-     * rules at all, so the user hears about the typo instead of trusting an empty scan.
+     * Validate CLI include and exclude ids against the registry before rule selection.
+     * Return an error for the first unknown id so a misspelled filter is not silently ignored.
      *
-     * @param RuleRegistry $registry - Registry whose ids define valid CLI rule filters.
-     * @param list<string> $includeRules - Rule ids from `--include-rule`; empty when the user focused nothing.
-     * @param list<string> $excludeRules - Rule ids from `--exclude-rule`; empty when the user dropped nothing.
+     * @param RuleRegistry $registry     - Registry whose ids define valid CLI rule filters.
+     * @param list<string> $includeRules - Rule ids from --include-rule; empty when the user focused nothing.
+     * @param list<string> $excludeRules - Rule ids from --exclude-rule; empty when the user dropped nothing.
      *
      * @return string|null - Usage error for the first unknown id, or null when every id is registered.
      */
     private function ruleFilterError(RuleRegistry $registry, array $includeRules, array $excludeRules): ?string
     {
-        // Check the include and exclude lists the same way, so a typo in either is caught and blamed on
-        // the flag that carried it.
+
+
         foreach (['--include-rule' => $includeRules, '--exclude-rule' => $excludeRules] as $option => $ruleIds) {
             $unknownRuleIds = $registry->unknownRuleIds($ruleIds);
-            // At least one id matches no registered rule; name the first so the user can correct that flag.
+
             if ($unknownRuleIds !== []) {
                 return sprintf('Unknown rule id "%s" for %s.', $unknownRuleIds[0], $option);
             }
@@ -387,7 +580,7 @@ final readonly class AnalyseCommandSetupBuilder
     }
 
     /**
-     * Turns the raw `--format` value into a renderer choice, or a ready-to-print usage error when it
+     * Turns the raw --format value into a renderer choice, or a ready-to-print usage error when it
      * names a format gruff can't produce. Runs before any scan so the user never waits for a report
      * that can't be rendered.
      *
@@ -400,7 +593,7 @@ final readonly class AnalyseCommandSetupBuilder
         $rawValue = is_string($optionValue) ? $optionValue : OutputFormat::Text->value;
         $format   = OutputFormat::fromInput($rawValue);
 
-        // Null coalesce turns an unrecognised format into the tagged usage-error string the caller checks for.
+
         return $format ?? sprintf(
             '<error>USAGE-ERROR Unsupported output format "%s". Use text, json, html, markdown, github, hotspot, or sarif.</error>',
             $rawValue,
@@ -408,11 +601,11 @@ final readonly class AnalyseCommandSetupBuilder
     }
 
     /**
-     * Settles which severity fails the run by the documented precedence: an explicit `--fail-on` the
-     * user typed wins, otherwise a per-command config threshold, otherwise the built-in default.
+     * Settles which severity fails the run: an explicit --fail-on value wins, followed by a per-command
+     * config threshold and then the built-in default.
      *
-     * @param InputInterface $input - Console input used for explicit-flag detection.
-     * @param AnalysisConfig $config - Loaded analysis config supplying per-command overrides.
+     * @param InputInterface $input             - Console input used for explicit-flag detection.
+     * @param AnalysisConfig $config            - Loaded analysis config supplying per-command overrides.
      * @param FailThreshold  $explicitOrDefault - Already-parsed CLI value; binary default when --fail-on omitted.
      *
      * @return FailThreshold - Resolved threshold honouring CLI > config > binary precedence.
@@ -422,8 +615,7 @@ final readonly class AnalyseCommandSetupBuilder
         AnalysisConfig $config,
         FailThreshold $explicitOrDefault,
     ): FailThreshold {
-        // The user typed an explicit `--fail-on`, which outranks any config setting, so keep the parsed
-        // threshold exactly as given.
+        // An explicit --fail-on outranks the config threshold, so keep the parsed CLI value.
         if ($input->hasParameterOption('--fail-on', true)) {
             return $explicitOrDefault;
         }
@@ -433,16 +625,12 @@ final readonly class AnalyseCommandSetupBuilder
     }
 
     /**
-     * Resolves the richer count-gate that decides the exit code, in precedence order the user controls:
-     * an explicit CLI flag, then a `failureConditions:` config block, then the single resolved threshold.
+     * Resolve exit-code gates from explicit CLI flags, configuration, or the resolved severity threshold.
+     * An explicit --fail-on overrides configured gates; --fail-on-new adds an error-only new-findings gate.
+     * With --fail-on-new alone, disable the overall gate; without either flag, prefer configured failure conditions.
      *
-     * An explicit `--fail-on` always wins (back-compat); otherwise an explicit
-     * `failureConditions:` block is used; otherwise the already-resolved singular
-     * threshold (config minimumSeverity or the binary default) is desugared so the
-     * gate stays byte-identical to today.
-     *
-     * @param InputInterface $input - Console input used for explicit-flag detection.
-     * @param AnalysisConfig $config - Loaded config supplying the optional failureConditions block.
+     * @param InputInterface $input         - Console input used for explicit-flag detection.
+     * @param AnalysisConfig $config        - Loaded config supplying the optional failureConditions block.
      * @param FailThreshold  $failThreshold - Already-resolved singular threshold for the run.
      *
      * @return FailThresholds - Count-gate thresholds that decide the exit code.
@@ -456,38 +644,36 @@ final readonly class AnalyseCommandSetupBuilder
         $hasExplicitFailOn       = $input->hasParameterOption('--fail-on', true);
         $hasExplicitFailOnNew    = $input->hasParameterOption('--fail-on-new', true);
 
-        // The user gave an explicit `--fail-on`, which wins outright; if `--fail-on-new` rides along, arm
-        // the new-findings sub-gate on top of it.
+        // Explicit --fail-on replaces configured gates; --fail-on-new adds an error-only new-findings gate.
         if ($hasExplicitFailOn) {
             return FailThresholds::fromFailOn($failThreshold)->withNewFindingsGate(
                 $hasExplicitFailOnNew ? FailThresholds::fromFailOn(FailThreshold::Error) : null,
             );
         }
 
-        // Only `--fail-on-new` was given, so let the overall gate pass but still fail when new findings appear.
+        // With only --fail-on-new, disable the overall gate and trip the new-findings sub-gate only on new errors.
         if ($hasExplicitFailOnNew) {
             return FailThresholds::fromFailOn(FailThreshold::None)
                 ->withNewFindingsGate(FailThresholds::fromFailOn(FailThreshold::Error));
         }
 
-        // No gate flags on the command line, but the project's `failureConditions:` block spells one out,
-        // so honour it verbatim.
+        // Without CLI gate flags, use the project's configured failure conditions unchanged.
         if ($configFailureConditions instanceof FailThresholds) {
             return $configFailureConditions;
         }
 
-        // Nothing overrode the gate, so desugar the single resolved threshold into the count-gate form.
+
         return FailThresholds::fromFailOn($failThreshold);
     }
 
     /**
-     * Guards against a new-findings gate that has nothing to compare against: returns the remediation
-     * message when no baseline or `--diff-vs` defines what counts as "new", and null once one does.
+     * Require a baseline or diff reference only when a new-findings gate is enabled.
+     * Baseline generation alone does not supply a reference for that gate.
      *
-     * @param AnalyseCommandOptions $options - Validated options carrying baseline and diff-vs selections.
+     * @param AnalyseCommandOptions $options        - Validated options carrying baseline and diff-vs selections.
      * @param FailThresholds        $failThresholds - Resolved gate, whose new-findings sub-gate may be set.
      *
-     * @return string|null - Remediation message, or null when a reference point exists so the gate is well-formed.
+     * @return string|null - Remediation message when an enabled gate lacks a reference; null otherwise.
      */
     private function newFindingsReferenceError(AnalyseCommandOptions $options, FailThresholds $failThresholds): ?string
     {
@@ -497,9 +683,9 @@ final readonly class AnalyseCommandSetupBuilder
         }
 
         $baselineWillApply = $options->baseline->baselinePath !== null && $options->baseline->generateBaselinePath === null;
-        // A baseline will apply, or `--diff-vs` names a ref to compare against, so "new" has a concrete
-        // meaning and the gate is well-formed.
-        if ($baselineWillApply || $options->diffVs !== null) {
+        // A selected baseline counts only outside generation mode; a diff reference works in either mode.
+
+        if ($baselineWillApply || $options->changeScope->diffVs !== null) {
             return null;
         }
 
@@ -507,7 +693,7 @@ final readonly class AnalyseCommandSetupBuilder
     }
 
     /**
-     * Parses the requested `--fail-on` severity, defaulting to advisory when the flag is absent and
+     * Parses the requested --fail-on severity, defaulting to advisory when the flag is absent and
      * handing the raw text straight back when it isn't a severity so the caller can quote it in an error.
      *
      * @param mixed $optionValue - Raw --fail-on console option; a non-string (option absent) defaults to advisory.
@@ -518,21 +704,21 @@ final readonly class AnalyseCommandSetupBuilder
     {
         $rawValue = is_string($optionValue) ? $optionValue : FailThreshold::Advisory->value;
 
-        // Hand back the matched threshold, or the raw text unchanged so the caller can name the bad value.
+
         return FailThreshold::fromInput($rawValue) ?? $rawValue;
     }
 
     /**
-     * Parses the optional `--mutation-budget`: how many surviving mutants the user will tolerate before
+     * Parses the optional --mutation-budget: how many surviving mutants the user will tolerate before
      * the run is treated as having failed its testing bar.
      *
      * @param mixed $optionValue - Raw --mutation-budget console option; null means the flag was not supplied.
      *
-     * @return int|false|null - Non-negative budget, false when the value wasn't a whole number, or null when the flag was omitted.
+     * @return int|false|null - Non-negative parsed budget, false when validation rejects the option, or null when omitted.
      */
     private function mutationBudget(mixed $optionValue): int|false|null
     {
-        // The `--mutation-budget` flag was never passed, so report "not set" rather than a budget of zero.
+        // The --mutation-budget flag was never passed, so report "not set" rather than a budget of zero.
         if ($optionValue === null) {
             return null;
         }
@@ -543,13 +729,13 @@ final readonly class AnalyseCommandSetupBuilder
 
     /**
      * Loads the project's analysis configuration, or turns a broken config into a printable error report
-     * so a bad `.gruff-php.yaml` fails the run cleanly instead of throwing at the user.
+     * so a bad .gruff-php.yaml fails the run cleanly instead of throwing at the user.
      *
-     * @param AnalyseCommandOptions $options - Validated options; its noConfig/configPath select the load path.
-     * @param RuleRegistry          $registry - Default rule set used to seed config when loading is disabled.
-     * @param OutputFormat          $format - Output format stamped onto the error report when loading fails.
+     * @param AnalyseCommandOptions $options       - Validated options; its noConfig/configPath select the load path.
+     * @param RuleRegistry          $registry      - Default rule set used to seed config when loading is disabled.
+     * @param OutputFormat          $format        - Output format stamped onto the error report when loading fails.
      * @param FailThreshold         $failThreshold - Threshold echoed into the error report so its failOn stays accurate.
-     * @param ConfigLoader          $configLoader - Loader that reads and validates the on-disk config file.
+     * @param ConfigLoader          $configLoader  - Loader that reads and validates the on-disk config file.
      *
      * @return AnalysisConfig|AnalysisReport - Loaded config, or a formatted config-error report when the file can't be used.
      */
@@ -561,14 +747,24 @@ final readonly class AnalyseCommandSetupBuilder
         ConfigLoader $configLoader,
     ): AnalysisConfig|AnalysisReport {
         try {
-            // `--no-config` skips the YAML entirely and runs the registry defaults; otherwise load and
-            // validate the project file the user relies on.
-            return $options->noConfig
+            // --no-config uses registry defaults; otherwise load and validate the project's configuration.
+            $config = $options->noConfig
                 ? AnalysisConfig::fromRegistry($registry)
                 : $configLoader->load($options->configPath, $registry);
+
+            if ($options->deepScanBudgetOverride !== null) {
+                $budget = $options->deepScanBudgetOverride;
+                $config = $config->withDeepScanBudget(
+                    $budget['enabled'],
+                    $budget['maxLines'],
+                    $budget['maxBytes'],
+                    'cli',
+                );
+            }
+
+            return $config;
         } catch (ConfigException $exception) {
-            // A broken or unreadable config is the user's to fix, so surface the reason as a report
-            // rather than a stack trace.
+            // Report a broken or unreadable config so the user gets its reason instead of a stack trace.
             return $this->usageReport(
                 options: $options,
                 format:  $format,
@@ -580,34 +776,34 @@ final readonly class AnalyseCommandSetupBuilder
     }
 
     /**
-     * Works out which config path the report should name, so the user can see exactly which file shaped
-     * the run - the one they passed, the one auto-discovery found, or none.
+     * Return the typed config path or ask the loader to discover one for reporting.
+     * Return null when configuration loading is disabled or discovery finds no config file.
      *
-     * @param AnalyseCommandOptions $options - Validated options; noConfig and an explicit configPath drive the result.
+     * @param AnalyseCommandOptions $options      - Validated options; noConfig and an explicit configPath drive the result.
      * @param ConfigLoader          $configLoader - Loader used to auto-discover the path when none was given explicitly.
      *
-     * @return string|null - Explicit or auto-discovered path, or null when `--no-config` ran with no file at all.
+     * @return string|null - Explicit or discovered path; null when configuration is disabled or no file is found.
      */
     private function effectiveConfigPath(AnalyseCommandOptions $options, ConfigLoader $configLoader): ?string
     {
-        // `--no-config` ran without reading any file, so there's no config path to show in the report.
+        // --no-config ran without reading any file, so there's no config path to show in the report.
         if ($options->noConfig) {
             return null;
         }
 
-        // Otherwise report the path the user named, or the one auto-discovery settles on when they named none.
+
         return $options->configPath ?? $configLoader->resolveConfigPath(null);
     }
 
     /**
-     * Packages a usage or config error as a zero-finding report, so a bad invocation flows through the
-     * same renderer and exit code as a real scan and reads consistently in every `--format`.
+     * Create a report with no findings and one diagnostic for a setup error.
+     * The caller renders it in the selected format; its exit code is always Command::INVALID.
      *
-     * @param AnalyseCommandOptions $options - Validated options supplying the requested paths and config path for context.
-     * @param OutputFormat          $format - Format the caller will render this error report in.
-     * @param string                $failOn - Fail-on value to record on the report so its threshold field stays accurate.
+     * @param AnalyseCommandOptions $options - Parsed options supplying requested paths and the explicit config path.
+     * @param OutputFormat          $format  - Format the caller will render this error report in.
+     * @param string                $failOn  - Fail-on value to record on the report so its threshold field stays accurate.
      * @param string                $message - Human-readable remediation text shown to the user as the diagnostic.
-     * @param string                $type - Diagnostic category, either 'usage-error' (default) or 'config-error'.
+     * @param string                $type    - Diagnostic category: 'usage-error' (default), 'config-error' or 'target-error'.
      *
      * @return AnalysisReport - Report carrying the diagnostic and invalid exit code.
      */

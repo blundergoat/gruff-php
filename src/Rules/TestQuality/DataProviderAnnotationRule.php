@@ -46,26 +46,26 @@ final readonly class DataProviderAnnotationRule implements RuleInterface
     }
 
     /**
-     * Reports legacy data-provider annotations that should use PHPUnit attributes.
+     * Reports class-method test scopes whose doc comments contain the @dataProvider marker so supported projects can consider PHPUnit attributes.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext - Unused; the rule interface requires it, and this rule reads no options or project root.
      *
-     * @return list<Finding> - Findings for data provider annotation usage.
+     * @return list<Finding> - Findings for class-method doc comments containing the @dataProvider marker.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $findings = [];
 
-        // Weigh every test scope in the file.
+
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
-            // Only a real PHPUnit method can carry a docblock annotation.
+
             if (!$scope->node instanceof Stmt\ClassMethod) {
                 continue;
             }
 
             $comment = $scope->node->getDocComment()?->getText() ?? '';
-            // Nothing to migrate unless the method declares a dataProvider annotation.
+
             if (!str_contains($comment, '@dataProvider')) {
                 continue;
             }
@@ -74,7 +74,7 @@ final readonly class DataProviderAnnotationRule implements RuleInterface
                 ruleId:      self::ID,
                 message:     sprintf('%s uses @dataProvider instead of the PHPUnit attribute form.', $scope->symbol),
                 filePath:    $analysisUnit->file->displayPath,
-                line:        $scope->line,
+                line:        $scope->anchorLine(),
                 severity:    Severity::Advisory,
                 pillar:      Pillar::TestQuality,
                 tier:        RuleTier::V01,

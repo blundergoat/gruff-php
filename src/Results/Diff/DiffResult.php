@@ -5,27 +5,26 @@ declare(strict_types=1);
 namespace GruffPhp\Results\Diff;
 
 /**
- * The verdict on what a diff-scoped run should judge: the files and line ranges the user actually
- * changed, keyed by the path shown in reports. The analyser builds one of these whenever a run is
- * narrowed to a diff (say `gruff-php analyse --diff main`), and downstream filters read it to drop
- * findings that fall outside those edits so the user only sees issues in code they touched. When
- * the user runs a plain whole-project scan instead, `inactive()` stands in and tells those same
- * filters to keep every finding. Alongside the changed set it carries the plain-English status
- * line shown to the user and, once filtering has run, how many findings the narrowing hid.
+ * Carries changed paths, line ranges, and status metadata for diff-scoped analysis.
+ * Paths use the display spelling consumed by finding filters and report serialization.
+ * An inactive result tells the filter to keep every finding.
+ *
+ * A missing or empty range list leaves a changed file unrestricted by line.
+ * The optional suppressed count is attached after filtering and omitted from output while null.
  */
 final readonly class DiffResult
 {
     /**
-     * Records exactly what a diff-scoped run should judge, so every later stage reads one shared
-     * source of truth for which of the user's edits are in play.
+     * Records the changed set and filtering metadata shared by later stages.
+     * Active results identify the user's edits in scope; inactive results preserve every finding.
      *
-     * @param bool                                  $active - Whether diff filtering is on; false means score the whole project and keep every finding.
-     * @param string                                $mode - How the changed set was derived (for example `stdin`, `explicit-ranges`, or `base-ref`), echoed back to the user in reports.
-     * @param string|null                           $base - Base ref the diff was taken against; set only for `base-ref` mode. Null for the local staged/unstaged/working-tree, stdin, and explicit-ranges modes (none name a ref) and for an inactive whole-project run.
-     * @param array<string, list<ChangedLineRange>> $changedLines - Changed line ranges keyed by display path; empty when nothing was narrowed, which leaves whole files in scope.
-     * @param list<string>                          $changedFiles - Display paths the user touched; empty means no file was marked changed - but on an active diff (a clean working tree, say) filtering still runs. A full-project run is `$active` being false, not this list being empty.
-     * @param string                                $message - Plain-English status line shown to the user, explaining why diff mode is on or off.
-     * @param int|null                              $suppressedCount - How many findings the changed-region filter hid; null until filtering has run, so the report omits the suppressed tally.
+     * @param bool $active - Whether filtering is enabled; false preserves all findings.
+     * @param string $mode - Source of the changed set, such as `stdin`, `explicit-ranges`, or `base-ref`.
+     * @param string|null $base - Base ref for `base-ref` mode; null for local, stdin, explicit-range, or inactive results.
+     * @param array<string, list<ChangedLineRange>> $changedLines - Ranges by display path; empty ranges leave listed files unrestricted.
+     * @param list<string> $changedFiles - Display paths in scope; an empty list in an active result excludes every finding.
+     * @param string $message - Status text explaining the selected diff mode.
+     * @param int|null $suppressedCount - Number filtered out; null omits the tally from serialization.
      */
     public function __construct(
         public bool    $active,
@@ -39,11 +38,10 @@ final readonly class DiffResult
     }
 
     /**
-     * Stands in for "the user asked for an ordinary whole-project scan, not a diff", so scoring runs
-     * over everything. Reach for it wherever a `DiffResult` is required but no diff was requested.
+     * Represents an ordinary whole-project scan with diff filtering disabled.
+     * Use it wherever a DiffResult is required but no diff was requested.
      *
-     * @return self - Inactive result (active=false) with empty changed-file/line sets; downstream filters read
-     *   this as "keep every finding", not "nothing changed".
+     * @return self - Inactive result with empty changed sets; filters still preserve every finding.
      */
     public static function inactive(): self
     {
@@ -55,9 +53,8 @@ final readonly class DiffResult
     /**
      * Returns a copy of this result with the "how many findings were hidden" tally attached - called
      * once changed-region filtering knows that number, so the report can tell the user what it dropped.
-     * Needed because the object is readonly, so the count can only be added by making a new one.
      *
-     * @param int $suppressedCount - Count of findings the diff filter excluded because they sat outside the user's changed lines.
+     * @param int $suppressedCount - Count of findings excluded by the selected diff scope.
      *
      * @return self - The same diff metadata plus the suppressed count, ready for report serialisation.
      */
@@ -75,18 +72,16 @@ final readonly class DiffResult
     }
 
     /**
-     * Answers "which lines did the user change in this file?" - called per file while filtering, so a
-     * finding can be kept when it lands on a changed line and dropped when it falls outside the edit.
+     * Looks up changed-line ranges for one display path without testing changed-file membership.
      *
      * @param string $filePath - Display path to look up, exactly as it appears in reports.
      *
-     * @return list<ChangedLineRange> - Changed ranges for that path; an empty list when the path has no entry,
-     *   which callers read as "whole file in scope" rather than an error.
+     * @return list<ChangedLineRange> - Stored ranges, or an empty list for an absent path; this does not imply that the file changed.
      */
     public function rangesFor(string $filePath): array
     {
-        // A path with no entry is an expected miss, not an error: a file the diff never recorded has no
-        // restricted ranges, so returning empty lets callers treat the whole file as in-scope, not skipped.
+
+
         return $this->changedLines[$filePath] ?? [];
     }
 
@@ -108,8 +103,8 @@ final readonly class DiffResult
     {
         $files = [];
 
-        // Turn every changed file into a path-plus-ranges record - the per-file detail a reader or
-        // editor expands to see exactly which lines the user's diff touched.
+
+
         foreach ($this->changedFiles as $filePath) {
             $files[] = [
                 'file'   => $filePath,

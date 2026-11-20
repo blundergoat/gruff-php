@@ -5,25 +5,21 @@ declare(strict_types=1);
 namespace GruffPhp\Results\Diff;
 
 /**
- * Turns raw `git diff` text into the two things diff-scoped analysis needs: the list of
- * changed files and, per file, the exact added-line ranges. This is the engine behind
- * gruff-php's "review only what I touched" modes - a bare `gruff-php analyse --diff`, a
- * `--diff=<ref>` branch comparison, a piped `--diff=-` patch on stdin, or the `hook`
- * command. Downstream, that lets findings be narrowed to the lines the user actually edited
- * instead of flooding them with pre-existing issues across the whole tree. It maps each hunk to
- * the lines it changed on the new side and the files it names - deletions included.
+ * Parses unified diff text into changed paths and new-side line ranges for diff-scoped analysis.
+ * File and rename headers register paths; additions and delete-only hunk anchors contribute ranges.
+ * Whole-file deletions keep the old path with an empty range list.
+ *
+ * The resulting scope describes patch locations rather than when findings were introduced.
  */
 final readonly class UnifiedDiffParser
 {
     /**
-     * Walks a unified diff line by line and reports which files changed and which new-file lines
-     * were added - the raw material every `--diff` run uses to focus findings on the user's edits
-     * rather than the whole codebase.
+     * Collects changed paths and new-side ranges from unified diff text.
+     * Additions and delete-only hunk anchors contribute ranges; whole-file deletions keep an empty range list.
      *
-     * @param string $diff - Raw `git diff` output; only added-line hunks contribute to the returned ranges.
+     * @param string $diff - Unified diff text; file and rename headers can register paths without hunks.
      *
-     * @return array{files: list<string>, lines: array<string, list<ChangedLineRange>>} - changed file paths sorted ascending, plus per-file
-     *                      added-line ranges keyed by path; both empty when the diff has no qualifying hunks
+     * @return array{files: list<string>, lines: array<string, list<ChangedLineRange>>} - Sorted changed paths and their new-side ranges.
      */
     public function parse(string $diff): array
     {
@@ -159,7 +155,7 @@ final readonly class UnifiedDiffParser
      * @param list<string>                          $changedFiles - Changed files collected so far.
      * @param array<string, list<ChangedLineRange>> $changedLines - Changed ranges keyed by file.
      *
-     * @return bool - true when the line was a rename header and the caller should skip to the next line; false hands it to the next matcher.
+     * @return bool - True for a consumed rename header; false leaves the line for another handler.
      */
     private function hasConsumedRenameHeader(string $line, array &$changedFiles, array &$changedLines): bool
     {
@@ -181,16 +177,16 @@ final readonly class UnifiedDiffParser
     }
 
     /**
-     * Handles an `@@ ... @@` hunk header, reading where in the new file the coming additions land so
-     * each added line can be pinned to a real line number the user can jump straight to.
+     * Starts new-side line tracking for a hunk or records its delete-only anchor.
+     * Whole-file deletions leave line tracking disabled because they have no new-side lines.
      *
-     * @param string                                $line - Diff line under inspection this iteration.
-     * @param string|null                           $currentFile - Active destination path; null when no file header has been seen yet, so there is nothing to attach a hunk to.
-     * @param bool                                  $isCurrentFileDeleted - Whether the active destination is `/dev/null`, a deleted file with no new-side lines.
-     * @param int|null                              $currentNewLine - Set to the hunk's first new-file line; null for a deleted file, where no new lines exist to count.
-     * @param array<string, list<ChangedLineRange>> $changedLines - Changed ranges keyed by file.
+     * @param string $line - Candidate hunk header.
+     * @param string|null $currentFile - Active changed-file path; null prevents the header from being consumed.
+     * @param bool $isCurrentFileDeleted - Whether the active file was deleted, disabling new-side line tracking.
+     * @param int|null $currentNewLine - Receives the new-side start, or null for a deleted file or zero-length new side.
+     * @param array<string, list<ChangedLineRange>> $changedLines - Receives an anchor for a non-deleted file's zero-length new side.
      *
-     * @return bool - true when the line was a hunk header and the caller should skip to the next line; false hands it to the body consumer.
+     * @return bool - True for a recognized hunk header with a current path; false otherwise.
      */
     private function hasConsumedHunkHeader(
         string $line,
@@ -215,8 +211,8 @@ final readonly class UnifiedDiffParser
         $currentNewLine = $isCurrentFileDeleted ? null : (int)$matches[1];
         $length         = isset($matches[2]) ? (int)$matches[2] : 1;
 
-        // A zero-length new side (`+c,0`) is a delete-only hunk; git still points at the line the removal
-        // sits before, so record that single line and stop counting - there are no additions to follow.
+        // A zero-length new side has no added lines; use its reported offset, clamped to line 1, as the change anchor.
+
         if (!$isCurrentFileDeleted && $length === 0) {
             $changedLines[$currentFile] = $this->appendChangedLine($changedLines[$currentFile], max(1, (int)$matches[1]));
             $currentNewLine = null;
@@ -229,12 +225,12 @@ final readonly class UnifiedDiffParser
      * Handles the context, `+`, and `-` lines inside a hunk, advancing the new-file line counter and
      * recording every added line as part of the user's changed region.
      *
-     * @param string                                $line - Diff hunk body line.
-     * @param string|null                           $currentFile - Active destination path; null when we are between files with nothing to attribute a line to.
-     * @param int|null                              $currentNewLine - Current new-file line; null when no hunk is active (or the file is deleted), so the line is ignored.
+     * @param string $line - Diff hunk body line.
+     * @param string|null $currentFile - Active destination path; null leaves the line unprocessed.
+     * @param int|null $currentNewLine - Current new-side line; null disables body-line processing.
      * @param array<string, list<ChangedLineRange>> $changedLines - Changed ranges keyed by file.
      *
-     * @return void - nothing is returned; the caller's range map is updated in place by reference.
+     * @return void - Updates the caller's range map and new-side line counter in place.
      */
     private function consumeHunkBodyLine(string $line, ?string $currentFile, ?int &$currentNewLine, array &$changedLines): void
     {
@@ -244,7 +240,7 @@ final readonly class UnifiedDiffParser
             return;
         }
 
-        // A `+` line is an addition - the heart of what diff mode reviews - so record it and step the counter on.
+
         if (str_starts_with($line, '+')) {
             $changedLines[$currentFile] = $this->appendChangedLine($changedLines[$currentFile], $currentNewLine);
             $currentNewLine++;
@@ -263,11 +259,11 @@ final readonly class UnifiedDiffParser
      * Registers a changed path exactly once and opens an empty range bucket for it, so every file the
      * user touched appears a single time in the changed set no matter how many headers mention it.
      *
-     * @param string|null                           $filePath - Project-relative changed path; null when the header resolved to `/dev/null` and there is no real file to track.
-     * @param list<string>                          $changedFiles - Changed files collected so far.
+     * @param string|null $filePath - Parsed changed path; null leaves both collections unchanged.
+     * @param list<string> $changedFiles - Changed files collected so far.
      * @param array<string, list<ChangedLineRange>> $changedLines - Changed ranges keyed by file.
      *
-     * @return void - nothing is returned; the caller's file list and range map are updated in place by reference.
+     * @return void - Adds a new path and empty range bucket in place; existing paths retain their ranges.
      */
     private function appendChangedFile(?string $filePath, array &$changedFiles, array &$changedLines): void
     {
@@ -297,31 +293,31 @@ final readonly class UnifiedDiffParser
         // empty list (lastIndex below zero) has no range to merge with and falls through to open a new one.
         if ($lastIndex >= 0) {
             $lastRange = $ranges[$lastIndex];
-            // The line already falls within the open range, so there is nothing to add.
+
             if ($line >= $lastRange->startLine && $line <= $lastRange->endLine) {
                 return $ranges;
             }
 
-            // The line sits directly after the open range, so stretch that range by one instead of starting a new row.
+
             if ($line === $lastRange->endLine + 1) {
                 $ranges[$lastIndex] = new ChangedLineRange($lastRange->startLine, $line);
                 return array_values($ranges);
             }
         }
 
-        // A gap from the previous range - or the very first added line - opens a fresh single-line range.
+
         $ranges[] = new ChangedLineRange($line, $line);
 
         return $ranges;
     }
 
     /**
-     * Pulls the project-relative path out of a `+++ ` header, stripping git's `b/` prefix, so findings
-     * report the file the way the user sees it in their working tree.
+     * Extracts the destination path from a `+++ ` header, removing a leading `b/`.
+     * `/dev/null` denotes a deleted file and yields null.
      *
-     * @param string $line - A `+++ ` header line; its `b/` prefix is stripped to a project-relative path.
+     * @param string $line - A `+++ ` header line to decode.
      *
-     * @return string|null - project-relative destination path, or null when the header points at /dev/null (a deleted file)
+     * @return string|null - Decoded destination path without a leading `b/`, or null for `/dev/null`.
      */
     private function parseNewFilePath(string $line): ?string
     {
@@ -332,7 +328,7 @@ final readonly class UnifiedDiffParser
             return null;
         }
 
-        // Strip git's `b/` new-side prefix to recover the path as it lives in the repo.
+
         if (str_starts_with($rawPath, 'b/')) {
             return substr($rawPath, 2);
         }
@@ -341,12 +337,12 @@ final readonly class UnifiedDiffParser
     }
 
     /**
-     * Pulls the project-relative path out of a `--- ` header, stripping git's `a/` prefix, so a deletion
-     * or rename can still be reported against the file's original name.
+     * Extracts the source path from a `--- ` header, removing a leading `a/`.
+     * `/dev/null` denotes a newly added file and yields null.
      *
-     * @param string $line - A `--- ` header line; its `a/` prefix is stripped to a project-relative path.
+     * @param string $line - A `--- ` header line to decode.
      *
-     * @return string|null - project-relative source path, or null when the header points at /dev/null (a newly added file)
+     * @return string|null - Decoded source path without a leading `a/`, or null for `/dev/null`.
      */
     private function parseOldFilePath(string $line): ?string
     {
@@ -357,7 +353,7 @@ final readonly class UnifiedDiffParser
             return null;
         }
 
-        // Strip git's `a/` old-side prefix so the deletion or rename is reported against the real path.
+
         if (str_starts_with($rawPath, 'a/')) {
             return substr($rawPath, 2);
         }
@@ -368,11 +364,11 @@ final readonly class UnifiedDiffParser
     /**
      * Cleans up the raw path slice from a diff header so the rest of the parser gets a plain path: it
      * decodes git's C-quoted form (used for non-ASCII names under `core.quotePath`) and strips any
-     * trailing tab-separated metadata some patch tools append. Every header parser here leans on it.
+     * trailing tab-separated metadata some patch tools append. Each file-path header parser here uses it.
      *
      * @param string $rawPath - Path slice from a diff header, still possibly C-quoted or tab-suffixed.
      *
-     * @return string - the path with any trailing tab-metadata removed and git C-quoting decoded, ready to use as a project-relative path
+     * @return string - Header path with tab metadata removed and surrounding C-quotes decoded; prefixes and absolute paths remain.
      */
     private function normaliseHeaderPath(string $rawPath): string
     {

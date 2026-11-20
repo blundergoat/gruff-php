@@ -8,15 +8,16 @@ use GruffPhp\Cli\Dashboard\DashboardScanCommandBuilder;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers dashboard scan command building: dash-prefixed and quoted path token preservation, owned-option separation, and prevention of option-like
- * paths reaching the argument vector.
+ * Covers parsing of dashboard paths and construction of scan arguments.
+ * Checks quoted path text and placement of supplied paths after --.
+ * Verifies the fail-on value and forwarding of the deep-scan-budget override.
  */
 final class DashboardScanCommandBuilderTest extends TestCase
 {
     /**
-     * Verify parse paths preserves dash-prefixed and quoted path entries.
+     * Verify that parsing preserves dash-prefixed and quoted path entries.
      *
-     * @return void
+     * @return void - Asserts that parsing preserves dash-prefixed operands and keeps quoted words in one path.
      */
     public function testDashboardPathTokensPreserveDashPrefixedAndQuotedEntries(): void
     {
@@ -30,7 +31,7 @@ final class DashboardScanCommandBuilderTest extends TestCase
     /**
      * Verify quoted Windows paths keep literal backslashes.
      *
-     * @return void
+     * @return void - Asserts preserved Windows separators for both encodings and literal quotes in the quoted-name case.
      */
     public function testDashboardPathTokensPreserveQuotedBackslashes(): void
     {
@@ -44,7 +45,7 @@ final class DashboardScanCommandBuilderTest extends TestCase
     /**
      * Verify analyse command separates owned options from user paths.
      *
-     * @return void
+     * @return void - Asserts the path suffix follows -- and the command contains the fixed fail-on option and value.
      */
     public function testAnalyseCommandSeparatesOwnedOptionsFromUserPaths(): void
     {
@@ -59,9 +60,9 @@ final class DashboardScanCommandBuilderTest extends TestCase
     }
 
     /**
-     * Verify option like path cannot reach produced argument vector.
+     * Verify option-like paths appear after -- in the produced argument vector.
      *
-     * @return void
+     * @return void - Asserts that option-like paths are preserved after -- in the produced argument vector.
      */
     public function testOptionLikePathCannotReachProducedArgumentVector(): void
     {
@@ -75,26 +76,44 @@ final class DashboardScanCommandBuilderTest extends TestCase
     }
 
     /**
+     * Verify the deep-scan-budget value appears before the path separator.
+     *
+     * @return void - Asserts that --deep-scan-budget has value 'off' and occurs before --.
+     */
+    public function testAnalyseCommandForwardsDeepScanBudget(): void
+    {
+        $state                   = $this->state();
+        $state['deepScanBudget'] = 'off';
+        $command                 = (new DashboardScanCommandBuilder('/tmp/gruff'))->analyseCommand(['src'], $state);
+        $optionIndex             = array_search('--deep-scan-budget', $command, true);
+        $separatorIndex          = array_search('--', $command, true);
+
+        self::assertIsInt($optionIndex);
+        self::assertIsInt($separatorIndex);
+        self::assertSame('off', $command[$optionIndex + 1]);
+        self::assertLessThan($separatorIndex, $optionIndex);
+    }
+
+    /**
      * Build the dashboard scan state used by command-builder tests.
      *
      * @return array{project: string, paths: string, scanScope: string, failOn: string, config: string, baseline: string, noBaseline: string,
-     *                        noConfig: string, includeIgnored: string, reportInteractive: string} - a fully-populated valid scan state fixture; flag
-     *                        fields ('noBaseline', 'noConfig', 'includeIgnored', 'reportInteractive') use '0'/'1' string toggles and 'baseline' is
-     *                        empty when no baseline applies
+     *                        noConfig: string, deepScanBudget: string, includeIgnored: string, reportInteractive: string} - Command-builder inputs.
      */
     private function state(): array
     {
-        // Canonical valid scan state the builder turns into a command line.
+
         return [
-            'project'           => __DIR__,
-            'paths'             => '.',
-            'scanScope'         => 'full',
-            'failOn'            => 'none',
-            'config'            => '.gruff-php.yaml',
-            'baseline'          => '',
-            'noBaseline'        => '0',
-            'noConfig'          => '0',
-            'includeIgnored'    => '0',
+            'project' => __DIR__,
+            'paths' => '.',
+            'scanScope' => 'full',
+            'failOn' => 'none',
+            'config' => '.gruff-php.yaml',
+            'baseline' => '',
+            'noBaseline' => '0',
+            'noConfig' => '0',
+            'deepScanBudget' => '',
+            'includeIgnored' => '0',
             'reportInteractive' => '0',
         ];
     }

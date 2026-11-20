@@ -17,7 +17,9 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers Halstead volume metrics, threshold stability, rounded finding metadata, and fractional-threshold preservation in messages.
+ * Checks Halstead metrics for methods in the cognitive complexity fixture.
+ * Asserts the default advisory threshold and rounded metadata on a selected finding.
+ * Checks that a fractional warning threshold appears unchanged in a finding message.
  */
 final class HalsteadVolumeRuleTest extends TestCase
 {
@@ -27,9 +29,9 @@ final class HalsteadVolumeRuleTest extends TestCase
     private HalsteadVolumeRule $rule;
 
     /**
-     * Prepare parser fixtures before each rule test.
+     * Give each test an independent Halstead rule and parser.
      *
-     * @return void
+     * @return void - Initializes the parser and rule properties with fresh instances.
      */
     protected function setUp(): void
     {
@@ -40,8 +42,7 @@ final class HalsteadVolumeRuleTest extends TestCase
     /**
      * Provide metrics cases for parameterized tests.
      *
-     * @return array<string, array{string, float, float, float, int, int}> - data-provider rows keyed by case label, each tuple holding the fixture
-     *                       method name and its expected volume, difficulty, effort, vocabulary, and length
+     * @return array<string, array{string, float, float, float, int, int}> - Case rows: method name, volume, difficulty, effort, vocabulary, length.
      */
     public static function metricsProvider(): array
     {
@@ -73,7 +74,7 @@ final class HalsteadVolumeRuleTest extends TestCase
      * @param int    $expectedVocabulary - Expected vocabulary count.
      * @param int    $expectedLength - Expected token length.
      *
-     * @return void
+     * @return void - Asserts volume, difficulty and effort within tolerance, plus exact vocabulary and length counts.
      */
     #[DataProvider('metricsProvider')]
     public function testHalsteadMetricsMatchExpected(
@@ -96,7 +97,7 @@ final class HalsteadVolumeRuleTest extends TestCase
     /**
      * Verify default Halstead thresholds stay stable.
      *
-     * @return void
+     * @return void - Asserts an empty default threshold map and an advisory severity threshold of 8000.
      */
     public function testDefinitionThresholdsAreStable(): void
     {
@@ -109,9 +110,9 @@ final class HalsteadVolumeRuleTest extends TestCase
     }
 
     /**
-     * Verify findings include rounded metric metadata.
+     * Verify rounded metrics and threshold metadata on the selected deeplyNested finding.
      *
-     * @return void
+     * @return void - Asserts rounded metrics, exact vocabulary and length, and error threshold metadata.
      */
     public function testFindingsIncludeRoundedMetricMetadata(): void
     {
@@ -134,9 +135,9 @@ final class HalsteadVolumeRuleTest extends TestCase
     }
 
     /**
-     * Verify fractional threshold values are preserved in messages.
+     * Verify the oneIf finding retains the fractional warning threshold in its message.
      *
-     * @return void
+     * @return void - Asserts the selected finding exists and its message includes the warning threshold 10.5.
      */
     public function testFractionalThresholdIsPreservedInMessage(): void
     {
@@ -153,9 +154,9 @@ final class HalsteadVolumeRuleTest extends TestCase
     /**
      * Analyse the cognitive fixture with custom Halstead thresholds.
      *
-     * @param array<string, int|float> $thresholds - Rule thresholds.
+     * @param array<string, int|float> $thresholds - Warning and error volume cutoffs applied to the cognitive fixture.
      *
-     * @return list<\GruffPhp\Results\Finding\Finding> - findings the rule emitted for the fixture under the given thresholds; empty when nothing breached
+     * @return list<\GruffPhp\Results\Finding\Finding> - Findings for volume threshold breaches; empty when no volume exceeds a cutoff.
      */
     private function analyse(array $thresholds): array
     {
@@ -182,7 +183,7 @@ final class HalsteadVolumeRuleTest extends TestCase
 
         foreach ($nodeFinder->findInstanceOf($this->parseFixture()->statements, ClassMethod::class) as $method) {
             if ($method->name->toString() === $methodName) {
-                // Fixture method names are unique, so the first match is the node under test; stop scanning here.
+                // Fixture method names are unique, so the first match is the node under test.
                 return $method;
             }
         }

@@ -6,77 +6,28 @@ namespace GruffPhp\Tests\Rule\Naming;
 
 use GruffPhp\Engine\Config\AnalysisConfig;
 use GruffPhp\Engine\Config\RuleSettings;
-use GruffPhp\Results\Finding\RemediationAction;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\PhpFileParser;
-use GruffPhp\Rules\Naming\BooleanPrefixRule;
 use GruffPhp\Rules\Naming\ClassFileMismatchRule;
 use GruffPhp\Rules\Naming\ConfusingNameRule;
-use GruffPhp\Rules\Naming\GenericMethodNameRule;
-use GruffPhp\Rules\Naming\HungarianNotationRule;
 use GruffPhp\Rules\Naming\IdentifierQualityRule;
 use GruffPhp\Rules\Naming\ShortVariableRule;
-use GruffPhp\Rules\Naming\SuffixHungarianRule;
 use GruffPhp\Rules\Naming\TestNamingConsistencyRule;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\RuleRegistry;
 use GruffPhp\Engine\Source\SourceFile;
 
 /**
- * Covers the naming rule pack: generic method names, single-char and Hungarian variables with sensible exemptions, boolean prefixes, class-file
- * mismatch, identifier tokenisation, and identifier quality across closures and arrow scopes.
+ * Exercises short-variable, confusing-name, test-naming, class/file, and identifier-quality rules through parsed fixtures.
+ * Checks reported names, exclusions, metadata, remediation, and configurable loop-body thresholds.
+ * Includes closure and arrow-function attribution checks alongside fixture-analysis helpers.
  */
 final class NamingRulesTest extends NamingRuleTestCase
 {
     /**
-     * Verify generic method names detected.
+     * Ordinary single-character variables remain reportable by the short-variable rule.
      *
-     * @return void
-     */
-    public function testGenericMethodNamesDetected(): void
-    {
-        $findings = $this->analyseRule('generic-method.php', GenericMethodNameRule::ID);
-
-        self::assertCount(6, $findings);
-
-        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
-        self::assertContains('GenericMethodFixture::process()', $symbols);
-        self::assertContains('GenericMethodFixture::handle()', $symbols);
-        self::assertContains('GenericMethodFixture::execute()', $symbols);
-    }
-
-    /**
-     * Verify qualified method names not flagged.
-     *
-     * @return void
-     */
-    public function testQualifiedMethodNamesNotFlagged(): void
-    {
-        $findings = $this->analyseRule('generic-method.php', GenericMethodNameRule::ID);
-
-        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
-        self::assertNotContains('GenericMethodFixture::processPayment()', $symbols);
-        self::assertNotContains('GenericMethodFixture::handleRequest()', $symbols);
-        self::assertNotContains('GenericMethodFixture::calculateTotal()', $symbols);
-    }
-
-    /**
-     * Verify symfony console execute override not flagged.
-     *
-     * @return void
-     */
-    public function testSymfonyConsoleExecuteOverrideNotFlagged(): void
-    {
-        $findings = $this->analyseRule('generic-method.php', GenericMethodNameRule::ID);
-
-        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
-        self::assertNotContains('FrameworkOverrideFixture::execute()', $symbols);
-    }
-
-    /**
-     * Verify single char variables detected.
-     *
-     * @return void
+     * @return void - Asserts that x and a appear among reported variables.
      */
     public function testSingleCharVariablesDetected(): void
     {
@@ -88,9 +39,9 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
-     * Verify loop counters excluded.
+     * Loop-counter variables remain exempt from short-variable findings.
      *
-     * @return void
+     * @return void - Asserts that i and j are absent from reported variables.
      */
     public function testLoopCountersExcluded(): void
     {
@@ -102,9 +53,9 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
-     * Verify catch variable excluded.
+     * Catch variables remain exempt from short-variable findings.
      *
-     * @return void
+     * @return void - Asserts that e is absent from reported variables.
      */
     public function testCatchVariableExcluded(): void
     {
@@ -115,145 +66,9 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
-     * Verify boolean prefix missing.
+     * Standalone Helper and Util class names produce confusing-name findings.
      *
-     * @return void
-     */
-    public function testBooleanPrefixMissing(): void
-    {
-        $findings = $this->analyseRule('boolean-prefix.php', BooleanPrefixRule::ID);
-        $symbols  = array_map(static fn($finding) => $finding->symbol, $findings);
-        $actions  = array_values(array_unique(array_map(
-            static fn($finding): string => is_string($finding->metadata['remediationAction'] ?? null)
-                ? $finding->metadata['remediationAction']
-                : '',
-            $findings,
-        )));
-        $configurationKeys = array_values(array_unique(array_map(
-            static fn($finding): string => is_string($finding->metadata['configurationKey'] ?? null)
-                ? $finding->metadata['configurationKey']
-                : '',
-            $findings,
-        )));
-
-        self::assertNotSame([], $findings);
-        self::assertContains('BooleanPrefixFixture::active()', $symbols);
-        self::assertContains('BooleanPrefixFixture::enabled()', $symbols);
-        self::assertContains('BooleanPrefixFixture::status()', $symbols);
-        self::assertContains('BooleanPrefixFixture::check()', $symbols);
-        self::assertContains('BooleanPrefixFixture::didRun()', $symbols);
-        // A prefix followed by a lowercase letter is no word boundary, so these still flag.
-        self::assertContains('BooleanPrefixFixture::hasty()', $symbols);
-        self::assertContains('BooleanPrefixFixture::isolate()', $symbols);
-        self::assertContains('BooleanStateVocabularyFixture::valid()', $symbols);
-        self::assertContains('BooleanStateVocabularyFixture::available()', $symbols);
-        self::assertContains('BooleanStateVocabularyFixture::resolved()', $symbols);
-        self::assertContains('BooleanStateVocabularyFixture::printable()', $symbols);
-        self::assertContains('BooleanStateVocabularyFixture::unrequested()', $symbols);
-        self::assertContains('BooleanStateVocabularyFixture::assistantRequirementsContext()', $symbols);
-        self::assertContains('BooleanStateVocabularyFixture::assistantIntentRequires()', $symbols);
-        self::assertContains('printable()', $symbols);
-
-        self::assertSame([RemediationAction::Consider->value], $actions);
-        self::assertSame(
-            ['rules.naming.boolean-prefix.options.acceptedBooleanNames'],
-            $configurationKeys,
-        );
-    }
-
-    /**
-     * Verify good boolean prefix not flagged.
-     *
-     * @return void
-     */
-    public function testGoodBooleanPrefixNotFlagged(): void
-    {
-        $findings = $this->analyseRule('boolean-prefix.php', BooleanPrefixRule::ID);
-
-        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
-        self::assertNotContains('BooleanPrefixFixture::isActive()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::hasPermission()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::canEdit()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::wasReady()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::containsValue()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::looksLikeTestFile()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::matchesPattern()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::supportsFeature()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::allowsGuestAccess()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::requiresReview()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::usesCache()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::acceptsPayload()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::permitsRetry()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::includesArchivedRows()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::excludesInactivePatients()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::enablesPracticeAssistant()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::disablesLegacyFallback()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::supportsSelectedAnswerScope()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::requiresCreditPurchaseAccess()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::usesCodeOwnedAnswer()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::matchesPrompt()', $symbols);
-        // An underscore after the prefix is a snake_case word boundary, so these read as predicates.
-        self::assertNotContains('BooleanPrefixFixture::has_note_been_actioned()', $symbols);
-        self::assertNotContains('BooleanPrefixFixture::is_valid_state()', $symbols);
-        self::assertNotContains('BooleanStateVocabularyFixture::paymentRequested()', $symbols);
-        self::assertNotContains('BooleanStateVocabularyFixture::printableTodayScheduleRequested()', $symbols);
-        self::assertNotContains('BooleanStateVocabularyFixture::scheduleLinkEnabled()', $symbols);
-        self::assertNotContains('BooleanStateVocabularyFixture::readOnlyScheduleAllowed()', $symbols);
-        self::assertNotContains('BooleanStateVocabularyFixture::declineCodeExplanationRequested()', $symbols);
-        self::assertNotContains('BooleanStateVocabularyFixture::assistantIntentRequiresContext()', $symbols);
-        self::assertNotContains('report_requested()', $symbols);
-        self::assertNotContains('assistant_intent_requires_context()', $symbols);
-    }
-
-    /**
-     * Verify non bool method not flagged.
-     *
-     * @return void
-     */
-    public function testNonBoolMethodNotFlagged(): void
-    {
-        $findings = $this->analyseRule('boolean-prefix.php', BooleanPrefixRule::ID);
-
-        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
-        self::assertNotContains('BooleanPrefixFixture::getName()', $symbols);
-    }
-
-    /**
-     * Verify hungarian notation detected.
-     *
-     * @return void
-     */
-    public function testHungarianNotationDetected(): void
-    {
-        $findings = $this->analyseRule('hungarian.php', HungarianNotationRule::ID);
-
-        $vars = array_map(static fn($finding) => $finding->metadata['variable'] ?? null, $findings);
-        self::assertContains('strName', $vars);
-        self::assertContains('arrItems', $vars);
-        self::assertContains('intCount', $vars);
-        self::assertContains('boolReady', $vars);
-        self::assertContains('objUser', $vars);
-    }
-
-    /**
-     * Verify clean variables not flagged as hungarian.
-     *
-     * @return void
-     */
-    public function testCleanVariablesNotFlaggedAsHungarian(): void
-    {
-        $findings = $this->analyseRule('hungarian.php', HungarianNotationRule::ID);
-
-        $vars = array_map(static fn($finding) => $finding->metadata['variable'] ?? null, $findings);
-        self::assertNotContains('name', $vars);
-        self::assertNotContains('items', $vars);
-        self::assertNotContains('strategy', $vars);
-    }
-
-    /**
-     * Verify confusing standalone class names.
-     *
-     * @return void
+     * @return void - Asserts that Helper and Util appear among reported symbols.
      */
     public function testConfusingStandaloneClassNames(): void
     {
@@ -265,9 +80,9 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
-     * Verify domain specific class names not flagged.
+     * Domain-specific UserService and OrderRepository class names remain exempt.
      *
-     * @return void
+     * @return void - Asserts that UserService and OrderRepository are absent from reported symbols.
      */
     public function testDomainSpecificClassNamesNotFlagged(): void
     {
@@ -279,9 +94,9 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
-     * Verify mixed test naming detected.
+     * Mixing test-method naming styles produces one fixture-level consistency finding.
      *
-     * @return void
+     * @return void - Asserts one finding with symbol MixedTestNamingFixture.
      */
     public function testMixedTestNamingDetected(): void
     {
@@ -292,9 +107,9 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
-     * Verify consistent test naming not flagged.
+     * The consistently named fixture remains exempt when its file also contains mixed test naming.
      *
-     * @return void
+     * @return void - Asserts that ConsistentTestNamingFixture is absent from reported symbols.
      */
     public function testConsistentTestNamingNotFlagged(): void
     {
@@ -305,9 +120,9 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
-     * Verify class file mismatch.
+     * The lowercase clean.php fixture receives file-rename-only remediation for its class mismatch.
      *
-     * @return void
+     * @return void - Asserts one CleanNamingFixture finding with a file-rename-only remediation.
      */
     public function testClassFileMismatch(): void
     {
@@ -315,12 +130,32 @@ final class NamingRulesTest extends NamingRuleTestCase
 
         self::assertCount(1, $findings);
         self::assertSame('CleanNamingFixture', $findings[0]->symbol);
+        // The rule offers a class rename only for an uppercase-first alphanumeric stem.
+        self::assertSame('Rename the file to CleanNamingFixture.php so it matches the class it declares.', $findings[0]->remediation);
     }
 
     /**
-     * Verify class file mismatch skips non classlike config filenames.
+     * Check rename advice for Widget.php and gadget_widget.php against the Gadget class.
      *
-     * @return void
+     * @return void - Asserts a class-rename alternative for Widget.php and file-rename-only advice for gadget_widget.php.
+     */
+    public function testClassFileMismatchOffersClassRenameOnlyForStudlyCapsStem(): void
+    {
+        $source = "<?php\n\nfinal class Gadget\n{\n}\n";
+
+        $studly = $this->analyseSourceRule($source, ClassFileMismatchRule::ID, 'src/Widget.php');
+        $snake  = $this->analyseSourceRule($source, ClassFileMismatchRule::ID, 'src/gadget_widget.php');
+
+        self::assertCount(1, $studly);
+        self::assertSame('Rename the file to Gadget.php or the class to Widget.', $studly[0]->remediation);
+        self::assertCount(1, $snake);
+        self::assertSame('Rename the file to Gadget.php so it matches the class it declares.', $snake[0]->remediation);
+    }
+
+    /**
+     * Check class/file mismatch handling for the PHP-CS-Fixer configuration file.
+     *
+     * @return void - Asserts no class/file mismatch findings for .php-cs-fixer.dist.php.
      */
     public function testClassFileMismatchSkipsNonClasslikeConfigFilenames(): void
     {
@@ -344,7 +179,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     /**
      * Verify identifier quality finds placeholder generic and numbered names.
      *
-     * @return void
+     * @return void - Asserts the listed name variants, string metadata fields, and shared remediation text.
      */
     public function testIdentifierQualityFindsPlaceholderGenericAndNumberedNames(): void
     {
@@ -374,12 +209,17 @@ final class NamingRulesTest extends NamingRuleTestCase
         self::assertSame('placeholder', $reported['function:bar'] ?? null);
         self::assertSame('placeholder', $reported['parameter:obj'] ?? null);
         self::assertSame('placeholder', $reported['variable:tmp'] ?? null);
+        // placeholderNames and genericTokens list what the rule reports, so the advice points an intentional name at ignoredNames.
+        self::assertSame(
+            ['Rename the identifier to describe its domain role or action. If the name is intentional, add it to `rules.naming.identifier-quality.options.ignoredNames` in `.gruff-php.yaml`, or remove the token from `placeholderNames` or `genericTokens` when your project does not treat it as a placeholder.'],
+            array_values(array_unique(array_map(static fn($finding): ?string => $finding->remediation, $findings))),
+        );
     }
 
     /**
      * Verify identifier quality exempts common noise sources.
      *
-     * @return void
+     * @return void - Asserts that each named exclusion is absent from identifierName metadata.
      */
     public function testIdentifierQualityExemptsCommonNoiseSources(): void
     {
@@ -396,9 +236,9 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
-     * Verify identifier quality skips the lone parameter of single-arg wide-typed non-void helpers.
+     * Verify generic parameter-name exemptions for the helper-signature fixture.
      *
-     * @return void
+     * @return void - Asserts that value is omitted for stringValue and fingerprint but reported for tag, transform, and describe.
      */
     public function testIdentifierQualitySkipsGenericByPurposeHelpers(): void
     {
@@ -413,7 +253,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
-     * Build `symbol|identifier` rows for identifier-quality findings with a reported name.
+     * Build pipe-delimited symbol and identifier rows for identifier-quality findings with a reported name.
      *
      * @param list<\GruffPhp\Results\Finding\Finding> $findings - Identifier-quality findings from a fixture.
      *
@@ -435,9 +275,9 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
-     * Verify identifier quality metadata is specific.
+     * Check metadata for the first reported item identifier.
      *
-     * @return void
+     * @return void - Asserts variable/generic classification, item tokens and matched token, and advisory severity.
      */
     public function testIdentifierQualityMetadataIsSpecific(): void
     {
@@ -456,9 +296,9 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
-     * Verify generic foreach variables report only once the configured body threshold is reached.
+     * Check loop-variable reports at body thresholds of four and five statements.
      *
-     * @return void
+     * @return void - Asserts long-loop item and row reports at 4 but not 5, plus short-loop and map exclusions at 4.
      */
     public function testIdentifierQualityFlagsGenericLoopVariablesAtConfiguredBodyThreshold(): void
     {
@@ -478,9 +318,9 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
-     * Verify closure and arrow scopes are checked without leaking into the parent method.
+     * Check selected naming findings in closure, arrow, and parent-method scopes.
      *
-     * @return void
+     * @return void - Asserts closure foo/tmp and arrow x reports, with no parent-method foo or x report.
      */
     public function testClosureAndArrowScopesAreCoveredByNamingRules(): void
     {
@@ -489,33 +329,15 @@ final class NamingRulesTest extends NamingRuleTestCase
         self::assertTrue($this->hasFinding(findings: $findings, ruleId: ShortVariableRule::ID, metadataKey: 'variable', metadataValue: 'x', symbolPrefix: 'arrow@'));
         self::assertTrue($this->hasFinding(findings: $findings, ruleId: IdentifierQualityRule::ID, metadataKey: 'identifierName', metadataValue: 'foo', symbolPrefix: 'closure@'));
         self::assertTrue($this->hasFinding(findings: $findings, ruleId: IdentifierQualityRule::ID, metadataKey: 'identifierName', metadataValue: 'tmp', symbolPrefix: 'closure@'));
-        self::assertTrue($this->hasFinding(findings: $findings, ruleId: HungarianNotationRule::ID, metadataKey: 'variable', metadataValue: 'strName', symbolPrefix: 'closure@'));
-        self::assertTrue($this->hasFinding(findings: $findings, ruleId: BooleanPrefixRule::ID, metadataKey: 'identifierName', metadataValue: 'changedOnly', symbolPrefix: 'closure@'));
 
         self::assertFalse($this->hasFinding(findings: $findings, ruleId: IdentifierQualityRule::ID, metadataKey: 'identifierName', metadataValue: 'foo', symbolPrefix: 'ClosureCoverageFixture::run()'));
         self::assertFalse($this->hasFinding(findings: $findings, ruleId: ShortVariableRule::ID, metadataKey: 'variable', metadataValue: 'x', symbolPrefix: 'ClosureCoverageFixture::run()'));
     }
 
     /**
-     * Verify suffix-Hungarian notation is detected while conversion idioms stay clear.
+     * Verify that no other naming rule reports on the clean fixture.
      *
-     * @return void
-     */
-    public function testSuffixHungarianDetectsTrailingTypeTokens(): void
-    {
-        $findings = $this->analyseRule('suffix-hungarian.php', SuffixHungarianRule::ID);
-        $names    = array_map(static fn($finding): mixed => $finding->metadata['identifierName'] ?? null, $findings);
-
-        self::assertContains('rawString', $names);
-        self::assertContains('useMap', $names);
-        self::assertNotContains('cache', $names);
-        self::assertNotContains('nameAsString', $names);
-    }
-
-    /**
-     * Verify clean fixture has no naming findings except file mismatch.
-     *
-     * @return void
+     * @return void - Asserts no naming findings remain after class/file mismatch findings are excluded.
      */
     public function testCleanFixtureHasNoNamingFindingsExceptFileMismatch(): void
     {
@@ -536,7 +358,7 @@ final class NamingRulesTest extends NamingRuleTestCase
      *
      * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options - Identifier-quality rule option overrides.
      *
-     * @return list<\GruffPhp\Results\Finding\Finding> - identifier-quality findings only, in discovery order; empty when the options suppress every report
+     * @return list<\GruffPhp\Results\Finding\Finding> - Identifier-quality findings in registry report order; empty when none survive.
      */
     private function identifierQualityFindingsWithOptions(array $options): array
     {
@@ -560,8 +382,7 @@ final class NamingRulesTest extends NamingRuleTestCase
      *
      * @param string $fixture - fixture basename under the naming fixtures dir, parsed then run through the full rule pack
      *
-     * @return list<\GruffPhp\Results\Finding\Finding> - every finding the default rule pack raises against the fixture, in discovery order; empty when the
-     *                                         fixture is clean
+     * @return list<\GruffPhp\Results\Finding\Finding> - Default-rule findings in registry report order; empty when none survive.
      */
     private function analyseFixture(string $fixture): array
     {
@@ -575,6 +396,8 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
+     * Check for a finding with the required rule, exact metadata value, and symbol prefix.
+     *
      * @param list<\GruffPhp\Results\Finding\Finding> $findings - Findings to search for a matching rule, metadata value, and symbol prefix.
      * @param string                          $ruleId - rule the finding must come from; others are skipped
      * @param string                          $metadataKey - finding metadata entry to match on, such as the reported identifier name
@@ -608,8 +431,7 @@ final class NamingRulesTest extends NamingRuleTestCase
      *
      * @param list<\GruffPhp\Results\Finding\Finding> $findings - Naming findings to group by reported variable name.
      *
-     * @return array<string, list<string>> - reported symbols bucketed by variable name; a name maps to repeated symbols when reported more than
-     *                       once, and absent keys mean that variable was never flagged
+     * @return array<string, list<string>> - Symbols by variable name, retaining duplicates; skips non-string names and null symbols.
      */
     private function reportedVariableSymbolsByName(array $findings): array
     {

@@ -9,7 +9,6 @@ use GruffPhp\Engine\Config\RuleSettings;
 use GruffPhp\Engine\Parser\PhpFileParser;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\RuleRegistry;
-use GruffPhp\Rules\Size\AverageMethodLengthRule;
 use GruffPhp\Rules\Size\ClassLengthRule;
 use GruffPhp\Rules\Size\FileLengthRule;
 use GruffPhp\Rules\Size\MethodLengthRule;
@@ -20,14 +19,16 @@ use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers co-firing of size rules on cumulative fixtures, config-override response, and silence on clean inputs.
+ * Exercises size rules together through the default registry on parsed fixtures.
+ * The cumulative fixture must include all six asserted size rule IDs and have unique finding fingerprints.
+ * Tighter thresholds must increase the total findings count; the short fixture must produce no size findings.
  */
 final class SizeIntegrationTest extends TestCase
 {
     /**
      * Verify cumulative fixture triggers multiple rules.
      *
-     * @return void
+     * @return void - Asserts all six size rule IDs, at least seven findings, and unique fingerprints.
      */
     public function testCumulativeFixtureTriggersMultipleRules(): void
     {
@@ -44,8 +45,7 @@ final class SizeIntegrationTest extends TestCase
             ->withRuleSettings(ClassLengthRule::ID, new RuleSettings(true, ['warning' => 10, 'error' => 500]))
             ->withRuleSettings(ParameterCountRule::ID, new RuleSettings(true, ['warning' => 5, 'error' => 8]))
             ->withRuleSettings(PublicMethodCountRule::ID, new RuleSettings(true, ['warning' => 5, 'error' => 25]))
-            ->withRuleSettings(PropertyCountRule::ID, new RuleSettings(true, ['warning' => 5, 'error' => 25]))
-            ->withRuleSettings(AverageMethodLengthRule::ID, new RuleSettings(true, ['warning' => 2, 'error' => 40]));
+            ->withRuleSettings(PropertyCountRule::ID, new RuleSettings(true, ['warning' => 5, 'error' => 25]));
 
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
@@ -58,7 +58,6 @@ final class SizeIntegrationTest extends TestCase
         self::assertContains(ParameterCountRule::ID, $ruleIds);
         self::assertContains(PublicMethodCountRule::ID, $ruleIds);
         self::assertContains(PropertyCountRule::ID, $ruleIds);
-        self::assertContains(AverageMethodLengthRule::ID, $ruleIds);
 
         self::assertGreaterThanOrEqual(7, count($findings));
 
@@ -70,7 +69,7 @@ final class SizeIntegrationTest extends TestCase
     /**
      * Verify config override changes findings.
      *
-     * @return void
+     * @return void - Asserts that tighter thresholds produce more total findings than the default configuration.
      */
     public function testConfigOverrideChangesFindings(): void
     {
@@ -90,8 +89,7 @@ final class SizeIntegrationTest extends TestCase
             ->withRuleSettings(ClassLengthRule::ID, new RuleSettings(true, ['warning' => 10, 'error' => 500]))
             ->withRuleSettings(ParameterCountRule::ID, new RuleSettings(true, ['warning' => 2, 'error' => 5]))
             ->withRuleSettings(PublicMethodCountRule::ID, new RuleSettings(true, ['warning' => 3, 'error' => 10]))
-            ->withRuleSettings(PropertyCountRule::ID, new RuleSettings(true, ['warning' => 3, 'error' => 10]))
-            ->withRuleSettings(AverageMethodLengthRule::ID, new RuleSettings(true, ['warning' => 2, 'error' => 10]));
+            ->withRuleSettings(PropertyCountRule::ID, new RuleSettings(true, ['warning' => 3, 'error' => 10]));
 
         $tightFindings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $tightConfig));
 
@@ -101,7 +99,7 @@ final class SizeIntegrationTest extends TestCase
     /**
      * Verify clean fixture produces no size findings.
      *
-     * @return void
+     * @return void - Asserts that the short fixture produces no findings whose rule ID starts with size.
      */
     public function testCleanFixtureProducesNoSizeFindings(): void
     {

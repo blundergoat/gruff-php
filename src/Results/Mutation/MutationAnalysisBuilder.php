@@ -8,25 +8,22 @@ use GruffPhp\Engine\Analysis\RunDiagnostic;
 use GruffPhp\Support\PathHelper;
 
 /**
- * Turns a mutation run into a result gruff can score, guarding against stale or missing Infection output.
+ * Builds mutation results from an Infection report and an optional baseline.
+ * When Infection is requested, a freshness check precedes parsing; supplied reports are parsed directly.
  *
- * This is the gatekeeper between "the user asked for mutation analysis" and "gruff has a trustworthy
- * report to read". Depending on the user's flags it either trusts a report they generated, or runs
- * Infection itself and then checks the report was genuinely rewritten before believing it. Every
- * failure path - missing report, misused flags, a run that left a stale file - becomes a diagnostic and
- * a null result, so a broken mutation setup degrades to a clear note instead of wrong numbers.
+ * Option errors and report parsing failures are appended to the caller's diagnostic list.
  */
 final readonly class MutationAnalysisBuilder
 {
     /**
-     * Produces a mutation result for the run, or null with a diagnostic when there is nothing
-     * trustworthy to read - so mutation analysis is either right or absent, never misleading.
+     * Parses the requested current and optional baseline reports into mutation analysis.
+     * With no report path, returns null; dependent flags without that path and parsing failures produce diagnostics.
      *
-     * @param string                  $projectRoot - Project root used to resolve the mutation report paths.
-     * @param MutationAnalysisOptions $options - Mutation-analysis options the user selected for the run.
-     * @param list<RunDiagnostic>     $diagnostics - By-reference sink; any usage or parse error is appended here for the reporters to show.
+     * @param string $projectRoot - Base directory used to resolve report paths.
+     * @param MutationAnalysisOptions $options - Requested report, runner, baseline, and budget settings.
+     * @param list<RunDiagnostic> $diagnostics - Receives option, runner, and report parsing diagnostics by reference.
      *
-     * @return MutationAnalysisResult|null - The parsed mutation result; null when no report was requested, Infection produced nothing usable, or the report was malformed.
+     * @return MutationAnalysisResult|null - Parsed result; null without a report path, after a rejected run, or on a report parsing failure.
      */
     public function build(
         string $projectRoot,
@@ -37,11 +34,11 @@ final readonly class MutationAnalysisBuilder
         if ($options->infectionReportPath === null) {
             $this->addOptionDiagnostics($options, $diagnostics);
 
-            // Without a report path there is nothing to read; mutation analysis is simply absent, not an error.
+
             return null;
         }
 
-        // Infection was meant to run but could not produce usable output, so stop here.
+
         if (!$this->canRunInfection($projectRoot, $options, $diagnostics)) {
             // Infection could not produce usable output; the diagnostic was already recorded by the gate.
             return null;
@@ -51,7 +48,7 @@ final readonly class MutationAnalysisBuilder
 
         try {
             $report         = $infectionReportParser->parse($options->infectionReportPath);
-            // Only load a baseline report when the user set one to compare this run against.
+
             $baselineReport = $options->mutationBaselinePath === null
                 ? null
                 : $infectionReportParser->parse($options->mutationBaselinePath);
@@ -62,7 +59,7 @@ final readonly class MutationAnalysisBuilder
                 path:    $options->infectionReportPath,
             );
 
-            // A malformed report is reported as a parse error and yields no result rather than a partial one.
+            // A missing, unreadable, or invalid current or baseline report prevents a partial mutation result.
             return null;
         }
 
@@ -70,27 +67,26 @@ final readonly class MutationAnalysisBuilder
     }
 
     /**
-     * Decides whether there is Infection output worth parsing - trusting an existing report, or running
-     * Infection and confirming it actually refreshed the file before believing it.
+     * Runs Infection when requested and applies the report freshness gate before parsing.
      *
-     * @param string                  $projectRoot - Anchor for resolving the report path Infection writes to.
-     * @param MutationAnalysisOptions $options - Run options; decide whether Infection is invoked or its report trusted as-is.
-     * @param list<RunDiagnostic>     $diagnostics - By-reference sink; a failure diagnostic is appended when the run cannot be trusted.
+     * @param string $projectRoot - Base directory for the requested report and Infection process.
+     * @param MutationAnalysisOptions $options - Settings controlling whether to run Infection or parse the supplied report directly.
+     * @param list<RunDiagnostic> $diagnostics - Receives runner or stale-report diagnostics by reference.
      *
-     * @return bool - True when a trustworthy Infection report is available to parse; false when the run failed or left a stale report.
+     * @return bool - Whether parsing may proceed; true without launching Infection when the caller supplied a report.
      */
     private function canRunInfection(
         string $projectRoot,
         MutationAnalysisOptions $options,
         array &$diagnostics,
     ): bool {
-        // The user did not ask gruff to run Infection, so take the report they already generated as-is.
+
         if (!$options->shouldRunInfection) {
-            // Caller opted not to run Infection, so trust the pre-existing report on disk as-is.
+            // Supplied reports are validated by the parser rather than by the run freshness gate.
             return true;
         }
 
-        // Note the report's state before the run, so afterwards we can tell whether Infection actually rewrote it.
+        // Capture the pre-run signature so the freshness gate can reject a missing or unchanged report afterward.
         $reportPath      = PathHelper::resolveAgainst($projectRoot, $options->infectionReportPath ?? '');
         $preRunSignature = $this->reportSignature($reportPath);
 
@@ -105,15 +101,15 @@ final readonly class MutationAnalysisBuilder
         if ($runResult->diagnostic instanceof RunDiagnostic) {
             $diagnostics[] = $runResult->diagnostic;
 
-            // The runner itself failed (e.g. binary missing); propagate its diagnostic and stop.
+
             return false;
         }
 
         clearstatcache(true, $reportPath);
 
-        // The report was created or rewritten by this run, so it reflects the code we just tested.
+
         if ($this->isReportFresh($reportPath, $preRunSignature)) {
-            // Report was created or rewritten by this run, so it reflects the current code.
+
             return true;
         }
 
@@ -126,22 +122,21 @@ final readonly class MutationAnalysisBuilder
             path: $options->infectionReportPath,
         );
 
-        // Infection exited without refreshing the report, so the stale file is rejected to avoid false results.
+        // The report is missing, unreadable, or unchanged, so reject it to avoid consuming stale results.
         return false;
     }
 
     /**
-     * Flags mutation options the user set without the `--infection-report` they depend on, so a misuse
-     * is explained rather than silently ignored.
+     * Appends usage diagnostics for mutation flags supplied without a report path.
      *
-     * @param MutationAnalysisOptions $options - Options whose flags set without --infection-report count as misuse.
-     * @param list<RunDiagnostic>     $diagnostics - By-reference sink; one usage-error is appended per stray flag.
+     * @param MutationAnalysisOptions $options - Mutation settings inspected for flags that require an Infection report.
+     * @param list<RunDiagnostic> $diagnostics - Receives one usage diagnostic for each unsupported flag setting.
      *
-     * @return void
+     * @return void - Appends diagnostics without running Infection or parsing a report.
      */
     private function addOptionDiagnostics(MutationAnalysisOptions $options, array &$diagnostics): void
     {
-        // --infection-run needs a report path to read Infection's JSON from, so on its own it is a misuse.
+
         if ($options->shouldRunInfection) {
             $diagnostics[] = new RunDiagnostic(
                 type:    'usage-error',
@@ -149,7 +144,7 @@ final readonly class MutationAnalysisBuilder
             );
         }
 
-        // --infection-config only means something when Infection is actually run against a report.
+
         if ($options->infectionConfigPath !== null) {
             $diagnostics[] = new RunDiagnostic(
                 type:    'usage-error',
@@ -158,7 +153,7 @@ final readonly class MutationAnalysisBuilder
             );
         }
 
-        // --infection-test-framework-options likewise only applies to an actual Infection run.
+
         if ($options->infectionTestFrameworkOptions !== null) {
             $diagnostics[] = new RunDiagnostic(
                 type:    'usage-error',
@@ -166,7 +161,7 @@ final readonly class MutationAnalysisBuilder
             );
         }
 
-        // --mutation-baseline needs a report to compare against.
+
         if ($options->mutationBaselinePath !== null) {
             $diagnostics[] = new RunDiagnostic(
                 type:    'usage-error',
@@ -175,7 +170,7 @@ final readonly class MutationAnalysisBuilder
             );
         }
 
-        // --mutation-budget needs a report to measure survivors against.
+
         if ($options->mutationBudget !== null) {
             $diagnostics[] = new RunDiagnostic(
                 type:    'usage-error',
@@ -185,18 +180,17 @@ final readonly class MutationAnalysisBuilder
     }
 
     /**
-     * Samples a report file's mtime, size, and hash, so a later re-sample can tell whether Infection
-     * rewrote it.
+     * Samples the report metadata and content hash for a later freshness comparison.
      *
-     * @param string $reportPath - Absolute path to the JSON report whose mtime, size, and hash are sampled.
+     * @param string $reportPath - Report file whose modification time, size, and SHA-256 hash are sampled.
      *
-     * @return array{mtime: int, size: int, hash: string}|null - The report's signature; null when the file is absent or any stat call failed, so freshness cannot be judged from it.
+     * @return array{mtime: int, size: int, hash: string}|null - File signature; null when absent or a metadata/hash read fails.
      */
     private function reportSignature(string $reportPath): ?array
     {
-        // No file yet means there is no prior state to compare against.
+
         if (!is_file($reportPath)) {
-            // No file yet means no prior state to compare against; null signals "absent", not "error".
+
             return null;
         }
 
@@ -204,9 +198,9 @@ final readonly class MutationAnalysisBuilder
         $size  = filesize($reportPath);
         $hash  = hash_file('sha256', $reportPath);
 
-        // If any stat call failed the signature is incomplete, so the whole sample is unusable.
+
         if (!is_int($mtime) || !is_int($size) || !is_string($hash)) {
-            // Any stat call failing leaves an incomplete signature, so treat the whole sample as unusable.
+
             return null;
         }
 

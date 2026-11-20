@@ -10,6 +10,7 @@ use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Pillar;
 use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
+use GruffPhp\Rules\Size\LimitBand;
 use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Contracts\RuleContext;
@@ -25,13 +26,12 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 
 /**
- * Flags a function or method whose control flow nests too deeply, since deep nesting is one of the
- * clearest signals that logic has become hard to follow.
+ * Flags functions and methods whose deeply nested control flow is hard to follow.
  *
- * Runs per file over every function-like node with a body. It measures the deepest level of nested ifs,
- * loops, switches, and closures (try/finally bodies do not add a level), and reports anything past the
- * configured maximum (default error above 4). The finding names the depth and suggests early returns or
- * extraction.
+ * Measures nested ifs, loops, switches and closures; try and finally bodies do not add a level.
+ * The default limit is 4 with error severity; findings below 1.5 times the active limit are advisory.
+ *
+ * Findings advise against adding to the method or recommend simplifying its execution path.
  */
 final readonly class NestingDepthRule implements RuleInterface
 {
@@ -62,7 +62,7 @@ final readonly class NestingDepthRule implements RuleInterface
      * Reports each function-like node whose deepest nesting exceeds the configured maximum.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext - Supplies the configured depth thresholds; a callable below every threshold is not reported.
      *
      * @return list<Finding> - Nesting-depth findings for the analysed unit.
      */
@@ -75,9 +75,9 @@ final readonly class NestingDepthRule implements RuleInterface
 
         $findings = [];
 
-        // Measure every function and method in the file.
+
         foreach ($nodes as $node) {
-            /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
+            /** @var ClassMethod|Function_ $node - The NodeIndex query selects only methods and functions. */
             // An abstract or bodyless declaration has nothing to measure.
             if (!CyclomaticComplexityRule::hasExecutableBody($node)) {
                 continue;
@@ -86,12 +86,14 @@ final readonly class NestingDepthRule implements RuleInterface
             $maxDepth       = self::computeMaximumNestingDepth($node);
             $thresholdMatch = $settings->highValueThresholdMatch($maxDepth);
 
-            // A depth within the limit is fine, so skip it.
+
             if ($thresholdMatch === null) {
                 continue;
             }
 
             $symbol = CyclomaticComplexityRule::resolveSymbol($node);
+
+            $band = LimitBand::of($maxDepth, $settings->lowestHighValueThreshold());
 
             $findings[] = new Finding(
                 ruleId:  $definition->id,
@@ -104,18 +106,19 @@ final readonly class NestingDepthRule implements RuleInterface
                 ),
                 filePath:         $analysisUnit->file->displayPath,
                 line:             $node->getStartLine(),
-                severity:         $thresholdMatch->severity,
+                severity:         LimitBand::severity($band, $thresholdMatch->severity),
                 pillar:           $definition->pillar,
                 tier:             $definition->tier,
                 confidence:       $definition->confidence,
                 endLine:          $node->getEndLine() > 0 ? $node->getEndLine() : null,
                 symbol:           $symbol,
-                remediation:      'Reduce nesting by using early returns, guard clauses, or extracting nested logic.',
+                remediation:      LimitBand::advice($band, LimitBand::LOWER_METHOD, LimitBand::SIMPLIFY_PATH),
                 secondaryPillars: $definition->secondaryPillars,
                 metadata:         [
                     'depth' => $maxDepth,
                     'threshold' => $thresholdMatch->threshold,
                     'thresholdType' => $thresholdMatch->severity->value,
+                    LimitBand::KEY => $band,
                 ],
             );
         }
@@ -147,7 +150,7 @@ final readonly class NestingDepthRule implements RuleInterface
     {
         $maximumDepth = $depth;
 
-        // Take the deepest level any statement in this list reaches.
+
         foreach ($stmts as $stmt) {
             $maximumDepth = max($maximumDepth, self::walkNode($stmt, $depth));
         }
@@ -229,7 +232,7 @@ final readonly class NestingDepthRule implements RuleInterface
      */
     private static function formatNumber(int|float $number): string
     {
-        // A genuine fraction keeps its decimals; a whole value is shown without them.
+
         if (is_float($number) && floor($number) !== $number) {
             return (string) $number;
         }

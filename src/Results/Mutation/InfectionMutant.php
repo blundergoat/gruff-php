@@ -5,26 +5,23 @@ declare(strict_types=1);
 namespace GruffPhp\Results\Mutation;
 
 /**
- * One mutant lifted from an Infection JSON report: a single deliberate edit Infection made to
- * the source, paired with the verdict on whether the test suite caught it.
+ * Represents one mutant parsed from a recognised status section of an Infection JSON report.
+ * The record stores the mutation's location, mutator, status, and optional diagnostic output.
  *
- * A user reaches these records by handing gruff-php an Infection report - for example
- * `gruff-php analyse --infection-report=infection.log.json` - which parses every mutant row
- * into one of these read-only objects. Survivors (mutants no test killed) later become the
- * findings the user acts on, and the `status` and `mutator` held here pick the exact wording.
+ * `--infection-report` feeds these records into mutation analysis.
+ * Escaped and timed-out mutants become findings whose wording depends on the status and mutator.
  */
 final readonly class InfectionMutant
 {
     /**
-     * Holds one parsed mutant exactly as Infection reported it, so the rest of the run can decide
-     * whether it survived and, if so, what to tell the user about the tests guarding that code.
+     * Stores the parser's normalised mutant record for mutation reporting.
      *
-     * @param string      $status - Normalised Infection verdict such as `killed`, `escaped`, `timed out`, or `not covered`; the survivors are the ones that turn into findings for the user.
-     * @param string      $filePath - Display path of the mutated source, so the user sees which file the weak or missing test was meant to guard.
-     * @param int|null    $line - Start line of the mutated code; null when Infection reported no line, so the finding names the file without pointing the user at a specific row.
-     * @param string      $mutator - Name of the mutator that made the edit (for example the operator it flipped); echoed back to the user in the survived-mutation message.
-     * @param string|null $diff - Before/after diff of what the mutant changed; null when Infection omitted it or sent a blank string, leaving the user no inline change to inspect.
-     * @param string|null $processOutput - Test-run output captured for this one mutant; null when Infection omitted it or sent a blank string, so there is no per-mutant log for the user to open.
+     * @param string $status - Normalised status; `escaped` and `timed out` records become survived-mutant findings.
+     * @param string $filePath - Display path of the mutated source file.
+     * @param int|null $line - Start line of the mutation; null leaves the finding without a line location.
+     * @param string $mutator - Mutation name included in survived-mutant messages.
+     * @param string|null $diff - Mutation diff; the parser maps missing, empty, or non-string input to null.
+     * @param string|null $processOutput - Per-mutant test output; the parser maps missing, empty, or non-string input to null.
      */
     public function __construct(
         public string  $status,
@@ -37,11 +34,10 @@ final readonly class InfectionMutant
     }
 
     /**
-     * Flattens the mutant into gruff's own flat `status`/`file`/`line`/`mutator`/`diff`/`processOutput` map
-     * for the report's machine-readable output - a script or editor gets one tidy row per mutant, not Infection's nested shape.
+     * Exports one mutant using gruff's report keys without transforming its stored values.
+     * Null optional fields remain null.
      *
-     * @return array{status: string, file: string, line: int|null, mutator: string, diff: string|null, processOutput: string|null} - report-ready flat map
-     *                       using gruff's own keys (not Infection's nested shape); `line`, `diff`, and `processOutput` come back null when Infection omitted them, so the reader gets no row number, no diff, and no per-mutant log
+     * @return array{status: string, file: string, line: int|null, mutator: string, diff: string|null, processOutput: string|null} - Values unchanged.
      */
     public function toArray(): array
     {

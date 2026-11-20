@@ -19,15 +19,16 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers the count-gate value object: legacy --fail-on parity, failureConditions
- * parsing and validation, and per-severity/total trip evaluation.
+ * Covers legacy --fail-on gates and failureConditions parsing and validation.
+ * Checks severity and total caps plus reported breach details.
+ * Exercises new-findings scope and precedence over the full finding set.
  */
 final class FailThresholdsTest extends TestCase
 {
     /**
-     * Verify fromFailOn(Error) trips only on error findings, matching the legacy gate.
+     * Verify fromFailOn(Error) trips only on error findings.
      *
-     * @return void
+     * @return void - Asserts no trip for advisory and warning findings and a trip for an error finding.
      */
     public function testFromFailOnErrorTripsOnlyOnErrors(): void
     {
@@ -40,7 +41,7 @@ final class FailThresholdsTest extends TestCase
     /**
      * Verify fromFailOn(Warning) trips on warning and error but not advisory.
      *
-     * @return void
+     * @return void - Asserts separate warning and error trips and no trip for an advisory finding.
      */
     public function testFromFailOnWarningTripsOnWarningAndError(): void
     {
@@ -52,9 +53,9 @@ final class FailThresholdsTest extends TestCase
     }
 
     /**
-     * Verify fromFailOn(Advisory) trips on any finding and fromFailOn(None) never trips.
+     * Verify the advisory gate trips on one advisory and the disabled gate accepts two errors.
      *
-     * @return void
+     * @return void - Asserts an advisory trip and no trip from the disabled gate for the supplied error findings.
      */
     public function testFromFailOnAdvisoryTripsOnAnyAndNoneNeverTrips(): void
     {
@@ -68,9 +69,9 @@ final class FailThresholdsTest extends TestCase
     }
 
     /**
-     * Verify a severity cap allows up to the cap then trips with the exceeded count.
+     * Verify two errors meet an error cap of two and a third reports the exceeded cap.
      *
-     * @return void
+     * @return void - Asserts no trip for two errors, then an error trip with count three and cap two.
      */
     public function testSeverityCapAllowsUpToCapThenTrips(): void
     {
@@ -88,9 +89,9 @@ final class FailThresholdsTest extends TestCase
     }
 
     /**
-     * Verify the total cap trips regardless of severity distribution.
+     * Verify three advisory findings exceed a total cap of two and report the total count.
      *
-     * @return void
+     * @return void - Asserts a total-threshold trip with count three for the advisory-only input.
      */
     public function testTotalCapTripsRegardlessOfSeverity(): void
     {
@@ -107,9 +108,9 @@ final class FailThresholdsTest extends TestCase
     }
 
     /**
-     * Verify the most severe breach is reported first when several thresholds trip.
+     * Verify an error breach is reported before a warning breach when both caps are exceeded.
      *
-     * @return void
+     * @return void - Asserts the error threshold is reported for findings ordered warning then error.
      */
     public function testReportsMostSevereTripFirst(): void
     {
@@ -124,15 +125,15 @@ final class FailThresholdsTest extends TestCase
      * Verify fromConfig rejects malformed failureConditions with a descriptive ConfigException.
      *
      * @param string $configJson - Malformed failureConditions block encoded as JSON.
-     * @param string $expectedMessage - ConfigException message the parser must report.
+     * @param string $expectedMessage - Text that the ConfigException message must contain.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts ConfigException with the expected message text for each supplied invalid configuration.
+     * @throws JsonException - If decoding the supplied JSON fails.
      */
     #[DataProvider('invalidFailureConditionsProvider')]
     public function testFromConfigRejectsInvalidFailureConditions(string $configJson, string $expectedMessage): void
     {
-        /** @var array<array-key, mixed> $config Decoded failureConditions block fed to the parser under test. */
+        /** @var array<array-key, mixed> $config - Decoded failureConditions block fed to the parser under test. */
         $config = json_decode($configJson, true, 16, JSON_THROW_ON_ERROR);
 
         $this->expectException(ConfigException::class);
@@ -142,10 +143,9 @@ final class FailThresholdsTest extends TestCase
     }
 
     /**
-     * Malformed failureConditions blocks (as JSON) paired with the ConfigException message each must raise.
+     * Invalid failureConditions blocks encoded as valid JSON, paired with required exception-message text.
      *
-     * @return iterable<string, array{string, string}> - data-provider cases keyed by scenario name; each pair is [malformed JSON config, expected
-     *                          ConfigException message]
+     * @return iterable<string, array{string, string}> - Named pairs of config JSON and text the exception message must contain.
      */
     public static function invalidFailureConditionsProvider(): iterable
     {
@@ -168,9 +168,9 @@ final class FailThresholdsTest extends TestCase
     }
 
     /**
-     * Verify the constructor refuses negative caps.
+     * Verify the constructor rejects a negative error-severity cap.
      *
-     * @return void
+     * @return void - Expects InvalidArgumentException with message text identifying the negative error cap.
      */
     public function testConstructorRejectsNegativeCap(): void
     {
@@ -183,7 +183,7 @@ final class FailThresholdsTest extends TestCase
     /**
      * Verify tripsOnScope reports a new-findings breach with the "new" scope.
      *
-     * @return void
+     * @return void - Asserts the new scope and error threshold for a breach in the new-findings gate.
      */
     public function testTripsOnScopeReportsNewScope(): void
     {
@@ -196,9 +196,9 @@ final class FailThresholdsTest extends TestCase
     }
 
     /**
-     * Verify tripsOnScope falls through to the total gate with the "total" scope.
+     * Verify a full-set error breach has total scope when no new-findings gate is attached.
      *
-     * @return void
+     * @return void - Asserts total scope for the full-set error finding with no new-findings gate.
      */
     public function testTripsOnScopeReportsTotalScopeWhenOnlyTotalTrips(): void
     {
@@ -210,9 +210,9 @@ final class FailThresholdsTest extends TestCase
     }
 
     /**
-     * Verify the new-findings trip wins when both the new and total gates fire.
+     * Verify a new-findings breach takes precedence when both finding sets exceed their error caps.
      *
-     * @return void
+     * @return void - Asserts new scope when the supplied findings exceed both gates' error caps.
      */
     public function testTripsOnScopeNewGateWinsWhenBothTrip(): void
     {
@@ -226,7 +226,7 @@ final class FailThresholdsTest extends TestCase
     /**
      * Verify tripsOnScope returns null when neither gate trips.
      *
-     * @return void
+     * @return void - Asserts null when both finding sets contain one error below their caps of five.
      */
     public function testTripsOnScopeReturnsNullWhenNeitherTrips(): void
     {
@@ -238,7 +238,7 @@ final class FailThresholdsTest extends TestCase
     /**
      * Verify fromConfig parses a newFindings sub-gate.
      *
-     * @return void
+     * @return void - Asserts a parsed new-findings gate with an error cap of zero.
      */
     public function testFromConfigParsesNewFindingsSubGate(): void
     {

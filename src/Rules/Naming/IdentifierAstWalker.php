@@ -21,18 +21,18 @@ use PhpParser\Node\Stmt\Function_;
 final readonly class IdentifierAstWalker
 {
     /**
-     * Collects every descendant across the given roots that satisfies the predicate.
+     * Collects matching roots and descendants without entering function-like nodes.
      *
-     * @param list<Node>           $nodes - Roots to traverse.
-     * @param callable(Node): bool $predicate - Predicate that selects matching descendants.
+     * @param list<Node>           $nodes - Roots to inspect; function-like roots and their contents are skipped.
+     * @param callable(Node): bool $predicate - Predicate applied to each node within the traversable scope.
      *
-     * @return list<Node> - every descendant satisfying the predicate, gathered across all roots; empty when none match
+     * @return list<Node> - Matching node occurrences in depth-first root order; empty when none match.
      */
     public function nodesMatching(array $nodes, callable $predicate): array
     {
         $matches = [];
 
-        // Walk each root scope in turn.
+
         foreach ($nodes as $node) {
             $this->collectMatchingNodes($node, $predicate, $matches);
         }
@@ -41,13 +41,13 @@ final readonly class IdentifierAstWalker
     }
 
     /**
-     * Recursively collects predicate-matching descendants, stopping at any nested scope.
+     * Appends matching nodes from this subtree, excluding function-like boundaries and their contents.
      *
-     * @param Node                 $node - Current node to test; recursion stops at function-like boundaries.
-     * @param callable(Node): bool $predicate - Predicate that selects matching descendants.
-     * @param list<Node>           $matches - Output list of matching descendant nodes.
+     * @param Node                 $node - Current subtree root; function-like nodes are skipped without testing the predicate.
+     * @param callable(Node): bool $predicate - Predicate that selects nodes to append.
+     * @param list<Node>           $matches - Accumulator receiving matches in depth-first order.
      *
-     * @return void
+     * @return void - Appends matches to $matches in place.
      */
     private function collectMatchingNodes(Node $node, callable $predicate, array &$matches): void
     {
@@ -56,12 +56,12 @@ final readonly class IdentifierAstWalker
             return;
         }
 
-        // Keep the node when it matches the caller's predicate.
+
         if ($predicate($node)) {
             $matches[] = $node;
         }
 
-        // Descend into the node's own children, staying inside this scope.
+
         foreach ($this->childNodes($node) as $child) {
             $this->collectMatchingNodes($child, $predicate, $matches);
         }
@@ -72,13 +72,13 @@ final readonly class IdentifierAstWalker
      *
      * @param Node $node - Parent node whose declared sub-node slots are flattened into traversable children.
      *
-     * @return list<Node> - the node's immediate child Nodes in sub-node declaration order; empty when it has no Node-valued slots
+     * @return list<Node> - Direct child nodes in slot order, including nodes inside arrays; empty when none exist.
      */
     private function childNodes(Node $node): array
     {
         $children = [];
 
-        // Flatten every sub-node slot the parser exposes for this node.
+
         foreach ($node->getSubNodeNames() as $name) {
             $this->collectChildNodes($node->{$name}, $children);
         }
@@ -92,23 +92,23 @@ final readonly class IdentifierAstWalker
      * @param mixed      $subNode - One sub-node slot value: a Node, an array of them, or a scalar/null that is skipped.
      * @param list<Node> $children - Accumulator mutated in place; discovered child nodes are appended in traversal order.
      *
-     * @return void
+     * @return void - Appends discovered nodes to $children in place.
      */
     private function collectChildNodes(mixed $subNode, array &$children): void
     {
         if ($subNode instanceof Node) {
             $children[] = $subNode;
 
-            // A bare Node is itself a child; record it and do not recurse into a non-array.
+
             return;
         }
 
         if (!is_array($subNode)) {
-            // Scalars, strings, and null are leaf slot values with no traversable children, so skip them.
+
             return;
         }
 
-        // An array slot can hold several children, so recurse into each entry.
+
         foreach ($subNode as $childSubNode) {
             $this->collectChildNodes($childSubNode, $children);
         }

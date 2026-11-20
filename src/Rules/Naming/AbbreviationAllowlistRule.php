@@ -70,12 +70,12 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     }
 
     /**
-     * Reports undeclared lowercase abbreviations on properties, parameters, and locals.
+     * Reports unapproved lowercase names in the configured abbreviation band on properties, parameters, and locals.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context carrying accepted abbreviations.
      *
-     * @return list<Finding> - one finding per undeclared abbreviation; empty when every short name is sanctioned
+     * @return list<Finding> - One per matching property, parameter, or distinct local name per scope; may be empty.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -86,7 +86,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
         $accepted   = $this->lowercaseList($ruleContext->config->acceptedAbbreviations());
         $findings   = [];
 
-        // Check every declared property in the file.
+
         foreach (NodeIndex::nodesOf($analysisUnit, Property::class) as $property) {
             array_push(
                 $findings,
@@ -102,7 +102,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
             );
         }
 
-        // Check parameters and locals across every function-like scope.
+
         foreach ((new FunctionLikeScopeWalker())->scopes($analysisUnit->statements) as $scope) {
             array_push(
                 $findings,
@@ -127,7 +127,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
      * @param RuleDefinition $definition - Rule metadata used to populate emitted findings.
      * @param AnalysisUnit   $analysisUnit - Parsed unit that owns the property declaration.
      * @param Property       $property - Property statement whose individual props are inspected.
-     * @param list<string>   $ignored - Lowercased built-in names that are never reported.
+     * @param list<string>   $ignored - Lowercased names excluded by the ignoredNames option.
      * @param list<string>   $accepted - Lowercased project abbreviations that suppress findings.
      * @param int            $minLength - Inclusive lower bound for abbreviation length.
      * @param int            $maxLength - Inclusive upper bound for abbreviation length.
@@ -157,7 +157,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
                 minLength:    $minLength,
                 maxLength:    $maxLength,
             );
-            // Keep the property only when its name is an undeclared abbreviation.
+
             if ($finding instanceof Finding) {
                 $findings[] = $finding;
             }
@@ -172,7 +172,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
      * @param RuleDefinition    $definition - Rule metadata used to populate emitted findings.
      * @param AnalysisUnit      $analysisUnit - Parsed unit that owns the callable scope.
      * @param FunctionLikeScope $scope - Callable scope whose parameters and locals are inspected.
-     * @param list<string>      $ignored - Lowercased built-in names that are never reported.
+     * @param list<string>      $ignored - Lowercased names excluded by the ignoredNames option.
      * @param list<string>      $accepted - Lowercased project abbreviations that suppress findings.
      * @param int               $minLength - Inclusive lower bound for abbreviation length.
      * @param int               $maxLength - Inclusive upper bound for abbreviation length.
@@ -216,7 +216,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
      * @param RuleDefinition    $definition - Rule metadata used to populate emitted findings.
      * @param AnalysisUnit      $analysisUnit - Parsed unit that owns the callable scope.
      * @param FunctionLikeScope $scope - Callable scope whose parameters are inspected.
-     * @param list<string>      $ignored - Lowercased built-in names that are never reported.
+     * @param list<string>      $ignored - Lowercased names excluded by the ignoredNames option.
      * @param list<string>      $accepted - Lowercased project abbreviations that suppress findings.
      * @param int               $minLength - Inclusive lower bound for abbreviation length.
      * @param int               $maxLength - Inclusive upper bound for abbreviation length.
@@ -235,9 +235,9 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
         $findings = [];
         $symbol   = $this->symbol($scope);
 
-        // Weigh each declared parameter.
+
         foreach ($scope->node->params as $param) {
-            // Skip anything without a plain string name.
+
             if (!$param->var instanceof Variable || !is_string($param->var->name)) {
                 continue;
             }
@@ -252,7 +252,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
                 minLength:    $minLength,
                 maxLength:    $maxLength,
             );
-            // Keep the parameter only when its name is an undeclared abbreviation.
+
             if ($finding instanceof Finding) {
                 $findings[] = $finding;
             }
@@ -267,7 +267,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
      * @param RuleDefinition    $definition - Rule metadata used to populate emitted findings.
      * @param AnalysisUnit      $analysisUnit - Parsed unit that owns the callable scope.
      * @param FunctionLikeScope $scope - Callable scope whose locals are inspected.
-     * @param list<string>      $ignored - Lowercased built-in names that are never reported.
+     * @param list<string>      $ignored - Lowercased names excluded by the ignoredNames option.
      * @param list<string>      $accepted - Lowercased project abbreviations that suppress findings.
      * @param int               $minLength - Inclusive lower bound for abbreviation length.
      * @param int               $maxLength - Inclusive upper bound for abbreviation length.
@@ -287,9 +287,9 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
         $symbol       = $this->symbol($scope);
         $exemptLocals = $this->exemptLocalNames($scope);
 
-        // Weigh each local the scope declares.
+
         foreach ($scope->localVariables as $name => $variable) {
-            // Skip a conventional loop or catch variable.
+            // Variables used by loop headers and catch clauses are exempt from abbreviation findings.
             if (isset($exemptLocals[$name])) {
                 continue;
             }
@@ -304,7 +304,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
                 minLength:    $minLength,
                 maxLength:    $maxLength,
             );
-            // Keep the local only when its name is an undeclared abbreviation.
+
             if ($finding instanceof Finding) {
                 $findings[] = $finding;
             }
@@ -314,24 +314,18 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     }
 
     /**
-     * Builds a finding for one identifier, or null when it passes every abbreviation gate.
+     * Builds a finding for an unapproved name in the configured abbreviation band.
      *
-     * @param RuleDefinition                                         $definition - Rule metadata supplying id, severity, and tier for any finding
-     *                                                                             raised.
-     * @param AnalysisUnit                                           $analysisUnit - Parsed unit, used only for its display path on the emitted
-     *                                                                             finding.
-     * @param Node                                                   $node - Declaration node whose start line the finding points at.
-     * @param array{kind: string, name: string, symbol: string|null} $identifier - Kind label, raw name, and owning
-     *                                                                             symbol; symbol is null for top-level locals.
-     * @param list<string>                                           $ignored - Lowercased built-in names that are never reported (e.g. this).
-     * @param list<string>                                           $accepted - Lowercased project vocabulary from acceptedAbbreviations that
-     *                                                                             suppresses a finding.
-     * @param int                                                    $minLength - Inclusive lower bound; shorter names fall to ShortVariableRule
-     *                                                                             instead.
-     * @param int                                                    $maxLength - Inclusive upper bound; longer names are treated as real words, not
-     *                                                                             abbreviations.
+     * @param RuleDefinition $definition - Metadata applied to an emitted finding.
+     * @param AnalysisUnit $analysisUnit - Supplies the finding's display path.
+     * @param Node $node - Supplies the finding's start line.
+     * @param array{kind: string, name: string, symbol: string|null} $identifier - Kind label, raw name, and symbol copied to the finding.
+     * @param list<string> $ignored - Lowercased names excluded by the ignoredNames option.
+     * @param list<string> $accepted - Lowercased project abbreviations exempted by configuration.
+     * @param int $minLength - Inclusive lower length bound; shorter names are skipped.
+     * @param int $maxLength - Inclusive upper length bound; longer names are skipped.
      *
-     * @return Finding|null - a finding for an undeclared abbreviation; null when out of scope or sanctioned
+     * @return Finding|null - A finding for an unapproved lowercase alphabetic name in the length band; otherwise null.
      */
     private function finding(
         RuleDefinition $definition,
@@ -347,7 +341,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
         $name      = $identifier['name'];
         $symbol    = $identifier['symbol'];
         $lowerName = strtolower($name);
-        // Only lowercase alphabetic identifiers can contain unapproved short abbreviations.
+        // This rule judges only lowercase alphabetic identifiers as short abbreviations.
         if ($lowerName !== $name || !preg_match('/^[a-z]+$/', $name)) {
             // Mixed-case or non-alphabetic names are out of scope; null means "not an abbreviation", not "approved".
             return null;
@@ -355,12 +349,12 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
 
         $length = strlen($name);
         if ($length < $minLength || $length > $maxLength) {
-            // Outside the configured abbreviation length band, so this name is somebody else's concern.
+
             return null;
         }
 
         if (in_array($lowerName, $ignored, true) || in_array($lowerName, $accepted, true)) {
-            // The name is built-in (this) or declared project vocabulary, so it is sanctioned and produces no finding.
+
             return null;
         }
 
@@ -383,7 +377,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     }
 
     /**
-     * Reads a positive integer rule option, falling back when configuration is not numeric.
+     * Reads an integer length option, clamping it to at least one or using the supplied default.
      *
      * @param RuleContext    $ruleContext - Source of resolved settings for this rule.
      * @param RuleDefinition $definition - Rule whose settings bag the option is read from.
@@ -396,7 +390,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     {
         $optionValue = $ruleContext->settingsFor($definition)->option($name);
 
-        // Clamp to at least 1 so a misconfigured zero or negative length can never match every name.
+
         return is_int($optionValue) ? max(1, $optionValue) : $default;
     }
 
@@ -405,15 +399,15 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
      *
      * @param FunctionLikeScope $scope - Scope whose body is scanned for loop and catch variable declarations.
      *
-     * @return array<string, true> - set of loop and catch variable names exempt from findings, keyed for fast lookup
+     * @return array<string, true> - Loop and catch variable names exempt from findings, keyed for membership checks.
      */
     private function exemptLocalNames(FunctionLikeScope $scope): array
     {
         $names = [];
 
-        // Scan the scope body for loop and catch declarations.
+
         foreach ($scope->bodyDescendants as $scopeNode) {
-            // A for, foreach, or catch introduces conventional variable names.
+            // Variables used by loop headers and catch clauses are exempt from abbreviation findings.
             if ($scopeNode instanceof For_ || $scopeNode instanceof Foreach_ || $scopeNode instanceof Catch_) {
                 $this->collectExemptLocalNames($scopeNode, $names);
             }
@@ -428,7 +422,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
      * @param Node                $node - Loop or catch node to inspect; other node kinds contribute nothing.
      * @param array<string, true> $names - Accumulator mutated in place; matched variable names are added as keys.
      *
-     * @return void
+     * @return void - Updates $names with the collected exemption names.
      */
     private function collectExemptLocalNames(Node $node, array &$names): void
     {
@@ -437,10 +431,10 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
             $this->collectVariableNames($node->init, $names);
         }
 
-        // A foreach binds its value, and optionally its key.
+
         if ($node instanceof Foreach_) {
             $foreachVariables = [$node->valueVar];
-            // Include the key variable when the loop declares one.
+
             if ($node->keyVar instanceof Node) {
                 $foreachVariables[] = $node->keyVar;
             }
@@ -448,7 +442,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
             $this->collectVariableNames($foreachVariables, $names);
         }
 
-        // A catch clause names its exception variable.
+
         if ($node instanceof Catch_ && $node->var instanceof Variable && is_string($node->var->name)) {
             $names[$node->var->name] = true;
         }
@@ -460,32 +454,32 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
      * @param array<Node>         $nodes - Loop init or foreach key/value nodes to walk for variable references.
      * @param array<string, true> $names - Accumulator mutated in place; each discovered variable name is added as a key.
      *
-     * @return void
+     * @return void - Adds string-named variable references from the supplied subtrees to $names.
      */
     private function collectVariableNames(array $nodes, array &$names): void
     {
-        // Walk each supplied node.
+
         foreach ($nodes as $node) {
             $this->collectVariableName($node, $names);
         }
     }
 
     /**
-     * Records a local variable name when the node is a variable reference.
+     * Collects string-named variable references from the node and its descendants.
      *
      * @param Node                $node - Node to test and then recurse into; only string-named variables are recorded.
      * @param array<string, true> $names - Accumulator mutated in place; each discovered variable name is added as a key.
      *
-     * @return void
+     * @return void - Adds discovered variable names to $names without removing existing entries.
      */
     private function collectVariableName(Node $node, array &$names): void
     {
-        // Record a plainly named variable.
+
         if ($node instanceof Variable && is_string($node->name)) {
             $names[$node->name] = true;
         }
 
-        // Recurse into the node's children to reach nested variables.
+
         foreach ($this->childNodes($node) as $child) {
             $this->collectVariableName($child, $names);
         }
@@ -502,7 +496,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     {
         $children = [];
 
-        // Flatten every sub-node slot the parser exposes for this node.
+
         foreach ($node->getSubNodeNames() as $name) {
             $this->collectChildNodes($node->{$name}, $children);
         }
@@ -516,7 +510,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
      * @param mixed      $subNode - A sub-node slot value: a Node, an array of them, or a scalar that is skipped.
      * @param list<Node> $children - Accumulator mutated in place; discovered Node instances are appended.
      *
-     * @return void
+     * @return void - Appends Node instances to $children, flattening arrays without visiting node descendants.
      */
     private function collectChildNodes(mixed $subNode, array &$children): void
     {
@@ -527,11 +521,11 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
         }
 
         if (!is_array($subNode)) {
-            // Scalars and nulls hold no child nodes, so there is nothing to collect.
+
             return;
         }
 
-        // An array slot can hold several children, so recurse into each entry.
+
         foreach ($subNode as $childSubNode) {
             $this->collectChildNodes($childSubNode, $children);
         }
@@ -542,11 +536,11 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
      *
      * @param FunctionLikeScope $scope - Scope whose node determines whether a real name or a synthetic label is used.
      *
-     * @return string - the qualified name for a method or function, or a kind@line label for a closure or arrow fn
+     * @return string - A method or function label from resolveSymbol(), otherwise a kind@line label.
      */
     private function symbol(FunctionLikeScope $scope): string
     {
-        // Named callables resolve to their declared symbol.
+
         if ($scope->node instanceof ClassMethod || $scope->node instanceof Function_) {
             return CyclomaticComplexityRule::resolveSymbol($scope->node);
         }

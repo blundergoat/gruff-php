@@ -15,9 +15,9 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
 
 /**
- * Flags a snapshot assertion (`toMatchSnapshot`, `assertMatchesSnapshot`) whose captured value is a short
- * scalar - the kind of value a direct `assertSame` would check more clearly, with none of a snapshot's
- * benefit. Runs over every test's assertions; the length cap is tunable. Advisory, medium confidence.
+ * Flags snapshot assertions of short string literals, where a direct assertion may be clearer.
+ * Analyses assertions in each discovered test scope with a configurable byte-length limit.
+ * Findings are advisory and have medium confidence.
  */
 final readonly class TrivialSnapshotRule implements RuleInterface
 {
@@ -42,16 +42,22 @@ final readonly class TrivialSnapshotRule implements RuleInterface
             defaultSeverity:   Severity::Advisory,
             confidence:        Confidence::Medium,
             defaultThresholds: ['maxLiteralLength' => 5],
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A short snapshot kept deliberately so a rendered value stays reviewable in the snapshot file alongside its larger siblings.',
+                    'mitigation' => 'Only the captured literal\'s length is judged, not why it is snapshotted, so raise this rule\'s maxLiteralLength threshold.',
+                ],
+            ],
         );
     }
 
     /**
-     * Reports snapshot assertions that only capture a tiny literal value.
+     * Reports supported snapshot-call shapes whose captured value is a short string literal.
      *
-     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Unit whose discovered assertion-call shapes are checked.
+     * @param RuleContext $ruleContext - Supplies the maxLiteralLength threshold for this analysis pass.
      *
-     * @return list<Finding> - Findings for trivial snapshot tests.
+     * @return list<Finding> - One advisory finding per matching call shape; empty when none qualify.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -59,12 +65,12 @@ final readonly class TrivialSnapshotRule implements RuleInterface
         $maxLength  = (int) $ruleContext->settingsFor($definition)->numericThreshold('maxLiteralLength');
         $findings   = [];
 
-        // Weigh every test scope in the file.
+
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
-            // Inspect each assertion the test makes.
+
             foreach (TestQualityNodeHelper::assertionCalls($scope) as $call) {
                 $name = TestQualityNodeHelper::callName($call);
-                // Only snapshot-style assertions are in scope here.
+
                 if ($name === null || !str_contains($name, 'snapshot')) {
                     continue;
                 }
@@ -75,7 +81,7 @@ final readonly class TrivialSnapshotRule implements RuleInterface
                     $literal = TestQualityNodeHelper::literalValue(TestQualityNodeHelper::pestExpectationValue($call));
                 }
 
-                // Leave real snapshots alone; only a short scalar literal is the smell.
+
                 if (!is_string($literal) || strlen($literal) > $maxLength) {
                     continue;
                 }

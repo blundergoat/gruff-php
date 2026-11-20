@@ -46,14 +46,24 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A file declaring two or more fully documented types; only a single documented class-like satisfies the file-level requirement.',
+                    'mitigation' => 'Add a one-line file docblock above the first statement, or split the types into one file each.',
+                ],
+                [
+                    'shape'      => 'A top-of-file banner written as a plain block or line comment rather than a `/** */` docblock.',
+                    'mitigation' => 'Only a structured docblock counts as file documentation, so convert the banner to `/** ... */`.',
+                ],
+            ],
         );
     }
 
     /**
-     * Reports a file that lacks a file-level docblock or a documented sole class-like declaration.
+     * Reports a file that has neither a file-level docblock nor a documented sole class-like declaration.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext - Unused; the rule interface requires it, and this rule reads no options or project root.
      *
      * @return list<Finding> - at most one finding when the file lacks file-level docs; empty when the file is documented or has nothing to anchor to
      */
@@ -72,12 +82,12 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
         }
 
         if ($this->isSingleDocumentedClassLikeFile($topLevel)) {
-            // A lone documented class-like already orients the reader; the file docblock is redundant.
+            // A lone class-like with a docblock satisfies this rule, so a separate file docblock is redundant.
             return [];
         }
 
         if ($this->hasFirstStatementDoc($topLevel[0])) {
-            // A docblock on the first statement satisfies the file-level documentation requirement.
+
             return [];
         }
 
@@ -95,11 +105,11 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
     {
         $effective = [];
 
-        // Flatten each namespace so its inner statements count as top-level.
+
         foreach ($analysisUnit->statements as $statement) {
-            // A namespace wrapper contributes its own inner statements.
+
             if ($statement instanceof Namespace_) {
-                // Hoist each statement out of the namespace.
+
                 foreach ($statement->stmts as $inner) {
                     $effective[] = $inner;
                 }
@@ -143,10 +153,10 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
      */
     private function hasFirstStatementDoc(Node\Stmt $statement): bool
     {
-        // Scan the statement's attached comments for a docblock.
+
         foreach ($statement->getComments() as $comment) {
             if ($comment instanceof Doc) {
-                // A structured docblock counts as file-level documentation.
+
                 return true;
             }
         }

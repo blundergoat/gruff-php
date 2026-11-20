@@ -18,13 +18,10 @@ use PhpParser\Node;
 use PhpParser\Node\Expr;
 
 /**
- * Flags an outbound URL fetch whose target is built from request data - a curl handle, a Guzzle-style
- * `$client->get(...)`, or a stream-wrapper read - the shape that lets an attacker point the server at
- * internal hosts (SSRF).
+ * Flags request data in curl URL settings, stream-wrapper paths and HTTP-style method arguments.
+ * Method names are matched without receiver-type checks; HTTP-style and stream calls also need an HTTP(S) literal.
  *
- * Runs per file over curl functions, stream-wrapper readers, and HTTP-client method calls whose URL reaches
- * user input. Warning, medium confidence - a request-built URL is a probable SSRF sink, defused by a host
- * allow-list.
+ * Emits warning-level, medium-confidence findings for possible SSRF; upstream host allow-lists are not verified.
  */
 final class RequestControlledUrlRule implements RuleInterface
 {
@@ -34,16 +31,16 @@ final class RequestControlledUrlRule implements RuleInterface
     public const ID = 'security.request-controlled-url';
 
     /**
-     * HTTP-client method names whose URL argument names a fetch target.
+     * Method names inspected as possible HTTP-client URL sinks, without receiver-type checks.
      *
-     * @var list<string>
+     * @var list<string> - Lower-case names matched against instance and static calls.
      */
     private const HTTP_METHODS = ['delete', 'get', 'head', 'patch', 'post', 'put', 'request', 'send'];
 
     /**
      * Describes the request-controlled-URL rule for the registry and reports.
      *
-     * @return RuleDefinition - Rule metadata and defaults.
+     * @return RuleDefinition - Warning-level, medium-confidence security metadata and documented false-positive shapes.
      */
     public function definition(): RuleDefinition
     {
@@ -55,32 +52,46 @@ final class RequestControlledUrlRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'An HTTP-verb method on something that is not an HTTP client, such as a repository\'s get() or a queue\'s send(), whose argument joins a literal URL with request data.',
+                    'mitigation' => 'Client calls are matched by method name with no receiver-type check, so accept the finding or rename the local method away from the HTTP verbs.',
+                ],
+                [
+                    'shape'      => 'A fetch whose host is fixed and where request data reaches only the path or query, so the target host cannot be redirected.',
+                    'mitigation' => 'A literal URL plus reachable request data is enough to report, so confirm the host is fixed and accept the finding.',
+                ],
+                [
+                    'shape'      => 'A request-built URL constrained by an upstream host allow-list can still look controlled at the sink.',
+                    'mitigation' => 'Confirm and document the upstream host allow-list when reviewing the warning.',
+                ],
+            ],
         );
     }
 
     /**
-     * Reports each URL sink that receives request-controlled data.
+     * Reports URL sink calls with detected request-controlled data in the modeled URL argument.
      *
-     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed file whose function and method calls are scanned for URL sinks.
+     * @param RuleContext  $ruleContext - Unused; the rule interface requires it, and this rule reads no options or project root.
      *
-     * @return list<Finding> - Findings for request-controlled URL access.
+     * @return list<Finding> - At most one finding per matched call; empty when no modeled sink receives detected request data.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $findings = [];
 
-        // Check curl and stream-wrapper function calls.
+
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
             array_push($findings, ...$this->functionFindings($analysisUnit, $call));
         }
 
-        // Check HTTP-client method calls such as $client->get(...).
+
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\MethodCall::class) as $call) {
             array_push($findings, ...$this->httpClientFindings($analysisUnit, $call));
         }
 
-        // Check static HTTP-client calls too.
+
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\StaticCall::class) as $call) {
             array_push($findings, ...$this->httpClientFindings($analysisUnit, $call));
         }
@@ -89,25 +100,25 @@ final class RequestControlledUrlRule implements RuleInterface
     }
 
     /**
-     * Builds the HTTP-client findings for one method or static call.
+     * Builds a finding for a recognized HTTP-style method name, without checking the receiver type.
      *
      * @param AnalysisUnit $analysisUnit - Unit being scanned; supplies the display path for any finding.
-     * @param Expr\MethodCall|Expr\StaticCall $call - Client call whose URL argument is checked for request taint.
+     * @param Expr\MethodCall|Expr\StaticCall $call - Call checked at positional URL index 1 for request(), otherwise 0.
      *
-     * @return list<Finding> - One finding when an HTTP-client URL argument is request-controlled, otherwise empty.
+     * @return list<Finding> - One finding for a recognized call with an HTTP(S) literal and request data in its URL argument; otherwise empty.
      */
     private function httpClientFindings(AnalysisUnit $analysisUnit, Expr\MethodCall|Expr\StaticCall $call): array
     {
         $findings = [];
         $method   = SecurityNodeHelper::methodName($call);
         if ($method === null || !in_array($method, self::HTTP_METHODS, true)) {
-            // Not a recognised HTTP verb, so this call cannot be a URL sink we model.
+
             return [];
         }
 
         $argumentIndex = $method === 'request' ? 1 : 0;
         $urlArg        = SecurityNodeHelper::argumentValue($call->args, $argumentIndex);
-        // A request-controlled URL argument is the SSRF risk.
+
         if ($urlArg !== null && SecurityNodeHelper::containsUrlLiteral($urlArg) && SecurityNodeHelper::containsUserInput($urlArg)) {
             $findings[] = $this->finding($analysisUnit, $call, $method);
         }
@@ -116,12 +127,12 @@ final class RequestControlledUrlRule implements RuleInterface
     }
 
     /**
-     * Builds the finding for a global curl or stream-wrapper URL call.
+     * Checks global curl setup and stream-read calls for request-controlled URLs.
      *
      * @param AnalysisUnit  $analysisUnit - Unit being scanned; supplies the display path for any finding.
-     * @param Expr\FuncCall $call - Global-function call routed by name to the matching curl/stream-wrapper check.
+     * @param Expr\FuncCall $call - Candidate call routed by its global name when resolvable.
      *
-     * @return list<Finding> - A single finding when the matched function reads a request-controlled URL, otherwise empty.
+     * @return list<Finding> - One finding for a matched request-controlled curl URL or HTTP(S) stream path; otherwise empty.
      */
     private function functionFindings(AnalysisUnit $analysisUnit, Expr\FuncCall $call): array
     {
@@ -132,26 +143,26 @@ final class RequestControlledUrlRule implements RuleInterface
         }
 
         if ($name === 'curl_init' && $this->hasCurlInitRequestUrl($call)) {
-            // curl_init() took a request-controlled URL straight into the handle.
+
             return [$this->finding($analysisUnit, $call, $name)];
         }
 
         if ($name === 'curl_setopt' && $this->hasCurlSetoptRequestUrl($call)) {
-            // CURLOPT_URL was set from request data via a single-option curl_setopt() call.
+
             return [$this->finding($analysisUnit, $call, $name)];
         }
 
         if ($name === 'curl_setopt_array' && $this->hasCurlSetoptArrayRequestUrl($call)) {
-            // The bulk option array carried a request-controlled CURLOPT_URL entry.
+
             return [$this->finding($analysisUnit, $call, $name)];
         }
 
         if (in_array($name, ['file_get_contents', 'fopen', 'readfile'], true) && $this->hasStreamWrapperRequestUrl($call)) {
-            // A stream-wrapper reader received a request-controlled remote URL.
+
             return [$this->finding($analysisUnit, $call, $name)];
         }
 
-        // The function name matched none of the modelled URL sinks, so report nothing.
+
         return [];
     }
 
@@ -166,12 +177,12 @@ final class RequestControlledUrlRule implements RuleInterface
     {
         $urlArg = SecurityNodeHelper::sinkArgumentValue($call, 0);
 
-        // Sink fires only when the URL argument is present and traces back to request input.
+
         return $urlArg !== null && SecurityNodeHelper::containsUserInput($urlArg);
     }
 
     /**
-     * Reports whether a `curl_setopt(CURLOPT_URL, ...)` sets a request-controlled URL.
+     * Reports whether a curl_setopt() call assigns request data to CURLOPT_URL.
      *
      * @param Expr\FuncCall $call - curl_setopt() call whose option (arg 1) and value (arg 2) are checked for URL taint.
      *
@@ -182,7 +193,7 @@ final class RequestControlledUrlRule implements RuleInterface
         $optionArg = SecurityNodeHelper::sinkArgumentValue($call, 1);
         $valueArg  = SecurityNodeHelper::sinkArgumentValue($call, 2);
 
-        // Sink fires only for the CURLOPT_URL option when its value traces back to request input.
+
         return $optionArg !== null
             && $valueArg !== null
             && SecurityNodeHelper::constantName($optionArg) === 'CURLOPT_URL'
@@ -194,39 +205,39 @@ final class RequestControlledUrlRule implements RuleInterface
      *
      * @param Expr\FuncCall $call - curl_setopt_array() call whose option-map (arg 1) is scanned for a tainted URL.
      *
-     * @return bool - True when the option map contains a request-controlled URL.
+     * @return bool - True when a literal option array has a CURLOPT_URL constant key whose value reads request data.
      */
     private function hasCurlSetoptArrayRequestUrl(Expr\FuncCall $call): bool
     {
         $optionsArg = SecurityNodeHelper::sinkArgumentValue($call, 1);
         if (!$optionsArg instanceof Expr\Array_) {
-            // No literal option array to inspect, so no CURLOPT_URL entry can be proven tainted.
+            // Non-literal option maps are outside this rule's static inspection.
             return false;
         }
 
-        // Weigh each option in the map.
+
         foreach ($optionsArg->items as $arrayItem) {
-            // Only a CURLOPT_URL entry is a URL sink.
+
             if (!$arrayItem->key instanceof Node || SecurityNodeHelper::constantName($arrayItem->key) !== 'CURLOPT_URL') {
                 continue;
             }
 
             if (SecurityNodeHelper::containsUserInput($arrayItem->value)) {
-                // A CURLOPT_URL entry whose value reads request input is enough to flag the call.
+
                 return true;
             }
         }
 
-        // No CURLOPT_URL entry was request-controlled, so the call is clean.
+
         return false;
     }
 
     /**
-     * Reports whether a stream-wrapper read fetches a request-controlled remote URL.
+     * Checks a stream-read path for both an HTTP(S) literal and request input.
      *
      * @param Expr\FuncCall $call - file_get_contents()/fopen()/readfile() call whose path (arg 0) is taint-checked.
      *
-     * @return bool - True when a stream wrapper call uses request-controlled URL construction.
+     * @return bool - True when the path expression contains both an HTTP(S) literal and detected request data; false otherwise.
      */
     private function hasStreamWrapperRequestUrl(Expr\FuncCall $call): bool
     {
@@ -243,14 +254,13 @@ final class RequestControlledUrlRule implements RuleInterface
      *
      * @param AnalysisUnit $analysisUnit - Unit being scanned; supplies the display path reported to the reviewer.
      * @param Node         $node - Tainted sink node whose start line anchors the finding for the reviewer.
-     * @param string       $sink - Sink discriminator (the curl/stream function name or HTTP verb) echoed into the
-     *                                   message and metadata so callers can tell which construct fired.
+     * @param string $sink - Curl/stream function or HTTP-style method name included in the message and metadata.
      *
-     * @return Finding - Security finding.
+     * @return Finding - Warning-level, medium-confidence security finding with the sink name in its message and metadata.
      */
     private function finding(AnalysisUnit $analysisUnit, Node $node, string $sink): Finding
     {
-        // Emit a fixed warning: every caller already confirmed the URL sink carries request-controlled data.
+
         return new Finding(
             ruleId:      self::ID,
             message:     sprintf('URL access with request-controlled data detected: %s.', $sink),

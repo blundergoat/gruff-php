@@ -19,14 +19,9 @@ use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 
 /**
- * Backs the `gruff-php init` command - the one-time scaffolder that writes a starter
- * `.gruff-php.yaml` populated with the current rule registry defaults.
- *
- * Reach for this the first time a project has no config and the user wants a real file to
- * edit instead of leaning on invisible built-in defaults: it mirrors every registered rule
- * with a description comment, seeds sensible path ignores and gating thresholds, and refuses
- * to clobber an existing config without `--force`. On a forced rerun it carries any
- * hand-edited `minimumSeverity:` and `paths.ignore` blocks forward, so local policy survives.
+ * Writes a starter `.gruff-php.yaml` with registry defaults, rule descriptions, ignores, abbreviations, selection stubs, and exit gates.
+ * Existing preferred or legacy configs require `--force`; valid `failOn` and `paths.ignore` blocks are preserved only from the preferred file.
+ * Invalid gates or a differing non-empty string schema version in the preferred file stop regeneration.
  */
 final class InitCommand extends Command
 {
@@ -39,6 +34,34 @@ final class InitCommand extends Command
                                 . "# Add project-specific generated paths under paths.ignore, such as var/cache/** or generated/**.\n"
                                 . "# After reviewing current findings, `gruff-php analyse --generate-baseline` records them as known debt.\n"
                                 . "# Future analyse/report runs auto-apply gruff-baseline.json; use `gruff-php analyse --no-baseline` to audit without it.\n";
+
+    /**
+     * Renders sensitive-exclusion guidance separately because `Yaml::dump` cannot attach comments.
+     * Entries are authored by hand and identify a rule, a path, and a rationale without matched secret values.
+     * The generated section starts with an empty exclusion list.
+     */
+    private const SENSITIVE_EXCLUSIONS_SECTION = "# Sensitive-data findings are suppressed only here, and only by hand.\n"
+                                                 . "# gruff never converts a reported finding, message, or preview value into an entry for you.\n"
+                                                 . "# Each entry needs one exact sensitive-data rule id, one project-relative path, and a reason;\n"
+                                                 . "# an optional `symbol` narrows it further. Nothing else is suppressed - the same rule in another\n"
+                                                 . "# file and another rule in the same file both keep reporting.\n"
+                                                 . "# Every entry is published in the report's `suppressions` array with the count it hid, so an entry\n"
+                                                 . "# that matches nothing simply reports `suppressed: 0` instead of failing the run.\n"
+                                                 . "#\n"
+                                                 . "# sensitiveExclusions:\n"
+                                                 . "#     - rule: sensitive-data.aws-access-key\n"
+                                                 . "#       path: tests/Fixtures/SensitiveData/synthetic-secrets.php\n"
+                                                 . "#       reason: Synthetic key used by the scanner fixtures; not a live credential.\n"
+                                                 . "sensitiveExclusions: []\n";
+
+    /**
+     * Explains the abbreviation seed inside the generated `allowlists` block, before its list.
+     * A project list replaces the defaults, so users must retain any default entries they still want.
+     */
+    private const ALLOWLISTS_SECTION_HEADER = "allowlists:\n"
+                                              . "    # Short forms the naming rules accept anywhere in an identifier, so `id` and `url` read as words.\n"
+                                              . "    # A project list replaces this seed rather than merging with it: keep the entries you still want.\n"
+                                              . "    acceptedAbbreviations:\n";
 
     /**
      * How deep `Yaml::dump` expands maps and lists before collapsing them to inline `{}`/`[]`.
@@ -54,16 +77,14 @@ final class InitCommand extends Command
     private const YAML_INDENT = 4;
 
     /**
-     * Default `minimumSeverity:` block written into a fresh config. Gating starts at "show
-     * everything, fail on anything" for `analyse` and stays off for the read-only viewing
-     * commands (`report`, `dashboard`), so a new project fails CI on any finding until the user
-     * deliberately relaxes it. A hand-edited block survives `--force` via `existingMinimumSeverity`.
+     * Seeds `analyse` with an advisory exit threshold and disables exit gating for `report` and `dashboard`.
+     * A valid existing `failOn` block replaces these defaults during forced regeneration.
      *
      * @var array<string, string>
      */
-    private const DEFAULT_MINIMUM_SEVERITY = [
-        'analyse'   => 'advisory',
-        'report'    => 'none',
+    private const DEFAULT_FAIL_ON = [
+        'analyse' => 'advisory',
+        'report' => 'none',
         'dashboard' => 'none',
     ];
 
@@ -88,17 +109,15 @@ final class InitCommand extends Command
     ];
 
     /**
-     * Universal-programming abbreviations seeded into fresh configs. Sourced from
-     * `AnalysisConfig::DEFAULT_ACCEPTED_ABBREVIATIONS` so the runtime default and the
-     * scaffolded init file stay in lockstep; the constant lives on `AnalysisConfig` because
-     * the runtime default is the source of truth and init is just a reflection of it.
+     * Seeds generated configs from `AnalysisConfig::DEFAULT_ACCEPTED_ABBREVIATIONS`.
+     * Sharing the runtime constant keeps the generated list aligned with registry-based configuration defaults.
      *
      * @var list<string>
      */
     private const DEFAULT_ACCEPTED_ABBREVIATIONS = AnalysisConfig::DEFAULT_ACCEPTED_ABBREVIATIONS;
 
     /**
-     * Declares the `init` command's name, description, and the two flags a user can pass
+     * Declares the `init` command's name, description, and the flags a user can pass
      * (`--project-root` and `--force`) so Symfony can route the command and `--help` can list them.
      *
      * @return void - Nothing; the command definition is registered on this instance as a side effect.
@@ -113,19 +132,19 @@ final class InitCommand extends Command
     }
 
     /**
-     * Runs the whole command when a user types `gruff-php init`: pick the target directory, refuse
-     * to clobber an existing config, then render the registry defaults to `.gruff-php.yaml` and
-     * print the wrote-path plus next-steps guidance.
+     * Runs gruff-php init: selects the target directory, refuses to clobber an existing config unless --force is set,
+     * renders registry defaults to .gruff-php.yaml, and prints the written path with
+     * next-step guidance.
      *
-     * @param InputInterface  $input - Console input; only the `--project-root` and `--force` options are read.
-     * @param OutputInterface $output - Console output; carries the wrote-path notice, next-steps guidance, and any error.
+     * @param InputInterface  $input  - Console input supplying only --project-root and --force.
+     * @param OutputInterface $output - Console output that receives the written path, next-step guidance, and any error.
      *
-     * @return int - Symfony command exit code; SUCCESS after writing, FAILURE on a bad directory, existing file, or write error.
+     * @return int - SUCCESS after writing; FAILURE for an unusable directory, a file conflict, invalid preserved settings, or a write error.
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $projectRoot = $this->projectRoot($input, $output);
-        // No usable target directory (a bad `--project-root` or an unreadable working directory); the error is already shown.
+        // No usable target directory remains after an invalid --project-root or unreadable working directory; the error is already shown.
         if ($projectRoot === null) {
             return Command::FAILURE;
         }
@@ -134,7 +153,7 @@ final class InitCommand extends Command
         $shouldForce = (bool)$input->getOption('force');
 
         $guardExitCode = $this->guardExistingConfig($projectRoot, $targetPath, $shouldForce, $output);
-        // A config already sits here (or a legacy file would be shadowed) and `--force` was absent; stop with its verdict.
+        // A config already exists here, or a legacy file would be shadowed, and --force was absent; stop with its verdict.
         if ($guardExitCode !== null) {
             return $guardExitCode;
         }
@@ -142,26 +161,26 @@ final class InitCommand extends Command
         $registry = RuleRegistry::defaults();
         $config   = AnalysisConfig::fromRegistry($registry);
 
-        // Reuse the user's existing ignore list when the file already has one; otherwise seed the shipped defaults.
+
         $ignoredPaths = self::existingIgnoredPaths($targetPath) ?? self::DEFAULT_IGNORED_PATHS;
 
-        // Carry forward any gating threshold the user hand-edited, and validate their schema version (an incompatible one throws below) before regenerating over the file.
         try {
-            $minimumSeverity = self::existingMinimumSeverity($targetPath) ?? self::DEFAULT_MINIMUM_SEVERITY;
+            $failOn = self::existingFailOn($targetPath) ?? self::DEFAULT_FAIL_ON;
             self::existingSchemaVersion($targetPath);
         } catch (ConfigException $exception) {
-            // Their existing config carries an invalid block; surface why and refuse rather than overwrite it blindly.
+            // Existing settings cannot be preserved safely, so report why and refuse rather than overwrite them.
             $output->writeln(sprintf('<error>%s</error>', $exception->getMessage()));
 
             return Command::FAILURE;
         }
 
-        $scaffold     = self::buildScaffoldDocument($config, $ignoredPaths, $minimumSeverity);
-        $scaffoldYaml = Yaml::dump($scaffold, self::YAML_INLINE_DEPTH, self::YAML_INDENT, Yaml::DUMP_EMPTY_ARRAY_AS_SEQUENCE);
-        $rulesYaml    = self::renderRulesSection($registry);
-        $contents     = self::FILE_HEADER . $scaffoldYaml . $rulesYaml;
+        $scaffold      = self::buildScaffoldDocument($config, $ignoredPaths, $failOn);
+        $scaffoldYaml  = Yaml::dump($scaffold, self::YAML_INLINE_DEPTH, self::YAML_INDENT, Yaml::DUMP_EMPTY_ARRAY_AS_SEQUENCE);
+        $selectionYaml = Yaml::dump(self::buildSelectionDocument(), self::YAML_INLINE_DEPTH, self::YAML_INDENT, Yaml::DUMP_EMPTY_ARRAY_AS_SEQUENCE);
+        $rulesYaml     = self::renderRulesSection($registry);
+        $contents      = self::FILE_HEADER . $scaffoldYaml . self::renderAllowlistsSection() . $selectionYaml . self::SENSITIVE_EXCLUSIONS_SECTION . $rulesYaml;
 
-        // The write itself failed (unwritable directory or a full disk); tell the user rather than claim success.
+
         if (file_put_contents($targetPath, $contents) === false) {
             $output->writeln(sprintf('<error>Unable to write %s.</error>', $targetPath));
 
@@ -183,7 +202,7 @@ final class InitCommand extends Command
      * Decides where the config file lands: an explicit `--project-root` wins, otherwise the
      * directory the user launched from. Runs first so every later path is anchored to one root.
      *
-     * @param InputInterface  $input - Console input; an explicit `--project-root` wins, else the current working directory is used.
+     * @param InputInterface  $input  - Console input; an explicit `--project-root` wins, else the current working directory is used.
      * @param OutputInterface $output - Console output used to report a missing directory or an undeterminable working directory.
      *
      * @return string|null - Directory to write into; null when the directory is missing or the cwd is unreadable, which aborts init.
@@ -191,9 +210,9 @@ final class InitCommand extends Command
     private function projectRoot(InputInterface $input, OutputInterface $output): ?string
     {
         $explicit = $input->getOption('project-root');
-        // The user named a directory with `--project-root` (e.g. `gruff-php init --project-root ./app`); honour it.
+
         if (is_string($explicit) && $explicit !== '') {
-            // Reject a `--project-root` that isn't a real directory (a typo like `./ap`) before writing anything.
+
             if (!is_dir($explicit)) {
                 $output->writeln(sprintf('<error>--project-root must be an existing directory: %s</error>', $explicit));
 
@@ -204,7 +223,7 @@ final class InitCommand extends Command
         }
 
         $cwd = getcwd();
-        // No `--project-root`, so fall back to the launch directory; getcwd() fails only when it was deleted or unreadable.
+
         if ($cwd === false) {
             $output->writeln('<error>Unable to determine current working directory.</error>');
 
@@ -215,25 +234,24 @@ final class InitCommand extends Command
     }
 
     /**
-     * Stops init from silently destroying work: refuses when a `.gruff-php.yaml` already exists, or
-     * when a legacy `.gruff.yaml` sits alongside that a new file would quietly override. Runs before
-     * any content is generated, so the user is warned while their files are still intact.
+     * Refuses to overwrite the preferred config or shadow a legacy config unless `--force` is set.
+     * Runs before rendering, while existing files are untouched.
      *
-     * @param string          $projectRoot - Directory checked for a sibling legacy `.gruff.yaml` that `--force` would shadow.
-     * @param string          $targetPath - Full path of the `.gruff-php.yaml` about to be written; refused when it already exists.
-     * @param bool            $shouldForce - True bypasses both guards; the caller derives it from the `--force` option.
+     * @param string $projectRoot - Directory checked for a sibling legacy `.gruff.yaml`.
+     * @param string $targetPath - Preferred config path checked before writing.
+     * @param bool $shouldForce - True bypasses both file guards; derived from `--force`.
      * @param OutputInterface $output - Console output used to explain why init refused.
      *
-     * @return int|null - Exit code when init must refuse and stop; null when nothing is in the way and writing may proceed.
+     * @return int|null - FAILURE when a file blocks an unforced run; null when forced or neither file blocks writing.
      */
     private function guardExistingConfig(string $projectRoot, string $targetPath, bool $shouldForce, OutputInterface $output): ?int
     {
-        // The user passed `--force`, opting into overwriting; skip both guards and let the write proceed.
+
         if ($shouldForce) {
             return null;
         }
 
-        // The user reran `gruff-php init` where a config already exists without `--force`; refuse rather than wipe their edits.
+
         if (is_file($targetPath)) {
             $output->writeln(sprintf(
                                  '<error>%s already exists. Pass --force to overwrite.</error>',
@@ -244,7 +262,7 @@ final class InitCommand extends Command
         }
 
         $legacyPath = $projectRoot . '/' . ConfigLoader::LEGACY_DEFAULT_CONFIG_FILE;
-        // An old-style `.gruff.yaml` is present; writing the preferred `.gruff-php.yaml` would silently switch analyse onto that new file (it loads ahead of the legacy one), so warn.
+        // Writing `.gruff-php.yaml` would shadow the legacy config because the loader prefers the new filename.
         if (is_file($legacyPath)) {
             $output->writeln(sprintf(
                                  '<error>%s already exists; writing %s would silently switch analyse over to generated defaults. Remove or rename the legacy file, or pass --force to write the preferred config alongside it.</error>',
@@ -259,45 +277,71 @@ final class InitCommand extends Command
     }
 
     /**
-     * Assembles everything above the `rules:` block of the generated config - schema version,
-     * minimum PHP version, severity gating, ignore paths, allowlists, and selection stubs - in the
-     * exact order init emits them. The `rules:` block is rendered separately so each rule can carry
-     * a description comment that `Yaml::dump` cannot emit.
+     * Builds the generated config's schema version, PHP floor, deep-scan budget, exit gates, and ignore paths.
+     * The remaining sections are appended separately, including manually rendered explanatory comments.
      *
-     * @param AnalysisConfig        $analysisConfig - Config seeded from the registry defaults.
-     * @param list<string>          $ignoredPaths - Paths to omit from generated project scans; these are what the user tunes after init.
-     * @param array<string, string> $minimumSeverity - Per-command exit-code thresholds emitted under `minimumSeverity:`.
+     * @param AnalysisConfig $analysisConfig - Config seeded from the registry defaults.
+     * @param list<string> $ignoredPaths - Paths to omit from generated project scans.
+     * @param array<string, string> $failOn - Per-command exit-code thresholds emitted under `failOn:`.
      *
-     * @return array<string, mixed> - Scaffold document keyed in the exact order init emits above the rules block, ready for `Yaml::dump`.
+     * @return array<string, mixed> - Ordered scaffold document ready for `Yaml::dump`.
      */
-    private static function buildScaffoldDocument(AnalysisConfig $analysisConfig, array $ignoredPaths, array $minimumSeverity): array
+    private static function buildScaffoldDocument(AnalysisConfig $analysisConfig, array $ignoredPaths, array $failOn): array
     {
         return [
-            'schemaVersion'     => ConfigLoader::SCHEMA_VERSION,
+            'schemaVersion' => ConfigLoader::SCHEMA_VERSION,
             'minimumPhpVersion' => $analysisConfig->minimumPhpVersion(),
-            'minimumSeverity'   => $minimumSeverity,
-            'paths'             => [
+            'deepScanBudget' => [
+                'enabled' => $analysisConfig->deepScanBudget()['enabled'],
+                'maxLines' => $analysisConfig->deepScanBudget()['maxLines'],
+                'maxBytes' => $analysisConfig->deepScanBudget()['maxBytes'],
+            ],
+            'failOn' => $failOn,
+            'paths' => [
                 'ignore' => $ignoredPaths,
-            ],
-            'allowlists'        => [
-                'acceptedAbbreviations' => self::DEFAULT_ACCEPTED_ABBREVIATIONS,
-                'secretPreviews'        => [],
-            ],
-            'selection'         => [
-                'tiers'          => [],
-                'pillars'        => [],
-                'rules'          => [],
-                'excludePillars' => [],
-                'excludeRules'   => [],
             ],
         ];
     }
 
     /**
-     * Renders the `rules:` block by hand so each rule can be preceded by a comment carrying its
-     * registry description - the annotations that tell the user what a rule checks when they open
-     * the file (falling back to the rule's display name when it ships without a description).
-     * Appended after the scaffold YAML, preserving the existing 4-space indent contract.
+     * Renders the abbreviation seed with guidance that project lists replace the defaults.
+     * The section is assembled by hand because `Yaml::dump` does not emit comments.
+     *
+     * @return string - Rendered `allowlists:` block including trailing newline.
+     */
+    private static function renderAllowlistsSection(): string
+    {
+        $entries = '';
+
+        foreach (self::DEFAULT_ACCEPTED_ABBREVIATIONS as $abbreviation) {
+            $entries .= sprintf("        - %s\n", $abbreviation);
+        }
+
+        return self::ALLOWLISTS_SECTION_HEADER . $entries;
+    }
+
+    /**
+     * Builds the empty selection stubs for a fresh config, so users can tune rules in an existing block
+     * instead of guessing its key names.
+     *
+     * @return array{selection: array<string, list<string>>} - Selection stubs ready for Yaml::dump.
+     */
+    private static function buildSelectionDocument(): array
+    {
+        return [
+            'selection' => [
+                'tiers' => [],
+                'pillars' => [],
+                'rules' => [],
+                'excludePillars' => [],
+                'excludeRules' => [],
+            ],
+        ];
+    }
+
+    /**
+     * Renders every registered rule with its description, or display name when the description is empty.
+     * Each YAML entry is indented under `rules:` using the scaffold's four-space nesting.
      *
      * @param RuleRegistry $ruleRegistry - Source of the rules to render and the descriptions that become their comments.
      *
@@ -306,15 +350,15 @@ final class InitCommand extends Command
     private static function renderRulesSection(RuleRegistry $ruleRegistry): string
     {
         $output = "rules:\n";
-        // Walk every registered rule so the generated file lists them all, each under its own description comment.
+
         foreach ($ruleRegistry->all() as $rule) {
             $ruleDefinition = $rule->definition();
-            // Prefer the rule's written description; fall back to its display name when it ships without one.
-            $description    = $ruleDefinition->description !== '' ? $ruleDefinition->description : $ruleDefinition->name;
-            $output         .= '    # ' . $description . "\n";
-            $ruleEntry      = self::buildRuleEntry($ruleDefinition);
-            $ruleEntryYaml  = Yaml::dump([$ruleDefinition->id => $ruleEntry], self::YAML_INLINE_DEPTH, self::YAML_INDENT, Yaml::DUMP_EMPTY_ARRAY_AS_SEQUENCE);
-            // Re-indent each dumped line by four spaces so the rule nests correctly under the `rules:` key.
+
+            $description = $ruleDefinition->description !== '' ? $ruleDefinition->description : $ruleDefinition->name;
+            $output .= '    # ' . $description . "\n";
+            $ruleEntry     = self::buildRuleEntry($ruleDefinition);
+            $ruleEntryYaml = Yaml::dump([$ruleDefinition->id => $ruleEntry], self::YAML_INLINE_DEPTH, self::YAML_INDENT, Yaml::DUMP_EMPTY_ARRAY_AS_SEQUENCE);
+
             foreach (explode("\n", rtrim($ruleEntryYaml, "\n")) as $line) {
                 $output .= '    ' . $line . "\n";
             }
@@ -324,25 +368,25 @@ final class InitCommand extends Command
     }
 
     /**
-     * Reads an existing config's `minimumSeverity:` block so a `--force` rerun carries the user's
+     * Reads an existing config's failOn: block so a --force rerun carries the user's
      * hand-edited gating thresholds forward instead of resetting them. Validates each entry the same
-     * way the loader does, so a broken block errors out rather than being silently kept.
+     * way the loader does, so an invalid readable block fails rather than being silently kept.
      *
      * @param string $targetPath - Path of the config file being regenerated, read for a hand-edited block to carry forward.
      *
-     * @return array<string, string>|null - Existing block (command => threshold); null when there's no block to preserve, so defaults apply.
-     * @throws ConfigException When a preserved entry is not a valid gating command or threshold value.
+     * @return array<string, string>|null - Validated map, possibly empty; null when the initial probe finds no failOn: marker to preserve.
+     * @throws ConfigException - When the block shape, command name, or threshold value is invalid.
      */
-    private static function existingMinimumSeverity(string $targetPath): ?array
+    private static function existingFailOn(string $targetPath): ?array
     {
-        // No existing block to carry forward (fresh file or no such key); signal "use the defaults" with null.
+        // The probe found no failOn: marker to preserve, so init uses the defaults.
         if (!self::hasMinimumSeverityBlock($targetPath)) {
             return null;
         }
 
         $existing  = self::readMinimumSeverityBlock($targetPath);
         $preserved = [];
-        // Validate each preserved entry, so a typo'd command or threshold stops init instead of riding along.
+
         foreach ($existing as $command => $threshold) {
             $preserved[self::validateGatingCommand($command)] = self::validateGatingThreshold((string)$command, $threshold);
         }
@@ -351,17 +395,16 @@ final class InitCommand extends Command
     }
 
     /**
-     * Reports whether the existing config carries a top-level `minimumSeverity:` key worth
-     * preserving. Split from {@see readMinimumSeverityBlock} so the pair never returns a nullable
-     * mixed-array shape from one helper, which would trip `modernisation.phpdoc-mixed-overuse`.
+     * Reports whether the existing YAML document contains a top-level `failOn` key.
+     * Missing files and YAML parse failures count as absent, allowing init to use its default gates.
      *
      * @param string $targetPath - Path of the existing config file to probe; a missing or unparseable file counts as absent.
      *
-     * @return bool - True when the YAML loads and contains a top-level `minimumSeverity:` key; false otherwise.
+     * @return bool - True when the YAML loads and contains a top-level `failOn:` key; false otherwise.
      */
     private static function hasMinimumSeverityBlock(string $targetPath): bool
     {
-        // Nothing on disk yet (first-time init), so there is no block to preserve.
+
         if (!is_file($targetPath)) {
             return false;
         }
@@ -373,56 +416,56 @@ final class InitCommand extends Command
             return false;
         }
 
-        // A block exists only when the document parsed to a map that actually holds the `minimumSeverity` key.
-        return is_array($decoded) && array_key_exists('minimumSeverity', $decoded);
+
+        return is_array($decoded) && array_key_exists('failOn', $decoded);
     }
 
     /**
-     * Pulls the raw `minimumSeverity:` map out of the existing config and checks only its overall
-     * shape; the caller has already confirmed the key is present and validates each entry itself.
+     * Reads a previously detected `failOn` block and rejects non-array values or non-empty lists.
+     * If the second read finds no document map or key, it returns an empty block.
      *
-     * @param string $targetPath - Path of the config file to read; the caller has already confirmed the block is present.
+     * @param string $targetPath - Config path whose block was detected before this second read.
      *
-     * @return array<array-key, mixed> - Decoded YAML map of command to threshold; per-entry validation happens in the caller.
-     * @throws ConfigException When the key is not a map shape.
+     * @return array<array-key, mixed> - Raw command-to-threshold map; empty when configured empty or the key disappeared.
+     * @throws ConfigException - When the block is not an array or is a non-empty list.
      */
     private static function readMinimumSeverityBlock(string $targetPath): array
     {
         $decoded = Yaml::parseFile($targetPath);
         // Guard against the file changing under us since the probe: no map or no key means nothing to preserve.
-        if (!is_array($decoded) || !array_key_exists('minimumSeverity', $decoded)) {
+        if (!is_array($decoded) || !array_key_exists('failOn', $decoded)) {
             return [];
         }
 
-        $existing = $decoded['minimumSeverity'];
+        $existing = $decoded['failOn'];
         // The block must be a keyed map; a bare list (e.g. `- advisory`) is a mistake worth telling the user about.
         if (!is_array($existing) || ($existing !== [] && array_is_list($existing))) {
-            throw new ConfigException('Config key "minimumSeverity" must be a map of command name to threshold.');
+            throw new ConfigException('Config key "failOn" must be a map of command name to threshold.');
         }
 
         return $existing;
     }
 
     /**
-     * Confirms a preserved `minimumSeverity:` key names a command that actually gates (`analyse`,
+     * Confirms a preserved `failOn:` key names a command that actually gates (`analyse`,
      * `report`, `dashboard`), so init never carries a threshold for a command that would ignore it.
      *
      * @param mixed $command - Raw YAML map key; must be a string naming one of `ConfigLoader::GATING_COMMANDS`.
      *
      * @return string - Validated gating-command name, returned unchanged for use as the preserved map key.
-     * @throws ConfigException When the key is not a string or names a non-gating command.
+     * @throws ConfigException - When the key is not a string or names a non-gating command.
      */
     private static function validateGatingCommand(mixed $command): string
     {
-        // YAML can yield a non-string key (e.g. a numeric map key); reject that before treating it as a command name.
+
         if (!is_string($command)) {
-            throw new ConfigException('Config key "minimumSeverity" keys must be strings.');
+            throw new ConfigException('Config key "failOn" keys must be strings.');
         }
 
-        // The key is a string but not a gating command; point the user at the valid names instead of silently keeping it.
+
         if (!in_array($command, ConfigLoader::GATING_COMMANDS, true)) {
             throw new ConfigException(sprintf(
-                                          'Config key "minimumSeverity.%s" is not a valid gating command. Valid keys are: %s.',
+                                          'Config key "failOn.%s" is not a valid gating command. Valid keys are: %s.',
                                           $command,
                                           implode(', ', ConfigLoader::GATING_COMMANDS),
                                       ));
@@ -435,18 +478,18 @@ final class InitCommand extends Command
      * Confirms a preserved threshold is one of the canonical `FailThreshold` values, so init never
      * carries forward a level (`advisory`, `warning`, `error`, `none`) that later gating can't read.
      *
-     * @param string $command - Owning command name, used only to point the rejection message at the offending key.
+     * @param string $command   - Owning command name, used only to point the rejection message at the offending key.
      * @param mixed  $threshold - Raw YAML value; must be a string accepted by `FailThreshold::fromInput`.
      *
      * @return string - Validated threshold string (one of `advisory`, `warning`, `error`, `none`).
-     * @throws ConfigException When the value is not a string or not in the canonical four.
+     * @throws ConfigException - When the value is not a string or not in the canonical four.
      */
     private static function validateGatingThreshold(string $command, mixed $threshold): string
     {
-        // Anything but one of the four known level names (a typo like `warn`, or a non-string) is rejected here.
+
         if (!is_string($threshold) || FailThreshold::fromInput($threshold) === null) {
             throw new ConfigException(sprintf(
-                                          'Config key "minimumSeverity.%s" value "%s" is not a valid threshold. Accepted: %s.',
+                                          'Config key "failOn.%s" value "%s" is not a valid threshold. Accepted: %s.',
                                           $command,
                                           is_string($threshold) ? $threshold : get_debug_type($threshold),
                                           implode(', ', array_map(static fn(FailThreshold $case): string => $case->value, FailThreshold::cases())),
@@ -457,18 +500,17 @@ final class InitCommand extends Command
     }
 
     /**
-     * Guards a `--force` regeneration against quietly overwriting a deliberately pinned
-     * `schemaVersion:`. The scaffold always writes the canonical value, so a set-but-different
-     * version is treated as user intent worth confirming rather than steamrolling.
+     * Prevents forced regeneration from replacing a non-empty string schema version that differs from the canonical version.
+     * Missing files, parse failures, missing keys, and empty or non-string values do not block regeneration.
      *
-     * @param string $targetPath - Path of the config file to inspect; a missing, unparseable, or unset `schemaVersion` is allowed.
+     * @param string $targetPath - Existing config path inspected before regeneration.
      *
-     * @return void - Nothing; returns quietly when the version is absent or already canonical, and throws otherwise.
-     * @throws ConfigException When the existing schemaVersion is set but does not match the canonical value.
+     * @return void - Returns without writing when the version check permits regeneration.
+     * @throws ConfigException - When a non-empty string version differs from `ConfigLoader::SCHEMA_VERSION`.
      */
     private static function existingSchemaVersion(string $targetPath): void
     {
-        // No file yet, so there is no pinned version to protect; let the scaffold write the canonical one.
+
         if (!is_file($targetPath)) {
             return;
         }
@@ -480,18 +522,18 @@ final class InitCommand extends Command
             return;
         }
 
-        // The document has no `schemaVersion` of its own, so there is nothing the user pinned to preserve.
+
         if (!is_array($decoded) || !array_key_exists('schemaVersion', $decoded)) {
             return;
         }
 
         $existing = $decoded['schemaVersion'];
-        // A blank or non-string version is not a deliberate pin; ignore it and let the canonical value be written.
+
         if (!is_string($existing) || $existing === '') {
             return;
         }
 
-        // A real version that differs from the canonical one is a deliberate override; stop and ask the user to clear it.
+
         if ($existing !== ConfigLoader::SCHEMA_VERSION) {
             throw new ConfigException(sprintf(
                                           'Config key "schemaVersion" must be "%s". Got "%s". Remove the deliberate override before regenerating with --force.',
@@ -512,7 +554,7 @@ final class InitCommand extends Command
      */
     private static function existingIgnoredPaths(string $targetPath): ?array
     {
-        // First-time init has no prior file, so there is no local ignore policy to carry forward.
+
         if (!is_file($targetPath)) {
             return null;
         }
@@ -524,13 +566,13 @@ final class InitCommand extends Command
             return null;
         }
 
-        // A scalar or empty document has no structure to read ignores from; use the defaults.
+
         if (!is_array($decoded)) {
             return null;
         }
 
         $paths = $decoded['paths'] ?? null;
-        // No `paths:` map means the user never set ignores here; leave the defaults in place.
+
         if (!is_array($paths)) {
             return null;
         }
@@ -542,7 +584,7 @@ final class InitCommand extends Command
         }
 
         $ignoredPaths = [];
-        // Copy each configured glob across, checking as we go that the list holds only real path strings.
+
         foreach ($ignore as $path) {
             // One blank or non-string entry taints the whole list, so discard it entirely and use the defaults.
             if (!is_string($path) || trim($path) === '') {
@@ -561,25 +603,24 @@ final class InitCommand extends Command
      *
      * @param RuleDefinition $ruleDefinition - Rule definition to serialise.
      *
-     * @return array<string, mixed> - config entry carrying only the keys this rule defines defaults for; always has `enabled`, with
-     *                       `threshold`/`severity`/`thresholds`/`options` present only when the rule sets them
+     * @return array<string, mixed> - Defaults with `enabled`; threshold, severity, thresholds, and options appear only when defined.
      */
     private static function buildRuleEntry(RuleDefinition $ruleDefinition): array
     {
         $ruleEntry = ['enabled' => $ruleDefinition->isEnabledByDefault];
 
-        // Emit the threshold/severity pair only for rules that gate on a numeric limit; others omit it.
+
         if ($ruleDefinition->severityThreshold instanceof SeverityThreshold) {
             $ruleEntry['threshold'] = $ruleDefinition->severityThreshold->threshold;
             $ruleEntry['severity']  = $ruleDefinition->severityThreshold->severity->value;
         }
 
-        // Only rules with named thresholds (e.g. size bands) carry a `thresholds` map into the file.
+
         if ($ruleDefinition->defaultThresholds !== []) {
             $ruleEntry['thresholds'] = $ruleDefinition->defaultThresholds;
         }
 
-        // Likewise, only surface an `options` block when the rule ships tunable options to show.
+
         if ($ruleDefinition->defaultOptions !== []) {
             $ruleEntry['options'] = $ruleDefinition->defaultOptions;
         }

@@ -20,11 +20,10 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Enum_;
 
 /**
- * Flags a class or enum that exposes so many public methods its responsibility has likely blurred, a
- * size signal that the type is doing too much for one caller to hold in their head.
+ * Reports excessive counts of declared public methods in classes and enums.
+ * Includes public constructors; inherited methods and methods supplied only by traits are not counted.
  *
- * Runs per file over every class and enum, counting public methods and reporting any past the threshold
- * (default error above 25). The finding names the type and its public-method count.
+ * The default limit is 25; lower-band findings are advisory and upper-band findings retain the matched severity.
  */
 final readonly class PublicMethodCountRule implements RuleInterface
 {
@@ -52,12 +51,12 @@ final readonly class PublicMethodCountRule implements RuleInterface
     }
 
     /**
-     * Reports each class or enum whose public-method count exceeds the configured threshold.
+     * Reports each class or enum whose declared public-method count exceeds the configured threshold.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext - Supplies the configured public-method thresholds; a class below every threshold is not reported.
      *
-     * @return list<Finding> - Findings for oversized public APIs.
+     * @return list<Finding> - Findings for oversized declared public APIs.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -68,21 +67,21 @@ final readonly class PublicMethodCountRule implements RuleInterface
 
         $findings = [];
 
-        // Check each class and enum in the file.
+
         foreach ($classLikes as $classLike) {
-            /** @var Class_|Enum_ $classLike Finder predicate restricts results to class and enum declarations. */
+            /** @var Class_|Enum_ $classLike - NodeIndex restricts results to class and enum declarations. */
             $publicCount = 0;
 
-            // Count the public methods on this type.
+
             foreach ($classLike->stmts as $stmt) {
-                // Only public methods count toward the API surface.
+
                 if ($stmt instanceof ClassMethod && $stmt->isPublic()) {
                     $publicCount++;
                 }
             }
             $thresholdMatch = $settings->highValueThresholdMatch($publicCount);
 
-            // A count within the threshold is fine, so skip it.
+
             if ($thresholdMatch === null) {
                 continue;
             }
@@ -90,6 +89,8 @@ final readonly class PublicMethodCountRule implements RuleInterface
             $symbol = $classLike instanceof Class_
                 ? ($classLike->name?->toString() ?? sprintf('class@anonymous:%d', $classLike->getStartLine()))
                 : ($classLike->name?->toString() ?? sprintf('enum@%d', $classLike->getStartLine()));
+
+            $band = LimitBand::of($publicCount, $settings->lowestHighValueThreshold());
 
             $findings[] = new Finding(
                 ruleId:  $definition->id,
@@ -102,18 +103,19 @@ final readonly class PublicMethodCountRule implements RuleInterface
                 ),
                 filePath:         $analysisUnit->file->displayPath,
                 line:             $classLike->getStartLine(),
-                severity:         $thresholdMatch->severity,
+                severity:         LimitBand::severity($band, $thresholdMatch->severity),
                 pillar:           $definition->pillar,
                 tier:             $definition->tier,
                 confidence:       $definition->confidence,
                 endLine:          $classLike->getEndLine() > 0 ? $classLike->getEndLine() : null,
                 symbol:           $symbol,
-                remediation:      'Split the class into smaller, focused interfaces and implementations.',
+                remediation:      LimitBand::advice($band, LimitBand::LOWER_PUBLIC_METHOD, LimitBand::SPLIT_CLASS),
                 secondaryPillars: $definition->secondaryPillars,
                 metadata:         [
                     'publicMethods' => $publicCount,
                     'threshold' => $thresholdMatch->threshold,
                     'thresholdType' => $thresholdMatch->severity->value,
+                    LimitBand::KEY => $band,
                 ],
             );
         }
@@ -130,7 +132,7 @@ final readonly class PublicMethodCountRule implements RuleInterface
      */
     private function formatNumber(int|float $number): string
     {
-        // A genuine fraction keeps its decimals; a whole value is shown without them.
+
         if (is_float($number) && floor($number) !== $number) {
             return (string) $number;
         }

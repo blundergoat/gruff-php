@@ -10,11 +10,9 @@ use GruffPhp\Engine\Source\SourceDiscoveryResult;
 use GruffPhp\Engine\Source\SourceFile;
 
 /**
- * The parsed sources for one analysis run - units, diagnostics, and discovery metadata.
- *
- * Sits between source loading and rule execution: it holds the parsed `AnalysisUnit`s the rules
- * inspect, the diagnostics (like parse errors) surfaced to the user, and the discovery result behind
- * the "N discovered / parsed / ignored / missing" counts shown in the summary and report.
+ * Carries discovery metadata, diagnostics, and file counts for one analysis run.
+ * Batch runs retain analysis units; streaming runs can supply counts after releasing those units.
+ * Parsed-file coverage includes text inputs; the scoring denominator counts only PHP inputs without fatal parse errors.
  */
 final readonly class AnalysisSourceSet
 {
@@ -24,6 +22,9 @@ final readonly class AnalysisSourceSet
      */
     private ?int $explicitParsedFileCount;
 
+    /** Ratified scoring denominator captured at parse time, when the units themselves were released. */
+    private ?int $explicitEvaluatedFileCount;
+
     /**
      * Bundles one run's discovered files and parsed units with the counts the user ultimately sees.
      *
@@ -31,14 +32,17 @@ final readonly class AnalysisSourceSet
      * @param list<AnalysisUnit>    $analysisUnits   - Parsed analysis units, possibly released.
      * @param list<RunDiagnostic>   $diagnostics     - Diagnostics emitted while loading sources.
      * @param int|null              $parsedFileCount - Pre-computed parsed-file count for streaming flows; null derives it live from the units.
+     * @param int|null              $evaluatedFileCount - Pre-computed eligible PHP-file count for streaming flows; null derives it live.
      */
     public function __construct(
         public SourceDiscoveryResult $discovery,
         public array $analysisUnits,
         public array $diagnostics,
         ?int $parsedFileCount = null,
+        ?int $evaluatedFileCount = null,
     ) {
-        $this->explicitParsedFileCount = $parsedFileCount;
+        $this->explicitParsedFileCount    = $parsedFileCount;
+        $this->explicitEvaluatedFileCount = $evaluatedFileCount;
     }
 
     /**
@@ -59,6 +63,32 @@ final readonly class AnalysisSourceSet
      *
      * @return int - Number of units without parse diagnostics.
      */
+    /**
+     * Counts PHP inputs without fatal parse errors for the scoring denominator.
+     * Text-only inputs contribute to parsedFileCount() but do not enter this denominator.
+     *
+     * @return int - The supplied streaming count, or the count of retained PHP units without fatal parse errors.
+     */
+    public function evaluatedFileCount(): int
+    {
+        // Streaming flows release each unit after parsing it, so the count captured then is all there is.
+        if ($this->explicitEvaluatedFileCount !== null) {
+            return $this->explicitEvaluatedFileCount;
+        }
+
+        return count(array_filter(
+            $this->analysisUnits,
+            static fn (AnalysisUnit $analysisUnit): bool => !$analysisUnit->hasParseErrors() && $analysisUnit->file->isPhp(),
+        ));
+    }
+
+    /**
+     * Counts supported inputs accepted without fatal parse diagnostics.
+     * Uses a supplied streaming count when present; otherwise derives coverage from retained units.
+     * The scoring denominator is the narrower evaluatedFileCount().
+     *
+     * @return int - Coverage count, including text inputs and PHP files with nonfatal budget notes.
+     */
     public function parsedFileCount(): int
     {
         // Streaming flows release each unit's AST before constructing the set, so the live units are
@@ -67,8 +97,8 @@ final readonly class AnalysisSourceSet
             return $this->explicitParsedFileCount;
         }
 
-        // No pre-computed count, so the units are still in memory: derive it by excluding
-        // units that failed to parse, matching how non-streaming callers measure coverage.
+
+
         return count(array_filter(
             $this->analysisUnits,
             static fn (AnalysisUnit $analysisUnit): bool => !$analysisUnit->hasParseErrors(),

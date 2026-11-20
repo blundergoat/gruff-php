@@ -6,26 +6,17 @@ namespace GruffPhp\Tests\Rule\TestQuality;
 
 use GruffPhp\Engine\Config\AnalysisConfig;
 use GruffPhp\Engine\Config\ConfigLoader;
-use GruffPhp\Engine\Config\RuleSettings;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Engine\Parser\PhpFileParser;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\RuleRegistry;
-use GruffPhp\Rules\TestQuality\ConditionalTestLogicRule;
 use GruffPhp\Rules\TestQuality\DataProviderAnnotationRule;
-use GruffPhp\Rules\TestQuality\EagerTestRule;
 use GruffPhp\Rules\TestQuality\EmptyDataProviderRule;
 use GruffPhp\Rules\TestQuality\ExceptionTypeOnlyRule;
-use GruffPhp\Rules\TestQuality\ExcessiveMockingRule;
-use GruffPhp\Rules\TestQuality\ExtendsProductionClassRule;
 use GruffPhp\Rules\TestQuality\GlobalStateMutationRule;
 use GruffPhp\Rules\TestQuality\LoopAssertionWithoutMessageRule;
-use GruffPhp\Rules\TestQuality\MagicNumberAssertionRule;
 use GruffPhp\Rules\TestQuality\MockingDomainObjectRule;
-use GruffPhp\Rules\TestQuality\MockOnlyTestRule;
-use GruffPhp\Rules\TestQuality\MockWithoutExpectationRule;
-use GruffPhp\Rules\TestQuality\MysteryGuestRule;
 use GruffPhp\Rules\TestQuality\NoAssertionsRule;
 use GruffPhp\Rules\TestQuality\PhpUnitCoverageSourceMissingRule;
 use GruffPhp\Rules\TestQuality\PhpUnitDeprecationsNotFatalRule;
@@ -33,39 +24,35 @@ use GruffPhp\Rules\TestQuality\PhpUnitStrictFlagsMissingRule;
 use GruffPhp\Rules\TestQuality\PrivateReflectionRule;
 use GruffPhp\Rules\TestQuality\RepeatedStructureMissingDataProviderRule;
 use GruffPhp\Rules\TestQuality\SetupBloatRule;
-use GruffPhp\Rules\TestQuality\SkippedWithoutReasonRule;
-use GruffPhp\Rules\TestQuality\SleepInTestRule;
 use GruffPhp\Rules\TestQuality\SutNotCalledRule;
-use GruffPhp\Rules\TestQuality\TautologicalTypeAssertionRule;
 use GruffPhp\Rules\TestQuality\TestLongerThanSutRule;
-use GruffPhp\Rules\TestQuality\TestMethodTooLongRule;
 use GruffPhp\Rules\TestQuality\TestNamingConsistencyRule;
-use GruffPhp\Rules\TestQuality\TrivialAssertionRule;
 use GruffPhp\Rules\TestQuality\TrivialSnapshotRule;
-use GruffPhp\Rules\TestQuality\UnusedMockRule;
 use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers config-driven test-quality rules and cumulative fixture contracts.
+ * Covers test-quality rule configuration and PHPUnit configuration diagnostics.
+ * Uses fixture projects to check strict, lax, legacy, and missing PHPUnit configuration.
+ * Checks selected rule coverage and fingerprint uniqueness in the cumulative fixture.
  */
 final class TestQualityConfigurationRulesTest extends TestCase
 {
-    /** Project root used by filesystem and CLI tests. */
+    /** Project root used to resolve fixtures and load analysis configuration. */
     private const PROJECT_ROOT = __DIR__ . '/../../..';
 
     /**
-     * Verify mocking domain object is enabled by default but requires patterns to fire.
+     * Verify the fixture produces zero mocking-domain-object findings without patterns and two with a domain pattern.
      *
-     * @return void
+     * @return void - Asserts the configured mocking-domain-object finding counts.
      */
     public function testMockingDomainObjectIsEnabledByDefaultAndRequiresPatternsToFire(): void
     {
         $defaultFindings = $this->analysePath('tests/Fixtures/TestQuality/mocking-domain-object.php');
         self::assertRuleCount(MockingDomainObjectRule::ID, 0, $defaultFindings);
 
-        $registry        = RuleRegistry::defaults();
-        $config          = (new ConfigLoader(self::PROJECT_ROOT))->load(
+        $registry = RuleRegistry::defaults();
+        $config   = (new ConfigLoader(self::PROJECT_ROOT))->load(
             'tests/Fixtures/Config/enable-mocking-domain-object.yaml',
             $registry,
         );
@@ -80,7 +67,7 @@ final class TestQualityConfigurationRulesTest extends TestCase
     /**
      * Verify PHPUnit strict flags missing fires on lax config and stays silent on strict.
      *
-     * @return void
+     * @return void - Asserts one lax-config finding with the expected missing flags and none for strict config.
      */
     public function testPhpUnitStrictFlagsMissingFiresOnLaxConfigAndStaysSilentOnStrict(): void
     {
@@ -101,7 +88,7 @@ final class TestQualityConfigurationRulesTest extends TestCase
     /**
      * Verify PHPUnit deprecations not fatal fires on lax config and stays silent on strict.
      *
-     * @return void
+     * @return void - Asserts one finding for lax config and none for strict config.
      */
     public function testPhpUnitDeprecationsNotFatalFiresOnLaxConfigAndStaysSilentOnStrict(): void
     {
@@ -119,7 +106,7 @@ final class TestQualityConfigurationRulesTest extends TestCase
     /**
      * Verify PHPUnit coverage source missing fires on lax config and allows legacy whitelist.
      *
-     * @return void
+     * @return void - Asserts one lax-config finding and none for strict or legacy-whitelist config.
      */
     public function testPhpUnitCoverageSourceMissingFiresOnLaxConfigAndAllowsLegacyWhitelist(): void
     {
@@ -142,7 +129,7 @@ final class TestQualityConfigurationRulesTest extends TestCase
     /**
      * Verify PHPUnit rules stay silent when no config file is present.
      *
-     * @return void
+     * @return void - Asserts no findings from the strictness, deprecation, and coverage rules.
      */
     public function testPhpUnitRulesStaySilentWhenNoConfigFileIsPresent(): void
     {
@@ -154,9 +141,9 @@ final class TestQualityConfigurationRulesTest extends TestCase
     }
 
     /**
-     * Verify test quality rules respect config disables.
+     * Verify the no-assertions rule produces no findings with its disabling configuration.
      *
-     * @return void
+     * @return void - Asserts the no-assertions finding count is zero.
      */
     public function testTestQualityRulesRespectConfigDisables(): void
     {
@@ -172,36 +159,12 @@ final class TestQualityConfigurationRulesTest extends TestCase
         );
 
         self::assertRuleCount(NoAssertionsRule::ID, 0, $findings);
-        self::assertRuleCount(TrivialAssertionRule::ID, 1, $findings);
     }
 
     /**
-     * Verify additionalTestBaseClasses accepts an exact base name that matches neither *TestCase shape.
+     * Verify test-prefixed methods in the non-test-class fixture produce no test-quality findings.
      *
-     * @return void
-     */
-    public function testExtendsProductionClassHonoursAdditionalTestBaseClasses(): void
-    {
-        $registry = RuleRegistry::defaults();
-        $settings = AnalysisConfig::fromRegistry($registry)->ruleSettings(ExtendsProductionClassRule::ID);
-        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
-            ExtendsProductionClassRule::ID,
-            new RuleSettings(true, $settings->thresholds, array_merge($settings->options, ['additionalTestBaseClasses' => ['IntegrationTestBase']])),
-        );
-
-        $findings = array_values(array_filter(
-                                     $this->analysePaths(['tests/Fixtures/TestQuality/extends-production.php'], $config),
-                                     static fn(Finding $finding): bool => $finding->ruleId === ExtendsProductionClassRule::ID,
-                                 ));
-
-        self::assertCount(1, $findings);
-        self::assertSame('OrderServiceTest', $findings[0]->symbol);
-    }
-
-    /**
-     * Verify non test class methods with test prefix are not analysed.
-     *
-     * @return void
+     * @return void - Asserts no test-quality finding is attributed to the non-test-class fixture.
      */
     public function testNonTestClassMethodsWithTestPrefixAreNotAnalysed(): void
     {
@@ -217,9 +180,9 @@ final class TestQualityConfigurationRulesTest extends TestCase
     }
 
     /**
-     * Verify cumulative fixture represents every static test quality rule.
+     * Verify the cumulative fixture emits all explicitly expected rule IDs with distinct fingerprints.
      *
-     * @return void
+     * @return void - Asserts no expected rule ID is missing and no finding fingerprint is duplicated.
      */
     public function testCumulativeFixtureRepresentsEveryStaticTestQualityRule(): void
     {
@@ -240,7 +203,7 @@ final class TestQualityConfigurationRulesTest extends TestCase
     /**
      * Build a dummy PHPUnit analysis unit.
      *
-     * @return AnalysisUnit - a parsed unit with no test-quality candidates, used as a placeholder subject for config-only rule checks
+     * @return AnalysisUnit - Parsed test fixture used as the subject for PHPUnit configuration checks.
      */
     private function phpUnitDummyUnit(): AnalysisUnit
     {
@@ -267,11 +230,11 @@ final class TestQualityConfigurationRulesTest extends TestCase
     /**
      * Assert the expected test-quality finding count for a rule.
      *
-     * @param string        $ruleId - Rule identifier whose findings are counted.
+     * @param string        $ruleId        - Rule identifier whose findings are counted.
      * @param int           $expectedCount - Exact number of findings the rule must emit.
-     * @param list<Finding> $findings - Findings to filter down to the requested rule id.
+     * @param list<Finding> $findings      - Findings to filter down to the requested rule id.
      *
-     * @return void
+     * @return void - Asserts that filtering by rule ID yields exactly the expected number of findings.
      */
     private static function assertRuleCount(string $ruleId, int $expectedCount, array $findings): void
     {
@@ -283,39 +246,25 @@ final class TestQualityConfigurationRulesTest extends TestCase
     }
 
     /**
-     * List rule IDs expected in enabled test-quality scans.
+     * List the rule IDs required by the cumulative fixture assertion.
      *
-     * @return list<string> - every test-quality rule id an enabled scan must surface; a missing entry means a rule was dropped
+     * @return list<string> - Rule IDs that the cumulative fixture's findings must include.
      */
     private function expectedRuleIds(): array
     {
         return [
             NoAssertionsRule::ID,
-            TrivialAssertionRule::ID,
-            ConditionalTestLogicRule::ID,
             TestLongerThanSutRule::ID,
-            EagerTestRule::ID,
-            MysteryGuestRule::ID,
-            ExcessiveMockingRule::ID,
-            MockOnlyTestRule::ID,
-            SleepInTestRule::ID,
             TestNamingConsistencyRule::ID,
-            MagicNumberAssertionRule::ID,
             PrivateReflectionRule::ID,
             DataProviderAnnotationRule::ID,
             TrivialSnapshotRule::ID,
             SutNotCalledRule::ID,
             SetupBloatRule::ID,
-            SkippedWithoutReasonRule::ID,
-            ExtendsProductionClassRule::ID,
-            TestMethodTooLongRule::ID,
             EmptyDataProviderRule::ID,
             LoopAssertionWithoutMessageRule::ID,
-            UnusedMockRule::ID,
             ExceptionTypeOnlyRule::ID,
-            TautologicalTypeAssertionRule::ID,
             GlobalStateMutationRule::ID,
-            MockWithoutExpectationRule::ID,
             RepeatedStructureMissingDataProviderRule::ID,
         ];
     }
@@ -323,8 +272,8 @@ final class TestQualityConfigurationRulesTest extends TestCase
     /**
      * Analyse test-quality fixtures and return findings for assertions.
      *
-     * @param string              $path - Single fixture path to analyse.
-     * @param AnalysisConfig|null $config - Overriding config, or null to use the registry defaults.
+     * @param string              $path   - Single fixture path to analyse.
+     * @param AnalysisConfig|null $config - Overriding config, or null to enable the default-off calibration rules.
      *
      * @return list<Finding> - all findings the default registry emits for the single fixture; empty when the fixture is clean
      */
@@ -336,8 +285,8 @@ final class TestQualityConfigurationRulesTest extends TestCase
     /**
      * Analyse test-quality fixtures and return findings for assertions.
      *
-     * @param list<string>        $paths - Fixture paths to parse and analyse together.
-     * @param AnalysisConfig|null $config - Overriding config, or null to use the registry defaults.
+     * @param list<string>        $paths  - Fixture paths to parse and analyse together.
+     * @param AnalysisConfig|null $config - Overriding config, or null to enable the default-off calibration rules.
      *
      * @return list<Finding> - findings the default registry emits across all parsed fixtures combined; empty when none fire
      */
@@ -345,17 +294,18 @@ final class TestQualityConfigurationRulesTest extends TestCase
     {
         $registry = RuleRegistry::defaults();
         $units    = array_map(fn(string $path): AnalysisUnit => $this->unitForPath($path), $paths);
+        $config ??= (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/enable-default-off-rules.yaml', $registry);
 
         return $registry->analyse(
             $units,
-            new RuleContext(self::PROJECT_ROOT, $config ?? AnalysisConfig::fromRegistry($registry)),
+            new RuleContext(self::PROJECT_ROOT, $config),
         );
     }
 
     /**
      * Parse the requested path into an analysis unit.
      *
-     * @param string $path - Filesystem path.
+     * @param string $path - Project-root-relative fixture path to parse.
      *
      * @return AnalysisUnit - the fixture parsed from the project-root-relative path, retaining that path as its display name
      */

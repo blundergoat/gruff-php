@@ -6,21 +6,21 @@ namespace GruffPhp\Tests\Console;
 
 use GruffPhp\Cli\Application;
 use GruffPhp\Rules\Docs\MissingPropertyPhpdocRule;
-use GruffPhp\Rules\Naming\GenericMethodNameRule;
-use GruffPhp\Rules\Naming\BooleanPrefixRule;
 use GruffPhp\Rules\Security\DangerousFunctionCallRule;
 use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers the version, list, and help CLI commands running end-to-end through the built binary on a clean checkout.
+ * Exercises version, command listing and rule-catalogue output through the CLI binary.
+ * Checks selected text and JSON fields, guidance, options and threshold maps.
+ * Installation fixtures cover help after a production install and init through a consumer's vendor/bin proxy.
  */
 final class ListRulesCliTest extends CliTestCase
 {
     /**
      * Verify version command runs through binary.
      *
-     * @return void
+     * @return void - Asserts a successful exit and the product name and version in stdout.
      */
     public function testVersionCommandRunsThroughBinary(): void
     {
@@ -35,7 +35,7 @@ final class ListRulesCliTest extends CliTestCase
     /**
      * Verify list command runs through binary.
      *
-     * @return void
+     * @return void - Asserts a successful exit and analyse, dashboard and report in the command list.
      */
     public function testListCommandRunsThroughBinary(): void
     {
@@ -51,7 +51,7 @@ final class ListRulesCliTest extends CliTestCase
     /**
      * Verify list-rules accepts the shared text format alias.
      *
-     * @return void
+     * @return void - Asserts a successful exit and the expected table header for text output.
      */
     public function testListRulesAcceptsTextFormatAlias(): void
     {
@@ -65,7 +65,7 @@ final class ListRulesCliTest extends CliTestCase
     /**
      * Verify list-rules with a rule id argument renders the per-rule detail view.
      *
-     * @return void
+     * @return void - Asserts the rule identity, option and escape-hatch text, and false-positive guidance heading.
      */
     public function testListRulesRendersPerRuleDetailViewForKnownId(): void
     {
@@ -88,9 +88,28 @@ final class ListRulesCliTest extends CliTestCase
     }
 
     /**
+     * Verifies that the retired docs.missing-public-phpdoc ID displays the docs.missing-phpdoc detail heading.
+     *
+     * @return void - Asserts a successful exit and the replacement rule's heading.
+     */
+    public function testListRulesResolvesARetiredIdToItsReplacement(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            self::PROJECT_ROOT . '/bin/gruff-php',
+            'list-rules',
+            'docs.missing-public-phpdoc',
+        ]);
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        self::assertStringContainsString('Rule: docs.missing-phpdoc', $process->getOutput());
+    }
+
+    /**
      * Verify list-rules detail view JSON includes the structured payload.
      *
-     * @return void
+     * @return void - Asserts the requested ID, guidance-key presence and nonempty escape hatches.
      */
     public function testListRulesDetailJsonIncludesStructuredFields(): void
     {
@@ -98,7 +117,7 @@ final class ListRulesCliTest extends CliTestCase
             PHP_BINARY,
             self::PROJECT_ROOT . '/bin/gruff-php',
             'list-rules',
-            'waste.one-line-method',
+            'waste.commented-out-code',
             '--format',
             'json',
         ]);
@@ -108,7 +127,7 @@ final class ListRulesCliTest extends CliTestCase
         $payload = json_decode($process->getOutput(), associative: true, flags: JSON_THROW_ON_ERROR);
 
         self::assertIsArray($payload);
-        self::assertSame('waste.one-line-method', $payload['id'] ?? null);
+        self::assertSame('waste.commented-out-code', $payload['id'] ?? null);
         self::assertArrayHasKey('escapeHatches', $payload);
         self::assertArrayHasKey('falsePositiveShapes', $payload);
         self::assertIsArray($payload['escapeHatches']);
@@ -116,67 +135,114 @@ final class ListRulesCliTest extends CliTestCase
     }
 
     /**
-     * Verify Boolean detail JSON preserves the documented option semantics added for configuration users.
+     * Verify the catalogue publishes false-positive guidance for every medium and low confidence rule.
+     * Checks catalogue counts, nonblank guidance entries and high confidence for rows without guidance.
      *
-     * @return void
+     * @return void - Asserts catalogue counts, complete medium/low guidance and high confidence for rows without guidance.
      */
-    public function testBooleanRuleDetailJsonKeepsDocumentedOptionSemantics(): void
+    public function testCatalogueJsonPublishesGuidanceForEveryMediumAndLowConfidenceRule(): void
     {
-        $process = new Process([
-            PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff-php',
-            'list-rules',
-            BooleanPrefixRule::ID,
-            '--format',
-            'json',
-        ]);
+        $process = new Process([PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'list-rules', '--format', 'json']);
         $process->run();
+        $exitCode = $process->getExitCode();
+        $payload  = json_decode($process->getOutput(), associative: true, flags: JSON_THROW_ON_ERROR);
+        /**
+         * @var list<array{id: string, confidence: string, falsePositiveShapes?: list<array{shape: string, mitigation: string}>}> $rules
+         *     - Catalogue rows as published by the JSON renderer.
+         */
+        $rules = (array)(is_array($payload) ? ($payload['rules'] ?? []) : []);
 
-        $payload = json_decode($process->getOutput(), associative: true, flags: JSON_THROW_ON_ERROR);
+        $mediumOrLowRules = array_values(array_filter(
+            $rules,
+            static fn(array $rule): bool => in_array($rule['confidence'], ['medium', 'low'], true),
+        ));
+        $withoutGuidance = array_values(array_map(
+            static fn(array $rule): string => $rule['id'],
+            array_filter(
+                $mediumOrLowRules,
+                static fn(array $rule): bool => ($rule['falsePositiveShapes'] ?? []) === [],
+            ),
+        ));
+        // Name every rule with a blank half so one failure lists them all rather than only the first.
+        $blankGuidance = array_values(array_map(
+            static fn(array $rule): string => $rule['id'],
+            array_filter($mediumOrLowRules, static fn(array $rule): bool => array_filter(
+                $rule['falsePositiveShapes'] ?? [],
+                static fn(array $entry): bool => trim($entry['shape']) === '' || trim($entry['mitigation']) === '',
+            ) !== []),
+        ));
 
-        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-        self::assertIsArray($payload);
-        self::assertSame(BooleanPrefixRule::ID, $payload['id'] ?? null);
-        self::assertSame(
-            [
-                'allowedPrefixes' => 'Leading predicate words accepted at camelCase or snake_case word boundaries.',
-                'stateAdjectiveAllowlist' => 'Exact whole Boolean names accepted for typed properties and parameters only.',
-                'stateSuffixAllowlist' => 'Final whole tokens accepted on Boolean names containing at least two tokens across methods, functions, properties, and parameters.',
-                'propositionVerbAllowlist' => 'Internal whole verbs accepted only with a subject token before and a context token after.',
-                'acceptedBooleanNames' => 'Exact case-insensitive Boolean names accepted across receivers for compatibility.',
-                'includePublicApi' => 'Whether to inspect public/protected methods, properties, named functions, and their caller-visible parameters; false limits findings to private/local declarations.',
-            ],
-            $payload['optionDescriptions'] ?? null,
-        );
+        // A rule that catalogues nothing omits the key rather than publishing an empty list, so an
+        // absent key never reads as "reviewed and found to have no false positives".
+        $shapelessRules       = array_values(array_filter(
+            $rules,
+            static fn(array $rule): bool => !array_key_exists('falsePositiveShapes', $rule),
+        ));
+        $shapelessConfidences = array_values(array_unique(array_map(
+            static fn(array $rule): string => (string)$rule['confidence'],
+            $shapelessRules,
+        )));
+
+        self::assertSame(0, $exitCode, $process->getErrorOutput());
+
+        self::assertCount(84, $rules);
+        self::assertCount(43, $mediumOrLowRules);
+        self::assertSame([], $withoutGuidance);
+        self::assertSame([], $blankGuidance);
+        self::assertNotEmpty($shapelessRules);
+        self::assertSame(['high'], $shapelessConfidences);
     }
 
     /**
-     * Verify requested rule detail JSON preserves replacement, toggle, and additive option contracts.
+     * Verifies that waste.commented-out-code publishes the same nonempty guidance in catalogue and detail JSON.
      *
-     * @return void
+     * @return void - Asserts successful exits and identical nonempty guidance for the selected rule.
+     */
+    public function testPreExistingGuidanceStaysPublishedInCatalogueAndDetailViews(): void
+    {
+        $listProcess = new Process([PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'list-rules', '--format', 'json']);
+        $listProcess->run();
+        $detailProcess = new Process([
+            PHP_BINARY,
+            self::PROJECT_ROOT . '/bin/gruff-php',
+            'list-rules',
+            'waste.commented-out-code',
+            '--format',
+            'json',
+        ]);
+        $detailProcess->run();
+
+        $listPayload   = json_decode($listProcess->getOutput(), associative: true, flags: JSON_THROW_ON_ERROR);
+        $detailPayload = json_decode($detailProcess->getOutput(), associative: true, flags: JSON_THROW_ON_ERROR);
+        /**
+         * @var list<array{id: string, falsePositiveShapes?: list<array{shape: string, mitigation: string}>}> $catalogueRules
+         *     - Catalogue rows as published by the JSON renderer.
+         */
+        $catalogueRules  = (array)(is_array($listPayload) ? ($listPayload['rules'] ?? []) : []);
+        $catalogueShapes = array_merge(...array_map(
+            static fn(array $rule): array => $rule['falsePositiveShapes'] ?? [],
+            array_values(array_filter(
+                $catalogueRules,
+                static fn(array $rule): bool => $rule['id'] === 'waste.commented-out-code',
+            )),
+        ));
+        $detailShapes = (array)(is_array($detailPayload) ? ($detailPayload['falsePositiveShapes'] ?? []) : []);
+
+        self::assertSame(0, $listProcess->getExitCode(), $listProcess->getErrorOutput());
+        self::assertSame(0, $detailProcess->getExitCode(), $detailProcess->getErrorOutput());
+        self::assertNotEmpty($catalogueShapes);
+
+        self::assertSame($detailShapes, $catalogueShapes);
+    }
+
+    /**
+     * Verify requested rule detail JSON preserves toggle and additive option contracts.
+     *
+     * @return void - Asserts selected rule IDs, default options and exact option descriptions in detail JSON.
      */
     public function testRequestedRuleDetailsExposeDocumentedOptionContracts(): void
     {
         $expectedByRule = [
-            GenericMethodNameRule::ID => [
-                'options' => [
-                    'genericNames' => [
-                        'process',
-                        'handle',
-                        'execute',
-                        'run',
-                        'manage',
-                        'doIt',
-                        'do',
-                        'perform',
-                        'make',
-                        'compute',
-                    ],
-                ],
-                'optionDescriptions' => [
-                    'genericNames' => 'Replacement list of function and method names treated as generic; matching is case-insensitive.',
-                ],
-            ],
             MissingPropertyPhpdocRule::ID => [
                 'options' => ['acceptLineComments' => false],
                 'optionDescriptions' => [
@@ -227,7 +293,7 @@ final class ListRulesCliTest extends CliTestCase
     /**
      * Verify list-rules with an unknown rule id suggests near matches and exits INVALID.
      *
-     * @return void
+     * @return void - Asserts exit code 2 and the unknown-rule message, suggestion prompt and corrected ID.
      */
     public function testListRulesUnknownRuleSuggestsNearMatches(): void
     {
@@ -247,9 +313,9 @@ final class ListRulesCliTest extends CliTestCase
     }
 
     /**
-     * Verify clean checkout install runs CLI help.
+     * Verifies that a package copy runs CLI help after installing dependencies without development packages.
      *
-     * @return void
+     * @return void - Asserts successful dependency installation and a successful help response containing Description:.
      */
     public function testCleanCheckoutInstallRunsCliHelp(): void
     {
@@ -289,8 +355,8 @@ final class ListRulesCliTest extends CliTestCase
     /**
      * Verify Composer's vendor/bin proxy boots the package through the consumer project's autoloader.
      *
-     * @return void
-     * @throws \JsonException
+     * @return void - Asserts installation without a package autoloader and successful config creation through vendor/bin.
+     * @throws \JsonException - If the consumer Composer manifest cannot be encoded as JSON.
      */
     public function testInstalledVendorBinProxyUsesConsumerAutoloader(): void
     {
@@ -352,5 +418,59 @@ final class ListRulesCliTest extends CliTestCase
         } finally {
             $this->removeDir($tempDir);
         }
+    }
+
+    /**
+     * Verifies selected named threshold maps in catalogue JSON and the method-length map in detail JSON.
+     * Checks that maps are nonempty, omit severity keys and omit thresholds for header injection.
+     *
+     * @return void - Asserts selected catalogue maps, threshold-key absence and the method-length detail map.
+     */
+    public function testCatalogueAndDetailPublishThresholdsAsNamedKnobMaps(): void
+    {
+        $listProcess = new Process([PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'list-rules', '--format', 'json']);
+        $listProcess->run();
+        $detailProcess = new Process([
+            PHP_BINARY,
+            self::PROJECT_ROOT . '/bin/gruff-php',
+            'list-rules',
+            'size.method-length',
+            '--format',
+            'json',
+        ]);
+        $detailProcess->run();
+
+        $listPayload   = json_decode($listProcess->getOutput(), associative: true, flags: JSON_THROW_ON_ERROR);
+        $detailPayload = json_decode($detailProcess->getOutput(), associative: true, flags: JSON_THROW_ON_ERROR);
+        /** @var list<array{id: string, thresholds?: array<string, int|float>}> $rules - Catalogue rows as published by the JSON renderer. */
+        $rules = (array)(is_array($listPayload) ? ($listPayload['rules'] ?? []) : []);
+        /** @var array{thresholds?: array<string, int|float>} $detail - Detail card as published by the JSON renderer. */
+        $detail = is_array($detailPayload) ? $detailPayload : [];
+        $rulesById = array_combine(
+            array_map(static fn(array $rule): string => $rule['id'], $rules),
+            $rules,
+        );
+        $pairShaped = array_keys(array_filter(
+            $rulesById,
+            static fn(array $rule): bool => array_key_exists('severity', $rule['thresholds'] ?? []),
+        ));
+        $emptyMaps = array_keys(array_filter(
+            $rulesById,
+            static fn(array $rule): bool => array_key_exists('thresholds', $rule) && $rule['thresholds'] === [],
+        ));
+
+        self::assertSame(0, $listProcess->getExitCode(), $listProcess->getErrorOutput());
+        self::assertSame(0, $detailProcess->getExitCode(), $detailProcess->getErrorOutput());
+
+        self::assertSame(['maxComplexity' => 20], $rulesById['complexity.cognitive']['thresholds'] ?? null);
+        self::assertSame(['maxLines' => 100], $rulesById['size.method-length']['thresholds'] ?? null);
+
+        self::assertSame(['threshold' => 10], $rulesById['docs.todo-density']['thresholds'] ?? null);
+        self::assertSame(['minWords' => 2], $rulesById['test-quality.testdox-readability']['thresholds'] ?? null);
+        self::assertArrayNotHasKey('thresholds', $rulesById['security.header-injection'] ?? []);
+        self::assertSame([], $pairShaped);
+        self::assertSame([], $emptyMaps);
+
+        self::assertSame(['maxLines' => 100], $detail['thresholds'] ?? null);
     }
 }
