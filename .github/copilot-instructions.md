@@ -1,4 +1,4 @@
-# .github/copilot-instructions.md - instructions v1.5.3 / goat-flow 1.17.0 (2026-10-03)
+# .github/copilot-instructions.md - instructions v1.5.3 / goat-flow 1.19.0 (2026-11-23)
 gruff-php is an opinionated PHP code-quality analyzer; its mission is to govern AI-generated code so a human can verify, trust, and sign off on it (legible, secure, genuinely tested). Current invariant: keep app claims and commands grounded in real source/config files. This file is standalone and does not defer to `CLAUDE.md` or `AGENTS.md`.
 
 ## Truth Order
@@ -66,6 +66,7 @@ Declare files allowed to change, non-goals, and max blast radius before writes. 
 
 ### ACT
 State: `[MODE]` | Goal: `[one line]` | Exit: `[condition]`. Implement narrowly and prefer existing project patterns over new abstractions.
+For milestone work, load `goat-plan`; with the project CLI `node node_modules/@blundergoat/goat-flow/dist/cli/cli.js`, run `plans time start <milestone-file> --category <product|proof|other>` before the first source edit, `plans time stop <milestone-file>` at human gates, and `plans time stop <milestone-file> --finalize` at exit; resume with `plans time start` after release. The CLI writes measured `Actual`; never invent it. Tick each task `- [x]` immediately, never at batch end or closeout.
 
 ### VERIFY
 Run relevant checks before claiming success. If no app commands exist, say that explicitly. For shell changes run `bash -n` or `shellcheck` when available. Do not claim checks passed without literal pass/fail output from this session.

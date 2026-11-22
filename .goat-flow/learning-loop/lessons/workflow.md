@@ -157,7 +157,7 @@ Better approach taken: extend `ConfigLoaderTestCase::writeTempConfig` with an au
 - Never invoke `git commit` or `git push` via Bash. Treat both as user-only operations forever, in this repo and in every other repo, for every session. There is no scenario in which the agent should run these.
 - When changes are ready to commit: stage with `git add <files>`, run the agreed checks (`composer check` / `composer test` / etc.), and write the commit message to `.goat-flow/scratchpad/commit.md`. Then tell the user the message is staged and stop. Do not retry, do not propose a workaround, do not suggest the user use `! git commit ...` — they will commit themselves whichever way they prefer.
 - If the harness denies `git commit` or `git push` once, treat it as a permanent signal for the rest of the session and never attempt either again. Do not interpret silence or further user instructions as a re-authorisation.
-- Permission-layer enforcement now exists: `.claude/settings.json` (search: `Bash(*git commit*)`) denies both commands, and `.goat-flow/hooks/deny-git-mutations.sh` blocks Git and GitHub writes before execution. A denial is the rule working, not an obstacle to route around.
+- Permission-layer enforcement now exists: `.claude/settings.json` (search: `Bash(*git commit*)`) denies both commands, and `.goat-flow/hooks/deny-git-mutations.mjs` blocks Git and GitHub writes before execution. A denial is the rule working, not an obstacle to route around.
 
 ## Lesson: Tick the per-task checkboxes when flipping a plan to complete
 

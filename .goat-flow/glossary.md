@@ -1,6 +1,6 @@
 # Glossary - gruff-php
 
-Last reviewed 2026-05-24; the Analysis Report, Baseline, Changed-Code Scan, Display Filter, and Branch Review Mode entries were reconciled with source on 2026-10-03.
+Last reviewed 2026-05-24; the Analysis Report, Baseline, Changed-Code Scan, Display Filter, and Branch Review Mode entries were reconciled with source on 2026-10-03, and the Fingerprint entry on 2026-11-23.
 
 This glossary defines terms used by `gruff-php`, its public reports, and local project memory. Keep shared gruff-family terms aligned with the sibling implementations; keep PHP-specific differences explicit rather than making them look identical.
 
@@ -48,7 +48,7 @@ One rule-produced result with rule ID, message, severity, confidence, pillar, lo
 
 ### Fingerprint
 
-A stable 16-character hash derived from finding identity fields. Baselines and downstream tooling key on it together with rule ID and file path.
+A 16-character hash of a finding's rule ID, file, positions (line, end line, column), symbol, and message, published in JSON reports and hook output. It changes when the finding moves. Baselines and SARIF do not key on it; they use the line-free identity described under Baseline.
 
 ### Gruff Config
 
