@@ -9,6 +9,7 @@ use Symfony\Component\Process\Process;
 
 /**
  * Covers the gruff.hook.v2 agent-hook CLI contract.
+ *
  * Exercises capability advertisements, finding metadata, changed ranges, and baseline filtering.
  * Checks JSON diagnostics and errors alongside the exit codes asserted by individual tests.
  */
@@ -38,6 +39,7 @@ final class HookCliContractTest extends CliTestCase
         $supports = $report['supports'] ?? null;
         self::assertIsArray($supports);
 
+        // Verify the advertised features so hook consumers know which scope and gates they can request.
         foreach ([
             'baseline', 'baselineV3', 'changedRanges', 'confidenceGate', 'deepScanBudget', 'diagnostics',
             'diff', 'ignoreReport', 'metadata', 'newOnly', 'scopeField', 'stableIdentity',
@@ -140,6 +142,61 @@ final class HookCliContractTest extends CliTestCase
             self::assertGreaterThanOrEqual(1, $this->suppressedCount($anchorReport));
         } finally {
             $this->removeDir($tempDir);
+        }
+    }
+
+    /**
+     * Distinguishes the three scopes when a changed line shares a function with a finding.
+     *
+     * @return void - Checks the reported scope and the gate verdict for each option.
+     */
+    public function testHookGateUsesRequestedChangedScope(): void
+    {
+        $project = $this->tempDir();
+
+        try {
+            file_put_contents($project . '/Example.php', <<<'PHP'
+                <?php
+                function example(): void {
+                    $text = 'sample';
+                    echo @strlen($text);
+                }
+                PHP);
+
+            // Use one edited function to show that widening from hunk to symbol or file changes the gate result.
+            foreach (['symbol' => 1, 'hunk' => 0, 'file' => 1] as $scope => $expectedExit) {
+                [$process, $report] = $this->runHook($project, [
+                    'hook', 'Example.php', '--no-config', '--include-rule=security.error-suppression',
+                    '--changed-ranges=3-3', '--changed-scope=' . $scope, '--fail-on=warning',
+                ]);
+
+                self::assertSame($expectedExit, $process->getExitCode(), $process->getOutput());
+                self::assertSame($scope, $this->decodedJsonObject($report['run'] ?? null)['scope'] ?? null);
+            }
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+
+    /**
+     * Proves a missing sole operand cannot count as a successful scan.
+     *
+     * @return void - Checks exit 2 and the machine-readable missing-path diagnostic.
+     */
+    public function testHookRefusesMissingSoleOperand(): void
+    {
+        $project = $this->tempDir();
+
+        try {
+            [$process, $report] = $this->runHook($project, ['hook', 'missing.php', '--no-config']);
+            self::assertSame(2, $process->getExitCode());
+            self::assertSame(0, $this->decodedJsonObject($report['run'] ?? null)['analysedFiles'] ?? null);
+            $diagnostics = $report['diagnostics'] ?? null;
+            self::assertIsArray($diagnostics);
+            $diagnostic = $this->decodedJsonObject($diagnostics[0] ?? null);
+            self::assertSame('missing-path', $diagnostic['type'] ?? null);
+        } finally {
+            $this->removeDir($project);
         }
     }
 
@@ -831,7 +888,9 @@ PHP;
      */
     private function firstFindingByRule(array $findings, string $ruleId): ?array
     {
+        // Find a published finding by the rule a hook caller asked to run.
         foreach ($findings as $finding) {
+            // The first matching rule row is enough for this test to inspect its payload.
             if (($finding['ruleId'] ?? null) === $ruleId) {
                 return $finding;
             }
@@ -850,7 +909,9 @@ PHP;
     private function symbols(array $findings): array
     {
         $symbols = [];
+        // Inspect only findings with a named declaration when checking symbol coverage.
         foreach ($findings as $finding) {
+            // A line or file finding without a symbol cannot contribute a declaration name.
             if (is_string($finding['symbol'] ?? null)) {
                 $symbols[] = $finding['symbol'];
             }

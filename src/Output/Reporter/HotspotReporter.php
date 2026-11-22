@@ -9,12 +9,16 @@ use GruffPhp\Engine\Analysis\RunDiagnostic;
 use GruffPhp\Results\Scoring\FileScore;
 
 /**
- * Serializes score->topOffenders in their existing order and includes run diagnostics in the hotspot-map JSON feed.
- * A null score yields an empty hotspot list and the full-project scope label.
- * Invalid UTF-8 is replaced during encoding; other JSON encoding failures propagate to the caller.
+ * Renders `--format hotspot` for callers tracking the files with the most findings.
+ *
+ * Uses the score's existing offender order and includes run diagnostics and suppression audit rows.
+ * When there is no score, the hotspot list is empty and the scope reads full-project.
  */
 final readonly class HotspotReporter
 {
+    /** Schema identifier for the compact hotspot document. */
+    public const SCHEMA_VERSION = 'gruff-php.hotspot.v1';
+
     /**
      * Serializes the report's existing hotspot ranking and diagnostics as newline-terminated JSON.
      * Invalid UTF-8 is substituted; other JSON encoding errors propagate.
@@ -27,11 +31,12 @@ final readonly class HotspotReporter
     {
         $score   = $report->score;
         $payload = [
-            'schemaVersion' => AnalysisReport::SCHEMA_VERSION,
+            'schemaVersion' => self::SCHEMA_VERSION,
             'type' => 'hotspot-map',
             'limitations' => 'v0.1 hotspot ranking uses finding density and available metrics; git churn weighting is not available unless a later history layer provides it.',
 
             'scope' => $score === null ? 'full-project' : $score->scope,
+            'suppressions' => $report->suppressionRows(),
             'diagnostics' => array_map(
                 static fn (RunDiagnostic $diagnostic): array => $diagnostic->toArray(),
                 $report->diagnostics,

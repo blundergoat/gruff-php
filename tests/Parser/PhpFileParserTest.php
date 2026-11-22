@@ -10,6 +10,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Covers conversion of PHP source fixtures into analysis units.
+ *
  * Checks syntax-error diagnostics and nonfatal limits on structural parsing.
  * Checks that text-source fixtures remain unbounded and have no diagnostics.
  */
@@ -71,6 +72,21 @@ final class PhpFileParserTest extends TestCase
         self::assertFalse($unit->diagnostics[0]->isFatal);
         self::assertStringContainsString('path=alpha.php;', $unit->diagnostics[0]->message);
         self::assertStringContainsString('maxLines=1; maxBytes=1; override=cli', $unit->diagnostics[0]->message);
+    }
+
+    /**
+     * Accepts a newline-terminated source whose physical line count equals its budget.
+     *
+     * @return void - Asserts no bounded-scan diagnostic at the inclusive line limit.
+     */
+    public function testDeepScanBudgetCountsPhysicalLines(): void
+    {
+        $file = new SourceFile($this->fixturePath('mixed/alpha.php'), 'alpha.php');
+        self::assertNull(PhpFileParser::deepScanBudgetDiagnostic(
+            $file,
+            "<?php\nreturn 1;\n",
+            ['enabled' => true, 'maxLines' => 2, 'maxBytes' => 100, 'override' => 'cli'],
+        ));
     }
 
     /**

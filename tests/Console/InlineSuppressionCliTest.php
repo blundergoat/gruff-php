@@ -9,6 +9,7 @@ use Symfony\Component\Process\Process;
 
 /**
  * Covers FAMILY-CONTRACT.md section 13c using phpcs and psalm comments plus an exec call reported by two rules.
+ *
  * Checks ordered security line/rule pairs and inline/duplicate audit rows against exact expected lists.
  * Text assertions cover two audit rows; SARIF assertions check the collected suppression kinds and reasons.
  */
@@ -36,6 +37,7 @@ final class InlineSuppressionCliTest extends CliTestCase
             $wpdb->query("SELECT * FROM secrets WHERE id = $id"); // phpcs:ignore Generic
             $wpdb->query("SELECT * FROM options WHERE id = $id"); // phpcs:ignore WordPress
             echo $contents;
+            echo @strlen('phpcs:ignore WordPress.PHP.NoSilencedErrors');
         }
 
         PHP;
@@ -52,8 +54,10 @@ final class InlineSuppressionCliTest extends CliTestCase
         try {
             $report   = $this->decodeJsonOutput($this->scan($project, 'json'));
             $security = [];
+            // Keep the expected rows limited to the security checks this suppression workflow exercises.
             foreach ($this->listAt($report, 'findings') as $finding) {
                 $finding = $this->decodedJsonObject($finding);
+                // Ignore findings from other pillars so the assertions track the rules covered by the fixture directives.
                 if (is_string($finding['ruleId'] ?? null) && str_starts_with($finding['ruleId'], 'security.')) {
                     $security[] = sprintf('%d %s', is_int($finding['line'] ?? null) ? $finding['line'] : 0, $finding['ruleId']);
                 }
@@ -66,6 +70,7 @@ final class InlineSuppressionCliTest extends CliTestCase
                 '14 security.process-command-construction',
                 '15 security.dangerous-function-call',
                 '16 security.sql-concatenation',
+                '19 security.error-suppression',
             ], $security);
             self::assertSame([
                 '0|inline|security.dangerous-function-call|1|' . InlineSuppressionFilter::INLINE_REASON,
@@ -100,6 +105,7 @@ final class InlineSuppressionCliTest extends CliTestCase
             foreach ($this->listAt($sarifRun, 'results') as $result) {
                 $suppressions = $this->decodedJsonObject($result)['suppressions'] ?? null;
                 $suppression  = is_array($suppressions) ? ($suppressions[0] ?? null) : null;
+                // Inspect only suppressed SARIF results, where the caller needs the reason a finding was hidden.
                 if (is_array($suppression)) {
                     self::assertSame('inSource', $suppression['kind'] ?? null);
                     $justification[] = $suppression['justification'] ?? null;
@@ -110,6 +116,49 @@ final class InlineSuppressionCliTest extends CliTestCase
                 [...array_fill(0, 5, InlineSuppressionFilter::INLINE_REASON), InlineSuppressionFilter::DUPLICATE_REASON],
                 $justification,
             );
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+
+    /**
+     * Checks that a selected hunk publishes only the suppression inside its lines.
+     *
+     * @return void - Asserts one SARIF result with the rule hidden on the selected line.
+     */
+    public function testSarifSuppressionsRespectChangedRanges(): void
+    {
+        $project = $this->writeProject();
+
+        try {
+            $report   = $this->decodeJsonOutput($this->scan($project, 'sarif', ['--changed-ranges=11-11', '--changed-scope=hunk', 'src/Db.php']));
+            $sarifRun = $this->decodedJsonObject($this->listAt($report, 'runs')[0] ?? null);
+            $results  = $this->listAt($sarifRun, 'results');
+            self::assertCount(1, $results);
+            $result = $this->decodedJsonObject($results[0]);
+            self::assertSame('security.error-suppression', $result['ruleId'] ?? null);
+            self::assertCount(1, $this->listAt($result, 'suppressions'));
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+
+    /**
+     * Checks the PHP hotspot schema and its suppression audit.
+     *
+     * @return void - Confirms the hotspot audit matches the analysis audit.
+     */
+    public function testHotspotPublishesItsSchemaAndSuppressionAudit(): void
+    {
+        $project = $this->writeProject();
+
+        try {
+            $hotspot  = $this->decodeJsonOutput($this->scan($project, 'hotspot'));
+            $analysis = $this->decodeJsonOutput($this->scan($project, 'json'));
+
+            self::assertSame('gruff-php.hotspot.v1', $hotspot['schemaVersion'] ?? null);
+            self::assertNotEmpty($this->listAt($hotspot, 'hotspots'));
+            self::assertSame($this->listAt($analysis, 'suppressions'), $this->listAt($hotspot, 'suppressions'));
         } finally {
             $this->removeDir($project);
         }
@@ -132,12 +181,13 @@ final class InlineSuppressionCliTest extends CliTestCase
     /**
      * Runs the analyse command over the project in one output format, as a user would from the project root.
      *
-     * @param string $project - Root of the fixture project.
-     * @param string $format  - Output format to request.
+     * @param string       $project - Root of the fixture project.
+     * @param string       $format  - Output format to request.
+     * @param list<string> $options - Additional scope arguments.
      *
      * @return Process - The finished process, whose output the caller reads.
      */
-    private function scan(string $project, string $format): Process
+    private function scan(string $project, string $format, array $options = []): Process
     {
         // Temp roots sit under an ignored directory, so ask for them explicitly.
         $process = new Process([
@@ -153,6 +203,7 @@ final class InlineSuppressionCliTest extends CliTestCase
             '--no-baseline',
             '--no-cache',
             '--include-ignored',
+            ...$options,
         ], $project);
         $process->run();
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
@@ -189,6 +240,7 @@ final class InlineSuppressionCliTest extends CliTestCase
         // Only the two section 13c sources are compared; built-in and configured rows belong to section 13a.
         foreach ($this->listAt($report, 'suppressions') as $row) {
             $row = $this->decodedJsonObject($row);
+            // Compare the inline and duplicate rows without relying on configured sensitive-exclusion entries.
             if (in_array($row['source'] ?? null, ['inline', 'duplicate'], true)) {
                 $fields = [$row['index'] ?? null, $row['source'], $row['rule'] ?? null, $row['suppressed'] ?? null, $row['reason'] ?? null];
                 $rows[] = implode('|', array_map(static fn (mixed $field): string => is_scalar($field) ? (string)$field : '', $fields));

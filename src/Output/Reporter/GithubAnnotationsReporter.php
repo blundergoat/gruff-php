@@ -6,12 +6,14 @@ namespace GruffPhp\Output\Reporter;
 
 use GruffPhp\Engine\Analysis\AnalysisReport;
 use GruffPhp\Engine\Analysis\RunDiagnostic;
+use GruffPhp\Engine\Analysis\SensitiveExclusionSummary;
 use GruffPhp\Results\Finding\Finding;
 
 /**
- * Renders findings and run diagnostics as GitHub Actions workflow commands, including available file and line properties.
- * Findings use error, warning or notice levels; diagnostics use error when fatal and notice otherwise.
- * Findings precede diagnostics; a report with neither produces no output.
+ * Renders `--format github` for a GitHub Actions workflow to display beside the code.
+ *
+ * Includes a file and line range where a finding or diagnostic can identify a source location.
+ * Publishes findings first, followed by run diagnostics and any suppression audit notice.
  */
 final readonly class GithubAnnotationsReporter
 {
@@ -27,14 +29,21 @@ final readonly class GithubAnnotationsReporter
         $lines = [];
 
 
+        // Emit one workflow annotation for each finding so GitHub can attach it to the source when possible.
         foreach ($report->findings as $finding) {
             $lines[] = $this->annotation($finding);
         }
 
+        // Publish run problems as annotations as well, including failures that produced no findings.
         foreach ($report->diagnostics as $diagnostic) {
             $lines[] = $this->diagnosticAnnotation($diagnostic);
         }
 
+        $suppressionSummary = SensitiveExclusionSummary::describeTotal($report->sensitiveExclusions);
+        // Add a notice when suppression totals explain why the workflow shows fewer findings.
+        if ($suppressionSummary !== null) {
+            $lines[] = '::notice title=Finding suppressions::' . $this->escapeData($suppressionSummary);
+        }
 
         return implode(PHP_EOL, $lines) . ($lines === [] ? '' : PHP_EOL);
     }
@@ -50,9 +59,11 @@ final readonly class GithubAnnotationsReporter
     {
         $properties = ['title=' . $this->escapeProperty($diagnostic->type)];
         $filePath   = $diagnostic->filePath ?? $diagnostic->path;
+        // A file-level problem can link to its file even when there is no source line to highlight.
         if ($filePath !== null) {
             $properties[] = 'file=' . $this->escapeProperty($filePath);
         }
+        // Attach the start line only when the diagnostic can point to a specific location.
         if ($diagnostic->line !== null) {
             $properties[] = 'line=' . $diagnostic->line;
         }
@@ -86,11 +97,13 @@ final readonly class GithubAnnotationsReporter
         ];
 
 
+        // Some findings apply to the whole file and have no line to highlight.
         if ($finding->line !== null) {
             $properties[] = 'line=' . $finding->line;
         }
 
 
+        // Include the final line when the rule reports an entire source range.
         if ($finding->endLine !== null) {
             $properties[] = 'endLine=' . $finding->endLine;
         }

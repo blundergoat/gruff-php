@@ -8,6 +8,7 @@ use Symfony\Component\Process\Process;
 
 /**
  * Exercises FAMILY-CONTRACT.md section 7 for path operands and option parsing.
+ *
  * Compares exit codes and timestamp-normalized stdout with flags before and after paths.
  * Also checks -- before a leading-dash path and rejection of an operand passed to init.
  */
@@ -22,12 +23,14 @@ final class ArgumentOrderCliTest extends CliTestCase
     {
         $project = $this->argumentOrderProject();
 
+        // Compare the same caller options and operands in both orders for every relevant command.
         foreach ($this->operandCommands() as $label => $arguments) {
             [$command, $flags, $operand] = $arguments;
 
             $before = $this->runInProject($project, [$command, ...$flags, $operand]);
             $after  = $this->runInProject($project, [$command, $operand, ...$flags]);
 
+            self::assertSame($label === 'check-ignore' ? 1 : 0, $before->getExitCode(), $label . ': ' . $before->getErrorOutput());
             self::assertSame(
                 $before->getExitCode(),
                 $after->getExitCode(),
@@ -93,7 +96,7 @@ final class ArgumentOrderCliTest extends CliTestCase
     {
         return [
             'analyse' => ['analyse', ['--no-config', '--fail-on', 'none', '--format', 'json'], 'Probe.php'],
-            'summary' => ['summary', ['--no-config', '--fail-on', 'none', '--format', 'json'], 'Probe.php'],
+            'summary' => ['summary', ['--no-config', '--format', 'json'], 'Probe.php'],
             'report' => ['report', ['--no-config', '--fail-on', 'none', '--format', 'json'], 'Probe.php'],
             'hook' => ['hook', ['--no-config', '--format', 'json'], 'Probe.php'],
             'check-ignore' => ['check-ignore', ['--no-config', '--format', 'json'], 'Probe.php'],

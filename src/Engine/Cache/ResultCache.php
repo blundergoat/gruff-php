@@ -9,13 +9,10 @@ use JsonException;
 use Throwable;
 
 /**
- * Content-addressed, on-disk cache of per-file findings for warm hook feedback.
+ * Stores findings per file to speed up repeated analysis and hook runs.
  *
- * A cache hit must be byte-identical to a cold run; on any doubt (missing entry,
- * unreadable or corrupt payload, encode failure) it fails open - a miss, never a
- * stale serve. Entries are bounded by an entry cap with oldest-first eviction
- * applied once per run via finalizeRun() - never per put - and the store never
- * holds raw source, only the redacted findings a run produced.
+ * An unreadable, malformed, or missing entry prompts a fresh scan of that file.
+ * Only redacted findings are stored. After the scan, eviction keeps the cache within its entry cap.
  */
 final readonly class ResultCache
 {
@@ -34,7 +31,7 @@ final readonly class ResultCache
     /**
      * Wraps the project's cache directory; use forProject() to build one rooted under the project.
      *
-     * @param string $cacheDir - Project-local directory holding cache entries.
+     * @param string $cacheDir   - Project-local directory holding cache entries.
      * @param int    $maxEntries - Maximum number of JSON entries retained after finalizeRun().
      */
     public function __construct(private string $cacheDir, private int $maxEntries = self::MAX_ENTRIES)
@@ -59,12 +56,13 @@ final readonly class ResultCache
      *
      * @param string $key - Cache key for a file's per-unit findings.
      *
-     * @return list<Finding>|null - Reconstructed findings; null on any miss (no entry, unreadable, corrupt, or malformed), so the caller re-runs cold.
+     * @return list<Finding>|null - Cached findings. Null means rescan this file, while an empty list means the cached scan found no issues.
      */
     public function get(string $key): ?array
     {
         $path = $this->pathFor($key);
 
+        // A missing or unreadable cache entry lets the scan compute the file's findings again.
         if (!is_file($path) || !is_readable($path)) {
             // No entry on disk for this key, or it is unreadable: a plain cache miss, so callers re-run cold.
             return null;
@@ -72,6 +70,7 @@ final readonly class ResultCache
 
         $raw = file_get_contents($path);
 
+        // A cache file can disappear between checks. Continue from the source when that happens.
         if (!is_string($raw)) {
             // The entry could not be read despite existing; fail open to a miss rather than risk a stale serve.
             return null;
@@ -80,7 +79,7 @@ final readonly class ResultCache
         try {
             $decoded = json_decode($raw, true, 32, JSON_THROW_ON_ERROR);
         } catch (JsonException) {
-            // A corrupt or truncated entry is treated as absent so a bad cache file never poisons the run.
+            // A truncated entry, such as one left by an interrupted write, triggers a fresh scan for that file.
             return null;
         }
 
@@ -92,6 +91,7 @@ final readonly class ResultCache
 
         $findings = [];
 
+        // Rebuild every cached finding so the current report never gets a partial file result.
         foreach ($decoded as $entry) {
             // One malformed row invalidates the whole entry - a partial rebuild could silently drop findings.
             if (!is_array($entry)) {
@@ -100,9 +100,10 @@ final readonly class ResultCache
             }
 
             try {
-                /** @var array<string, mixed> $entry A cached row is a string-keyed finding payload; the is_array guard cannot express that to PHPStan. */
+                /** @var array<string, mixed> $entry - A cached finding must use named fields. Finding::fromArray checks them. */
                 $findings[] = Finding::fromArray($entry);
             } catch (Throwable) {
+                // An older or malformed cached finding cannot fill part of a report. Recompute the file from source.
                 return null;
             }
         }
@@ -127,7 +128,7 @@ final readonly class ResultCache
      * Stores a file's findings under its key; cache failures leave the analysis result unchanged.
      * Eviction waits for finalizeRun() so per-file writes do not scan the cache directory.
      *
-     * @param string        $key - Cache key for a file's per-unit findings.
+     * @param string        $key      - Cache key for a file's per-unit findings.
      * @param list<Finding> $findings - Findings produced for the file.
      *
      * @return void - Cache failures are not returned to the caller.
@@ -135,6 +136,7 @@ final readonly class ResultCache
     public function put(string $key, array $findings): void
     {
 
+        // If the cache directory cannot be created, keep the scan usable without saved results.
         if (!is_dir($this->cacheDir) && !mkdir($this->cacheDir, 0775, true) && !is_dir($this->cacheDir)) {
             // Cache directory is absent and could not be created; skip persisting since the cache is best-effort.
             return;
@@ -151,7 +153,7 @@ final readonly class ResultCache
         try {
             $json = json_encode($payload, JSON_THROW_ON_ERROR);
         } catch (JsonException) {
-            // Findings that will not encode are simply not cached; the next run recomputes them from source.
+            // If a finding cannot be written as JSON, the next scan recomputes it from source.
             return;
         }
 
@@ -160,21 +162,48 @@ final readonly class ResultCache
 
     /**
      * Applies oldest-first eviction when the cache exceeds its configured entry cap.
-     * Call once per run to keep directory scans out of the per-file write path.
+     * Serializes eviction across runs so each process starts from the entries still on disk.
      *
      * @return void - Attempts to remove excess JSON entries in ascending modification-time order.
      */
     public function finalizeRun(): void
     {
-        $entries = glob($this->cacheDir . '/*.json');
-
-        if (!is_array($entries) || count($entries) <= $this->maxEntries) {
-
+        // Skip eviction when the cache cannot be changed, such as on a read-only checkout.
+        if (!is_writable($this->cacheDir)) {
             return;
         }
 
-        usort($entries, static fn (string $left, string $right): int => (int) filemtime($left) <=> (int) filemtime($right));
+        $lock = fopen($this->cacheDir . '/.eviction.lock', 'c');
+        // Without a shared lock file, leave this run's cache entries in place safely.
+        if ($lock === false) {
+            return;
+        }
 
+        try {
+            // Several scans can finish together. Wait for the shared lock before choosing what to remove.
+            if (flock($lock, LOCK_EX)) {
+                $this->evictOldestEntries();
+            }
+        } finally {
+            fclose($lock);
+        }
+    }
+
+    /**
+     * Removes any entries above the cap while the caller holds the eviction lock.
+     *
+     * @return void - Deletes the excess entries in modification-time order.
+     */
+    private function evictOldestEntries(): void
+    {
+        $entries = glob($this->cacheDir . '/*.json');
+        // An already small cache needs no eviction, and an unreadable directory yields no candidates.
+        if (!is_array($entries) || count($entries) <= $this->maxEntries) {
+            return;
+        }
+
+        usort($entries, static fn (string $left, string $right): int => (int)filemtime($left) <=> (int)filemtime($right));
+        // Discard the oldest entries first so recently scanned files can still be reused.
         foreach (array_slice($entries, 0, count($entries) - $this->maxEntries) as $stale) {
             unlink($stale);
         }

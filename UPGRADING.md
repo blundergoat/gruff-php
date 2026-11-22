@@ -66,10 +66,11 @@ time, so a project using more than one of them moves once. This port's recorded 
    composer require --dev blundergoat/gruff-php:^0.6
    ```
 
-3. Migrate the configuration if you hand-wrote one. `gruff-php migrate-config` rewrites it for
-   the current schema and carries your tuning forward, never modifying the file it reads: pass
-   the old file to `--config` and the new one to `--output`. `gruff-php init --force` is not the
-   upgrade path — it writes registry defaults and preserves only `paths.ignore`.
+3. For a hand-written config, pass the original to `gruff-php migrate-config --config`
+   and choose an unused path with `--output`. When settings change, the command
+   serializes them as fresh YAML. Keep the original for its comments and formatting.
+   `gruff-php init --force` regenerates the registry defaults and preserves
+   `paths.ignore` and valid `failOn` settings.
 4. Carry a baseline forward rather than regenerating it, so previously reviewed findings stay
    reviewed. The command is in the CHANGELOG entry for the baseline break.
 5. Re-run `gruff-php summary .` and compare the finding count with the one you had. A rule

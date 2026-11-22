@@ -17,6 +17,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Exercises v3 baseline persistence with counted identities and separate sensitive counts.
+ *
  * Checks selected validation failures, legacy-schema rejection, and migration into a separate file.
  * Checks that tested secret representations are absent and legacy input bytes are preserved.
  */
@@ -208,13 +209,14 @@ final class BaselineStoreTest extends TestCase
 
         try {
             $cases = [
-                'a count below one'        => '{"identity":"0000000000000000","count":0}',
-                'a forbidden line field'   => '{"identity":"0000000000000000","count":1,"line":10}',
-                'a malformed identity'     => '{"identity":"not-hex","count":1}',
-                'a duplicated identity'    => '{"identity":"0000000000000000","count":1},{"identity":"0000000000000000","count":1}',
-                'identities out of order'  => '{"identity":"ffffffffffffffff","count":1},{"identity":"0000000000000000","count":1}',
+                'a count below one' => '{"identity":"0000000000000000","count":0}',
+                'a forbidden line field' => '{"identity":"0000000000000000","count":1,"line":10}',
+                'a malformed identity' => '{"identity":"not-hex","count":1}',
+                'a duplicated identity' => '{"identity":"0000000000000000","count":1},{"identity":"0000000000000000","count":1}',
+                'identities out of order' => '{"identity":"ffffffffffffffff","count":1},{"identity":"0000000000000000","count":1}',
             ];
 
+            // Exercise each malformed reviewed occurrence through the same baseline read used by the CLI.
             foreach ($cases as $label => $occurrences) {
                 file_put_contents($root . '/gruff-baseline.json', $this->document($occurrences));
 
@@ -222,6 +224,7 @@ final class BaselineStoreTest extends TestCase
                     (new BaselineStore($root))->read('gruff-baseline.json');
                     self::fail(sprintf('read accepted %s', $label));
                 } catch (BaselineException $exception) {
+                    // Check that the malformed occurrence names the right field for the caller to fix.
                     self::assertStringContainsString('Baseline occurrences[', $exception->getMessage(), $label);
                 }
             }
@@ -233,7 +236,7 @@ final class BaselineStoreTest extends TestCase
     /**
      * Verify same-path and symlink targets are rejected, the original bytes survive, and the legacy rule alias matches.
      *
-     * @return void - Asserts rejected aliasing targets, one accepted migrated entry, the current rule id, and unchanged input bytes.
+     * @return void - Checks alias refusal, a two-occurrence migration budget, the current rule id, and preserved input.
      */
     public function testMigrateCarriesReviewsIntoASeparateFileAndPreservesTheOriginal(): void
     {
@@ -243,17 +246,30 @@ final class BaselineStoreTest extends TestCase
             $legacyBytes = $this->stageLegacyInput($root);
             $store       = new BaselineStore($root);
 
-            $reviewed   = $this->finding(
-                ruleId:   'docs.missing-phpdoc',
-                message:  'Method calculateTotal needs a brief intent description above its declaration (one plain-English line; not a restatement of the method signature).',
-                symbol:   'Example::calculateTotal()',
+            $reviewed = $this->finding(
+                ruleId:  'docs.missing-phpdoc',
+                message: 'Method calculateTotal needs a brief intent description above its declaration (one plain-English line; not a restatement of the method signature).',
+                symbol:  'Example::calculateTotal()',
             );
             $unreviewed = $this->finding(ruleId: 'naming.generic-method', symbol: 'Example::handle()');
+            $laterMatch = $this->finding(
+                line:    20,
+                ruleId:  $reviewed->ruleId,
+                message: $reviewed->message,
+                symbol:  'Example::other()',
+            );
+            $excessMatch = $this->finding(
+                line:    30,
+                ruleId:  $reviewed->ruleId,
+                message: $reviewed->message,
+                symbol:  'Example::unreviewed()',
+            );
 
             try {
                 $store->migrate('legacy.json', 'legacy.json', [$reviewed]);
                 self::fail('a same-path migration was accepted');
             } catch (BaselineException $exception) {
+                // A migration naming the same input and output must give an actionable refusal.
                 self::assertStringContainsString('same file', $exception->getMessage());
             }
 
@@ -263,13 +279,15 @@ final class BaselineStoreTest extends TestCase
                 $store->migrate('legacy.json', 'link.json', [$reviewed]);
                 self::fail('a symlinked migration target was accepted');
             } catch (BaselineException $exception) {
+                // A link to the migration input should be refused even when the paths look different.
                 self::assertStringContainsString('resolves to the input', $exception->getMessage());
             }
 
-            $migration = $store->migrate('legacy.json', 'gruff-baseline.json', [$reviewed, $unreviewed]);
+            $migration = $store->migrate('legacy.json', 'gruff-baseline.json', [$excessMatch, $laterMatch, $reviewed, $unreviewed]);
 
-            self::assertSame(1, $migration->accepted);
-            self::assertCount(1, $migration->writtenBaseline->entries);
+            self::assertSame(2, $migration->accepted);
+            self::assertCount(2, $migration->writtenBaseline->entries);
+            self::assertNotContains('Example::unreviewed()#1', array_column($migration->writtenBaseline->entries, 'subject'));
             $this->assertLegacyInputUnchanged($root, $legacyBytes);
             self::assertSame('docs.missing-phpdoc', $store->read('gruff-baseline.json')->entries[0]->ruleId);
         } finally {
@@ -300,6 +318,7 @@ final class BaselineStoreTest extends TestCase
             (new BaselineStore($root))->write('gruff-baseline.json', [$secret]);
             $written = (string)file_get_contents($root . '/gruff-baseline.json');
 
+            // Check each representation so redaction cannot hide the raw value in another common encoding.
             foreach ($this->sentinelForms($sentinel) as $name => $form) {
                 self::assertStringNotContainsString($form, $written, sprintf('the written baseline carries the %s form of the sentinel', $name));
             }
@@ -321,9 +340,9 @@ final class BaselineStoreTest extends TestCase
     private function sentinelForms(string $sentinel): array
     {
         return [
-            'raw'     => $sentinel,
+            'raw' => $sentinel,
             'partial' => substr($sentinel, 0, 8),
-            'hashed'  => hash('sha256', $sentinel),
+            'hashed' => hash('sha256', $sentinel),
             'encoded' => base64_encode($sentinel),
         ];
     }
@@ -350,6 +369,7 @@ final class BaselineStoreTest extends TestCase
                 $store->requireOverwritableDefaultPath('gruff-baseline.json', false);
                 self::fail('a generate over a 0.5 baseline must be refused');
             } catch (BaselineException $exception) {
+                // The overwrite refusal must name the flag a caller can use after reviewing the damaged file.
                 self::assertStringContainsString('--force', $exception->getMessage());
             }
 
@@ -386,6 +406,7 @@ final class BaselineStoreTest extends TestCase
                 (new BaselineStore($root))->migrate('legacy.json', 'migrated.json', []);
                 self::fail('an ambiguous 0.5 input must be refused');
             } catch (BaselineException $exception) {
+                // A baseline with two row containers must explain why it cannot be applied.
                 self::assertStringContainsString('more than one row container', $exception->getMessage());
             }
 
@@ -415,6 +436,7 @@ final class BaselineStoreTest extends TestCase
                 (new BaselineStore($root))->migrate('legacy.json', 'hard-link.json', []);
                 self::fail('a hard-linked output must be refused');
             } catch (BaselineException $exception) {
+                // A destination linked to the original baseline must fail before either file changes.
                 self::assertStringContainsString('resolves to the input path', $exception->getMessage());
             }
 
@@ -442,7 +464,7 @@ final class BaselineStoreTest extends TestCase
     /**
      * Prove the 0.5 input survived the migration byte for byte, which is the user's retreat path.
      *
-     * @param string $root - Temp project root.
+     * @param string $root        - Temp project root.
      * @param string $legacyBytes - Bytes staged before the migration.
      *
      * @return void - Asserts that the staged legacy file still has exactly the supplied bytes.
@@ -472,11 +494,11 @@ final class BaselineStoreTest extends TestCase
      * Build a finding fixture for assertions.
      *
      * @param string      $filePath - Display path recorded for the finding; varied to prove row ordering.
-     * @param int         $line - Source line; varied to prove same-identity findings on different lines aggregate.
-     * @param string      $ruleId - Rule id, part of the identity.
-     * @param string      $message - Message; only part of the identity when no symbol is named.
-     * @param string|null $symbol - Symbol the finding is anchored to; null for a file-level finding.
-     * @param Pillar      $pillar - Pillar assigned to the finding; SensitiveData creates a sensitive-data fixture.
+     * @param int         $line     - Source line; varied to prove same-identity findings on different lines aggregate.
+     * @param string      $ruleId   - Rule id, part of the identity.
+     * @param string      $message  - Message; only part of the identity when no symbol is named.
+     * @param string|null $symbol   - Symbol the finding is anchored to; null for a file-level finding.
+     * @param Pillar      $pillar   - Pillar assigned to the finding; SensitiveData creates a sensitive-data fixture.
      *
      * @return Finding - Advisory finding using the supplied fields, with Documentation as the default pillar.
      */
@@ -525,6 +547,7 @@ final class BaselineStoreTest extends TestCase
      */
     private function removeDir(string $path): void
     {
+        // Cleanup also runs when validation fails before the temporary directory is created.
         if (!is_dir($path)) {
             return;
         }
@@ -532,13 +555,16 @@ final class BaselineStoreTest extends TestCase
         $items = scandir($path);
         self::assertIsArray($items);
 
+        // Remove only entries that belong to this test's temporary folder.
         foreach ($items as $directoryEntry) {
+            // Skip the entries that refer to the test directory itself and its parent.
             if ($directoryEntry === '.' || $directoryEntry === '..') {
                 continue;
             }
 
             $child = $path . '/' . $directoryEntry;
 
+            // Recurse into fixture folders while leaving a symlink target outside the cleanup untouched.
             if (is_dir($child) && !is_link($child)) {
                 $this->removeDir($child);
                 continue;

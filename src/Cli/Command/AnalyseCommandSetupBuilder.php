@@ -23,6 +23,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 /**
  * Resolves scan targets, validates options, and loads configuration before analysis starts.
+ *
  * May offer to initialize missing project configuration, then applies profile and CLI rule selections.
  * Returns a ready setup, the first detected error, or an exit code when initialization fails.
  */
@@ -56,7 +57,7 @@ final readonly class AnalyseCommandSetupBuilder
 
         /** @var list<string> $requestedPaths - Path operands exactly as typed, before any root resolution. */
         $requestedPaths = (array) $input->getArgument('paths');
-        $projectRoot = self::projectRootFromTargets($launchDirectory, $requestedPaths);
+        $projectRoot    = self::projectRootFromTargets($launchDirectory, $requestedPaths);
 
         // Targets without a common filesystem ancestor cannot share the report's project root.
         if ($projectRoot === null) {
@@ -89,6 +90,7 @@ final readonly class AnalyseCommandSetupBuilder
 
     /**
      * Find the first resolvable target outside the launch directory when multiple targets were requested.
+     *
      * The caller uses it to reject multi-target scans not contained by the launch directory.
      * Unresolved targets are left for discovery to diagnose.
      *
@@ -100,10 +102,12 @@ final readonly class AnalyseCommandSetupBuilder
     private static function targetOutsideLaunchDirectory(string $launchDirectory, array $paths): ?string
     {
 
+        // A single target can establish its own project root without comparing it with another operand.
         if (count($paths) < 2) {
             return null;
         }
 
+        // Resolve each operand from the launch directory before deciding whether they belong to one scan.
         foreach ($paths as $path) {
             $absolute = self::isAbsolutePath($path) ? $path : $launchDirectory . DIRECTORY_SEPARATOR . $path;
             $resolved = realpath($absolute);
@@ -134,6 +138,7 @@ final readonly class AnalyseCommandSetupBuilder
     public static function targetsForRoot(string $launchDirectory, string $projectRoot, array $paths): array
     {
 
+        // Paths the caller supplied already refer to the scan root when the command starts there.
         if ($launchDirectory === $projectRoot) {
             return $paths;
         }
@@ -157,6 +162,7 @@ final readonly class AnalyseCommandSetupBuilder
     public static function pathForRoot(string $launchDirectory, string $projectRoot, string $path): string
     {
 
+        // Rewrite relative paths only when the scan root differs from where the command started.
         if ($launchDirectory === $projectRoot || PathHelper::isAbsolute($path)) {
             return $path;
         }
@@ -168,6 +174,7 @@ final readonly class AnalyseCommandSetupBuilder
 
     /**
      * Choose a project root from the common ancestor of targets that realpath() can resolve.
+     *
      * Keep the launch directory when all resolved targets lie within it or no target resolves.
      * For outside targets, use their common directory ancestor; a file contributes its containing directory.
      *
@@ -179,16 +186,19 @@ final readonly class AnalyseCommandSetupBuilder
     public static function projectRootFromTargets(string $launchDirectory, array $paths): ?string
     {
 
+        // With no operands, the launch directory is the project the caller asked to scan.
         if ($paths === []) {
             return $launchDirectory;
         }
 
         $common = null;
 
+        // Use existing targets to find the root that owns the scan and its config.
         foreach ($paths as $path) {
             $absolute = self::isAbsolutePath($path) ? $path : $launchDirectory . DIRECTORY_SEPARATOR . $path;
             $resolved = realpath($absolute);
 
+            // A missing path cannot choose a project root. The scan reports that operand separately.
             if ($resolved === false) {
                 continue;
             }
@@ -246,6 +256,7 @@ final readonly class AnalyseCommandSetupBuilder
     private static function isSameOrDescendant(string $candidate, string $ancestor): bool
     {
 
+        // A path can name the project root itself.
         if ($candidate === $ancestor) {
             return true;
         }
@@ -348,7 +359,7 @@ final readonly class AnalyseCommandSetupBuilder
         }
 
         $registry        = RuleRegistry::defaults();
-        $ruleFilterError = $this->ruleFilterError($registry, $options->includeRules, $options->excludeRules);
+        $ruleFilterError = $this->ruleFilterError($registry, $options);
         // Unknown includes can omit intended checks; unknown excludes leave intended checks enabled.
 
         if ($ruleFilterError !== null) {
@@ -504,6 +515,7 @@ final readonly class AnalyseCommandSetupBuilder
     ): ?string {
         $profilePillarNames = [];
 
+        // Seed the score with the pillars that belong to the selected profile.
         foreach ($profileScorePillars as $profileScorePillar) {
             $profilePillarNames[] = $profileScorePillar->value;
         }
@@ -511,6 +523,7 @@ final readonly class AnalyseCommandSetupBuilder
         $profilePillarIds    = implode('/', $profilePillarNames);
 
 
+        // An explicit rule can add a pillar outside the profile's default score.
         foreach ($includeRuleIds as $ruleId) {
             $pillar = $registry->get($ruleId)->definition()->pillar;
             // An unscored pillar would emit findings the grade ignores; tell the user both ways out.
@@ -540,11 +553,13 @@ final readonly class AnalyseCommandSetupBuilder
     private static function formatPillarList(array $pillarNames): string
     {
 
+        // Show that no pillar is selected rather than rendering a blank answer.
         if ($pillarNames === []) {
             return 'no';
         }
 
 
+        // A single pillar needs no list punctuation in the selection prompt.
         if (count($pillarNames) === 1) {
             return $pillarNames[0];
         }
@@ -558,19 +573,26 @@ final readonly class AnalyseCommandSetupBuilder
      * Validate CLI include and exclude ids against the registry before rule selection.
      * Return an error for the first unknown id so a misspelled filter is not silently ignored.
      *
-     * @param RuleRegistry $registry     - Registry whose ids define valid CLI rule filters.
-     * @param list<string> $includeRules - Rule ids from --include-rule; empty when the user focused nothing.
-     * @param list<string> $excludeRules - Rule ids from --exclude-rule; empty when the user dropped nothing.
+     * @param RuleRegistry          $registry - Registry whose ids define valid CLI rule filters.
+     * @param AnalyseCommandOptions $options  - Execution and display rule selectors supplied by the caller.
      *
      * @return string|null - Usage error for the first unknown id, or null when every id is registered.
      */
-    private function ruleFilterError(RuleRegistry $registry, array $includeRules, array $excludeRules): ?string
+    private function ruleFilterError(RuleRegistry $registry, AnalyseCommandOptions $options): ?string
     {
 
 
-        foreach (['--include-rule' => $includeRules, '--exclude-rule' => $excludeRules] as $option => $ruleIds) {
+        $ruleSelectors = [
+            '--include-rule' => $options->includeRules,
+            '--exclude-rule' => $options->excludeRules,
+            '--show-rule' => $options->presentation->showRules,
+            '--hide-rule' => $options->presentation->hideRules,
+        ];
+        // Validate execution and display flags against the same catalogue so unknown rule IDs cannot disappear silently.
+        foreach ($ruleSelectors as $option => $ruleIds) {
             $unknownRuleIds = $registry->unknownRuleIds($ruleIds);
 
+            // Name the first invalid entry and its flag so the caller can correct the invocation.
             if ($unknownRuleIds !== []) {
                 return sprintf('Unknown rule id "%s" for %s.', $unknownRuleIds[0], $option);
             }
@@ -626,6 +648,7 @@ final readonly class AnalyseCommandSetupBuilder
 
     /**
      * Resolve exit-code gates from explicit CLI flags, configuration, or the resolved severity threshold.
+     *
      * An explicit --fail-on overrides configured gates; --fail-on-new adds an error-only new-findings gate.
      * With --fail-on-new alone, disable the overall gate; without either flag, prefer configured failure conditions.
      *
@@ -752,6 +775,7 @@ final readonly class AnalyseCommandSetupBuilder
                 ? AnalysisConfig::fromRegistry($registry)
                 : $configLoader->load($options->configPath, $registry);
 
+            // An explicit command-line scan budget takes precedence over the target project's config.
             if ($options->deepScanBudgetOverride !== null) {
                 $budget = $options->deepScanBudgetOverride;
                 $config = $config->withDeepScanBudget(
@@ -764,7 +788,7 @@ final readonly class AnalyseCommandSetupBuilder
 
             return $config;
         } catch (ConfigException $exception) {
-            // Report a broken or unreadable config so the user gets its reason instead of a stack trace.
+            // A config with invalid YAML or an unreadable path cannot choose the scan settings. Report the error from the loader.
             return $this->usageReport(
                 options: $options,
                 format:  $format,

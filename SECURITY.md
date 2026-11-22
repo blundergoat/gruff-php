@@ -54,6 +54,8 @@ If gruff reports a real secret:
 
 1. Rotate or revoke the secret first.
 2. Remove it from source history if required by your incident process.
-3. Add a baseline or allowlist only after confirming the value is not live.
 
-Nothing in the configuration hides a sensitive-data finding except a reviewed, reason-bearing `sensitiveExclusions` entry; the 0.5 `allowlists.secretPreviews` key is refused on sight.
+For a confirmed sample or false positive, record the exact file, rule, and
+reason under `sensitiveExclusions`. Reports include an audit row for each
+configured exclusion. Sensitive-data findings are ineligible for baseline
+matching. Remove any legacy `allowlists.secretPreviews` entry during migration.

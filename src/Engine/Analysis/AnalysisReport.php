@@ -21,6 +21,7 @@ use LogicException;
 
 /**
  * Carries findings, file counts and optional results from one analysis run for report renderers.
+ *
  * Optional results include scoring, mutation, diff, trend, baseline and branch review data.
  * Machine serializers expose canonical analysis and summary documents from the stored data.
  *
@@ -55,15 +56,15 @@ final readonly class AnalysisReport
      * Gathers everything one analysis run produced into the single object every reporter renders from.
      *
      * @param string              $toolVersion     - Gruff version used to produce the report.
-     * @param list<string>        $requestedPaths  - Paths requested for analysis.
+     * @param list<string>        $requestedPaths  - Scan operands. An empty list leaves discovery to the project defaults.
      * @param string              $format          - Output format requested for report serialization.
      * @param string              $failOn          - Severity gate used to determine the process exit code.
      * @param int                 $filesDiscovered - Number of source files discovered before parsing.
      * @param int                 $filesParsed     - Number of source files parsed successfully.
      * @param list<string>        $ignoredPaths    - Requested paths ignored by discovery.
      * @param list<string>        $missingPaths    - Requested paths that did not resolve to files.
-     * @param list<RunDiagnostic> $diagnostics     - Non-finding diagnostics emitted during the run.
-     * @param list<Finding>       $findings        - Findings included in the report.
+     * @param list<RunDiagnostic> $diagnostics     - Run diagnostics. An empty list means there are no scan problems or notes to show.
+     * @param list<Finding>       $findings        - Visible findings. Check diagnostics before treating an empty report as a clean scan.
      * @param int                 $exitCode        - Process exit code represented by the report.
      *
      * @param string|null                 $configPath - Config file path used for the run; null when the run used no config.
@@ -80,7 +81,7 @@ final readonly class AnalysisReport
      * @param ThresholdTrip|null $failureReason            - Gate threshold that tripped; null when the run did not fail a count threshold.
      * @param int|null           $newFindingsCount         - Size of the new-findings set; null when no new-findings gate is active.
      *
-     * @param list<SensitiveExclusionSummary> $sensitiveExclusions - Audit rows for configured, built-in, inline and duplicate suppressions.
+     * @param list<SensitiveExclusionSummary> $sensitiveExclusions - Audit rows for suppressions. An empty list means nothing was recorded.
      *
      * @param MachineReportContext $machineContext - Serializer paths, flags, root, pre-display findings and optional suppressed SARIF results.
      */
@@ -137,12 +138,13 @@ final readonly class AnalysisReport
     {
         $counts = [
             'advisory' => 0,
-            'warning'  => 0,
-            'error'    => 0,
-            'total'    => count($this->findings),
+            'warning' => 0,
+            'error' => 0,
+            'total' => count($this->findings),
         ];
 
 
+        // Group findings by severity for the totals shown in the report.
         foreach ($this->findings as $finding) {
             $counts[$finding->severity->value]++;
         }
@@ -160,6 +162,7 @@ final readonly class AnalysisReport
         $byRule = [];
 
 
+        // Collect counts under each rule ID so a renderer can rank the issues the caller sees.
         foreach ($this->findings as $finding) {
             $byRule[$finding->ruleId] ??= ['total' => 0, 'advisory' => 0, 'warning' => 0, 'error' => 0];
             $byRule[$finding->ruleId]['total']++;
@@ -169,13 +172,14 @@ final readonly class AnalysisReport
         $rows = [];
 
 
+        // Expose a row per rule with the same severity totals used elsewhere in the report.
         foreach ($byRule as $ruleId => $counts) {
             $rows[] = [
-                'ruleId'   => $ruleId,
-                'total'    => $counts['total'],
+                'ruleId' => $ruleId,
+                'total' => $counts['total'],
                 'advisory' => $counts['advisory'],
-                'warning'  => $counts['warning'],
-                'error'    => $counts['error'],
+                'warning' => $counts['warning'],
+                'error' => $counts['error'],
             ];
         }
 
@@ -218,17 +222,21 @@ final readonly class AnalysisReport
             'projectRoot' => '.',
         ];
 
+        // Publish the config only when the run actually used one.
         if ($this->configPath !== null) {
             $configPath = $this->machineRelativePath($this->configPath);
+            // Only a path relative to the scanned project is portable in report JSON.
             if ($configPath !== null) {
                 $runMetadata['config'] = $configPath;
             }
         }
 
+        // An active display filter explains why the visible findings differ from the full counts.
         if ($this->filters instanceof FindingDisplayFilter && $this->filters->isActive()) {
             $runMetadata['filters'] = $this->machineRunFilters($this->filters);
         }
 
+        // Record the explicit option when a caller chose to inspect normally ignored files.
         if ($this->machineContext['shouldIncludeIgnored']) {
             $runMetadata['includeIgnored'] = true;
         }
@@ -260,31 +268,33 @@ final readonly class AnalysisReport
                 'analysedFiles' => $this->filesParsed,
                 'details' => $details,
                 'ignoredPaths' => $ignoredPaths,
-                'missingPaths' => $this->machinePaths($this->missingPaths),
+                'missingPaths' => $this->machineInputs($this->missingPaths),
             ],
-            'suppressions' => array_map(
-                fn(SensitiveExclusionSummary $summary): array => $this->machineSuppression($summary),
-                $this->sensitiveExclusions,
-            ),
+            'suppressions' => $this->suppressionRows(),
         ];
 
+        // Changed-code runs publish how many findings the selected region removed. Full scans have no such count.
         if ($this->suppressedCount !== null) {
             $report['summary']['suppressedFindings'] = $this->suppressedCount;
         }
 
+        // Give machine readers a baseline section for applied debt or a gate that counted new findings.
         if ($this->baseline instanceof BaselineReport || $this->newFindingsCount !== null) {
             $report['baseline'] = $this->machineBaseline($this->baseline);
         }
 
+        // Include comparison details only when Git or explicit ranges narrowed the result.
         if ($this->diff instanceof DiffResult && $this->diff->active) {
             $report['diff'] = $this->machineDiff($this->diff);
         }
 
+        // Publish what the display filters hid without changing the score or the summary totals.
         if ($this->filters instanceof FindingDisplayFilter && $this->filters->isActive()) {
             $report['displayFilter'] = $this->machineDisplayFilter($this->filters, count($summaryFindings) - count($this->findings));
         }
 
         $extensions = $this->machineExtensions();
+        // Keep optional PHP-specific data out of the envelope when none was collected.
         if ($extensions !== []) {
             $report['extensions'] = $extensions;
         }
@@ -317,6 +327,7 @@ final readonly class AnalysisReport
     {
         $counts = ['advisory' => 0, 'warning' => 0, 'error' => 0, 'total' => count($findings)];
 
+        // Count by severity from the same findings the caller's summary represents.
         foreach ($findings as $finding) {
             $counts[$finding->severity->value]++;
         }
@@ -335,6 +346,7 @@ final readonly class AnalysisReport
     {
         $counts = [];
 
+        // Add only pillars that contributed findings so the counts can stay sparse.
         foreach ($findings as $finding) {
             $counts[$finding->pillar->value] = ($counts[$finding->pillar->value] ?? 0) + 1;
         }
@@ -354,6 +366,7 @@ final readonly class AnalysisReport
     private function machineRunFilters(FindingDisplayFilter $filters): array
     {
         $payload = $filters->toArray();
+        // An omitted severity floor should not become a null filter setting in the contract.
         if ($payload['minSeverity'] === null) {
             unset($payload['minSeverity']);
         }
@@ -388,14 +401,17 @@ final readonly class AnalysisReport
             'metadata' => $metadata,
         ];
 
+        // Carry an end line only when the rule provides a range the caller can locate.
         if ($finding->endLine !== null) {
             $payload['endLine'] = max(1, $finding->endLine);
         }
 
+        // A scanner-supplied column can point to an exact occurrence on a crowded line.
         if ($finding->column !== null) {
             $payload['column'] = max(1, $finding->column);
         }
 
+        // A file-only finding has no symbol to display.
         if ($finding->symbol !== null && $finding->symbol !== '') {
             $payload['symbol'] = $finding->symbol;
         }
@@ -417,7 +433,7 @@ final readonly class AnalysisReport
             'message' => $diagnostic->message,
             'invalidatesRun' => $diagnostic->isFatal,
         ];
-        $filePath = $diagnostic->filePath ?? $diagnostic->path;
+        $filePath    = $diagnostic->filePath ?? $diagnostic->path;
         $machineFile = $filePath === null || $filePath === '' ? null : $this->machineRelativePath($filePath);
 
         // A file outside the project, such as a baseline kept beside it, has no project-relative form and a host path
@@ -426,6 +442,7 @@ final readonly class AnalysisReport
             $payload['file'] = $machineFile;
         }
 
+        // Add a source line only when the diagnostic can direct the caller to a real location.
         if ($diagnostic->line !== null && $diagnostic->line > 0) {
             $payload['line'] = $diagnostic->line;
         }
@@ -448,6 +465,7 @@ final readonly class AnalysisReport
             'source' => $ignoredPath->source,
         ];
 
+        // Show the matching ignore pattern when discovery can tell the caller which pattern applied.
         if ($ignoredPath->pattern !== null && $ignoredPath->pattern !== '') {
             $payload['pattern'] = $ignoredPath->pattern;
         }
@@ -465,18 +483,22 @@ final readonly class AnalysisReport
      */
     private static function skipReason(IgnoredPath $ignoredPath): string
     {
+        // Tag a path ignored through project config so the caller knows which setting to inspect.
         if ($ignoredPath->source === PathIgnoreResolver::SOURCE_CONFIG) {
             return 'config-ignore';
         }
 
+        // Keep Git ignores distinct from the scanner's own ignore defaults.
         if ($ignoredPath->source === PathIgnoreResolver::SOURCE_GITIGNORE) {
             return 'gitignored';
         }
 
+        // Mark generated paths so callers can tell why they were skipped.
         if ($ignoredPath->source === PathIgnoreResolver::SOURCE_GENERATED) {
             return 'generated';
         }
 
+        // Reject an unsupported internal reason instead of publishing an invented explanation.
         if ($ignoredPath->source !== PathIgnoreResolver::SOURCE_DEFAULT) {
             throw new LogicException(sprintf('Unknown ignored-path source "%s".', $ignoredPath->source));
         }
@@ -509,6 +531,7 @@ final readonly class AnalysisReport
             'suppressed' => $summary->suppressed,
         ];
 
+        // A whole-file exclusion has no symbol. Only declaration-specific audit rows carry one.
         if ($summary->symbol !== null && $summary->symbol !== '') {
             $payload['symbol'] = $summary->symbol;
         }
@@ -522,12 +545,23 @@ final readonly class AnalysisReport
     }
 
     /**
+     * Gives machine formats the same suppression audit rows.
+     *
+     * @return list<array<string, ReportValue>> - Configured and observed suppressions.
+     */
+    public function suppressionRows(): array
+    {
+        return array_map($this->machineSuppression(...), $this->sensitiveExclusions);
+    }
+
+    /**
      * Adapts the native score container without recalculating its scores.
      *
      * @return array<string, ReportValue> - Canonical score data, or the structural unscored representation.
      */
     private function machineScore(): array
     {
+        // If analysis produced no score, provide the empty score shape expected by JSON readers.
         if (!$this->score instanceof ScoreReport) {
             return [
                 // No scoring ran, so there is no number to report; a 0.0 here would read as a failing grade.
@@ -551,6 +585,7 @@ final readonly class AnalysisReport
             return self::withoutNullValues($offender);
         }, $payload['topOffenders']);
 
+        // An empty complexity distribution is still a JSON mapping, so clients can treat it like populated distributions.
         if ($payload['complexityDistribution'] === []) {
             $payload['complexityDistribution'] = (object)[];
         }
@@ -567,11 +602,12 @@ final readonly class AnalysisReport
      */
     private function machineBaseline(?BaselineReport $baseline): array
     {
+        // A diff-based gate can report new findings without applying a baseline file.
         if (!$baseline instanceof BaselineReport) {
             return ['newFindings' => $this->newFindingsCount ?? 0];
         }
 
-        $legacy  = $baseline->toArray();
+        $legacy = $baseline->toArray();
         // Common baseline fields let consumers read every port without a PHP-specific branch.
         // Generation and migration keep movement fields present, even when no comparison produced counts.
         $payload = [
@@ -591,6 +627,7 @@ final readonly class AnalysisReport
             ],
         ];
         $baselinePath = $this->machineRelativePath($baseline->path);
+        // Include the baseline's path only when the reader can resolve it inside this project.
         if ($baselinePath !== null) {
             $payload['path'] = $baselinePath;
         }
@@ -615,10 +652,12 @@ final readonly class AnalysisReport
             'mode' => $diff->mode,
         ];
 
+        // Explicit ranges may narrow the scan without naming a Git comparison ref.
         if ($diff->base !== null && $diff->base !== '') {
             $payload['base'] = $diff->base;
         }
 
+        // Show the number filtered out only after the changed-region filter has run.
         if ($diff->suppressedCount !== null) {
             $payload['filteredFindings'] = $diff->suppressedCount;
         }
@@ -653,18 +692,22 @@ final readonly class AnalysisReport
     {
         $topLevel = [];
 
+        // Include what tripped the exit gate when the report has threshold evidence to explain it.
         if ($this->failureReason instanceof ThresholdTrip) {
             $topLevel['failureReason'] = $this->failureReason->toArray();
         }
 
+        // Only a requested mutation result adds Infection data to the report.
         if ($this->mutation instanceof MutationAnalysisResult) {
             $topLevel['mutation'] = $this->mutation->toArray();
         }
 
+        // Branch-review details appear after comparison against a Git base ref.
         if ($this->review instanceof BranchReviewResult) {
             $topLevel['review'] = $this->review->toArray();
         }
 
+        // The trend section exists only when the caller requested history output and a report was produced.
         if ($this->trend instanceof TrendReport) {
             $topLevel['trend'] = $this->trend->toArray();
         }
@@ -714,6 +757,7 @@ final readonly class AnalysisReport
     private function machineInputs(array $paths): array
     {
         $inputs = [];
+        // Keep operands in report JSON only when they can be named relative to the project.
         foreach ($paths as $path) {
             $normalized = $this->machineRelativePath($path);
             // An input with no project-relative form is left out rather than published as a host path.
@@ -737,6 +781,7 @@ final readonly class AnalysisReport
     {
         $normalized = $this->machineRelativePath($path);
 
+        // Required machine paths must point inside the scan root or the report would give clients an unusable location.
         if ($normalized === null || $normalized === '') {
             throw new LogicException(sprintf('Machine path "%s" is outside the project root.', $path));
         }
@@ -769,8 +814,10 @@ final readonly class AnalysisReport
     public function hasFindingsAtSeverity(Severity $severity): bool
     {
 
+        // Look at the visible findings when a renderer asks whether it should show a severity.
         foreach ($this->findings as $finding) {
 
+            // Stop at the first matching finding because one is enough to make the severity visible.
             if ($finding->severity === $severity) {
                 return true;
             }

@@ -16,6 +16,7 @@ use Symfony\Component\Console\Input\InputOption;
 
 /**
  * Covers dashboard scan caching using temporary projects and stub scanner scripts.
+ *
  * Checks source edits, config and baseline changes, and requests that bypass the cache.
  * Also checks error text for invalid project roots, empty output, and timeouts.
  */
@@ -31,6 +32,7 @@ final class DashboardScanRunnerTest extends TestCase
      */
     protected function tearDown(): void
     {
+        // Drop temporary projects after each case so later scans cannot reuse their state.
         foreach ($this->tempDirs as $tempDir) {
             $this->removeDir($tempDir);
         }
@@ -46,10 +48,13 @@ final class DashboardScanRunnerTest extends TestCase
         $project = $this->projectDir();
         $runner  = $this->runner($this->fakeGruffBinary('counter'));
         $context = $this->context($project);
+        self::assertTrue(mkdir($project . '/src/generated'));
+        $source = $project . '/src/generated/Generated.php';
+        file_put_contents($source, "<?php\nfinal class Generated {}\n");
 
         $first  = $runner->scanHtml($context, ['paths' => 'src']);
         $second = $runner->scanHtml($context, ['paths' => 'src']);
-        file_put_contents($project . '/src/Example.php', "<?php\nfinal class ExampleChanged {}\n");
+        file_put_contents($source, "<?php\nfinal class GeneratedChanged {}\n");
         $third = $runner->scanHtml($context, ['paths' => 'src']);
 
         self::assertStringContainsString('scan 1', $first);
@@ -293,13 +298,14 @@ PHP,
      */
     private function removeDir(string $directory): void
     {
+        // A missing fixture needs no cleanup when the test stopped before creating it.
         if (!is_dir($directory)) {
-            // No directory remains, so repeated teardown stays harmless.
             return;
         }
 
         $items = array_diff(scandir($directory) ?: [], ['.', '..']);
 
+        // Clean up each discovered fixture entry inside the test's temporary project.
         foreach ($items as $item) {
             $path = $directory . '/' . $item;
             is_dir($path) ? $this->removeDir($path) : unlink($path);

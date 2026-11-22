@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Cli\Command;
 
+use GruffPhp\Engine\Config\ConfigException;
 use GruffPhp\Engine\Config\ConfigMigrator;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -11,12 +12,10 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * Backs `gruff-php migrate-config` - the one-way trip that carries a 0.5 config onto the 0.6 schema.
+ * Runs `gruff-php migrate-config` to prepare a 0.5 project config for the current loader.
  *
- * Reach for this after upgrading, when `analyse` refuses a configuration written for 0.5: the per-command exit gate
- * moved from `minimumSeverity:` to `failOn:`, and `allowlists.secretPreviews` was removed. The migration is always
- * out of place - the file named by `--config` is only ever read - so a user who regrets it still has the
- * configuration they started with, which is what FAMILY-CONTRACT.md section 8's migration rule requires.
+ * Use `--dry-run` to inspect the changes after upgrading, or `--output` to write a separate file.
+ * Moves the old command thresholds to `failOn`, removes the retired preview option, and preserves the input for reference.
  */
 final class MigrateConfigCommand extends Command
 {
@@ -31,7 +30,7 @@ final class MigrateConfigCommand extends Command
             ->setName('migrate-config')
             ->setDescription('Rewrite a 0.5 config for the current schema, writing the result to a different file.')
             ->addOption('config', null, InputOption::VALUE_REQUIRED, 'The 0.5 config to read. It is never modified.')
-            ->addOption('output', null, InputOption::VALUE_REQUIRED, 'Where to write the migrated config. Required unless --dry-run.')
+            ->addOption('output', null, InputOption::VALUE_REQUIRED, 'New file for the migrated config. Required unless --dry-run.')
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Print what would change and write nothing.');
     }
 
@@ -53,18 +52,35 @@ final class MigrateConfigCommand extends Command
 
             return Command::INVALID;
         }
+        // A missing --config file gives the caller nothing to migrate.
         if (!is_file($inputPath)) {
             $output->writeln(sprintf('<error>config to migrate does not exist: %s</error>', $inputPath));
 
             return Command::INVALID;
         }
 
-        $original  = (string) file_get_contents($inputPath);
-        $migration = ConfigMigrator::migrate($original);
+        $original = is_readable($inputPath) ? file_get_contents($inputPath) : false;
+        // A permissions error or a file removed during startup must not be treated as a blank config.
+        if ($original === false) {
+            $output->writeln(sprintf('<error>Unable to read %s.</error>', $inputPath));
+
+            return Command::INVALID;
+        }
+
+        try {
+            $migration = ConfigMigrator::migrate($original);
+        } catch (ConfigException $exception) {
+            // A legacy file containing both threshold sections needs a decision from the caller before it can be written.
+            $output->writeln('<error>' . $exception->getMessage() . '</error>');
+
+            return Command::INVALID;
+        }
+        // If the file already uses current settings, keep the original text and tell the caller there were no changes.
         $output->writeln($migration['changes'] === []
             ? sprintf('%s is already current; no changes.', $inputPath)
             : implode("\n", ['Migration changes:', ...array_map(static fn(string $change): string => '  - ' . $change, $migration['changes'])]));
 
+        // Dry-run mode shows the proposed changes without needing an output destination.
         if ($input->getOption('dry-run') === true) {
             $output->writeln('Dry run: nothing written.');
 
@@ -75,35 +91,47 @@ final class MigrateConfigCommand extends Command
     }
 
     /**
-     * Writes the migrated text to the destination the user named, refusing to overwrite the input.
+     * Writes the migrated YAML to an unused destination after the caller reviews the change summary.
      *
      * @param OutputInterface $output     - Console output; carries the wrote-path notice or the refusal.
      * @param string          $inputPath  - The 0.5 config, which must survive untouched.
      * @param string          $migrated   - The rewritten configuration text.
      * @param mixed           $outputPath - The `--output` value as the console parsed it; anything but a non-empty string is refused.
      *
-     * @return int - Symfony exit code; SUCCESS after writing, INVALID when no usable destination was named.
+     * @return int - 0 after writing, 2 for a missing or occupied destination, or 1 if the new file could not be written.
      */
     private function writeMigrated(OutputInterface $output, string $inputPath, string $migrated, mixed $outputPath): int
     {
-        // Without a destination there is nowhere to put the result, and writing over the input is the one thing
-        // migration must never do; refusing is better than choosing a path the user did not name.
+        // Require an explicit output path so the caller can decide where the separate config goes.
         if (!is_string($outputPath) || $outputPath === '') {
             $output->writeln('<error>migrate-config needs --output <path>, or --dry-run to print the changes.</error>');
 
             return Command::INVALID;
         }
-        if (realpath($outputPath) !== false && realpath($outputPath) === realpath($inputPath)) {
-            $output->writeln(sprintf('<error>--output must name a different file from --config; %s is the copy you may want back.</error>', $inputPath));
+        // Refuse existing destinations, including links that could point back to a file the caller wants to preserve.
+        if (file_exists($outputPath) || is_link($outputPath)) {
+            $output->writeln(sprintf('<error>--output must name a new file. %s already exists.</error>', $outputPath));
 
             return Command::INVALID;
         }
 
-        // A destination gruff cannot write is reported rather than swallowed, so the user does not believe it migrated.
-        if (file_put_contents($outputPath, $migrated) === false) {
+        // Exclusive creation also refuses a link or file created after the existence check.
+        $destinationStream = fopen($outputPath, 'xb');
+        // A destination may become occupied after validation or sit in a directory the caller cannot write to.
+        if ($destinationStream === false) {
             $output->writeln(sprintf('<error>Unable to write %s.</error>', $outputPath));
 
-            return Command::INVALID;
+            return Command::FAILURE;
+        }
+
+        $didWrite = fwrite($destinationStream, $migrated) === strlen($migrated) && fflush($destinationStream);
+        $didClose = fclose($destinationStream);
+        // Remove our partial output so a retry can safely use the same destination.
+        if (!$didWrite || !$didClose) {
+            unlink($outputPath);
+            $output->writeln(sprintf('<error>Unable to finish writing %s.</error>', $outputPath));
+
+            return Command::FAILURE;
         }
 
         $output->writeln(sprintf('Wrote %s; %s is unchanged.', $outputPath, $inputPath));

@@ -28,9 +28,13 @@ use GruffPhp\Engine\Source\SourceDiscoveryResult;
 
 /**
  * Discovers and analyses sources for `gruff-php analyse`, returning findings and run metadata.
- * Releases parsed units as it goes when the enabled rules and requested scope support streaming.
  *
+ * Releases parsed units as it goes when the enabled rules and requested scope support streaming.
  * Uses batch analysis for reviews, changed regions, narrow project-rule scopes, or rules that need all units.
+ *
+ * @phpstan-type ProjectContextLoader Closure(
+ *     string, AnalyseCommandOptions, AnalysisConfig, RuleRegistry, ?DiffResult, AnalysisSourceSet
+ * ): list<AnalysisUnit>
  */
 final class AnalysisPipeline
 {
@@ -38,16 +42,15 @@ final class AnalysisPipeline
      * Resolver the legacy pipeline calls to gather whole-project rule context, so diff and review
      * runs can weigh the changed files against the rest of the codebase.
      *
-     * @var Closure(string, AnalyseCommandOptions, AnalysisConfig, RuleRegistry, ?DiffResult, AnalysisSourceSet): list<AnalysisUnit>
+     * @var ProjectContextLoader - Loads the full context needed by project rules during a review.
      */
     private readonly Closure $projectContextUnitsResolver;
 
     /**
      * Stores the rule registry and the project-context resolver used by the legacy pipeline.
      *
-     * @param RuleRegistry $registry - Registry used to execute enabled rules.
-     * @param Closure(string, AnalyseCommandOptions, AnalysisConfig, RuleRegistry, ?DiffResult, AnalysisSourceSet): list<AnalysisUnit> $closure
-     *     - Resolves project-context units for legacy analysis.
+     * @param RuleRegistry         $registry - Registry used to execute enabled rules.
+     * @param ProjectContextLoader $closure  - Supplies project rules with review context. A null diff means the comparison could not be resolved.
      */
     public function __construct(
         private readonly RuleRegistry $registry,
@@ -64,8 +67,8 @@ final class AnalysisPipeline
      * @param AnalyseCommandOptions   $options            - Effective CLI analysis options.
      * @param AnalysisConfig          $config             - Effective rule and path configuration.
      * @param RuleContext             $ruleContext        - Context passed to each enabled rule.
-     * @param DiffResult|null $reviewDiff - Inactive for plain scans; null after a failed review diff lookup.
-     * @param list<string>|null $analysisPaths - Paths to analyse; null skips discovery and rule execution.
+     * @param DiffResult|null         $reviewDiff         - Inactive for plain scans; null after a failed review diff lookup.
+     * @param list<string>|null       $analysisPaths      - Paths to analyse; null skips discovery and rule execution.
      * @param int                     $discoverStart      - Monotonic start timestamp for discovery timing.
      * @param RuleRunnerObserver|null $ruleRunnerObserver - Per-rule timing observer; null when this run isn't collecting timings.
      *
@@ -120,15 +123,14 @@ final class AnalysisPipeline
     }
 
     /**
-     * Routes one run to the streaming or legacy pipeline and returns its raw findings, before any
-     * configured sensitive exclusion has been applied.
+     * Routes one run to the streaming or legacy pipeline and returns its raw findings, before any configured sensitive exclusion has been applied.
      *
      * @param string                  $projectRoot        - Project root used for discovery and parsing.
      * @param AnalyseCommandOptions   $options            - Effective CLI analysis options.
      * @param AnalysisConfig          $config             - Effective rule and path configuration.
      * @param RuleContext             $ruleContext        - Context passed to each enabled rule.
-     * @param DiffResult|null $reviewDiff - Inactive for plain scans; null after a failed review diff lookup.
-     * @param list<string>|null $analysisPaths - Paths to analyse; null skips discovery and rule execution.
+     * @param DiffResult|null         $reviewDiff         - Inactive for plain scans; null after a failed review diff lookup.
+     * @param list<string>|null       $analysisPaths      - Paths to analyse; null skips discovery and rule execution.
      * @param int                     $discoverStart      - Monotonic start timestamp for discovery timing.
      * @param RuleRunnerObserver|null $ruleRunnerObserver - Per-rule timing observer; null when this run isn't collecting timings.
      *
@@ -165,6 +167,7 @@ final class AnalysisPipeline
 
 
 
+        // Use a per-file scan when the selected rules and view need no whole-project or declaration context.
         if ($this->canStream($projectRoot, $options, $reviewDiff, $ruleContext)) {
             return $this->runStreaming(
                 projectRoot:        $projectRoot,
@@ -196,7 +199,7 @@ final class AnalysisPipeline
      *
      * @param string                $projectRoot - Project root requested paths resolve against.
      * @param AnalyseCommandOptions $options     - CLI options; changed-region and diff modes force the legacy path.
-     * @param DiffResult|null $reviewDiff - Inactive for plain scans; null after a failed review diff lookup.
+     * @param DiffResult|null       $reviewDiff  - Inactive for plain scans; null after a failed review diff lookup.
      * @param RuleContext           $ruleContext - Context whose enabled rules must all tolerate per-unit release.
      *
      * @return bool - True when review, scope, and enabled-rule constraints permit streaming.
@@ -223,15 +226,16 @@ final class AnalysisPipeline
     }
 
     /**
-     * Counts PHP inputs in the scoring denominator, excluding text-only inputs scanned by raw-text rules.
+     * Counts PHP inputs that reached structural analysis in the scoring denominator.
      *
-     * @param SourceFile $file - File accepted without fatal parse diagnostics.
+     * @param SourceFile $file      - File accepted without fatal parse diagnostics.
+     * @param bool       $isBounded - Whether only the text-level checks ran on this file.
      *
      * @return int - 1 when the file enters the scoring denominator, 0 otherwise.
      */
-    private static function evaluatedIncrement(SourceFile $file): int
+    private static function evaluatedIncrement(SourceFile $file, bool $isBounded): int
     {
-        return $file->isPhp() ? 1 : 0;
+        return $file->isPhp() && !$isBounded ? 1 : 0;
     }
 
     /**
@@ -239,7 +243,7 @@ final class AnalysisPipeline
      *
      * @param string                  $projectRoot        - Root for discovery, parsing, and the per-project result cache.
      * @param AnalyseCommandOptions   $options            - CLI options; gate the cache and whether ignored files load.
-     * @param AnalysisConfig $config - Ignore patterns, deep-scan budget, and cache fingerprint inputs.
+     * @param AnalysisConfig          $config             - Ignore patterns, deep-scan budget, and cache fingerprint inputs.
      * @param RuleContext             $ruleContext        - Context the per-unit and accumulator rule passes run against.
      * @param list<string>            $analysisPaths      - Project-relative paths to discover under; never null here.
      * @param int                     $discoverStart      - Monotonic hrtime start for the discover-and-parse span.
@@ -294,6 +298,7 @@ final class AnalysisPipeline
 
 
 
+        // Walk the discovered inputs once, using a current cached result when it saves a parse.
         foreach ($discoveryResult->files as $file) {
 
 
@@ -301,14 +306,16 @@ final class AnalysisPipeline
 
 
 
+            // An empty cached findings list still confirms this file ran cleanly.
             if ($cached['findings'] !== null) {
                 array_push($findings, ...$cached['findings']);
+                // A cache hit must still tell the caller when structural rules were skipped by the budget.
                 if ($cached['budgetDiagnostic'] !== null) {
                     $sourceDiagnostics[] = self::runDiagnosticFor($cached['budgetDiagnostic'], $file);
                 }
                 $parsedCount++;
 
-                $evaluatedCount += self::evaluatedIncrement($file);
+                $evaluatedCount += self::evaluatedIncrement($file, $cached['budgetDiagnostic'] !== null);
                 continue;
             }
 
@@ -317,7 +324,7 @@ final class AnalysisPipeline
 
             if (!$unit->hasParseErrors()) {
                 $parsedCount++;
-                $evaluatedCount += self::evaluatedIncrement($file);
+                $evaluatedCount += self::evaluatedIncrement($file, $unit->isDeepScanBounded());
             }
             // Keep nonfatal budget notes as well as fatal parse errors visible in the run report.
 
@@ -357,6 +364,7 @@ final class AnalysisPipeline
 
     /**
      * Looks up cached findings and returns the key for a later cache write when one can be computed.
+     *
      * Disabled caching or unreadable files return no key; null findings mean a miss, while an empty list is a hit.
      * The budget check runs whenever a key is available, including on cache misses.
      *
@@ -375,6 +383,7 @@ final class AnalysisPipeline
     ): array {
         $miss = ['key' => null, 'findings' => null, 'budgetDiagnostic' => null];
 
+        // Unavailable caching or an unreadable input falls through to the source path, which owns diagnostics.
         if (!$cache instanceof ResultCache || !$fingerprint instanceof AnalysisFingerprint || !is_readable($file->absolutePath)) {
             return $miss;
         }
@@ -382,6 +391,7 @@ final class AnalysisPipeline
         $contents = file_get_contents($file->absolutePath);
 
 
+        // If a file disappears before it can be read, let source analysis report the failed input.
         if (!is_string($contents)) {
             return $miss;
         }
@@ -418,11 +428,11 @@ final class AnalysisPipeline
      * Loads requested sources and any wider project context for runs that cannot stream.
      * Analyses them together, then limits project-rule findings to the requested files.
      *
-     * @param string $projectRoot - Root for discovery and parsing of the requested paths.
+     * @param string                  $projectRoot        - Root for discovery and parsing of the requested paths.
      * @param AnalyseCommandOptions   $options            - CLI options forwarded to discovery and the context resolver.
      * @param AnalysisConfig          $config             - Effective config supplying ignore patterns and rule selection.
      * @param RuleContext             $ruleContext        - Context the whole-project analysis pass runs against.
-     * @param DiffResult|null $reviewDiff - Diff metadata for the context resolver; null after a failed review lookup.
+     * @param DiffResult|null         $reviewDiff         - Diff metadata for the context resolver; null after a failed review lookup.
      * @param list<string>            $analysisPaths      - Project-relative paths to load and parse; never null here.
      * @param int                     $discoverStart      - Monotonic hrtime start for the discover-and-parse span.
      * @param RuleRunnerObserver|null $ruleRunnerObserver - Per-rule timing sink; null when this run isn't collecting per-rule timings.

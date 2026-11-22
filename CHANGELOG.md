@@ -146,7 +146,7 @@ Upgrading from 0.5.x: this release changes every machine-readable contract at on
 - **Text reports state the suppression total** - A `Suppressed findings: N via ...` line names each entry and its reason, so a hidden finding is a number rather than an absence.
 - **Suppressed findings leave scoring and exit codes** - They are removed like accepted baseline debt; an entry matching nothing reports `suppressed: 0` instead of failing.
 - **`summary` applies sensitive exclusions** - The digest filters, counts, and scores the same findings `analyse` does, so its totals no longer disagree with the report it digests.
-- **`summary` publishes the full suppression audit** - Text prints the same `Suppressed findings: N via ...` line as `analyse`. JSON emits `gruff.summary.v3` with the same `suppressions` rows and `summary.suppressedFindings` count as the corresponding analysis run.
+- **`summary` publishes the suppression audit** - Text prints the total suppressed. JSON carries the count for each audit row in `suppressions[].suppressed`.
 - **Known limitation: two detector fixes measured on 2026-08-12 have no family regression suite** - `security.sql-concatenation` and `security.process-command-construction` reporting procedural `mysqli_query` and `shell_exec` sinks, and `test-quality.mock-without-expectation` reading Prophecy expectations, ship unguarded by the family, because the suite that would hold them was deferred past 0.6.0.
 - **The self-scan gate proves zero findings, not zero false positives** - `gruff-php` finding nothing in its own repository is an invariant this release holds, not evidence about false-positive rates, which negative fixtures measure and a self-scan cannot.
 

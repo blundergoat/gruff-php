@@ -224,8 +224,8 @@ Use `github` inside GitHub Actions to emit workflow annotations.
 
 ## Hotspot
 
-Use `hotspot` for score and offender analysis. Hotspot output is a compact JSON
-view intended for dashboards and trend tooling.
+Use `hotspot` for score and offender analysis. The compact JSON document uses
+`gruff-php.hotspot.v1` and includes hotspots, run diagnostics, and suppression audit rows.
 
 ## SARIF
 

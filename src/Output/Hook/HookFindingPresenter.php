@@ -9,6 +9,7 @@ use JsonException;
 
 /**
  * Converts findings to `gruff.hook.v2` entries for editor and agent consumers.
+ *
  * Supplies fallback remediation and threshold metadata defaults while preserving rule-provided metadata.
  * Orders presented batches by severity, then location and rule ID.
  */
@@ -30,22 +31,22 @@ final readonly class HookFindingPresenter
     {
         $scope   = HookFindingScope::classify($finding);
         $payload = [
-            'ruleId'         => $finding->ruleId,
-            'pillar'         => $finding->pillar->value,
-            'severity'       => $finding->severity->value,
-            'confidence'     => $finding->confidence->value,
-            'scope'          => $scope,
-            'file'           => $finding->filePath,
-            'line'           => $finding->line,
-            'endLine'        => $this->endLine($finding),
-            'symbol'         => $finding->symbol,
-            'symbolOrdinal'  => $symbolOrdinal,
-            'message'        => $finding->message,
-            'remediation'    => $finding->remediation ?? sprintf('Address the %s finding or configure the rule if this is intentional.', $finding->ruleId),
+            'ruleId' => $finding->ruleId,
+            'pillar' => $finding->pillar->value,
+            'severity' => $finding->severity->value,
+            'confidence' => $finding->confidence->value,
+            'scope' => $scope === HookFindingScope::LINE ? HookFindingScope::SYMBOL : $scope,
+            'file' => $finding->filePath,
+            'line' => $finding->line,
+            'endLine' => $this->endLine($finding),
+            'symbol' => $finding->symbol,
+            'symbolOrdinal' => $symbolOrdinal,
+            'message' => $finding->message,
+            'remediation' => $finding->remediation ?? sprintf('Address the %s finding or configure the rule if this is intentional.', $finding->ruleId),
             'baselineStatus' => $baselineStatus,
-            'metadata'       => $this->metadata($finding),
+            'metadata' => $this->metadata($finding),
             'stableIdentity' => $stableIdentity,
-            'fingerprint'    => $finding->fingerprint(),
+            'fingerprint' => $finding->fingerprint(),
         ];
 
         // Encode empty metadata as a JSON object so consumers receive a keyed map.
@@ -67,6 +68,7 @@ final readonly class HookFindingPresenter
     private function endLine(Finding $finding): ?int
     {
 
+        // A file-wide finding has no line range for the caller to highlight.
         if ($finding->line === null) {
             return null;
         }
@@ -118,15 +120,16 @@ final readonly class HookFindingPresenter
         $metadata = $finding->metadata;
 
 
+        // Preserve metadata as supplied when there is no threshold to explain to the reviewer.
         if (!isset($metadata['threshold'])) {
             return $metadata;
         }
 
         $measured   = $this->measuredValue($finding);
         $normalized = [
-            'measured'  => $measured,
+            'measured' => $measured,
             'threshold' => $metadata['threshold'],
-            'unit'      => $this->unit($finding),
+            'unit' => $this->unit($finding),
             'direction' => $this->direction($finding),
         ];
 
@@ -144,15 +147,18 @@ final readonly class HookFindingPresenter
     private function measuredValue(Finding $finding): bool|float|int|string|null
     {
 
+        // Prefer the rule's known measurement so the hook can say what crossed its limit.
         foreach ($this->measuredKeys($finding->ruleId) as $key) {
             $value = $finding->metadata[$key] ?? null;
 
+            // A scalar observation can be shown directly beside the threshold.
             if (is_bool($value) || is_float($value) || is_int($value) || is_string($value)) {
                 return $value;
             }
         }
 
 
+        // Rules without a known measurement key can still report a numeric observation.
         foreach ($finding->metadata as $key => $value) {
             // Skip the limit and its type; they describe the boundary, not the observed value.
             if ($key === 'threshold' || $key === 'thresholdType') {
@@ -160,6 +166,7 @@ final readonly class HookFindingPresenter
             }
 
 
+            // Use the first numeric observation available to explain why a finding crossed a limit.
             if (is_float($value) || is_int($value)) {
                 return $value;
             }
@@ -229,8 +236,7 @@ final readonly class HookFindingPresenter
     }
 
     /**
-     * Turns a severity word into a sortable rank so `sort()` can push errors above warnings above
-     * advisories when ordering a batch for display.
+     * Turns a severity word into a sortable rank so `sort()` can push errors above warnings above advisories when ordering a batch for display.
      *
      * @param string $severity - The finding's severity word, such as `error`, `warning`, or `advisory`.
      *

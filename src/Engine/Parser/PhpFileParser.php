@@ -15,6 +15,7 @@ use Throwable;
 
 /**
  * Reads source files into analysis units containing raw text, AST statements, retained tokens, and diagnostics.
+ *
  * PHP parsing resolves names and connects parents; non-PHP and over-budget files retain text without an AST or tokens.
  * Read failures and caught parser failures become diagnostics so callers can report unusable files.
  */
@@ -38,12 +39,13 @@ final readonly class PhpFileParser
 
     /**
      * Reads source files; successful PHP parsing resolves names, connects parents, and retains comment tokens.
+     *
      * Non-PHP and over-budget files retain only source; a failed read returns empty contents with a fatal diagnostic.
      * Caught parser or visitor failures retain source without an AST; PhpParser errors also retain the full token stream.
      *
      * @param SourceFile $file - File descriptor to parse.
      *
-     * @param array{enabled: bool, maxLines: int, maxBytes: int, override: string}|null $deepScanBudget - Limits; null leaves parsing unbounded.
+     * @param array{enabled: bool, maxLines: int, maxBytes: int, override: string}|null $deepScanBudget - Null gives PHP files no structural limit.
      *
      * @return AnalysisUnit - Retained contents with fatal read/parse diagnostics or a nonfatal budget notice; no diagnostics otherwise.
      */
@@ -71,6 +73,7 @@ final readonly class PhpFileParser
         }
 
         $budgetDiagnostic = self::deepScanBudgetDiagnostic($file, $source, $deepScanBudget);
+        // Keep the file available for text rules and report that the configured limit skipped structural analysis.
         if ($budgetDiagnostic instanceof ParseDiagnostic) {
             return new AnalysisUnit($file, $source, [], [], [$budgetDiagnostic]);
         }
@@ -90,8 +93,10 @@ final readonly class PhpFileParser
 
             $commentTokens = [];
 
+            // Retain only evidence the annotation and line-count rules can use after the AST is built.
             foreach ($this->parser->getTokens() as $token) {
 
+                // Comment tokens preserve source intent without retaining identifiers and operators already described by the AST.
                 if ($token->id === T_COMMENT || $token->id === T_DOC_COMMENT) {
                     $commentTokens[] = $token;
                 }
@@ -100,7 +105,7 @@ final readonly class PhpFileParser
 
             return new AnalysisUnit($file, $source, $traversed, $commentTokens, []);
         } catch (Error $error) {
-            // Caught parser errors retain source and all tokens; their fatal diagnostic uses the reported line, or line 1 if unknown.
+            // A file with an unfinished PHP expression still reaches the report as a fatal diagnostic at the parser's best known line.
 
             return new AnalysisUnit(
                 $file,
@@ -110,7 +115,7 @@ final readonly class PhpFileParser
                 [new ParseDiagnostic($error->getRawMessage(), max(1, $error->getStartLine()))],
             );
         } catch (Throwable $throwable) {
-            // Unexpected parser or visitor failures retain the source and become a fatal diagnostic at line 1.
+            // If a caller-supplied parser throws before producing an AST, report a fatal error at line 1 and retain the source.
 
             return new AnalysisUnit(
                 $file,
@@ -125,7 +130,7 @@ final readonly class PhpFileParser
     /**
      * Describes a PHP file whose raw source crosses either structural-analysis bound.
      *
-     * @param SourceFile $file - Discovered file under consideration; a non-PHP source is never bounded.
+     * @param SourceFile $file   - Discovered file under consideration; a non-PHP source is never bounded.
      * @param string     $source - Raw contents, measured in lines and bytes against the budget.
      *
      * @param array{enabled: bool, maxLines: int, maxBytes: int, override: string}|null $deepScanBudget - Limits; null disables the guard.
@@ -137,12 +142,14 @@ final readonly class PhpFileParser
         string $source,
         ?array $deepScanBudget,
     ): ?ParseDiagnostic {
+        // Text inputs have no structural budget. PHP can also run unbounded when the caller or config disables it.
         if (!$file->isPhp() || $deepScanBudget === null || !$deepScanBudget['enabled']) {
             return null;
         }
 
-        $lineCount = $source === '' ? 0 : substr_count($source, "\n") + 1;
+        $lineCount = substr_count($source, "\n") + (int)($source !== '' && !str_ends_with($source, "\n"));
         $byteCount = strlen($source);
+        // A PHP file at the configured line and byte limits still gets a structural scan.
         if ($lineCount <= $deepScanBudget['maxLines'] && $byteCount <= $deepScanBudget['maxBytes']) {
             return null;
         }

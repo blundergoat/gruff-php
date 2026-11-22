@@ -52,7 +52,7 @@ final readonly class SensitiveExclusionConfigParser
      * Parses the sensitiveExclusions block into exact rule, relative-path, and optional-symbol scopes.
      *
      * @param ConfigValue  $decodedValue - Raw sensitiveExclusions config value; must be a list of entry objects.
-     * @param RuleRegistry $registry - Registry consulted to confirm each rule id exists and sits in the sensitive-data pillar.
+     * @param RuleRegistry $registry     - Registry consulted to confirm each rule id exists and sits in the sensitive-data pillar.
      *
      * @return list<SensitiveExclusion> - Exclusions in config order, whose positions are audit indexes; empty for an empty block.
      * @throws ConfigException - When the block is not a list, an entry is malformed, or two entries claim one scope.
@@ -60,6 +60,7 @@ final readonly class SensitiveExclusionConfigParser
     public function parse(object|array|string|int|float|bool|null $decodedValue, RuleRegistry $registry): array
     {
 
+        // An exclusion needs an entry in a list so validation can point the caller to its position.
         if (!is_array($decodedValue) || !array_is_list($decodedValue)) {
             throw new ConfigException(sprintf('Config key "%s" must be a list of exclusion entries.', self::CONFIG_KEY));
         }
@@ -68,6 +69,7 @@ final readonly class SensitiveExclusionConfigParser
         $scopeKeys  = [];
 
 
+        // Check each entry before any exclusion can affect findings.
         foreach ($decodedValue as $index => $decodedEntry) {
             $exclusion = $this->parseEntry($decodedEntry, $index, $registry);
             $scopeKey  = $exclusion->scopeKey();
@@ -92,8 +94,8 @@ final readonly class SensitiveExclusionConfigParser
      * Validates one entry end to end and builds the scope it declares.
      *
      * @param ConfigValue  $decodedEntry - Raw entry value; must be a string-keyed object.
-     * @param int          $index - Entry position, named in every diagnostic this entry can raise.
-     * @param RuleRegistry $registry - Registry used to resolve and classify the entry's rule id.
+     * @param int          $index        - Entry position, named in every diagnostic this entry can raise.
+     * @param RuleRegistry $registry     - Registry used to resolve and classify the entry's rule id.
      *
      * @return SensitiveExclusion - the validated scope; every field is already checked, so matching never re-validates.
      * @throws ConfigException - When the entry is not an object, carries an unsupported key, or holds an invalid value.
@@ -101,6 +103,7 @@ final readonly class SensitiveExclusionConfigParser
     private function parseEntry(object|array|string|int|float|bool|null $decodedEntry, int $index, RuleRegistry $registry): SensitiveExclusion
     {
 
+        // An entry needs named fields for the rule, path, and reason.
         if (!is_array($decodedEntry) || ($decodedEntry !== [] && array_is_list($decodedEntry))) {
             throw new ConfigException(sprintf('Config key "%s" must be an object.', $this->entryPath($index)));
         }
@@ -119,7 +122,7 @@ final readonly class SensitiveExclusionConfigParser
      * Rejects keys other than rule, path, symbol, and reason, preventing message- and value-matching fields from widening an exclusion.
      *
      * @param array<array-key, mixed> $decodedEntry - Decoded entry whose keys are checked against the supported set.
-     * @param int                     $index - Entry position, named in the diagnostic.
+     * @param int                     $index        - Entry position, named in the diagnostic.
      *
      * @return void - Returns when every entry key belongs to the supported set.
      * @throws ConfigException - When the entry carries any key outside the supported set.
@@ -127,6 +130,7 @@ final readonly class SensitiveExclusionConfigParser
     private function assertKnownKeys(array $decodedEntry, int $index): void
     {
 
+        // A misspelled or disallowed key must be reported before the exclusion can affect the scan.
         foreach (array_keys($decodedEntry) as $entryKey) {
             // A message- or value-matching key is the exact shape this block exists to forbid, so name it rather than ignore it.
             if (!in_array($entryKey, self::ENTRY_KEYS, true)) {
@@ -144,8 +148,8 @@ final readonly class SensitiveExclusionConfigParser
      * Resolves the entry's rule to one known sensitive-data rule id, rejecting pattern syntax, pillar selectors, unknown ids, and other pillars.
      *
      * @param array<array-key, mixed> $decodedEntry - Decoded entry supplying the rule value.
-     * @param int                     $index - Entry position, named in every diagnostic below.
-     * @param RuleRegistry            $registry - Registry consulted for existence and pillar classification.
+     * @param int                     $index        - Entry position, named in every diagnostic below.
+     * @param RuleRegistry            $registry     - Registry consulted for existence and pillar classification.
      *
      * @return string - the exact rule id this entry suppresses, guaranteed to exist and to sit in the sensitive-data pillar.
      * @throws ConfigException - When rule is missing, empty, contains pattern syntax, names a pillar, is unknown, or belongs to another pillar.
@@ -182,8 +186,8 @@ final readonly class SensitiveExclusionConfigParser
     /**
      * Confirms a known rule id belongs to the sensitive-data pillar because other pillars are configured through selection.
      *
-     * @param string       $ruleId - Known rule id to classify.
-     * @param int          $index - Entry position, named in the diagnostic.
+     * @param string       $ruleId   - Known rule id to classify.
+     * @param int          $index    - Entry position, named in the diagnostic.
      * @param RuleRegistry $registry - Registry supplying the rule's declared pillar.
      *
      * @return string - the same rule id, returned once it is confirmed to sit in the sensitive-data pillar.
@@ -207,42 +211,44 @@ final readonly class SensitiveExclusionConfigParser
     }
 
     /**
-     * Validates a non-empty relative path for matching, without checking file existence or resolving dot segments.
+     * Canonicalizes a project-relative file path without checking file existence.
      *
      * @param array<array-key, mixed> $decodedEntry - Decoded entry supplying the path value.
-     * @param int                     $index - Entry position, named in every diagnostic below.
+     * @param int                     $index        - Entry position, named in every diagnostic below.
      *
      * @return string - The path with forward-slash separators, ready to compare against a finding's display path.
-     * @throws ConfigException - When path is missing, blank, absolute, equals '..', contains '../', or contains glob syntax.
+     * @throws ConfigException - When the path is missing or contains root, parent, directory or glob syntax.
      */
     private function relativePath(array $decodedEntry, int $index): string
     {
         $relativePath = PathHelper::normalizeSeparators($this->requiredString($decodedEntry, 'path', $index));
 
-        // Absolute paths depend on one machine; a standalone '..' or any '../' sequence is rejected to keep exclusions project-relative.
-        if (PathHelper::isAbsolute($relativePath) || $relativePath === '..' || str_contains($relativePath, '../')) {
+        $segments = explode('/', $relativePath);
+        // A path outside the project or containing a null byte cannot name an auditable source file.
+        if (PathHelper::isAbsolute($relativePath) || in_array('..', $segments, true) || str_contains($relativePath, "\0")) {
             throw new ConfigException(sprintf(
                                           'Config key "%s.path" must be a relative project path that stays inside the project.',
                                           $this->entryPath($index),
                                       ));
         }
 
-        // Glob syntax is rejected because each exclusion must name one reviewed file.
-        if (strcspn($relativePath, self::PATH_GLOB_CHARACTERS) !== strlen($relativePath)) {
+        $canonical = implode('/', array_filter($segments, static fn (string $segment): bool => $segment !== '' && $segment !== '.'));
+        // Each exclusion needs one specific file. A directory, wildcard, or empty path cannot select it.
+        if ($canonical === '' || str_ends_with($relativePath, '/') || strcspn($canonical, self::PATH_GLOB_CHARACTERS) !== strlen($canonical)) {
             throw new ConfigException(sprintf(
                                           'Config key "%s.path" must name exactly one file; glob syntax is not accepted.',
                                           $this->entryPath($index),
                                       ));
         }
 
-        return $relativePath;
+        return $canonical;
     }
 
     /**
      * Reads the optional symbol that narrows an entry below file scope.
      *
      * @param array<array-key, mixed> $decodedEntry - Decoded entry; an absent symbol leaves the entry at file scope.
-     * @param int                     $index - Entry position, named in the diagnostic.
+     * @param int                     $index        - Entry position, named in the diagnostic.
      *
      * @return string|null - the configured symbol, or null when the entry covers every occurrence in the file.
      * @throws ConfigException - When symbol is present but not a non-empty string.
@@ -263,8 +269,8 @@ final readonly class SensitiveExclusionConfigParser
      * is a suppression nobody can review.
      *
      * @param array<array-key, mixed> $decodedEntry - Decoded entry to read from.
-     * @param string                  $entryKey - Required field name, appended to the indexed diagnostic path.
-     * @param int                     $index - Entry position, named in the diagnostic.
+     * @param string                  $entryKey     - Required field name, appended to the indexed diagnostic path.
+     * @param int                     $index        - Entry position, named in the diagnostic.
      *
      * @return string - the trimmed value; whitespace-only input never survives, so callers receive real content.
      * @throws ConfigException - When the key is absent, not a string, or blank after trimming.
@@ -274,6 +280,7 @@ final readonly class SensitiveExclusionConfigParser
         $rawValue = $decodedEntry[$entryKey] ?? null;
 
 
+        // A blank value gives the report no trustworthy reason, rule, or path to show for this exclusion.
         if (!is_string($rawValue) || trim($rawValue) === '') {
             throw new ConfigException(sprintf(
                                           'Config key "%s.%s" must be a non-empty string.',

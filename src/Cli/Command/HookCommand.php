@@ -19,6 +19,7 @@ use GruffPhp\Engine\Config\RuleSelection;
 use GruffPhp\Cli\Application as GruffApplication;
 use GruffPhp\Results\Diff\ChangedLineRange;
 use GruffPhp\Results\Diff\DiffException;
+use GruffPhp\Results\Diff\DiffFindingFilter;
 use GruffPhp\Results\Diff\ChangeScopeOptions;
 use GruffPhp\Results\Diff\DiffResult;
 use GruffPhp\Results\Diff\GitDiffProvider;
@@ -35,7 +36,6 @@ use GruffPhp\Results\Review\GitArchiveSnapshot;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\RuleRegistry;
 use GruffPhp\Engine\Source\IgnoredPath;
-use GruffPhp\Support\PathHelper;
 use JsonException;
 use RuntimeException;
 use Symfony\Component\Console\Command\Command;
@@ -69,11 +69,6 @@ final class HookCommand extends Command
     private const SEVERITY_RANK = ['advisory' => 0, 'warning' => 1, 'error' => 2];
 
     /**
-     * Confidence order the exit gate compares against; an unrated finding ranks highest so it cannot slip under a gate.
-     */
-    private const CONFIDENCE_RANK = ['low' => 0, 'medium' => 1, 'high' => 2];
-
-    /**
      * Defines the paths and supported options accepted by gruff-php hook.
      *
      * @return void - Registers arguments and options with Symfony Console.
@@ -92,10 +87,10 @@ final class HookCommand extends Command
             ->addOption('deep-scan-budget', null, InputOption::VALUE_REQUIRED, 'Bound structural analysis as <lines>:<bytes>, or disable it with off.')
             ->addOption('include-ignored', null, InputOption::VALUE_NONE, 'Scan ignored files by using filesystem traversal instead of Git/default ignores.')
             ->addOption('changed-ranges', null, InputOption::VALUE_REQUIRED, 'Explicit changed line ranges, e.g. 3-3,8-10.')
-            ->addOption('changed-scope', null, InputOption::VALUE_REQUIRED, 'Changed-region scope. Hook mode supports symbol.', default: 'symbol')
+            ->addOption('changed-scope', null, InputOption::VALUE_REQUIRED, 'Changed-region scope: symbol, hunk, or file.', default: DiffFindingFilter::SCOPE_SYMBOL)
             ->addOption('diff', null, InputOption::VALUE_OPTIONAL, 'Use a git diff mode/base ref for changed regions and new-only filtering.')
             ->addOption('since', null, InputOption::VALUE_REQUIRED, 'Use a git base ref for changed regions and new-only filtering.')
-            ->addOption('baseline', null, InputOption::VALUE_REQUIRED, 'Path to a prior gruff.hook.v1 JSON report for new-only filtering.')
+            ->addOption('baseline', null, InputOption::VALUE_REQUIRED, 'Path to a gruff.baseline.v3 file for new-only filtering.')
             ->addOption('include-rule', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Run only the named rule id. Can be repeated or comma-separated.')
             ->addOption('exclude-rule', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Skip the named rule id. Can be repeated or comma-separated.')
             ->addOption('fail-on', null, InputOption::VALUE_REQUIRED, 'Lowest severity that exits 1. The hook default of none keeps findings advisory.', default: 'none')
@@ -131,15 +126,16 @@ final class HookCommand extends Command
         }
 
         $projectRoot = getcwd();
+        // Without a working directory the hook cannot resolve the operands supplied by the caller.
         if ($projectRoot === false) {
             throw new RuntimeException('Unable to determine the current working directory.');
         }
 
         $paths        = $this->paths($input);
-        $changedScope = $this->stringOption($input, 'changed-scope') ?? 'symbol';
-        // The contract only implements symbol-level scoping, so another --changed-scope value is refused up front.
-        if ($changedScope !== 'symbol') {
-            $this->writeJson($output, $this->emptyReport(false, 'hook supports only --changed-scope symbol.'));
+        $changedScope = $this->providedStringOption($input, 'changed-scope') ?? DiffFindingFilter::SCOPE_SYMBOL;
+        // Return a hook diagnostic when the requested width has no supported scope.
+        if (!in_array($changedScope, [DiffFindingFilter::SCOPE_SYMBOL, DiffFindingFilter::SCOPE_HUNK, DiffFindingFilter::SCOPE_FILE], true)) {
+            $this->writeJson($output, $this->emptyReport(false, '--changed-scope must be symbol, hunk, or file.'));
 
             return Command::INVALID;
         }
@@ -149,7 +145,7 @@ final class HookCommand extends Command
         try {
             $config = $this->config($input, $projectRoot, $registry);
         } catch (ConfigException $exception) {
-            // Malformed YAML or a retired secret-preview key, even with an empty list, produces an in-band configuration error.
+            // A config using a retired secret-preview key makes the hook report a configuration error before scanning.
             $this->writeJson($output, $this->emptyReport(false, $exception->getMessage()));
 
             return Command::INVALID;
@@ -172,6 +168,7 @@ final class HookCommand extends Command
                 shouldIncludeIgnored: (bool)$input->getOption('include-ignored'),
                 config:               $config,
                 registry:             $registry,
+                symbolRegion:         $changedScope === DiffFindingFilter::SCOPE_SYMBOL ? $diff : null,
             );
             $findings             = $analysis['findings'];
             $baseStableIdentities = $this->baseStableIdentities(
@@ -181,21 +178,29 @@ final class HookCommand extends Command
                 shouldIncludeIgnored: (bool)$input->getOption('include-ignored'),
                 config:               $config,
             );
-            $hasNewOnlySource = $baseStableIdentities !== null;
-            $filterResult     = (new HookFindingFilter())->apply($findings, $diff, $baseStableIdentities ?? [], $hasNewOnlySource);
-            $inventory        = DeclarationInventory::forFindings($projectRoot, $filterResult->findings);
-            $baselineResult   = $this->applyBaseline($input, $projectRoot, $filterResult->findings, $inventory);
+            $hasNewOnlySource = $baseStableIdentities !== null || $this->stringOption($input, 'baseline') !== null;
+            $filterResult     = (new HookFindingFilter())->apply(
+                $findings,
+                $diff,
+                $baseStableIdentities ?? [],
+                $hasNewOnlySource,
+                $analysis['sources']->analysisUnits,
+                $changedScope,
+            );
+            $inventory      = DeclarationInventory::forFindings($projectRoot, $filterResult->findings);
+            $baselineResult = $this->applyBaseline($input, $projectRoot, $filterResult->findings, $inventory);
 
-            $payload = $this->report(
-                findings:         $baselineResult['findings'],
-                suppressedCount:  $filterResult->suppressedCount,
-                ignoredPathRows:  $analysis['sources']->discovery->ignoredPathDetails,
-                diagnostics:      $analysis['sources']->diagnostics,
-                runAudit:         new HookRunAudit(
+            $analysedFileCount = $analysis['sources']->parsedFileCount();
+            $payload           = $this->report(
+                findings:          $baselineResult['findings'],
+                suppressedCount:   $filterResult->suppressedCount,
+                ignoredPathRows:   $analysis['sources']->discovery->ignoredPathDetails,
+                diagnostics:       $analysis['sources']->diagnostics,
+                runAudit:          new HookRunAudit(
                                       mode:              $this->runMode($input),
-                                      scope:             $this->runScope($input),
+                                      scope:             $this->runScope($input, $changedScope),
                                       paths:             $paths,
-                                      analysedFiles:     count($analysis['sources']->discovery->files),
+                                      analysedFiles:     $analysedFileCount,
                                       isBaselineApplied: $baselineResult['path'] !== null,
                                       baselinePath:      $baselineResult['path'],
                                   ),
@@ -205,22 +210,31 @@ final class HookCommand extends Command
             );
             $this->writeJson($output, $payload);
 
+            // An empty scan can succeed when there are no changed files. Fatal input errors make it unusable.
+            if ($analysedFileCount === 0) {
+                // Check why no file was analysed before deciding whether the hook completed.
+                foreach ($analysis['sources']->diagnostics as $diagnostic) {
+                    // A sole missing or unparseable file must fail the hook rather than look clean.
+                    if ($diagnostic->isFatal) {
+                        return Command::INVALID;
+                    }
+                }
+            }
+
             return $this->exitCode($payload, $gate);
         } catch (BaselineException $exception) {
-            // An unreadable or incompatible baseline cannot be applied safely. Report the reason in both the JSON payload
-            // and stderr so agents and shell users receive it.
+            // A v2 baseline supplied to this v3 hook produces a diagnostic in both JSON and stderr.
             $this->writeJson($output, $this->emptyReport(true, $exception->getMessage(), 'baseline'));
             $this->writeError($output, $exception->getMessage());
 
             return Command::INVALID;
         } catch (DiffException $exception) {
-            // A scope the run could not read carries one family type on every surface, so an agent reading the hook
-            // and a reader of the analyse envelope see the same name for the same failure.
+            // An unknown Git ref or invalid changed range produces the same changed-region diagnostic as analyse.
             $this->writeJson($output, $this->emptyReport(true, $exception->getMessage(), RunDiagnostic::CHANGED_REGION_TYPE));
 
             return Command::INVALID;
         } catch (RuntimeException $exception) {
-            // Operational failures such as an unreadable hook baseline are reported in-band, even after the main scan finishes.
+            // If the Git comparison could not be prepared, return an operational error in the hook report.
             $this->writeJson($output, $this->emptyReport(true, $exception->getMessage()));
 
             return Command::INVALID;
@@ -232,7 +246,7 @@ final class HookCommand extends Command
      *
      * @param InputInterface $input - Flags carrying `--fail-on`, `--min-confidence`, `--fail-on-new` and `--fail-on-diagnostics`.
      *
-     * @return array{failOn: string, minConfidence: string, failOnNew: bool, failOnDiagnostics: bool}|string - Gate or validation error.
+     * @return array{failOn: string, minConfidence: Confidence, failOnNew: bool, failOnDiagnostics: bool}|string - Gate or validation error.
      */
     private function exitGate(InputInterface $input): array|string
     {
@@ -243,10 +257,17 @@ final class HookCommand extends Command
             return sprintf('Unknown severity "%s" for --fail-on: want advisory, warning, error or none.', $failOn);
         }
 
-        $minConfidence = strtolower(trim($this->stringOption($input, 'min-confidence') ?? Confidence::Low->value));
+        $requestedConfidence = strtolower(trim($this->providedStringOption($input, 'min-confidence') ?? Confidence::Low->value));
+        $minConfidence       = Confidence::tryFrom($requestedConfidence);
 
-        if (Confidence::tryFrom($minConfidence) === null) {
-            return sprintf('Unknown confidence "%s" for --min-confidence: want low, medium or high.', $minConfidence);
+        // Reject an unknown confidence threshold so the hook never applies an unintended gate.
+        if ($minConfidence === null) {
+            return sprintf('Unknown confidence "%s" for --min-confidence: want low, medium or high.', $requestedConfidence);
+        }
+
+        // New-only gating needs reviewed occurrences to classify each finding as new.
+        if ((bool)$input->getOption('fail-on-new') && $this->stringOption($input, 'baseline') === null) {
+            return 'Hook --fail-on-new requires --baseline with a gruff.baseline.v3 file.';
         }
 
         return [
@@ -259,11 +280,12 @@ final class HookCommand extends Command
 
     /**
      * Decides what the hook tells the calling agent, reading the payload it just published rather than the raw scan.
+     *
      * What blocks an edit is exactly what the agent was shown: a finding the changed-region filter or the baseline
      * removed is not in the payload and does not block.
      *
-     * @param array<string, mixed>                                                                  $payload - The published hook report.
-     * @param array{failOn: string, minConfidence: string, failOnNew: bool, failOnDiagnostics: bool} $gate    - The resolved exit gate.
+     * @param array<string, mixed>                                                                       $payload - The published hook report.
+     * @param array{failOn: string, minConfidence: Confidence, failOnNew: bool, failOnDiagnostics: bool} $gate    - The resolved exit gate.
      *
      * @return int - 0 when nothing reached the gate, 1 when something did.
      */
@@ -277,7 +299,9 @@ final class HookCommand extends Command
         /** @var list<array<string, mixed>> $rows - Findings already included in the report payload. */
         $rows = is_array($payload['findings'] ?? null) ? $payload['findings'] : [];
 
+        // Check the published findings so the exit code reflects the same evidence the caller receives.
         foreach ($rows as $publishedFinding) {
+            // Any finding that reaches the requested gate makes the hook exit 1.
             if ($this->isGateReached($publishedFinding, $gate)) {
                 return 1;
             }
@@ -290,13 +314,14 @@ final class HookCommand extends Command
      * Tests whether a published finding triggers the caller's exit gate.
      * `--fail-on-new` accepts status `new` regardless of either threshold; otherwise both thresholds must be met.
      *
-     * @param array<string, mixed> $publishedFinding - One finding from the payload.
-     * @param array{failOn: string, minConfidence: string, failOnNew: bool, failOnDiagnostics: bool} $gate - Validated exit settings.
+     * @param array<string, mixed>                                                                       $publishedFinding - Published finding.
+     * @param array{failOn: string, minConfidence: Confidence, failOnNew: bool, failOnDiagnostics: bool} $gate             - Validated exit settings.
      *
      * @return bool - True when this finding alone is enough to exit 1.
      */
     private function isGateReached(array $publishedFinding, array $gate): bool
     {
+        // A finding marked new by the baseline trips the explicit new-only gate on its own.
         if ($gate['failOnNew'] && ($publishedFinding['baselineStatus'] ?? null) === 'new') {
             return true;
         }
@@ -309,9 +334,10 @@ final class HookCommand extends Command
         }
 
         $severity   = self::SEVERITY_RANK[is_string($publishedFinding['severity'] ?? null) ? $publishedFinding['severity'] : ''] ?? 0;
-        $confidence = self::CONFIDENCE_RANK[is_string($publishedFinding['confidence'] ?? null) ? $publishedFinding['confidence'] : ''] ?? 2;
+        $confidence = $publishedFinding['confidence'] ?? null;
+        $rating     = is_string($confidence) ? Confidence::tryFrom($confidence) : null;
 
-        return $severity >= $severityFloor && $confidence >= (self::CONFIDENCE_RANK[$gate['minConfidence']] ?? 0);
+        return $severity >= $severityFloor && ($rating ?? Confidence::High)->rank() >= $gate['minConfidence']->rank();
     }
 
     /**
@@ -328,39 +354,42 @@ final class HookCommand extends Command
             return 'changed-ranges';
         }
 
-        if ($input->getOption('diff') !== null && $input->getOption('diff') !== false) {
-            return 'diff';
+        // A comparison ref supplied with --since determines the run mode in the audit.
+        if ($this->stringOption($input, 'since') !== null) {
+            return 'since';
         }
 
-        return $this->stringOption($input, 'since') !== null ? 'since' : 'full';
+        return $this->diffMode($input) === null ? 'full' : 'diff';
     }
 
     /**
      * Names how wide each changed line was taken to be, which decides what a clean result actually proves.
      *
-     * @param InputInterface $input - Flags carrying the region selectors.
+     * @param InputInterface $input        - Flags carrying the region selectors.
+     * @param string         $changedScope - Requested scope when a region selector is active.
      *
-     * @return string - `symbol` when a region selector narrowed the run, `file` when nothing did.
+     * @return string - Requested region scope, or file when the whole file was analysed.
      */
-    private function runScope(InputInterface $input): string
+    private function runScope(InputInterface $input, string $changedScope): string
     {
-        // A region selector widens each changed line to its enclosing declaration; without one, the whole file was judged.
+        // Without a region selector, the audit reports the full-file scope.
         if ($this->runMode($input) === 'full') {
             return 'file';
         }
 
-        return 'symbol';
+        return $changedScope;
     }
 
     /**
      * Applies a --baseline file, classifying every finding it covers and leaving the rest to be reported.
+     *
      * The hook reads the same ratified baseline v3 file written by analyse --generate-baseline, so one review carries
      * across both surfaces. A file in any other schema is refused rather than read under the wrong matching rules.
      *
-     * @param InputInterface $input       - Flags carrying --baseline.
-     * @param string         $projectRoot - Project root the baseline path resolves against.
-     * @param list<Finding>  $findings    - Findings the changed-region filter left; the returned set is what the baseline gates.
-     * @param DeclarationInventory $inventory - Scanned variable occurrences, so the hook ranks a variable's ordinal as `analyse` does.
+     * @param InputInterface       $input       - Flags carrying --baseline.
+     * @param string               $projectRoot - Project root the baseline path resolves against.
+     * @param list<Finding>        $findings    - Findings the changed-region filter left; the returned set is what the baseline gates.
+     * @param DeclarationInventory $inventory   - Scanned variable occurrences, so the hook ranks a variable's ordinal as `analyse` does.
      *
      * @return array{findings: list<Finding>, statuses: array<int, string>, path: string|null} - Gated findings, object-ID statuses, and applied path.
      * @throws BaselineException - When the baseline is missing, unreadable, invalid, or from another port.
@@ -441,11 +470,13 @@ final class HookCommand extends Command
             : (new ConfigLoader($projectRoot, ConfigLoader::packageRoot(), shouldResolveFromLaunchDir: true))->load($configPath, $registry);
 
         $deepScanBudgetOverride = AnalyseCommandOptions::parseDeepScanBudgetOverride(
-            $this->stringOption($input, 'deep-scan-budget'),
+            $this->providedStringOption($input, 'deep-scan-budget'),
         );
+        // Report a malformed hook budget before starting any analysis.
         if (is_string($deepScanBudgetOverride)) {
             throw new ConfigException($deepScanBudgetOverride);
         }
+        // A caller-supplied budget overrides the project setting for this invocation.
         if ($deepScanBudgetOverride !== null) {
             $config = $config->withDeepScanBudget(
                 $deepScanBudgetOverride['enabled'],
@@ -459,9 +490,11 @@ final class HookCommand extends Command
         $includeRules    = array_map(RuleRegistry::canonicalRuleId(...), $this->stringListOption($input, 'include-rule'));
         $excludeRules    = array_map(RuleRegistry::canonicalRuleId(...), $this->stringListOption($input, 'exclude-rule'));
         $ruleFilterError = $this->ruleFilterError($registry, $includeRules, $excludeRules);
+        // An unknown rule stops the hook before a partial selection could make a check look clean.
         if ($ruleFilterError !== null) {
             throw new ConfigException($ruleFilterError);
         }
+        // Preserve configured selection when neither execution filter was supplied.
         if ($includeRules !== [] || $excludeRules !== []) {
             $config = $config->withRuleSelection($this->refinedSelection($config->ruleSelection(), $includeRules, $excludeRules));
         }
@@ -506,8 +539,10 @@ final class HookCommand extends Command
      */
     private function ruleFilterError(RuleRegistry $registry, array $includeRules, array $excludeRules): ?string
     {
+        // Check allow and deny selections separately so the error names the flag to correct.
         foreach (['--include-rule' => $includeRules, '--exclude-rule' => $excludeRules] as $option => $ruleIds) {
             $unknownRuleIds = $registry->unknownRuleIds($ruleIds);
+            // An unknown rule ID means the requested check could not be run as written.
             if ($unknownRuleIds !== []) {
                 return sprintf('Unknown rule id "%s" for %s.', $unknownRuleIds[0], $option);
             }
@@ -524,6 +559,7 @@ final class HookCommand extends Command
      * @param bool              $shouldIncludeIgnored - Whether ignored files are pulled in via filesystem traversal.
      * @param AnalysisConfig    $config               - Effective config driving rule selection and ignores.
      * @param RuleRegistry      $registry             - Rule set executed against the discovered sources.
+     * @param DiffResult|null   $symbolRegion         - Requested symbol scope. Null means the caller does not need declaration spans for filtering.
      *
      * @return array{sources: AnalysisSourceSet, findings: list<Finding>, suppressions: list<SensitiveExclusionSummary>} - Sources, kept findings,
      *     and audit rows for configured exclusions, test-path skips, inline markers, and duplicates.
@@ -534,6 +570,7 @@ final class HookCommand extends Command
         bool $shouldIncludeIgnored,
         AnalysisConfig $config,
         RuleRegistry $registry,
+        ?DiffResult $symbolRegion = null,
     ): array {
         $options = new AnalyseCommandOptions(
             paths:                         $paths ?? [],
@@ -551,7 +588,7 @@ final class HookCommand extends Command
                                       mutationBaselinePath:          null,
                                       mutationBudget:                null,
                                   ),
-            changeScope:          new ChangeScopeOptions(
+            changeScope:   new ChangeScopeOptions(
                                       diffMode:      null,
                                       since:         null,
                                       changedRanges: null,
@@ -586,7 +623,7 @@ final class HookCommand extends Command
             options:            $options,
             config:             $config,
             ruleContext:        new RuleContext($projectRoot, $config),
-            reviewDiff:         null,
+            reviewDiff:         $symbolRegion,
             analysisPaths:      $paths,
             discoverStart:      hrtime(true),
             ruleRunnerObserver: null,
@@ -613,13 +650,16 @@ final class HookCommand extends Command
     {
         $changedRanges = $this->providedStringOption($input, 'changed-ranges');
 
+        // Explicit spans let a caller review edits supplied by an editor without asking Git for a diff.
         if ($changedRanges !== null) {
             $changedFiles = (new AnalysisFindingSupport())->normaliseRequestedPaths($projectRoot, $paths);
+            // Line numbers need a file operand to identify what the hook should review.
             if ($changedFiles === []) {
                 throw new DiffException('--changed-ranges requires at least one file path.');
             }
 
             $changedLines = [];
+            // Apply the caller's line spans to each selected file.
             foreach ($changedFiles as $changedFile) {
                 $changedLines[$changedFile] = $this->parseChangedRanges($changedRanges);
             }
@@ -635,11 +675,13 @@ final class HookCommand extends Command
         }
 
         $since = $this->stringOption($input, 'since');
+        // A --since ref supplies the Git comparison for the requested scope.
         if ($since !== null) {
             return (new GitDiffProvider())->changedLines($projectRoot, $since);
         }
 
         $diffMode = $this->diffMode($input);
+        // With neither explicit spans nor a Git selector, the hook reviews whole files.
         if ($diffMode === null) {
             return null;
         }
@@ -647,6 +689,7 @@ final class HookCommand extends Command
         // A `--diff=-` value means the unified patch arrives on stdin rather than from a git ref.
         if ($diffMode === '-') {
             $patch = stream_get_contents(STDIN);
+            // A failing stdin read means a piped patch cannot establish the review scope.
             if ($patch === false) {
                 throw new DiffException('Unable to read unified diff from stdin.');
             }
@@ -677,10 +720,12 @@ final class HookCommand extends Command
      */
     private function analysisPaths(string $projectRoot, array $paths, ?DiffResult $diff): ?array
     {
+        // Explicit operands take precedence over the file list supplied by Git.
         if ($paths !== []) {
             return $paths;
         }
 
+        // With no operands or active change selection, discovery starts from the project root.
         if (!$diff instanceof DiffResult || !$diff->active) {
             return [];
         }
@@ -692,9 +737,9 @@ final class HookCommand extends Command
     }
 
     /**
-     * Gathers findings that already existed before this change, so a run can surface only new ones (from `--baseline` and/or a diff base).
+     * Gathers finding identities from the Git comparison tree.
      *
-     * @param InputInterface $input                - Flags naming the `--baseline` file and/or the diff base.
+     * @param InputInterface $input                - Flags that may select a Git comparison ref.
      * @param string         $projectRoot          - Project root the base snapshot is taken from.
      * @param list<string>   $paths                - Paths to analyse in the base so their prior findings are known.
      * @param bool           $shouldIncludeIgnored - Whether ignored files should be included in the base scan.
@@ -709,78 +754,9 @@ final class HookCommand extends Command
         bool $shouldIncludeIgnored,
         AnalysisConfig $config,
     ): ?array {
-        $identities = null;
-
-        $baselinePath = $this->stringOption($input, 'baseline');
-        if ($baselinePath !== null) {
-            $identities = $this->baselineIdentities($projectRoot, $baselinePath);
-        }
-
         $baseRef = $this->baseRef($input);
-        if ($baseRef !== null) {
-            $baseIdentities = $this->baseRefIdentities(
-                projectRoot:          $projectRoot,
-                baseRef:              $baseRef,
-                paths:                $paths,
-                shouldIncludeIgnored: $shouldIncludeIgnored,
-                config:               $config,
-            );
-            // Union both sources so a finding known to either the baseline or the base ref reads as pre-existing.
-            $identities = $identities === null ? $baseIdentities : $identities + $baseIdentities;
-        }
 
-        return $identities;
-    }
-
-    /**
-     * Reads non-empty stable identities from the baseline file passed through --baseline for new-only filtering.
-     *
-     * @param string $projectRoot  - Project root used to resolve the --baseline path.
-     * @param string $baselinePath - Baseline file path supplied through --baseline.
-     *
-     * @return array<string, true> - Every stable identity found in the baseline; empty when it listed no findings.
-     */
-    private function baselineIdentities(string $projectRoot, string $baselinePath): array
-    {
-        $path = PathHelper::resolveAgainst($projectRoot, $baselinePath);
-        if (!is_file($path)) {
-            throw new RuntimeException(sprintf('Hook baseline not found: %s', $baselinePath));
-        }
-
-        $contents = file_get_contents($path);
-        if (!is_string($contents)) {
-            throw new RuntimeException(sprintf('Unable to read hook baseline: %s', $baselinePath));
-        }
-
-        try {
-            $decoded = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
-        } catch (JsonException $exception) {
-            // A malformed --baseline file is an operational error; surface it in-band rather than crashing the contract.
-            throw new RuntimeException(sprintf('Hook baseline is not valid JSON: %s', $baselinePath), 0, $exception);
-        }
-
-        if (!is_array($decoded)) {
-            throw new RuntimeException(sprintf('Hook baseline is not a JSON object: %s', $baselinePath));
-        }
-
-        $rows = $decoded['findings'] ?? [];
-        if (!is_array($rows)) {
-            throw new RuntimeException(sprintf('Hook baseline findings must be an array: %s', $baselinePath));
-        }
-
-        $identities = [];
-        foreach ($rows as $row) {
-            if (!is_array($row)) {
-                continue;
-            }
-
-            $identity = $row['stableIdentity'] ?? null;
-            if (is_string($identity) && $identity !== '') {
-                $identities[$identity] = true;
-            }
-        }
-
-        return $identities;
+        return $baseRef === null ? null : $this->baseRefIdentities($projectRoot, $baseRef, $paths, $shouldIncludeIgnored, $config);
     }
 
     /**
@@ -822,6 +798,7 @@ final class HookCommand extends Command
             );
 
             $identities = [];
+            // Keep the identities from the comparison so familiar findings can be recognized in the current tree.
             foreach (HookFindingIdentity::forFindings($analysis['findings']) as $identity) {
                 $identities[$identity] = true;
             }
@@ -844,12 +821,19 @@ final class HookCommand extends Command
      */
     private function baseRef(InputInterface $input): ?string
     {
+        // Explicit ranges describe locations only. They do not request a historical comparison tree.
+        if ($this->providedStringOption($input, 'changed-ranges') !== null) {
+            return null;
+        }
+
         $since = $this->stringOption($input, 'since');
+        // Use the caller's --since ref to identify findings that already existed.
         if ($since !== null) {
             return $since;
         }
 
         $diffMode = $this->diffMode($input);
+        // A full scan or a piped patch supplies no Git ref for comparing previous findings.
         if ($diffMode === null || $diffMode === '-') {
             return null;
         }
@@ -860,14 +844,14 @@ final class HookCommand extends Command
     /**
      * Builds the `gruff.hook.v2` report from findings, suppression counts, ignored paths, diagnostics, and run metadata.
      *
-     * @param list<Finding> $findings - Findings remaining after hook filtering and baseline application.
-     * @param int $suppressedCount - Count removed by HookFindingFilter before baseline application.
-     * @param list<IgnoredPath> $ignoredPathRows - Ignored path records surfaced so the caller sees what was skipped.
-     * @param list<RunDiagnostic> $diagnostics - Analysis diagnostics, including nonfatal bounded-scan notes.
-     * @param HookRunAudit $runAudit - What this run did: mode, scope, operands, file count and baseline.
-     * @param list<SensitiveExclusionSummary> $exclusions - Configured, test-path, inline, and duplicate suppression audits.
-     * @param array<int, string> $baselineStatuses - Statuses keyed by spl_object_id($finding); empty without a baseline.
-     * @param DeclarationInventory $inventory - Scanned variable occurrences, so each reported ordinal matches the baseline's.
+     * @param list<Finding>                   $findings         - Findings remaining after hook filtering and baseline application.
+     * @param int                             $suppressedCount  - Count removed by HookFindingFilter before baseline application.
+     * @param list<IgnoredPath>               $ignoredPathRows  - Ignored path records surfaced so the caller sees what was skipped.
+     * @param list<RunDiagnostic>             $diagnostics      - Analysis diagnostics, including nonfatal bounded-scan notes.
+     * @param HookRunAudit                    $runAudit         - What this run did: mode, scope, operands, file count and baseline.
+     * @param list<SensitiveExclusionSummary> $exclusions       - Configured, test-path, inline, and duplicate suppression audits.
+     * @param array<int, string>              $baselineStatuses - Statuses keyed by spl_object_id($finding); empty without a baseline.
+     * @param DeclarationInventory            $inventory        - Scanned variable occurrences, so each reported ordinal matches the baseline's.
      *
      * @return array<string, mixed> - The full JSON-ready hook report.
      */
@@ -884,6 +868,7 @@ final class HookCommand extends Command
         $presenter = new HookFindingPresenter();
         $ordinals  = BaselineIdentity::assignOrdinals($findings, $inventory);
         $presented = [];
+        // Keep ordinal lookup tied to individual findings before they are presented to the hook consumer.
         foreach ($findings as $finding) {
             $ordinal     = $ordinals[spl_object_id($finding)] ?? 0;
             $presented[] = $presenter->toArray(
@@ -907,10 +892,10 @@ final class HookCommand extends Command
             ],
             'suppressions' => array_map(
                 static fn(SensitiveExclusionSummary $exclusion): array => [
-                    'rule'       => $exclusion->rule,
-                    'path'       => $exclusion->path,
-                    'symbol'     => $exclusion->symbol,
-                    'reason'     => $exclusion->reason,
+                    'rule' => $exclusion->rule,
+                    'path' => $exclusion->path,
+                    ...($exclusion->symbol === null ? [] : ['symbol' => $exclusion->symbol]),
+                    'reason' => $exclusion->reason,
                     'suppressed' => $exclusion->suppressed,
                     // Configured rows omit source; test-path, inline, and duplicate suppression rows include it.
                     ...($exclusion->source === null ? [] : ['source' => $exclusion->source]),
@@ -933,6 +918,7 @@ final class HookCommand extends Command
 
     /**
      * Names one finding with the ratified family identity, or with nothing where the family refuses to name it.
+     *
      * A sensitive-data finding is deliberately unidentifiable: a durable identity is exactly what would let a stored
      * review hide a secret. A finding this port cannot name is reported without one rather than with a guessed one.
      *
@@ -951,7 +937,7 @@ final class HookCommand extends Command
         try {
             return BaselineIdentity::identityOf($finding, $ordinal);
         } catch (BaselineException) {
-            // Invalid subjects, including missing ordinals or embedded ordinal separators, cannot be given a safe identity.
+            // A declaration missing its ordinal cannot be assigned a safe baseline identity, so the hook leaves that identity empty.
             return null;
         }
     }
@@ -968,7 +954,7 @@ final class HookCommand extends Command
     {
         return array_map(
             static function (RunDiagnostic $diagnostic): array {
-                $diagnosticRow = $diagnostic->toArray();
+                $diagnosticRow             = $diagnostic->toArray();
                 $diagnosticRow['severity'] = $diagnostic->isFatal ? 'fatal' : 'warning';
 
                 return $diagnosticRow;
@@ -1005,18 +991,18 @@ final class HookCommand extends Command
             ],
             // An error makes this report unusable, so its diagnostic is fatal even if analysis already ran.
             'diagnostics' => $configError === null ? [] : [[
-                'type'     => $diagnosticType,
+                'type' => $diagnosticType,
                 'severity' => 'fatal',
-                'message'  => $configError,
-                'file'     => null,
-                'line'     => null,
-                'path'     => null,
+                'message' => $configError,
+                'file' => null,
+                'line' => null,
+                'path' => null,
             ]],
             'config' => [
-                'schemaOk' => $isConfigSchemaOk,
+                'schemaOk' => $isConfigSchemaOk && $configError === null,
                 // A configuration a consumer cannot fix is a dead end, so the error carries its remediation.
                 'error' => $configError === null ? null : [
-                    'message'     => $configError,
+                    'message' => $configError,
                     'remediation' => 'Fix the reported problem in .gruff-php.yaml, or pass --no-config to run without project configuration.',
                 ],
             ],
@@ -1063,8 +1049,10 @@ final class HookCommand extends Command
     {
         $parsed = [];
 
+        // Accept several separate edited spans in one --changed-ranges value.
         foreach (explode(',', $ranges) as $part) {
             $part = trim($part);
+            // A trailing comma contributes no span. A list with no valid spans is rejected below.
             if ($part === '') {
                 continue;
             }
@@ -1077,6 +1065,7 @@ final class HookCommand extends Command
             $startLine = (int)$matches[1];
             $endLine   = isset($matches[2]) ? (int)$matches[2] : $startLine;
 
+            // A zero or reversed range cannot select source lines, so report how to enter a valid span.
             if ($startLine < 1 || $endLine < $startLine) {
                 throw new DiffException(sprintf('Invalid --changed-ranges value "%s". Use ranges like "3-3,8-10".', $ranges));
             }
@@ -1084,6 +1073,7 @@ final class HookCommand extends Command
             $parsed[] = new ChangedLineRange($startLine, $endLine);
         }
 
+        // An empty list cannot describe an edit and must not widen the scan to a whole file.
         if ($parsed === []) {
             throw new DiffException('--changed-ranges requires at least one range like "3-3,8-10".');
         }
@@ -1102,6 +1092,7 @@ final class HookCommand extends Command
     {
         /** @var list<string> $paths - The paths argument is declared variadic, so the console returns a list of strings. */
         $paths = $input->getArgument('paths');
+        // Repeated --file options augment the positional scan targets.
         foreach ($this->stringListOption($input, 'file') as $filePath) {
             $paths[] = $filePath;
         }
@@ -1170,19 +1161,24 @@ final class HookCommand extends Command
     private function stringListOption(InputInterface $input, string $name): array
     {
         $values = $input->getOption($name);
+        // An absent repeatable selector leaves the configured rule selection in place.
         if (!is_array($values)) {
             return [];
         }
 
         $items = [];
+        // Read each flag occurrence before interpreting the caller's comma-separated selections.
         foreach ($values as $value) {
+            // Values that do not carry a selector contribute no path or rule ID.
             if (!is_string($value)) {
                 continue;
             }
 
 
+            // Let one occurrence specify several rule IDs or files.
             foreach (explode(',', $value) as $part) {
                 $part = trim($part);
+                // Empty list entries do not make discovery or execution selectors broader.
                 if ($part !== '') {
                     $items[] = $part;
                 }

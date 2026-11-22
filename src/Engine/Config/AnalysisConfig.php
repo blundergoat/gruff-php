@@ -31,6 +31,7 @@ final readonly class AnalysisConfig
 
     /**
      * Common programming abbreviations seeded by fromRegistry() for the naming rules.
+     *
      * Project vocabulary can replace this list through allowlists.acceptedAbbreviations.
      * InitCommand references this constant to keep generated and runtime defaults aligned.
      *
@@ -41,18 +42,19 @@ final readonly class AnalysisConfig
     ];
 
     /**
-     * Assembles the effective config from resolved rule settings and run-wide options, refusing a PHP
-     * floor gruff cannot support.
+     * Assembles the effective config from resolved rule settings and run-wide options, refusing a PHP floor gruff cannot support.
      *
-     * @param array<string, RuleSettings> $rules - Effective settings keyed by rule id.
-     * @param float $minimumPhpVersion - Minimum PHP version used by version-sensitive rules.
-     * @param RuleSelection $ruleSelection - Include/exclude rule selection for the run.
-     * @param list<string> $ignoredPathPatterns - Path patterns skipped during discovery.
-     * @param list<string> $acceptedAbbreviations - Abbreviations accepted by naming rules.
-     * @param array<string, FailThreshold> $minimumSeverity - Per-command exit-code thresholds, keyed by command name.
-     * @param FailThresholds|null $failureConditions - Severity count gate; null means no configured failureConditions block.
-     * @param list<SensitiveExclusion> $sensitiveExclusions - Reviewed exclusions in configuration order; empty applies no exclusions.
+     * @param array<string, RuleSettings>  $rules                 - Effective settings keyed by rule id.
+     * @param float                        $minimumPhpVersion     - Minimum PHP version used by version-sensitive rules.
+     * @param RuleSelection                $ruleSelection         - Include/exclude rule selection for the run.
+     * @param list<string>                 $ignoredPathPatterns   - Path patterns skipped during discovery.
+     * @param list<string>                 $acceptedAbbreviations - Abbreviations accepted by naming rules.
+     * @param array<string, FailThreshold> $minimumSeverity       - Per-command exit-code thresholds, keyed by command name.
+     * @param FailThresholds|null          $failureConditions     - Severity count gate; null means no configured failureConditions block.
+     * @param list<SensitiveExclusion>     $sensitiveExclusions   - Reviewed exclusions in configuration order; empty applies no exclusions.
+     *
      * @param array{enabled: bool, maxLines: int, maxBytes: int, override: 'default'|'config'|'cli'} $deepScanBudget - Budget and winning source.
+     *
      * @param Severity|null $displayFloor - Lowest displayed severity; null imposes no filter through this setting.
      *
      * @throws InvalidArgumentException - When the PHP version floor is below 7.4.
@@ -75,6 +77,7 @@ final readonly class AnalysisConfig
         private ?Severity       $displayFloor = null,
     ) {
 
+        // Reject a PHP floor older than the analyser supports before modernisation rules use it.
         if ($this->minimumPhpVersion < 7.4) {
             throw new InvalidArgumentException('Minimum PHP version must be at least 7.4.');
         }
@@ -93,6 +96,7 @@ final readonly class AnalysisConfig
         $rules = [];
 
 
+        // Populate defaults from the same catalogue the caller can inspect with list-rules.
         foreach ($registry->all() as $rule) {
             $definition             = $rule->definition();
             $rules[$definition->id] = new RuleSettings(
@@ -107,8 +111,7 @@ final readonly class AnalysisConfig
     }
 
     /**
-     * Reads one rule's effective settings, failing loudly on an unknown id since that means a caller
-     * bug rather than user input.
+     * Reads one rule's effective settings, failing loudly on an unknown id since that means a caller bug rather than user input.
      *
      * @param string $ruleId - Rule identifier to read.
      *
@@ -134,6 +137,7 @@ final readonly class AnalysisConfig
     public function withRuleSettings(string $ruleId, RuleSettings $settings): self
     {
 
+        // A rule absent from the catalogue has no configured behavior to apply.
         if (!isset($this->rules[$ruleId])) {
             throw new InvalidArgumentException(sprintf('Unknown rule id "%s".', $ruleId));
         }
@@ -151,6 +155,7 @@ final readonly class AnalysisConfig
             $this->failureConditions,
             $this->sensitiveExclusions,
             $this->deepScanBudget,
+            $this->displayFloor,
         );
     }
 
@@ -183,6 +188,7 @@ final readonly class AnalysisConfig
             $this->failureConditions,
             $this->sensitiveExclusions,
             $this->deepScanBudget,
+            $this->displayFloor,
         );
     }
 
@@ -225,6 +231,7 @@ final readonly class AnalysisConfig
             $this->failureConditions,
             $this->sensitiveExclusions,
             $this->deepScanBudget,
+            $this->displayFloor,
         );
     }
 
@@ -257,12 +264,12 @@ final readonly class AnalysisConfig
             $this->failureConditions,
             $this->sensitiveExclusions,
             $this->deepScanBudget,
+            $this->displayFloor,
         );
     }
 
     /**
-     * Reads the abbreviations naming rules treat as whole words, so a project's known short forms are
-     * not flagged as bad names.
+     * Reads the abbreviations naming rules treat as whole words, so a project's known short forms are not flagged as bad names.
      *
      * @return list<string> - Stored allowlist, without merging defaults; empty adds no accepted abbreviations.
      */
@@ -290,6 +297,7 @@ final readonly class AnalysisConfig
             $this->failureConditions,
             $this->sensitiveExclusions,
             $this->deepScanBudget,
+            $this->displayFloor,
         );
     }
 
@@ -391,6 +399,7 @@ final readonly class AnalysisConfig
             $failureConditions,
             $this->sensitiveExclusions,
             $this->deepScanBudget,
+            $this->displayFloor,
         );
     }
 
@@ -424,6 +433,7 @@ final readonly class AnalysisConfig
             $this->failureConditions,
             $sensitiveExclusions,
             $this->deepScanBudget,
+            $this->displayFloor,
         );
     }
 
@@ -440,9 +450,9 @@ final readonly class AnalysisConfig
     /**
      * Returns a copy carrying a validated structural-analysis budget.
      *
-     * @param bool $enabled - Whether the size guard runs; false disables only the size limit check.
-     * @param int $maxLines - Line count above which deep script analysis is skipped; must be positive.
-     * @param int $maxBytes - Byte count above which deep script analysis is skipped; must be positive.
+     * @param bool   $enabled  - Whether the size guard runs; false disables only the size limit check.
+     * @param int    $maxLines - Line count above which deep script analysis is skipped; must be positive.
+     * @param int    $maxBytes - Byte count above which deep script analysis is skipped; must be positive.
      * @param string $override - Source that supplied the effective value; must be default, config, or cli.
      *
      * @return self - A copy carrying the budget; the receiver is left unchanged.
@@ -451,10 +461,12 @@ final readonly class AnalysisConfig
      */
     public function withDeepScanBudget(bool $enabled, int $maxLines, int $maxBytes, string $override): self
     {
+        // Each structural budget needs positive line and byte limits to describe how much source will be inspected.
         if ($maxLines < 1 || $maxBytes < 1) {
             throw new InvalidArgumentException('Deep-scan limits must be positive integers.');
         }
 
+        // Keep the budget origin valid so diagnostics can say whether the limit came from config, CLI, or defaults.
         if (!in_array($override, ['default', 'config', 'cli'], true)) {
             throw new InvalidArgumentException('Deep-scan override must be default, config, or cli.');
         }
@@ -474,6 +486,7 @@ final readonly class AnalysisConfig
                 'maxBytes' => $maxBytes,
                 'override' => $override,
             ],
+            $this->displayFloor,
         );
     }
 }

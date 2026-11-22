@@ -8,6 +8,7 @@ use Symfony\Component\Process\Process;
 
 /**
  * Exercises the analyse command's deep-scan budget with real CLI processes.
+ *
  * Cases check retained sensitive-data findings, invalid-budget diagnostics, and CLI precedence over config.
  * Every supported output format must include the bounded-scan diagnostic and its configured limits.
  */
@@ -54,6 +55,7 @@ final class AnalyseCliDeepScanBudgetTest extends CliTestCase
         self::assertSame(1, $summary['discoveredFiles'] ?? null);
         self::assertSame(1, $summary['parsedFiles'] ?? null);
         self::assertSame(0, $summary['parseErrors'] ?? null);
+        self::assertSame(0, $this->decodedJsonObject($report['score'] ?? null)['evaluatedFiles'] ?? null);
         self::assertIsArray($diagnostics);
         self::assertCount(1, $diagnostics);
         $diagnostic = $diagnostics[0];
@@ -177,6 +179,7 @@ final class AnalyseCliDeepScanBudgetTest extends CliTestCase
      */
     public function testBoundedDeepScanDiagnosticIsVisibleInEveryFormat(): void
     {
+        // Run all supported report formats to catch a renderer that hides the skipped-structural-scan notice.
         foreach (['text', 'json', 'html', 'markdown', 'github', 'hotspot', 'sarif'] as $format) {
             $process = new Process([
                 PHP_BINARY,

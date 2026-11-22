@@ -8,15 +8,13 @@ use GruffPhp\Engine\Source\SourceFile;
 use GruffPhp\Results\Finding\Finding;
 
 /**
- * Applies FAMILY-CONTRACT.md section 13c after the sensitive exclusions: another tool's suppression comment, and a
- * second rule repeating one claim on one call.
+ * Applies PHPCS and Psalm directives plus duplicate-call suppression under FAMILY-CONTRACT.md section 13c.
+ * The analysis uses this after sensitive exclusions so the report can account for each removal.
  *
- * - A phpcs or psalm comment naming a check that makes the finding's claim suppresses it where it was written, when
- *   the comment is on the reported line or alone on the line above, e.g. `// phpcs:ignore WordPress.DB.PreparedSQL`
- *   above a `$wpdb->query()` hides security.sql-concatenation there and nothing else.
- * - An exec-family call reported by both security.dangerous-function-call and security.process-command-construction
- *   reports once, as security.process-command-construction, the narrower claim that the command is built at run time.
- * - Each removal is counted in one audit row per rule and file, after the built-in rows, and kept for SARIF.
+ * A PHPCS directive naming PreparedSQL can suppress the corresponding SQL finding on its line or alone above it.
+ *
+ * One exec-family call retains the more specific command-construction finding when both security rules report it.
+ * The result includes audit rows by file and rule, with the per-finding reasons available to SARIF.
  */
 final readonly class InlineSuppressionFilter
 {
@@ -94,10 +92,11 @@ final readonly class InlineSuppressionFilter
     {
         $survivors  = [];
         $suppressed = [];
-        $lines      = [];
+        $comments   = [];
         // A finding leaves only when supported directive text maps to its rule on its line or a preceding comment-marker line.
         foreach ($result->findings as $finding) {
-            if ($this->isCoveredByComment($finding, $lines)) {
+            // A matching directive removes the finding from the visible report and leaves its audit reason.
+            if ($this->isCoveredByComment($finding, $comments)) {
                 $suppressed[] = ['finding' => $finding, 'justification' => self::INLINE_REASON];
                 continue;
             }
@@ -115,28 +114,38 @@ final readonly class InlineSuppressionFilter
     }
 
     /**
-     * Reports whether supported directive text maps to the finding on its line or on a preceding comment-marker line.
+     * Checks comment tokens on the finding line and standalone comments immediately above it.
      *
-     * @param Finding                     $finding - Finding whose path, line, and rule are checked for a covering directive.
-     * @param array<string, list<string>> $lines   - Lines of each file read so far, keyed by display path; filled on demand.
+     * @param Finding                                                                $finding  - Finding examined for an inline suppression.
+     * @param array<string, array<int, list<array{text: string, standalone: bool}>>> $comments - Comment tokens indexed on demand by file and line.
      *
      * @return bool - True when recognized directive text maps to the finding's rule.
      */
-    private function isCoveredByComment(Finding $finding, array &$lines): bool
+    private function isCoveredByComment(Finding $finding, array &$comments): bool
     {
         $line = $finding->line;
         // Only mapped rules can be suppressed, and a file-level finding has no line that a directive can cover.
         if ($line === null || $line < 1 || !self::isMappedRule($finding->ruleId)) {
             return false;
         }
-        $lines[$finding->filePath] ??= $this->readLines($finding->filePath);
-        $fileLines = $lines[$finding->filePath];
-        if (self::hasCoveringComment($fileLines[$line - 1] ?? '', $finding->ruleId)) {
-            return true;
+        $comments[$finding->filePath] ??= $this->readComments($finding->filePath);
+        $fileComments = $comments[$finding->filePath];
+        // Same-line directives can cover a finding where the caller wrote the suppression beside it.
+        foreach ($fileComments[$line] ?? [] as $comment) {
+            // Ignore the finding only when the directive actually names a check that covers it.
+            if (self::hasCoveringComment($comment['text'], $finding->ruleId)) {
+                return true;
+            }
         }
-        $above = trim($fileLines[$line - 2] ?? '');
+        // A standalone comment just above the finding can express intent when the source line has no inline directive.
+        foreach ($fileComments[$line - 1] ?? [] as $comment) {
+            // A preceding comment beside other code belongs to that line and does not cover the next finding.
+            if ($comment['standalone'] && self::hasCoveringComment($comment['text'], $finding->ruleId)) {
+                return true;
+            }
+        }
 
-        return self::isCommentOnly($above) && self::hasCoveringComment($above, $finding->ruleId);
+        return false;
     }
 
     /**
@@ -152,31 +161,39 @@ final readonly class InlineSuppressionFilter
     }
 
     /**
-     * Reads one discovered file's lines; an unreadable file has none, so nothing in it is suppressed.
+     * Indexes actual PHP comment fragments so directive-like string data has no effect.
      *
      * @param string $displayPath - Display path the finding carries.
      *
-     * @return list<string> - The file's lines without their line endings.
+     * @return array<int, list<array{text: string, standalone: bool}>> - Comment fragments keyed by one-based source line.
      */
-    private function readLines(string $displayPath): array
+    private function readComments(string $displayPath): array
     {
         $absolutePath = $this->absolutePathByDisplayPath[$displayPath] ?? null;
         $contents     = $absolutePath !== null && is_readable($absolutePath) ? file_get_contents($absolutePath) : false;
 
-        // Splits on any line ending, so a CRLF file numbers its lines the way the parser does.
-        return $contents === false ? [] : (preg_split('/\R/', $contents) ?: []);
-    }
+        // Keep findings visible if the source cannot be read to verify its suppression comment.
+        if ($contents === false) {
+            return [];
+        }
 
-    /**
-     * Reports whether a trimmed line starts with a supported comment marker, allowing a directive there to cover the line below.
-     *
-     * @param string $trimmed - The line with surrounding whitespace removed.
-     *
-     * @return bool - True when the line starts with `//`, `#`, `/*` or `*`.
-     */
-    private static function isCommentOnly(string $trimmed): bool
-    {
-        return str_starts_with($trimmed, '//') || str_starts_with($trimmed, '#') || str_starts_with($trimmed, '/*') || str_starts_with($trimmed, '*');
+        $lines    = explode("\n", $contents);
+        $comments = [];
+        // Read PHP tokens so examples in strings and heredocs cannot suppress findings.
+        foreach (token_get_all($contents) as $token) {
+            // Only real PHP comments count as evidence of the caller's suppression.
+            if (!is_array($token) || !in_array($token[0], [T_COMMENT, T_DOC_COMMENT], true)) {
+                continue;
+            }
+
+            // Preserve the exact line of a directive in a block comment.
+            foreach (explode("\n", $token[1]) as $offset => $text) {
+                $line              = $token[2] + $offset;
+                $comments[$line][] = ['text' => $text, 'standalone' => trim($lines[$line - 1] ?? '') === trim($text)];
+            }
+        }
+
+        return $comments;
     }
 
     /**
@@ -211,6 +228,7 @@ final readonly class InlineSuppressionFilter
         $listed = preg_split('/\s--|\*\//', $match[1])[0] ?? '';
         // A reference can name a whole standard, a category, a sniff or one error code.
         $matched = preg_match_all('/[A-Za-z][\w]*(?:\.\w+)*/', $listed, $references);
+        // A rule with no mapped PHPCS sniff cannot use a PHPCS directive.
         if ($sniff === false) {
             return false;
         }
@@ -218,7 +236,9 @@ final readonly class InlineSuppressionFilter
         if ($matched === 0) {
             return true;
         }
+        // Accept a sniff, an individual error code, or the documented enclosing category in the directive.
         foreach ($references[0] as $reference) {
+            // Match only the configured sniff or its standard/category family so unrelated checks stay visible.
             if ($reference === $sniff || str_starts_with($reference, $sniff . '.') || str_starts_with($sniff, $reference . '.')) {
                 return true;
             }
@@ -243,6 +263,7 @@ final readonly class InlineSuppressionFilter
         }
         // Whitespace and commas delimit Psalm issue names; only names mapped to this rule suppress it.
         foreach (preg_split('/[\s,]+/', trim($match[1])) ?: [] as $issue) {
+            // A Psalm directive suppresses only the matching issue family for the reported rule.
             if (in_array($ruleId, self::PSALM_ISSUE_RULES[$issue] ?? [], true)) {
                 return true;
             }
@@ -263,6 +284,7 @@ final readonly class InlineSuppressionFilter
         $commandCalls = [];
         // Count command-construction findings by file, line, and sink so each count removes at most one repeat.
         foreach ($findings as $finding) {
+            // Keep the more specific command-construction finding available when the broader rule reports the same call.
             if ($finding->ruleId === 'security.process-command-construction') {
                 $key                = self::callKey($finding, $finding->metadata['sink'] ?? null);
                 $commandCalls[$key] = ($commandCalls[$key] ?? 0) + 1;
@@ -270,6 +292,7 @@ final readonly class InlineSuppressionFilter
         }
         $survivors = [];
         $merged    = [];
+        // Compare each broader finding with the specific command report before counting a duplicate.
         foreach ($findings as $finding) {
             $function = $finding->metadata['function'] ?? null;
             $key      = self::callKey($finding, $function);
@@ -311,12 +334,14 @@ final readonly class InlineSuppressionFilter
     private static function rows(array $removed, string $source, string $reason, int $firstIndex): array
     {
         $counts = [];
+        // Combine removed findings by file and rule so callers can see what was suppressed without one row per hit.
         foreach ($removed as $item) {
             $fileAndRule          = $item['finding']->filePath . "\0" . $item['finding']->ruleId;
             $counts[$fileAndRule] = ($counts[$fileAndRule] ?? 0) + 1;
         }
         uksort($counts, strcmp(...));
         $rows = [];
+        // Add one audit row for each affected file and rule after the configured exclusions.
         foreach ($counts as $fileAndRule => $count) {
             [$filePath, $ruleId] = explode("\0", (string)$fileAndRule, 2);
             $rows[]              = new SensitiveExclusionSummary(

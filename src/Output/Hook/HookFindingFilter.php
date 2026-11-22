@@ -4,119 +4,86 @@ declare(strict_types=1);
 
 namespace GruffPhp\Output\Hook;
 
+use GruffPhp\Engine\Parser\AnalysisUnit;
+use GruffPhp\Results\Diff\DiffFindingFilter;
 use GruffPhp\Results\Diff\DiffResult;
 use GruffPhp\Results\Finding\Finding;
 
 /**
- * Filters hook findings by optional base-identity and changed-region checks; identities absent from the base are treated as new.
- * Active regions require new-only mode for file/project findings; line/symbol findings need a changed file with no ranges or span overlap.
- * Absent or inactive regions skip location checks; any enabled base-identity suppression still applies.
+ * Selects current findings for the JSON returned by `gruff-php hook`.
+ *
+ * Uses the caller's changed scope to decide whether a finding is inside the edits under review.
+ * Findings already present in the Git comparison are omitted from this result.
  */
 final readonly class HookFindingFilter
 {
     /**
-     * Applies optional identity and changed-region filters and counts every excluded input finding.
-     * Returns identities for the complete input set, including findings that were suppressed.
+     * Applies the requested review scope and Git comparison before the hook presents or gates its findings.
+     * Counts findings excluded from that view so the caller can account for them.
      *
-     * @param list<Finding> $findings - Findings from one analysis pass; empty input yields no kept findings and a zero suppressed count.
-     * @param DiffResult|null $changedRegion - Changed files and ranges; null or inactive skips region filtering after the new-only check.
-     * @param array<string, true> $baseStableIdentities - Base identities; empty means no input identity is recognized as pre-existing.
-     * @param bool $hasNewOnlySource - Enables base-identity suppression and allows new file/project findings in active region mode.
+     * @param list<Finding>       $findings             - Current findings before scope filtering. Empty means the hook has no findings to compare.
+     * @param DiffResult|null     $changedRegion        - Changed paths and ranges, or null for a full run.
+     * @param array<string, true> $baseStableIdentities - Git comparison identities. Empty means no finding is excluded by the comparison.
+     * @param bool                $hasNewOnlySource     - Whether a baseline or Git comparison can classify broad findings.
+     * @param list<AnalysisUnit>  $analysisUnits        - Parsed units used to recover declaration spans in symbol scope.
+     * @param string              $changedScope         - Requested symbol, hunk, or file scope.
      *
-     * @return HookFilterResult - The kept findings, the suppressed-finding count, and the disambiguated identities for the whole input set.
+     * @return HookFilterResult - Kept findings, excluded count, and identities for all input findings.
      */
     public function apply(
         array $findings,
         ?DiffResult $changedRegion,
         array $baseStableIdentities,
         bool $hasNewOnlySource,
+        array $analysisUnits = [],
+        string $changedScope = DiffFindingFilter::SCOPE_SYMBOL,
     ): HookFilterResult {
-        $identities      = HookFindingIdentity::forFindings($findings);
-        $kept            = [];
-        $suppressedCount = 0;
+        $identities                = HookFindingIdentity::forFindings($findings);
+        $kept                      = [];
+        $findingIdsInChangedRegion = [];
+        $changedFileLookup         = [];
 
+        // Build a file lookup only when the caller has asked to restrict the hook to a changed region.
+        if ($changedRegion instanceof DiffResult && $changedRegion->active) {
+            $changedFileLookup = array_fill_keys($changedRegion->changedFiles, true);
+            // Symbol and hunk scope need overlap checks. File scope accepts the whole changed file.
+            if ($changedScope !== DiffFindingFilter::SCOPE_FILE) {
+                $regionMatches = (new DiffFindingFilter())->apply($findings, $changedRegion, $analysisUnits, $changedScope);
+                // Remember the exact findings inside the selected region so same-line results stay distinct.
+                foreach ($regionMatches->findings as $finding) {
+                    $findingIdsInChangedRegion[spl_object_id($finding)] = true;
+                }
+            }
+        }
 
+        // Decide which current findings belong in the hook report after checking scope and comparison history.
         foreach ($findings as $finding) {
-            $scope = HookFindingScope::classify($finding);
-            $isNew = !isset($baseStableIdentities[$identities[spl_object_id($finding)] ?? HookFindingIdentity::forFinding($finding, $scope)]);
-
-
-            if ($hasNewOnlySource && !$isNew) {
-                $suppressedCount++;
+            $findingObjectId = spl_object_id($finding);
+            $scope           = HookFindingScope::classify($finding);
+            // A finding already in the chosen Git comparison should not count as a newly introduced issue.
+            if (isset($baseStableIdentities[$identities[$findingObjectId] ?? HookFindingIdentity::forFinding($finding, $scope)])) {
                 continue;
             }
 
-            // Without an active region, no location restriction remains after the identity check.
+            // A full scan keeps current findings that were not matched to the comparison.
             if (!$changedRegion instanceof DiffResult || !$changedRegion->active) {
                 $kept[] = $finding;
                 continue;
             }
 
-            // Line overlap cannot establish eligibility for broader scopes; an identity comparison is required.
-            if ($scope === HookFindingScope::FILE || $scope === HookFindingScope::PROJECT) {
-
-                if ($hasNewOnlySource) {
-                    $kept[] = $finding;
-                    continue;
-                }
-
-
-                $suppressedCount++;
-                continue;
-            }
-
-
-            if ($this->touchesChangedRegion($finding, $changedRegion)) {
+            $isChangedFile = isset($changedFileLookup[$finding->filePath]);
+            $isInScope     = match (true) {
+                $scope === HookFindingScope::PROJECT => $hasNewOnlySource,
+                $changedScope === DiffFindingFilter::SCOPE_FILE => $isChangedFile,
+                $scope === HookFindingScope::FILE => $isChangedFile && $hasNewOnlySource,
+                default => isset($findingIdsInChangedRegion[$findingObjectId]),
+            };
+            // Publish only findings covered by the requested scope or eligible as new project-wide findings.
+            if ($isInScope) {
                 $kept[] = $finding;
-                continue;
-            }
-
-
-            $suppressedCount++;
-        }
-
-        return new HookFilterResult($kept, $suppressedCount, $identities);
-    }
-
-    /**
-     * Checks changed-file membership and overlap with recorded line ranges.
-     * Listed files without ranges match even without line metadata; with ranges, a null start line cannot match.
-     * A null end line uses the finding's start line.
-     *
-     * @param Finding    $finding       - The finding under test, whose file and line span are matched against the diff.
-     * @param DiffResult $changedRegion - Active changed-region data holding the edited files and their changed line ranges.
-     *
-     * @return bool - True if the file is listed and either has no ranges or a finding span overlaps a recorded range.
-     */
-    private function touchesChangedRegion(Finding $finding, DiffResult $changedRegion): bool
-    {
-
-        if (!in_array($finding->filePath, $changedRegion->changedFiles, true)) {
-            return false;
-        }
-
-        $ranges = $changedRegion->rangesFor($finding->filePath);
-        // The file changed but carries no specific line ranges (a whole-file change), so treat every line as in scope and keep the finding.
-        if ($ranges === []) {
-            return true;
-        }
-
-        $line = $finding->line;
-        // We have concrete ranges but the finding carries no line to test against them, so it cannot be pinned to the edit; leave it out.
-        if ($line === null) {
-            return false;
-        }
-
-        $endLine = $finding->endLine ?? $line;
-
-
-        foreach ($ranges as $range) {
-
-            if ($range->touches($line, $endLine)) {
-                return true;
             }
         }
 
-        return false;
+        return new HookFilterResult($kept, count($findings) - count($kept), $identities);
     }
 }

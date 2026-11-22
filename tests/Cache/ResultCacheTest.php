@@ -9,6 +9,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Covers cache entry retention before and after an explicit finalizeRun() call.
+ *
  * Asserts that writes beyond the cap retain all entries and finalization keeps the newest entries.
  * Checks that canHoldRun() accepts the default cap and rejects a working set one file larger.
  */
@@ -42,14 +43,22 @@ final class ResultCacheTest extends TestCase
     /**
      * Remove the throwaway cache directory and its entries.
      *
-     * @return void - Deletes matching JSON entries and removes the directory if present.
+     * @return void - Deletes cache files and removes the directory if present.
      */
     protected function tearDown(): void
     {
+        // Remove each temporary finding entry so the next test starts with its own cache.
         foreach ($this->entryPaths() as $entryPath) {
             unlink($entryPath);
         }
 
+        $evictionLock = $this->cacheDir . '/.eviction.lock';
+        // A scan that never evicts entries may not create the shared lock file.
+        if (is_file($evictionLock)) {
+            unlink($evictionLock);
+        }
+
+        // A test that never writes results may not have created a cache folder.
         if (is_dir($this->cacheDir)) {
             rmdir($this->cacheDir);
         }
@@ -116,7 +125,7 @@ final class ResultCacheTest extends TestCase
     /**
      * Write the given number of empty-findings entries through put().
      *
-     * @param ResultCache $cache - Cache that receives the generated entries.
+     * @param ResultCache $cache      - Cache that receives the generated entries.
      * @param int         $entryCount - Number of entries to write; zero or negative values write none.
      *
      * @return void - Writes entries with empty findings using zero-based entry keys.
@@ -182,6 +191,7 @@ final class ResultCacheTest extends TestCase
     private function entryPaths(): array
     {
         $paths = glob($this->cacheDir . '/*.json');
+        // Treat a missing temporary cache as empty so the test can ask whether any entries were written.
         if (!is_array($paths)) {
 
             return [];

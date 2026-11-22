@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Cli\Dashboard;
 
+use GruffPhp\Cli\Command\AnalyseCommandOptions;
 use GruffPhp\Cli\Command\MissingConfigPrompt;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -12,10 +13,10 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * Backs the `gruff-php dashboard` command - the interactive browser UI for analysis.
+ * Starts the local browser UI for `gruff-php dashboard`.
  *
- * Validates the initial project root, port, and scan timeout before starting the HTTP server.
- * Passes the remaining launch options to the dashboard request context for browser-driven scans.
+ * Validates the project directory, port, timeout, and scan budget before opening the server.
+ * The initial options populate the dashboard for the first browser-driven scan.
  */
 final class DashboardCommand extends Command
 {
@@ -83,6 +84,7 @@ final class DashboardCommand extends Command
         $projectRoot           = $dashboardStateFactory->initialProjectRoot($input, $cwd);
 
 
+        // The dashboard needs a real project directory to open its initial scan.
         if ($projectRoot === null) {
             $output->writeln('<error>Initial --project/--project-root must resolve to an existing directory.</error>');
 
@@ -92,6 +94,7 @@ final class DashboardCommand extends Command
         $port = $this->port($input, $output);
 
 
+        // The port parser has already told the caller how to choose a valid browser endpoint.
         if ($port === false) {
             return Command::INVALID;
         }
@@ -99,7 +102,17 @@ final class DashboardCommand extends Command
         $scanTimeout = $this->scanTimeout($input, $output);
 
 
+        // Reject an invalid timeout before the browser server starts.
         if ($scanTimeout === false) {
+            return Command::INVALID;
+        }
+
+        $budget         = $input->getOption('deep-scan-budget');
+        $budgetOverride = AnalyseCommandOptions::parseDeepScanBudgetOverride(is_string($budget) ? $budget : null);
+        // Reject an invalid scan budget before offering to create a config or starting the server.
+        if (is_string($budgetOverride)) {
+            $output->writeln('<error>' . $budgetOverride . '</error>');
+
             return Command::INVALID;
         }
 
@@ -112,6 +125,7 @@ final class DashboardCommand extends Command
             shouldSkipConfig:   (bool) $input->getOption('no-config'),
         );
 
+        // Finish the config prompt before opening the dashboard. A failed prompt already carries its exit code.
         if ($promptExitCode !== null) {
             return $promptExitCode;
         }
@@ -136,6 +150,7 @@ final class DashboardCommand extends Command
         $rawPort = $input->getOption('port');
 
 
+        // Accept only decimal port numbers so the browser address matches the caller's request.
         if (!is_string($rawPort) || !ctype_digit($rawPort)) {
             $output->writeln('<error>--port must be an integer from 1 to 65535.</error>');
 
@@ -145,6 +160,7 @@ final class DashboardCommand extends Command
         $port = (int) $rawPort;
 
 
+        // Reject ports outside the TCP range before asking the server to bind.
         if ($port < 1 || $port > 65535) {
             $output->writeln('<error>--port must be an integer from 1 to 65535.</error>');
 
@@ -167,6 +183,7 @@ final class DashboardCommand extends Command
         $rawTimeout = $input->getOption('scan-timeout');
 
 
+        // A negative or nonnumeric timeout has no valid scan meaning and is rejected before starting the server.
         if (!is_string($rawTimeout) || !ctype_digit($rawTimeout)) {
             $output->writeln('<error>--scan-timeout must be a non-negative integer.</error>');
 

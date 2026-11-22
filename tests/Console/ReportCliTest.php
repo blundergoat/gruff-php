@@ -9,6 +9,7 @@ use Symfony\Component\Process\Process;
 
 /**
  * Exercise report output on stdout and disk, including HTML options, JSON and baseline suppression.
+ *
  * Cover selected analyse options, new-findings failure status, dash-prefixed paths and sensitive-snippet redaction.
  * Check invalid profile and configuration cases, including preservation of existing output files.
  */
@@ -106,6 +107,33 @@ final class ReportCliTest extends CliTestCase
 
         $report = $this->decodeJsonOutput($process);
         self::assertSame('gruff.analysis.v3', $report['schemaVersion'] ?? null);
+    }
+
+    /**
+     * Checks that reporting a sibling project reads its exit threshold.
+     *
+     * @return void - Asserts the target configuration trips its advisory gate.
+     */
+    public function testReportUsesTargetProjectGateFromSibling(): void
+    {
+        $workspace = $this->tempDir();
+
+        try {
+            self::assertTrue(mkdir($workspace . '/launch'));
+            self::assertTrue(mkdir($workspace . '/target'));
+            file_put_contents($workspace . '/target/.gruff-php.yaml', "schemaVersion: gruff-php.config.v0.1\nfailOn: {report: advisory}\n");
+            file_put_contents($workspace . '/target/Example.php', '<?php class Example { public function emptyMethod(): void {} }');
+
+            $process = new Process([
+                PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'report', '../target',
+                '--format=json', '--no-cache', '--include-rule=waste.empty-method',
+            ], $workspace . '/launch');
+            self::assertSame(1, $process->run(), $process->getOutput() . $process->getErrorOutput());
+            $report = $this->decodeJsonOutput($process);
+            self::assertSame('advisory', $this->decodedJsonObject($report['run'] ?? null)['failOn'] ?? null);
+        } finally {
+            $this->removeDir($workspace);
+        }
     }
 
     /**
@@ -333,6 +361,10 @@ final class ReportCliTest extends CliTestCase
 
         $reportSupportedOptions = [
             '--profile',
+            '--diff-base',
+            '--min-confidence',
+            '--show-rule',
+            '--hide-pillar',
             '--fail-on-new',
             '--no-cache',
             '--since',
@@ -346,6 +378,7 @@ final class ReportCliTest extends CliTestCase
             '--print-runtime',
             '--runtime-mode',
         ];
+        // Check each option a report caller can use so the help stays aligned with forwarding.
         foreach ($reportSupportedOptions as $optionName) {
             self::assertStringContainsString($optionName, $helpText, sprintf('report --help must document %s.', $optionName));
         }
@@ -363,6 +396,7 @@ final class ReportCliTest extends CliTestCase
      */
     public function testReportCommandDoesNotLeakSensitiveDataSecrets(): void
     {
+        // Test both saved-report formats for accidental exposure of a raw sensitive match.
         foreach (['html', 'json'] as $format) {
             $process = new Process([
                 PHP_BINARY,
@@ -380,6 +414,7 @@ final class ReportCliTest extends CliTestCase
             $process->run();
 
             self::assertSame(0, $process->getExitCode(), $process->getErrorOutput() . $process->getOutput());
+            // Search for every fixture value that a report must redact before it reaches the caller.
             foreach (self::SENSITIVE_SNIPPETS as $sensitiveSnippet) {
                 self::assertStringNotContainsString($sensitiveSnippet, $process->getOutput(), sprintf('%s report leaked a raw secret.', $format));
             }
