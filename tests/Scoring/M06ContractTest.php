@@ -194,7 +194,7 @@ final class M06ContractTest extends TestCase
         $report = (new ScoreCalculator())->calculate(
             [
                 $this->finding('size.method-length', Pillar::Size, Severity::Warning, symbol: 'A::run()', line: 1),
-                $this->finding('complexity.nesting-depth', Pillar::Complexity, Severity::Warning, symbol: 'A::run()', line: 9),
+                $this->finding('complexity.cyclomatic', Pillar::Complexity, Severity::Warning, symbol: 'A::run()', line: 9),
             ],
             self::EVALUATED_FILES,
             null,
@@ -208,14 +208,14 @@ final class M06ContractTest extends TestCase
         self::assertCount(1, $report->clusters);
         self::assertSame(2, $report->clusters[0]['findings']);
         self::assertSame(4.0, $report->clusters[0]['weight']);
-        self::assertSame(['complexity.nesting-depth', 'size.method-length'], $report->clusters[0]['ruleIds']);
+        self::assertSame(['complexity.cyclomatic', 'size.method-length'], $report->clusters[0]['ruleIds']);
         // The ratified key carries no line identity, so the published cluster must not name one.
         self::assertArrayNotHasKey('line', $report->clusters[0]);
 
         $distinct = (new ScoreCalculator())->calculate(
             [
                 $this->finding('size.method-length', Pillar::Size, Severity::Warning, symbol: 'A::run()', line: 1),
-                $this->finding('complexity.nesting-depth', Pillar::Complexity, Severity::Warning, symbol: 'A::walk()', line: 9),
+                $this->finding('complexity.cyclomatic', Pillar::Complexity, Severity::Warning, symbol: 'A::walk()', line: 9),
             ],
             self::EVALUATED_FILES,
             null,
@@ -258,7 +258,7 @@ final class M06ContractTest extends TestCase
     public function testMachineViewPublishesTheScoredComposite(): void
     {
         $report = (new ScoreCalculator())->calculate(
-            [$this->finding('complexity.nesting-depth', Pillar::Complexity, Severity::Warning)],
+            [$this->finding('complexity.cyclomatic', Pillar::Complexity, Severity::Warning)],
             self::EVALUATED_FILES,
             null,
             DiffResult::inactive(),

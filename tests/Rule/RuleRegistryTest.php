@@ -16,6 +16,7 @@ use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Engine\Parser\PhpFileParser;
 use GruffPhp\Rules\Complexity\CognitiveComplexityRule;
+use GruffPhp\Rules\Complexity\CyclomaticComplexityRule;
 use GruffPhp\Rules\Complexity\HalsteadVolumeRule;
 use GruffPhp\Rules\Complexity\MaintainabilityIndexRule;
 use GruffPhp\Rules\Complexity\NestingDepthRule;
@@ -100,7 +101,7 @@ final class RuleRegistryTest extends TestCase
     {
         $registry        = RuleRegistry::defaults();
         $expectedRuleIds = [
-            CognitiveComplexityRule::ID,
+            CognitiveComplexityRule::ID, CyclomaticComplexityRule::ID,
             HalsteadVolumeRule::ID, MaintainabilityIndexRule::ID,
             NestingDepthRule::ID,
             UnusedPrivateConstantRule::ID,
@@ -310,7 +311,7 @@ final class RuleRegistryTest extends TestCase
     /**
      * Verify default rule definitions keep stable reporting and config metadata.
      *
-     * @return void - Asserts 84 definitions and the expected hash of their sorted metadata.
+     * @return void - Asserts 83 definitions and the expected hash of their sorted metadata.
      */
     public function testDefaultRuleDefinitionsStayStable(): void
     {
@@ -341,7 +342,7 @@ final class RuleRegistryTest extends TestCase
         usort($definitions, static fn(array $left, array $right): int => $left['id'] <=> $right['id']);
         $json = json_encode($definitions, JSON_THROW_ON_ERROR);
 
-        self::assertCount(82, $definitions);
+        self::assertCount(83, $definitions);
 
 
 
@@ -355,7 +356,7 @@ final class RuleRegistryTest extends TestCase
 
 
         self::assertSame(
-            '62d15f998d84c6837921c20b8ca58fe45c18075df4e712b8474b3b25eb1352ef',
+            'b6972067432474806f20f8a09311528b73e3ab6f5138a28c12676c57d664830c',
             hash('sha256', $json),
         );
     }

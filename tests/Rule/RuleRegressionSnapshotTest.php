@@ -12,6 +12,7 @@ use GruffPhp\Engine\Parser\PhpFileParser;
 use GruffPhp\Engine\Source\SourceDiscovery;
 use GruffPhp\Engine\Source\SourceFile;
 use GruffPhp\Results\Finding\Finding;
+use GruffPhp\Rules\Complexity\CyclomaticComplexityRule;
 use GruffPhp\Rules\Complexity\HalsteadVolumeRule;
 use GruffPhp\Rules\Complexity\MaintainabilityIndexRule;
 use GruffPhp\Rules\Contracts\RuleContext;
@@ -115,8 +116,8 @@ final class RuleRegressionSnapshotTest extends TestCase
 
 
 
-        // Precision-floor M09 (2026-11-22) removed two: default scans no longer run complexity.cyclomatic or
-        // test-quality.setup-bloat, and complexity.maintainability-index is off by default.
+        // Precision-floor M09 (2026-11-22): default scans no longer run test-quality.setup-bloat, and
+        // complexity.maintainability-index is off by default.
         self::assertCount(1974, $findings);
 
 
@@ -148,6 +149,7 @@ final class RuleRegressionSnapshotTest extends TestCase
         $defaultMissing      = array_values(array_diff($registeredRuleIds, $defaultRuleIds));
 
         self::assertSame([
+                             CyclomaticComplexityRule::ID,
                              HalsteadVolumeRule::ID,
                              MaintainabilityIndexRule::ID,
                              UnusedPrivateMethodRule::ID,

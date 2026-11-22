@@ -49,6 +49,11 @@
           "invocations": 7
         },
         {
+          "ruleId": "complexity.cyclomatic",
+          "totalNs": 2246853,
+          "invocations": 7
+        },
+        {
           "ruleId": "complexity.cognitive",
           "totalNs": 2084553,
           "invocations": 7
@@ -92,6 +97,11 @@
           "invocations": 280
         },
         {
+          "ruleId": "complexity.cyclomatic",
+          "totalNs": 154122748,
+          "invocations": 280
+        },
+        {
           "ruleId": "complexity.cognitive",
           "totalNs": 114242192,
           "invocations": 280
@@ -127,6 +137,11 @@
         {
           "ruleId": "dead-code.unused-private-method",
           "totalNs": 343596080,
+          "invocations": 393
+        },
+        {
+          "ruleId": "complexity.cyclomatic",
+          "totalNs": 303005307,
           "invocations": 393
         },
         {

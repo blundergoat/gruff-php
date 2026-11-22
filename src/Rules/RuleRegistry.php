@@ -13,6 +13,7 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
 use GruffPhp\Rules\Contracts\SourceTextRuleInterface;
 use GruffPhp\Rules\Complexity\CognitiveComplexityRule;
+use GruffPhp\Rules\Complexity\CyclomaticComplexityRule;
 use GruffPhp\Rules\Complexity\HalsteadVolumeRule;
 use GruffPhp\Rules\Complexity\MaintainabilityIndexRule;
 use GruffPhp\Rules\Complexity\NestingDepthRule;
@@ -196,6 +197,7 @@ final class RuleRegistry
     {
         return new self([
                             new CognitiveComplexityRule(),
+                            new CyclomaticComplexityRule(),
                             new HalsteadVolumeRule(),
                             new MaintainabilityIndexRule(),
                             new NestingDepthRule(),

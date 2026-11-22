@@ -318,7 +318,7 @@ The rule-id flags (`--include-rule`, `--exclude-rule`) select rule execution, ma
 
 ```bash
 php bin/gruff-php analyse src --format json --fail-on none --exclude-rule docs.missing-phpdoc
-php bin/gruff-php analyse src --format json --fail-on none --include-rule complexity.cognitive
+php bin/gruff-php analyse src --format json --fail-on none --include-rule complexity.cyclomatic
 ```
 
 ## Dashboard

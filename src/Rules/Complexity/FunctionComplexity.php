@@ -17,7 +17,7 @@ use PhpParser\Node\Stmt\Function_;
  * and its full cyclomatic count.
  *
  * Documentation, naming and complexity rules use it to name the callable a finding points at; the
- * maintainability index reads the count, which no longer has a rule of its own.
+ * cyclomatic rule and the maintainability index read the count.
  */
 final class FunctionComplexity
 {

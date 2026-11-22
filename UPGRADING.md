@@ -7,7 +7,7 @@ Every break below is the one this port's own `CHANGELOG.md` records; nothing her
 
 `docs.param-comment` is now enabled by default. The `everyCallable` default is now true for `docs.missing-phpdoc`, `docs.missing-param-tag` and `docs.return-comment`: named functions can report missing PHPDoc, and bound closures and arrow functions can report missing parameter tags or undescribed return tags. Existing explicit settings keep their values. To retain the earlier behavior, set `rules.docs.param-comment.enabled: false` and `rules.<id>.options.everyCallable: false` for those three rules. `docs.param-comment` keeps its own `everyCallable` default false.
 
-`complexity.cyclomatic` and `test-quality.setup-bloat` are removed: remove both IDs from configuration and stored baselines; a leftover `rules:` block warns and is ignored. `complexity.maintainability-index` is off by default; set `rules.complexity.maintainability-index.enabled: true` to keep it.
+`test-quality.setup-bloat` is removed: remove its ID from configuration and stored baselines; a leftover `rules:` block warns and is ignored. `complexity.maintainability-index` is off by default; set `rules.complexity.maintainability-index.enabled: true` to keep it.
 
 ## What is stable across `0.5.x`
 
