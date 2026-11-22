@@ -138,7 +138,7 @@ tests/
 |   |-- Complexity/
 |   |   |-- CognitiveComplexityRuleTest.php
 |   |   |-- ComplexityIntegrationTest.php
-|   |   |-- CyclomaticComplexityRuleTest.php
+|   |   |-- FunctionComplexityTest.php
 |   |   `-- NestingDepthRuleTest.php
 |   |-- DeadCode/
 |   |   `-- DeadCodeRulesTest.php
