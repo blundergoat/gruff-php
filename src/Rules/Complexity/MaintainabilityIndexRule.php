@@ -53,6 +53,8 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
             defaultSeverity:   Severity::Advisory,
             confidence:        Confidence::Low,
             severityThreshold: new SeverityThreshold(35, Severity::Advisory),
+            // Off by default since precision-floor M09: right on 8 of 14 judged findings on unseen code.
+            isEnabledByDefault: false,
             falsePositiveShapes: [
                 [
                     'shape'      => 'A long but linear method - wiring, data setup, or generated code - that branches very little.',
@@ -95,7 +97,7 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
                 continue;
             }
 
-            $symbol = CyclomaticComplexityRule::resolveSymbol($node);
+            $symbol = FunctionComplexity::resolveSymbol($node);
 
             $findings[] = new Finding(
                 ruleId:  $definition->id,
@@ -146,7 +148,7 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
         }
 
         $lloc     = max(1, NodeIndex::logicalStatementLineCount($node));
-        $ccn      = CyclomaticComplexityRule::computeCyclomaticComplexity($node);
+        $ccn      = FunctionComplexity::computeCyclomaticComplexity($node);
         $halstead = HalsteadVolumeRule::computeHalsteadMetrics($node);
         $volume   = max(1.0, $halstead['volume']);
 

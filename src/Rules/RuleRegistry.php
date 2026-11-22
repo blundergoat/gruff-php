@@ -13,7 +13,6 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
 use GruffPhp\Rules\Contracts\SourceTextRuleInterface;
 use GruffPhp\Rules\Complexity\CognitiveComplexityRule;
-use GruffPhp\Rules\Complexity\CyclomaticComplexityRule;
 use GruffPhp\Rules\Complexity\HalsteadVolumeRule;
 use GruffPhp\Rules\Complexity\MaintainabilityIndexRule;
 use GruffPhp\Rules\Complexity\NestingDepthRule;
@@ -90,7 +89,6 @@ use GruffPhp\Rules\TestQuality\PhpUnitDeprecationsNotFatalRule;
 use GruffPhp\Rules\TestQuality\PhpUnitStrictFlagsMissingRule;
 use GruffPhp\Rules\TestQuality\PrivateReflectionRule;
 use GruffPhp\Rules\TestQuality\RepeatedStructureMissingDataProviderRule;
-use GruffPhp\Rules\TestQuality\SetupBloatRule;
 use GruffPhp\Rules\TestQuality\StaticAnalysisRedundantTestRule;
 use GruffPhp\Rules\TestQuality\SutNotCalledRule;
 use GruffPhp\Rules\TestQuality\TestdoxReadabilityRule;
@@ -198,7 +196,6 @@ final class RuleRegistry
     {
         return new self([
                             new CognitiveComplexityRule(),
-                            new CyclomaticComplexityRule(),
                             new HalsteadVolumeRule(),
                             new MaintainabilityIndexRule(),
                             new NestingDepthRule(),
@@ -253,7 +250,6 @@ final class RuleRegistry
                             new PhpUnitStrictFlagsMissingRule(),
                             new PrivateReflectionRule(),
                             new RepeatedStructureMissingDataProviderRule(),
-                            new SetupBloatRule(),
                             new StaticAnalysisRedundantTestRule(),
                             new SutNotCalledRule(),
                             new TestLongerThanSutRule(),

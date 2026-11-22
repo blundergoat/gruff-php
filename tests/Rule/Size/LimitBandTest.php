@@ -28,7 +28,7 @@ final class LimitBandTest extends TestCase
     /** Banded rule ids; the averages, halstead volume and maintainability index are routed by measurement instead. */
     private const BANDED = [
         'size.file-length', 'size.class-length', 'size.method-length', 'size.parameter-count', 'size.property-count',
-        'size.public-method-count', 'complexity.cognitive', 'complexity.cyclomatic', 'complexity.nesting-depth',
+        'size.public-method-count', 'complexity.cognitive', 'complexity.nesting-depth',
     ];
 
     /** @var list<string> - Temporary fixture paths removed after each test. */
@@ -64,7 +64,6 @@ final class LimitBandTest extends TestCase
             'property count' => ['size.property-count', self::classWithProperties(16), self::classWithProperties(30), LimitBand::LOWER_PROPERTY, LimitBand::SPLIT_CLASS],
             'public method count' => ['size.public-method-count', self::classWithPublicMethods(26), self::classWithPublicMethods(50), LimitBand::LOWER_PUBLIC_METHOD, LimitBand::SPLIT_CLASS],
             'cognitive' => ['complexity.cognitive', self::methodWithBranches(21), self::methodWithBranches(40), LimitBand::LOWER_METHOD, LimitBand::SIMPLIFY_PATH],
-            'cyclomatic' => ['complexity.cyclomatic', self::methodWithBranches(20), self::methodWithBranches(39), LimitBand::LOWER_METHOD, LimitBand::SIMPLIFY_PATH],
             'nesting depth' => ['complexity.nesting-depth', self::methodNestedTo(5), self::methodNestedTo(8), LimitBand::LOWER_METHOD, LimitBand::SIMPLIFY_PATH],
         ];
     }

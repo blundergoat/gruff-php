@@ -93,7 +93,7 @@ final readonly class CognitiveComplexityRule implements RuleInterface
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node - NodeIndex limits this scan to methods and named functions. */
             // An abstract or bodyless declaration has no control flow to score.
-            if (!CyclomaticComplexityRule::hasExecutableBody($node)) {
+            if (!FunctionComplexity::hasExecutableBody($node)) {
                 continue;
             }
 
@@ -104,7 +104,7 @@ final readonly class CognitiveComplexityRule implements RuleInterface
                 continue;
             }
 
-            $symbol = CyclomaticComplexityRule::resolveSymbol($node);
+            $symbol = FunctionComplexity::resolveSymbol($node);
             $isFlatGuardFlow = ComplexityShapeClassifier::isFlatGuardClauseFlow($node);
             $band = LimitBand::of($cc, $settings->lowestHighValueThreshold());
             $severity = LimitBand::severity($band, $isFlatGuardFlow ? Severity::Advisory : $thresholdMatch->severity);

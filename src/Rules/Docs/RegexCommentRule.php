@@ -11,7 +11,7 @@ use GruffPhp\Results\Finding\RemediationAction;
 use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
-use GruffPhp\Rules\Complexity\CyclomaticComplexityRule;
+use GruffPhp\Rules\Complexity\FunctionComplexity;
 use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Shared\PhysicalCommentAttachment;
 use GruffPhp\Rules\Contracts\RuleContext;
@@ -521,7 +521,7 @@ final readonly class RegexCommentRule implements RuleInterface
         while ($parent instanceof Node) {
             if ($parent instanceof ClassMethod || $parent instanceof Function_) {
 
-                return CyclomaticComplexityRule::resolveSymbol($parent);
+                return FunctionComplexity::resolveSymbol($parent);
             }
 
             $parent = $parent->getAttribute('parent');

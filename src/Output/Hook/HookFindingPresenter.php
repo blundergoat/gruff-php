@@ -179,8 +179,7 @@ final readonly class HookFindingPresenter
     private function measuredKeys(string $ruleId): array
     {
         return match ($ruleId) {
-            'complexity.cognitive',
-            'complexity.cyclomatic' => ['complexity'],
+            'complexity.cognitive' => ['complexity'],
             'complexity.halstead-volume' => ['volume'],
             'complexity.maintainability-index' => ['maintainabilityIndex'],
             'complexity.nesting-depth' => ['depth'],
@@ -204,7 +203,6 @@ final readonly class HookFindingPresenter
     {
         return match ($finding->ruleId) {
             'complexity.cognitive',
-            'complexity.cyclomatic',
             'complexity.maintainability-index' => 'score',
             'complexity.halstead-volume' => 'volume',
             'complexity.nesting-depth' => 'levels',

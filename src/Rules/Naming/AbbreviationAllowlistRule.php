@@ -11,7 +11,7 @@ use GruffPhp\Results\Finding\RemediationAction;
 use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
-use GruffPhp\Rules\Complexity\CyclomaticComplexityRule;
+use GruffPhp\Rules\Complexity\FunctionComplexity;
 use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
@@ -542,7 +542,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     {
 
         if ($scope->node instanceof ClassMethod || $scope->node instanceof Function_) {
-            return CyclomaticComplexityRule::resolveSymbol($scope->node);
+            return FunctionComplexity::resolveSymbol($scope->node);
         }
 
         // Closures and arrow functions have no name, so fall back to a kind@line label.

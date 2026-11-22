@@ -23,7 +23,6 @@ use GruffPhp\Rules\TestQuality\MockingDomainObjectRule;
 use GruffPhp\Rules\TestQuality\NoAssertionsRule;
 use GruffPhp\Rules\TestQuality\PrivateReflectionRule;
 use GruffPhp\Rules\TestQuality\RepeatedStructureMissingDataProviderRule;
-use GruffPhp\Rules\TestQuality\SetupBloatRule;
 use GruffPhp\Rules\TestQuality\StaticAnalysisRedundantTestRule;
 use GruffPhp\Rules\TestQuality\SutNotCalledRule;
 use GruffPhp\Rules\TestQuality\TestdoxReadabilityRule;
@@ -72,7 +71,6 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(PrivateReflectionRule::ID, 3, $findings);
         self::assertRuleCount(DataProviderAnnotationRule::ID, 1, $findings);
         self::assertRuleCount(TrivialSnapshotRule::ID, 1, $findings);
-        self::assertRuleCount(SetupBloatRule::ID, 1, $findings);
     }
 
     /**

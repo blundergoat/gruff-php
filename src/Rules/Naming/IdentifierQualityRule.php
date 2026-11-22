@@ -10,7 +10,7 @@ use GruffPhp\Results\Finding\Pillar;
 use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
-use GruffPhp\Rules\Complexity\CyclomaticComplexityRule;
+use GruffPhp\Rules\Complexity\FunctionComplexity;
 use GruffPhp\Rules\Modernisation\ModernisationNodeHelper;
 use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Contracts\RuleContext;
@@ -340,7 +340,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
             node:                     $function,
             kind:                     $function instanceof ClassMethod ? 'method' : 'function',
             name:                     $function->name->toString(),
-            symbol:                   CyclomaticComplexityRule::resolveSymbol($function),
+            symbol:                   FunctionComplexity::resolveSymbol($function),
         );
 
         return $finding instanceof Finding ? [$finding] : [];
@@ -777,7 +777,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
     {
 
         if ($scope->node instanceof ClassMethod || $scope->node instanceof Function_) {
-            return CyclomaticComplexityRule::resolveSymbol($scope->node);
+            return FunctionComplexity::resolveSymbol($scope->node);
         }
 
         return sprintf('%s@%d', $scope->kind, $scope->node->getStartLine());

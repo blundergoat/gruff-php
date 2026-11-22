@@ -10,7 +10,7 @@ use GruffPhp\Results\Finding\Pillar;
 use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
-use GruffPhp\Rules\Complexity\CyclomaticComplexityRule;
+use GruffPhp\Rules\Complexity\FunctionComplexity;
 use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
@@ -98,7 +98,7 @@ final readonly class MissingReturnTagRule implements RuleInterface
                 continue;
             }
 
-            $symbol = CyclomaticComplexityRule::resolveSymbol($node);
+            $symbol = FunctionComplexity::resolveSymbol($node);
 
             $findings[] = new Finding(
                 ruleId:      $definition->id,

@@ -8,7 +8,6 @@ use GruffPhp\Engine\Config\AnalysisConfig;
 use GruffPhp\Engine\Config\RuleSettings;
 use GruffPhp\Engine\Parser\PhpFileParser;
 use GruffPhp\Rules\Complexity\CognitiveComplexityRule;
-use GruffPhp\Rules\Complexity\CyclomaticComplexityRule;
 use GruffPhp\Rules\Complexity\HalsteadVolumeRule;
 use GruffPhp\Rules\Complexity\MaintainabilityIndexRule;
 use GruffPhp\Rules\Complexity\NestingDepthRule;
@@ -27,7 +26,7 @@ final class ComplexityIntegrationTest extends TestCase
     /**
      * Verify complex fixture triggers multiple complexity rules.
      *
-     * @return void - Asserts cyclomatic, cognitive and nesting rule IDs are present and all finding fingerprints are unique.
+     * @return void - Asserts cognitive and nesting rule IDs are present and all finding fingerprints are unique.
      */
     public function testComplexFixtureTriggersMultipleComplexityRules(): void
     {
@@ -39,7 +38,6 @@ final class ComplexityIntegrationTest extends TestCase
 
         $registry = RuleRegistry::defaults();
         $config   = AnalysisConfig::fromRegistry($registry)
-            ->withRuleSettings(CyclomaticComplexityRule::ID, new RuleSettings(true, ['warning' => 3, 'error' => 20]))
             ->withRuleSettings(CognitiveComplexityRule::ID, new RuleSettings(true, ['warning' => 2, 'error' => 30]))
             ->withRuleSettings(NestingDepthRule::ID, new RuleSettings(true, ['warning' => 1, 'error' => 6]))
             ->withRuleSettings(HalsteadVolumeRule::ID, new RuleSettings(true, ['warning' => 30, 'error' => 2000]))
@@ -49,7 +47,6 @@ final class ComplexityIntegrationTest extends TestCase
 
         $ruleIds = array_unique(array_map(static fn ($finding): string => $finding->ruleId, $findings));
 
-        self::assertContains(CyclomaticComplexityRule::ID, $ruleIds);
         self::assertContains(CognitiveComplexityRule::ID, $ruleIds);
         self::assertContains(NestingDepthRule::ID, $ruleIds);
 
@@ -101,7 +98,6 @@ final class ComplexityIntegrationTest extends TestCase
         );
 
         $tightConfig = AnalysisConfig::fromRegistry($registry)
-            ->withRuleSettings(CyclomaticComplexityRule::ID, new RuleSettings(true, ['warning' => 1, 'error' => 5]))
             ->withRuleSettings(CognitiveComplexityRule::ID, new RuleSettings(true, ['warning' => 1, 'error' => 5]))
             ->withRuleSettings(NestingDepthRule::ID, new RuleSettings(true, ['warning' => 1, 'error' => 3]))
             ->withRuleSettings(HalsteadVolumeRule::ID, new RuleSettings(true, ['warning' => 10, 'error' => 50]))

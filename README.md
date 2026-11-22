@@ -26,7 +26,7 @@ Wired into a coding agent's loop — as a pre-commit hook, a CI gate (`--fail-on
 | Runtime | PHP `^8.3` |
 | Package | `blundergoat/gruff-php` |
 | Binary | `bin/gruff-php` from checkout; `vendor/bin/gruff-php` after install |
-| Rule catalogue | 84 rules across 10 pillars |
+| Rule catalogue | 82 rules across 10 pillars |
 | Primary config | `.gruff-php.yaml`; legacy `.gruff.yaml` is accepted when the primary file is absent |
 | Analysis schema | `gruff.analysis.v3` |
 | Baseline schema | `gruff.baseline.v3` |
@@ -187,7 +187,7 @@ rules:
   size.method-length:
     threshold: 80
     severity: error
-  complexity.cyclomatic:
+  complexity.cognitive:
     enabled: false
 ```
 
@@ -195,12 +195,12 @@ Use `vendor/bin/gruff-php list-rules --format json` to inspect supported thresho
 
 ## Rules And Pillars
 
-The v0.1 catalogue contains 84 registry rules:
+The v0.1 catalogue contains 82 registry rules:
 
 | Pillar | Rules |
 | --- | ---: |
 | `size` | 6 |
-| `complexity` | 4 |
+| `complexity` | 3 |
 | `maintainability` | 1 |
 | `dead-code` | 6 |
 | `naming` | 6 |
@@ -208,7 +208,7 @@ The v0.1 catalogue contains 84 registry rules:
 | `modernisation` | 2 |
 | `security` | 18 |
 | `sensitive-data` | 7 |
-| `test-quality` | 19 |
+| `test-quality` | 18 |
 
 Some dead-code pillar rules keep a `waste.*` rule-id prefix for historical continuity. Filter by the `pillar` field from `list-rules --format json` when the pillar matters more than the rule-id prefix.
 

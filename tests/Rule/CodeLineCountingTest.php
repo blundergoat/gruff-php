@@ -8,7 +8,6 @@ use GruffPhp\Engine\Config\AnalysisConfig;
 use GruffPhp\Engine\Config\RuleSettings;
 use GruffPhp\Rules\RuleRegistry;
 use GruffPhp\Rules\Size\ClassLengthRule;
-use GruffPhp\Rules\TestQuality\SetupBloatRule;
 use GruffPhp\Rules\TestQuality\TestLongerThanSutRule;
 use GruffPhp\Rules\Waste\UnreachableCodeRule;
 use GruffPhp\Tests\Rule\Docs\DocsRuleTestCase;
@@ -44,17 +43,6 @@ final class CodeLineCountingTest extends DocsRuleTestCase
         $findings = $this->analyseSourceRule($this->attributedClass(3), ClassLengthRule::ID, $config);
         self::assertCount(1, $findings);
         self::assertStringContainsString('is 15 substantive lines', $findings[0]->message);
-    }
-
-    /**
-     * Verify setup-bloat weighs setUp() and the tests by code lines, and still reports a setUp() long in code.
-     *
-     * @return void - Asserts no setup-bloat finding for four setup statements and one for five.
-     */
-    public function testSetupBloatComparesCodeLines(): void
-    {
-        self::assertSame([], $this->analyseSourceRule($this->relayTest(4), SetupBloatRule::ID));
-        self::assertCount(1, $this->analyseSourceRule($this->relayTest(5), SetupBloatRule::ID));
     }
 
     /**
@@ -117,25 +105,6 @@ PHP, UnreachableCodeRule::ID);
         }
 
         return $source . "}\n";
-    }
-
-    /**
-     * Build a test class whose setUp() has statements + 3 code lines among comment and blank lines, beside one
-     * four-code-line test.
-     *
-     * @param int $statements - Statements in setUp().
-     *
-     * @return string - PHP source for one PHPUnit test class.
-     */
-    private function relayTest(int $statements): string
-    {
-        $source = "<?php\nfinal class RelayTest extends \\PHPUnit\\Framework\\TestCase\n{\n    private array \$hosts = [];\n\n"
-            . "    protected function setUp(): void\n    {\n";
-        for ($index = 0; $index < $statements; ++$index) {
-            $source .= sprintf("        // Host %d joins the relay pool.\n\n        \$this->hosts[] = 'host-%d';\n", $index, $index);
-        }
-
-        return $source . "    }\n\n    public function testSends(): void\n    {\n        self::assertCount(1, \$this->hosts);\n    }\n}\n";
     }
 
     /**

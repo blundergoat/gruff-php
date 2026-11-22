@@ -34,7 +34,6 @@ final class ListRulesCommand extends Command
      */
     private const THRESHOLD_KNOB_NAMES = [
         'complexity.cognitive'    => 'maxComplexity',
-        'complexity.cyclomatic'   => 'maxComplexity',
         'complexity.nesting-depth' => 'maxDepth',
         'size.file-length'        => 'maxLines',
         'size.method-length'      => 'maxLines',

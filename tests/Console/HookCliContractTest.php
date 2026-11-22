@@ -461,7 +461,7 @@ YAML);
     }
 
     /**
-     * Verify a cyclomatic finding reports a score unit and the rule's measured complexity value.
+     * Verify a cognitive-complexity finding reports a score unit and the rule's measured complexity value.
      *
      * @return void - Asserts the score unit, above direction, threshold one, and matching measured and complexity values.
      * @throws JsonException - When decoding hook stdout fails.
@@ -483,7 +483,7 @@ YAML);
                 'json',
             ]);
 
-            $finding = $this->firstFindingByRule($this->findingRows($report), 'complexity.cyclomatic');
+            $finding = $this->firstFindingByRule($this->findingRows($report), 'complexity.cognitive');
             self::assertNotNull($finding);
 
             $metadata = $finding['metadata'] ?? null;
@@ -746,9 +746,9 @@ PHP;
     }
 
     /**
-     * Return a config that runs only the cyclomatic-complexity rule at a low threshold.
+     * Return a config that runs only the cognitive-complexity rule at a low threshold.
      *
-     * @return string - YAML selecting complexity.cyclomatic with threshold one and warning severity.
+     * @return string - YAML selecting complexity.cognitive with threshold one and warning severity.
      */
     private function complexityConfig(): string
     {
@@ -756,16 +756,16 @@ PHP;
 schemaVersion: gruff-php.config.v0.1
 selection:
     rules:
-        - complexity.cyclomatic
+        - complexity.cognitive
 rules:
-    complexity.cyclomatic:
+    complexity.cognitive:
         threshold: 1
         severity:  warning
 YAML;
     }
 
     /**
-     * Source with one method whose cyclomatic complexity exceeds a low threshold.
+     * Source with one method whose cognitive complexity exceeds a low threshold.
      *
      * @return string - PHP source with branches, loops, and a ternary in Complex::tangled().
      */

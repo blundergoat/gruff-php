@@ -79,7 +79,7 @@ final readonly class NestingDepthRule implements RuleInterface
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node - The NodeIndex query selects only methods and functions. */
             // An abstract or bodyless declaration has nothing to measure.
-            if (!CyclomaticComplexityRule::hasExecutableBody($node)) {
+            if (!FunctionComplexity::hasExecutableBody($node)) {
                 continue;
             }
 
@@ -91,7 +91,7 @@ final readonly class NestingDepthRule implements RuleInterface
                 continue;
             }
 
-            $symbol = CyclomaticComplexityRule::resolveSymbol($node);
+            $symbol = FunctionComplexity::resolveSymbol($node);
 
             $band = LimitBand::of($maxDepth, $settings->lowestHighValueThreshold());
 

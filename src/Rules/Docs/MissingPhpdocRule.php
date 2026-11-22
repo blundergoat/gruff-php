@@ -10,7 +10,7 @@ use GruffPhp\Results\Finding\Pillar;
 use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
-use GruffPhp\Rules\Complexity\CyclomaticComplexityRule;
+use GruffPhp\Rules\Complexity\FunctionComplexity;
 use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
@@ -112,7 +112,7 @@ final readonly class MissingPhpdocRule implements RuleInterface
      */
     private function findingForDeclaration(AnalysisUnit $analysisUnit, RuleDefinition $definition, ClassMethod|Function_ $declaration): Finding
     {
-        $symbol = CyclomaticComplexityRule::resolveSymbol($declaration);
+        $symbol = FunctionComplexity::resolveSymbol($declaration);
         $kind   = $declaration instanceof ClassMethod ? 'method' : 'function';
 
 

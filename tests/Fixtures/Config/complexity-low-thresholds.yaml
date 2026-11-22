@@ -1,8 +1,5 @@
 schemaVersion: gruff-php.config.v0.1
 rules:
-    complexity.cyclomatic:
-        threshold: 1
-        severity: warning
     complexity.cognitive:
         threshold: 1
         severity: warning
@@ -10,6 +7,7 @@ rules:
         threshold: 1
         severity: warning
     complexity.maintainability-index:
+        enabled: true
         threshold: 200
         severity: warning
     complexity.halstead-volume:

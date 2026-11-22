@@ -23,7 +23,6 @@ use GruffPhp\Rules\TestQuality\PhpUnitDeprecationsNotFatalRule;
 use GruffPhp\Rules\TestQuality\PhpUnitStrictFlagsMissingRule;
 use GruffPhp\Rules\TestQuality\PrivateReflectionRule;
 use GruffPhp\Rules\TestQuality\RepeatedStructureMissingDataProviderRule;
-use GruffPhp\Rules\TestQuality\SetupBloatRule;
 use GruffPhp\Rules\TestQuality\SutNotCalledRule;
 use GruffPhp\Rules\TestQuality\TestLongerThanSutRule;
 use GruffPhp\Rules\TestQuality\TestNamingConsistencyRule;
@@ -260,7 +259,6 @@ final class TestQualityConfigurationRulesTest extends TestCase
             DataProviderAnnotationRule::ID,
             TrivialSnapshotRule::ID,
             SutNotCalledRule::ID,
-            SetupBloatRule::ID,
             EmptyDataProviderRule::ID,
             LoopAssertionWithoutMessageRule::ID,
             ExceptionTypeOnlyRule::ID,

@@ -10,7 +10,7 @@ use GruffPhp\Results\Finding\Pillar;
 use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
-use GruffPhp\Rules\Complexity\CyclomaticComplexityRule;
+use GruffPhp\Rules\Complexity\FunctionComplexity;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
@@ -459,7 +459,7 @@ final readonly class ShortVariableRule implements RuleInterface
     {
 
         if ($scope->node instanceof ClassMethod || $scope->node instanceof Function_) {
-            return CyclomaticComplexityRule::resolveSymbol($scope->node);
+            return FunctionComplexity::resolveSymbol($scope->node);
         }
 
         // Closures and arrow functions have no name, so fall back to a kind@line label.

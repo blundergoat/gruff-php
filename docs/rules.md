@@ -12,11 +12,11 @@ to three near-match suggestions and exits with code 2.
 This rule catalogue is generated from `php bin/gruff-php list-rules --format json`.
 Use that command for the full machine-readable metadata, including thresholds and options.
 
-Total rules: 84
+Total rules: 82
 
 ## False-positive guidance
 
-44 of the 84 rules publish `falsePositiveShapes`: a list of shapes the detector is
+46 of the 82 rules publish `falsePositiveShapes`: a list of shapes the detector is
 known to misfire on, each paired with the mitigation that answers it. Every rule at
 `medium` or `low` confidence carries at least one, because a heuristic rule owes the
 reader the cases where its heuristic is wrong. A rule that catalogues nothing omits
@@ -107,12 +107,11 @@ A rule's confidence follows its measured precision: high at an error-adjusted sc
 
 ## Rule Catalogue
 
-### `complexity` (4)
+### `complexity` (3)
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
 | --- | --- | --- | --- | --- |
 | `complexity.cognitive` | Cognitive complexity | `error` | `low` | yes |
-| `complexity.cyclomatic` | Cyclomatic complexity | `warning` | `medium` | yes |
 | `complexity.halstead-volume` | Halstead volume | `advisory` | `medium` | no |
 | `complexity.nesting-depth` | Maximum nesting depth | `error` | `high` | yes |
 
@@ -216,7 +215,7 @@ run. The default is false, so a docblock is required.
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
 | --- | --- | --- | --- | --- |
-| `complexity.maintainability-index` | Maintainability index | `advisory` | `low` | yes |
+| `complexity.maintainability-index` | Maintainability index | `advisory` | `low` | no |
 
 An exact same-class named callback is also a contract boundary. The rule
 recognises PHP first-class callable syntax and two-element callable arrays whose
@@ -226,20 +225,19 @@ case-insensitive method name. Foreign, unresolved, computed, string, and
 child-class-name references to a parent declaration remain conservative and
 still need `allowedSymbols` when framework wiring makes them intentional.
 
-`complexity.cyclomatic` and `complexity.cognitive` keep their raw metric
+`complexity.cognitive` keeps its raw metric
 values in metadata, but flat validation flows made of top-level guard
 clauses that each exit early (return, throw, or exit) are reported at
 advisory severity when they cross the configured threshold. Nested
 decision trees, loops, switch/match
 sprawl, try/catch control flow, and mixed-responsibility methods keep the
 configured warning/error severity at one and a half times the limit or more;
-below that a cyclomatic, cognitive or nesting-depth finding is a lower-band advisory notice (see
+below that a cognitive or nesting-depth finding is a lower-band advisory notice (see
 "Two bands" under `size`). Upper-band complexity advice asks for a simpler
 execution path, not extracted helpers.
 
-`complexity.cyclomatic` reports each `switch` and each `match` as one decision,
-however many cases or arm conditions it has; the maintainability index keeps
-the full count. `complexity.maintainability-index` reports nothing in a file of
+`complexity.maintainability-index` is off by default and counts every
+`switch` case and `match` arm. When enabled, it reports nothing in a file of
 the family's test-path class: a `test`, `tests`, `__tests__`, `spec`,
 `testdata`, `fixtures` or `examples` folder, or a `*Test.php` file.
 `complexity.halstead-volume` is off by default since 0.6.0. `complexity.cognitive` scores an early-exit guard (an `if` with
@@ -537,7 +535,7 @@ matching when a unit crosses the boundary. A `--fail-on warning` or
 `analyse` gate, `advisory`, still does. Size and complexity rules only ever
 measure `.php` source; configuration and data files never reach them.
 
-### `test-quality` (19)
+### `test-quality` (18)
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
 | --- | --- | --- | --- | --- |
@@ -554,7 +552,6 @@ measure `.php` source; configuration and data files never reach them.
 | `test-quality.phpunit-strict-flags-missing` | PHPUnit strict flags missing | `warning` | `high` | yes |
 | `test-quality.private-reflection` | Private member reflection | `warning` | `high` | yes |
 | `test-quality.repeated-structure-missing-data-provider` | Repeated test structure missing data provider | `advisory` | `low` | yes |
-| `test-quality.setup-bloat` | Setup bloat | `advisory` | `medium` | yes |
 | `test-quality.static-analysis-redundant-test` | Static-analysis-redundant test candidate | `advisory` | `high` | yes |
 | `test-quality.sut-not-called` | Test name mentions SUT that is not called | `advisory` | `low` | no |
 | `test-quality.test-longer-than-sut` | Test longer than apparent SUT | `advisory` | `low` | no |

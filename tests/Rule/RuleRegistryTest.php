@@ -16,7 +16,6 @@ use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Engine\Parser\PhpFileParser;
 use GruffPhp\Rules\Complexity\CognitiveComplexityRule;
-use GruffPhp\Rules\Complexity\CyclomaticComplexityRule;
 use GruffPhp\Rules\Complexity\HalsteadVolumeRule;
 use GruffPhp\Rules\Complexity\MaintainabilityIndexRule;
 use GruffPhp\Rules\Complexity\NestingDepthRule;
@@ -66,7 +65,6 @@ use GruffPhp\Rules\Size\PublicMethodCountRule;
 use GruffPhp\Rules\TestQuality\DataProviderAnnotationRule;
 use GruffPhp\Rules\TestQuality\NoAssertionsRule;
 use GruffPhp\Rules\TestQuality\PrivateReflectionRule;
-use GruffPhp\Rules\TestQuality\SetupBloatRule;
 use GruffPhp\Rules\TestQuality\StaticAnalysisRedundantTestRule;
 use GruffPhp\Rules\TestQuality\SutNotCalledRule;
 use GruffPhp\Rules\TestQuality\TestLongerThanSutRule;
@@ -102,7 +100,7 @@ final class RuleRegistryTest extends TestCase
     {
         $registry        = RuleRegistry::defaults();
         $expectedRuleIds = [
-            CognitiveComplexityRule::ID, CyclomaticComplexityRule::ID,
+            CognitiveComplexityRule::ID,
             HalsteadVolumeRule::ID, MaintainabilityIndexRule::ID,
             NestingDepthRule::ID,
             UnusedPrivateConstantRule::ID,
@@ -130,7 +128,7 @@ final class RuleRegistryTest extends TestCase
             UnsafeArchiveExtractionRule::ID, UnsafeXmlLoadingRule::ID,
             UnsafeUnserializeRule::ID,
             DataProviderAnnotationRule::ID, NoAssertionsRule::ID,
-            PrivateReflectionRule::ID, SetupBloatRule::ID,
+            PrivateReflectionRule::ID,
             StaticAnalysisRedundantTestRule::ID,
             SutNotCalledRule::ID, TestLongerThanSutRule::ID,
             TestNamingConsistencyRule::ID,
@@ -343,7 +341,7 @@ final class RuleRegistryTest extends TestCase
         usort($definitions, static fn(array $left, array $right): int => $left['id'] <=> $right['id']);
         $json = json_encode($definitions, JSON_THROW_ON_ERROR);
 
-        self::assertCount(84, $definitions);
+        self::assertCount(82, $definitions);
 
 
 
@@ -357,7 +355,7 @@ final class RuleRegistryTest extends TestCase
 
 
         self::assertSame(
-            'd30c0fe449df02a1a3b27912c46abc42a7282b48cfb812d28961b0742b604e40',
+            '62d15f998d84c6837921c20b8ca58fe45c18075df4e712b8474b3b25eb1352ef',
             hash('sha256', $json),
         );
     }

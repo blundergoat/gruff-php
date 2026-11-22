@@ -97,7 +97,7 @@ final readonly class HalsteadVolumeRule implements RuleInterface
                 continue;
             }
 
-            $symbol = CyclomaticComplexityRule::resolveSymbol($node);
+            $symbol = FunctionComplexity::resolveSymbol($node);
 
             $findings[] = new Finding(
                 ruleId:           $definition->id,

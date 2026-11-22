@@ -75,12 +75,12 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
         self::assertTrue(mkdir($directory));
         self::assertNotFalse(file_put_contents(
                                  $configPath,
-                                 "schemaVersion: gruff-php.config.v0.1\nrules:\n    complexity.cyclomatic:\n        threshold: 70\n        severity: error\n",
+                                 "schemaVersion: gruff-php.config.v0.1\nrules:\n    complexity.cognitive:\n        threshold: 70\n        severity: error\n",
                              ));
 
         try {
             $config   = (new ConfigLoader($directory))->load(null, RuleRegistry::defaults());
-            $settings = $config->ruleSettings('complexity.cyclomatic');
+            $settings = $config->ruleSettings('complexity.cognitive');
 
             self::assertInstanceOf(SeverityThreshold::class, $settings->severityThreshold);
             self::assertSame(70, $settings->severityThreshold->threshold);
@@ -102,12 +102,12 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
         self::assertTrue(mkdir($directory));
         self::assertNotFalse(file_put_contents(
                                  $configPath,
-                                 "schemaVersion: gruff-php.config.v0.1\nrules:\n    complexity.cyclomatic:\n        threshold: 130\n        severity: error\n",
+                                 "schemaVersion: gruff-php.config.v0.1\nrules:\n    complexity.cognitive:\n        threshold: 130\n        severity: error\n",
                              ));
 
         try {
             $config   = (new ConfigLoader($directory))->load(null, RuleRegistry::defaults());
-            $settings = $config->ruleSettings('complexity.cyclomatic');
+            $settings = $config->ruleSettings('complexity.cognitive');
 
             self::assertInstanceOf(SeverityThreshold::class, $settings->severityThreshold);
             self::assertSame(130, $settings->severityThreshold->threshold);
@@ -131,12 +131,12 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
         self::assertTrue(mkdir($fallbackDirectory));
         self::assertNotFalse(file_put_contents(
                                  $fallbackPath,
-                                 "schemaVersion: gruff-php.config.v0.1\nrules:\n    complexity.cyclomatic:\n        threshold: 110\n        severity: error\n",
+                                 "schemaVersion: gruff-php.config.v0.1\nrules:\n    complexity.cognitive:\n        threshold: 110\n        severity: error\n",
                              ));
 
         try {
             $config   = (new ConfigLoader($projectDirectory, $fallbackDirectory))->load(null, RuleRegistry::defaults());
-            $settings = $config->ruleSettings('complexity.cyclomatic');
+            $settings = $config->ruleSettings('complexity.cognitive');
 
             self::assertInstanceOf(SeverityThreshold::class, $settings->severityThreshold);
             self::assertSame(110, $settings->severityThreshold->threshold);
@@ -161,12 +161,12 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
         self::assertTrue(mkdir($fallbackDirectory));
         self::assertNotFalse(file_put_contents(
                                  $fallbackPath,
-                                 "schemaVersion: gruff-php.config.v0.1\nrules:\n    complexity.cyclomatic:\n        threshold: 170\n        severity: error\n",
+                                 "schemaVersion: gruff-php.config.v0.1\nrules:\n    complexity.cognitive:\n        threshold: 170\n        severity: error\n",
                              ));
 
         try {
             $config   = (new ConfigLoader($projectDirectory, $fallbackDirectory))->load(null, RuleRegistry::defaults());
-            $settings = $config->ruleSettings('complexity.cyclomatic');
+            $settings = $config->ruleSettings('complexity.cognitive');
 
             self::assertInstanceOf(SeverityThreshold::class, $settings->severityThreshold);
             self::assertSame(170, $settings->severityThreshold->threshold);
@@ -185,12 +185,12 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     public function testLoadsExplicitYamlConfigFile(): void
     {
         $path = $this->writeTempConfig(
-            "rules:\n    complexity.cyclomatic:\n        threshold: 90\n        severity: error\n",
+            "rules:\n    complexity.cognitive:\n        threshold: 90\n        severity: error\n",
             '.yaml',
         );
 
         $config   = (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
-        $settings = $config->ruleSettings('complexity.cyclomatic');
+        $settings = $config->ruleSettings('complexity.cognitive');
 
         self::assertInstanceOf(SeverityThreshold::class, $settings->severityThreshold);
         self::assertSame(90, $settings->severityThreshold->threshold);
@@ -416,8 +416,8 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
                 'Config key "rules.docs.missing-public-phpdoc.threshold" is only supported for rules with a threshold/severity rubric.',
             ],
             'combined severity threshold and threshold map' => [
-                '{"rules":{"complexity.cyclomatic":{"threshold":70,"severity":"error","thresholds":{"warning":7}}}}',
-                'Config key "rules.complexity.cyclomatic.thresholds" is not supported; this rule uses a single threshold and severity.',
+                '{"rules":{"complexity.cognitive":{"threshold":70,"severity":"error","thresholds":{"warning":7}}}}',
+                'Config key "rules.complexity.cognitive.thresholds" is not supported; this rule uses a single threshold and severity.',
             ],
             'unsupported minimum PHP version' => [
                 '{"minimumPhpVersion": 7.3}',
@@ -456,8 +456,8 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
                 'Unknown config key "failureConditions.newFindings.newFindings".',
             ],
             'unknown threshold key' => [
-                '{"rules":{"complexity.cyclomatic":{"thresholds":{"critical":1}}}}',
-                'Config key "rules.complexity.cyclomatic.thresholds" is not supported; this rule uses a single threshold and severity.',
+                '{"rules":{"complexity.cognitive":{"thresholds":{"critical":1}}}}',
+                'Config key "rules.complexity.cognitive.thresholds" is not supported; this rule uses a single threshold and severity.',
             ],
             'invalid path ignore pattern' => [
                 '{"paths":{"ignore":["../outside"]}}',

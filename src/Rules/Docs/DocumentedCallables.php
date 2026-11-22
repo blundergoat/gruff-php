@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace GruffPhp\Rules\Docs;
 
 use GruffPhp\Engine\Parser\AnalysisUnit;
-use GruffPhp\Rules\Complexity\CyclomaticComplexityRule;
+use GruffPhp\Rules\Complexity\FunctionComplexity;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Shared\NodeIndex;
@@ -55,7 +55,7 @@ final class DocumentedCallables
 
         foreach (NodeIndex::nodesOfAny($unit, [ClassMethod::class, Function_::class]) as $node) {
             /** @var ClassMethod|Function_ $node - Index lookup restricts results to methods and named functions. */
-            $callables[] = ['node' => $node, 'doc' => $node->getDocComment(), 'symbol' => CyclomaticComplexityRule::resolveSymbol($node)];
+            $callables[] = ['node' => $node, 'doc' => $node->getDocComment(), 'symbol' => FunctionComplexity::resolveSymbol($node)];
         }
 
         if (($context->settingsFor($definition)->options[self::EVERY_CALLABLE] ?? false) !== true) {

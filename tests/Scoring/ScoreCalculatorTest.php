@@ -109,12 +109,12 @@ final class ScoreCalculatorTest extends TestCase
         $findings = [
             $this->finding('size.method-length', Pillar::Size, Severity::Warning, filePath: 'src/TooMuch.php', line: 12, endLine: 30, symbol: 'TooMuch::run()'),
             $this->finding('complexity.cognitive', Pillar::Complexity, Severity::Warning, filePath: 'src/TooMuch.php', line: 14, endLine: 28, symbol: 'TooMuch::run()'),
-            $this->finding('complexity.cyclomatic', Pillar::Complexity, Severity::Warning, filePath: 'src/Other.php', line: 9, symbol: 'Other::run()'),
+            $this->finding('complexity.nesting-depth', Pillar::Complexity, Severity::Warning, filePath: 'src/Other.php', line: 9, symbol: 'Other::run()'),
         ];
 
         $score = (new ScoreCalculator())->calculate($findings, 10, null, DiffResult::inactive());
 
-        self::assertSame(['size.method-length', 'complexity.cognitive', 'complexity.cyclomatic'], array_map(
+        self::assertSame(['size.method-length', 'complexity.cognitive', 'complexity.nesting-depth'], array_map(
             static fn(Finding $finding): string => $finding->ruleId,
             $findings,
         ));
@@ -133,13 +133,13 @@ final class ScoreCalculatorTest extends TestCase
         $clustered = (new ScoreCalculator())->calculate([
                                                             $this->finding('size.method-length', Pillar::Size, Severity::Warning, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
                                                             $this->finding('complexity.cognitive', Pillar::Complexity, Severity::Warning, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
-                                                            $this->finding('complexity.cyclomatic', Pillar::Complexity, Severity::Warning, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
+                                                            $this->finding('complexity.nesting-depth', Pillar::Complexity, Severity::Warning, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
                                                         ], 10, null, DiffResult::inactive());
 
         $spread = (new ScoreCalculator())->calculate([
                                                          $this->finding('size.method-length', Pillar::Size, Severity::Warning, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
                                                          $this->finding('complexity.cognitive', Pillar::Complexity, Severity::Warning, filePath: 'src/Big.php', line: 40, symbol: 'Big::other()'),
-                                                         $this->finding('complexity.cyclomatic', Pillar::Complexity, Severity::Warning, filePath: 'src/Big.php', line: 70, symbol: 'Big::third()'),
+                                                         $this->finding('complexity.nesting-depth', Pillar::Complexity, Severity::Warning, filePath: 'src/Big.php', line: 70, symbol: 'Big::third()'),
                                                      ], 10, null, DiffResult::inactive());
 
         self::assertGreaterThan($this->composite($spread)->score, $this->composite($clustered)->score);
@@ -158,7 +158,7 @@ final class ScoreCalculatorTest extends TestCase
     public function testClusterPenaltyIsMaxMemberPenaltyDividedByCount(): void
     {
         $score = (new ScoreCalculator())->calculate([
-                                                        $this->finding('complexity.cyclomatic', Pillar::Complexity, Severity::Error, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
+                                                        $this->finding('complexity.nesting-depth', Pillar::Complexity, Severity::Error, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
                                                         $this->finding('complexity.cognitive', Pillar::Complexity, Severity::Warning, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
                                                         $this->finding('complexity.nesting-depth', Pillar::Complexity, Severity::Advisory, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
                                                     ], 10, null, DiffResult::inactive());
@@ -177,7 +177,7 @@ final class ScoreCalculatorTest extends TestCase
     public function testCorrelatedFindingsWithoutALineShareOnePenalty(): void
     {
         $score = (new ScoreCalculator())->calculate([
-            $this->finding('complexity.cyclomatic', Pillar::Complexity, Severity::Warning, filePath: 'src/Big.php', line: null, symbol: 'Big::run()'),
+            $this->finding('complexity.nesting-depth', Pillar::Complexity, Severity::Warning, filePath: 'src/Big.php', line: null, symbol: 'Big::run()'),
             $this->finding('complexity.cognitive', Pillar::Complexity, Severity::Warning, filePath: 'src/Big.php', line: null, symbol: 'Big::run()'),
         ], 10, null, DiffResult::inactive());
 
@@ -195,7 +195,7 @@ final class ScoreCalculatorTest extends TestCase
     public function testLoneCorrelatedAndUnrelatedFindingsKeepFullPenalty(): void
     {
         $score = (new ScoreCalculator())->calculate([
-                                                        $this->finding('complexity.cyclomatic', Pillar::Complexity, Severity::Warning, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
+                                                        $this->finding('complexity.nesting-depth', Pillar::Complexity, Severity::Warning, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
                                                         $this->finding('naming.generic-method-name', Pillar::Naming, Severity::Warning, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
                                                     ], 10, null, DiffResult::inactive());
 

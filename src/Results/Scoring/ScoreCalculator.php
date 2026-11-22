@@ -57,7 +57,6 @@ final readonly class ScoreCalculator
      */
     private const CORRELATED_COMPLEXITY_RULES = [
         'complexity.cognitive',
-        'complexity.cyclomatic',
         'complexity.nesting-depth',
         'size.method-length',
         'size.parameter-count',
@@ -343,6 +342,7 @@ final readonly class ScoreCalculator
                 warning:       $counts['warning'],
                 error:         $counts['error'],
                 penalty:       $weight,
+                // Always null since precision-floor M09 deleted complexity.cyclomatic; the family file-score shape keeps the field.
                 maxCyclomatic: $this->maxMetadataInt($fileFindings, 'complexity.cyclomatic', 'complexity'),
                 maxCognitive:  $this->maxMetadataInt($fileFindings, 'complexity.cognitive', 'complexity'),
                 maxLines:      $this->maxLineMetric($fileFindings),
@@ -362,7 +362,8 @@ final readonly class ScoreCalculator
 
     /**
      * Count integer complexity values on scored cyclomatic findings in the report's fixed buckets.
-     * This is a finding histogram, so methods without a contributing finding are absent.
+     * This is a finding histogram, so methods without a contributing finding are absent. No rule emits cyclomatic
+     * findings since precision-floor M09, so every bucket is zero; the report keeps the field.
      *
      * @param list<Finding> $findings - Scored findings; other rules and non-integer complexity metadata are ignored.
      *
