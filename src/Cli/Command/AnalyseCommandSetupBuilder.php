@@ -395,7 +395,7 @@ final readonly class AnalyseCommandSetupBuilder
         }
 
         $options      = $options->withDefaultBaseline($projectRoot);
-        $configLoader = new ConfigLoader($projectRoot, ConfigLoader::packageRoot(), shouldResolveFromLaunchDir: true);
+        $configLoader = new ConfigLoader($projectRoot, shouldResolveFromLaunchDir: true);
         $configResult = $this->config(
             options:       $options,
             registry:      $registry,

@@ -33,7 +33,7 @@ Unknown top-level keys are rejected so config mistakes fail early.
 
 ## Bounded Deep Scans
 
-PHP files are classified before the deep-scan guard runs. By default, a PHP file over either 20,000 lines or 2,000,000 bytes keeps raw-text checks—file size, sensitive-data, and config checks—but skips token masking, PHP parsing, AST walking, and other structural analysis. The file still counts as analysed and every output format includes a nonfatal `bounded-deep-scan` diagnostic naming its path, measured lines and bytes, both limits, and the winning override source.
+PHP files are classified before the deep-scan guard runs. By default, a PHP file over either 20,000 lines or 2,000,000 bytes keeps raw-text checks (file size, sensitive-data, and config checks) and skips token masking, PHP parsing, AST walking, and other structural rules. The file still counts as analysed, leaves the scoring denominator, and emits a nonfatal `bounded-deep-scan` diagnostic across every output format naming its path, measured lines and bytes, both limits, and the winning override source.
 
 ```yaml
 deepScanBudget:
@@ -85,20 +85,15 @@ minimumSeverity: warning
 
 The floor changes what a report shows, never what it decides: a finding it
 hides still counts toward the exit code and the score. `none` is not a floor
-value, and a per-command map is rejected with an error pointing at `failOn`,
-which is the key that gates the exit code.
+value, and a per-command map is rejected with an error pointing at `failOn` and
+`gruff-php migrate-config`, which converts legacy 0.5 configs out of place
+(moving `minimumSeverity` maps to `failOn`, removing retired rule IDs, and
+renaming legacy rule aliases).
 
 ## Fail On
 
-Across the Gruff family only `analyse` and `report` are accepted by every port, so a
-polyglot repository that shares one `failOn` block should write only those two keys.
-`dashboard` is accepted by gruff-go, gruff-php and gruff-py, and `summary` by gruff-go
-and gruff-ts; each other port refuses the key with exit 2 rather than ignoring it,
-because it ships no gate for that command.
-
-`failOn` sets the exit-code threshold per gating command. Keys are
-`analyse`, `report`, and `dashboard`; values are `advisory`, `warning`,
-`error`, or `none`:
+`failOn` sets the exit-code threshold per gating command. Keys are `analyse`,
+`report`, and `dashboard`; values are `advisory`, `warning`, `error`, or `none`:
 
 ```yaml
 failOn:
@@ -108,22 +103,26 @@ failOn:
 ```
 
 The validator rejects every other key, including `summary`, `init`, and
-`list-rules`, because those commands do not gate exit code; silent
-acceptance would hide a CI misconfiguration. It also rejects every other
-value (including the gruff-go alias `never`) with an error naming the four
+`list-rules`, because those commands do not gate exit codes and silently
+accepting them would hide a CI misconfiguration. It also rejects every other
+value (including the `gruff-go` alias `never`) with an error naming the four
 accepted values.
+
+Across the Gruff family only `analyse` and `report` exist in every port, so a
+polyglot repository sharing one `failOn` block should write only those two keys.
+`dashboard` is accepted by `gruff-go`, `gruff-php`, and `gruff-py`, and
+`summary` by `gruff-go` and `gruff-ts`; each other port exits `2` on an
+unsupported key rather than ignoring it.
 
 Precedence when resolving the effective threshold:
 
 1. CLI `--fail-on` flag (when set explicitly)
 2. `failOn.<command>` from `.gruff-php.yaml`
-3. Binary default — `advisory` for `analyse`, `none` for `report` and
-   `dashboard`
+3. Binary default (`advisory` for `analyse`, `none` for `report` and `dashboard`)
 
-`analyse`'s binary default lowered from `error` to `advisory` in 0.2.0 so
-that every finding visible in the report can fail CI by default. Pass
-`--fail-on error` or set `failOn.analyse: error` to restore the older
-behaviour.
+By default, `analyse` fails on `advisory` and above so every visible finding can
+gate CI. Pass `--fail-on error` or set `failOn.analyse: error` when you only
+want error-level findings to fail the build.
 
 ## Failure Conditions
 
@@ -207,19 +206,17 @@ and why, without running an analysis (see [CI integration](ci-integration.md)).
 
 ## Allowlists
 
-Use allowlists for deliberate naming or sensitive-data exceptions:
+Use allowlists for deliberate short-abbreviation exceptions:
 
 ```yaml
 allowlists:
   acceptedAbbreviations:
     - age
-    - api
     - app
     - db
     - dob
     - dto
     - fs
-    - http
     - id
     - io
     - key
@@ -236,13 +233,17 @@ allowlists:
 ```
 
 `allowlists.acceptedAbbreviations` is matched case-insensitively by
-`naming.abbreviation-allowlist`. Gruff seeds the universal programming terms
-`age`, `app`, `db`, `fs`, `id`, `io`, `key`, `log`, `max`, `min`, `now`, `raw`,
-`rx`, `tx`, `ui`, and `url` when this key is absent. Supplying the key replaces
-that seeded list, so include every universal term the project still accepts as
-well as domain vocabulary such as `dob`. An unaccepted short name remains an
-advisory `CONSIDER` finding; the allowlist is a deliberate project decision,
-not an automatic classification of the name as good or bad.
+`naming.abbreviation-allowlist`. Common two- and three-letter English words
+(such as `fee`, `row`, `tax`, `day`, `end`, `map`, `sum`, `tag`, `zip`) and
+universal technical terms (such as `api`, `csv`, `env`, `ids`, `jwt`, `pdf`,
+`sql`, `xml`) stay quiet out of the box and remain disjoint from the sixteen
+seeded terms. Gruff seeds `age`, `app`, `db`, `fs`, `id`, `io`, `key`, `log`,
+`max`, `min`, `now`, `raw`, `rx`, `tx`, `ui`, and `url` when this key is absent.
+Supplying the key replaces that seeded list, so include every seeded term the
+project still accepts as well as domain abbreviations such as `dob`, `dto`, and
+`utc`. An unaccepted short abbreviation remains an advisory `CONSIDER` finding;
+the allowlist is a deliberate project decision, not an automatic classification
+of the name as good or bad.
 
 ## Selection
 
@@ -256,13 +257,7 @@ selection:
 
 ## Sensitive Exclusions
 
-`sensitiveExclusions` is the only setting that suppresses a sensitive-data finding. It is deliberately
-separate from `selection` so the ban on matching reported text is structural rather than a setting
-someone can relax later:
-
-A built-in test-path skip also hides sensitive-data and security findings in test, fixture and example files, and counts each one in `suppressions`.
-It covers every sensitive-data rule except `sensitive-data.pii-test-fixture`.
-A configured entry applies first, so a finding it claims is counted under the entry.
+`sensitiveExclusions` is the only config setting that suppresses a sensitive-data finding. Keeping it separate from `selection` ensures the ban on text- or value-based matching stays structural:
 
 ```yaml
 sensitiveExclusions:
@@ -271,6 +266,8 @@ sensitiveExclusions:
     symbol: Fixtures::awsSample
     reason: Synthetic key used by the scanner fixtures; not a live credential.
 ```
+
+Separately, a built-in test-path skip hides security findings and every sensitive-data rule except `sensitive-data.pii-test-fixture` in test, fixture, and example files, counting each skip in `suppressions`. Configured entries apply first, so a finding claimed by an entry is counted under that entry.
 
 **Entries are authored by hand.** gruff never converts a reported finding, message, or preview value
 into an entry, and there is no command that writes one for you. Every finding you accept is a
@@ -337,12 +334,11 @@ metadata keys:
 - `configurationKey` is the full config path when the rule offers a deliberate
   hatch, for example `allowlists.acceptedAbbreviations`.
 
-`CONFIGURE` is not emitted unconditionally by any 0.5.2 rule. Abbreviation,
-every Boolean parameter, and other caller-visible Boolean findings use
-`CONSIDER` because configuration or a compatibility-sensitive rename can both
-be valid. Only private property and private callable names use `APPLY`.
-JSON, hook, and SARIF transport the keys; text and Markdown presentation is
-unchanged in this release.
+`CONFIGURE` is reserved and not emitted by any current rule. `docs.missing-constant-phpdoc`
+and `docs.regex-comment` emit `APPLY`; `naming.abbreviation-allowlist` emits
+`CONSIDER` because either renaming the identifier or adding it to
+`allowlists.acceptedAbbreviations` can be the right choice. JSON, hook, and
+SARIF carry these keys; text and Markdown omit them.
 
 ### Visibility without scoring
 

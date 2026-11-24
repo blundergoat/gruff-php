@@ -1,16 +1,15 @@
 # Gruff PHP Rules
 
-Run `vendor/bin/gruff-php list-rules <rule-id>` to see a per-rule detail view
-including the description, default options with one-line explanations,
-escape-hatch config paths (`rules.<id>.options.*`, `enabled`, `excludeFromScore`,
-etc.), and any catalogued false-positive shapes with mitigations. Pass
-`--format=json` for the same payload in structured form. A typo prints up
-to three near-match suggestions and exits with code 2.
+Run `vendor/bin/gruff-php list-rules <rule-id>` for a single rule's detail view,
+including its description, default options with one-line explanations, config
+escape hatches (`rules.<id>.options.*`, `enabled`, `excludeFromScore`), and any
+catalogued false-positive shapes with mitigations. Pass `--format=json` for the
+structured payload. An unknown rule ID prints up to three close matches and
+exits with code `2`.
 
-
-
-This rule catalogue is generated from `php bin/gruff-php list-rules --format json`.
-Use that command for the full machine-readable metadata, including thresholds and options.
+This catalogue matches `php bin/gruff-php list-rules --format json`. Use that
+command for complete machine-readable metadata, including thresholds and
+options.
 
 Total rules: 83
 
@@ -30,25 +29,20 @@ single place this text is written.
 ## Remediation action metadata
 
 Selected findings carry a machine-readable `metadata.remediationAction`. The
-action classification itself does not change severity, score, or exit-code
-behaviour:
+action classification does not change severity, score, or exit codes:
 
 - `APPLY` marks a direct source fix.
 - `CONSIDER` marks optional or compatibility-sensitive advice that needs human
   judgement.
-- `CONFIGURE` is reserved for a deterministic configuration-only resolution;
-  no current rule emits it.
+- `CONFIGURE` is reserved for a configuration-only resolution; no current rule
+  emits it.
 
-When a deliberate configuration hatch exists, `metadata.configurationKey`
-contains its full path. Regex comments and missing constant documentation emit
-`APPLY`; one-line wrappers, abbreviation and named-argument findings emit
-`CONSIDER`; Boolean naming emits `APPLY` for private property and private
-callable names, while every parameter and other caller-visible declaration
-emits `CONSIDER`. PHP named arguments make parameter-only renames
-compatibility-sensitive even for private methods, promoted private state,
-closures, and arrow functions.
-JSON, hook, and SARIF transport these fields. Text and Markdown keep their
-existing finding presentation in 0.5.2.
+When a deliberate configuration hatch exists, `metadata.configurationKey` holds
+its full path. `docs.missing-constant-phpdoc` and `docs.regex-comment` emit
+`APPLY` (with `rules.docs.regex-comment.options.functionNames` as the regex
+configuration key); `naming.abbreviation-allowlist` emits `CONSIDER` with
+`allowlists.acceptedAbbreviations`. JSON, hook, and SARIF carry these fields;
+text and Markdown omit them.
 
 ## Confidence evidence
 
@@ -103,7 +97,7 @@ A rule's confidence follows its measured precision: high at an error-adjusted sc
 | `security` | 18 |
 | `sensitive-data` | 7 |
 | `size` | 6 |
-| `test-quality` | 19 |
+| `test-quality` | 18 |
 
 ## Rule Catalogue
 
@@ -115,6 +109,24 @@ A rule's confidence follows its measured precision: high at an error-adjusted sc
 | `complexity.cyclomatic` | Cyclomatic complexity | `warning` | `medium` | yes |
 | `complexity.halstead-volume` | Halstead volume | `advisory` | `medium` | no |
 | `complexity.nesting-depth` | Maximum nesting depth | `error` | `high` | yes |
+
+`complexity.cyclomatic` and `complexity.cognitive` keep their raw metric values
+in metadata, while flat validation flows made of top-level early-exit guard
+clauses (`return`, `throw`, or `exit`) soften to advisory severity when they
+cross the threshold. Nested decision trees, loops, switch/match sprawl,
+try/catch control flow, and mixed-responsibility methods keep their configured
+warning/error severity at 1.5x the limit or above; below 1.5x, cyclomatic,
+cognitive, and nesting-depth findings report as lower-band advisory notices (see
+**Two bands** under `size`). Upper-band complexity advice asks for a simpler
+execution path rather than extracting helper methods.
+
+- `complexity.cyclomatic` counts each `switch` and `match` as one decision,
+  regardless of case or arm count.
+- `complexity.cognitive` adds no nesting penalty for an early-exit guard (an
+  `if` with no `elseif`/`else` whose body is a single `return`, `continue`,
+  `break`, or `throw`) and scores `switch` case bodies at the switch's level.
+- `complexity.halstead-volume` is off by default since 0.6.0; enable it with
+  `rules.complexity.halstead-volume.enabled: true`.
 
 ### `dead-code` (6)
 
@@ -218,34 +230,12 @@ run. The default is false, so a docblock is required.
 | --- | --- | --- | --- | --- |
 | `complexity.maintainability-index` | Maintainability index | `advisory` | `low` | no |
 
-An exact same-class named callback is also a contract boundary. The rule
-recognises PHP first-class callable syntax and two-element callable arrays whose
-receiver resolves to `$this`, `self::class`, `static::class`, `__CLASS__`, or
-the fully resolved declaring class. Resolution uses declaring class plus a
-case-insensitive method name. Foreign, unresolved, computed, string, and
-child-class-name references to a parent declaration remain conservative and
-still need `allowedSymbols` when framework wiring makes them intentional.
-
-`complexity.cyclomatic` and `complexity.cognitive` keep their raw metric
-values in metadata, but flat validation flows made of top-level guard
-clauses that each exit early (return, throw, or exit) are reported at
-advisory severity when they cross the configured threshold. Nested
-decision trees, loops, switch/match
-sprawl, try/catch control flow, and mixed-responsibility methods keep the
-configured warning/error severity at one and a half times the limit or more;
-below that a cyclomatic, cognitive or nesting-depth finding is a lower-band advisory notice (see
-"Two bands" under `size`). Upper-band complexity advice asks for a simpler
-execution path, not extracted helpers.
-
-`complexity.cyclomatic` reports each `switch` and each `match` as one decision,
-however many cases or arm conditions it has; the maintainability index keeps
-the full count. `complexity.maintainability-index` is off by default; when
-enabled, it reports nothing in a file of the family's test-path class: a `test`, `tests`, `__tests__`, `spec`,
-`testdata`, `fixtures` or `examples` folder, or a `*Test.php` file.
-`complexity.halstead-volume` is off by default since 0.6.0. `complexity.cognitive` scores an early-exit guard (an `if` with
-no `elseif` or `else` whose body is one `return`, `continue`, `break` or
-`throw`) without its nesting penalty, and scores `switch` case bodies at the
-switch's own level.
+`complexity.maintainability-index` is off by default since 0.6.0 (right on 8 of
+14 judged findings on unseen code). Unlike `complexity.cyclomatic`, it keeps the
+full cyclomatic branch count. When enabled (`rules.complexity.maintainability-index.enabled: true`),
+it skips test, fixture, and example files (directories named `test`, `tests`,
+`__tests__`, `spec`, `testdata`, `fixtures`, or `examples`, and `*Test.php`
+files).
 
 ### `modernisation` (2)
 
@@ -277,48 +267,27 @@ is a deliberate lifecycle or integration contract.
 | `naming.short-variable` | Short variable name | `advisory` | `high` | yes |
 | `naming.test-naming-consistency` | Test method naming consistency | `advisory` | `high` | yes |
 
-`naming.abbreviation-allowlist` keeps short lowercase names as findings until
-the project accepts them through `allowlists.acceptedAbbreviations`. Universal
-programming/time vocabulary includes `dto` and `utc`; a domain term such as
-`dob` is not added automatically, while four-character `uuid` lies outside the
-default two-to-three-character band. Retain a domain advisory and either rename
-it or document the project vocabulary. These
-findings carry `CONSIDER` plus the full configuration key.
-
-The state options use tokenizer-defined whole words, never raw substrings.
-`stateAdjectiveAllowlist` applies exact whole-name matching only to typed
-properties and parameters; its shipped values are single-token adjectives and
-now include `resolved`, `limited`, and `printable`. `stateSuffixAllowlist`
-defaults to `requested`, `present`, `enabled`, and `allowed`, and
-accepts them only as the final token of a name with at least two tokens across
-methods, functions, parameters, promoted properties, and declared properties.
-`propositionVerbAllowlist` defaults to `requires` and accepts a subject-first
-name only when the verb has at least one token on each side, such as
-`assistantIntentRequiresContext()`.
-
-`acceptedBooleanNames` defaults to an empty list and matches exact whole names
-case-insensitively. It is the non-breaking hatch for an intentional public
-contract. Single-token Boolean callables such as `valid()`, `available()`,
-`resolved()`, and `printable()` still report by default, as do vague names such
-as `$data`, `$result`, `$mode`, and `status()`.
-
-`includePublicApi` defaults to `true`. Setting it to `false` limits this rule to
-private methods/properties and closure/arrow-local parameters, skipping named
-functions, public/protected declarations, and their caller-visible parameters.
-Retained parameter findings still carry `CONSIDER`: named arguments can target
-private methods from inside their class and can target closures or arrow
-functions through callable variables. Public constructor parameters likewise
-remain API even when they promote private state.
+`naming.abbreviation-allowlist` keeps short lowercase abbreviations as findings
+until the project accepts them through `allowlists.acceptedAbbreviations`.
+Common two- and three-letter English words (such as `fee`, `row`, `tax`, `day`,
+`end`, `map`, `sum`, `tag`, `zip`) and universal technical terms (such as `api`,
+`csv`, `env`, `ids`, `jwt`, `pdf`, `sql`, `xml`) stay quiet out of the box and
+remain disjoint from the sixteen-word `init` seed so replace-not-merge
+configuration stays observable. Domain and architectural abbreviations such as
+`dob`, `dto`, and `utc` still report until added to
+`allowlists.acceptedAbbreviations`, while four-character `uuid` lies outside the
+default two-to-three-character band. These findings carry `CONSIDER` plus the
+full configuration key.
 
 `naming.identifier-quality` applies its `loopBodyThreshold` escape hatch
-to inline iteration callbacks as well as foreach loops: the sole
+to inline iteration callbacks as well as `foreach` loops: the sole
 parameter of a closure or arrow function passed directly to an
 array-iteration callable (`array_filter`, `array_map`, `array_walk`,
 `usort`, `uasort`, `array_reduce`, `array_any`, `array_all`,
-`array_find`) is treated as a loop variable, so a generic name like
+`array_find`) is treated as a loop variable, so a short name like
 `$item` stays quiet while the callback body is below the threshold.
 Longer callback bodies and generic parameters on non-iteration closures
-still fire.
+still report.
 
 ### `security` (18)
 
@@ -343,18 +312,17 @@ still fire.
 | `security.unsafe-unserialize` | Unsafe unserialize usage | `warning` | `medium` | no |
 | `security.unsafe-xml-loading` | Unsafe XML loading | `warning` | `medium` | yes |
 
-`security.dangerous-function-call`, `security.disabled-ssl-verification`, `security.sql-concatenation` and `security.unsafe-unserialize`
-are off by default since 0.6.0 (ADR-034): the latest precision measurement judged them right on 3 of 6, 1 of 1 (the rest unresolved),
-4 of 11 and 2 of 8 findings, too few to establish their floor. Set `rules.<id>.enabled: true` to run one.
+Nine security rules are off by default since 0.6.0 (ADR-034) because precision
+measurements either left too few findings to establish a floor or fell short of
+the 0.80 floor. Enable any of them with `rules.<id>.enabled: true`:
 
-`security.debug-mode-enabled`, `security.header-injection` and `security.silent-catch` are off by default since 0.6.0 (ADR-034).
-The repairs below leave the first two with 3 and 9 findings across the precision corpus, fewer than the ten a precision floor needs.
-`security.silent-catch` was judged right on 13 of 25 findings after its repair, below its 0.80 floor.
-Set `rules.<id>.enabled: true` to run one.
-
-`security.dependency-composer-path` and `security.dependency-composer-vcs` are off by default since 0.6.0 (ADR-034).
-In the 0.6.0 precision measurement both of the path rule's judged findings were wrong, and both of the VCS rule's were correct but not worth acting on.
-Two findings each are too few to delete a rule on. Set `rules.<id>.enabled: true` to run one.
+- Too few judged findings to establish a floor: `security.dangerous-function-call`
+  (3/6), `security.disabled-ssl-verification` (1/1, rest unresolved),
+  `security.sql-concatenation` (4/11), `security.unsafe-unserialize` (2/8),
+  `security.dependency-composer-path` (0/2), `security.dependency-composer-vcs`
+  (0/2 actionable), `security.debug-mode-enabled` (3 remaining after repair),
+  and `security.header-injection` (9 remaining after repair).
+- Below the 0.80 floor after repair: `security.silent-catch` (13/25).
 
 `security.sql-concatenation` no longer flags identifier-only
 interpolation through property fetches on receivers named in
@@ -411,54 +379,39 @@ A reason needs a word such as `if`, `because`, `must`, `cannot` or `fall back` p
 `// Catch exceptions and remain silent.`, a TODO and commented-out code still report. A later read is the first use of the caught
 variable after the try, such as `if ($error !== null) { log($error); }`; a new binding, `unset()` or `isset()` first still reports.
 
-`security.dangerous-function-call` trusts a dynamic call only through a
-proof PHP itself accepts: a closure, arrow function, `new` object of a
-written class, or first-class callable of a written method other than
-reflection's `invoke(...)`, or of one of PHP's own functions that takes no
-callable (`strlen(...)`, never `array_map(...)`, `call_user_func(...)`, or a
-userland function whose body this file cannot see), assigned to the
-variable; a
-`callable` or `Closure` type hint, or a `@param` or inline `@var` docblock
-naming one (`callable-string` names a function, so it proves nothing); an
-enclosing `instanceof` or one-argument `is_callable()` test; a property
-its class types as callable; or an immediately invoked closure. A proof
-holds only in the function that makes it, plus arrow functions that do not
-shadow the name and the closures that `use` it. No proof outranks request
-input: a callee that reads a superglobal, directly or through a local the
-same function filled from one, always reports, unless that local was last
-bound to a closure literal.
-`Closure::fromCallable($x)()` is judged as `$x()`, and `$f(...)` only builds a
-Closure, so it never reports.
+`security.dangerous-function-call` trusts a dynamic call only when PHP syntax or
+local flow proves the callee is a safe callable:
 
-A local whose only write is one plain string literal, assigned before the
-call on the same branch, is judged as a direct call to the function it
-names: `$f = 'strtoupper'; $f($s)` stays quiet and `$f = 'system'; $f($c)`
-reports as `system`. A by-reference closure capture, or an `extract()`,
-one-argument `parse_str()`, `eval`, `include` or `goto` in the function,
-leaves the call dynamic. A loop over a local assigned once, before the
-loop, from an array whose every item is a closure or arrow function also
-keeps a call to the loop value quiet, in a named function or method. A
-built-in execution call (`exec`, `passthru`, `popen`, `proc_open`,
-`shell_exec`, `system`) whose command is one plain string literal no longer
-reports; any other command, and every `options.additionalFunctions` name,
-still does.
-When `security.process-command-construction` also reports the same
-exec-family call, the call reports once, under that rule, and the merge is
-counted as a `duplicate` row in `suppressions` (FAMILY-CONTRACT.md section 13c).
-
-Bounded local aliases now preserve callable evidence through ordinary assignments and resolved built-in `Closure::bind()` calls.
-New alias facts stop at ambiguous branches, reassignment, borrowed references, unknown receivers, runtime-created locals or eight alias steps.
-Both sides of a coalescing expression must qualify. Earlier declaration-based trust retains its existing behavior and is not flow-sensitive.
-
-Callbacks returned by one visible same-class method stay quiet when a non-public property starts empty.
-Every observed write must append an untouched typed callback.
-The method may return one keyed bucket with an empty fallback, or merge selected buckets into an empty result with PHP's `array_merge()`.
-The call must bind every argument by position, and the loop must use one unchanged result.
-Unknown returns, property writes and references keep the warning.
-
-`security.dangerous-function-call` adds `options.additionalFunctions` to
-its built-in execution list rather than replacing it, so the built-ins
-cannot be configured away. Matching is case-insensitive.
+- **Proved callables:** a closure, arrow function, `new` object of a written
+  class, first-class callable of a written method (other than reflection's
+  `invoke(...)`) or of a PHP built-in that accepts no callable (`strlen(...)`,
+  never `array_map(...)`, `call_user_func(...)`, or an opaque userland function),
+  a `callable` or `Closure` type hint or `@param`/`@var` docblock (`callable-string`
+  proves nothing), an enclosing `instanceof` or one-argument `is_callable()` check,
+  a callable-typed class property, or an immediately invoked closure.
+- **Scope and taint:** proofs hold only inside the declaring function (plus
+  non-shadowing arrow functions and closures that `use` the variable). Request
+  input overrides every proof: a callee filled from a superglobal always reports
+  unless last bound to a closure literal. `Closure::fromCallable($x)()` is
+  judged as `$x()`, and `$f(...)` builds a `Closure` without calling it.
+- **Literals, aliases, and callback buckets:** a local written once with one
+  plain string literal on the same branch is judged as a direct call to that
+  function (`$f = 'strtoupper'; $f($s)` stays quiet; `$f = 'system'; $f($c)`
+  reports as `system`), unless by-reference capture, `extract()`, one-argument
+  `parse_str()`, `eval`, `include`, or `goto` appears in the function. Loops over
+  a local array of closure literals, bounded local aliases (up to eight steps and
+  resolved `Closure::bind()`, stopping at ambiguous branches, reassignment,
+  borrowed references, unknown receivers, or coalescing with an unproved branch),
+  and callbacks returned from one visible same-class method reading an initially
+  empty non-public typed-callback property (keyed lookup with empty fallback or
+  `array_merge()` with positional arguments) stay quiet.
+- **Execution calls and configuration:** built-in execution functions (`exec`,
+  `passthru`, `popen`, `proc_open`, `shell_exec`, `system`) with one plain string
+  literal command stay quiet; any dynamic command and every name in
+  `options.additionalFunctions` (appended case-insensitively to the built-in
+  list, never replacing it) still report. When `security.process-command-construction`
+  reports the same `exec`-family call, it reports once under that rule and logs a
+  `duplicate` row in `suppressions` (FAMILY-CONTRACT.md section 13c).
 
 Security rules that read an argument from a global function resolve it by
 the parameter name PHP declares, so `header(header: $target)` is analysed
@@ -572,7 +525,8 @@ External helpers, unresolved receivers and cycles without a recognized check sti
 
 `test-quality.no-assertions` also accepts Symfony user-deprecation message expectations, registered Prophecy terminal expectations and a local receiver created by `Illuminate\Testing\Fluent\AssertableJson::fromArray` with `where` or `whereContains`. Unused callbacks, first-class callable references, foreign builders and rebound receivers do not establish that fluent expectation.
 
-PHPUnit `createStub()` supplies values and does not count as a mock.
+In `test-quality.mocking-domain-object`, PHPUnit `createStub()` supplies values
+and does not count as a mock.
 
 `test-quality.loop-assertion-without-message` accepts a literal singleton, a direct assertion followed by an exit, or an expected value that identifies the loop binding. In a keyed table the key identifies the row; its value alone may repeat.
 

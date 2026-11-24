@@ -6,6 +6,7 @@ namespace GruffPhp\Cli\Command;
 
 use GruffPhp\Engine\Analysis\AnalysisReport;
 use GruffPhp\Engine\Analysis\RunDiagnostic;
+use GruffPhp\Engine\Config\AnalysisConfig;
 use GruffPhp\Results\Baseline\BaselineApplication;
 use GruffPhp\Results\Baseline\BaselineReport;
 use GruffPhp\Results\Baseline\BaselineStore;
@@ -37,6 +38,7 @@ use GruffPhp\Output\Reporter\TextReporter;
 use GruffPhp\Output\Reporter\ThresholdTrip;
 use GruffPhp\Results\Review\BranchReviewResult;
 use GruffPhp\Rules\Contracts\RuleContext;
+use GruffPhp\Rules\RuleRegistry;
 use GruffPhp\Results\Scoring\ScoreCalculator;
 use GruffPhp\Results\Scoring\ScoreReport;
 use GruffPhp\Results\Trend\TrendRecorder;
@@ -282,7 +284,7 @@ final class AnalyseCommand extends Command
 
         $scoreStart     = hrtime(true);
         $evaluatedFiles = $sources->evaluatedFileCount();
-        $score          = (new ScoreCalculator())->calculate($findings, $evaluatedFiles, $mutationAnalysis, $diff, scorePillars: $options->profileScorePillars(), analysisConfig: $config);
+        $score          = (new ScoreCalculator())->calculate($findings, $evaluatedFiles, $mutationAnalysis, $diff, scorePillars: $this->scorePillarsForRun($registry, $config, $options, $mutationAnalysis), analysisConfig: $config);
         $scoreNs        = hrtime(true) - $scoreStart;
         // Without --diff-vs, review covers the whole run.
         // With a base ref, mutation findings are excluded so the branch verdict reflects only comparable rules.
@@ -290,10 +292,8 @@ final class AnalyseCommand extends Command
                                                                                    $findings,
                                                                                    static fn(Finding $finding): bool => $finding->pillar !== Pillar::Mutation,
                                                                                ));
-        $reviewScore = $options->changeScope->diffVs === null
-            ? $score->composite?->score
-            : (new ScoreCalculator())->calculate($reviewFindings, $evaluatedFiles, null, null, scorePillars: $options->profileScorePillars(), analysisConfig: $config)->composite?->score;
-        $review = $branchReviewBuilder->build(
+        $reviewScore = $this->reviewCompositeScore($options, $score, $reviewFindings, $evaluatedFiles, $registry, $config);
+        $review      = $branchReviewBuilder->build(
             projectRoot:     $projectRoot,
             options:         $options,
             config:          $config,
@@ -1124,5 +1124,60 @@ final class AnalyseCommand extends Command
         }
 
         return $this->recordTrend($projectRoot, $options, $score, $findingCount, $diagnostics);
+    }
+
+    /**
+     * Resolves the scored pillars for the active run, appending Mutation when an Infection report ran under the default profile.
+     *
+     * @param RuleRegistry                $registry         - Rule registry providing enabled static pillars.
+     * @param AnalysisConfig              $config           - Effective analysis config governing enabled rules.
+     * @param AnalyseCommandOptions       $options          - CLI options providing the active profile restriction.
+     * @param MutationAnalysisResult|null $mutationAnalysis - Parsed Infection mutation result, or null when not supplied.
+     *
+     * @return list<Pillar> - Pillars scored for the run, including Mutation when applicable.
+     */
+    private function scorePillarsForRun(
+        RuleRegistry $registry,
+        AnalysisConfig $config,
+        AnalyseCommandOptions $options,
+        ?MutationAnalysisResult $mutationAnalysis,
+    ): array {
+        $staticPillars = $registry->enabledStaticPillars($config, $options->profileScorePillars());
+
+        // Security-profile runs score only security pillars even if an Infection report was passed.
+        if ($mutationAnalysis instanceof MutationAnalysisResult && $options->profileScorePillars() === null) {
+            return [...$staticPillars, Pillar::Mutation];
+        }
+
+        return $staticPillars;
+    }
+
+    /**
+     * Computes the composite score passed to branch-review comparison, excluding mutation findings when comparing against a base ref.
+     *
+     * @param AnalyseCommandOptions $options        - CLI options selecting diff-vs mode and active profile.
+     * @param ScoreReport           $score          - Primary score report reused when diff-vs is inactive.
+     * @param list<Finding>         $reviewFindings - Current-tree findings with mutation findings removed under diff-vs.
+     * @param int                   $evaluatedFiles - Evaluated PHP file count used as the score denominator.
+     * @param RuleRegistry          $registry       - Rule registry providing enabled static pillars.
+     * @param AnalysisConfig        $config         - Effective analysis config governing enabled rules and score exclusions.
+     *
+     * @return float|null - Comparable composite score, or null when no pillar produced a grade.
+     */
+    private function reviewCompositeScore(
+        AnalyseCommandOptions $options,
+        ScoreReport $score,
+        array $reviewFindings,
+        int $evaluatedFiles,
+        RuleRegistry $registry,
+        AnalysisConfig $config,
+    ): ?float {
+        if ($options->changeScope->diffVs === null) {
+            return $score->composite?->score;
+        }
+
+        $staticPillars = $registry->enabledStaticPillars($config, $options->profileScorePillars());
+
+        return (new ScoreCalculator())->calculate($reviewFindings, $evaluatedFiles, null, null, scorePillars: $staticPillars, analysisConfig: $config)->composite?->score;
     }
 }

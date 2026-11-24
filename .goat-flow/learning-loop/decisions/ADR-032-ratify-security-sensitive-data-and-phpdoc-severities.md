@@ -1,10 +1,10 @@
 # ADR-032: Ratify security, sensitive-data, and missing-PHPDoc severities
 
-**Status:** Proposed
+**Status:** Accepted (reconciled with FAMILY-CONTRACT.md section 12 M06)
 **Date:** 2026-08-11
-**Updated:** 2026-10-03 (baseline-identity note reconciled with ADR-033)
-**Target:** Family ratification for 0.5.2; any runtime change belongs in a future minor release
-**Readiness:** Ready for an operator decision on the constrained deferral proposed here
+**Updated:** 2026-11-24 (reconciled with FAMILY-CONTRACT.md section 12 M06 and 0.6.0 release policy)
+**Target:** Family ratification for 0.5.2; reconciled for 0.6.0 under FAMILY-CONTRACT.md section 12 M06
+**Readiness:** Reconciled; see Reconciliation (2026-11-24) below
 **Relates to:** [ADR-017 mission](ADR-017-mission-govern-ai-generated-code.md), [ADR-022 test-quality gate parity](ADR-022-test-quality-gate-parity.md), [ADR-029 baseline matching](ADR-029-baseline-v2-group-count-matching.md)
 
 ## Context
@@ -30,6 +30,14 @@ This proposal asks the operator to ratify a constrained deferral:
 The operator decision is whether to ratify this deferral and its evidence gates. Ratification does not authorize a severity edit. A later package may propose exact promotions or a PHPDoc demotion after it closes the evidence gaps above.
 
 Ratification belongs in the family contract. A port-local ADR may carry the evidence and recommendation, but it cannot authorize the family policy.
+
+## Reconciliation (2026-11-24)
+
+The family severity fork recorded here was dispositioned in `<workspace>/FAMILY-CONTRACT.md` section 12 by M06 (2026-09-03) and landed across all ports in 0.6.0 (M10, 2026-09-25):
+
+- **`sensitive-data.*` unified at `warning` family-wide:** Go, Python, Rust, and TypeScript moved their error defaults to `warning` to match PHP. Projects wanting an error gate on a specific rule can override `severity: error` in config.
+- **`security.*` tier alignment deferred to 0.7.0:** Port-specific security severities (including PHP's uniform `warning` tier) stay in place until the section 14 rule-lifecycle review.
+- **`docs.missing-phpdoc` (formerly `docs.missing-public-phpdoc`) stays at `error`:** Confirmed by the operator on 2026-11-24 for 0.6.0 across both production and test files, with no test-file exemption.
 
 ## Measurement method and provenance
 

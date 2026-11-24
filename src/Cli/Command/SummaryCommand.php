@@ -124,7 +124,7 @@ final class SummaryCommand extends Command
         }
 
         $registry     = RuleRegistry::defaults();
-        $configLoader = new ConfigLoader($projectRoot, ConfigLoader::packageRoot(), shouldResolveFromLaunchDir: true);
+        $configLoader = new ConfigLoader($projectRoot, shouldResolveFromLaunchDir: true);
         $config       = $this->analysisConfig(
             noConfig:               $noConfig,
             configPath:             $configPath,
@@ -384,7 +384,8 @@ final class SummaryCommand extends Command
         $exclusionResult = (new SensitiveExclusionFilter())->apply($findings, $config->sensitiveExclusions(), InlineSuppressionFilter::forFiles($sources->discovery->files));
         $findings        = $exclusionResult->findings;
 
-        $score           = (new ScoreCalculator())->calculate($findings, $sources->evaluatedFileCount(), null, DiffResult::inactive(), $topLimit, analysisConfig: $config);
+        $scorePillars    = $registry->enabledStaticPillars($config);
+        $score           = (new ScoreCalculator())->calculate($findings, $sources->evaluatedFileCount(), null, DiffResult::inactive(), $topLimit, scorePillars: $scorePillars, analysisConfig: $config);
         $filesDiscovered = count($sources->discovery->files);
         $analysisReport  = new AnalysisReport(
             toolVersion:         Application::VERSION,

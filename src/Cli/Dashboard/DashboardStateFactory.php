@@ -197,7 +197,7 @@ final class DashboardStateFactory
         }
 
         try {
-            $config = (new ConfigLoader($projectRoot, ConfigLoader::packageRoot()))
+            $config = (new ConfigLoader($projectRoot))
                 ->load($this->optionalStringOption($input, 'config'), RuleRegistry::defaults());
         } catch (ConfigException) {
             // Invalid config must not block the form; return null so the caller can use its default threshold.

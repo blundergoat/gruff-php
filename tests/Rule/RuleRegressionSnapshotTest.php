@@ -118,7 +118,9 @@ final class RuleRegressionSnapshotTest extends TestCase
 
         // Precision-floor M09 (2026-11-22): default scans no longer run test-quality.setup-bloat, and
         // complexity.maintainability-index is off by default.
-        self::assertCount(1974, $findings);
+        // 0.6.0 M01 (2026-11-24): naming.abbreviation-allowlist exempts common 2-3 letter English words and universal
+        // technical terms (27 fixture hits such as $sum, $row, $out, $zip, $tag, $map, $ok, $one, $two, $ids, $ssl, $xml, $api).
+        self::assertCount(1947, $findings);
 
 
 
@@ -130,7 +132,7 @@ final class RuleRegressionSnapshotTest extends TestCase
 
 
         self::assertSame(
-            '70302b562728d02cffe46552e6c404785a89a4d02d47d992b846b9bffbec763d',
+            '5584bf85948a6df51c074d38a3816efef6523deb70b77f92de23bba5be2b95fa',
             hash('sha256', $json),
         );
     }

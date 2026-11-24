@@ -38,6 +38,27 @@ final readonly class ScoreCalculator
     ];
 
     /**
+     * Returns the built-in static-analysis pillars in canonical report order.
+     *
+     * @return list<Pillar> - Static pillar enum cases matching STATIC_PILLARS order.
+     */
+    public static function staticPillarOrder(): array
+    {
+        return [
+            Pillar::Size,
+            Pillar::Complexity,
+            Pillar::Maintainability,
+            Pillar::DeadCode,
+            Pillar::Naming,
+            Pillar::Documentation,
+            Pillar::Modernisation,
+            Pillar::Security,
+            Pillar::SensitiveData,
+            Pillar::TestQuality,
+        ];
+    }
+
+    /**
      * Floor for static density grades; one static pillar can lower an N-pillar composite by at most (100 - floor) / N points.
      * Together with DENSITY_SCALE, this belongs to the family-ratified bounded-normalized-density-floored curve.
      * Changing either value requires a family decision.

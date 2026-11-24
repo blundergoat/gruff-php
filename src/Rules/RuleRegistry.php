@@ -6,6 +6,8 @@ namespace GruffPhp\Rules;
 
 use GruffPhp\Engine\Config\AnalysisConfig;
 use GruffPhp\Results\Finding\Finding;
+use GruffPhp\Results\Finding\Pillar;
+use GruffPhp\Results\Scoring\ScoreCalculator;
 use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Rules\Contracts\ProjectRuleInterface;
 use GruffPhp\Rules\Contracts\RuleContext;
@@ -362,6 +364,61 @@ final class RuleRegistry
     public function enabledRules(AnalysisConfig $config): array
     {
         return $this->enabledRulesByConfig[$config] ??= $this->filterEnabledRules($config);
+    }
+
+    /**
+     * Returns the static pillars reachable by at least one enabled rule under the effective config.
+     * Preserves profile pillar order when a profile narrows scoring, or canonical static order otherwise.
+     *
+     * @param AnalysisConfig    $config         - Config governing enabled rules and rule selection.
+     * @param list<Pillar>|null $profilePillars - Optional profile pillar restriction; null keeps every enabled static pillar.
+     *
+     * @return list<Pillar> - Reachable static pillars in score order; empty when no static rule is enabled.
+     */
+    public function enabledStaticPillars(AnalysisConfig $config, ?array $profilePillars = null): array
+    {
+        $enabledByValue = [];
+
+        // Mark each static pillar that at least one enabled rule can emit findings into.
+        foreach ($this->enabledRules($config) as $rule) {
+            $pillar = $rule->definition()->pillar;
+
+            if ($pillar === Pillar::Mutation) {
+                continue;
+            }
+
+            $enabledByValue[$pillar->value] = $pillar;
+        }
+
+        // Preserve profile ordering when a profile narrows the scored pillar set (for example, --profile=security).
+        if ($profilePillars !== null) {
+            $matched = [];
+
+            foreach ($profilePillars as $pillar) {
+                if (isset($enabledByValue[$pillar->value])) {
+                    $matched[] = $pillar;
+                }
+            }
+
+            return $matched;
+        }
+
+        $ordered = [];
+
+        foreach (ScoreCalculator::staticPillarOrder() as $pillar) {
+            if (isset($enabledByValue[$pillar->value])) {
+                $ordered[] = $pillar;
+            }
+        }
+
+        // Retain any enabled pillar outside the built-in static list (for example, a custom rule pillar).
+        foreach ($enabledByValue as $pillar) {
+            if (!in_array($pillar, $ordered, true)) {
+                $ordered[] = $pillar;
+            }
+        }
+
+        return $ordered;
     }
 
     /**

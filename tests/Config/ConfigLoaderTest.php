@@ -533,7 +533,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
             ],
             'minimumSeverity refuses the pre-0.6.0 gate map' => [
                 '{"minimumSeverity":{"analyse":"error"}}',
-                'move the per-command exit gate to "failOn"',
+                'Config key "minimumSeverity" is the display floor in 0.6.0 and takes one severity, not a per-command map; move the per-command exit gate to "failOn", which is the key that gates the exit code, or run "gruff-php migrate-config" to migrate your 0.5 config.',
             ],
             'minimumSeverity rejects a severity outside the ratified three' => [
                 '{"minimumSeverity":"medium"}',

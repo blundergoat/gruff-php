@@ -876,7 +876,7 @@ final readonly class ConfigLoader
         if (is_array($configuredFloor)) {
             throw new ConfigException(
                 'Config key "minimumSeverity" is the display floor in 0.6.0 and takes one severity, not a per-command map; '
-                . 'move the per-command exit gate to "failOn", which is the key that gates the exit code.',
+                . 'move the per-command exit gate to "failOn", which is the key that gates the exit code, or run "gruff-php migrate-config" to migrate your 0.5 config.',
             );
         }
 

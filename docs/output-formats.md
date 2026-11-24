@@ -11,9 +11,8 @@ Use `text` for local terminal scans:
 vendor/bin/gruff-php analyse src --format text --fail-on warning
 ```
 
-Text keeps the established finding block in 0.5.2. Machine-readable
-`remediationAction` and `configurationKey` metadata is not added to this
-presentation.
+Text output omits machine-readable `remediationAction` and `configurationKey`
+metadata.
 
 ## JSON
 
@@ -115,27 +114,29 @@ because every security rule, and every sensitive-data rule except
 `builtInTestPath[<path>]`. The lockfile skip was removed in 0.6.0 with the
 entropy rule it served (ADR-034).
 
-Another tool's suppression comment that names the same check as a gruff-php
-rule suppresses that finding where it was written (FAMILY-CONTRACT.md section
-13c): phpcs `WordPress.PHP.NoSilencedErrors` for `security.error-suppression`,
-phpcs `WordPress.DB.PreparedSQL` for `security.sql-concatenation`, psalm
-`ForbiddenCode` for `security.dangerous-function-call` and
-`security.process-command-construction`, and a `phpcs:ignore` naming no sniff
-for both phpcs rows. A sniff category or error code covers the sniff it
-contains or belongs to, so `WordPress.DB.PreparedSQL.InterpolatedNotPrepared`
-counts. The comment must be on the reported line or alone on the line above it.
-Type-checker comments such as `@phpstan-ignore` and region forms such as
-`phpcs:disable` are never honoured. An `exec`-family call that both
-`security.dangerous-function-call` and `security.process-command-construction`
-report is reported once, under `security.process-command-construction`.
+Matching inline suppression comments from other tools suppress the corresponding
+`gruff-php` finding when placed on the reported line or alone on the line above
+it (FAMILY-CONTRACT.md section 13c):
 
-Suppressed findings are counted in one row per file and rule after the built-in rows,
-numbered on from them, with `source: "inline"` and the reason "Another tool's
-suppression comment names this check, so the finding is suppressed where it was
-written." Each merge adds a row with `source: "duplicate"` and the reason
-"Another rule reports the same claim on this line, so the line reports it
-once." Text output labels them `inline[<path>]` and `duplicate[<path>]`, and
-SARIF keeps each removed finding as a result carrying
+- phpcs `WordPress.PHP.NoSilencedErrors` suppresses `security.error-suppression`.
+- phpcs `WordPress.DB.PreparedSQL` (or a narrower code such as
+  `WordPress.DB.PreparedSQL.InterpolatedNotPrepared`) suppresses
+  `security.sql-concatenation`.
+- A bare `phpcs:ignore` with no sniff name suppresses both phpcs rows above.
+- psalm `ForbiddenCode` suppresses `security.dangerous-function-call` and
+  `security.process-command-construction`.
+- Type-checker comments (`@phpstan-ignore`) and region directives
+  (`phpcs:disable`) are not honoured.
+
+When both `security.dangerous-function-call` and
+`security.process-command-construction` match the same `exec`-family call, it
+reports once under `security.process-command-construction`.
+
+Each inline suppression adds one row per file and rule after the built-in rows
+with `source: "inline"` and the reason `"Another tool's suppression comment names this check, so the finding is suppressed where it was written."`. Each
+deduplicated `exec`-family finding adds a row with `source: "duplicate"` and the
+reason `"Another rule reports the same claim on this line, so the line reports it once."`. Text output labels them `inline[<path>]` and `duplicate[<path>]`, and
+SARIF keeps each removed finding with
 `"suppressions": [{"kind": "inSource", "justification": <reason>}]`.
 
 ### Baseline, trend, and changed-region data
@@ -200,23 +201,21 @@ Use `html` for archived human review or dashboard scan output:
 vendor/bin/gruff-php report src --format html --output gruff-php.html
 ```
 
-`report` delegates to `analyse` and supports the analyse options that affect
-analysis selection, gating, baselines, cache, mutation ingestion, or rendered
-report content — including `--profile`, `--since`, `--changed-ranges`,
-`--changed-scope`, `--fail-on-new`, `--no-cache`, `--baseline-include-absent`,
-the `--infection-*` runtime options, and `--print-runtime`/`--runtime-mode`.
-With `--fail-on-new`, the report artifact is still written and the exit code
-reflects the gate, matching `analyse` semantics. Two analyse flags stay
-analyse-only by design: `--generate-baseline` (report never writes baselines)
-and `--file` (pass paths positionally instead).
+`report` delegates to `analyse` and forwards the options that affect analysis
+selection, gating, baselines, cache, mutation ingestion, or rendered output
+(including `--profile`, `--since`, `--changed-ranges`, `--changed-scope`,
+`--fail-on-new`, `--no-cache`, `--baseline-include-absent`, the `--infection-*`
+options, and `--print-runtime`/`--runtime-mode`). With `--fail-on-new`, the
+report file is still written and the exit code reflects the gate, matching
+`analyse`. Two flags stay `analyse`-only by design: `--generate-baseline`
+(`report` never writes baselines) and `--file` (pass paths positionally).
 
 ## Markdown
 
 Use `markdown` for pull request comments and release notes.
 
-Markdown keeps its established finding rows in 0.5.2 and does not render the
-new action metadata. Use JSON, hook, or SARIF when a consumer needs the
-machine-readable action distinction.
+Markdown omits machine-readable `remediationAction` and `configurationKey`
+metadata; use JSON, hook, or SARIF when a consumer needs those fields.
 
 ## GitHub
 

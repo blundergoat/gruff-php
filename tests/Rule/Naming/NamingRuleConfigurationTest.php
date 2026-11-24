@@ -144,6 +144,89 @@ PHP, AbbreviationAllowlistRule::ID);
     }
 
     /**
+     * Verify common short English words and universal tech terms stay quiet while real abbreviations still report.
+     * Also verify omitting a seeded abbreviation such as rx still causes it to report under replace-not-merge.
+     *
+     * @return void - Asserts only real undeclared abbreviations report and rx follows allowlists.acceptedAbbreviations.
+     */
+    public function testAbbreviationAllowlistExemptsPlainEnglishWordsAndUniversalTechTerms(): void
+    {
+        $source = <<<'PHP'
+<?php
+final class BillingSummary
+{
+    public function compute(
+        int $fee,
+        int $tax,
+        string $day,
+        string $end,
+        string $sex,
+        array $row,
+        array $map,
+        int $sum,
+        string $tag,
+        string $zip,
+        string $sql,
+        string $env,
+        string $jwt,
+        string $xml,
+        array $ids,
+        string $sms,
+        string $cfg,
+        string $em,
+        string $rx,
+    ): int {
+        return $fee + $tax + $sum + count($row) + count($map) + count($ids)
+            + strlen($day . $end . $sex . $tag . $zip . $sql . $env . $jwt . $xml . $sms . $cfg . $em . $rx);
+    }
+}
+PHP;
+        $registry   = RuleRegistry::defaults();
+        $iqSettings = $registry->get(IdentifierQualityRule::ID)->definition();
+        $baseConfig = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+            IdentifierQualityRule::ID,
+            new RuleSettings(false, $iqSettings->defaultThresholds, $iqSettings->defaultOptions),
+        );
+
+        $emptyConfig = $baseConfig->withAcceptedAbbreviations([]);
+        $emptyNames  = array_map(
+            static fn($finding): mixed => $finding->metadata['identifierName'] ?? null,
+            $this->analyseSourceRule($source, AbbreviationAllowlistRule::ID, 'src/BillingSummary.php', $emptyConfig),
+        );
+        sort($emptyNames);
+
+        // Plain English words and universal tech terms stay quiet even with an empty project allowlist;
+        // real abbreviations and omitted seeded terms (rx) still report.
+        self::assertSame(['cfg', 'em', 'rx'], $emptyNames);
+
+        $rxConfig = $baseConfig->withAcceptedAbbreviations(['rx']);
+        $rxNames  = array_map(
+            static fn($finding): mixed => $finding->metadata['identifierName'] ?? null,
+            $this->analyseSourceRule($source, AbbreviationAllowlistRule::ID, 'src/BillingSummary.php', $rxConfig),
+        );
+        sort($rxNames);
+
+        self::assertSame(['cfg', 'em'], $rxNames);
+    }
+
+    /**
+     * Verify built-in non-abbreviations stay disjoint from the ratified sixteen-word init seed.
+     * Any overlap would hide replace-not-merge behaviour when a project omits a seeded term.
+     *
+     * @return void - Asserts zero intersection with DEFAULT_ACCEPTED_ABBREVIATIONS and valid lowercase 2-3 char entries.
+     */
+    public function testBuiltInNonAbbreviationsStayDisjointFromRatifiedSixteenSeed(): void
+    {
+        $builtIn = AbbreviationAllowlistRule::builtInNonAbbreviations();
+
+        self::assertSame([], array_values(array_intersect(AnalysisConfig::DEFAULT_ACCEPTED_ABBREVIATIONS, $builtIn)));
+
+        foreach ($builtIn as $word) {
+            self::assertMatchesRegularExpression('/^[a-z]{2,3}$/', $word);
+        }
+    }
+
+    /**
      * Verify identifier quality takes precedence over abbreviation findings for cb and still reports strX.
      *
      * @return void - Asserts cb has identifier quality without an abbreviation finding and strX retains identifier quality.

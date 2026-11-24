@@ -540,7 +540,7 @@ final class ReportCommand extends Command
         }
 
         try {
-            $config = (new ConfigLoader($projectRoot, ConfigLoader::packageRoot(), shouldResolveFromLaunchDir: true))
+            $config = (new ConfigLoader($projectRoot, shouldResolveFromLaunchDir: true))
                 ->load($this->optionalStringOption($input, 'config'), RuleRegistry::defaults());
         } catch (ConfigException) {
             // An unreadable or malformed config is reported by the child analyse command, which owns the diagnostic.

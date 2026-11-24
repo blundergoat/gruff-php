@@ -1,14 +1,14 @@
 {
   "schemaVersion": "gruff-perf.v1",
-  "createdAt": "2026-08-22T05:40:35Z",
+  "createdAt": "2026-11-24T10:51:53Z",
   "host": {
     "platform": "linux-x86_64",
-    "uname": "Linux 6.6.87.2-microsoft-standard-WSL2 x86_64",
+    "uname": "Linux 6.18.58.1-microsoft-standard-WSL2 x86_64",
     "cpu": "Intel(R) Core(TM) Ultra 9 275HX",
-    "php": "8.3.30"
+    "php": "8.4.26"
   },
   "source": {
-    "gitCommit": "98a329c68e9e8f38a788d87316f8c0421d3143ef",
+    "gitCommit": "d7226de048e180f462f8391c63dc76d9f2b29d05",
     "gitDirty": true,
     "runtimeSource": {
       "includedPaths": [
@@ -17,15 +17,15 @@
         "composer.json",
         "composer.lock"
       ],
-      "fileCount": 283,
-      "digest": "sha256:9a91ac6028b33724fc23c173b165b2dbc5c307bcd1effff9e3a5141024d1fd28"
+      "fileCount": 258,
+      "digest": "sha256:0d6d93347c761ad04344ce7342e9ed144e5dfa08f0c41ddbe28364c5b832d84e"
     },
     "artifact": {
       "kind": "live-wrapper",
       "sha256": "sha256:a6245a7a5f9ea30a4bc5aaff35d95f345584e840e9e262cc61a195b0c9a4ce58"
     },
     "harnessSha256": "sha256:17ad61bfea3f801c16dcacc8ea61e22da2b02912cec139ff0b5a3677675d879c",
-    "toolVersion": "gruff-php 0.5.2"
+    "toolVersion": "gruff-php 0.6.0"
   },
   "runner": {
     "mode": "full",
@@ -33,146 +33,176 @@
   },
   "corpora": {
     "small": {
-      "wallMs": 84,
+      "wallMs": 43,
       "peakBytes": 16777216,
-      "filesParsed": 7,
-      "rulesExecuted": 127,
+      "filesParsed": 8,
+      "rulesExecuted": 76,
       "topRules": [
         {
           "ruleId": "dead-code.unused-private-method",
-          "totalNs": 2912196,
-          "invocations": 7
-        },
-        {
-          "ruleId": "naming.abbreviation-allowlist",
-          "totalNs": 2418075,
-          "invocations": 7
-        },
-        {
-          "ruleId": "complexity.cyclomatic",
-          "totalNs": 2246853,
-          "invocations": 7
+          "totalNs": 1055285,
+          "invocations": 8
         },
         {
           "ruleId": "complexity.cognitive",
-          "totalNs": 2084553,
-          "invocations": 7
+          "totalNs": 1047754,
+          "invocations": 8
+        },
+        {
+          "ruleId": "complexity.cyclomatic",
+          "totalNs": 1047712,
+          "invocations": 8
         },
         {
           "ruleId": "naming.identifier-quality",
-          "totalNs": 1524476,
-          "invocations": 7
+          "totalNs": 1035730,
+          "invocations": 8
         },
         {
-          "ruleId": "naming.class-file-mismatch",
-          "totalNs": 1214010,
-          "invocations": 7
+          "ruleId": "naming.abbreviation-allowlist",
+          "totalNs": 951374,
+          "invocations": 8
         },
         {
           "ruleId": "docs.missing-param-tag",
-          "totalNs": 690479,
-          "invocations": 7
+          "totalNs": 571090,
+          "invocations": 8
+        },
+        {
+          "ruleId": "security.dangerous-function-call",
+          "totalNs": 566504,
+          "invocations": 8
+        },
+        {
+          "ruleId": "size.class-length",
+          "totalNs": 517309,
+          "invocations": 8
+        },
+        {
+          "ruleId": "naming.class-file-mismatch",
+          "totalNs": 511507,
+          "invocations": 8
         },
         {
           "ruleId": "complexity.halstead-volume",
-          "totalNs": 680370,
-          "invocations": 7
+          "totalNs": 362468,
+          "invocations": 8
         }
       ]
     },
     "medium": {
-      "wallMs": 2440,
-      "peakBytes": 23068672,
-      "filesParsed": 280,
-      "rulesExecuted": 127,
+      "wallMs": 889,
+      "peakBytes": 20971520,
+      "filesParsed": 255,
+      "rulesExecuted": 76,
       "topRules": [
         {
+          "ruleId": "complexity.cyclomatic",
+          "totalNs": 69898186,
+          "invocations": 255
+        },
+        {
           "ruleId": "dead-code.unused-private-method",
-          "totalNs": 189719921,
-          "invocations": 280
+          "totalNs": 63267571,
+          "invocations": 255
         },
         {
           "ruleId": "naming.abbreviation-allowlist",
-          "totalNs": 162780261,
-          "invocations": 280
-        },
-        {
-          "ruleId": "complexity.cyclomatic",
-          "totalNs": 154122748,
-          "invocations": 280
+          "totalNs": 53230213,
+          "invocations": 255
         },
         {
           "ruleId": "complexity.cognitive",
-          "totalNs": 114242192,
-          "invocations": 280
-        },
-        {
-          "ruleId": "naming.class-file-mismatch",
-          "totalNs": 85925316,
-          "invocations": 280
+          "totalNs": 43899251,
+          "invocations": 255
         },
         {
           "ruleId": "naming.identifier-quality",
-          "totalNs": 77178714,
-          "invocations": 280
+          "totalNs": 32694708,
+          "invocations": 255
+        },
+        {
+          "ruleId": "naming.class-file-mismatch",
+          "totalNs": 27295989,
+          "invocations": 255
         },
         {
           "ruleId": "docs.var-annotation-description",
-          "totalNs": 59469718,
-          "invocations": 280
+          "totalNs": 21779040,
+          "invocations": 255
+        },
+        {
+          "ruleId": "size.class-length",
+          "totalNs": 17123598,
+          "invocations": 255
         },
         {
           "ruleId": "complexity.halstead-volume",
-          "totalNs": 46114505,
-          "invocations": 280
+          "totalNs": 17096358,
+          "invocations": 255
+        },
+        {
+          "ruleId": "dead-code.unused-private-constant",
+          "totalNs": 13787626,
+          "invocations": 255
         }
       ]
     },
     "large": {
-      "wallMs": 4733,
-      "peakBytes": 25165824,
-      "filesParsed": 433,
-      "rulesExecuted": 127,
+      "wallMs": 1673,
+      "peakBytes": 23068672,
+      "filesParsed": 429,
+      "rulesExecuted": 76,
       "topRules": [
         {
-          "ruleId": "dead-code.unused-private-method",
-          "totalNs": 343596080,
-          "invocations": 393
+          "ruleId": "complexity.cyclomatic",
+          "totalNs": 134566124,
+          "invocations": 386
         },
         {
-          "ruleId": "complexity.cyclomatic",
-          "totalNs": 303005307,
-          "invocations": 393
+          "ruleId": "dead-code.unused-private-method",
+          "totalNs": 107741841,
+          "invocations": 386
         },
         {
           "ruleId": "naming.abbreviation-allowlist",
-          "totalNs": 296234453,
-          "invocations": 393
+          "totalNs": 104926465,
+          "invocations": 386
         },
         {
           "ruleId": "complexity.cognitive",
-          "totalNs": 211016191,
-          "invocations": 393
-        },
-        {
-          "ruleId": "naming.class-file-mismatch",
-          "totalNs": 165708289,
-          "invocations": 393
+          "totalNs": 78765908,
+          "invocations": 386
         },
         {
           "ruleId": "naming.identifier-quality",
-          "totalNs": 144475188,
-          "invocations": 393
+          "totalNs": 55964837,
+          "invocations": 386
         },
         {
-          "ruleId": "complexity.halstead-volume",
-          "totalNs": 93356827,
-          "invocations": 393
+          "ruleId": "naming.class-file-mismatch",
+          "totalNs": 50306152,
+          "invocations": 386
+        },
+        {
+          "ruleId": "test-quality.repeated-structure-missing-data-provider",
+          "totalNs": 34083385,
+          "invocations": 386
         },
         {
           "ruleId": "docs.var-annotation-description",
-          "totalNs": 84988712,
-          "invocations": 393
+          "totalNs": 33272819,
+          "invocations": 386
+        },
+        {
+          "ruleId": "complexity.halstead-volume",
+          "totalNs": 32170981,
+          "invocations": 386
+        },
+        {
+          "ruleId": "size.class-length",
+          "totalNs": 28741639,
+          "invocations": 386
         }
       ]
     }

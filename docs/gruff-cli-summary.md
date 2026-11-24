@@ -15,7 +15,7 @@ Use it when:
 php bin/gruff-php summary [paths...] [options]
 ```
 
-`paths` defaults to whatever you pass; if empty, the analyser discovers from the project root just like `analyse`.
+Pass paths to narrow the scan, or omit them to discover files from the project root just like `analyse`.
 
 ### Options
 
@@ -37,44 +37,44 @@ php bin/gruff-php summary tests/Fixtures/Source/mixed --no-config --top=3
 
 ```
 gruff-php 0.6.0 summary
-Composite: B (86.22 / 100)
-Findings: 23 total · 0 error · 6 warning · 17 advisory
+Composite: B (89.36 / 100)
+Findings: 16 total · 0 error · 5 warning · 11 advisory
 
 Paths     tests/Fixtures/Source/mixed
 Config    (none)
-Files     7 discovered, 7 parsed, 0 ignored, 0 missing, 0 parse errors
+Files     6 discovered, 6 parsed, 1 ignored, 0 missing, 0 parse errors
 Scope     full-project
 Score note Each pillar scores on the density of its weighted findings per evaluated file, on a curve from 50 to 100, so a larger project is not penalised for its size; correlated size and complexity findings on one symbol share a single weight; the composite is the average of applicable pillar scores. Mutation is omitted when no Infection report is supplied.
 
 Pillars
-  documentation   F  52.70 findings=12    advisory=12    warning=0     error=0
-  naming          F  51.18 findings=7     advisory=1     warning=6     error=0
-  dead-code       F  58.33 findings=4     advisory=4     warning=0     error=0
+  documentation  F  52.70 findings=10    advisory=10    warning=0     error=0
+  naming         F  51.56 findings=6     advisory=1     warning=5     error=0
+  size           A 100.00 findings=0     advisory=0     warning=0     error=0
   ...
 
 Top 3 rules by finding count
-      6  naming.class-file-mismatch      naming  a=0 w=6 e=0
-      5  docs.missing-class-phpdoc       documentation  a=5 w=0 e=0
-      5  docs.missing-file-phpdoc        documentation  a=5 w=0 e=0
+      5  naming.class-file-mismatch      naming  a=0 w=5 e=0
+      4  docs.missing-class-phpdoc       documentation  a=4 w=0 e=0
+      4  docs.missing-file-phpdoc        documentation  a=4 w=0 e=0
 
 Top 3 file offenders
-  F   50.76  tests/Fixtures/Source/mixed/build/ignored.php      findings=4    a=3 w=1 e=0
-  F   50.76  tests/Fixtures/Source/mixed/cache/ignored.php      findings=4    a=3 w=1 e=0
-  F   50.76  tests/Fixtures/Source/mixed/generated/ignored.php  findings=4    a=3 w=1 e=0
+  F   50.89  tests/Fixtures/Source/mixed/nested/beta.php    findings=4    a=3 w=1 e=0
+  F   51.03  tests/Fixtures/Source/mixed/build/ignored.php  findings=3    a=2 w=1 e=0
+  F   51.03  tests/Fixtures/Source/mixed/cache/ignored.php  findings=3    a=2 w=1 e=0
 
 Baseline  After review, `gruff-php analyse --generate-baseline` records current findings as known debt.
           Use `gruff-php analyse --no-baseline` to audit without a baseline.
 ```
 
-Pillars are ordered by finding count (loudest first). Pillars with zero findings still appear so it's obvious which are clean.
+Pillars are ordered by finding count (loudest first). Enabled pillars with zero findings still appear so you can see which ones are clean; pillars with no enabled rules (such as default-off `maintainability`) are omitted.
 
-`summary` applies any configured [`sensitiveExclusions`](configuration.md#sensitive-exclusions), so its counts and grade match `analyse` over the same tree. When a run suppressed something, a final line states the total in the same words `analyse` uses:
+`summary` applies any configured [`sensitiveExclusions`](configuration.md#sensitive-exclusions), so its counts and grade match `analyse` over the same tree. When a run suppresses findings, a final line prints the total in the same format `analyse` uses:
 
 ```
 Suppressed findings: 1 via sensitiveExclusions[0] sensitive-data.aws-access-key: 1 (Synthetic key used by the scanner fixtures; not a live credential.)
 ```
 
-`gruff.summary.v3` publishes a top-level `suppressions` array - one `{index, rule, paths, symbol?, reason, suppressed}` row per configured `sensitiveExclusions` entry, including entries that matched nothing, then the `source: "built-in"` rows the test-path skip publishes (see [Output formats](output-formats.md)) - so `summary --format json` reports the same total the text output prints.
+`gruff.summary.v3` publishes a top-level `suppressions` array with one `{index, rule, paths, symbol?, reason, suppressed}` row per configured `sensitiveExclusions` entry (including entries that matched nothing), followed by `source: "built-in"`, `inline`, and `duplicate` rows (see [Output formats](output-formats.md)). That keeps `summary --format json` aligned with the text total.
 
 ## Example - JSON format
 
@@ -93,33 +93,33 @@ php bin/gruff-php summary tests/Fixtures/Source/mixed --no-config --format=json 
     "projectRoot": "."
   },
   "summary": {
-    "analysedFiles": 7,
-    "discoveredFiles": 7,
-    "parsedFiles": 7,
-    "skippedFiles": 0,
-    "ignoredPaths": 0,
+    "analysedFiles": 6,
+    "discoveredFiles": 6,
+    "parsedFiles": 6,
+    "skippedFiles": 1,
+    "ignoredPaths": 1,
     "missingPaths": 0,
     "parseErrors": 0,
     "diagnostics": 0,
     "exitCode": 0,
-    "findings": { "advisory": 17, "warning": 6, "error": 0, "total": 23 },
-    "findingsByPillar": { "dead-code": 4, "documentation": 12, "naming": 7 }
+    "findings": { "advisory": 11, "warning": 5, "error": 0, "total": 16 },
+    "findingsByPillar": { "documentation": 10, "naming": 6 }
   },
   "score": {
-    "composite": { "score": 86.22, "grade": "B" },
+    "composite": { "score": 89.36, "grade": "B" },
     "clusters": [],
     "ruleAttribution": [
-      { "ruleId": "docs.missing-class-phpdoc", "findings": 5, "weight": 5 },
+      { "ruleId": "docs.missing-class-phpdoc", "findings": 4, "weight": 4 },
       ...
     ],
-    "evaluatedFiles": 6,
-    "scoredPillars": ["size", "complexity", "maintainability", "dead-code", "naming", "documentation", "modernisation", "security", "sensitive-data", "test-quality"],
+    "evaluatedFiles": 5,
+    "scoredPillars": ["size", "complexity", "dead-code", "naming", "documentation", "modernisation", "security", "sensitive-data", "test-quality"],
     "pillars": [
       { "pillar": "size", "applicable": true, "score": 100, "grade": "A", "findings": 0, "advisory": 0, "warning": 0, "error": 0, "penalty": 0 },
       ...
     ],
     "topOffenders": [
-      { "file": "tests/Fixtures/Source/mixed/build/ignored.php", "score": 50.76, "grade": "F", "findings": 4, "advisory": 3, "warning": 1, "error": 0, "penalty": 6.5 },
+      { "file": "tests/Fixtures/Source/mixed/nested/beta.php", "score": 50.89, "grade": "F", "findings": 4, "advisory": 3, "warning": 1, "error": 0, "penalty": 5.5 },
       ...
     ],
     "complexityDistribution": { "1-5": 0, "6-10": 0, "11-15": 0, "16-20": 0, "21+": 0 },
@@ -127,7 +127,14 @@ php bin/gruff-php summary tests/Fixtures/Source/mixed --no-config --format=json 
     "explanation": "Each pillar scores on the density of its weighted findings per evaluated file, ..."
   },
   "diagnostics": [],
-  "paths": { "analysedFiles": 7, "details": [], "ignoredPaths": [], "missingPaths": [] },
+  "paths": {
+    "analysedFiles": 6,
+    "details": [
+      { "path": "tests/Fixtures/Source/mixed/vendor/ignored.php", "reason": "dependency", "source": "default", "pattern": "vendor" }
+    ],
+    "ignoredPaths": ["tests/Fixtures/Source/mixed/vendor/ignored.php"],
+    "missingPaths": []
+  },
   "suppressions": []
 }
 ```
@@ -151,7 +158,7 @@ without bumping the schema version.
 |---|---|
 | `0` | Summary printed successfully. |
 | `1` | Reserved for future "failure on threshold" support if added. Today the command never returns `1`. |
-| `2` | Usage error: bad `--format`, non-integer `--top`, `--config` combined with `--no-config`, or config load failure. |
+| `2` | Usage error or fatal scan failure: bad `--format`, non-integer `--top`, `--config` combined with `--no-config`, config load failure, or parse errors (in both text and JSON modes). |
 
 `summary` deliberately does **not** honour `--fail-on`. It is a read-only digest; use `analyse --fail-on=warning` if you want CI to fail on the same data.
 

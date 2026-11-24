@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Console;
 
+use GruffPhp\Engine\Config\ConfigException;
+use GruffPhp\Engine\Config\ConfigMigrator;
+use GruffPhp\Rules\RuleRegistry;
 use Symfony\Component\Process\Process;
 use Symfony\Component\Yaml\Yaml;
 
@@ -43,5 +46,84 @@ final class MigrateConfigCliTest extends CliTestCase
         } finally {
             $this->removeDir($project);
         }
+    }
+
+    /**
+     * Verifies retired rule IDs are stripped across rules and selection lists while legacy aliases rename and unknown typos stay intact.
+     *
+     * @return void - Asserts retired removals, docs.missing-phpdoc rename/deduplication, and preserved unknown rule IDs.
+     */
+    public function testStripsRetiredRuleIdsAndRenamesLegacyAliasWhilePreservingUnknownTypos(): void
+    {
+        $yaml = <<<'YAML'
+schemaVersion: gruff-php.config.v0.1
+selection:
+    rules:
+        - docs.missing-public-phpdoc
+        - docs.missing-phpdoc
+        - security.weak-crypto
+        - size.mistyped-selection
+    excludeRules:
+        - test-quality.setup-bloat
+        - docs.missing-public-phpdoc
+        - naming.unknown-typo
+rules:
+    size.file-length:
+        enabled: true
+        threshold: 800
+        severity: warning
+    docs.missing-public-phpdoc:
+        enabled: false
+    test-quality.setup-bloat:
+        enabled: true
+    security.weak-crypto:
+        enabled: true
+    waste.one-line-method:
+        enabled: true
+    size.mistyped-rule:
+        enabled: true
+YAML;
+
+        $result = ConfigMigrator::migrate($yaml);
+        $parsed = Yaml::parse($result['text']);
+        self::assertIsArray($parsed);
+
+        $selection = $parsed['selection'] ?? null;
+        $rules     = $parsed['rules'] ?? null;
+        self::assertIsArray($selection);
+        self::assertIsArray($rules);
+
+        self::assertSame(['docs.missing-phpdoc', 'size.mistyped-selection'], $selection['rules']);
+        self::assertSame(['docs.missing-phpdoc', 'naming.unknown-typo'], $selection['excludeRules']);
+        self::assertSame(['size.file-length', 'docs.missing-phpdoc', 'size.mistyped-rule'], array_keys($rules));
+        self::assertSame(['enabled' => false], $rules['docs.missing-phpdoc']);
+        self::assertContains('Remove 3 retired rule override(s) from rules.', $result['changes']);
+        self::assertContains('Rename legacy rule "docs.missing-public-phpdoc" to "docs.missing-phpdoc" under rules.', $result['changes']);
+        self::assertContains('Remove 1 retired rule id(s) from selection.rules.', $result['changes']);
+        self::assertContains('Remove 1 retired rule id(s) from selection.excludeRules.', $result['changes']);
+    }
+
+    /**
+     * Verifies migration rejects conflicting alias/canonical rule blocks, leaves current YAML unchanged,
+     * and keeps the retired rule list strictly disjoint from active registered rules.
+     *
+     * @return void - Asserts conflict rejection, idempotency on current YAML, and retired-vs-active disjointness.
+     */
+    public function testRejectsConflictingAliasBlocksKeepsCurrentYamlByteIdenticalAndStaysDisjointFromActiveRules(): void
+    {
+        $registry = RuleRegistry::defaults();
+        foreach (ConfigMigrator::retiredRuleIds() as $retiredRuleId) {
+            self::assertFalse($registry->has($retiredRuleId), sprintf('Retired rule id "%s" must not overlap an active rule.', $retiredRuleId));
+        }
+
+        $current   = "schemaVersion: gruff-php.config.v0.1\nfailOn:\n    analyse: error\nrules:\n    docs.missing-phpdoc:\n        enabled: true\n";
+        $unchanged = ConfigMigrator::migrate($current);
+        self::assertSame([], $unchanged['changes']);
+        self::assertSame($current, $unchanged['text']);
+
+        $conflict = "schemaVersion: gruff-php.config.v0.1\nrules:\n    docs.missing-public-phpdoc:\n        enabled: false\n    docs.missing-phpdoc:\n        enabled: true\n";
+        $this->expectException(ConfigException::class);
+        $this->expectExceptionMessage('Migration input sets both legacy "docs.missing-public-phpdoc" and "docs.missing-phpdoc" under rules.');
+        ConfigMigrator::migrate($conflict);
     }
 }

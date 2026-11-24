@@ -78,7 +78,8 @@ final readonly class BranchReviewBuilder
         if ($options->changeScope->isChangedOnly && !$shouldLoadProjectContext && $baseSnapshotPaths === []) {
             // The base is scored on the current run's denominator, so the delta measures the branch's
             // findings rather than the difference between two project sizes.
-            $baseScore = (new ScoreCalculator())->calculate([], $scoreContext->evaluatedFiles, null, null, scorePillars: $options->profileScorePillars(), analysisConfig: $config);
+            $baseScorePillars = $registry->enabledStaticPillars($config, $options->profileScorePillars());
+            $baseScore        = (new ScoreCalculator())->calculate([], $scoreContext->evaluatedFiles, null, null, scorePillars: $baseScorePillars, analysisConfig: $config);
 
             // Compare against an empty base so every current finding is reported as introduced by this branch.
             return (new BranchReviewComparator())->compare(
@@ -152,8 +153,9 @@ final readonly class BranchReviewBuilder
                 }
             }
 
-            $baseFindings = (new AnalysisFindingSupport())->normalizeFindingPaths($baseFindings, $options->pathsRelativeTo);
-            $baseScore    = (new ScoreCalculator())->calculate($baseFindings, $scoreContext->evaluatedFiles, null, null, scorePillars: $options->profileScorePillars(), analysisConfig: $config);
+            $baseFindings     = (new AnalysisFindingSupport())->normalizeFindingPaths($baseFindings, $options->pathsRelativeTo);
+            $baseScorePillars = $registry->enabledStaticPillars($config, $options->profileScorePillars());
+            $baseScore        = (new ScoreCalculator())->calculate($baseFindings, $scoreContext->evaluatedFiles, null, null, scorePillars: $baseScorePillars, analysisConfig: $config);
 
 
             return (new BranchReviewComparator())->compare(

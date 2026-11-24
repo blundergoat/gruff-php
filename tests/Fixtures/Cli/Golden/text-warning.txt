@@ -1,5 +1,5 @@
 gruff-php 0.5.2 analyse
-Composite: B (85.72 / 100)
+Composite: B (84.13 / 100)
 Findings: 4 total · 0 error · 2 warning · 2 advisory
 Format: text
 Fail threshold: error
@@ -17,7 +17,6 @@ Score
   Pillars:
     size: F (51.22) findings=1
     complexity: A (100.00) findings=0
-    maintainability: A (100.00) findings=0
     dead-code: A (100.00) findings=0
     naming: F (51.39) findings=2
     documentation: F (54.55) findings=1

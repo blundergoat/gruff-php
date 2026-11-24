@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Scoring;
 
+use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Config\RuleSettings;
 use GruffPhp\Results\Diff\DiffResult;
 use GruffPhp\Results\Finding\Confidence;
 use GruffPhp\Results\Finding\Finding;
@@ -13,6 +15,8 @@ use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Results\Scoring\Grade;
 use GruffPhp\Results\Scoring\PillarScore;
 use GruffPhp\Results\Scoring\ScoreCalculator;
+use GruffPhp\Rules\Complexity\MaintainabilityIndexRule;
+use GruffPhp\Rules\RuleRegistry;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -269,6 +273,66 @@ final class M06ContractTest extends TestCase
         self::assertSame(['score' => $report->composite->score, 'grade' => $report->composite->letter], $payload['composite']);
         self::assertSame(self::EVALUATED_FILES, $payload['evaluatedFiles']);
         self::assertSame($report->scoredPillars, $payload['scoredPillars']);
+    }
+
+    /**
+     * Enabled static pillars exclude disabled maintainability by default, restore it when enabled,
+     * respect profile narrowing, and produce a null composite when zero rules are enabled.
+     *
+     * @return void - Asserts reachable pillar derivation and null composite on empty scorePillars.
+     */
+    public function testEnabledStaticPillarsExcludeDisabledPillarsAndKeepEmptyCompositeNull(): void
+    {
+        $registry      = RuleRegistry::defaults();
+        $defaultConfig = AnalysisConfig::fromRegistry($registry);
+        $defaultSet    = $registry->enabledStaticPillars($defaultConfig);
+
+        self::assertSame([
+            Pillar::Size,
+            Pillar::Complexity,
+            Pillar::DeadCode,
+            Pillar::Naming,
+            Pillar::Documentation,
+            Pillar::Modernisation,
+            Pillar::Security,
+            Pillar::SensitiveData,
+            Pillar::TestQuality,
+        ], $defaultSet);
+
+        $miSettings    = $defaultConfig->ruleSettings(MaintainabilityIndexRule::ID);
+        $enabledConfig = $defaultConfig->withRuleSettings(
+            MaintainabilityIndexRule::ID,
+            new RuleSettings(
+                enabled:    true,
+                thresholds: $miSettings->thresholds,
+                options:    $miSettings->options,
+            ),
+        );
+        $enabledSet = $registry->enabledStaticPillars($enabledConfig);
+        self::assertCount(10, $enabledSet);
+        self::assertContains(Pillar::Maintainability, $enabledSet);
+
+        $securitySet = $registry->enabledStaticPillars($defaultConfig, [Pillar::Security, Pillar::SensitiveData]);
+        self::assertSame([Pillar::Security, Pillar::SensitiveData], $securitySet);
+
+        $allDisabled = $defaultConfig;
+
+        foreach ($registry->all() as $rule) {
+            $ruleId      = $rule->definition()->id;
+            $settings    = $allDisabled->ruleSettings($ruleId);
+            $allDisabled = $allDisabled->withRuleSettings(
+                $ruleId,
+                new RuleSettings(false, $settings->thresholds, $settings->options),
+            );
+        }
+
+        $emptyPillars = $registry->enabledStaticPillars($allDisabled);
+        self::assertSame([], $emptyPillars);
+
+        $emptyScore = (new ScoreCalculator())->calculate([], self::EVALUATED_FILES, null, DiffResult::inactive(), scorePillars: $emptyPillars);
+        self::assertNull($emptyScore->composite);
+        self::assertSame([], $emptyScore->pillars);
+        self::assertSame([], $emptyScore->scoredPillars);
     }
 
     /**

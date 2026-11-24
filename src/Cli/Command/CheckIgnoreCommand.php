@@ -151,7 +151,7 @@ final class CheckIgnoreCommand extends Command
         }
 
         try {
-            $configLoader = new ConfigLoader($projectRoot, ConfigLoader::packageRoot(), shouldResolveFromLaunchDir: true);
+            $configLoader = new ConfigLoader($projectRoot, shouldResolveFromLaunchDir: true);
 
 
 

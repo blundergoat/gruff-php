@@ -351,6 +351,89 @@ final class GruffCliSummaryTest extends CliTestCase
     }
 
     /**
+     * Verify summary omits disabled maintainability by default and includes it when enabled by config.
+     *
+     * @return void - Asserts maintainability is absent from default scored pillars and present when enabled.
+     * @throws JsonException - If CLI stdout cannot be decoded as JSON.
+     */
+    public function testSummaryOmitsDisabledMaintainabilityPillarByDefaultAndIncludesWhenEnabled(): void
+    {
+        $defaultReport = $this->runMachineJson([
+            'summary',
+            'tests/Fixtures/Source/mixed',
+            '--no-config',
+            '--format',
+            'json',
+        ]);
+        $defaultScore = $defaultReport['score'] ?? null;
+        self::assertIsArray($defaultScore);
+        $defaultScoredPillars = $defaultScore['scoredPillars'] ?? null;
+        $defaultPillars       = $defaultScore['pillars'] ?? null;
+        self::assertIsArray($defaultScoredPillars);
+        self::assertIsArray($defaultPillars);
+
+        self::assertNotContains('maintainability', $defaultScoredPillars);
+        self::assertNotContains('maintainability', array_column($defaultPillars, 'pillar'));
+
+        $enabledReport = $this->runMachineJson([
+            'summary',
+            'tests/Fixtures/Source/mixed',
+            '--config',
+            'tests/Fixtures/Config/complexity-low-thresholds.yaml',
+            '--format',
+            'json',
+        ]);
+        $enabledScore = $enabledReport['score'] ?? null;
+        self::assertIsArray($enabledScore);
+        $enabledScoredPillars = $enabledScore['scoredPillars'] ?? null;
+        $enabledPillars       = $enabledScore['pillars'] ?? null;
+        self::assertIsArray($enabledScoredPillars);
+        self::assertIsArray($enabledPillars);
+
+        self::assertContains('maintainability', $enabledScoredPillars);
+        self::assertContains('maintainability', array_column($enabledPillars, 'pillar'));
+    }
+
+    /**
+     * Verify a config-less external project uses registry defaults instead of inheriting gruff-php's checkout config.
+     *
+     * @return void - Asserts run.config is null and default-off maintainability stays absent from scoredPillars.
+     * @throws JsonException - If CLI stdout cannot be decoded as JSON.
+     */
+    public function testSummaryOnConfiglessProjectUsesRegistryDefaultsInsteadOfPackageCheckoutConfig(): void
+    {
+        $project = $this->tempDir();
+
+        try {
+            file_put_contents($project . '/Sample.php', "<?php\nfinal class Sample\n{\n    public function run(): int\n    {\n        return 1;\n    }\n}\n");
+            $process = new Process([
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff-php',
+                'summary',
+                '.',
+                '--format=json',
+                '--no-interaction',
+            ], $project);
+            $process->run();
+
+            self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+            $document = json_decode($process->getOutput(), true, 512, JSON_THROW_ON_ERROR);
+            self::assertIsArray($document);
+
+            $run   = $document['run'] ?? null;
+            $score = $document['score'] ?? null;
+            self::assertIsArray($run);
+            self::assertIsArray($score);
+            self::assertNull($run['config'] ?? null);
+            $scoredPillars = $score['scoredPillars'] ?? null;
+            self::assertIsArray($scoredPillars);
+            self::assertNotContains('maintainability', $scoredPillars);
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+
+    /**
      * Provide invalid summary option combinations and their usage errors.
      *
      * @return iterable<string, array{0: list<string>, 1: string}> - Named cases pairing extra CLI arguments with expected stdout excerpts.

@@ -467,7 +467,7 @@ final class HookCommand extends Command
 
         $config = (bool)$input->getOption('no-config')
             ? AnalysisConfig::fromRegistry($registry)
-            : (new ConfigLoader($projectRoot, ConfigLoader::packageRoot(), shouldResolveFromLaunchDir: true))->load($configPath, $registry);
+            : (new ConfigLoader($projectRoot, shouldResolveFromLaunchDir: true))->load($configPath, $registry);
 
         $deepScanBudgetOverride = AnalyseCommandOptions::parseDeepScanBudgetOverride(
             $this->providedStringOption($input, 'deep-scan-budget'),

@@ -162,7 +162,7 @@ final class DashboardScanRunner
 
         // A scan requested with --no-config cannot change when a config file is edited.
         if ($state['noConfig'] !== '1') {
-            $loader = new ConfigLoader($scanRoot, ConfigLoader::packageRoot());
+            $loader = new ConfigLoader($scanRoot);
             try {
                 $configPath = $loader->resolveConfigPath($state['config']);
                 // Include the selected config so the next dashboard refresh sees a setting change.

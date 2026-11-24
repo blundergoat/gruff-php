@@ -49,7 +49,7 @@ final class AgentWorkflowCliTest extends TestCase
     /**
      * Check hidden findings, filter metadata, and the composite grade for an include-rule run.
      *
-     * @return void - Asserts hidden-count agreement, active filter metadata, no displayed findings, and composite grade A.
+     * @return void - Asserts hidden-count agreement, active filter metadata, no displayed findings, single scored pillar, and composite grade F.
      * @throws JsonException - If the command's stdout is invalid JSON.
      */
     public function testIncludeRuleNarrowsExecutionWhileMinSeverityRemainsDisplayOnly(): void
@@ -85,7 +85,9 @@ final class AgentWorkflowCliTest extends TestCase
         self::assertTrue($filters['active'] ?? null);
         self::assertSame('warning', $this->stringValue($filters, 'minSeverity'));
         self::assertSame(['naming.identifier-quality'], $this->listValue($filters, 'includeRules'));
-        self::assertSame('A', $this->stringValue($composite, 'grade'));
+        // Only the naming pillar had an enabled rule, so unexecuted pillars do not inflate the composite above F.
+        self::assertSame(['naming'], $this->listValue($score, 'scoredPillars'));
+        self::assertSame('F', $this->stringValue($composite, 'grade'));
     }
 
     /**
