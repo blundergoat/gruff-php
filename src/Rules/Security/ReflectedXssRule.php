@@ -22,9 +22,10 @@ use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
 /**
- * Detects request data at echo, print, printf and vprintf; traces local assignments in the same function or file scope without following calls.
- * Accepts recognized escapers, encoders, numeric casts, probes and formatters; JSON encoding requires sibling-header state to remain JSON.
- * Excludes output after a recognized top-level CLI guard.
+ * Detects unescaped request data reaching `echo`, `print`, `printf`, and `vprintf`, tracing same-scope local assignments.
+ *
+ * Accepts recognized escapers, encoders, numeric casts, probes, and formatters; JSON encoding requires sibling headers to stay JSON.
+ * Excludes output after a recognized top-level CLI guard when no executable code precedes the guard.
  */
 final class ReflectedXssRule implements RuleInterface
 {
@@ -101,18 +102,20 @@ final class ReflectedXssRule implements RuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $findings            = [];
-        $commandLineGuardEnd = $this->commandLineGuardEnd($analysisUnit);
+        $findings         = [];
+        $commandLineGuard = $this->commandLineGuard($analysisUnit);
 
 
+        // Inspect every echo statement in the file for unescaped request data.
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Echo_::class) as $echo) {
             // Output classified as command-line-only is outside this page-oriented XSS rule.
-            if ($this->runsOnlyFromCommandLine($echo, $commandLineGuardEnd)) {
+            if ($this->runsOnlyFromCommandLine($echo, $commandLineGuard)) {
                 continue;
             }
 
             $isJsonResponse = $this->answersWithJson($echo, $analysisUnit);
 
+            // Check each comma-separated expression passed to echo.
             foreach ($echo->exprs as $echoedValue) {
                 // One raw request value is enough to report the echo once.
                 if ($this->printsRawRequestData($echoedValue, $analysisUnit, $isJsonResponse)) {
@@ -122,26 +125,28 @@ final class ReflectedXssRule implements RuleInterface
             }
         }
 
-
+        // Inspect every print expression in the file for unescaped request data.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\Print_::class) as $print) {
             $isJsonResponse = $this->answersWithJson($this->statementHolding($print), $analysisUnit);
 
-            if (!$this->runsOnlyFromCommandLine($print, $commandLineGuardEnd) && $this->printsRawRequestData($print->expr, $analysisUnit, $isJsonResponse)) {
+            // Flag print when it is reachable from web requests and outputs raw request data.
+            if (!$this->runsOnlyFromCommandLine($print, $commandLineGuard) && $this->printsRawRequestData($print->expr, $analysisUnit, $isJsonResponse)) {
                 $findings[] = $this->xssFinding($analysisUnit, $print->getStartLine(), 'print');
             }
         }
 
-
+        // Inspect global printf() and vprintf() calls that write formatted output directly to the response body.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
             $functionName = SecurityNodeHelper::globalFunctionName($call);
 
-            if ($functionName === null || !in_array($functionName, self::PRINTF_SINKS, true) || $this->runsOnlyFromCommandLine($call, $commandLineGuardEnd)) {
+            // Skip unrelated calls and CLI-only output that cannot execute in a browser response.
+            if ($functionName === null || !in_array($functionName, self::PRINTF_SINKS, true) || $this->runsOnlyFromCommandLine($call, $commandLineGuard)) {
                 continue;
             }
 
             $isJsonResponse = $this->answersWithJson($this->statementHolding($call), $analysisUnit);
 
-
+            // Check every argument because either the format string or a substituted value may carry raw request data.
             foreach ($call->args as $argument) {
                 // One raw request argument is enough to report the call once.
                 if ($argument instanceof Node\Arg && $this->printsRawRequestData($argument->value, $analysisUnit, $isJsonResponse)) {
@@ -157,7 +162,7 @@ final class ReflectedXssRule implements RuleInterface
     /**
      * Reports whether a printed value carries raw request data, directly or through a local variable.
      *
-     * @param Expr         $printedValue - Value being echoed or printed.
+     * @param Expr         $printedValue   - Value being echoed or printed.
      * @param AnalysisUnit $analysisUnit   - Parsed file whose top-level statements supply assignments for output outside a function.
      * @param bool         $isJsonResponse - Whether the response is JSON, so json_encode() output counts as safe.
      *
@@ -165,9 +170,9 @@ final class ReflectedXssRule implements RuleInterface
      */
     private function printsRawRequestData(Expr $printedValue, AnalysisUnit $analysisUnit, bool $isJsonResponse): bool
     {
-
+        // First check direct request superglobals such as $_GET['name'] inside the printed expression.
         foreach ($this->requestInputLeaves($printedValue) as $requestInput) {
-
+            // Flag immediately when any direct superglobal reaches the sink without escaping or casting.
             if (!$this->isMadeSafeBefore($requestInput, $printedValue, $isJsonResponse)) {
                 return true;
             }
@@ -177,13 +182,14 @@ final class ReflectedXssRule implements RuleInterface
         $statements     = $owningFunction instanceof FunctionLike ? ($owningFunction->getStmts() ?? []) : $analysisUnit->statements;
         $taintedLocals  = $this->localsHoldingRawRequestData(array_values($statements), $owningFunction, $printedValue->getStartFilePos(), $isJsonResponse);
 
+        // Without any tainted locals in scope, no variable reference can carry indirect request data.
         if ($taintedLocals === []) {
             return false;
         }
 
         // A local such as `$name = $_GET['name']; echo $name;` carries request data even with no superglobal in sight.
         foreach ($this->variableLeaves($printedValue) as $variable) {
-
+            // Flag when the output reads a tainted local without wrapping it in a recognized escaper or cast.
             if (is_string($variable->name) && isset($taintedLocals[$variable->name]) && !$this->isMadeSafeBefore($variable, $printedValue, $isJsonResponse)) {
                 return true;
             }
@@ -268,7 +274,7 @@ final class ReflectedXssRule implements RuleInterface
      */
     private function carriesRawRequestData(Expr $assignedValue, array $taintedLocals, bool $isJsonResponse): bool
     {
-
+        // Check direct request superglobals on the right-hand side of the assignment first.
         foreach ($this->requestInputLeaves($assignedValue) as $requestInput) {
             // Unless an escaper or other neutraliser wraps it first.
             if (!$this->isMadeSafeBefore($requestInput, $assignedValue, $isJsonResponse)) {
@@ -290,8 +296,8 @@ final class ReflectedXssRule implements RuleInterface
     /**
      * Reports whether the rule recognizes a safe wrapper between a request value and the enclosing printed or assigned value.
      *
-     * @param Node $requestValue - Superglobal or tainted local inside the printed or assigned value.
-     * @param Node $outerValue - The printed or assigned value that bounds the climb.
+     * @param Node $requestValue   - Superglobal or tainted local inside the printed or assigned value.
+     * @param Node $outerValue     - The printed or assigned value that bounds the climb.
      * @param bool $isJsonResponse - Whether the response is JSON, so json_encode() output counts as safe.
      *
      * @return bool - True when a recognized safe wrapper is found before or at the bound; false otherwise.
@@ -302,12 +308,12 @@ final class ReflectedXssRule implements RuleInterface
         $child   = $requestValue;
 
         while ($current instanceof Node) {
-
+            // Stop as soon as an enclosing escaper, cast, probe, or JSON encoder neutralises the request value.
             if ($current !== $requestValue && $this->makesValueSafe($current, $child, $isJsonResponse)) {
                 return true;
             }
 
-
+            // Do not climb past the printed or assigned root expression being evaluated.
             if ($current === $outerValue) {
                 break;
             }
@@ -379,40 +385,91 @@ final class ReflectedXssRule implements RuleInterface
         $statementBlocks = $holder instanceof Node
             ? array_filter(array_map(static fn(string $name): mixed => $holder->{$name}, $holder->getSubNodeNames()), 'is_array')
             : [$analysisUnit->statements];
-        $owningFunction  = $outputStatement === null ? null : $this->enclosingFunctionLike($outputStatement);
-        $isJson          = false;
+        $owningFunction   = $outputStatement === null ? null : $this->enclosingFunctionLike($outputStatement);
+        $isJson           = false;
+        $hasOutputStarted = false;
+        // Locate the sibling statement list that actually contains the output statement.
         foreach ($statementBlocks as $statementBlock) {
             // Other blocks of the same holder, such as the else branch, do not run before this output.
             if (!in_array($outputStatement, $statementBlock, true)) {
                 continue;
             }
 
-            // Walk the statements before the output in order, tracking the latest content type.
+            // Walk the statements before the output in order, tracking the latest content type and whether body output already started.
             foreach ($statementBlock as $earlierStatement) {
                 // This heuristic credits only headers that appear before the output statement.
                 if ($earlierStatement === $outputStatement) {
                     break;
                 }
 
-                // Only a statement node can hold a header() call; an empty slot in the block holds nothing.
+                // Only a statement node can hold a header() or output call; an empty slot in the block holds nothing.
                 if (!$earlierStatement instanceof Node) {
                     continue;
                 }
 
-                foreach ((new NodeFinder())->findInstanceOf($earlierStatement, Expr\FuncCall::class) as $call) {
-                    // A header() inside a nested function runs only if that function is called.
-                    if (SecurityNodeHelper::globalFunctionName($call) !== 'header' || $this->enclosingFunctionLike($call) !== $owningFunction) {
-                        continue;
-                    }
+                // Once response output has already started, later header() calls cannot switch the response into JSON.
+                if (!$hasOutputStarted) {
+                    $isJson = $this->updatedJsonStateForStatement($earlierStatement, $owningFunction, $isJson);
+                }
 
-                    // A header() nested in a branch may not run, so it can switch JSON off but never on.
-                    $isJsonAfterCall = $this->isJsonAfterHeader($call, $isJson);
-                    $isJson          = $earlierStatement instanceof Stmt\Expression && $earlierStatement->expr === $call ? $isJsonAfterCall : $isJson && $isJsonAfterCall;
+                // Record when an earlier statement emits body output or flushes headers so later header() calls cannot turn JSON on.
+                if ($this->statementStartsResponseOutput($earlierStatement, $owningFunction)) {
+                    $hasOutputStarted = true;
                 }
             }
         }
 
         return $isJson;
+    }
+
+    /**
+     * Applies every same-function `header()` call inside one statement to the running JSON-response classification.
+     *
+     * @param Node              $statement      - Earlier statement inspected for `header()` calls.
+     * @param FunctionLike|null $owningFunction - Function enclosing the inspected output, or null at file scope.
+     * @param bool              $isJson         - Whether the response was classified as JSON before this statement.
+     *
+     * @return bool - Updated JSON-response classification after applying the statement's `header()` calls.
+     */
+    private function updatedJsonStateForStatement(Node $statement, ?FunctionLike $owningFunction, bool $isJson): bool
+    {
+        // Inspect every function call inside the statement to catch direct or branch-nested header() calls.
+        foreach ((new NodeFinder())->findInstanceOf($statement, Expr\FuncCall::class) as $call) {
+            // A header() inside a nested function runs only if that function is called.
+            if (SecurityNodeHelper::globalFunctionName($call) !== 'header' || $this->enclosingFunctionLike($call) !== $owningFunction) {
+                continue;
+            }
+
+            // A header() nested in a branch may not run, so it can switch JSON off but never on.
+            $isJsonAfterCall = $this->isJsonAfterHeader($call, $isJson);
+            $isJson          = $statement instanceof Stmt\Expression && $statement->expr === $call ? $isJsonAfterCall : $isJson && $isJsonAfterCall;
+        }
+
+        return $isJson;
+    }
+
+    /**
+     * Reports whether an earlier statement in the same function can emit response body output or flush headers.
+     *
+     * @param Node              $statement      - Statement appearing before the inspected output.
+     * @param FunctionLike|null $owningFunction - Function enclosing the inspected output, or null at file scope.
+     *
+     * @return bool - True when the statement directly outputs or flushes in the same function; false otherwise.
+     */
+    private function statementStartsResponseOutput(Node $statement, ?FunctionLike $owningFunction): bool
+    {
+        $outputNodes = (new NodeFinder())->find(
+            [$statement],
+            fn (Node $candidate): bool => $this->enclosingFunctionLike($candidate) === $owningFunction
+                && (
+                    $candidate instanceof Stmt\Echo_
+                    || $candidate instanceof Stmt\InlineHTML
+                    || $candidate instanceof Expr\Print_
+                    || ($candidate instanceof Expr\FuncCall && in_array(SecurityNodeHelper::globalFunctionName($candidate), ['printf', 'vprintf', 'flush', 'ob_flush', 'readfile', 'fpassthru'], true))
+                ),
+        );
+
+        return $outputNodes !== [];
     }
 
     /**
@@ -441,25 +498,54 @@ final class ReflectedXssRule implements RuleInterface
     }
 
     /**
-     * Finds the end of a top-level guard the rule recognizes as excluding non-command-line SAPIs.
+     * Finds a top-level guard that stops non-command-line SAPIs and whether any executable statement precedes it.
      *
      * @param AnalysisUnit $analysisUnit - Parsed file whose top-level statements are searched.
      *
-     * @return int|null - End byte offset of a recognized guard; null when this heuristic finds none.
+     * @return array{endOffset: int, hasEarlierExecutableCode: bool}|null - Guard metadata; null when no recognized guard exists.
      */
-    private function commandLineGuardEnd(AnalysisUnit $analysisUnit): ?int
+    private function commandLineGuard(AnalysisUnit $analysisUnit): ?array
     {
+        $hasEarlierExecutableCode = false;
+
         // Only top-level guards contribute to this file-position heuristic.
         foreach ($analysisUnit->statements as $statement) {
             $isGuard = $statement instanceof Stmt\If_ && $statement->elseifs === [] && $statement->else === null
                 && $this->isNotCommandLineTest($statement->cond) && $this->alwaysStopsScript($statement->stmts);
             // The first recognized guard sets the boundary used for later output nodes.
             if ($isGuard) {
-                return $statement->getEndFilePos();
+                return [
+                    'endOffset' => $statement->getEndFilePos(),
+                    'hasEarlierExecutableCode' => $hasEarlierExecutableCode,
+                ];
+            }
+
+            // Track whether executable top-level statements ran before the guard and could call hoisted functions declared later.
+            if (!$this->isNonExecutableDeclaration($statement)) {
+                $hasEarlierExecutableCode = true;
             }
         }
 
         return null;
+    }
+
+    /**
+     * Reports whether a top-level statement only declares symbols or directives and executes no code before a CLI guard.
+     *
+     * @param Stmt $statement - Top-level statement appearing before the CLI guard.
+     *
+     * @return bool - True for declarations and no-ops that cannot invoke a hoisted function; false for executable statements.
+     */
+    private function isNonExecutableDeclaration(Stmt $statement): bool
+    {
+        return $statement instanceof Stmt\Declare_
+            || $statement instanceof Stmt\Namespace_
+            || $statement instanceof Stmt\Use_
+            || $statement instanceof Stmt\GroupUse
+            || $statement instanceof Stmt\Const_
+            || $statement instanceof Stmt\Function_
+            || $statement instanceof Stmt\ClassLike
+            || $statement instanceof Stmt\Nop;
     }
 
     /**
@@ -471,16 +557,17 @@ final class ReflectedXssRule implements RuleInterface
      */
     private function isNotCommandLineTest(Expr $condition): bool
     {
-
+        // Only negative comparisons (`!=` or `!==`) express "stop when not running in CLI".
         if (!$condition instanceof Expr\BinaryOp\NotIdentical && !$condition instanceof Expr\BinaryOp\NotEqual) {
             return false;
         }
 
-
+        // Accept either operand order (`PHP_SAPI !== 'cli'` or `'cli' !== PHP_SAPI`).
         foreach ([[$condition->left, $condition->right], [$condition->right, $condition->left]] as [$literal, $sapiSide]) {
             $namesSapi = SecurityNodeHelper::constantName($sapiSide) === 'PHP_SAPI'
                 || ($sapiSide instanceof Expr\FuncCall && SecurityNodeHelper::globalFunctionName($sapiSide) === 'php_sapi_name');
 
+            // Match only an explicit `'cli'` literal paired with PHP_SAPI or php_sapi_name().
             if ($namesSapi && $literal instanceof Scalar\String_ && $literal->value === 'cli') {
                 return true;
             }
@@ -505,16 +592,27 @@ final class ReflectedXssRule implements RuleInterface
     }
 
     /**
-     * Reports whether the rule classifies an output as command-line-only because it appears after the recognized guard.
+     * Reports whether the rule classifies an output as command-line-only because a top-level CLI guard dominates it.
+     * Hoisted functions declared after the guard stay reportable when executable top-level code ran before the guard.
      *
-     * @param Node     $outputNode - Echo, print or printf() call.
-     * @param int|null $commandLineGuardEnd - Where the guard ends; null when the file has none.
+     * @param Node                                                        $outputNode       - Echo, print or printf() call.
+     * @param array{endOffset: int, hasEarlierExecutableCode: bool}|null $commandLineGuard - Recognized guard metadata; null when absent.
      *
-     * @return bool - true when the output starts after the guard; false without a guard or before it
+     * @return bool - True when the guard dominates the output; false without a guard, before it, or in a callable reachable earlier.
      */
-    private function runsOnlyFromCommandLine(Node $outputNode, ?int $commandLineGuardEnd): bool
+    private function runsOnlyFromCommandLine(Node $outputNode, ?array $commandLineGuard): bool
     {
-        return $commandLineGuardEnd !== null && $outputNode->getStartFilePos() > $commandLineGuardEnd;
+        // Without a guard, or before the guard ends, web requests can reach this output.
+        if ($commandLineGuard === null || $outputNode->getStartFilePos() <= $commandLineGuard['endOffset']) {
+            return false;
+        }
+
+        // Top-level code before the guard can call a hoisted function declared below the guard, so keep function outputs reportable.
+        if ($commandLineGuard['hasEarlierExecutableCode'] && $this->enclosingFunctionLike($outputNode) !== null) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -526,7 +624,7 @@ final class ReflectedXssRule implements RuleInterface
      */
     private function isHtmlEscaperCall(Node $node): bool
     {
-
+        // Only a function call can invoke one of the recognized HTML/URL/scalar escaping functions.
         if (!$node instanceof Expr\FuncCall) {
             return false;
         }
@@ -562,8 +660,9 @@ final class ReflectedXssRule implements RuleInterface
     {
         $requestInputs = [];
 
+        // Filter the expression's variable leaves down to PHP request superglobals (`$_GET`, `$_POST`, etc.).
         foreach ($this->variableLeaves($expression) as $variable) {
-
+            // Keep only statically named request superglobals; ordinary local variables are checked separately.
             if (is_string($variable->name) && in_array($variable->name, SecurityNodeHelper::userInputSuperglobals(), true)) {
                 $requestInputs[] = $variable;
             }
@@ -583,6 +682,7 @@ final class ReflectedXssRule implements RuleInterface
     {
         $variables = [];
 
+        // Collect every variable node referenced anywhere inside the printed or assigned expression.
         foreach ((new NodeFinder())->find($expression, static fn(Node $candidate): bool => $candidate instanceof Expr\Variable) as $variable) {
             // The finder returns loosely typed nodes, so confirm each is a variable.
             if ($variable instanceof Expr\Variable) {

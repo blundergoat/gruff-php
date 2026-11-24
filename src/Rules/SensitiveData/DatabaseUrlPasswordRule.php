@@ -93,6 +93,7 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
 
         $findings      = [];
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
+        // Inspect every matched connection string independently so one exempted local DSN cannot hide a live production password.
         foreach ($matches[0] as $index => $match) {
             [, $offset] = $match;
             // Skip URLs inside comments as documentation examples; a real credential left in a comment is not reported.
@@ -114,15 +115,15 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
             // Keep only the non-secret scheme in the marker; omit the captured credentials, host, path, and length.
             $displayMarker = SecretScannerHelper::connectionStringMarker($matches['scheme'][$index][0]);
 
-            $findings[] = SecretScannerHelper::finding(
-                analysisUnit: $analysisUnit,
-                ruleId:       self::ID,
-                message:      sprintf('Database connection string contains an inline password: %s.', $displayMarker),
-                line:         SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
-                confidence:   Confidence::High,
-                detector:     'database-url-password',
+            $findings[] = SecretScannerHelper::findingAtOffset(
+                analysisUnit:  $analysisUnit,
+                ruleId:        self::ID,
+                message:       sprintf('Database connection string contains an inline password: %s.', $displayMarker),
+                offset:        $offset,
+                confidence:    Confidence::High,
+                detector:      'database-url-password',
                 displayMarker: $displayMarker,
-                remediation:  'Move database passwords into a secret store or runtime environment variable.',
+                remediation:   'Move database passwords into a secret store or runtime environment variable.',
             );
         }
 
@@ -141,7 +142,7 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
      */
     private static function isStockDevelopmentUrl(string $user, string $password, string $hostAndRest): bool
     {
-
+        // Require both the user name and password to be recognized stock defaults before exempting local development URLs.
         if (!in_array(strtolower($user), self::STOCK_DEVELOPMENT_WORDS, true)
             || !in_array(strtolower($password), self::STOCK_DEVELOPMENT_WORDS, true)) {
             return false;

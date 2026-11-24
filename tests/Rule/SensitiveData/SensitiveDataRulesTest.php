@@ -186,6 +186,30 @@ final class SensitiveDataRulesTest extends TestCase
     }
 
     /**
+     * Verify two credentials of the same rule on one source line both survive registry deduplication with distinct columns.
+     *
+     * @return void - Asserts two AWS access-key findings on line 2 carrying distinct 1-based column offsets.
+     */
+    public function testTwoSecretsOnSameLineAreBothReportedWithDistinctColumns(): void
+    {
+        $firstKey  = 'AKIA' . 'Q7R2M8N4' . 'P6T9V1X3';
+        $secondKey = 'AKIA' . 'W3E5R7T9' . 'Y2U4I6O8';
+        $source    = "<?php\n\$keys = ['{$firstKey}', '{$secondKey}'];\n";
+        $unit      = new AnalysisUnit(new SourceFile(__FILE__, 'src/keys.php', SourceFile::TYPE_TEXT), $source, [], [], []);
+        $findings  = array_values(array_filter(
+            $this->analyseUnits([$unit]),
+            static fn (Finding $finding): bool => $finding->ruleId === AwsAccessKeyRule::ID,
+        ));
+
+        self::assertCount(2, $findings);
+        self::assertSame([2, 2], array_map(static fn (Finding $finding): ?int => $finding->line, $findings));
+        $columns = array_map(static fn (Finding $finding): ?int => $finding->column, $findings);
+        self::assertNotNull($columns[0]);
+        self::assertNotNull($columns[1]);
+        self::assertGreaterThan($columns[0], $columns[1]);
+    }
+
+    /**
      * Verifies the PHP-comment fixture is silent for API keys, AWS keys, JWTs, database URLs, and PII.
      * A private-key finding remains expected in that fixture.
      *

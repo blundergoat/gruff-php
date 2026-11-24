@@ -1,6 +1,6 @@
 ---
 category: setup
-last_reviewed: 2026-11-23
+last_reviewed: 2026-11-25
 ---
 
 # Setup Footguns
@@ -48,6 +48,16 @@ last_reviewed: 2026-11-23
 **Evidence:** Measured 2026-10-03 during the 1.17.0 upgrade. The install output listed every retired rule it removed, including `Bash(*sudo *)` and `Read(**/secrets/**)`, but printed nothing about the two `.env*` rules. `git diff .claude/settings.json` showed both gone, and they were restored by hand after the install. `.codex/config.toml` never carried a catch-all, so the Codex profile was unaffected. The trap recurred in the 1.18.0 upgrade: commit `a25ff4e` removed both catch-alls again, and they stayed missing until they were restored on 2026-11-23 during the 1.19.0 upgrade. That upgrade cannot show whether 1.19.0 still drops them, because they were already absent when it ran, but 1.19.0's `install-command.js` still carries the rewrite.
 
 **Prevention:** After any `goat-flow install`, search `.claude/settings.json` for `Read(**/.env*)` and `Edit(**/.env*)` and restore whichever is missing. A diff against `HEAD` is not enough: after the 1.18.0 loss, `HEAD` itself lacked both, so the 1.19.0 diff showed nothing. The install log is not a complete list of removals.
+
+## Footgun: `composer perf` fails on large speedups as well as regressions after rule-catalogue changes
+
+**Status:** active | **Created:** 2026-11-25 | **Evidence:** ACTUAL_MEASURED
+**Decision changed:** How to interpret a `composer perf` failure after retiring rules or upgrading the PHP runtime, and when to refresh the checked-in performance baseline.
+**Trigger phase:** VERIFY
+
+**Prevention:** When `composer perf` exits `1`, inspect the sign of `delta` in the output table before investigating a performance regression. `scripts/test-performance.sh` (search: `abs="$(awk -v d="$delta"`) compares the absolute value of `delta` against `tolerance * 1.5` (30% for wall time with default `GRUFF_PERF_WALL_TOLERANCE=20`), so a speedup greater than 30% fails identically to a slowdown. When a negative delta reflects intentional rule removals or a deliberate parser speedup, regenerate the platform baseline with `bash scripts/test-performance.sh --baseline --yes` and re-run `composer perf` to confirm stability.
+
+**Evidence:** Measured 2026-11-24 during 0.6.0 preflight after retiring 46 rules (`127` rules on PHP 8.3.30 in the 0.5.2 baseline vs `83` rules on PHP 8.4.26): `composer perf` exited `1` because `medium` dropped `-61.7%` and `large` dropped `-66.7%` against `scripts/performance-baselines/linux-x86_64.json`. Regenerating the baseline for `0.6.0` and re-running `composer perf` passed all 6 metrics (`small` 44ms, `medium` 860ms, `large` 1647ms; deltas `-3.3%` to `+2.3%`, exit `0`).
 
 ## Resolved Entries
 

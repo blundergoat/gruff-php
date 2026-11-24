@@ -14,12 +14,11 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\SourceTextRuleInterface;
 
 /**
- * Flags a string shaped like an AWS access key ID (`AKIA...`/`ASIA...` plus 16 chars), so the user can pull
- * a committed credential out of source and rotate it.
+ * Flags a string shaped like an AWS access key ID (`AKIA...`/`ASIA...` plus 16 chars) so users can remove and rotate it.
  *
- * A source-text rule: it scans the raw file, skipping matches inside comments and obvious dummy values, and
- * redacts the reported value. Warning severity, high confidence - the AKIA/ASIA prefix with a fixed body is
- * a near-unique AWS shape.
+ * Scans raw source text rather than only PHP AST literals so credentials in config or fixture files are caught too:
+ * - Skips matches inside comments and obvious dummy values, and redacts every reported value.
+ * - Reports Warning severity with High confidence because the fixed `AKIA`/`ASIA` shape is near-unique to AWS.
  */
 final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
 {
@@ -56,8 +55,8 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
+        // Fast pre-screen: files without an AKIA or ASIA prefix cannot contain a supported AWS access-key ID.
         if (!str_contains($analysisUnit->source, 'AKIA') && !str_contains($analysisUnit->source, 'ASIA')) {
-
             return [];
         }
 
@@ -67,14 +66,16 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
         $findings      = [];
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
 
+        // Judge each match independently so one example key in a comment does not hide a live-shaped key on the next line.
         foreach ($matches[0] as $match) {
             [$candidateSecret, $offset] = $match;
 
+            // Documentation examples inside PHP comments are skipped rather than reported as live credentials.
             if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
                 continue;
             }
 
-
+            // Skip vendor-documented samples and placeholder tokens such as AKIA...EXAMPLE before reporting.
             if (SecretScannerHelper::isLikelyDummyValue($candidateSecret, shouldSplitIdentifierWords: false)) {
                 continue;
             }
@@ -84,15 +85,15 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
                 continue;
             }
 
-            $findings[] = SecretScannerHelper::finding(
-                analysisUnit: $analysisUnit,
-                ruleId:       self::ID,
-                message:      sprintf('Potential AWS access key detected: %s.', SecretScannerHelper::categoryMarker('aws-access-key')),
-                line:         SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
-                confidence:   Confidence::High,
-                detector:     'aws-access-key',
+            $findings[] = SecretScannerHelper::findingAtOffset(
+                analysisUnit:  $analysisUnit,
+                ruleId:        self::ID,
+                message:       sprintf('Potential AWS access key detected: %s.', SecretScannerHelper::categoryMarker('aws-access-key')),
+                offset:        $offset,
+                confidence:    Confidence::High,
+                detector:      'aws-access-key',
                 displayMarker: SecretScannerHelper::categoryMarker('aws-access-key'),
-                remediation:  'Remove the key from source and rotate it if it was real.',
+                remediation:   'Remove the key from source and rotate it if it was real.',
             );
         }
 

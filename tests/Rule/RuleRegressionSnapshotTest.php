@@ -131,8 +131,10 @@ final class RuleRegressionSnapshotTest extends TestCase
 
 
 
+        // 0.6.0 PR #14 fix (2026-11-25): sensitive-data.* findings now emit 1-based column offsets so two secrets of
+        // the same rule on the same line survive deduplication; unit count (163) and finding count (1947) are unchanged.
         self::assertSame(
-            '5584bf85948a6df51c074d38a3816efef6523deb70b77f92de23bba5be2b95fa',
+            '603e7eb902eb7518d86ac1a784e8c16cd553d389eb377e9fb1beb649fd2dff10',
             hash('sha256', $json),
         );
     }

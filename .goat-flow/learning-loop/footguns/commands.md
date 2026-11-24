@@ -1,6 +1,6 @@
 ---
 category: commands
-last_reviewed: 2026-09-25
+last_reviewed: 2026-11-25
 ---
 
 # CLI Command Footguns
@@ -77,6 +77,20 @@ subprocess runs with its working directory at the scanned project root.
 
 **Prevention:** Change what a typed CLI path means at the CLI edge, not in a loader other code constructs directly.
 Run the whole suite, not only the new CLI test, before calling the change done.
+
+## Footgun: ConfigLoader packageRoot fallback leaks this checkout's dogfood config onto config-less targets
+
+**Status:** active | **Created:** 2026-11-25 | **Evidence:** ACTUAL_MEASURED
+**Decision changed:** Whether a CLI command passes `ConfigLoader::packageRoot()` as `$fallbackConfigRoot` when loading user configuration.
+**Trigger phase:** ACT
+**Caught at:** VERIFY
+**hallucination-risk:** high
+
+**Prevention:** Construct `ConfigLoader` with `$fallbackConfigRoot = null` (the default) in every CLI command (`src/Cli/Command/SummaryCommand.php`, search: `new ConfigLoader($projectRoot`). Reserve `ConfigLoader::packageRoot()` (`src/Engine/Config/ConfigLoader.php`, search: `public static function packageRoot`) strictly for locating bundled `extends:` presets under `resources/profiles/`. Whenever changing config discovery or CLI defaults, run a subprocess test against an external config-less temp directory from a source checkout (see `tests/Console/GruffCliSummaryTest.php`, search: `testSummaryOnConfiglessProjectUsesRegistryDefaultsInsteadOfPackageCheckoutConfig`).
+
+In a Packagist install, `.gitattributes` (search: `.gruff-php.yaml         export-ignore`) excludes `.gruff-php.yaml`, so passing `ConfigLoader::packageRoot()` as `$fallbackConfigRoot` falls back cleanly to registry defaults. From a source checkout, however, `packageRoot()` contains `gruff-php`'s own dogfood `.gruff-php.yaml`, so every CLI command silently inherited this repository's dogfood overrides (such as enabling default-off `complexity.maintainability-index`) whenever scanning an external project without its own config.
+
+**Evidence:** Measured 2026-11-24 during 0.6.0 conformance: all 1,292 PHPUnit tests passed while `gruff-spec` (`--suite text --port php`) failed with `php summary: text composite 86.06 disagrees with machine composite 84.51` because `summary` loaded `gruff-php`'s checkout `.gruff-php.yaml` onto the config-less fixture tree. Removing `ConfigLoader::packageRoot()` from all seven CLI call sites (`AnalyseCommandSetupBuilder`, `CheckIgnoreCommand`, `HookCommand`, `ReportCommand`, `SummaryCommand`, `DashboardScanRunner`, `DashboardStateFactory`) resolved the failure and passed `gruff-spec --suite text --port php` (6 checks, exit `0`).
 
 ## Resolved Entries
 

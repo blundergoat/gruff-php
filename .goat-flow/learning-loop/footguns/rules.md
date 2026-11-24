@@ -1,6 +1,6 @@
 ---
 category: rules
-last_reviewed: 2026-10-15
+last_reviewed: 2026-11-25
 ---
 
 # Rule Footguns
@@ -41,30 +41,31 @@ Constructor-promoted properties are represented as `Node\Param` entries with vis
 
 ## Footgun: Retiring a rule leaves stale count references in five doc artefacts
 
-**Status:** active | **Created:** 2026-05-25 | **Evidence:** OBSERVED
+**Status:** active | **Created:** 2026-05-25 | **Evidence:** ACTUAL_MEASURED
+**Decision changed:** Which doc surfaces and prose checks must run after retiring or adding rules before trusting preflight's green Documentation drift check.
+**Trigger phase:** ACT
+**Caught at:** VERIFY
+**Incident count:** 2 | **Latest occurrence:** 2026-11-25
 
-The rule registry's true count lives only in `src/Rules/RuleRegistry.php` (search: `NAMING_RULE_PRIORITY`) - that constant plus the public registration block - but human-readable counts of the same facts are stamped in five other artefacts that don't auto-update. The five stamp locations are:
+**Prevention:** After retiring or adding rules in `src/Rules/RuleRegistry.php`, run four checks beyond `scripts/preflight-checks.sh`:
+1. Check all five count stamps (`README.md` rule catalogue + pillar table, `docs/rules.md` `Summary By Pillar` table + `### <pillar> (N)` headings, and `.goat-flow/architecture.md` prose counts) and verify the `docs/rules.md` pillar table sums to `Total rules:`.
+2. Grep `docs/` for every retired rule's option names (not only its backticked rule ID), because orphaned option prose carries no rule ID and bypasses the phantom-rule check.
+3. Cross-check prepared `CHANGELOG.md` and `UPGRADING.md` sections against live `php bin/gruff-php list-rules --format=json` to strip superseded intermediate bullets for rules retired later in the same release and to verify exact `defaultEnabled: false` and `falsePositiveShapes` counts.
+4. Keep `src/Engine/Config/ConfigMigrator.php` (search: `RETIRED_RULE_IDS`) disjoint from active registered rules.
+
+The rule registry's true count lives only in `src/Rules/RuleRegistry.php` (search: `NAMING_RULE_PRIORITY`) - that constant plus the public registration block - but human-readable counts of the same facts are stamped in five other artefacts that don't auto-update:
 
 ```text
-README.md                       — quality-table line ("Rule catalogue")
-README.md                       — per-pillar tally row    | `naming` | N |
-docs/rules.md                   — same pillar tally       | `naming` | N |
-docs/rules.md                   — per-pillar section heading  ### `naming` (N)
-.goat-flow/architecture.md      — prose count ("exposes N rule ids")
+README.md                       - quality-table line ("Rule catalogue")
+README.md                       - per-pillar tally row    | `naming` | N |
+docs/rules.md                   - same pillar tally       | `naming` | N |
+docs/rules.md                   - per-pillar section heading  ### `naming` (N)
+.goat-flow/architecture.md      - prose count ("exposes N rule ids")
 ```
 
-PR #6 retired `naming.parameter-type-name`, dropping the registry count from 120 → 119 and the naming-pillar count from 12 → 11. The PR updated the `docs/rules.md` pillar tally but missed the other four stamps. CodeRabbit's outside-diff sweep caught two of the four (the `docs/rules.md` section heading and the `architecture.md` prose); the two README stamps weren't in the PR's touched-file set so neither AI reviewer surfaced them.
+PR #6 retired `naming.parameter-type-name`, dropping the registry count from 120 to 119 and the naming-pillar count from 12 to 11. The PR updated the `docs/rules.md` pillar tally but missed the other four stamps. Since then, `scripts/preflight-checks.sh` (search: `Compare every per-pillar table row in the README`) checks `README.md` pillar rows and `docs/rules.md`'s `Total rules:` and `falsePositiveShapes` lines, plus backticked phantom rule IDs.
 
-Since then, preflight gates the two README stamps: the Documentation drift step in `scripts/preflight-checks.sh` (search: `Compare every per-pillar table row in the README`) fails when a README pillar row or the `N rules across N pillars` claim disagrees with `list-rules`. For `docs/rules.md` it checks only the `Total rules:` line and the false-positive-shape count, so the `docs/rules.md` pillar tally and section heading and the prose count in `.goat-flow/architecture.md` (search: `rule ids through`) are still manual. Re-checked 2026-10-03.
-
-**Prevention:** When retiring or adding a rule, after editing `src/Rules/RuleRegistry.php` run a sweep over the five stamp locations above. Greppable form:
-
-```bash
-grep -rn 'exposes [0-9]* rule\|Rule catalogue\|^|`naming`\|^### `naming` (' \
-    README.md docs/rules.md .goat-flow/architecture.md
-```
-
-Update every hit before claiming retirement done; do not rely on a single PR review to surface all of them — outside-diff coverage is bounded by which files the PR touches.
+**Recurrence 2026-11-25:** During the 0.6.0 46-rule retirement (`ADR-034`), preflight's Documentation drift check passed while `docs/rules.md` still listed `test-quality | 19` (summing to 84 instead of 83) alongside four orphaned option paragraphs without backticked rule IDs (`allowedSymbols` under `maintainability`; `stateAdjectiveAllowlist`, `acceptedBooleanNames`, and `includePublicApi` under `naming`), `docs/configuration.md` still described retired Boolean-naming `remediationAction` behaviour, and the prepared `0.6.0` section of `CHANGELOG.md` and `UPGRADING.md` still carried pre-ADR-034 draft bullets for retired rules (`waste.one-line-method`, `modernisation.named-argument-opportunity`, `test-quality.test-method-too-long`, six retired `test-quality.*` opt-in rules) plus a stale `64` medium/low `falsePositiveShapes` count (live count: `42` medium/low, `47` total). Manual cross-checking against `php bin/gruff-php list-rules --format=json` caught and reconciled all of them.
 
 ## Footgun: PHPStan rejects prose attached to multiline array-shape tags
 
@@ -145,6 +146,20 @@ The size rules treat immutable value objects gently: `src/Rules/Size/PropertyCou
 **Evidence:** `tests/Rule/Size/SubstantiveLineCounterTest.php` (search: `testEvictsCachedPrefixBeforeUnitRelease`) pins the zero as expected behaviour: it evicts, releases, then asserts `countAll()` returns `0`. The trap is currently unreachable, and that is a property of the call sites rather than of the counter: `src/Cli/Command/BranchReviewBuilder.php` (search: `$baseRegistry->analyse`) re-analyses base units but omits `shouldReleaseUnitsAfterAnalysis`, which defaults to `false`, and also passes `$projectUnits`, which independently forces `$canReleaseUnits` to `false`. `SubstantiveLineCounter` is consumed only by `src/Rules/Size/FileLengthRule.php` and `src/Rules/Size/ClassLengthRule.php`, both per-unit rules that run before the eviction in the same iteration.
 
 **Prevention:** Before adding a caller that reuses `$sources->analysisUnits` after `RuleRegistry::analyse()`, confirm whether that call released them. Never pass units through a second size-rule pass without re-parsing. If a future caller genuinely needs post-release counting, make the counter fail loudly on a released unit rather than returning `0`; a zero here is indistinguishable from a genuinely empty file.
+
+## Footgun: Built-in `naming.abbreviation-allowlist` exemptions must stay disjoint from the sixteen-word init seed
+
+**Status:** active | **Created:** 2026-11-25 | **Evidence:** OBSERVED
+**Decision changed:** Which short words may be added to `AbbreviationAllowlistRule::BUILT_IN_NON_ABBREVIATIONS` without breaking family replace-not-merge semantics.
+**Trigger phase:** ACT
+**Caught at:** VERIFY
+**hallucination-risk:** high
+
+**Prevention:** Keep `src/Rules/Naming/AbbreviationAllowlistRule.php` (search: `BUILT_IN_NON_ABBREVIATIONS`) strictly disjoint from the sixteen ratified terms in `src/Engine/Config/AnalysisConfig.php` (search: `DEFAULT_ACCEPTED_ABBREVIATIONS`). Preserve the disjointness invariant in `tests/Rule/Naming/NamingRuleConfigurationTest.php` (search: `testBuiltInNonAbbreviationsStayDisjointFromRatifiedSixteenSeed`) and verify `gruff-spec` `conformance-bootstrap` after any allowlist change.
+
+`FAMILY-CONTRACT.md` section 8 requires `allowlists.acceptedAbbreviations` to replace the 16-word default seed rather than merge with it, and `gruff-spec` (`conformance-bootstrap`) tests that contract by omitting a seeded word (`rx`) and asserting that it reports. Adding any seeded word (such as `age`, `app`, `db`, `fs`, `id`, `io`, `key`, `log`, `max`, `min`, `now`, `raw`, `rx`, `tx`, `ui`, or `url`) to `BUILT_IN_NON_ABBREVIATIONS` unconditionally silences that word even when a project replaces `acceptedAbbreviations`, masking replace-not-merge and breaking cross-port conformance.
+
+**Evidence:** Verified 2026-11-24 against `src/Engine/Config/AnalysisConfig.php` (search: `DEFAULT_ACCEPTED_ABBREVIATIONS`), `src/Rules/Naming/AbbreviationAllowlistRule.php` (search: `BUILT_IN_NON_ABBREVIATIONS`), and `tests/Rule/Naming/NamingRuleConfigurationTest.php` (search: `testAbbreviationAllowlistExemptsPlainEnglishWordsAndUniversalTechTerms`), with `gruff-spec --suite conformance-bootstrap --port php` exiting `0`.
 
 ## Resolved Entries
 

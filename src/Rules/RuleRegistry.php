@@ -106,10 +106,14 @@ use InvalidArgumentException;
 use WeakMap;
 
 /**
- * The catalogue of every analysis rule and the engine that runs them. Holds each rule keyed by id, snapshots
- * their definitions once, and - given an AnalysisConfig - hands back only the enabled set, memoised per config.
- * Drives both the one-shot analyse() flow and the streaming begin/analyseUnit/end pipeline that keeps a large
- * codebase's peak memory near a single unit, then dedupes and canonically orders every finding for the report.
+ * Owns the built-in rule catalogue and executes enabled rules during `analyse`, `summary`, `report`, and `hook`.
+ *
+ * Callers use this registry to validate configured rule IDs, resolve retired aliases, and discover which static pillars are active.
+ *
+ * Execution responsibilities:
+ * - Resolves enabled rules from `AnalysisConfig` and memoises each config's filtered rule set.
+ * - Supports both one-shot `analyse()` and streaming per-unit passes to keep peak memory low on large projects.
+ * - Deduplicates overlapping findings and sorts surviving findings into canonical report order.
  */
 final class RuleRegistry
 {
@@ -139,9 +143,7 @@ final class RuleRegistry
     /**
      * Rule definitions captured once at construction, keyed by rule id in registry order.
      *
-     * Calling definition() rebuilds a RuleDefinition (with its preg-validating
-     * constructor) on every invocation, so the enabled-rule filter reads from
-     * this snapshot instead of re-asking each rule per call.
+     * Calling `definition()` rebuilds a RuleDefinition (with its regex validation) every time, so enabled-rule filters read this snapshot instead.
      *
      * @var array<string, RuleDefinition>
      */
@@ -150,9 +152,7 @@ final class RuleRegistry
     /**
      * Enabled-rule lists memoised per AnalysisConfig instance.
      *
-     * AnalysisConfig is immutable (every with*() returns a new instance), so
-     * object identity is a sound cache key and WeakMap keeps entries from
-     * outliving their config.
+     * AnalysisConfig is immutable (every `with*()` returns a new instance), so object identity is a sound cache key and WeakMap avoids leaks.
      *
      * @var WeakMap<AnalysisConfig, list<RuleInterface|ProjectRuleInterface>>
      */
@@ -170,6 +170,7 @@ final class RuleRegistry
         $indexedRules       = [];
         $indexedDefinitions = [];
 
+        // Index each supplied rule and snapshot its metadata while guarding against duplicate rule IDs.
         foreach ($rules as $rule) {
             $definition = $rule->definition();
             $id         = $definition->id;
@@ -329,7 +330,9 @@ final class RuleRegistry
     public function unknownRuleIds(array $ruleIds): array
     {
         $unknown = [];
+        // Check every caller-supplied rule ID so misspelled flags or config entries fail loudly.
         foreach ($ruleIds as $ruleId) {
+            // Skip duplicates and known IDs (including retired aliases mapped by has()).
             if (isset($unknown[$ruleId]) || $this->has($ruleId)) {
                 continue;
             }
@@ -383,6 +386,7 @@ final class RuleRegistry
         foreach ($this->enabledRules($config) as $rule) {
             $pillar = $rule->definition()->pillar;
 
+            // Mutation scoring is attached separately only when the caller supplies an Infection report.
             if ($pillar === Pillar::Mutation) {
                 continue;
             }
@@ -394,7 +398,9 @@ final class RuleRegistry
         if ($profilePillars !== null) {
             $matched = [];
 
+            // Keep only profile pillars that still have at least one enabled rule under the user's config.
             foreach ($profilePillars as $pillar) {
+                // Omit pillars the user disabled via config or --exclude-rule so they do not inflate the profile score.
                 if (isset($enabledByValue[$pillar->value])) {
                     $matched[] = $pillar;
                 }
@@ -405,7 +411,9 @@ final class RuleRegistry
 
         $ordered = [];
 
+        // Emit built-in static pillars in canonical report order so every report displays pillars consistently.
         foreach (ScoreCalculator::staticPillarOrder() as $pillar) {
+            // Include the pillar only when at least one of its rules actually ran in this scan.
             if (isset($enabledByValue[$pillar->value])) {
                 $ordered[] = $pillar;
             }
@@ -413,6 +421,7 @@ final class RuleRegistry
 
         // Retain any enabled pillar outside the built-in static list (for example, a custom rule pillar).
         foreach ($enabledByValue as $pillar) {
+            // Append non-standard pillars after the canonical static list without duplicating entries.
             if (!in_array($pillar, $ordered, true)) {
                 $ordered[] = $pillar;
             }
@@ -433,7 +442,9 @@ final class RuleRegistry
         $selection    = $config->ruleSelection();
         $enabledRules = [];
 
+        // Keep only rules enabled by per-rule settings and permitted by the active selection or profile.
         foreach ($this->definitions as $ruleId => $definition) {
+            // A rule must pass both its own enabled toggle and any selection/profile filter before running.
             if ($config->ruleSettings($ruleId)->enabled && $selection->allows($definition)) {
                 $enabledRules[] = $this->rules[$ruleId];
             }
@@ -451,7 +462,9 @@ final class RuleRegistry
      */
     public function hasEnabledProjectRules(AnalysisConfig $config): bool
     {
+        // Check enabled rules to see whether any require whole-project context beyond a single file.
         foreach ($this->enabledRules($config) as $rule) {
+            // One enabled project rule means callers must feed project context instead of only target files.
             if ($rule instanceof ProjectRuleInterface) {
                 return true;
             }
@@ -465,13 +478,15 @@ final class RuleRegistry
      *
      * @param AnalysisConfig $config - Config used to filter registered rules.
      *
-     * @return list<string> - Enabled ProjectRuleInterface ids in registry order.
+     * @return list<string> - Enabled ProjectRuleInterface ids in registry order; empty when only file-level rules are enabled.
      */
     public function enabledProjectRuleIds(AnalysisConfig $config): array
     {
         $ruleIds = [];
 
+        // Collect each enabled project-wide rule ID in deterministic registry order.
         foreach ($this->enabledRules($config) as $rule) {
+            // Only whole-project rules belong in the project-rule list shown for scoped runs.
             if ($rule instanceof ProjectRuleInterface) {
                 $ruleIds[] = $rule->definition()->id;
             }
@@ -490,7 +505,9 @@ final class RuleRegistry
      */
     public function supportsStreaming(RuleContext $ruleContext): bool
     {
+        // Inspect enabled rules to confirm none require the full project AST buffered in memory at once.
         foreach ($this->enabledRules($ruleContext->config) as $rule) {
+            // Any non-streaming project rule forces the runner to fall back to the buffered analysis path.
             if ($rule instanceof ProjectRuleInterface && !$rule instanceof ProjectRuleAccumulator) {
                 return false;
             }
@@ -508,7 +525,9 @@ final class RuleRegistry
      */
     public function beginStreaming(RuleContext $ruleContext): void
     {
+        // Reset every enabled streaming project rule before feeding parsed files into this run.
         foreach ($this->enabledRules($ruleContext->config) as $rule) {
+            // Per-unit rules are stateless, so only accumulators need a start-of-project reset.
             if ($rule instanceof ProjectRuleAccumulator) {
                 $rule->startProject($ruleContext);
             }
@@ -560,12 +579,17 @@ final class RuleRegistry
 
         // Non-PHP and deep-scan-bounded units run only rules that do not require a complete PHP AST.
         foreach ($this->enabledRules($ruleContext->config) as $rule) {
+            // Skip project-only rules here; they run through the streaming or legacy project pass.
             if (!$rule instanceof RuleInterface) {
                 continue;
             }
+
+            // Non-PHP files (such as YAML or env fixtures) can only run source-text scanners.
             if (!$isPhp && !$rule instanceof SourceTextRuleInterface) {
                 continue;
             }
+
+            // Oversized files skipped by deep AST parsing still run source-text rules and file-length checks.
             if ($analysisUnit->isDeepScanBounded()
                 && !$rule instanceof SourceTextRuleInterface
                 && !$rule instanceof FileLengthRule
@@ -573,6 +597,7 @@ final class RuleRegistry
                 continue;
             }
 
+            // Fast path when no profiling observer is attached (the default CLI run).
             if ($ruleRunnerObserver === null) {
                 array_push($findings, ...$rule->analyse($analysisUnit, $ruleContext));
                 continue;
@@ -610,16 +635,22 @@ final class RuleRegistry
         $isPhp = $analysisUnit->file->isPhp();
         // Non-PHP and deep-scan-bounded units contribute only to source-text accumulators.
         foreach ($this->enabledRules($ruleContext->config) as $rule) {
+            // Skip per-unit rules and legacy project rules during the streaming accumulation pass.
             if (!$rule instanceof ProjectRuleAccumulator) {
                 continue;
             }
+
+            // Non-PHP files only feed accumulators that scan raw text rather than PHP AST nodes.
             if (!$isPhp && !$rule instanceof ProjectSourceTextRuleAccumulator) {
                 continue;
             }
+
+            // Bounded oversized files have no AST, so only source-text accumulators can inspect them.
             if ($analysisUnit->isDeepScanBounded() && !$rule instanceof ProjectSourceTextRuleAccumulator) {
                 continue;
             }
 
+            // Fast path when no per-rule profiling observer is active.
             if ($ruleRunnerObserver === null) {
                 $rule->accumulate($analysisUnit, $ruleContext);
                 continue;
@@ -636,7 +667,7 @@ final class RuleRegistry
      * Finalises the project-rule accumulators and returns their findings after streaming completes.
      *
      * @param RuleContext             $ruleContext        - Context used to select and flush each enabled accumulator.
-     * @param RuleRunnerObserver|null $ruleRunnerObserver - Optional per-rule timing hook.
+     * @param RuleRunnerObserver|null $ruleRunnerObserver - Optional per-rule timing hook; null skips per-rule timing.
      *
      * @return list<Finding> - project-level findings flushed from accumulator state; empty when no accumulators ran or matched
      */
@@ -646,11 +677,14 @@ final class RuleRegistry
     ): array {
         $findings = [];
 
+        // Flush every enabled streaming project rule once all files have been accumulated.
         foreach ($this->enabledRules($ruleContext->config) as $rule) {
+            // Only streaming project accumulators hold deferred project-wide findings.
             if (!$rule instanceof ProjectRuleAccumulator) {
                 continue;
             }
 
+            // Fast path when no profiling observer is attached.
             if ($ruleRunnerObserver === null) {
                 array_push($findings, ...$rule->finishProject($ruleContext));
                 continue;
@@ -722,11 +756,14 @@ final class RuleRegistry
         $this->beginStreaming($ruleContext);
 
         $findings = [];
+        // Run per-unit rules on every target unit, streaming into accumulators and freeing memory when safe.
         foreach ($units as $unit) {
             array_push($findings, ...$this->runPerUnitRules($unit, $ruleContext, $ruleRunnerObserver));
+            // When no separate project unit list was supplied, target units double as project context.
             if ($projectUnits === null) {
                 $this->accumulateForUnit($unit, $ruleContext, $ruleRunnerObserver);
             }
+            // Free AST caches right after analysing each unit to keep large repo scans within memory limits.
             if ($canReleaseUnits) {
                 NodeIndex::evictUnit($unit);
                 SubstantiveLineCounter::evictUnit($unit);
@@ -734,7 +771,9 @@ final class RuleRegistry
             }
         }
 
+        // Scoped runs (such as diff or single-file scans) supply a broader project unit list for whole-project rules.
         if ($projectUnits !== null) {
+            // Feed each context unit so project-level rules see cross-file symbols outside the diff.
             foreach ($projectUnits as $contextUnit) {
                 $this->accumulateForUnit($contextUnit, $ruleContext, $ruleRunnerObserver);
             }
@@ -765,7 +804,9 @@ final class RuleRegistry
     private function legacyProjectRules(RuleContext $ruleContext): array
     {
         $rules = [];
+        // Collect enabled project rules that have not been migrated to the streaming accumulator interface.
         foreach ($this->enabledRules($ruleContext->config) as $rule) {
+            // Keep only whole-project rules that cannot process files incrementally.
             if ($rule instanceof ProjectRuleInterface && !$rule instanceof ProjectRuleAccumulator) {
                 $rules[] = $rule;
             }
@@ -780,7 +821,7 @@ final class RuleRegistry
      * @param list<ProjectRuleInterface> $rules              - Project rules to run.
      * @param list<AnalysisUnit>         $contextUnits       - Candidate units available to project rules.
      * @param RuleContext                $ruleContext        - Context passed to each supplied project rule during analysis.
-     * @param RuleRunnerObserver|null    $ruleRunnerObserver - Optional per-rule timing hook.
+     * @param RuleRunnerObserver|null    $ruleRunnerObserver - Optional per-rule timing hook; null skips per-rule timing.
      *
      * @return list<Finding> - findings from the supplied legacy project rules; empty when no parse-clean, unbounded PHP units remain eligible
      */
@@ -803,7 +844,9 @@ final class RuleRegistry
         }
 
         $findings = [];
+        // Execute each legacy project rule against the full set of parse-clean PHP units.
         foreach ($rules as $rule) {
+            // Fast path when no profiling observer is attached.
             if ($ruleRunnerObserver === null) {
                 array_push($findings, ...$rule->analyseProject($analyseableUnits, $ruleContext));
                 continue;
@@ -831,6 +874,7 @@ final class RuleRegistry
         $seen           = [];
         $uniqueFindings = [];
 
+        // Keep only the first finding for each exact rule, location, symbol, message, and metadata tuple.
         foreach ($findings as $finding) {
             $key = implode("\0", [
                 $finding->ruleId,
@@ -868,19 +912,23 @@ final class RuleRegistry
         $bestByIdentifier = [];
         $selectedIndexes  = [];
 
+        // Partition non-overlapping findings straight through while picking the highest-priority naming rule per identifier.
         foreach ($findings as $index => $finding) {
             $key = $this->namingOverlapKey($finding);
+            // Non-naming findings or findings without an identifier never collide here, so keep them immediately.
             if ($key === null) {
                 $selectedIndexes[$index] = true;
                 continue;
             }
 
             $priority = self::NAMING_RULE_PRIORITY[$finding->ruleId];
+            // Prefer the lower numeric priority rank (more specific naming rule) for the same identifier location.
             if (!isset($bestByIdentifier[$key]) || $priority < $bestByIdentifier[$key]['priority']) {
                 $bestByIdentifier[$key] = ['index' => $index, 'priority' => $priority];
             }
         }
 
+        // Restore each winning naming finding's original index so report ordering remains predictable.
         foreach ($bestByIdentifier as $selected) {
             $selectedIndexes[$selected['index']] = true;
         }
@@ -899,11 +947,13 @@ final class RuleRegistry
      */
     private function namingOverlapKey(Finding $finding): ?string
     {
+        // Findings outside the naming overlap priority map are never merged with other rules.
         if (!isset(self::NAMING_RULE_PRIORITY[$finding->ruleId])) {
             return null;
         }
 
         $identifierName = $this->findingIdentifierName($finding);
+        // Without an identifier name to compare, two naming findings cannot be proven to describe the same symbol.
         if ($identifierName === null) {
             return null;
         }
@@ -926,8 +976,10 @@ final class RuleRegistry
      */
     private function findingIdentifierName(Finding $finding): ?string
     {
+        // Check naming-rule metadata keys in preference order before falling back to the enclosing symbol.
         foreach (['identifierName', 'variable', 'parameter'] as $metadataKey) {
             $metadataValue = $finding->metadata[$metadataKey] ?? null;
+            // Use the first populated string metadata key so cross-rule naming dedup compares the exact identifier.
             if (is_string($metadataValue)) {
                 return $metadataValue;
             }

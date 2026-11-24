@@ -413,6 +413,56 @@ final class SecurityRulesTest extends TestCase
     }
 
     /**
+     * Verify ProcessCommandConstructionRule flags a trailing unquoted backslash before escapeshellarg() and userland escapeshellarg() overrides.
+     *
+     * @return void - Asserts findings only on unsafe shell-escaping bypasses while keeping genuine global escaping quiet.
+     */
+    public function testProcessCommandConstructionRejectsTrailingBackslashAndUserlandEscapeshellarg(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'gruff-proc-');
+        self::assertIsString($path);
+        $source = <<<'PHP'
+<?php
+
+namespace App;
+
+function escapeshellarg(string $value): string
+{
+    return $value;
+}
+
+function run(string $input): void
+{
+    exec('printf %s \\' . \escapeshellarg($input));
+    exec('printf %s \\\\' . \escapeshellarg($input));
+    exec('ls ' . escapeshellarg($input));
+    exec('ls ' . \escapeshellarg($input));
+}
+PHP;
+        file_put_contents($path, $source);
+
+        try {
+            $unit     = (new PhpFileParser())->parse(new SourceFile($path, 'src/Command.php', SourceFile::TYPE_PHP));
+            $findings = $this->findingsForRule($unit, ProcessCommandConstructionRule::ID);
+            self::assertSame([12, 14], self::findingLines($findings));
+
+            $importedSource = "<?php\nnamespace App;\nuse function Evil\\escapeshellarg;\nfunction run(string \$input): void\n{\n    exec('ls ' . escapeshellarg(\$input));\n}\n";
+            file_put_contents($path, $importedSource);
+            $importedUnit     = (new PhpFileParser())->parse(new SourceFile($path, 'src/Imported.php', SourceFile::TYPE_PHP));
+            $importedFindings = $this->findingsForRule($importedUnit, ProcessCommandConstructionRule::ID);
+            self::assertSame([6], self::findingLines($importedFindings));
+
+            $aliasedGlobalSource = "<?php\nnamespace App;\nuse function trim as escapeshellarg;\nfunction run(string \$input): void\n{\n    exec('ls ' . escapeshellarg(\$input));\n}\n";
+            file_put_contents($path, $aliasedGlobalSource);
+            $aliasedUnit     = (new PhpFileParser())->parse(new SourceFile($path, 'src/Aliased.php', SourceFile::TYPE_PHP));
+            $aliasedFindings = $this->findingsForRule($aliasedUnit, ProcessCommandConstructionRule::ID);
+            self::assertSame([6], self::findingLines($aliasedFindings));
+        } finally {
+            unlink($path);
+        }
+    }
+
+    /**
      * Assert the expected security finding count for a rule.
      *
      * @param string        $ruleId        - rule id whose findings are counted; all other rules' findings are filtered out first

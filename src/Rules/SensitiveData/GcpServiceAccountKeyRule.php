@@ -62,14 +62,13 @@ final readonly class GcpServiceAccountKeyRule implements SourceTextRuleInterface
         }
 
         $privateKeyValue = $this->privateKeyValue($source);
+        // A short extracted body is treated as placeholder text rather than reportable key material.
         if ($this->looksLikePlaceholderKey($privateKeyValue, $source)) {
-            // A short extracted body is treated as placeholder text rather than reportable key material.
             return [];
         }
 
         // Match the service-account marker that anchors this rule's distinct finding.
         if (preg_match_all('/"type"\s*:\s*"service_account"/', $source, $matches, PREG_OFFSET_CAPTURE) < 1) {
-            // The initial substring check found no exact type field for this rule to anchor.
             return [];
         }
 
@@ -77,6 +76,7 @@ final readonly class GcpServiceAccountKeyRule implements SourceTextRuleInterface
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
 
         $findings = [];
+        // Emit one finding per un-commented service-account marker, with column coordinates so compact JSON files keep every match.
         foreach ($matches[0] as $match) {
             [, $offset] = $match;
             // Skip markers inside comments as documentation examples; a real key left in a comment is not reported.
@@ -84,15 +84,15 @@ final readonly class GcpServiceAccountKeyRule implements SourceTextRuleInterface
                 continue;
             }
 
-            $findings[] = SecretScannerHelper::finding(
-                analysisUnit: $analysisUnit,
-                ruleId:       self::ID,
-                message:      sprintf('GCP service-account key detected (type: service_account with embedded private key): %s.', $displayMarker),
-                line:         SecretScannerHelper::lineNumberForOffset($source, $offset),
-                confidence:   Confidence::High,
-                detector:     'gcp-service-account-key',
+            $findings[] = SecretScannerHelper::findingAtOffset(
+                analysisUnit:  $analysisUnit,
+                ruleId:        self::ID,
+                message:       sprintf('GCP service-account key detected (type: service_account with embedded private key): %s.', $displayMarker),
+                offset:        $offset,
+                confidence:    Confidence::High,
+                detector:      'gcp-service-account-key',
                 displayMarker: $displayMarker,
-                remediation:  'Remove the service-account key from source, rotate it in Google Cloud IAM, and load credentials from a secret manager or workload identity instead.',
+                remediation:   'Remove the service-account key from source, rotate it in Google Cloud IAM, and load credentials from a secret manager or workload identity instead.',
             );
         }
 
@@ -128,8 +128,8 @@ final readonly class GcpServiceAccountKeyRule implements SourceTextRuleInterface
     private function looksLikePlaceholderKey(?string $privateKeyValue, string $source): bool
     {
         $keyText = $privateKeyValue ?? $this->pemBlock($source);
+        // No extractable key body means this heuristic has no placeholder evidence and keeps the match reportable.
         if ($keyText === null) {
-            // No extractable key body means this heuristic has no placeholder evidence.
             return false;
         }
 

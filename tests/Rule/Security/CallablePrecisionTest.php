@@ -83,6 +83,25 @@ final class CallablePrecisionTest extends TestCase
     }
 
     /**
+     * Verify top-level request-assigned callables remain flagged even when guarded by is_callable().
+     *
+     * @return void - Asserts one dynamic-call finding for the file-scope request-controlled invocation.
+     */
+    public function testTopLevelRequestAssignedCallableIsNotExemptedByIsCallable(): void
+    {
+        $source    = "<?php\n\$fn = \$_GET['fn'];\nif (is_callable(\$fn)) {\n    \$fn();\n}\n";
+        $parser    = (new ParserFactory())->createForNewestSupportedVersion();
+        $traverser = new NodeTraverser(new NameResolver(null, ['replaceNodes' => false]), new ParentConnectingVisitor());
+        /** @var list<Stmt> $statements - Parsed top-level statements with names and parent links. */
+        $statements = $traverser->traverse($parser->parse($source) ?? []);
+        $unit       = new AnalysisUnit(new SourceFile(__FILE__, 'src/script.php'), $source, $statements, [], []);
+        $context    = new RuleContext(__DIR__, AnalysisConfig::fromRegistry(RuleRegistry::defaults()));
+        $findings   = (new DangerousFunctionCallRule())->analyse($unit, $context);
+
+        self::assertCount(1, $findings);
+    }
+
+    /**
      * Supplies bounded reproductions and nearby unsafe mutations for developers' callback code.
      *
      * @return iterable<string, array{string, int, 2?: string}> - Named source bodies and expected warnings; no production code is executed.
@@ -136,6 +155,9 @@ final class CallablePrecisionTest extends TestCase
         yield 'later loop write' => ['$handler = $this->callback; while ($condition) { $handler(); $handler = $unknown; }', 1];
         yield 'prior closure write does not escape its scope' => [
             '$nested = function () { $handler = null; }; $handler = $this->callback; $handler();', 0,
+        ];
+        yield 'call before annotated callable assignment remains flagged' => [
+            '$handler(); /** @var callable $handler */ $handler = $unknown;', 1,
         ];
     }
 }

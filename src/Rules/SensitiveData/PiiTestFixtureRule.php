@@ -113,32 +113,34 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
 
         $findings      = [];
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
+        // Run email, phone, and address patterns in turn so each match carries its specific category label and advice.
         foreach ($this->piiPatterns() as $piiPattern) {
-            // Collect every match of this shape with its byte offset, so a finding can name its line.
+            // Collect every match of this shape with its byte offset, so a finding can name its line and column.
             preg_match_all($piiPattern['pattern'], $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
             // Each match is judged on its own, so one example address does not hide a real one on the next line.
             foreach ($matches[0] as $match) {
                 [$matchedValue, $matchOffset] = $match;
+                // Skip documentation examples inside PHP comments so docblocks stay quiet.
                 if (SecretScannerHelper::isInsideComment($matchOffset, $commentRanges)) {
                     continue;
                 }
 
+                // Skip reserved domains, 555-010x numbers, author credits, URL userinfo, and marked synthetic addresses.
                 if ($this->isKnownNotPersonalData($piiPattern['name'], $matchedValue, $analysisUnit->source, $matchOffset)) {
                     continue;
                 }
 
-                $line          = SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $matchOffset);
                 $displayMarker = SecretScannerHelper::categoryMarker($piiPattern['name']);
-                $findings[]    = SecretScannerHelper::finding(
-                    analysisUnit: $analysisUnit,
-                    ruleId:       self::ID,
-                    message:      sprintf('Realistic-looking %s found in a test fixture: %s.', $piiPattern['name'], $displayMarker),
-                    line:         $line,
-                    confidence:   Confidence::Medium,
-                    detector:     $piiPattern['name'],
+                $findings[]    = SecretScannerHelper::findingAtOffset(
+                    analysisUnit:  $analysisUnit,
+                    ruleId:        self::ID,
+                    message:       sprintf('Realistic-looking %s found in a test fixture: %s.', $piiPattern['name'], $displayMarker),
+                    offset:        $matchOffset,
+                    confidence:    Confidence::Medium,
+                    detector:      $piiPattern['name'],
                     displayMarker: $displayMarker,
-                    remediation:  'Use reserved example domains (.example, .test, .invalid, .local, .localhost), '
+                    remediation:   'Use reserved example domains (.example, .test, .invalid, .local, .localhost), '
                         . 'phone numbers in the 555-010x block, and addresses with a synthetic marker word such as Test or Anytown.',
                 );
             }
@@ -220,6 +222,7 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     private function usesUndeliverableDomain(string $matchedValue): bool
     {
         $atPosition = strrpos($matchedValue, '@');
+        // Without an at sign there is no domain suffix to test.
         if ($atPosition === false) {
             return false;
         }
@@ -228,6 +231,7 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
 
         // Each reserved suffix keeps its leading dot, so only a whole label such as woo.local matches.
         foreach (self::RESERVED_DOMAIN_SUFFIXES as $reservedSuffix) {
+            // Matching any reserved test suffix confirms the mailbox cannot route real mail.
             if (str_ends_with($domain, $reservedSuffix)) {
                 return true;
             }

@@ -386,6 +386,56 @@ final class InitCliTest extends CliTestCase
     }
 
     /**
+     * Verify --force preserves reviewed sensitiveExclusions entries and refuses malformed ones without clobbering.
+     *
+     * @return void - Asserts valid exclusions survive forced regeneration and invalid ones fail while preserving the original file.
+     */
+    public function testInitForcePreservesExistingSensitiveExclusionsAndRejectsMalformedOnes(): void
+    {
+        $project    = $this->tempDir();
+        $configPath = $project . '/' . ConfigLoader::DEFAULT_CONFIG_FILE;
+
+        try {
+            $validConfig = implode("\n", [
+                'schemaVersion: gruff-php.config.v0.1',
+                'sensitiveExclusions:',
+                '    - rule: sensitive-data.aws-access-key',
+                '      path: tests/Fixtures/SensitiveData/synthetic-secrets.php',
+                '      symbol: Demo::sample()',
+                '      reason: Synthetic fixture key for scanner tests.',
+                '',
+            ]);
+            file_put_contents($configPath, $validConfig);
+
+            $preserveProcess = new Process([PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'init', '--force'], $project);
+            $preserveProcess->run();
+
+            self::assertSame(0, $preserveProcess->getExitCode(), $preserveProcess->getErrorOutput());
+            $decoded = $this->decodedConfig($configPath);
+            self::assertSame([
+                [
+                    'rule' => 'sensitive-data.aws-access-key',
+                    'path' => 'tests/Fixtures/SensitiveData/synthetic-secrets.php',
+                    'symbol' => 'Demo::sample()',
+                    'reason' => 'Synthetic fixture key for scanner tests.',
+                ],
+            ], $decoded['sensitiveExclusions'] ?? null);
+
+            $invalidConfig = "schemaVersion: gruff-php.config.v0.1\nsensitiveExclusions:\n    - rule: size.file-length\n      path: src/App.php\n      reason: Not a sensitive rule.\n";
+            file_put_contents($configPath, $invalidConfig);
+
+            $rejectProcess = new Process([PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'init', '--force'], $project);
+            $rejectProcess->run();
+
+            self::assertNotSame(0, $rejectProcess->getExitCode());
+            self::assertStringContainsString('sensitive-data', $rejectProcess->getOutput() . $rejectProcess->getErrorOutput());
+            self::assertSame($invalidConfig, file_get_contents($configPath));
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+
+    /**
      * Write an existing config with local path-ignore policy.
      *
      * @param string $configPath - Destination the pre-existing config is written to before init runs.

@@ -9,16 +9,20 @@ use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 
 /**
- * Converts 0.5 YAML settings for `gruff-php migrate-config` after an upgrade.
+ * Converts a 0.5 `.gruff-php.yaml` or `.gruff.yaml` file to the 0.6.0 config format when a user runs `gruff-php migrate-config`.
  *
- * Moves legacy command thresholds to `failOn`, drops retired preview and rule settings, and renames legacy rule aliases.
- * Returns the text and a change list so the command can preview the migration or write a new file.
+ * Typical path: a project hits a config-error on 0.6.0 and runs `gruff-php migrate-config --config .gruff-php.yaml --output .gruff-php.next.yaml`.
+ *
+ * The migrator updates only recognized legacy settings while leaving custom rules and unknown typos untouched:
+ * - Adds `schemaVersion: gruff-php.config.v0.1` when absent and moves per-command `minimumSeverity` maps to `failOn`.
+ * - Drops the retired `allowlists.secretPreviews` key and strips verified retired rule IDs from `rules:` and `selection:`.
+ * - Renames legacy rule aliases such as `docs.missing-public-phpdoc` to `docs.missing-phpdoc`, stopping if both keys already exist.
  */
 final class ConfigMigrator
 {
     /**
      * Verified rule IDs retired in ADR-006, ADR-014, ADR-018, ADR-023, ADR-026, ADR-027, ADR-034, and 0.6.0.
-     * Kept explicit so migration removes known retired IDs without silently deleting mistyped unknown rule names.
+     * Kept explicit so migration strips known retired IDs without silently deleting a user's mistyped rule name.
      *
      * @var array<string, true>
      */
@@ -91,42 +95,43 @@ final class ConfigMigrator
     }
 
     /**
-     * Migrates the YAML mapping while preserving unaffected configuration values.
+     * Migrates a 0.5 YAML config string to the 0.6.0 schema while preserving unaffected user settings.
      *
-     * @param string $original - Complete source configuration.
-     * @return array{text: string, changes: list<string>} - Migrated YAML, or original bytes when already current.
-     * @throws ConfigException - When the source cannot be migrated safely.
+     * @param string $original - Raw YAML text read from the user's config file; an empty string is rejected because it is not a mapping.
+     *
+     * @return array{text: string, changes: list<string>} - Migrated YAML and change lines; an empty change list preserves original bytes verbatim.
+     * @throws ConfigException - When the YAML is invalid, uses an unknown schemaVersion, or contains conflicting legacy and current settings.
      */
     public static function migrate(string $original): array
     {
         try {
             $config = Yaml::parse($original, Yaml::PARSE_EXCEPTION_ON_INVALID_TYPE);
         } catch (ParseException) {
-            // A malformed legacy preview list can appear in Symfony's YAML error text, so give a diagnostic without quoting it.
+            // For example, a user broke indentation or left an unclosed quote in `.gruff-php.yaml`; omit raw text so legacy previews cannot leak.
             throw new ConfigException('Invalid YAML in migration input.');
         }
 
-        // A legacy config needs named settings. A scalar or top-level list cannot be migrated as a project config.
+        // A project config must be a YAML mapping of named sections; a bare scalar, empty file, or top-level list cannot be migrated.
         if (!is_array($config) || ($config !== [] && array_is_list($config))) {
             throw new ConfigException('Migration input must be a YAML mapping.');
         }
 
         $changes = [];
 
-        // A legacy file without a schema marker gets the marker needed by the current loader.
+        // A 0.5 config without a schemaVersion receives the 0.6.0 marker so ConfigLoader accepts the migrated output.
         if (!array_key_exists('schemaVersion', $config)) {
             $config    = ['schemaVersion' => ConfigLoader::SCHEMA_VERSION] + $config;
             $changes[] = 'Add the required schemaVersion.';
         } elseif ($config['schemaVersion'] !== ConfigLoader::SCHEMA_VERSION) {
-            // Leave unknown schema versions alone because their settings may have different meanings.
+            // Refuse an unfamiliar schemaVersion rather than rewriting keys whose meaning may belong to another format.
             throw new ConfigException(sprintf('Unsupported schemaVersion in migration input. Expected "%s".', ConfigLoader::SCHEMA_VERSION));
         }
 
         $legacyExitThresholds = $config['minimumSeverity'] ?? null;
 
-        // A command-by-command minimumSeverity map is legacy. A scalar value already expresses a display floor.
+        // In 0.5, a per-command minimumSeverity map set exit gates; in 0.6.0, scalar minimumSeverity is the display floor and failOn sets gates.
         if (is_array($legacyExitThresholds)) {
-            // Ask the caller to reconcile both sets of exit thresholds rather than choosing one silently.
+            // If the user already started migrating by adding failOn alongside the old map, stop so they can reconcile both thresholds manually.
             if (array_key_exists('failOn', $config)) {
                 throw new ConfigException('Migration input sets both a legacy minimumSeverity mapping and failOn. Combine them before migrating.');
             }
@@ -138,10 +143,10 @@ final class ConfigMigrator
 
         $allowlists = $config['allowlists'] ?? null;
 
-        // Remove the retired preview setting so a migrated file cannot request raw secret previews.
+        // Drop the removed allowlists.secretPreviews key so the migrated file does not trip the 0.6.0 loader error.
         if (is_array($allowlists) && array_key_exists('secretPreviews', $allowlists)) {
             unset($allowlists['secretPreviews']);
-            // Drop the empty allowlists section when the preview setting was its only entry.
+            // Remove the allowlists block completely when secretPreviews was its only entry, avoiding an empty section.
             if ($allowlists === []) {
                 unset($config['allowlists']);
             } else {
@@ -153,42 +158,50 @@ final class ConfigMigrator
         $config = self::migrateRules($config, $changes);
         $config = self::migrateSelection($config, $changes);
 
-        return ['text' => $changes === [] ? $original : Yaml::dump($config, 10, 4), 'changes' => $changes];
+        return [
+            'text' => $changes === [] ? $original : Yaml::dump($config, 10, 4, Yaml::DUMP_EMPTY_ARRAY_AS_SEQUENCE),
+            'changes' => $changes,
+        ];
     }
 
     /**
-     * Strips verified retired rule blocks and renames legacy rule aliases under `rules:`, leaving unknown typos intact.
+     * Strips verified retired rule blocks and renames legacy aliases under `rules:`, leaving mistyped rule IDs intact for normal validation.
      *
-     * @param array<array-key, mixed> $config  - Decoded config mapping being migrated.
-     * @param list<string>            $changes - Human-readable migration summary lines appended in place.
+     * @param array<array-key, mixed> $config  - Decoded config mapping being migrated; missing or non-map `rules` passes through unchanged.
+     * @param list<string>            $changes - Human-readable migration summary lines appended in place for CLI output.
      *
-     * @return array<array-key, mixed> - Updated config mapping.
-     * @throws ConfigException - When both a legacy alias and its replacement exist under `rules:`.
+     * @return array<array-key, mixed> - Updated config mapping with retired overrides removed and legacy aliases renamed.
+     * @throws ConfigException - When both a legacy alias and its replacement key exist under `rules:`.
      */
     private static function migrateRules(array $config, array &$changes): array
     {
         $rules = $config['rules'] ?? null;
+        // Skip when the config defines no per-rule overrides or uses a non-map shape that ConfigLoader should diagnose.
         if (!is_array($rules) || ($rules !== [] && array_is_list($rules))) {
             return $config;
         }
 
-        $migrated     = [];
-        $removedCount = 0;
+        $migratedRules = [];
+        $removedCount  = 0;
 
+        // Inspect each configured rule override in user-authored order so untouched rules keep their exact position.
         foreach ($rules as $ruleId => $ruleConfig) {
+            // Preserve unexpected non-string keys untouched so normal config validation reports them accurately.
             if (!is_string($ruleId)) {
-                $migrated[$ruleId] = $ruleConfig;
+                $migratedRules[$ruleId] = $ruleConfig;
                 continue;
             }
 
+            // Drop verified retired 0.5 rule overrides that would otherwise make 0.6.0 reject the upgraded file.
             if (isset(self::RETIRED_RULE_IDS[$ruleId])) {
                 $removedCount++;
                 continue;
             }
 
             $canonicalId = RuleRegistry::canonicalRuleId($ruleId);
+            // Rename a retired alias such as docs.missing-public-phpdoc to its 0.6.0 rule ID when no conflict exists.
             if ($canonicalId !== $ruleId) {
-                // Avoid silently overwriting explicit settings when both legacy and replacement keys exist.
+                // Stop if both the old alias and the new ID are configured, so neither set of user options is silently discarded.
                 if (array_key_exists($canonicalId, $rules)) {
                     throw new ConfigException(sprintf(
                         'Migration input sets both legacy "%s" and "%s" under rules. Combine them before migrating.',
@@ -197,49 +210,54 @@ final class ConfigMigrator
                     ));
                 }
 
-                $migrated[$canonicalId] = $ruleConfig;
-                $changes[]              = sprintf('Rename legacy rule "%s" to "%s" under rules.', $ruleId, $canonicalId);
+                $migratedRules[$canonicalId] = $ruleConfig;
+                $changes[]                   = sprintf('Rename legacy rule "%s" to "%s" under rules.', $ruleId, $canonicalId);
                 continue;
             }
 
-            $migrated[$ruleId] = $ruleConfig;
+            $migratedRules[$ruleId] = $ruleConfig;
         }
 
+        // Report how many retired rule blocks were stripped so the user can review the migration summary before applying it.
         if ($removedCount > 0) {
             $changes[] = sprintf('Remove %d retired rule override(s) from rules.', $removedCount);
         }
 
-        if ($migrated === [] && $removedCount > 0) {
+        // Remove the rules section completely if every entry in it was retired, rather than emitting an empty block.
+        if ($migratedRules === [] && $removedCount > 0) {
             unset($config['rules']);
         } else {
-            $config['rules'] = $migrated;
+            $config['rules'] = $migratedRules;
         }
 
         return $config;
     }
 
     /**
-     * Strips verified retired rule IDs and renames legacy aliases in `selection.rules` and `selection.excludeRules`.
+     * Strips verified retired rule IDs and renames legacy aliases inside `selection.rules` and `selection.excludeRules`.
      *
-     * @param array<array-key, mixed> $config  - Decoded config mapping being migrated.
-     * @param list<string>            $changes - Human-readable migration summary lines appended in place.
+     * @param array<array-key, mixed> $config  - Decoded config mapping being migrated; missing or non-map `selection` passes through unchanged.
+     * @param list<string>            $changes - Human-readable migration summary lines appended in place for CLI output.
      *
-     * @return array<array-key, mixed> - Updated config mapping.
+     * @return array<array-key, mixed> - Updated config mapping with migrated selection lists.
      */
     private static function migrateSelection(array $config, array &$changes): array
     {
         $selection = $config['selection'] ?? null;
+        // Skip when the config has no selection block or uses a non-map shape that ConfigLoader should diagnose.
         if (!is_array($selection) || ($selection !== [] && array_is_list($selection))) {
             return $config;
         }
 
+        // Migrate both explicit inclusion and exclusion rule lists using the same retirement and alias rules.
         foreach (['rules', 'excludeRules'] as $selectionKey) {
-            $entries = $selection[$selectionKey] ?? null;
-            if (!is_array($entries) || !array_is_list($entries)) {
+            $configuredRuleIds = $selection[$selectionKey] ?? null;
+            // Skip absent or malformed list entries so normal config validation reports structural mistakes.
+            if (!is_array($configuredRuleIds) || !array_is_list($configuredRuleIds)) {
                 continue;
             }
 
-            $selection[$selectionKey] = self::migrateSelectionList($entries, $selectionKey, $changes);
+            $selection[$selectionKey] = self::migrateSelectionList($configuredRuleIds, $selectionKey, $changes);
         }
 
         $config['selection'] = $selection;
@@ -250,46 +268,53 @@ final class ConfigMigrator
     /**
      * Filters retired rule IDs and renames legacy aliases in one `selection` rule list without dropping unknown typos.
      *
-     * @param list<mixed>  $entries      - Raw rule-list entries from `selection.rules` or `selection.excludeRules`.
-     * @param string       $selectionKey - Key name (`rules` or `excludeRules`) used in migration messages.
-     * @param list<string> $changes      - Human-readable migration summary lines appended in place.
+     * @param list<mixed>  $configuredRuleIds - Raw rule-list entries from `selection.rules` or `selection.excludeRules`; empty returns empty.
+     * @param string       $selectionKey      - Key name (`rules` or `excludeRules`) echoed in migration summary lines.
+     * @param list<string> $changes           - Human-readable migration summary lines appended in place for CLI output.
      *
-     * @return list<mixed> - Migrated rule list in original order without duplicate renamed IDs.
+     * @return list<mixed> - Migrated rule list in original order with duplicate renamed IDs collapsed; empty when all entries were retired.
      */
-    private static function migrateSelectionList(array $entries, string $selectionKey, array &$changes): array
+    private static function migrateSelectionList(array $configuredRuleIds, string $selectionKey, array &$changes): array
     {
-        $migrated     = [];
-        $removedCount = 0;
+        $migratedRuleIds = [];
+        $removedCount    = 0;
 
-        foreach ($entries as $ruleId) {
+        // Walk the user's selected rule list in order, stripping retired IDs and renaming aliases without hiding typos.
+        foreach ($configuredRuleIds as $ruleId) {
+            // Preserve non-string items untouched so ConfigLoader can point out the bad YAML value.
             if (!is_string($ruleId)) {
-                $migrated[] = $ruleId;
+                $migratedRuleIds[] = $ruleId;
                 continue;
             }
 
+            // Drop verified retired rule IDs that no longer exist in the 0.6.0 registry.
             if (isset(self::RETIRED_RULE_IDS[$ruleId])) {
                 $removedCount++;
                 continue;
             }
 
             $canonicalId = RuleRegistry::canonicalRuleId($ruleId);
+            // Replace a legacy alias with its current rule ID and avoid duplicating it if the current ID is also listed.
             if ($canonicalId !== $ruleId) {
                 $changes[] = sprintf('Rename legacy rule "%s" to "%s" in selection.%s.', $ruleId, $canonicalId, $selectionKey);
-                if (!in_array($canonicalId, $migrated, true)) {
-                    $migrated[] = $canonicalId;
+                // Keep only one copy if the user already listed the replacement ID elsewhere in the same selection list.
+                if (!in_array($canonicalId, $migratedRuleIds, true)) {
+                    $migratedRuleIds[] = $canonicalId;
                 }
                 continue;
             }
 
-            if (!in_array($ruleId, $migrated, true)) {
-                $migrated[] = $ruleId;
+            // Keep active and unrecognized rule IDs once in original order so typos still fail loud during config load.
+            if (!in_array($ruleId, $migratedRuleIds, true)) {
+                $migratedRuleIds[] = $ruleId;
             }
         }
 
+        // Summarize retired removals for this list so the caller sees exactly what `migrate-config` cleaned up.
         if ($removedCount > 0) {
             $changes[] = sprintf('Remove %d retired rule id(s) from selection.%s.', $removedCount, $selectionKey);
         }
 
-        return $migrated;
+        return $migratedRuleIds;
     }
 }

@@ -59,11 +59,6 @@ final readonly class AnalysisSourceSet
     }
 
     /**
-     * Counts the files gruff actually parsed, feeding the "N parsed" figure in the summary and report.
-     *
-     * @return int - Number of units without parse diagnostics.
-     */
-    /**
      * Counts PHP inputs that reached structural analysis for the scoring denominator.
      * Text-only and bounded inputs still contribute to parsedFileCount().
      *

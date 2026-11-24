@@ -14,12 +14,11 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\SourceTextRuleInterface;
 
 /**
- * Flags a hardcoded API key from a known provider (Stripe, GitHub, OpenAI, Anthropic, Slack, npm, Google,
- * Azure, GitLab), so the user can pull the committed credential from source and rotate it.
+ * Flags a hardcoded API key from a known provider (Stripe, GitHub, OpenAI, Anthropic, Slack, npm, Google, Azure, GitLab).
  *
- * A source-text rule: it runs each provider's prefix pattern over the raw file, skipping matches inside
- * comments and obvious dummy values, and redacts every reported key. Warning severity, high confidence -
- * the published provider prefixes make a non-dummy match very likely a real key.
+ * Scans the raw file with each provider's prefix pattern so users can remove committed credentials and rotate them:
+ * - Skips matches inside comments and obvious dummy values, and redacts every reported value.
+ * - Reports Warning severity with High confidence because published prefixes make non-dummy matches likely real keys.
  */
 final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
 {
@@ -90,33 +89,35 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
 
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
 
+        // Scan each provider's prefix pattern in order so every matched vendor produces its own labelled finding.
         foreach ($this->patterns() as $providerPattern) {
-            // Candidate offsets allow comment filtering and source-line reporting before a redacted finding is emitted.
+            // Candidate offsets allow comment filtering and source-line/column reporting before a redacted finding is emitted.
             preg_match_all($providerPattern['pattern'], $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
-
+            // Filter each candidate independently so an example token in a comment never hides a live key on the same file.
             foreach ($matches[0] as $match) {
                 [$candidateSecret, $offset] = $match;
 
+                // Documentation snippets inside PHP comments are skipped rather than reported as committed credentials.
                 if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
                     continue;
                 }
 
-
+                // Skip vendor samples and placeholder words so README-style dummy keys stay quiet.
                 if (SecretScannerHelper::isLikelyDummyValue($candidateSecret)) {
                     continue;
                 }
 
                 $displayMarker = SecretScannerHelper::categoryMarker(self::markerCategory($providerPattern['name']));
-                $findings[] = SecretScannerHelper::finding(
-                    analysisUnit: $analysisUnit,
-                    ruleId:       self::ID,
-                    message:      sprintf('Potential %s API key detected: %s.', $providerPattern['name'], $displayMarker),
-                    line:         SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
-                    confidence:   Confidence::High,
-                    detector:     $providerPattern['name'],
+                $findings[]    = SecretScannerHelper::findingAtOffset(
+                    analysisUnit:  $analysisUnit,
+                    ruleId:        self::ID,
+                    message:       sprintf('Potential %s API key detected: %s.', $providerPattern['name'], $displayMarker),
+                    offset:        $offset,
+                    confidence:    Confidence::High,
+                    detector:      $providerPattern['name'],
                     displayMarker: $displayMarker,
-                    remediation:  'Remove committed API keys and rotate the credential if it was real.',
+                    remediation:   'Remove committed API keys and rotate the credential if it was real.',
                 );
             }
         }

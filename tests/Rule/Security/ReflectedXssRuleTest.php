@@ -293,6 +293,51 @@ PHP);
     }
 
     /**
+     * Verify a JSON header after earlier output and a hoisted function called before a CLI guard remain reported.
+     *
+     * @return void - Asserts findings for the post-output JSON header and pre-guard function call, while keeping a leading-guard function quiet.
+     */
+    public function testJsonHeaderAfterOutputAndFunctionCalledBeforeCliGuardRemainReported(): void
+    {
+        $postOutputJson = $this->findingsForSource(<<<'PHP'
+<?php
+function mixedResponse(): void
+{
+    echo '<!doctype html>';
+    flush();
+    header('Content-Type: application/json');
+    echo json_encode($_GET['q']);
+}
+PHP);
+        $calledBeforeGuard = $this->findingsForSource(<<<'PHP'
+<?php
+render();
+if (PHP_SAPI !== 'cli') {
+    exit(1);
+}
+function render(): void
+{
+    echo $_GET['x'];
+}
+PHP);
+        $declaredAfterLeadingGuard = $this->findingsForSource(<<<'PHP'
+<?php
+declare(strict_types=1);
+if (PHP_SAPI !== 'cli') {
+    exit(1);
+}
+function renderCli(): void
+{
+    echo $_GET['x'];
+}
+PHP);
+
+        self::assertSame([7], array_map(static fn (Finding $finding): ?int => $finding->line, $postOutputJson));
+        self::assertSame([8], array_map(static fn (Finding $finding): ?int => $finding->line, $calledBeforeGuard));
+        self::assertSame([], $declaredAfterLeadingGuard);
+    }
+
+    /**
      * Analyse a fixture and return only reflected-XSS findings.
      *
      * @param string $displayPath - Root-relative fixture path used for loading and finding display.

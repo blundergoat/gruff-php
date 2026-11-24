@@ -33,8 +33,9 @@ final readonly class BranchReviewBuilder
 {
     /**
      * Builds the user's branch review by analysing the base ref and comparing it with current findings.
+     *
      * The report uses this result to label findings as introduced, removed, or unchanged.
-     * It runs once for analyse --diff-vs, after the current tree has been scored.
+     * It runs once for `analyse --diff-vs`, after the current tree has been scored.
      *
      * @param string                $projectRoot     - Project root the comparison runs from.
      * @param AnalyseCommandOptions $options         - Effective CLI analysis options, including the --diff-vs base ref.
@@ -100,6 +101,7 @@ final readonly class BranchReviewBuilder
             $baseFiles    = [];
 
 
+            // Only parse and analyse the base snapshot when at least one requested path existed at the base ref.
             if ($basePaths !== []) {
                 $baseSources = (new AnalysisSourceLoader())->load(
                     $baseRoot,
@@ -263,6 +265,7 @@ final readonly class BranchReviewBuilder
         }
 
 
+        // Without --changed-only, snapshot every requested path from the base ref for a whole-target comparison.
         if (!$options->changeScope->isChangedOnly) {
             return $support->normaliseRequestedPaths($projectRoot, $options->paths);
         }
@@ -272,7 +275,7 @@ final readonly class BranchReviewBuilder
             return [];
         }
 
-
+        // When no explicit paths were typed under --changed-only, snapshot every file touched by the branch diff.
         if ($options->paths === []) {
             return $reviewDiff->changedFiles;
         }
@@ -304,7 +307,7 @@ final readonly class BranchReviewBuilder
      */
     private function baseAnalysisPaths(string $projectRoot, AnalyseCommandOptions $options, DiffResult $reviewDiff): array
     {
-
+        // Under --changed-only with no explicit targets, analyse only the files modified on this branch.
         if ($options->changeScope->isChangedOnly && $options->paths === []) {
             return $reviewDiff->changedFiles;
         }
@@ -359,7 +362,7 @@ final readonly class BranchReviewBuilder
         AnalysisConfig $config,
         ?DiffResult $reviewDiff,
     ): bool {
-
+        // When no project-wide rule is enabled, per-file rules need no whole-project context snapshot.
         if (!$registry->hasEnabledProjectRules($config)) {
             return false;
         }
@@ -369,9 +372,8 @@ final readonly class BranchReviewBuilder
             return true;
         }
 
-        // A whole-project request ('.', './', or the root path) covers the same tree a bare invocation
-        // does, so it must not trigger the separate full-tree context load that genuinely narrower paths
-        // need; otherwise `analyse . --diff-vs=<ref>` reparses the whole tree twice for the same scope.
+        // A whole-project request ('.', './', or the root path) covers the same tree as a bare invocation, so skip
+        // loading a separate project-context tree; otherwise `analyse . --diff-vs=<ref>` would reparse the repo twice.
         $requestedPaths = (new AnalysisFindingSupport())->normaliseRequestedPaths($projectRoot, $options->paths);
         // Narrow paths leave project rules without the rest of the tree, so load that context separately.
         if ($requestedPaths !== [] && $requestedPaths !== ['.']) {

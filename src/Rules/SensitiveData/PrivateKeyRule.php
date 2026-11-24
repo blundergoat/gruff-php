@@ -55,8 +55,8 @@ final readonly class PrivateKeyRule implements SourceTextRuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
+        // Fast pre-screen: files without a PEM BEGIN banner cannot hold a supported private-key header.
         if (!str_contains($analysisUnit->source, '-----BEGIN ')) {
-
             return [];
         }
 
@@ -65,17 +65,18 @@ final readonly class PrivateKeyRule implements SourceTextRuleInterface
 
         $findings = [];
 
+        // Emit one finding per header match, pinning both line and column so multiple headers on one line remain distinct.
         foreach ($matches[0] as $match) {
             [, $offset] = $match;
-            $findings[] = SecretScannerHelper::finding(
-                analysisUnit: $analysisUnit,
-                ruleId:       self::ID,
-                message:      'Private key block header detected; key body is redacted.',
-                line:         SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
-                confidence:   Confidence::High,
-                detector:     'private-key-header',
+            $findings[] = SecretScannerHelper::findingAtOffset(
+                analysisUnit:  $analysisUnit,
+                ruleId:        self::ID,
+                message:       'Private key block header detected; key body is redacted.',
+                offset:        $offset,
+                confidence:    Confidence::High,
+                detector:      'private-key-header',
                 displayMarker: SecretScannerHelper::categoryMarker('private-key'),
-                remediation:  'Remove private keys from source and rotate the key if it was real.',
+                remediation:   'Remove private keys from source and rotate the key if it was real.',
             );
         }
 

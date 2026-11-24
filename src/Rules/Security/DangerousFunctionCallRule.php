@@ -30,9 +30,21 @@ use PhpParser\Node\Stmt\Property;
 use PhpParser\NodeFinder;
 
 /**
- * Reports built-in execution patterns, configured global functions, and unresolved dynamic calls for review.
- * Local callable evidence can suppress dynamic-call findings; it does not prove that a callable body is harmless.
- * Built-in process calls whose command is a plain string literal are skipped.
+ * Reports built-in shell execution calls, configured dangerous global functions, `eval`, and unproven dynamic `$fn()` calls.
+ *
+ * Disabled by default under ADR-034; when a project enables `security.dangerous-function-call`, it flags execution sites needing human review.
+ * Local callable evidence (types, closures, guards, and `@var callable` annotations before the call) keeps safe callbacks quiet.
+ *
+ * Key boundaries applied during analysis:
+ * - Built-in process calls (`exec`, `system`, `shell_exec`, etc.) whose command is a plain string literal are skipped.
+ * - Request superglobals reaching a dynamic callee outrank `is_callable()` guards at both function scope and top-level file scope.
+ *
+ * @phpstan-type CallableTrust array{
+ *     variables: array<int|string, array<string, int>>,
+ *     collections: array<int|string, array<string, int>>,
+ *     properties: array<int|string, array<string, true>>,
+ *     collectionProperties: array<int|string, array<string, true>>
+ * }
  */
 final class DangerousFunctionCallRule implements RuleInterface
 {
@@ -131,19 +143,21 @@ final class DangerousFunctionCallRule implements RuleInterface
         $trust    = $this->callableTrust($analysisUnit);
 
 
+        // Inspect every function call in the file for unproven dynamic invocation, shell execution, or string assert().
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
             // A local with one detected literal function name is classified like a direct call.
             $name = SecurityNodeHelper::globalFunctionName($call) ?? CallableFlowEvidence::literalCalleeName($call);
 
+            // Dynamic callees whose target is not a static name require local callable proof to avoid a warning.
             if ($name === null) {
                 // $f(...) builds a Closure from its target and executes nothing, so there is no call to judge.
                 if ($call->isFirstClassCallable()) {
                     continue;
                 }
 
-
-                if (!$call->name instanceof Node\Name && !$this->isKnownCallableInvocation($call, $trust)
-                    && !CallableFlowEvidence::hasInvocationEvidence($call, fn (Expr $callbackValue): bool => $this->isProvenCallable($callbackValue, $call, $trust))
+                // Flag the dynamic call when none of the file-local proof or collection-tracking checks vouch for it.
+                if (!$call->name instanceof Node\Name && !$this->isKnownCallableInvocation($call, $trust, $analysisUnit)
+                    && !CallableFlowEvidence::hasInvocationEvidence($call, fn (Expr $callbackValue): bool => $this->isProvenCallable($callbackValue, $call, $trust, $analysisUnit))
                     && !CallableCollectionEvidence::hasInvocationEvidence($call)
                     && !CallableCollectionReturnEvidence::hasInvocationEvidence($call)
                     && !CallableFlowEvidence::hasLocalClosureListEvidence($call)) {
@@ -155,17 +169,18 @@ final class DangerousFunctionCallRule implements RuleInterface
 
             $firstArg = SecurityNodeHelper::sinkArgumentValue($call, 0);
 
+            // Flag built-in shell calls with dynamic commands and every configured additionalFunctions name.
             if (in_array($name, $dangerousFunctions, true) && !$this->isFixedBuiltInCommand($name, $firstArg)) {
                 $findings[] = $this->finding($analysisUnit, $call, $name);
             }
 
-
+            // Passing a string literal to assert() evaluates PHP code on older configurations and needs human review.
             if ($name === 'assert' && $firstArg !== null && SecurityNodeHelper::isStringLiteral($firstArg)) {
                 $findings[] = $this->finding($analysisUnit, $call, 'assert string evaluation');
             }
         }
 
-
+        // Every eval() expression executes arbitrary PHP code and is always flagged when this rule is enabled.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\Eval_::class) as $eval) {
             $findings[] = $this->finding($analysisUnit, $eval, 'eval');
         }
@@ -212,10 +227,9 @@ final class DangerousFunctionCallRule implements RuleInterface
      *
      * Variable evidence is keyed by its function-like or file scope; property evidence is keyed by its class.
      *
-     * @param AnalysisUnit $analysisUnit - file to scan for parameters, assignments, loops, and properties that supply callable evidence
+     * @param AnalysisUnit $analysisUnit - File to scan for parameters, assignments, loops, and properties that supply callable evidence.
      *
-     * @return array{variables: array<int|string, array<string, true>>, collections: array<int|string, array<string, true>>, properties: array<int|string, array<string, true>>, collectionProperties: array<int|string, array<string, true>>} -
-     *   Scoped variable, collection, property, and collection-property names; true marks membership in each inner set.
+     * @return CallableTrust - Scoped variable, collection, property, and collection-property proofs with earliest proving byte offsets.
      */
     private function callableTrust(AnalysisUnit $analysisUnit): array
     {
@@ -223,9 +237,9 @@ final class DangerousFunctionCallRule implements RuleInterface
         [$properties, $collectionProperties] = $this->callablePropertyNames($analysisUnit);
 
         // A closure, arrow function, object construction, or supported callable-array shape supplies evidence in its
-        // scope; an inline @var callable $name annotation on the assignment does too.
+        // scope from its assignment offset onward; an inline @var callable $name annotation on the assignment does too.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\Assign::class) as $assignment) {
-
+            // Ignore non-variable assignments and expressions that neither prove a callable nor carry an inline @var callable docblock.
             if (
                 !$assignment->var instanceof Expr\Variable
                 || !is_string($assignment->var->name)
@@ -234,12 +248,16 @@ final class DangerousFunctionCallRule implements RuleInterface
                 continue;
             }
 
-            $variables[$this->scopeKey(SecurityNodeHelper::enclosingFunctionLike($assignment))][$assignment->var->name] = true;
+            $scopeKey                               = $this->scopeKey(SecurityNodeHelper::enclosingFunctionLike($assignment));
+            $variableName                           = $assignment->var->name;
+            $assignmentOffset                       = max(0, $assignment->getStartFilePos());
+            $variables[$scopeKey][$variableName]    = min($variables[$scopeKey][$variableName] ?? PHP_INT_MAX, $assignmentOffset);
         }
 
         // An expression accepted by the callable-evidence heuristic marks its property array as callable collection evidence for that class.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\Assign::class) as $assignment) {
             $propertyName = $assignment->var instanceof Expr\ArrayDimFetch ? $this->staticPropertyName($assignment->var->var) : null;
+            // Only property-array appends receiving a proven callable expression populate collection evidence for that class.
             if ($propertyName === null || !$this->isCallableExpression($assignment->expr)) {
                 continue;
             }
@@ -254,12 +272,15 @@ final class DangerousFunctionCallRule implements RuleInterface
                 continue;
             }
 
-
+            // Skip loops whose iterable is not a tracked callable collection in the enclosing scope or class.
             if (!$this->isCallableCollectionExpression($foreach->expr, $foreach, $collections, $collectionProperties)) {
                 continue;
             }
 
-            $variables[$this->scopeKey(SecurityNodeHelper::enclosingFunctionLike($foreach))][$foreach->valueVar->name] = true;
+            $scopeKey                            = $this->scopeKey(SecurityNodeHelper::enclosingFunctionLike($foreach));
+            $variableName                        = $foreach->valueVar->name;
+            $loopOffset                          = max(0, $foreach->getStartFilePos());
+            $variables[$scopeKey][$variableName] = min($variables[$scopeKey][$variableName] ?? PHP_INT_MAX, $loopOffset);
         }
 
         return [
@@ -271,22 +292,21 @@ final class DangerousFunctionCallRule implements RuleInterface
     }
 
     /**
-     * Collects the parameters of every function, method, closure, and arrow function that are typed or documented
-     * as callable, each under the function-like that declares it.
+     * Collects callable-typed or `@param callable`-documented parameters under each function-like scope.
      * Both result sets contain the same names for direct calls and callable-collection evidence.
      *
-     * @param AnalysisUnit $analysisUnit - file to scan for callable-typed or @param callable-documented parameters
+     * @param AnalysisUnit $analysisUnit - File to scan for callable-typed or `@param callable`-documented parameters.
      *
-     * @return array{0: array<int|string, array<string, true>>, 1: array<int|string, array<string, true>>} - Identical parameter-name sets by scope.
+     * @return array{0: array<int|string, array<string, int>>, 1: array<int|string, array<string, int>>} - Parameter maps by scope at offset 0.
      */
     private function callableParameterNames(AnalysisUnit $analysisUnit): array
     {
         $variables   = [];
         $collections = [];
 
-
+        // Walk every function, method, closure, and arrow function to collect callable-typed parameters.
         foreach (NodeIndex::nodesOfAny($analysisUnit, [Function_::class, ClassMethod::class, Expr\Closure::class, Expr\ArrowFunction::class]) as $functionLike) {
-
+            // Guard against unexpected AST nodes returned by the index lookup.
             if (!$functionLike instanceof FunctionLike) {
                 continue;
             }
@@ -294,20 +314,21 @@ final class DangerousFunctionCallRule implements RuleInterface
             $documented = $this->documentedCallableParameters($functionLike);
             $scope      = $this->scopeKey($functionLike);
 
-
+            // Register each parameter proven callable by its PHP type hint or matching @param docblock.
             foreach ($functionLike->getParams() as $param) {
-
+                // Skip parameters without a static variable name.
                 if (!$param->var instanceof Expr\Variable || !is_string($param->var->name)) {
                     continue;
                 }
 
                 $parameterName = $param->var->name;
+                // Untyped parameters without a callable docblock stay unproven and will still be flagged if called dynamically.
                 if (!$this->isCallableType($param->type) && !isset($documented[$parameterName])) {
                     continue;
                 }
 
-                $variables[$scope][$parameterName]   = true;
-                $collections[$scope][$parameterName] = true;
+                $variables[$scope][$parameterName]   = 0;
+                $collections[$scope][$parameterName] = 0;
             }
         }
 
@@ -324,8 +345,8 @@ final class DangerousFunctionCallRule implements RuleInterface
     private function documentedCallableParameters(FunctionLike $functionLike): array
     {
         $docComment = $functionLike->getDocComment();
+        // Without a docblock on the callable, no `@param callable` evidence can be read.
         if ($docComment === null) {
-
             return [];
         }
 
@@ -345,9 +366,8 @@ final class DangerousFunctionCallRule implements RuleInterface
     }
 
     /**
-     * Collects property callable evidence from a callable type hint, an @var callable docblock, or a promoted
-     * constructor parameter typed as callable, keyed by declaring class.
-     * Documented properties also supply collection evidence.
+     * Collects property callable evidence from a callable type hint, an `@var callable` docblock, or a promoted constructor parameter.
+     * Documented properties also supply collection evidence for loops over `$this->handlers`.
      *
      * @param AnalysisUnit $analysisUnit - file to scan for callable-typed or callable-documented properties
      *
@@ -358,33 +378,35 @@ final class DangerousFunctionCallRule implements RuleInterface
         $properties           = [];
         $collectionProperties = [];
 
-
+        // Scan explicit class properties for callable type hints or `@var callable` docblocks.
         foreach (NodeIndex::nodesOf($analysisUnit, Property::class) as $property) {
             $isDocumented = $this->hasCallableDocblock($property);
 
+            // Skip properties that carry neither a callable type hint nor a callable docblock.
             if (!$this->isCallableType($property->type) && !$isDocumented) {
                 continue;
             }
 
             $classScope = $this->classKey($property);
 
+            // Record every declared name on the property statement under its owning class.
             foreach ($property->props as $prop) {
                 $properties[$classScope][$prop->name->toString()] = true;
 
-
+                // Docblock-typed properties often describe lists of callbacks, so also record collection evidence.
                 if ($isDocumented) {
                     $collectionProperties[$classScope][$prop->name->toString()] = true;
                 }
             }
         }
 
-
+        // Scan constructor-promoted properties declared directly in class method parameter lists.
         foreach (NodeIndex::nodesOf($analysisUnit, Class_::class) as $class) {
-
+            // Check each class method so promoted parameters on `__construct` join the class property trust map.
             foreach ($class->getMethods() as $classMethod) {
-
+                // Record only promoted parameters with a static name and a callable type hint.
                 foreach ($classMethod->params as $param) {
-
+                    // Skip ordinary non-promoted parameters and promoted properties whose type is not callable.
                     if (
                         $param->flags === 0
                         || !$param->var instanceof Expr\Variable
@@ -403,54 +425,54 @@ final class DangerousFunctionCallRule implements RuleInterface
     }
 
     /**
-     * Reports whether a dynamic call's target is proven to hold a callable, which is the gate that turns a
-     * finding off.
+     * Reports whether a dynamic call's target is proven to hold a callable, which is the gate that turns a finding off.
      *
-     * @param Expr\FuncCall                                                                                                                                                                                                                   $call  - the dynamic call whose callee is not a plain function name
-     * @param array{variables: array<int|string, array<string, true>>, collections: array<int|string, array<string, true>>, properties: array<int|string, array<string, true>>, collectionProperties: array<int|string, array<string, true>>} $trust -
-     *                                                                                                                                                                                                                                               the scoped callable proofs `callableTrust()` learned from this file
+     * @param Expr\FuncCall $call         - Dynamic call whose callee is not a plain function name.
+     * @param CallableTrust $trust        - Scoped callable proofs learned from this file.
+     * @param AnalysisUnit  $analysisUnit - Parsed file used to trace file-scope request taint.
      *
-     * @return bool - true means "trusted callable, do not flag"; false means the target is unproven and the
-     *   caller should record a dynamic-call finding (false is the safe default, not a positive denial)
+     * @return bool - True means trusted callable, do not flag; false means unproven and the caller records a dynamic-call finding.
      */
-    private function isKnownCallableInvocation(Expr\FuncCall $call, array $trust): bool
+    private function isKnownCallableInvocation(Expr\FuncCall $call, array $trust, AnalysisUnit $analysisUnit): bool
     {
-        return $call->name instanceof Expr && $this->isProvenCallable($call->name, $call, $trust);
+        return $call->name instanceof Expr && $this->isProvenCallable($call->name, $call, $trust, $analysisUnit);
     }
 
     /**
      * Reports whether one callee expression is proven callable at a call site.
      *
-     * @param Expr                                                                                                                                                                                                                            $target - the callee, or the argument `Closure::fromCallable()` wraps
-     * @param Expr\FuncCall                                                                                                                                                                                                                   $call   - the dynamic call, whose scope and class resolve names
-     * @param array{variables: array<int|string, array<string, true>>, collections: array<int|string, array<string, true>>, properties: array<int|string, array<string, true>>, collectionProperties: array<int|string, array<string, true>>} $trust  -
-     *                                                                                                                                                                                                                                                the scoped callable proofs `callableTrust()` learned from this file
+     * @param Expr          $target       - Callee, or argument `Closure::fromCallable()` wraps.
+     * @param Expr\FuncCall $call         - Dynamic call whose scope and class resolve names.
+     * @param CallableTrust $trust        - Scoped callable proofs learned from this file.
+     * @param AnalysisUnit  $analysisUnit - Parsed file used to trace file-scope request taint.
      *
-     * @return bool - true for a proven variable or property, a guarded variable, or a syntactic callable; false otherwise
+     * @return bool - True for a proven variable or property, a guarded variable, or a syntactic callable; false otherwise.
      */
-    private function isProvenCallable(Expr $target, Expr\FuncCall $call, array $trust): bool
+    private function isProvenCallable(Expr $target, Expr\FuncCall $call, array $trust, AnalysisUnit $analysisUnit): bool
     {
-        if ($this->isRequestInputCallee($target, $call)) {
-            // Request input reaching the callee outranks every proof: `is_callable()` and `callable` accept `'system'`.
+        // Request input reaching the callee outranks every proof: `is_callable()` and `callable` accept `'system'`.
+        if ($this->isRequestInputCallee($target, $call, $analysisUnit)) {
             return false;
         }
 
+        // A bare `$var()` is trusted when its scope proves the name before the call, or an enclosing condition guards it.
         if ($target instanceof Expr\Variable && is_string($target->name)) {
-            // A bare `$var()` is trusted when its scope proves the name, or an enclosing condition guards it.
-            return $this->isTrustedName($target->name, SecurityNodeHelper::enclosingFunctionLike($call), $trust['variables'])
+            $callOffset = $call->getStartFilePos();
+
+            return $this->isTrustedName($target->name, SecurityNodeHelper::enclosingFunctionLike($call), $trust['variables'], $callOffset >= 0 ? $callOffset : PHP_INT_MAX)
                 || $this->isGuardedCallable($call, $target->name);
         }
 
         $propertyName = $this->staticPropertyName($target);
+        // A call through a property is trusted only when the enclosing class proves that property callable.
         if ($propertyName !== null) {
-            // A call through a property is trusted only when the enclosing class proves that property callable.
             return isset($trust['properties'][$this->classKey($call)][$propertyName]);
         }
 
         $wrappedCallable = $this->closureFromCallableArgument($target);
+        // `Closure::fromCallable($x)()` runs exactly what `$x()` would, so its argument is judged in the call's place.
         if ($wrappedCallable !== null) {
-            // `Closure::fromCallable($x)()` runs exactly what `$x()` would, so its argument is judged in the call's place.
-            return $this->isProvenCallable($wrappedCallable, $call, $trust);
+            return $this->isProvenCallable($wrappedCallable, $call, $trust, $analysisUnit);
         }
 
         // An immediately invoked closure, arrow function, object, or callable array is its own proof.
@@ -466,6 +488,7 @@ final class DangerousFunctionCallRule implements RuleInterface
      */
     private function closureFromCallableArgument(Expr $expr): ?Expr
     {
+        // Only direct `Closure::fromCallable($arg)` calls unwrap to the underlying callee expression.
         if (
             !$expr instanceof Expr\StaticCall
             || !$expr->class instanceof Name
@@ -503,20 +526,22 @@ final class DangerousFunctionCallRule implements RuleInterface
     }
 
     /**
-     * Reports whether a variable name has callable evidence in a scope, following only scopes that can expose it.
+     * Reports whether a variable name has callable evidence in a scope at or before the call site, following only scopes that can expose it.
      *
-     * @param string                                 $name  - Variable name without its dollar-sign prefix.
-     * @param FunctionLike|null $scope - function-like the use sits in, or null for file scope
-     * @param array<int|string, array<string, true>> $sets - names with callable evidence, keyed by scope
+     * @param string                                $name       - Variable name without its dollar-sign prefix.
+     * @param FunctionLike|null                     $scope      - Function-like the use sits in, or null for file scope.
+     * @param array<int|string, array<string, int>> $sets       - Names with earliest proving byte offsets, keyed by scope.
+     * @param int                                   $callOffset - Byte offset of the call site; PHP_INT_MAX skips order filtering.
      *
-     * @return bool - True for local or inherited callable evidence visible through arrow capture or a closure use clause.
+     * @return bool - True for local or inherited callable evidence visible at or before the call through arrow capture or a closure use clause.
      */
-    private function isTrustedName(string $name, ?FunctionLike $scope, array $sets): bool
+    private function isTrustedName(string $name, ?FunctionLike $scope, array $sets, int $callOffset = PHP_INT_MAX): bool
     {
         // Climb only through the scopes PHP itself lets the name through.
         while (true) {
-            if (isset($sets[$this->scopeKey($scope)][$name])) {
-
+            $scopeKey = $this->scopeKey($scope);
+            // Accept the variable when this scope recorded a proof at or before the dynamic call's source offset.
+            if (isset($sets[$scopeKey][$name]) && $callOffset >= $sets[$scopeKey][$name]) {
                 return true;
             }
 
@@ -553,16 +578,17 @@ final class DangerousFunctionCallRule implements RuleInterface
 
         // Walk outward to the nearest scope boundary the variable cannot cross.
         while ($parent instanceof Node) {
+            // Stop with a match as soon as an enclosing if/elseif, ternary, or conjunction guards this variable.
             if ($this->isGuardedBranch($parent, $child, $name)) {
                 return true;
             }
 
+            // A guard outside a function-like cannot supply evidence for a name that the function-like does not capture.
             if (
                 $parent instanceof FunctionLike
                 && !($parent instanceof Expr\ArrowFunction && !$this->hasParameterNamed($parent, $name))
                 && !($parent instanceof Expr\Closure && $this->isImportedByClosure($parent, $name))
             ) {
-                // A guard outside a function-like cannot supply evidence for a name that the function-like does not capture.
                 return false;
             }
 
@@ -584,18 +610,18 @@ final class DangerousFunctionCallRule implements RuleInterface
      */
     private function isGuardedBranch(Node $parent, Node $child, string $name): bool
     {
+        // Only the guarded body runs after the condition held; the condition and else branches do not.
         if ($parent instanceof Stmt\If_ || $parent instanceof Stmt\ElseIf_) {
-            // Only the guarded body runs after the condition held; the condition and else branches do not.
             return in_array($child, $parent->stmts, true) && $this->isNarrowedToCallable($parent->cond, $name);
         }
 
+        // The ternary true arm is accepted only when its condition supplies evidence for the same variable.
         if ($parent instanceof Expr\Ternary) {
-            // The ternary true arm is accepted only when its condition supplies evidence for the same variable.
             return $parent->if === $child && $this->isNarrowedToCallable($parent->cond, $name);
         }
 
+        // The conjunction's right operand is accepted only when its left operand supplies evidence for the same variable.
         if ($parent instanceof Expr\BinaryOp\BooleanAnd || $parent instanceof Expr\BinaryOp\LogicalAnd) {
-            // The conjunction's right operand is accepted only when its left operand supplies evidence for the same variable.
             return $parent->right === $child && $this->isNarrowedToCallable($parent->left, $name);
         }
 
@@ -612,23 +638,23 @@ final class DangerousFunctionCallRule implements RuleInterface
      */
     private function isNarrowedToCallable(Expr $condition, string $name): bool
     {
+        // When a conjunction is true, either operand can supply the rule's callable evidence.
         if ($condition instanceof Expr\BinaryOp\BooleanAnd || $condition instanceof Expr\BinaryOp\LogicalAnd) {
-            // When a conjunction is true, either operand can supply the rule's callable evidence.
             return $this->isNarrowedToCallable($condition->left, $name) || $this->isNarrowedToCallable($condition->right, $name);
         }
 
+        // A class test on the same variable rules out a string global-function target.
         if ($condition instanceof Expr\Instanceof_) {
-            // A class test on the same variable rules out a string global-function target.
             return $condition->class instanceof Name && $this->isVariableNamed($condition->expr, $name);
         }
 
+        // A one-argument is_callable() check supplies evidence for the same variable; a second argument can accept any string.
         if (
             $condition instanceof Expr\FuncCall
             && $condition->name instanceof Name
             && strtolower($condition->name->getLast()) === 'is_callable'
             && count($condition->args) === 1
         ) {
-            // A one-argument is_callable() check supplies evidence for the same variable; a second argument can accept any string.
             $firstArg = SecurityNodeHelper::sinkArgumentValue($condition, 0);
 
             return $firstArg !== null && $this->isVariableNamed($firstArg, $name);
@@ -660,8 +686,9 @@ final class DangerousFunctionCallRule implements RuleInterface
      */
     private function isImportedByClosure(Expr\Closure $closure, string $name): bool
     {
-
+        // Check each variable in the closure's `use (...)` clause for a match.
         foreach ($closure->uses as $use) {
+            // A matching `use` entry lets parent-scope callable proofs reach inside the closure body.
             if ($use->var->name === $name) {
                 return true;
             }
@@ -680,8 +707,9 @@ final class DangerousFunctionCallRule implements RuleInterface
      */
     private function hasParameterNamed(FunctionLike $functionLike, string $name): bool
     {
-
+        // Check whether any local parameter shadows the parent-scope variable name.
         foreach ($functionLike->getParams() as $param) {
+            // Shadowing breaks automatic arrow-function capture of outer callable proofs.
             if ($this->isVariableNamed($param->var, $name)) {
                 return true;
             }
@@ -699,6 +727,7 @@ final class DangerousFunctionCallRule implements RuleInterface
      */
     private function staticPropertyName(Expr $expr): ?string
     {
+        // Dynamic property names like `$this->$prop` cannot be matched against declared class properties.
         if (!$expr instanceof Expr\PropertyFetch || !$expr->name instanceof Identifier) {
             return null;
         }
@@ -707,19 +736,26 @@ final class DangerousFunctionCallRule implements RuleInterface
     }
 
     /**
-     * Reports whether the rule finds request-input syntax in a callee expression.
+     * Reports whether the rule finds request-input syntax in a callee expression, including top-level file-scope assignments.
      *
-     * @param Expr          $target - Callee or argument passed to Closure::fromCallable().
-     * @param Expr\FuncCall $call   - Dynamic call that owns the callee.
+     * @param Expr          $target       - Callee or argument passed to Closure::fromCallable().
+     * @param Expr\FuncCall $call         - Dynamic call that owns the callee.
+     * @param AnalysisUnit  $analysisUnit - Parsed file searched for top-level request assignments when the call is at file scope.
      *
      * @return bool - True for request-input syntax unless a plain variable's latest local assignment is a closure or arrow function.
      */
-    private function isRequestInputCallee(Expr $target, Expr\FuncCall $call): bool
+    private function isRequestInputCallee(Expr $target, Expr\FuncCall $call, AnalysisUnit $analysisUnit): bool
     {
-        if (!SecurityNodeHelper::containsUserInput($target)) {
-            return false;
+        $hasFunctionScopeTaint = SecurityNodeHelper::containsUserInput($target);
+        // At file scope, SecurityNodeHelper skips local taint, so trace top-level assignments explicitly before trusting is_callable().
+        if (!$hasFunctionScopeTaint) {
+            return $target instanceof Expr\Variable
+                && is_string($target->name)
+                && SecurityNodeHelper::enclosingFunctionLike($call) === null
+                && $this->isFileScopeVariableTainted($target->name, $call, $analysisUnit);
         }
 
+        // Non-variable tainted expressions (like `$_GET['fn']()`) cannot be sanitized by an earlier local closure assignment.
         if (!$target instanceof Expr\Variable || !is_string($target->name)) {
             return true;
         }
@@ -727,6 +763,74 @@ final class DangerousFunctionCallRule implements RuleInterface
         $latest = $this->latestAssignmentBefore($target->name, $call);
 
         return !($latest?->expr instanceof Expr\Closure || $latest?->expr instanceof Expr\ArrowFunction);
+    }
+
+    /**
+     * Reports whether a top-level file-scope variable holds request superglobal data at a call site.
+     *
+     * @param string        $name         - Variable name without its dollar-sign prefix.
+     * @param Expr\FuncCall $call         - File-scope dynamic call whose start offset bounds the trace.
+     * @param AnalysisUnit  $analysisUnit - Parsed file whose top-level statements are replayed in order.
+     *
+     * @return bool - True when an earlier file-scope assignment tainted the variable without a later clean overwrite.
+     */
+    private function isFileScopeVariableTainted(string $name, Expr\FuncCall $call, AnalysisUnit $analysisUnit): bool
+    {
+        $callOffset = $call->getStartFilePos();
+        // Without a byte offset, file-scope order cannot be established.
+        if ($callOffset < 0) {
+            return false;
+        }
+
+        $tainted     = [];
+        $assignments = (new NodeFinder())->find(
+            $analysisUnit->statements,
+            static fn (Node $candidate): bool => SecurityNodeHelper::isTaintTrackedAssignment($candidate)
+                && $candidate->getStartFilePos() >= 0
+                && $candidate->getStartFilePos() < $callOffset
+                && SecurityNodeHelper::enclosingFunctionLike($candidate) === null,
+        );
+
+        // Replay top-level assignments in source order so request taint flows through local aliases like $fn = $_GET['fn'].
+        foreach ($assignments as $assignment) {
+            // Narrow the finder output to plain assignments and string-concatenation assignments.
+            if (!$assignment instanceof Expr\Assign && !$assignment instanceof Expr\AssignOp\Concat) {
+                continue;
+            }
+
+            $targetName = SecurityNodeHelper::assignmentTargetName($assignment);
+            // Skip assignments to properties, array offsets, or dynamic variable names.
+            if ($targetName === null) {
+                continue;
+            }
+
+            $rhsVariables = (new NodeFinder())->findInstanceOf($assignment->expr, Expr\Variable::class);
+            $readsTainted = false;
+
+            // Check whether the assigned expression reads any top-level variable already tainted by request input.
+            foreach ($rhsVariables as $variable) {
+                // One tainted alias on the right-hand side is enough to taint the target variable.
+                if (is_string($variable->name) && isset($tainted[$variable->name])) {
+                    $readsTainted = true;
+                    break;
+                }
+            }
+
+            // Direct superglobal access or reading an already-tainted top-level variable taints the assigned variable.
+            if (SecurityNodeHelper::containsUserInput($assignment->expr) || $readsTainted) {
+                $tainted[$targetName] = true;
+                continue;
+            }
+
+            // Appending a clean string to an already-tainted variable preserves its taint.
+            if ($assignment instanceof Expr\AssignOp\Concat) {
+                continue;
+            }
+
+            unset($tainted[$targetName]);
+        }
+
+        return isset($tainted[$name]);
     }
 
     /**
@@ -741,13 +845,16 @@ final class DangerousFunctionCallRule implements RuleInterface
     {
         $scope      = SecurityNodeHelper::enclosingFunctionLike($call);
         $statements = $scope?->getStmts();
+        // File-scope calls and bodyless arrow functions have no statement block to search here.
         if ($statements === null) {
             return null;
         }
 
         $latest = null;
 
+        // Pick the last same-scope assignment to this variable that occurs before the dynamic call.
         foreach ((new NodeFinder())->findInstanceOf($statements, Expr\Assign::class) as $assignment) {
+            // Skip other variables, later assignments, nested closures, and earlier assignments superseded by a newer one.
             if (
                 !$this->isVariableNamed($assignment->var, $name)
                 || $assignment->getStartFilePos() >= $call->getStartFilePos()
@@ -801,6 +908,7 @@ final class DangerousFunctionCallRule implements RuleInterface
         $current = $node->getAttribute('parent');
 
         while ($current instanceof Node) {
+            // Stop at the nearest enclosing class, trait, interface, or enum declaration.
             if ($current instanceof ClassLike) {
                 return spl_object_id($current);
             }
@@ -823,8 +931,8 @@ final class DangerousFunctionCallRule implements RuleInterface
     private function hasCallableDocblock(Property $property): bool
     {
         $docComment = $property->getDocComment();
+        // No docblock means no `@var` to inspect, so this path cannot vouch for the property.
         if ($docComment === null) {
-            // No docblock means no `@var` to inspect, so this path cannot vouch for the property.
             return false;
         }
 
@@ -858,14 +966,13 @@ final class DangerousFunctionCallRule implements RuleInterface
      */
     private function isStaticFirstClassCallable(Expr $expr): bool
     {
+        // Only PHP 8.1+ first-class callable syntax (`fn(...)`) builds a Closure directly from a callable target.
         if (!$expr instanceof Expr\CallLike || !$expr->isFirstClassCallable()) {
-            // First-class callable syntax creates a Closure without running the target.
             return false;
         }
 
+        // Accept a function reference only for an internal function with no callback parameter that could dispatch dynamically.
         if ($expr instanceof Expr\FuncCall) {
-            // Accept a function reference only for an internal function with no recognized callback parameter.
-            // Dispatch helpers could invoke a caller-supplied target.
             return $expr->name instanceof Name && $this->isNonDispatchingInternalFunction($expr->name->toString());
         }
 
@@ -884,17 +991,20 @@ final class DangerousFunctionCallRule implements RuleInterface
      */
     private function isNonDispatchingInternalFunction(string $name): bool
     {
+        // Unknown or unloaded functions cannot be verified as safe built-ins.
         if (!function_exists($name)) {
             return false;
         }
 
         $function = new \ReflectionFunction($name);
+        // Userland functions may dispatch dynamically internally, so only PHP internal functions qualify.
         if (!$function->isInternal()) {
             return false;
         }
 
-
+        // Reject internal helpers (like `call_user_func`) that accept a callback parameter and can invoke arbitrary targets.
         foreach ($function->getParameters() as $parameter) {
+            // Any callback-shaped parameter disqualifies the first-class reference from automatic trust.
             if ($this->isCallableParameter($parameter)) {
                 return false;
             }
@@ -915,9 +1025,10 @@ final class DangerousFunctionCallRule implements RuleInterface
         $type    = $parameter->getType();
         $members = $type instanceof \ReflectionUnionType ? $type->getTypes() : [$type];
 
-
+        // Inspect every union member type (or the single declared type) for callback signatures.
         foreach ($members as $member) {
             $typeName = $member instanceof \ReflectionNamedType ? strtolower($member->getName()) : 'mixed';
+            // Explicit callable or Closure parameter hints prove the function dispatches callbacks.
             if (in_array($typeName, ['callable', 'closure'], true)) {
                 return true;
             }
@@ -940,8 +1051,8 @@ final class DangerousFunctionCallRule implements RuleInterface
      */
     private function isStaticCallableArray(Expr $expr): bool
     {
+        // Only a two-element array literal (`[$obj, 'method']`) matches PHP's static callable-array form.
         if (!$expr instanceof Expr\Array_ || count($expr->items) !== 2) {
-
             return false;
         }
 
@@ -960,9 +1071,9 @@ final class DangerousFunctionCallRule implements RuleInterface
     /**
      * Reports whether tracked evidence supports treating a foreach subject as a callable collection.
      *
-     * @param Expr                                   $expr                 - the subject expression from the foreach loop
-     * @param Node                                   $context              - the foreach, whose scope and class resolve names
-     * @param array<int|string, array<string, true>> $collections          - variables tracked as callable collections in each scope
+     * @param Expr                                  $expr                 - the subject expression from the foreach loop
+     * @param Node                                  $context              - the foreach, whose scope and class resolve names
+     * @param array<int|string, array<string, int>> $collections          - variables tracked as callable collections in each scope
      * @param array<int|string, array<string, true>> $collectionProperties - properties tracked as callable collections in each class
      *
      * @return bool - True when the rule carries tracked collection evidence through the expression; false leaves the loop value untrusted.
@@ -970,18 +1081,18 @@ final class DangerousFunctionCallRule implements RuleInterface
     private function isCallableCollectionExpression(Expr $expr, Node $context, array $collections, array $collectionProperties): bool
     {
         $propertyName = $this->staticPropertyName($expr);
+        // A statically named property is matched against its own class's callable collections.
         if ($propertyName !== null) {
-            // A statically named property is matched against its own class's callable collections.
             return isset($collectionProperties[$this->classKey($context)][$propertyName]);
         }
 
+        // A variable carries collection evidence when its scope, or one it can see, tracks it.
         if ($expr instanceof Expr\Variable && is_string($expr->name)) {
-            // A variable carries collection evidence when its scope, or one it can see, tracks it.
             return $this->isTrustedName($expr->name, SecurityNodeHelper::enclosingFunctionLike($context), $collections);
         }
 
+        // The heuristic carries existing collection evidence through an array cast.
         if ($expr instanceof Expr\Cast\Array_) {
-            // The heuristic carries existing collection evidence through an array cast.
             return $this->isCallableCollectionExpression($expr->expr, $context, $collections, $collectionProperties);
         }
 
@@ -1029,8 +1140,8 @@ final class DangerousFunctionCallRule implements RuleInterface
      */
     private function isCallableType(?Node $type): bool
     {
+        // A built-in type hint counts only when it is the literal callable keyword.
         if ($type instanceof Identifier) {
-            // A built-in type hint counts only when it is the literal callable keyword.
             return strtolower($type->toString()) === 'callable';
         }
 
@@ -1042,17 +1153,19 @@ final class DangerousFunctionCallRule implements RuleInterface
             return $shortName === 'closure' || str_ends_with($shortName, 'callable');
         }
 
+        // A union type counts as callable if at least one member type is callable (for example `callable|null`).
         if ($type instanceof Node\UnionType) {
+            // Check every branch of the union for a callable or Closure hint.
             foreach ($type->types as $innerType) {
+                // One callable member is enough for this permissive type heuristic.
                 if ($this->isCallableType($innerType)) {
-                    // One callable member is enough for this permissive type heuristic.
                     return true;
                 }
             }
         }
 
+        // This heuristic follows the inner type through nullable syntax (for example `?Closure`).
         if ($type instanceof Node\NullableType) {
-            // This heuristic follows the inner type through nullable syntax.
             return $this->isCallableType($type->type);
         }
 

@@ -17,7 +17,9 @@ use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Node;
 use PhpParser\Node\Expr;
 use PhpParser\Node\InterpolatedStringPart;
+use PhpParser\Node\Name;
 use PhpParser\Node\Scalar;
+use PhpParser\Node\Stmt;
 
 /**
  * Reports a shell command built from data the code does not control, where an attacker could run their own commands.
@@ -111,8 +113,9 @@ final class ProcessCommandConstructionRule implements RuleInterface
         $findings = array_merge($findings, $this->proceduralCommandFindings($analysisUnit));
 
 
+        // Inspect Symfony Process constructor calls where request data flows directly into the command argument.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\New_::class) as $construction) {
-
+            // Skip unrelated classes whose constructor arguments are not shell commands.
             if (!SecurityNodeHelper::hasMatchingClassName($construction->class, ['Symfony\Component\Process\Process', 'Process'])) {
                 continue;
             }
@@ -126,7 +129,7 @@ final class ProcessCommandConstructionRule implements RuleInterface
 
         // `Process::fromShellCommandline(...)` hands a raw string to the shell.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\StaticCall::class) as $staticCall) {
-
+            // Match only Process::fromShellCommandline() calls rather than unrelated static factory methods.
             if (
                 !SecurityNodeHelper::hasMatchingClassName($staticCall->class, ['Symfony\Component\Process\Process', 'Process'])
                 || SecurityNodeHelper::methodName($staticCall) !== 'fromshellcommandline'
@@ -156,9 +159,11 @@ final class ProcessCommandConstructionRule implements RuleInterface
         $findings = [];
 
 
+        // Inspect every global procedural command sink (exec, system, passthru, popen, proc_open, shell_exec) in the file.
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $functionCall) {
             $functionName = SecurityNodeHelper::globalFunctionName($functionCall);
 
+            // Ignore calls outside PHP's built-in process-execution functions.
             if ($functionName === null || !in_array($functionName, self::PROCEDURAL_COMMAND_SINKS, true)) {
                 continue;
             }
@@ -189,7 +194,7 @@ final class ProcessCommandConstructionRule implements RuleInterface
      */
     private function splicesUnescapedValue(AnalysisUnit $analysisUnit, Expr $command): bool
     {
-        $isShellSafe = fn (Node $node): bool => $this->isShellSafeOperand($node);
+        $isShellSafe = fn (Node $node): bool => $this->isShellSafeOperand($node, $analysisUnit);
         // Each concatenation or interpolated string in the command is judged separately.
         foreach (SecurityNodeHelper::outermostStringConstructions($command, $isShellSafe) as $construction) {
             // A string built inside sprintf() or str_replace() can have other values spliced around it.
@@ -198,17 +203,17 @@ final class ProcessCommandConstructionRule implements RuleInterface
             }
 
             $literalText = '';
-            // Walk the parts left to right, tracking the literal text so far to know whether a quote is open.
+            // Walk the parts left to right, tracking the literal text so far to know whether a quote or backslash escape is open.
             foreach (SecurityNodeHelper::flattenedOperands($construction) as $operand) {
-                // The code's own text is fixed; it only matters for the quote state of later parts.
+                // The code's own text is fixed; it only matters for the quote and escape state of later parts.
                 if ($operand instanceof Scalar\String_ || $operand instanceof InterpolatedStringPart) {
                     $literalText .= $operand->value;
                     continue;
                 }
 
-                // An (int) cast, or escapeshellarg() outside an open quote, cannot break out of its argument.
+                // An (int) cast, or escapeshellarg() outside an open quote or pending backslash escape, cannot break out of its argument.
                 if ($operand instanceof Expr\Cast\Int_
-                    || ($this->isShellSafeOperand($operand) && !SecurityNodeHelper::hasOpenQuote($literalText, '\'"', false))) {
+                    || ($this->isShellSafeOperand($operand, $analysisUnit) && !$this->hasOpenQuoteOrPendingEscape($literalText))) {
                     continue;
                 }
 
@@ -225,6 +230,45 @@ final class ProcessCommandConstructionRule implements RuleInterface
     }
 
     /**
+     * Reports whether literal shell text leaves an unmatched quote open or ends with an unquoted trailing backslash.
+     * A trailing unquoted backslash escapes the opening quote that escapeshellarg() adds, allowing shell injection.
+     *
+     * @param string $literalText - Literal command prefix accumulated before a spliced operand.
+     *
+     * @return bool - True when a quote is still open or a trailing backslash would escape the next character; false when safe.
+     */
+    private function hasOpenQuoteOrPendingEscape(string $literalText): bool
+    {
+        $openQuote  = null;
+        $isEscaped  = false;
+        $textLength = strlen($literalText);
+
+        // Scan left to right so backslashes outside single quotes consume the character that follows them.
+        for ($index = 0; $index < $textLength; $index++) {
+            $character = $literalText[$index];
+
+            // The previous backslash already escaped this character, so clear the escape flag and move on.
+            if ($isEscaped) {
+                $isEscaped = false;
+                continue;
+            }
+
+            // Outside single quotes, a backslash escapes the following character (including a spliced argument's opening quote).
+            if ($character === '\\' && $openQuote !== "'") {
+                $isEscaped = true;
+                continue;
+            }
+
+            // Track unescaped single and double quotes so operands inside an open quote stay flagged.
+            if (($character === "'" || $character === '"') && ($openQuote === null || $openQuote === $character)) {
+                $openQuote = $openQuote === null ? $character : null;
+            }
+        }
+
+        return $openQuote !== null || $isEscaped;
+    }
+
+    /**
      * Reports whether an assigned value is one plain word, or a ternary choosing between plain words.
      *
      * @param Expr $assigned - Right-hand side of an assignment to a spliced local.
@@ -233,6 +277,7 @@ final class ProcessCommandConstructionRule implements RuleInterface
      */
     private function isPlainWordOrChoice(Expr $assigned): bool
     {
+        // Plain literal strings qualify only when every character is a safe word or flag character.
         if ($assigned instanceof Scalar\String_) {
             // Excluding whitespace, quotes, backslashes, and shell separators keeps the word from opening a quote or starting another command.
             return preg_match('~^[\w./:=+-]+$~', $assigned->value) === 1;
@@ -244,21 +289,71 @@ final class ProcessCommandConstructionRule implements RuleInterface
     }
 
     /**
-     * Reports whether a spliced part is an escapeshellarg() result or an `(int)` cast.
+     * Reports whether a spliced part is a built-in escapeshellarg() result or an `(int)` cast.
      *
-     * @param Node $operand - Part of a command concatenation or interpolated string.
+     * @param Node         $operand      - Part of a command concatenation or interpolated string.
+     * @param AnalysisUnit $analysisUnit - Parsed file checked for same-namespace userland overrides of escapeshellarg().
      *
-     * @return bool - True for an escapeshellarg() call or an `(int)` cast; false for any other value.
+     * @return bool - True for a built-in escapeshellarg() call or an `(int)` cast; false for userland wrappers or other values.
      */
-    private function isShellSafeOperand(Node $operand): bool
+    private function isShellSafeOperand(Node $operand, AnalysisUnit $analysisUnit): bool
     {
         // An integer prints only digits and a sign.
         if ($operand instanceof Expr\Cast\Int_) {
             return true;
         }
 
-        return $operand instanceof Expr\FuncCall && !$operand->isFirstClassCallable()
-            && in_array(SecurityNodeHelper::globalFunctionName($operand), self::SHELL_ARGUMENT_ESCAPERS, true);
+        // Only a regular call to a statically named escaper qualifies; first-class callables do not return escaped text.
+        if (!$operand instanceof Expr\FuncCall || $operand->isFirstClassCallable() || !$operand->name instanceof Name) {
+            return false;
+        }
+
+        $functionName = SecurityNodeHelper::globalFunctionName($operand);
+        // Reject calls outside the shell-argument escaper allowlist.
+        if ($functionName === null || !in_array($functionName, self::SHELL_ARGUMENT_ESCAPERS, true)) {
+            return false;
+        }
+
+        // An explicit leading backslash always invokes PHP's global built-in even inside a namespace.
+        if ($operand->name->isFullyQualified()) {
+            return true;
+        }
+
+        $resolvedName = $operand->name->getAttribute('resolvedName');
+        // Imported or aliased calls (like `Evil\escapeshellarg` or `trim as escapeshellarg`) must resolve to the built-in itself.
+        if ($resolvedName instanceof Name && !in_array(strtolower($resolvedName->toString()), self::SHELL_ARGUMENT_ESCAPERS, true)) {
+            return false;
+        }
+
+        $namespacedName = $operand->name->getAttribute('namespacedName');
+        // Unqualified calls inside a namespace resolve to a same-namespace function before falling back to PHP's global built-in.
+        if ($namespacedName instanceof Name && $this->hasDeclaredFunction($analysisUnit, strtolower($namespacedName->toString()))) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Reports whether the analysed file declares a userland function with the given fully-qualified lowercase name.
+     *
+     * @param AnalysisUnit $analysisUnit       - Parsed unit whose function declarations are checked.
+     * @param string       $lowerQualifiedName - Lowercase namespace-qualified function name to look for.
+     *
+     * @return bool - True when the file declares a matching function; false when none is declared in this unit.
+     */
+    private function hasDeclaredFunction(AnalysisUnit $analysisUnit, string $lowerQualifiedName): bool
+    {
+        // Scan declared functions in the file so a namespaced wrapper like App\escapeshellarg() cannot bypass the rule.
+        foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Function_::class) as $function) {
+            $declaredName = $function->namespacedName?->toString() ?? $function->name->toString();
+            // A same-namespace userland declaration shadows the global built-in for unqualified calls.
+            if (strtolower($declaredName) === $lowerQualifiedName) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -279,6 +374,7 @@ final class ProcessCommandConstructionRule implements RuleInterface
         $interpreterPath = str_replace('\\', '/', strtolower($firstItem->value->value));
         $interpreterName = basename($interpreterPath);
 
+        // Non-shell executables invoked via proc_open() argv arrays never pass arguments through a shell parser.
         if (!in_array($interpreterName, self::SHELL_INTERPRETER_NAMES, true)) {
             return null;
         }

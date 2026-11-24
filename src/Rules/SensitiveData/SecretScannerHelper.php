@@ -49,13 +49,16 @@ final class SecretScannerHelper
     {
         $cacheKey = $analysisUnit->file->displayPath;
 
+        // Reuse the cached comment spans when multiple sensitive-data rules scan the same file.
         if (isset(self::$commentRangeCache[$cacheKey])) {
             return self::$commentRangeCache[$cacheKey];
         }
 
         $ranges = [];
 
+        // Record half-open byte ranges for PHP comments so scanners can skip documentation examples quickly.
         foreach ($analysisUnit->tokens as $token) {
+            // Keep only line, block, and PHPDoc comment tokens; code tokens remain scannable.
             if ($token->id === T_COMMENT || $token->id === T_DOC_COMMENT) {
                 $ranges[] = [$token->pos, $token->getEndPos()];
             }
@@ -68,20 +71,19 @@ final class SecretScannerHelper
      * Reports whether a source-text byte offset falls inside one of the given comment ranges.
      *
      * @param int                      $offset - Zero-based byte offset of a pattern match.
-     * @param list<array{0:int,1:int}> $ranges - Comment ranges produced by commentRanges().
+     * @param list<array{0:int,1:int}> $ranges - Comment ranges produced by commentRanges(); empty means no comments exist to skip.
      *
      * @return bool - true when the offset falls inside a comment span, signalling the caller to skip the match
      */
     public static function isInsideComment(int $offset, array $ranges): bool
     {
-
+        // Check whether the candidate's starting byte lies inside any comment span of the file.
         foreach ($ranges as [$start, $end]) {
+            // A half-open match confirms the candidate sits inside a comment rather than executable code.
             if ($offset >= $start && $offset < $end) {
-
                 return true;
             }
         }
-
 
         return false;
     }
@@ -98,6 +100,21 @@ final class SecretScannerHelper
     {
 
         return substr_count(substr($source, 0, $offset), "\n") + 1;
+    }
+
+    /**
+     * Converts a byte offset into its 1-based column on the containing line so multiple secrets on one line stay distinct.
+     *
+     * @param string $source - Source text being scanned.
+     * @param int    $offset - Zero-based byte offset inside the source text.
+     *
+     * @return int - 1-based column within the line containing the offset.
+     */
+    public static function columnForOffset(string $source, int $offset): int
+    {
+        $lastNewline = strrpos(substr($source, 0, $offset), "\n");
+
+        return $lastNewline === false ? $offset + 1 : $offset - $lastNewline;
     }
 
     /**
@@ -210,9 +227,10 @@ final class SecretScannerHelper
     }
 
     /**
-     * Treats samples, empty values, placeholder-prefixed tokens and normalized values with at most two distinct characters as dummies.
+     * Treats vendor samples, empty values, placeholder-prefixed tokens, and low-variety strings as dummies.
+     *
      * Token prefixes match alphanumeric runs and, by default, identifier words; embedded substrings alone do not match.
-     * Disabling identifier splitting preserves whole alphanumeric runs but still excludes exact documented samples.
+     * Disabling identifier splitting preserves whole alphanumeric runs while still excluding exact documented samples.
      *
      * @param string $secretValue - Candidate value, trimmed of surrounding quotes, spaces, tabs and line breaks.
      * @param bool $shouldSplitIdentifierWords - Whether to add camelCase, acronym and digit-run tokens to the alphanumeric runs.
@@ -228,26 +246,28 @@ final class SecretScannerHelper
         }
 
         $normalized = strtolower($trimmed);
+        // Empty strings carry no credential material to report.
         if ($normalized === '') {
-
             return true;
         }
 
         // Runs of letters and digits, split on every other character.
         $tokens = preg_split('/[^a-z0-9]+/', $normalized, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        // Split camelCase and digit runs unless the caller disabled identifier splitting for fixed-format keys like AKIA...
         if ($shouldSplitIdentifierWords) {
             $tokens = [...$tokens, ...(new IdentifierTokenizer())->tokenize($trimmed)];
         }
 
-
+        // Reject values containing any known placeholder prefix such as example, fake, dummy, or test.
         foreach ($tokens as $token) {
+            // Check every placeholder prefix against the current token start so substrings like "latest" never match "test".
             foreach (self::PLACEHOLDER_WORDS as $word) {
+                // One placeholder-prefixed word is enough to treat the candidate as sample text rather than a live secret.
                 if (str_starts_with($token, $word)) {
                     return true;
                 }
             }
         }
-
 
         return count(array_unique(str_split($normalized))) <= 2;
     }
@@ -280,14 +300,13 @@ final class SecretScannerHelper
     {
         $upperLine = strtoupper($line);
 
-
+        // Check whether the source line mentions a credential-related keyword such as KEY, TOKEN, or PASSWORD.
         foreach (self::sensitiveKeyFragments() as $fragment) {
+            // Any recognized keyword fragment confirms the surrounding line looks like a credential assignment.
             if (str_contains($upperLine, $fragment)) {
-
                 return true;
             }
         }
-
 
         return false;
     }
@@ -326,6 +345,49 @@ final class SecretScannerHelper
             pillar:      Pillar::SensitiveData,
             tier:        RuleTier::V01,
             confidence:  $confidence,
+            remediation: $remediation,
+            metadata:    [
+                             'detector' => $detector,
+                             'preview'  => $displayMarker,
+                         ],
+        );
+    }
+
+    /**
+     * Builds a warning-level sensitive-data finding located by exact line and 1-based column from a match byte offset.
+     * Carrying the column preserves every secret when a single source line holds more than one match of the same rule.
+     *
+     * @param AnalysisUnit $analysisUnit  - Supplies the raw source and display path attached to the finding.
+     * @param string       $ruleId        - Rule identifier attached to the finding.
+     * @param string       $message       - Report message copied verbatim; must not contain the matched value.
+     * @param int          $offset        - Zero-based byte offset of the matched credential inside the source.
+     * @param Confidence   $confidence    - Detector-selected confidence copied to the finding.
+     * @param string       $detector      - Detector name stored in metadata.
+     * @param string       $displayMarker - Non-empty classification-only marker; callers must enforce the permitted grammar.
+     * @param string       $remediation   - Remediation text copied verbatim into the finding.
+     *
+     * @return Finding - Warning finding in the SensitiveData pillar, located by 1-based line and column.
+     */
+    public static function findingAtOffset(
+        AnalysisUnit $analysisUnit,
+        string       $ruleId,
+        string       $message,
+        int          $offset,
+        Confidence   $confidence,
+        string       $detector,
+        string       $displayMarker,
+        string       $remediation,
+    ): Finding {
+        return new Finding(
+            ruleId:      $ruleId,
+            message:     $message,
+            filePath:    $analysisUnit->file->displayPath,
+            line:        self::lineNumberForOffset($analysisUnit->source, $offset),
+            severity:    Severity::Warning,
+            pillar:      Pillar::SensitiveData,
+            tier:        RuleTier::V01,
+            confidence:  $confidence,
+            column:      self::columnForOffset($analysisUnit->source, $offset),
             remediation: $remediation,
             metadata:    [
                              'detector' => $detector,

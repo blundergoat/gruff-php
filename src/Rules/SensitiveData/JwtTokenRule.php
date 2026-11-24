@@ -67,8 +67,8 @@ final readonly class JwtTokenRule implements SourceTextRuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
+        // Fast pre-screen: files without the base64url JSON prefix `eyJ` cannot contain a supported JWT literal.
         if (!str_contains($analysisUnit->source, 'eyJ')) {
-
             return [];
         }
 
@@ -78,28 +78,30 @@ final readonly class JwtTokenRule implements SourceTextRuleInterface
         $findings      = [];
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
 
+        // Judge each token match independently so a sample token in a comment cannot hide a live-shaped token elsewhere.
         foreach ($matches[0] as $match) {
             [$candidateSecret, $offset] = $match;
 
+            // Skip documentation examples inside PHP comments so explanatory docblocks do not trigger false alarms.
             if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
                 continue;
             }
 
-
+            // Skip documented vendor examples (such as jwt.io) and placeholder tokens before reporting.
             if (SecretScannerHelper::isLikelyDummyValue($candidateSecret)) {
                 continue;
             }
 
             $displayMarker = SecretScannerHelper::categoryMarker('jwt');
-            $findings[] = SecretScannerHelper::finding(
-                analysisUnit: $analysisUnit,
-                ruleId:       self::ID,
-                message:      sprintf('JWT-like token literal detected: %s.', $displayMarker),
-                line:         SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
-                confidence:   Confidence::Medium,
-                detector:     'jwt-token',
+            $findings[]    = SecretScannerHelper::findingAtOffset(
+                analysisUnit:  $analysisUnit,
+                ruleId:        self::ID,
+                message:       sprintf('JWT-like token literal detected: %s.', $displayMarker),
+                offset:        $offset,
+                confidence:    Confidence::Medium,
+                detector:      'jwt-token',
                 displayMarker: $displayMarker,
-                remediation:  'Move tokens out of source fixtures/config and generate them at runtime.',
+                remediation:   'Move tokens out of source fixtures/config and generate them at runtime.',
             );
         }
 

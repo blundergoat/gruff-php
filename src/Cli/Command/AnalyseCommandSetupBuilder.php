@@ -47,7 +47,6 @@ final readonly class AnalyseCommandSetupBuilder
         $launchDirectory = getcwd();
 
         // The launch directory is unavailable, so stop before resolving targets against an unknown location.
-
         if ($launchDirectory === false) {
             return AnalyseCommandSetupResult::plainError(
                 '<error>Unable to determine current working directory.</error>',
@@ -214,8 +213,8 @@ final readonly class AnalyseCommandSetupBuilder
 
             while (!self::isSameOrDescendant($directory, $common)) {
                 $parent = dirname($common);
-                // Reaching a filesystem root without containing this target means no common ancestor exists.
-                if ($parent === $common) {
+                // Reaching a filesystem root, or widening unrelated subtrees up to `/`, means the targets share no project root.
+                if ($parent === $common || (dirname($parent) === $parent && $directory !== $parent && $launchDirectory !== $parent)) {
                     return null;
                 }
                 $common = $parent;
@@ -223,7 +222,6 @@ final readonly class AnalyseCommandSetupBuilder
         }
 
         // Keep the launch directory when targets stay inside it or none resolve, so config, ignores, and baselines retain their anchor.
-
         if ($common === null || self::isSameOrDescendant($common, $launchDirectory)) {
             return $launchDirectory;
         }
@@ -330,7 +328,6 @@ final readonly class AnalyseCommandSetupBuilder
         }
 
         // A multi-target request escaped the launch directory; report this policy error through the selected format.
-
         if ($outsideTarget !== null) {
             return AnalyseCommandSetupResult::reportError(
                 $this->usageReport(
@@ -361,7 +358,6 @@ final readonly class AnalyseCommandSetupBuilder
         $registry        = RuleRegistry::defaults();
         $ruleFilterError = $this->ruleFilterError($registry, $options);
         // Unknown includes can omit intended checks; unknown excludes leave intended checks enabled.
-
         if ($ruleFilterError !== null) {
             return AnalyseCommandSetupResult::reportError(
                 $this->usageReport($options, $formatResult, $failThreshold->value, $ruleFilterError),
@@ -389,7 +385,6 @@ final readonly class AnalyseCommandSetupBuilder
             isMachineReadableFormat: $formatResult->isMachineReadable(),
         );
         // Initialization failed after the first-run offer, so return its exit code without starting analysis.
-
         if ($promptExitCode !== null) {
             return AnalyseCommandSetupResult::exitCode($promptExitCode);
         }
@@ -431,7 +426,6 @@ final readonly class AnalyseCommandSetupBuilder
             $configResult = $configResult->withRuleSelection($profileRuleSelection);
         }
         // Explicit includes replace the selection with those ids; without includes, CLI excludes extend the existing exclusions.
-
         if ($options->includeRules !== [] || $options->excludeRules !== []) {
             $configResult = $configResult->withRuleSelection(
                 $this->refinedSelection($configResult->ruleSelection(), $options->includeRules, $options->excludeRules),
@@ -602,9 +596,8 @@ final readonly class AnalyseCommandSetupBuilder
     }
 
     /**
-     * Turns the raw --format value into a renderer choice, or a ready-to-print usage error when it
-     * names a format gruff can't produce. Runs before any scan so the user never waits for a report
-     * that can't be rendered.
+     * Turns the raw --format value into a renderer choice, or a ready-to-print usage error when it names an unsupported format.
+     * Runs before any scan so the user never waits for a report that cannot be rendered.
      *
      * @param mixed $optionValue - Raw --format console option; a non-string (option absent) defaults to text.
      *
@@ -707,7 +700,6 @@ final readonly class AnalyseCommandSetupBuilder
 
         $baselineWillApply = $options->baseline->baselinePath !== null && $options->baseline->generateBaselinePath === null;
         // A selected baseline counts only outside generation mode; a diff reference works in either mode.
-
         if ($baselineWillApply || $options->changeScope->diffVs !== null) {
             return null;
         }

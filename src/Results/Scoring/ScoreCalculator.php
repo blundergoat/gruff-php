@@ -14,10 +14,12 @@ use GruffPhp\Results\Mutation\MutationAnalysisResult;
 use GruffPhp\Results\Mutation\MutationFileSummary;
 
 /**
- * Builds score reports from weighted finding density, optional mutation results, and per-file summaries.
- * Static grades use a bounded density curve; applicable graded pillars contribute equally to the composite.
+ * Builds the score report shown at the top of `gruff-php analyse`, `summary`, and `dashboard` outputs.
  *
- * Rules excluded from scoring contribute no weight, and correlated findings share one penalty per file and symbol.
+ * Converts weighted finding density per evaluated file into pillar grades, a composite grade, and a fix-first offender list:
+ * - Static grades use the family-ratified bounded density curve so larger repositories are not penalised for file count.
+ * - Correlated size and complexity findings on one file and symbol share one weight instead of double-counting one bad method.
+ * - Optional Infection mutation reports populate the Mutation pillar from MSI rather than finding penalties.
  */
 final readonly class ScoreCalculator
 {
@@ -60,6 +62,7 @@ final readonly class ScoreCalculator
 
     /**
      * Floor for static density grades; one static pillar can lower an N-pillar composite by at most (100 - floor) / N points.
+     *
      * Together with DENSITY_SCALE, this belongs to the family-ratified bounded-normalized-density-floored curve.
      * Changing either value requires a family decision.
      */
@@ -73,6 +76,7 @@ final readonly class ScoreCalculator
 
     /**
      * Correlated size and complexity rules share weight when at least two findings name the same file and symbol.
+     *
      * The group contributes its largest base penalty, split equally among members; reported line numbers do not split it.
      * The family scoring contract uses this grouping to avoid charging several symptoms of one method independently.
      */
@@ -115,7 +119,7 @@ final readonly class ScoreCalculator
 
         // Average only the pillars that actually applied, so an ungraded pillar cannot drag the composite down.
         foreach ($pillars as $pillar) {
-
+            // Skip inapplicable or ungraded pillars (such as Mutation when no Infection report was supplied).
             if (!$pillar->applicable || !$pillar->grade instanceof Grade) {
                 continue;
             }
@@ -155,9 +159,8 @@ final readonly class ScoreCalculator
      */
     private function scoredFindings(array $findings, ?AnalysisConfig $analysisConfig): array
     {
-
+        // When no config was supplied (for example in unit tests), keep every finding in the score calculation.
         if (!$analysisConfig instanceof AnalysisConfig) {
-
             return $findings;
         }
 
@@ -166,14 +169,12 @@ final readonly class ScoreCalculator
         return array_values(array_filter(
                                 $findings,
                                 static function (Finding $finding) use ($rules): bool {
-
                                     $settings = $rules[$finding->ruleId] ?? null;
 
+                                    // Honour `excludeFromScore: true` for configured rules so advisory-only rules do not lower the grade.
                                     if ($settings !== null) {
-
                                         return !$settings->isExcludedFromScore();
                                     }
-
 
                                     return true;
                                 },
@@ -192,7 +193,7 @@ final readonly class ScoreCalculator
     {
         $base = 'Each pillar scores on the density of its weighted findings per evaluated file, on a curve from 50 to 100, so a larger project is not penalised for its size; correlated size and complexity findings on one symbol share a single weight; the composite is the average of applicable pillar scores.';
 
-
+        // Explain the MSI contribution when the user ran with an Infection mutation report; otherwise explain why Mutation is omitted.
         if ($mutationAnalysisResult instanceof MutationAnalysisResult) {
             return $base . ' Mutation uses the supplied Infection MSI as the mutation pillar score.';
         }
@@ -220,9 +221,9 @@ final readonly class ScoreCalculator
 
         // When deriving pillars, make sure any pillar a finding belongs to earns a slot, even outside the built-in set.
         if ($scorePillars === null) {
-
+            // Walk scored findings so custom or non-static pillars still appear in the report breakdown.
             foreach ($findings as $finding) {
-
+                // Append unseen pillars once while preserving canonical built-in pillar order first.
                 if (!in_array($finding->pillar->value, $pillarNames, true)) {
                     $pillarNames[] = $finding->pillar->value;
                 }
@@ -240,7 +241,7 @@ final readonly class ScoreCalculator
 
         $scores = [];
 
-
+        // Build one PillarScore row per resolved pillar in report order.
         foreach ($pillarNames as $pillarName) {
             // The Mutation pillar is special: it is graded from Infection's MSI, not from finding penalties.
             if ($pillarName === Pillar::Mutation->value) {
@@ -292,7 +293,8 @@ final readonly class ScoreCalculator
     }
 
     /**
-     * Convert summed finding weight to a static grade, or return null when no files were evaluated.
+     * Converts summed finding weight to a static grade, or returns null when no files were evaluated.
+     *
      * Density is weight / evaluated files; the curve is floor + (100 - floor) / (1 + density / DENSITY_SCALE).
      * Proportional increases in finding weight and evaluated files therefore preserve the score.
      *
@@ -330,6 +332,7 @@ final readonly class ScoreCalculator
         $byFile = [];
 
 
+        // Group scored findings by their display path so each file's worst metrics can be aggregated.
         foreach ($findings as $finding) {
             $byFile[$finding->filePath]   ??= [];
             $byFile[$finding->filePath][] = $finding;
@@ -338,7 +341,7 @@ final readonly class ScoreCalculator
         $mutationByFile = [];
         // When mutation ran, make sure every file it measured gets a score row, even with no other findings.
         if ($mutationAnalysisResult instanceof MutationAnalysisResult) {
-
+            // Index each Infection per-file summary so file rows can attach its MSI score.
             foreach ($mutationAnalysisResult->report->fileSummaries() as $summary) {
                 $mutationByFile[$summary->filePath] = $summary;
                 $byFile[$summary->filePath]         ??= [];
@@ -347,7 +350,7 @@ final readonly class ScoreCalculator
 
         $scores = [];
 
-
+        // Compute one FileScore row per file with findings or mutation data.
         foreach ($byFile as $filePath => $fileFindings) {
             $counts          = $this->severityCounts($fileFindings);
             // File grades apply the project density curve to that file's weighted findings with a denominator of one.
@@ -400,20 +403,20 @@ final readonly class ScoreCalculator
         ];
 
 
+        // Bucket cyclomatic complexity findings into fixed histogram ranges shown in reports.
         foreach ($findings as $finding) {
-
+            // Only `complexity.cyclomatic` carries the cyclomatic branch count used by this histogram.
             if ($finding->ruleId !== 'complexity.cyclomatic') {
                 continue;
             }
 
-
             $complexity = $finding->metadata['complexity'] ?? null;
-
+            // Ignore malformed or missing complexity metadata rather than skewing the lowest bucket.
             if (!is_int($complexity)) {
                 continue;
             }
 
-
+            // Place the method's cyclomatic score into the matching report histogram range.
             if ($complexity <= 5) {
                 $buckets['1-5']++;
             } elseif ($complexity <= 10) {
@@ -456,7 +459,8 @@ final readonly class ScoreCalculator
     }
 
     /**
-     * Assign base penalties and share the largest penalty across correlated findings with the same file and non-null symbol.
+     * Assigns base penalties and shares the largest penalty across correlated findings with the same file and non-null symbol.
+     *
      * Each group of two or more contributes its largest base penalty in total; other findings keep their base penalties.
      * Object IDs keep the same weights attached to findings in both pillar and file calculations.
      *
@@ -468,6 +472,7 @@ final readonly class ScoreCalculator
     {
         $penalties = [];
 
+        // Start every finding at its unclustered severity-by-confidence base penalty.
         foreach ($findings as $finding) {
             $penalties[spl_object_id($finding)] = $this->penaltyFor($finding);
         }
@@ -475,29 +480,29 @@ final readonly class ScoreCalculator
         /** @var array<string, list<Finding>> $clusters - Includes different reported lines for the same file and symbol. */
         $clusters = [];
 
+        // Group correlated size and complexity findings that point to the same file and qualified symbol.
         foreach ($findings as $finding) {
-
-
+            // Only correlated rules with an enclosing symbol can share a single method-level penalty.
             if (!in_array($finding->ruleId, self::CORRELATED_COMPLEXITY_RULES, true) || $finding->symbol === null) {
                 continue;
             }
 
-            // The ratified contract keys clustering on file and qualified symbol without line
-            // identity: correlated rules disagree about which line to report, and a line in the key
-            // splits one root cause into two. gruff-php emits a qualified symbol, so the key is exact.
+            // The ratified contract keys clustering on file and qualified symbol without line identity: correlated rules
+            // report different lines for one root cause, and gruff-php emits qualified symbols so the key stays exact.
             $key              = $finding->filePath . "\0" . $finding->symbol;
             $clusters[$key][] = $finding;
         }
 
-
+        // Split the single largest base penalty equally across members of each multi-finding cluster.
         foreach ($clusters as $cluster) {
-
+            // Solo findings are not part of a correlated cluster and keep their full base penalty.
             if (count($cluster) < 2) {
                 continue;
             }
 
             $shared = max(array_map(fn(Finding $finding): float => $this->penaltyFor($finding), $cluster)) / count($cluster);
 
+            // Assign the shared slice to every finding in the cluster so file and pillar totals stay consistent.
             foreach ($cluster as $finding) {
                 $penalties[spl_object_id($finding)] = $shared;
             }
@@ -520,7 +525,9 @@ final readonly class ScoreCalculator
         /** @var array<string, list<Finding>> $groups - Includes different reported lines for the same file and symbol. */
         $groups = [];
 
+        // Bucket correlated findings by file and symbol so report rows match the penalties calculated above.
         foreach ($findings as $finding) {
+            // Skip uncorrelated rules and file-level findings without a qualified symbol.
             if (!in_array($finding->ruleId, self::CORRELATED_COMPLEXITY_RULES, true) || $finding->symbol === null) {
                 continue;
             }
@@ -530,8 +537,9 @@ final readonly class ScoreCalculator
 
         $clusters = [];
 
+        // Format each group of two or more findings into a report-ready cluster summary row.
         foreach ($groups as $group) {
-
+            // A single finding did not share weight with anything, so omit it from the cluster breakdown.
             if (count($group) < 2) {
                 continue;
             }
@@ -554,7 +562,8 @@ final readonly class ScoreCalculator
     }
 
     /**
-     * Group scored findings by native rule ID and report each rule's total finding weight.
+     * Groups scored findings by native rule ID and reports each rule's total finding weight.
+     *
      * These are weights before the density curve, not points subtracted from a grade.
      * Native rule IDs remain the attribution keys; rows are sorted by those IDs.
      *
@@ -568,6 +577,7 @@ final readonly class ScoreCalculator
         $counts  = [];
         $weights = [];
 
+        // Accumulate finding count and clustered weight per rule ID so users can see which rules cost the most grade weight.
         foreach ($findings as $finding) {
             $counts[$finding->ruleId]  = ($counts[$finding->ruleId] ?? 0) + 1;
             $weights[$finding->ruleId] = ($weights[$finding->ruleId] ?? 0.0) + ($penalties[spl_object_id($finding)] ?? $this->penaltyFor($finding));
@@ -576,6 +586,7 @@ final readonly class ScoreCalculator
         ksort($counts);
         $attribution = [];
 
+        // Build deterministic sorted attribution rows rounded to two decimal places for display.
         foreach ($counts as $ruleId => $count) {
             $attribution[] = ['ruleId' => (string)$ruleId, 'findings' => $count, 'weight' => round($weights[$ruleId], 2)];
         }
@@ -596,6 +607,7 @@ final readonly class ScoreCalculator
     {
         $total = 0.0;
 
+        // Add each finding's clustered penalty, falling back to its base penalty if absent from the map.
         foreach ($findings as $finding) {
             $total += $penalties[spl_object_id($finding)] ?? $this->penaltyFor($finding);
         }
@@ -614,7 +626,7 @@ final readonly class ScoreCalculator
     {
         $counts = ['advisory' => 0, 'warning' => 0, 'error' => 0];
 
-
+        // Count advisory, warning, and error findings separately for summary tables.
         foreach ($findings as $finding) {
             $counts[$finding->severity->value]++;
         }
@@ -636,20 +648,18 @@ final readonly class ScoreCalculator
     {
         $maximumValue = null;
 
-
+        // Scan the file's findings for the highest integer metric emitted by the requested rule.
         foreach ($findings as $finding) {
-
+            // Skip findings emitted by other rules.
             if ($finding->ruleId !== $ruleId) {
                 continue;
             }
 
-
             $metricValue = $finding->metadata[$key] ?? null;
-
+            // Ignore absent or non-integer metadata values so malformed entries never crash scoring.
             if (!is_int($metricValue)) {
                 continue;
             }
-
 
             $maximumValue = $maximumValue === null ? $metricValue : max($maximumValue, $metricValue);
         }
@@ -669,20 +679,18 @@ final readonly class ScoreCalculator
     {
         $maximumLines = null;
 
-
+        // Find the largest reported line count across file, method, and class size findings for this file.
         foreach ($findings as $finding) {
-
+            // Only the three length-based size rules record a line-count metric.
             if (!in_array($finding->ruleId, ['size.file-length', 'size.method-length', 'size.class-length'], true)) {
                 continue;
             }
 
-
             $lineCount = $finding->metadata['lines'] ?? null;
-
+            // Skip findings that omitted or non-integer-encoded their line count.
             if (!is_int($lineCount)) {
                 continue;
             }
-
 
             $maximumLines = $maximumLines === null ? $lineCount : max($maximumLines, $lineCount);
         }

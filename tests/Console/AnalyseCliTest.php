@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GruffPhp\Tests\Console;
 
 use GruffPhp\Cli\Application;
+use GruffPhp\Cli\Command\AnalyseCommandSetupBuilder;
 use JsonException;
 use Symfony\Component\Process\Process;
 
@@ -818,6 +819,26 @@ final class AnalyseCliTest extends CliTestCase
             self::assertSame(0, $single->getExitCode(), $single->getErrorOutput());
         } finally {
             $this->removeDir($workspace);
+        }
+    }
+
+    /**
+     * Checks that unrelated POSIX target trees whose only common ancestor is the filesystem root return no project root.
+     *
+     * @return void - Asserts null when two unrelated top-level trees share only `/`.
+     */
+    public function testProjectRootFromTargetsReturnsNullForUnrelatedRootLevelTrees(): void
+    {
+        if (DIRECTORY_SEPARATOR !== '/' || !is_dir('/usr') || !is_dir('/var')) {
+            self::markTestSkipped('POSIX /usr and /var directories are required.');
+        }
+
+        $launchDirectory = $this->tempDir();
+
+        try {
+            self::assertNull(AnalyseCommandSetupBuilder::projectRootFromTargets($launchDirectory, ['/usr', '/var']));
+        } finally {
+            $this->removeDir($launchDirectory);
         }
     }
 

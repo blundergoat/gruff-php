@@ -149,17 +149,6 @@ final class AnalyseCommand extends Command
     }
 
     /**
-     * Orchestrates one `gruff-php analyse` request from source discovery through report rendering.
-     *
-     * It runs rules, scoring, baselines, and branch review in the order users expect.
-     * A setup failure returns early only after giving the user an actionable message.
-     *
-     * @param InputInterface  $input  - Parsed CLI arguments and options for this analyse run.
-     * @param OutputInterface $output - Destination for the rendered report; its stderr stream carries any runtime payload.
-     *
-     * @return int - Symfony exit code: SUCCESS when clean, FAILURE when a fail-on gate trips, INVALID on a run diagnostic.
-     */
-    /**
      * Prints one notice per supplied superseded flag, naming its replacement without stopping the run.
      *
      * @param InputInterface  $input  - The parsed command line.
@@ -1153,16 +1142,19 @@ final class AnalyseCommand extends Command
     }
 
     /**
-     * Computes the composite score passed to branch-review comparison, excluding mutation findings when comparing against a base ref.
+     * Computes the composite score compared against the base ref during `--diff-base` / `--diff-vs` branch reviews.
+     *
+     * Without a base ref, this reuses the main run's composite score directly.
+     * With a base ref, it recalculates over static pillars only so mutation findings cannot skew the branch delta.
      *
      * @param AnalyseCommandOptions $options        - CLI options selecting diff-vs mode and active profile.
-     * @param ScoreReport           $score          - Primary score report reused when diff-vs is inactive.
-     * @param list<Finding>         $reviewFindings - Current-tree findings with mutation findings removed under diff-vs.
-     * @param int                   $evaluatedFiles - Evaluated PHP file count used as the score denominator.
-     * @param RuleRegistry          $registry       - Rule registry providing enabled static pillars.
+     * @param ScoreReport           $score          - Primary score report reused when no branch comparison was requested.
+     * @param list<Finding>         $reviewFindings - Current-tree findings with mutation findings removed; empty yields a clean static score.
+     * @param int                   $evaluatedFiles - Evaluated PHP file count used as the score denominator; 0 leaves static pillars ungraded.
+     * @param RuleRegistry          $registry       - Rule registry providing enabled static pillars for the effective config.
      * @param AnalysisConfig        $config         - Effective analysis config governing enabled rules and score exclusions.
      *
-     * @return float|null - Comparable composite score, or null when no pillar produced a grade.
+     * @return float|null - Comparable composite score, or null when no applicable pillar produced a grade.
      */
     private function reviewCompositeScore(
         AnalyseCommandOptions $options,
@@ -1172,6 +1164,7 @@ final class AnalyseCommand extends Command
         RuleRegistry $registry,
         AnalysisConfig $config,
     ): ?float {
+        // When the user did not ask for a branch comparison, reuse the primary composite score instead of scoring twice.
         if ($options->changeScope->diffVs === null) {
             return $score->composite?->score;
         }

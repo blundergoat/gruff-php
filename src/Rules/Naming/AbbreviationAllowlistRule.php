@@ -29,9 +29,8 @@ use PhpParser\Node\Stmt\Property;
  * Requires a short lowercase abbreviation to be declared in project config before it is accepted, so the
  * user builds an explicit, documented vocabulary instead of scattering ad-hoc short names.
  *
- * Kept deliberately separate from ShortVariableRule: a single-character variable is a local clarity problem,
- * while a 2-3 character abbreviation needs an explicit project vocabulary through
- * allowlists.acceptedAbbreviations. High confidence, advisory severity.
+ * Kept deliberately separate from ShortVariableRule: single-character names are a local clarity issue, while 2-3 character
+ * abbreviations need an explicit project vocabulary through `allowlists.acceptedAbbreviations`. High confidence, advisory severity.
  */
 final readonly class AbbreviationAllowlistRule implements RuleInterface
 {
@@ -46,8 +45,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
 
     /**
      * Common 2-3 letter English words and universal technical terms that are not project-specific abbreviations.
-     * Kept strictly disjoint from AnalysisConfig::DEFAULT_ACCEPTED_ABBREVIATIONS so omitting a seeded entry in
-     * allowlists.acceptedAbbreviations still takes effect under replace-not-merge.
+     * Kept strictly disjoint from `AnalysisConfig::DEFAULT_ACCEPTED_ABBREVIATIONS` so omitting a seeded entry still takes effect.
      *
      * @var array<string, true>
      */
@@ -161,6 +159,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
         $findings   = [];
 
 
+        // Check every class property declaration for unapproved short lowercase names.
         foreach (NodeIndex::nodesOf($analysisUnit, Property::class) as $property) {
             array_push(
                 $findings,
@@ -176,7 +175,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
             );
         }
 
-
+        // Check every function, method, closure, and arrow-function scope for unapproved parameter and local names.
         foreach ((new FunctionLikeScopeWalker())->scopes($analysisUnit->statements) as $scope) {
             array_push(
                 $findings,
@@ -232,6 +231,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
                 maxLength:    $maxLength,
             );
 
+            // Collect the finding only when the property name falls in the abbreviation band and is not allowed.
             if ($finding instanceof Finding) {
                 $findings[] = $finding;
             }
@@ -310,8 +310,9 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
         $symbol   = $this->symbol($scope);
 
 
+        // Inspect each parameter in declaration order for unapproved short abbreviations.
         foreach ($scope->node->params as $param) {
-
+            // Skip malformed or dynamic parameter nodes without a static variable name.
             if (!$param->var instanceof Variable || !is_string($param->var->name)) {
                 continue;
             }
@@ -327,6 +328,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
                 maxLength:    $maxLength,
             );
 
+            // Collect the finding only when the parameter name falls in the abbreviation band and is not allowed.
             if ($finding instanceof Finding) {
                 $findings[] = $finding;
             }
@@ -362,6 +364,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
         $exemptLocals = $this->exemptLocalNames($scope);
 
 
+        // Inspect each non-exempt local variable in discovery order for unapproved short abbreviations.
         foreach ($scope->localVariables as $name => $variable) {
             // Variables used by loop headers and catch clauses are exempt from abbreviation findings.
             if (isset($exemptLocals[$name])) {
@@ -379,6 +382,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
                 maxLength:    $maxLength,
             );
 
+            // Collect the finding only when the local variable name falls in the abbreviation band and is not allowed.
             if ($finding instanceof Finding) {
                 $findings[] = $finding;
             }
@@ -422,11 +426,12 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
         }
 
         $length = strlen($name);
+        // Names shorter than minLength (handled by short-variable) or longer than maxLength are outside this rule's band.
         if ($length < $minLength || $length > $maxLength) {
-
             return null;
         }
 
+        // Skip explicitly ignored names, project-configured abbreviations, and built-in everyday English/tech words.
         if (
             in_array($lowerName, $ignored, true)
             || in_array($lowerName, $accepted, true)
@@ -483,6 +488,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
         $names = [];
 
 
+        // Scan body descendants once to collect loop-counter and catch-variable exemptions for this callable.
         foreach ($scope->bodyDescendants as $scopeNode) {
             // Variables used by loop headers and catch clauses are exempt from abbreviation findings.
             if ($scopeNode instanceof For_ || $scopeNode instanceof Foreach_ || $scopeNode instanceof Catch_) {
@@ -508,10 +514,11 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
             $this->collectVariableNames($node->init, $names);
         }
 
-
+        // Foreach value and optional key variables (including destructured targets) stay exempt from abbreviation findings.
         if ($node instanceof Foreach_) {
             $foreachVariables = [$node->valueVar];
 
+            // Include the optional foreach key expression when the loop declares one.
             if ($node->keyVar instanceof Node) {
                 $foreachVariables[] = $node->keyVar;
             }
@@ -519,7 +526,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
             $this->collectVariableNames($foreachVariables, $names);
         }
 
-
+        // Catch variables such as `$ex` are idiomatic exception handles and stay exempt.
         if ($node instanceof Catch_ && $node->var instanceof Variable && is_string($node->var->name)) {
             $names[$node->var->name] = true;
         }
@@ -535,7 +542,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
      */
     private function collectVariableNames(array $nodes, array &$names): void
     {
-
+        // Walk each root expression in the loop header so nested destructuring patterns are captured too.
         foreach ($nodes as $node) {
             $this->collectVariableName($node, $names);
         }
@@ -551,12 +558,12 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
      */
     private function collectVariableName(Node $node, array &$names): void
     {
-
+        // Record plain variable names while ignoring dynamic variable-variables.
         if ($node instanceof Variable && is_string($node->name)) {
             $names[$node->name] = true;
         }
 
-
+        // Recurse into direct child AST nodes to capture variables inside array destructuring or compound init clauses.
         foreach ($this->childNodes($node) as $child) {
             $this->collectVariableName($child, $names);
         }
@@ -573,7 +580,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     {
         $children = [];
 
-
+        // Inspect each AST sub-node property declared by php-parser for this node type.
         foreach ($node->getSubNodeNames() as $name) {
             $this->collectChildNodes($node->{$name}, $children);
         }
@@ -591,18 +598,18 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
      */
     private function collectChildNodes(mixed $subNode, array &$children): void
     {
+        // A single node is a leaf for this pass; stop so we do not descend past the immediate children.
         if ($subNode instanceof Node) {
             $children[] = $subNode;
-            // A single node is a leaf for this pass; stop so we do not descend past the immediate children.
             return;
         }
 
+        // Ignore scalar attributes and null slots because they cannot contain nested AST nodes.
         if (!is_array($subNode)) {
-
             return;
         }
 
-
+        // Flatten nested sub-node arrays (for example, list items or statement blocks) into the child list.
         foreach ($subNode as $childSubNode) {
             $this->collectChildNodes($childSubNode, $children);
         }
@@ -617,7 +624,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
      */
     private function symbol(FunctionLikeScope $scope): string
     {
-
+        // Named methods and functions report their real declared symbol rather than an anonymous line marker.
         if ($scope->node instanceof ClassMethod || $scope->node instanceof Function_) {
             return FunctionComplexity::resolveSymbol($scope->node);
         }

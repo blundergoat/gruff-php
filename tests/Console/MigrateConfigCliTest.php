@@ -101,6 +101,9 @@ YAML;
         self::assertContains('Rename legacy rule "docs.missing-public-phpdoc" to "docs.missing-phpdoc" under rules.', $result['changes']);
         self::assertContains('Remove 1 retired rule id(s) from selection.rules.', $result['changes']);
         self::assertContains('Remove 1 retired rule id(s) from selection.excludeRules.', $result['changes']);
+
+        $emptiedSelection = ConfigMigrator::migrate("schemaVersion: gruff-php.config.v0.1\nselection:\n    rules:\n        - security.weak-crypto\n");
+        self::assertStringContainsString('rules: []', $emptiedSelection['text']);
     }
 
     /**
