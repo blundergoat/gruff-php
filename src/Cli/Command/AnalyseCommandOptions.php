@@ -388,17 +388,40 @@ final readonly class AnalyseCommandOptions
      */
     public function displayFilter(): FindingDisplayFilter
     {
-
-        $shownPillars  = [...$this->includePillars, ...$this->presentation->showPillars];
+        $shownPillars  = $this->effectiveShownPillars();
         $hiddenPillars = [...$this->excludePillars, ...$this->presentation->hidePillars];
+
+        // Disjoint --include-pillar and --show-pillar allowlists match no pillar, so hide the nominal allowlist instead of widening to all pillars.
+        if ($this->includePillars !== [] && $this->presentation->showPillars !== [] && $shownPillars === []) {
+            $shownPillars  = $this->presentation->showPillars;
+            $hiddenPillars = [...$hiddenPillars, ...$this->presentation->showPillars];
+        }
+
+        // Execution already ran only --include-rule when set, so --show-rule narrows the visible subset instead of unioning back in hidden rules.
+        $shownRules = $this->presentation->showRules !== [] ? $this->presentation->showRules : $this->includeRules;
 
         return new FindingDisplayFilter(
             minSeverity:    $this->minSeverity === null ? null : Severity::from($this->minSeverity),
             includePillars: array_map(static fn(string $optionValue): Pillar => Pillar::from($optionValue), $shownPillars),
-            excludePillars: array_map(static fn(string $optionValue): Pillar => Pillar::from($optionValue), $hiddenPillars),
-            includeRules:   [...$this->includeRules, ...$this->presentation->showRules],
-            excludeRules:   [...$this->excludeRules, ...$this->presentation->hideRules],
+            excludePillars: array_map(static fn(string $optionValue): Pillar => Pillar::from($optionValue), array_values(array_unique($hiddenPillars))),
+            includeRules:   $shownRules,
+            excludeRules:   array_values(array_unique([...$this->excludeRules, ...$this->presentation->hideRules])),
         );
+    }
+
+    /**
+     * Resolves the effective display pillar allowlist, intersecting legacy `--include-pillar` and `--show-pillar` when both are supplied.
+     *
+     * @return list<string> - Pillars the display filter lets through; empty means no allowlist, unless both lists were set and share none.
+     */
+    private function effectiveShownPillars(): array
+    {
+        // With both --include-pillar and --show-pillar, only pillars named by both are shown, so neither flag widens the other.
+        if ($this->includePillars !== [] && $this->presentation->showPillars !== []) {
+            return array_values(array_intersect($this->includePillars, $this->presentation->showPillars));
+        }
+
+        return $this->presentation->showPillars !== [] ? $this->presentation->showPillars : $this->includePillars;
     }
 
     /**
@@ -593,8 +616,8 @@ final readonly class AnalyseCommandOptions
         // Check each occurrence independently so one valid path cannot hide a missing --file value.
         foreach ($values as $optionValue) {
 
-            // A blank --file is a usage error because there is no target to scan.
-            if (!is_string($optionValue) || $optionValue === '') {
+            // A blank or whitespace-only --file is a usage error because PathHelper would resolve it to the project root.
+            if (!is_string($optionValue) || trim($optionValue) === '') {
                 return sprintf('--%s requires a non-empty value.', $name);
             }
 

@@ -157,6 +157,28 @@ final class DashboardScanRunnerTest extends TestCase
     }
 
     /**
+     * Verify projects using auto-discovered legacy .gruff.yaml invalidate the dashboard cache when that file changes.
+     *
+     * @return void - Asserts modifying .gruff.yaml triggers a second scan rather than reusing stale cached HTML.
+     */
+    public function testDefaultConfigAutoDiscoveryInvalidatesCacheForLegacyConfig(): void
+    {
+        $project = $this->projectDir();
+        file_put_contents($project . '/.gruff.yaml', "schemaVersion: gruff-php.config.v0.1\nrules: {}\n");
+        $runner  = $this->runner($this->fakeGruffBinary('counter'));
+        $context = $this->context($project);
+        $query   = ['paths' => 'src'];
+
+        $first = $runner->scanHtml($context, $query);
+        file_put_contents($project . '/.gruff.yaml', "schemaVersion: gruff-php.config.v0.1\nrules:\n    size.file-length:\n        threshold: 500\n");
+        $second = $runner->scanHtml($context, $query);
+
+        self::assertStringContainsString('scan 1', $first);
+        self::assertStringContainsString('scan 2', $second);
+        self::assertSame('2', trim((string)file_get_contents($project . '/scan-count.txt')));
+    }
+
+    /**
      * Verify invalid project roots render a dashboard error.
      *
      * @return void - Asserts that the returned HTML contains the invalid-directory message and exit code 2.

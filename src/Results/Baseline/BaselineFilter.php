@@ -14,7 +14,7 @@ use GruffPhp\Results\Finding\Finding;
  * Full scans also report absent reviewed occurrences; diff-scoped scans skip that comparison.
  *
  * @phpstan-type Collision array{identity: string, ruleId: string, path: string, subjects: list<string>}
- * @phpstan-type IdentityGroup array{findings: list<Finding>, positions: array<string, true>, subjects: list<string>, ruleId: string, path: string}
+ * @phpstan-type IdentityGroup array{identity: string, findings: list<Finding>, positions: array<string, true>, subjects: list<string>, ruleId: string, path: string}
  * @phpstan-type Classification array{statuses: array<int, string>, groups: array<string, IdentityGroup>, collisions: list<Collision>, collided: array<string, true>}
  * @phpstan-type Partition array{gated: list<Finding>, new: list<Finding>, unchanged: list<Finding>, collisionCount: int, notEligibleCount: int}
  */
@@ -105,7 +105,7 @@ final readonly class BaselineFilter
             // One identity over two declarations cannot separate them, so neither is hidden and the run says so by name.
             if (count($group['positions']) > 1) {
                 $collided[$identity] = true;
-                $collisions[]        = ['identity' => $identity, 'ruleId' => $group['ruleId'], 'path' => $group['path'], 'subjects' => $group['subjects']];
+                $collisions[]        = ['identity' => $group['identity'], 'ruleId' => $group['ruleId'], 'path' => $group['path'], 'subjects' => $group['subjects']];
 
                 foreach ($group['findings'] as $finding) {
                     $statuses[spl_object_id($finding)] = 'collision';
@@ -146,7 +146,7 @@ final readonly class BaselineFilter
 
             $ordinal  = $ordinals[spl_object_id($finding)] ?? 0;
             $identity = BaselineIdentity::identityOf($finding, $ordinal);
-            $group    = $groups[$identity] ?? ['findings' => [], 'positions' => [], 'subjects' => [], 'ruleId' => $finding->ruleId, 'path' => $finding->filePath];
+            $group    = $groups[$identity] ?? ['identity' => $identity, 'findings' => [], 'positions' => [], 'subjects' => [], 'ruleId' => $finding->ruleId, 'path' => $finding->filePath];
 
             $group['findings'][] = $finding;
             $group['positions']['declaration:' . BaselineIdentity::declarationPosition($finding)] = true;
@@ -235,7 +235,8 @@ final readonly class BaselineFilter
                 continue;
             }
 
-            $resolvedEntries[] = new BaselineEntry($identity, $surplus, $reviewedEntry->ruleId, $reviewedEntry->path, $reviewedEntry->subject);
+            // Use the entry's string identity rather than the array key, because PHP coerces all-digit hex keys to int.
+            $resolvedEntries[] = new BaselineEntry($reviewedEntry->identity, $surplus, $reviewedEntry->ruleId, $reviewedEntry->path, $reviewedEntry->subject);
             $occurrences      += $surplus;
         }
 

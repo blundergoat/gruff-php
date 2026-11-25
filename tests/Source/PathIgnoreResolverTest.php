@@ -148,6 +148,41 @@ final class PathIgnoreResolverTest extends TestCase
     }
 
     /**
+     * Verify Gruff's own .gruff-cache directory stays ignored even when a governing .gitignore exists without listing it.
+     *
+     * @return void - Asserts .gruff-cache JSON artifacts remain excluded with source default and pattern .gruff-cache.
+     */
+    public function testGruffCacheStaysIgnoredUnderGoverningGitignore(): void
+    {
+        $root = $this->tempDir();
+        file_put_contents($root . '/.gitignore', "*.log\n");
+
+        $decision = (new PathIgnoreResolver($root))->decide(
+            '.gruff-cache/entry.json',
+            $root . '/.gruff-cache/entry.json',
+            [],
+            false,
+            false,
+            false,
+        );
+
+        self::assertTrue($decision->ignored);
+        self::assertSame(PathIgnoreResolver::SOURCE_DEFAULT, $decision->source);
+        self::assertSame('.gruff-cache', $decision->pattern);
+
+        // A regular file named .gruff-cache is not a cache directory and must not be dropped as tool-cache.
+        $fileNamedCache = (new PathIgnoreResolver($root))->decide(
+            '.gruff-cache',
+            $root . '/.gruff-cache',
+            [],
+            false,
+            false,
+            false,
+        );
+        self::assertFalse($fileNamedCache->ignored);
+    }
+
+    /**
      * Verify representative dependency, build-output, and minified paths stay excluded under a governing .gitignore.
      * Check mixed-case directory names, the outermost match, and file/directory boundaries.
      *

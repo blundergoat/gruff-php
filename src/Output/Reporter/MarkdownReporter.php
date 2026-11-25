@@ -147,15 +147,9 @@ final readonly class MarkdownReporter
                 $lines[] = '<details><summary>Resolved baseline entries</summary>';
                 $lines[] = '';
 
-                // Include the file, rule, and count so the caller can review each unused acceptance.
+                // Include the file, rule, and count (or identity fallback for minimal rows) so the caller can review each unused acceptance.
                 foreach ($report->baseline->staleEntries as $resolvedEntry) {
-                    $lines[] = sprintf(
-                        '- `%s` %s (resolved %d): %s',
-                        $resolvedEntry->ruleId,
-                        $resolvedEntry->path,
-                        $resolvedEntry->count,
-                        $resolvedEntry->subject,
-                    );
+                    $lines[] = '- ' . $resolvedEntry->resolvedSummary(quoteCode: true);
                 }
                 $lines[] = '';
                 $lines[] = '</details>';

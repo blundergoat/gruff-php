@@ -161,8 +161,28 @@ final readonly class PhpdocTagText
     }
 
     /**
+     * Reports whether a docblock contains an actual `@return` tag line rather than a prose mention such as `@return-value`.
+     *
+     * @param string $docText - Raw docblock text including its `/**`, ` * `, and `*\/` framing.
+     *
+     * @return bool - True when any docblock content line starts with `@return` followed by whitespace or end-of-line.
+     */
+    public static function hasReturnTag(string $docText): bool
+    {
+        // Check each docblock line on its own, with the leading `*` already removed.
+        foreach (self::contentLines($docText) as $line) {
+            // Require @return at the start of a docblock line followed by whitespace or end-of-line so prose mentions stay ignored.
+            if (preg_match('/^@return(?:\s|$)/', $line) === 1) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Reads the variable a `@param` body documents and returns it when no description follows, tolerating
-     * spaces and `$` tokens inside generic or callable types such as `callable(int $x): void`.
+     * spaces, quoted array-shape keys, and `$` tokens inside generic or callable types such as `callable(int $x): void`.
      *
      * @param string $body - text following `@param`: an optional type, the variable, then any description, to scan
      *
@@ -176,6 +196,11 @@ final readonly class PhpdocTagText
         for ($offset = 0; $offset < $length; $offset++) {
             $character = $body[$offset];
 
+            // Skip quoted string literals inside type shapes so keys like `array{'key(': int}` cannot skew bracket depth.
+            if ($depth > 0 && ($character === "'" || $character === '"')) {
+                $offset = self::endOfQuotedTypeLiteral($body, $offset, $length);
+                continue;
+            }
 
             if (str_contains('<{[(', $character)) {
                 $depth++;
@@ -188,7 +213,7 @@ final readonly class PhpdocTagText
                 continue;
             }
 
-            // The first variable outside any type shape is the documented parameter.
+            // Match the parameter variable immediately at the current offset once outside any enclosing type shape.
             if ($depth === 0 && $character === '$' && preg_match('/\$(\w+)/A', $body, $matches, 0, $offset) === 1) {
                 // Bare exactly when nothing follows the variable.
                 return trim(substr($body, $offset + strlen($matches[0]))) === '' ? $matches[1] : null;
@@ -200,6 +225,36 @@ final readonly class PhpdocTagText
     }
 
     /**
+     * Scans from an opening quote inside a PHPDoc type shape to its matching closing quote, respecting backslash escapes.
+     *
+     * @param string $body   - `@param` body text being scanned.
+     * @param int    $offset - Byte index of the opening single or double quote.
+     * @param int    $length - Precomputed byte length of `$body`.
+     *
+     * @return int - Byte index of the closing quote, or `$length - 1` when the literal is unterminated.
+     */
+    private static function endOfQuotedTypeLiteral(string $body, int $offset, int $length): int
+    {
+        $quote = $body[$offset];
+
+        for ($cursor = $offset + 1; $cursor < $length; $cursor++) {
+            $current = $body[$cursor];
+            // An escaped quote inside a quoted type, such as 'it\'s', does not end it.
+            if ($current === '\\' && $cursor + 1 < $length) {
+                $cursor++;
+                continue;
+            }
+
+            // Return on the closing quote so scanning resumes after the quoted key without counting brackets inside it.
+            if ($current === $quote) {
+                return $cursor;
+            }
+        }
+
+        return $length - 1;
+    }
+
+    /**
      * Reports whether one PHPDoc line matches this rule's supported bare @param or @return shape.
      *
      * @param string $line - single trimmed docblock line, already stripped of comment markers, to classify
@@ -208,18 +263,21 @@ final readonly class PhpdocTagText
      */
     private static function isBareParamOrReturnTag(string $line): bool
     {
-        // A terminal parameter variable is the rule's supported bare @param shape.
-        if (preg_match('/^@param\s+\S+(?:\s+\S+)*\s+\$\w+\s*$/', $line) === 1) {
-            return true;
+        // Delegate @param lines (space or tab separated) to the bracket-aware scanner so trailing variables in descriptions are not misclassified.
+        if (preg_match('/^@param\s/', $line) === 1) {
+            $body = trim(substr($line, strlen('@param')));
+
+            return !str_starts_with($body, '$') && self::bareParamName($body) !== null;
         }
 
-        if (!str_starts_with($line, '@return ')) {
+        // Match @return followed by any whitespace (space or tab) so bare return tags keep consistent classification.
+        if (preg_match('/^@return\s/', $line) !== 1) {
 
             return false;
         }
 
 
-        return !self::hasReturnTagDescription(trim(substr($line, strlen('@return '))));
+        return !self::hasReturnTagDescription(trim(substr($line, strlen('@return'))));
     }
 
     /**

@@ -60,7 +60,7 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Advisory with Medium confidence because teams differ on whether trivial properties need documentation.
+        // Advisory with High confidence because declared properties should explain their purpose consistently.
         return new RuleDefinition(
             id:                 self::ID,
             name:               'Missing property PHPDoc',

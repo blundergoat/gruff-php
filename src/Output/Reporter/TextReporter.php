@@ -359,13 +359,7 @@ final readonly class TextReporter
             $lines[] = '  Resolved entries:';
 
             foreach ($report->baseline->staleEntries as $resolvedEntry) {
-                $lines[] = sprintf(
-                    '    %s %s (resolved %d): %s',
-                    $resolvedEntry->ruleId,
-                    $resolvedEntry->path,
-                    $resolvedEntry->count,
-                    $resolvedEntry->subject,
-                );
+                $lines[] = '    ' . $resolvedEntry->resolvedSummary();
             }
         }
     }

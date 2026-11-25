@@ -608,4 +608,33 @@ final class ReportCliTest extends CliTestCase
             $this->removeDir($project);
         }
     }
+
+    /**
+     * Verify an explicit empty --fail-on= fails validation with exit 2 instead of silently disabling the gate.
+     *
+     * @return void - Asserts exit code 2 and the unsupported fail-threshold diagnostic.
+     */
+    public function testReportCommandRejectsEmptyFailOnOption(): void
+    {
+        $project = $this->createBaselineProject();
+
+        try {
+            $process = new Process([
+                PHP_BINARY,
+                __DIR__ . '/../../bin/gruff-php',
+                'report',
+                'src',
+                '--no-config',
+                '--format',
+                'json',
+                '--fail-on=',
+            ], $project);
+            $process->run();
+
+            self::assertSame(2, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
+            self::assertStringContainsString('Unsupported fail threshold ""', $process->getOutput() . $process->getErrorOutput());
+        } finally {
+            $this->removeDir($project);
+        }
+    }
 }

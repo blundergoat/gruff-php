@@ -40,10 +40,19 @@ final readonly class PathIgnoreResolver
         '.svn',
     ];
 
+    /**
+     * Gruff's own result-cache directory; skipped by default regardless of ancestor `.gitignore` files
+     * (overridable with `--include-ignored` or an explicit file operand) so repeated runs never scan their own cache artifacts.
+     *
+     * @var list<string>
+     */
+    private const TOOL_CACHE_DIRECTORIES = [
+        '.gruff-cache',
+    ];
+
     /** @var list<string> */
     private const FALLBACK_DIRECTORIES = [
         '.fleet',
-        '.gruff-cache',
         '.idea',
         '.phpunit.cache',
         '.vscode',
@@ -115,6 +124,12 @@ final readonly class PathIgnoreResolver
         }
 
         $isDirectory ??= is_dir($absolutePath);
+        $toolCacheDirectory = self::matchedDirectorySegment($displayPath, self::TOOL_CACHE_DIRECTORIES, $isDirectory);
+        // Never scan Gruff's own result cache by default, even in Git repositories whose .gitignore omits .gruff-cache/.
+        if ($toolCacheDirectory !== null) {
+            return IgnoreDecision::ignored(self::SOURCE_DEFAULT, $toolCacheDirectory);
+        }
+
         $thirdPartyDirectory = self::matchedThirdPartyDirectory($displayPath, $isDirectory);
         // A committed copy is still someone else's code, so these classes skip whatever the .gitignore says.
         if ($thirdPartyDirectory !== null) {
@@ -142,10 +157,31 @@ final readonly class PathIgnoreResolver
      */
     public function matchedVcsDirectory(string $displayPath): ?string
     {
+        return self::matchedDirectorySegment($displayPath, self::VCS_DIRECTORIES);
+    }
+
+    /**
+     * Finds the first matching single-segment directory token on a path.
+     *
+     * @param string       $displayPath - Project-relative display path being tested.
+     * @param list<string> $directories - Exact directory segment names to look for.
+     * @param bool         $isDirectory - True when the path itself is a directory (or unknown for VCS matching); false drops the trailing filename.
+     *
+     * @return string|null - The matched directory name, or null when absent from the path.
+     */
+    private static function matchedDirectorySegment(string $displayPath, array $directories, bool $isDirectory = true): ?string
+    {
         $segments = explode('/', trim(str_replace('\\', '/', $displayPath), '/'));
 
+        // A regular file named like a cache directory is not a directory itself, so inspect only parent directory segments.
+        if (!$isDirectory) {
+            array_pop($segments);
+        }
+
+        // Inspect each path component so nested caches or VCS folders match at any depth.
         foreach ($segments as $segment) {
-            if (in_array($segment, self::VCS_DIRECTORIES, true)) {
+            // The first matched folder name on the path, such as .gruff-cache or .git, is reported as the ignore pattern.
+            if (in_array($segment, $directories, true)) {
                 return $segment;
             }
         }

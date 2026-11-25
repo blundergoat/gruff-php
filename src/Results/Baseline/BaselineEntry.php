@@ -97,6 +97,36 @@ final readonly class BaselineEntry
     }
 
     /**
+     * Formats one resolved baseline entry for human-readable reports, falling back to its hex identity when descriptive fields are absent.
+     *
+     * @param bool $quoteCode - When true, wraps the leading rule ID (or fallback identity) in Markdown backticks.
+     *
+     * @return string - Formatted summary line such as `ruleId path (resolved 1): subject` or `identity (resolved 1)`.
+     */
+    public function resolvedSummary(bool $quoteCode = false): string
+    {
+        $prefixParts = [];
+        // A minimal v3 row may omit its rule, so the summary shows only the fields the row carries.
+        if ($this->ruleId !== '') {
+            $prefixParts[] = $quoteCode ? sprintf('`%s`', $this->ruleId) : $this->ruleId;
+        }
+
+        // A row without a path is summarised without an empty location.
+        if ($this->path !== '') {
+            $prefixParts[] = $this->path;
+        }
+
+        // Minimal v3 baseline rows carry only identity and count, so fall back to the identity when descriptive fields are absent.
+        if ($prefixParts === []) {
+            $prefixParts[] = $quoteCode ? sprintf('`%s`', $this->identity) : $this->identity;
+        }
+
+        $summary = sprintf('%s (resolved %d)', implode(' ', $prefixParts), $this->count);
+
+        return $this->subject !== '' ? sprintf('%s: %s', $summary, $this->subject) : $summary;
+    }
+
+    /**
      * Returns a descriptive field when it is textual, treating absent or non-string values as empty.
      *
      * @param array<string, bool|float|int|string|null> $occurrenceRow - Decoded baseline occurrence row containing optional descriptive fields.

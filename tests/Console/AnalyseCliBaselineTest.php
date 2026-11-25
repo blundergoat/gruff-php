@@ -873,6 +873,42 @@ final class AnalyseCliBaselineTest extends CliTestCase
     }
 
     /**
+     * Verify a fatal scan diagnostic prevents --generate-baseline from overwriting an existing baseline with empty data.
+     *
+     * @return void - Asserts exit code 2 and byte-identical preservation of the existing baseline file.
+     */
+    public function testFatalDiagnosticPreservesExistingBaselineOnGenerate(): void
+    {
+        $project = $this->createBaselineProject();
+
+        try {
+            $this->runInProject($project, ['analyse', 'src', '--format', 'json', '--fail-on', 'none', '--generate-baseline', 'reviewed.json']);
+            $originalBytes = file_get_contents($project . '/reviewed.json');
+            self::assertIsString($originalBytes);
+
+            $failed = new Process([
+                PHP_BINARY,
+                __DIR__ . '/../../bin/gruff-php',
+                'analyse',
+                'src',
+                '--changed-ranges=',
+                '--generate-baseline',
+                'reviewed.json',
+                '--format',
+                'json',
+                '--fail-on',
+                'none',
+            ], $project);
+            $failed->run();
+
+            self::assertSame(2, $failed->getExitCode(), $failed->getOutput() . $failed->getErrorOutput());
+            self::assertSame($originalBytes, file_get_contents($project . '/reviewed.json'));
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+
+    /**
      * Run the analyse CLI inside a project directory and return the finished process.
      *
      * @param string       $project - Working directory the binary runs in, so relative paths resolve against it.

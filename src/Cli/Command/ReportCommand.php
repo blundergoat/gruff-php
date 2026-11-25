@@ -516,8 +516,10 @@ final class ReportCommand extends Command
         // Symfony returns the `none` default even when the user never typed `--fail-on`, so detect a real
         // flag via the raw argv; otherwise a config-supplied `failOn.report` could never win.
         if ($input->hasParameterOption('--fail-on', true)) {
-            // Explicit CLI flag is the top of the precedence chain; empty value degrades to `none`.
-            return $this->optionalStringOption($input, 'fail-on') ?? 'none';
+            // Forward the raw explicit flag so an empty `--fail-on=` fails validation instead of silently turning the gate off.
+            $rawFailOn = $input->getOption('fail-on');
+
+            return is_string($rawFailOn) ? $rawFailOn : '';
         }
 
         return $this->loadConfigFailThreshold($input, $projectRoot) ?? 'none';

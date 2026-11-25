@@ -120,7 +120,7 @@ final class HookCommand extends Command
         $format = $input->getOption('format');
         // Hook mode only emits JSON; another format such as --format=text receives a JSON error.
         if ($format !== 'json') {
-            $this->writeJson($output, $this->emptyReport(false, 'hook supports only --format json.'));
+            $this->writeJson($output, $this->emptyReport(true, 'hook supports only --format json.'));
 
             return Command::INVALID;
         }
@@ -131,11 +131,19 @@ final class HookCommand extends Command
             throw new RuntimeException('Unable to determine the current working directory.');
         }
 
+        $fileOptionError = $this->fileOptionError($input);
+        // A blank --file, such as --file= from an empty shell variable, stops the hook instead of quietly checking the whole project.
+        if ($fileOptionError !== null) {
+            $this->writeJson($output, $this->emptyReport(true, $fileOptionError));
+
+            return Command::INVALID;
+        }
+
         $paths        = $this->paths($input);
         $changedScope = $this->providedStringOption($input, 'changed-scope') ?? DiffFindingFilter::SCOPE_SYMBOL;
         // Return a hook diagnostic when the requested width has no supported scope.
         if (!in_array($changedScope, [DiffFindingFilter::SCOPE_SYMBOL, DiffFindingFilter::SCOPE_HUNK, DiffFindingFilter::SCOPE_FILE], true)) {
-            $this->writeJson($output, $this->emptyReport(false, '--changed-scope must be symbol, hunk, or file.'));
+            $this->writeJson($output, $this->emptyReport(true, '--changed-scope must be symbol, hunk, or file.'));
 
             return Command::INVALID;
         }
@@ -210,14 +218,11 @@ final class HookCommand extends Command
             );
             $this->writeJson($output, $payload);
 
-            // An empty scan can succeed when there are no changed files. Fatal input errors make it unusable.
-            if ($analysedFileCount === 0) {
-                // Check why no file was analysed before deciding whether the hook completed.
-                foreach ($analysis['sources']->diagnostics as $diagnostic) {
-                    // A sole missing or unparseable file must fail the hook rather than look clean.
-                    if ($diagnostic->isFatal) {
-                        return Command::INVALID;
-                    }
+            // Any fatal input or parse diagnostic invalidates the hook run even when other operands parsed.
+            foreach ($analysis['sources']->diagnostics as $diagnostic) {
+                // A missing operand or a file that does not parse means the edit was not fully checked, so the hook exits 2.
+                if ($diagnostic->isFatal) {
+                    return Command::INVALID;
                 }
             }
 
@@ -966,13 +971,13 @@ final class HookCommand extends Command
     /**
      * Builds a findings-free `gruff.hook.v2` payload for a failed hook invocation.
      *
-     * @param bool        $isConfigSchemaOk - Whether configuration was accepted before the reported failure.
+     * @param bool        $isConfigAccepted - False when the configuration itself caused the failure, which points the remediation at .gruff-php.yaml.
      * @param string|null $configError      - The error to relay; null omits both the diagnostic and config error.
      * @param string      $diagnosticType   - Stable machine-readable kind for the fatal diagnostic, such as config or baseline.
      *
      * @return array<string, mixed> - Findings-free report with a fatal diagnostic when an error is supplied.
      */
-    private function emptyReport(bool $isConfigSchemaOk, ?string $configError, string $diagnosticType = 'usage-error'): array
+    private function emptyReport(bool $isConfigAccepted, ?string $configError, string $diagnosticType = 'usage-error'): array
     {
         return [
             'contractVersion' => self::CONTRACT_VERSION,
@@ -999,11 +1004,14 @@ final class HookCommand extends Command
                 'path' => null,
             ]],
             'config' => [
-                'schemaOk' => $isConfigSchemaOk && $configError === null,
-                // A configuration a consumer cannot fix is a dead end, so the error carries its remediation.
+                // The gruff.hook.v2 contract makes schemaOk false whenever an error is reported, whatever caused it.
+                'schemaOk' => $isConfigAccepted && $configError === null,
+                // Only a configuration failure points the user at .gruff-php.yaml; a mistyped flag or bad baseline names the hook input instead.
                 'error' => $configError === null ? null : [
                     'message' => $configError,
-                    'remediation' => 'Fix the reported problem in .gruff-php.yaml, or pass --no-config to run without project configuration.',
+                    'remediation' => $isConfigAccepted
+                        ? 'Fix the reported hook input, baseline, or diff-scope problem and rerun the hook.'
+                        : 'Fix the reported problem in .gruff-php.yaml, or pass --no-config to run without project configuration.',
                 ],
             ],
         ];
@@ -1079,6 +1087,32 @@ final class HookCommand extends Command
         }
 
         return $parsed;
+    }
+
+    /**
+     * Rejects blank or whitespace-only `--file` values before path extraction can drop them and widen to a full-project scan.
+     *
+     * @param InputInterface $input - Console input carrying repeatable `--file` values.
+     *
+     * @return string|null - Usage error when any `--file` occurrence is blank, or null when all occurrences are valid.
+     */
+    private function fileOptionError(InputInterface $input): ?string
+    {
+        $values = $input->getOption('file');
+        // Without any --file flag there is nothing to check here.
+        if (!is_array($values)) {
+            return null;
+        }
+
+        // Check every repeated --file occurrence independently so an empty or comma-only flag cannot widen to the whole repository.
+        foreach ($values as $value) {
+            // One blank or comma-only occurrence (such as --file= or --file=,) yields no paths and must refuse the run.
+            if (!is_string($value) || trim($value, " \t\n\r\0\x0B,") === '') {
+                return '--file requires a non-empty value.';
+            }
+        }
+
+        return null;
     }
 
     /**

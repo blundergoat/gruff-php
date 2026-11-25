@@ -28,8 +28,11 @@ use PhpParser\Node\Stmt;
  * It covers backtick strings, exec()-style functions, proc_open() argv arrays that launch a shell, and Symfony Process.
  *
  * Spliced values that cannot break out of their argument stay quiet:
- * - an escapeshellarg() result outside an open quote, or an `(int)` cast;
+ * - an escapeshellarg() result outside an open quote, backtick, or `$(...)` command substitution, or an `(int)` cast;
  * - a local the code only ever sets to its own plain words, such as `$mode = $isDir ? 'J' : 'H'`.
+ *
+ * @phpstan-type ShellFrame array{quote: string|null, parenDepth: int}
+ * @phpstan-type ShellDelimiterState array{frames: list<ShellFrame>, isEscaped: bool, inBacktick: bool}
  */
 final class ProcessCommandConstructionRule implements RuleInterface
 {
@@ -230,42 +233,144 @@ final class ProcessCommandConstructionRule implements RuleInterface
     }
 
     /**
-     * Reports whether literal shell text leaves an unmatched quote open or ends with an unquoted trailing backslash.
-     * A trailing unquoted backslash escapes the opening quote that escapeshellarg() adds, allowing shell injection.
+     * Reports whether literal shell text leaves an unmatched quote, command substitution, or unquoted trailing backslash open.
+     *
+     * A trailing unquoted backslash escapes the opening quote that escapeshellarg() adds.
+     * Quotes inside backticks or `$(...)` still run as part of a command, so an operand spliced there stays flagged.
      *
      * @param string $literalText - Literal command prefix accumulated before a spliced operand.
      *
-     * @return bool - True when a quote is still open or a trailing backslash would escape the next character; false when safe.
+     * @return bool - True when a quote, backtick, `$(...)` subshell, or trailing backslash is still open; false when safe.
      */
     private function hasOpenQuoteOrPendingEscape(string $literalText): bool
     {
-        $openQuote  = null;
-        $isEscaped  = false;
+        /** @var ShellDelimiterState $state - Running shell delimiter state across bytes of the literal prefix. */
+        $state = [
+            'frames' => [['quote' => null, 'parenDepth' => 0]],
+            'isEscaped' => false,
+            'inBacktick' => false,
+        ];
         $textLength = strlen($literalText);
 
-        // Scan left to right so backslashes outside single quotes consume the character that follows them.
+        // Scan left to right so escapes, nested quotes, and command substitutions track the exact state before the spliced operand.
         for ($index = 0; $index < $textLength; $index++) {
-            $character = $literalText[$index];
-
-            // The previous backslash already escaped this character, so clear the escape flag and move on.
-            if ($isEscaped) {
-                $isEscaped = false;
-                continue;
-            }
-
-            // Outside single quotes, a backslash escapes the following character (including a spliced argument's opening quote).
-            if ($character === '\\' && $openQuote !== "'") {
-                $isEscaped = true;
-                continue;
-            }
-
-            // Track unescaped single and double quotes so operands inside an open quote stay flagged.
-            if (($character === "'" || $character === '"') && ($openQuote === null || $openQuote === $character)) {
-                $openQuote = $openQuote === null ? $character : null;
-            }
+            $index += $this->advanceShellDelimiterState($literalText, $index, $textLength, $state);
         }
 
-        return $openQuote !== null || $isEscaped;
+        return count($state['frames']) > 1
+            || ($state['frames'][0]['quote'] ?? null) !== null
+            || $state['isEscaped']
+            || $state['inBacktick'];
+    }
+
+    /**
+     * Updates the quote, escape, and command-substitution state for one byte of literal shell text.
+     *
+     * @param string              $literalText - Literal command prefix being scanned.
+     * @param int                 $index       - Zero-based byte position of the current character.
+     * @param int                 $textLength  - Precomputed byte length of `$literalText`.
+     * @param ShellDelimiterState $state       - Running shell state updated in place across bytes.
+     *
+     * @return int - Extra byte offset to skip when consuming a two-character token such as `$(`, or zero otherwise.
+     */
+    private function advanceShellDelimiterState(string $literalText, int $index, int $textLength, array &$state): int
+    {
+        $character = $literalText[$index];
+        $topIndex  = count($state['frames']) - 1;
+        $topFrame  = $state['frames'][$topIndex] ?? ['quote' => null, 'parenDepth' => 0];
+        $openQuote = $topFrame['quote'];
+
+        // The previous backslash already escaped this character, so clear the escape flag and move on.
+        if ($state['isEscaped']) {
+            $state['isEscaped'] = false;
+
+            return 0;
+        }
+
+        // Single-quoted text treats every byte literally until the closing single quote.
+        if ($openQuote === "'") {
+            // Only another single quote ends single-quoted text; nothing inside it can be escaped.
+            if ($character === "'") {
+                $state['frames'][$topIndex] = ['quote' => null, 'parenDepth' => $topFrame['parenDepth']];
+            }
+
+            return 0;
+        }
+
+        // Outside single quotes, a backslash escapes the following character (including a spliced argument's opening quote).
+        if ($character === '\\') {
+            $state['isEscaped'] = true;
+
+            return 0;
+        }
+
+        // Track unescaped backtick command substitutions so escapeshellarg() inside them stays flagged.
+        if ($character === '`') {
+            $state['inBacktick'] = !$state['inBacktick'];
+
+            return 0;
+        }
+
+        // Each `$(` starts a fresh quoting frame so quotes inside `"$(...)"` do not block closing `)`.
+        if ($character === '$' && $index + 1 < $textLength && $literalText[$index + 1] === '(') {
+            $state['frames'][] = ['quote' => null, 'parenDepth' => 0];
+
+            return 1;
+        }
+
+        // Match nested `(...)` and close the top `$(...)` frame only when unquoted inside that frame.
+        if (count($state['frames']) > 1 && $openQuote === null && ($character === '(' || $character === ')')) {
+            $this->updateSubshellParentheses($character, $state['frames']);
+
+            return 0;
+        }
+
+        // Track unescaped single and double quotes within the current shell frame.
+        if (($character === "'" || $character === '"') && ($openQuote === null || $openQuote === $character)) {
+            $state['frames'][$topIndex] = [
+                'quote' => $openQuote === null ? $character : null,
+                'parenDepth' => $topFrame['parenDepth'],
+            ];
+        }
+
+        return 0;
+    }
+
+    /**
+     * Tracks nested parentheses inside an active `$(...)` command substitution and pops its frame on the matching `)`.
+     *
+     * @param string           $character - Either `(` or `)` seen outside quotes inside a subshell frame.
+     * @param list<ShellFrame> $frames    - Active shell quoting frames updated in place.
+     *
+     * @return void - Adjusts the current frame's parenthesis depth or pops the completed subshell frame.
+     */
+    private function updateSubshellParentheses(string $character, array &$frames): void
+    {
+        $topIndex = count($frames) - 1;
+        $topFrame = $frames[$topIndex] ?? null;
+        // With no open subshell there is no parenthesis depth to track.
+        if ($topFrame === null) {
+            return;
+        }
+
+        // Track inner subshell or arithmetic parentheses so their closing `)` does not end `$(...)` early.
+        if ($character === '(') {
+            $frames[$topIndex] = ['quote' => $topFrame['quote'], 'parenDepth' => $topFrame['parenDepth'] + 1];
+
+            return;
+        }
+
+        // A `)` that closes an inner group, such as $((1 + 2)), leaves the outer $( ... ) open.
+        if ($topFrame['parenDepth'] > 0) {
+            $frames[$topIndex] = ['quote' => $topFrame['quote'], 'parenDepth' => $topFrame['parenDepth'] - 1];
+
+            return;
+        }
+
+        // Keep the root frame intact while closing the completed `$(...)` command substitution.
+        if (count($frames) > 1) {
+            array_pop($frames);
+        }
     }
 
     /**

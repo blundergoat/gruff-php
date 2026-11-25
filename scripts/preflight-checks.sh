@@ -551,7 +551,7 @@ docs_drift_pillar_table() {
     done < <(grep -oE "^\| *${backtick}[a-z-]+${backtick} *\| *[0-9]+ *\|$" "$readme" \
         | sed -E "s/^\| *${backtick}([a-z-]+)${backtick} *\| *([0-9]+) *\|$/\1|\2/")
 
-    # A partial table leaves at least one shipped pillar unrepresented.
+    # A partial table leaves at least one shipped pillar unrepresented; zero rows is checked after false-empty.
     if ((table_rows > 0 && table_rows != pillars)); then
         printf 'docs drift: source-revision: README.md pillar table has %s rows but list-rules has %s pillars\n' \
             "$table_rows" "$pillars"
@@ -930,6 +930,8 @@ main() {
     local test_status=0
     local audit_status=0
     local gruff_status=0
+    local docs_drift_status=0
+    local docs_fixtures_status=0
     local mutation_status=0
     local version_status=0
 
@@ -992,11 +994,13 @@ main() {
     audit_status=$?
 
     run_step "Gruff full-project scan" gruff_php_check
+    gruff_status=$?
 
     run_step "Documentation drift" docs_drift_check
+    docs_drift_status=$?
 
     run_step "Documentation drift fixtures" docs_drift_fixture_check
-    gruff_status=$?
+    docs_fixtures_status=$?
 
     # Run the requested Infection scope. Ordinary preflight leaves mutation testing optional.
     if [[ "$MUTATION_MODE" == "diff" ]]; then
@@ -1014,7 +1018,7 @@ main() {
     local summary_status=$?
 
     # Preserve a nonzero result for CI even if a later check produced a passing row.
-    if ((version_status != 0 || phpstan_status != 0 || test_status != 0 || audit_status != 0 || gruff_status != 0 || mutation_status != 0)); then
+    if ((version_status != 0 || phpstan_status != 0 || test_status != 0 || audit_status != 0 || gruff_status != 0 || docs_drift_status != 0 || docs_fixtures_status != 0 || mutation_status != 0)); then
         return 1
     fi
 

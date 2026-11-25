@@ -181,7 +181,7 @@ rules:
         severity: error
 ```
 
-Use `threshold` + `severity` for rules with warning/error metric defaults. Keep `thresholds` for named tuning values such as `minPositionalArguments` or `minWords`.
+Use `threshold` + `severity` for rules with warning/error metric defaults. Keep `thresholds` for named tuning values such as `maxLiteralLength` or `minWords`.
 
 Tune rule options only with names listed by `list-rules --format=json`. For
 example, `size.parameter-count` supports a constructor-specific cap while

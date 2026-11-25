@@ -144,6 +144,35 @@ final class InlineSuppressionCliTest extends CliTestCase
     }
 
     /**
+     * Checks that `--diff-base --changed-only --format sarif` excludes suppressed findings from unchanged files.
+     *
+     * @return void - Asserts zero SARIF results when the only suppressed findings live in an unchanged file.
+     */
+    public function testSarifSuppressionsRespectChangedOnlyBranchReview(): void
+    {
+        $project = $this->writeProject();
+
+        try {
+            file_put_contents($project . '/src/Clean.php', "<?php\n\ndeclare(strict_types=1);\n\n/** Clean helper. */\nfinal readonly class Clean\n{\n}\n");
+
+            foreach ([['init', '-q'], ['add', 'src/Db.php', 'src/Clean.php'], ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'base']] as $gitArgs) {
+                $git = new Process(array_merge(['git'], $gitArgs), $project);
+                $git->run();
+                self::assertSame(0, $git->getExitCode(), $git->getErrorOutput());
+            }
+
+            // Modify only Clean.php so Db.php (with its inline suppressions) is unchanged against HEAD.
+            file_put_contents($project . '/src/Clean.php', "<?php\n\ndeclare(strict_types=1);\n\n/** Clean helper updated. */\nfinal readonly class Clean\n{\n}\n");
+
+            $report   = $this->decodeJsonOutput($this->scan($project, 'sarif', ['src', '--diff-base', 'HEAD', '--changed-only']));
+            $sarifRun = $this->decodedJsonObject($this->listAt($report, 'runs')[0] ?? null);
+            self::assertSame([], $this->listAt($sarifRun, 'results'));
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+
+    /**
      * Checks the PHP hotspot schema and its suppression audit.
      *
      * @return void - Confirms the hotspot audit matches the analysis audit.

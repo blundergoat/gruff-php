@@ -102,8 +102,13 @@ YAML;
         self::assertContains('Remove 1 retired rule id(s) from selection.rules.', $result['changes']);
         self::assertContains('Remove 1 retired rule id(s) from selection.excludeRules.', $result['changes']);
 
-        $emptiedSelection = ConfigMigrator::migrate("schemaVersion: gruff-php.config.v0.1\nselection:\n    rules:\n        - security.weak-crypto\n");
-        self::assertStringContainsString('rules: []', $emptiedSelection['text']);
+        $emptiedWithPillar = ConfigMigrator::migrate("schemaVersion: gruff-php.config.v0.1\nselection:\n    pillars:\n        - security\n    rules:\n        - security.weak-crypto\n");
+        self::assertStringContainsString('rules: []', $emptiedWithPillar['text']);
+
+        // Refusing an all-retired selection.rules with no tier/pillar fallback prevents silently widening to all rules.
+        $this->expectException(ConfigException::class);
+        $this->expectExceptionMessage('Every rule in selection.rules was retired in 0.6.0');
+        ConfigMigrator::migrate("schemaVersion: gruff-php.config.v0.1\nselection:\n    rules:\n        - security.weak-crypto\n");
     }
 
     /**

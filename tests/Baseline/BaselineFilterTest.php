@@ -306,6 +306,26 @@ final class BaselineFilterTest extends TestCase
     }
 
     /**
+     * Verify all-digit hex identities resolve without PHP int-key TypeError and minimal resolved rows fall back to identity labels.
+     *
+     * @return void - Asserts strict string identity on resolved entries and clean identity fallback formatting.
+     */
+    public function testNumericHexIdentityResolvesCleanlyAndFormatsMinimalSummary(): void
+    {
+        $numericIdentity = '1000000000000000';
+        $baseline        = new BaselineData('gruff-baseline.json', 'php', [new BaselineEntry($numericIdentity, 2)]);
+
+        $application = (new BaselineFilter())->apply($baseline, [], false);
+
+        self::assertCount(1, $application['report']->staleEntries);
+        $resolved = $application['report']->staleEntries[0];
+        self::assertSame($numericIdentity, $resolved->identity);
+        self::assertSame(2, $resolved->count);
+        self::assertSame('1000000000000000 (resolved 2)', $resolved->resolvedSummary());
+        self::assertSame('`1000000000000000` (resolved 2)', $resolved->resolvedSummary(quoteCode: true));
+    }
+
+    /**
      * Build a baseline from reviewed findings and classify a run against it.
      *
      * @param list<Finding> $reviewed - Findings the user reviewed.

@@ -257,12 +257,33 @@ final class ConfigMigrator
                 continue;
             }
 
-            $selection[$selectionKey] = self::migrateSelectionList($configuredRuleIds, $selectionKey, $changes);
+            $migratedRuleIds          = self::migrateSelectionList($configuredRuleIds, $selectionKey, $changes);
+            $hasOtherIncludeSelectors = self::hasNonEmptyList($selection['tiers'] ?? null) || self::hasNonEmptyList($selection['pillars'] ?? null);
+            // Leaving selection.rules empty with no tier or pillar filter causes RuleSelection to run every rule in the registry.
+            if ($selectionKey === 'rules' && $configuredRuleIds !== [] && $migratedRuleIds === [] && !$hasOtherIncludeSelectors) {
+                throw new ConfigException(
+                    'Every rule in selection.rules was retired in 0.6.0; leaving selection.rules empty would widen the scan to every rule. Choose replacement rules or remove selection.rules explicitly before migrating.',
+                );
+            }
+
+            $selection[$selectionKey] = $migratedRuleIds;
         }
 
         $config['selection'] = $selection;
 
         return $config;
+    }
+
+    /**
+     * Reports whether a decoded config entry is a non-empty list, so selection migration knows when another include filter remains active.
+     *
+     * @param mixed $value - Raw decoded value from `selection.tiers` or `selection.pillars`; null or empty means no fallback filter is set.
+     *
+     * @return bool - True when the entry holds at least one list item; false when absent, empty, or not a list.
+     */
+    private static function hasNonEmptyList(mixed $value): bool
+    {
+        return is_array($value) && $value !== [] && array_is_list($value);
     }
 
     /**

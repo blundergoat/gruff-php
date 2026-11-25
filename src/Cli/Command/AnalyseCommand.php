@@ -334,7 +334,7 @@ final class AnalyseCommand extends Command
                 'shouldIncludeIgnored' => $options->shouldIncludeIgnored,
                 'projectRoot' => $projectRoot,
                 'unfilteredFindings' => $findings,
-                'suppressedFindings' => $this->sarifSuppressionsWithinScope($format, $analysisRun['suppressedFindings'], $diagnostics, $diff, $sources, $options, $displayFilter),
+                'suppressedFindings' => $this->sarifSuppressionsWithinScope($format, $analysisRun['suppressedFindings'], $diagnostics, ['scope' => $diff, 'review' => $reviewDiff], $sources, $options, $displayFilter),
             ],
         );
 
@@ -531,10 +531,10 @@ final class AnalyseCommand extends Command
     /**
      * Scopes SARIF suppression results like visible findings before serializing them.
      *
-     * @param OutputFormat                                         $format        - Requested report format.
+     * @param OutputFormat                                         $format        - Requested report format; only SARIF serialises suppressions.
      * @param list<array{finding: Finding, justification: string}> $suppressed    - Inline and duplicate removals. Empty adds no SARIF results.
      * @param list<RunDiagnostic>                                  $diagnostics   - Run diagnostics that can make the selection unreadable.
-     * @param DiffResult|null                                      $diff          - Selected changes. Null keeps removals across the scan.
+     * @param array{scope: DiffResult|null, review: DiffResult|null} $diffs       - Line-scope and review diffs; null skips each filter.
      * @param AnalysisSourceSet                                    $sources       - Parsed units for declaration-level scope.
      * @param AnalyseCommandOptions                                $options       - Changed scope and display path options.
      * @param FindingDisplayFilter                                 $displayFilter - The same display filter used for visible findings.
@@ -545,7 +545,7 @@ final class AnalyseCommand extends Command
         OutputFormat $format,
         array $suppressed,
         array $diagnostics,
-        ?DiffResult $diff,
+        array $diffs,
         AnalysisSourceSet $sources,
         AnalyseCommandOptions $options,
         FindingDisplayFilter $displayFilter,
@@ -555,14 +555,17 @@ final class AnalyseCommand extends Command
             return [];
         }
 
-        $findings = $this->findingsWithinReadableScope(array_column($suppressed, 'finding'), $diagnostics);
+        $diff           = $diffs['scope'];
+        $findingSupport = new AnalysisFindingSupport();
+        $findings       = $this->findingsForChangedReview(array_column($suppressed, 'finding'), $options, $diffs['review'], $findingSupport);
+        $findings       = $this->findingsWithinReadableScope($findings, $diagnostics);
         // Apply the same changed region to suppressed SARIF results so the file does not show issues outside the requested review.
         if ($diff instanceof DiffResult && $diff->active && $findings !== []) {
             $findings = (new DiffFindingFilter())->apply($findings, $diff, $sources->analysisUnits, $options->changeScope->changedScope)->findings;
         }
 
         $findings                      = $displayFilter->apply($findings);
-        $displayFindings               = (new AnalysisFindingSupport())->normalizeFindingPaths($findings, $options->pathsRelativeTo);
+        $displayFindings               = $findingSupport->normalizeFindingPaths($findings, $options->pathsRelativeTo);
         $suppressionReasonsByFindingId = [];
         // Keep each explanation attached to its finding when paths are rewritten for the report.
         foreach ($suppressed as $entry) {

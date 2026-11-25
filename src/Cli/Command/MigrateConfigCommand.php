@@ -115,6 +115,21 @@ final class MigrateConfigCommand extends Command
             return Command::INVALID;
         }
 
+        $outputDirectory = dirname($outputPath);
+        // A typo in the --output folder, such as config/ that does not exist, is reported plainly instead of as a PHP warning.
+        if (!is_dir($outputDirectory)) {
+            $output->writeln(sprintf('<error>Migration output directory does not exist: %s</error>', $outputDirectory));
+
+            return Command::INVALID;
+        }
+
+        // A read-only output folder is refused before any file is opened.
+        if (!is_writable($outputDirectory)) {
+            $output->writeln(sprintf('<error>Migration output directory is not writable: %s</error>', $outputDirectory));
+
+            return Command::INVALID;
+        }
+
         // Exclusive creation also refuses a link or file created after the existence check.
         $destinationStream = fopen($outputPath, 'xb');
         // A destination may become occupied after validation or sit in a directory the caller cannot write to.

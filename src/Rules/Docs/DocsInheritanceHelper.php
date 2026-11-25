@@ -39,13 +39,14 @@ final readonly class DocsInheritanceHelper
             return true;
         }
 
-        $class = $this->enclosingClass($classMethod);
-        if (!$class instanceof Class_) {
+        $owner = $this->enclosingClassLike($classMethod);
+        // A function outside any class, interface or enum has no ancestor to inherit docs from.
+        if (!$owner instanceof ClassLike) {
 
             return false;
         }
 
-        $ancestorNames = $this->ancestorNames($class);
+        $ancestorNames = $this->ancestorNames($owner);
 
 
         return $ancestorNames !== [] && $this->hasDocumentedAncestorMethod(
@@ -57,24 +58,26 @@ final readonly class DocsInheritanceHelper
     }
 
     /**
-     * Returns the same-file direct ancestor method a method overrides, whether or not it is documented.
+     * Returns all same-file direct ancestor methods a method overrides or implements, in unit traversal order.
+     * Inspecting every matching ancestor prevents a class, interface, or enum from missing tags declared on a later ancestor.
      *
-     * @param ClassMethod     $classMethod - Overriding method whose ancestor is looked up by name.
-     * @param list<Node\Stmt> $statements - Parsed statements used to find ancestor declarations.
-     * @param NodeFinder      $nodeFinder - Node finder used to search inherited method candidates.
+     * @param ClassMethod     $classMethod - Overriding method whose direct ancestors are looked up by name.
+     * @param list<Node\Stmt> $statements  - Parsed statements used to find ancestor declarations.
+     * @param NodeFinder      $nodeFinder  - Node finder used to search inherited method candidates.
      *
-     * @return ClassMethod|null - First non-private match in unit traversal order, or null if no direct ancestor method matches.
+     * @return list<ClassMethod> - All non-private matching direct ancestor methods in traversal order; empty when none match.
      */
-    public function sameFileAncestorMethod(ClassMethod $classMethod, array $statements, NodeFinder $nodeFinder): ?ClassMethod
+    public function sameFileAncestorMethods(ClassMethod $classMethod, array $statements, NodeFinder $nodeFinder): array
     {
-        $class = $this->enclosingClass($classMethod);
-        $ancestorNames = $class instanceof Class_ ? $this->ancestorNames($class) : [];
+        $owner         = $this->enclosingClassLike($classMethod);
+        $ancestorNames = $owner instanceof ClassLike ? $this->ancestorNames($owner) : [];
+        // Standalone declarations without extends or implements have no ancestor methods to inherit tags from.
         if ($ancestorNames === []) {
-
-            return null;
+            return [];
         }
 
         $methodName = strtolower($classMethod->name->toString());
+        $matches    = [];
 
         foreach ($nodeFinder->findInstanceOf($statements, ClassLike::class) as $candidate) {
             // Only the class's named ancestors are worth searching.
@@ -85,12 +88,12 @@ final readonly class DocsInheritanceHelper
             // Private methods are not inherited and cannot supply the overriding method's contract.
             foreach ($candidate->getMethods() as $ancestorMethod) {
                 if (!$ancestorMethod->isPrivate() && strtolower($ancestorMethod->name->toString()) === $methodName) {
-                    return $ancestorMethod;
+                    $matches[] = $ancestorMethod;
                 }
             }
         }
 
-        return null;
+        return $matches;
     }
 
     /**
@@ -134,26 +137,40 @@ final readonly class DocsInheritanceHelper
     }
 
     /**
-     * Returns the resolved parent and implemented-interface names declared directly on a class.
+     * Returns the resolved parent and implemented-interface names declared directly on a class, interface, or enum.
      *
-     * @param Class_ $class - Class declaration whose direct parent and interfaces should be collected.
+     * @param ClassLike $classLike - Class-like declaration whose direct ancestors should be collected.
      *
-     * @return list<string> - Lowercased, namespace-resolved ancestor names declared directly on the class.
+     * @return list<string> - Lowercased, namespace-resolved ancestor names declared directly on the declaration.
      */
-    private function ancestorNames(Class_ $class): array
+    private function ancestorNames(ClassLike $classLike): array
     {
         $ancestorNames = [];
 
-        if ($class->extends instanceof Name) {
-            $ancestorNames[] = $this->resolvedName($class->extends);
+        // A class can inherit docs from its parent class and from every interface it implements.
+        if ($classLike instanceof Class_) {
+            // A class without `extends` has no parent class to search.
+            if ($classLike->extends instanceof Name) {
+                $ancestorNames[] = $this->resolvedName($classLike->extends);
+            }
+
+            // Each implemented interface can document the method too.
+            foreach ($classLike->implements as $interface) {
+                $ancestorNames[] = $this->resolvedName($interface);
+            }
+        } elseif ($classLike instanceof Interface_) {
+            // An interface inherits from every interface it extends.
+            foreach ($classLike->extends as $parentInterface) {
+                $ancestorNames[] = $this->resolvedName($parentInterface);
+            }
+        } elseif ($classLike instanceof Enum_) {
+            // An enum can only inherit docs from the interfaces it implements.
+            foreach ($classLike->implements as $interface) {
+                $ancestorNames[] = $this->resolvedName($interface);
+            }
         }
 
-
-        foreach ($class->implements as $interface) {
-            $ancestorNames[] = $this->resolvedName($interface);
-        }
-
-        // Direct parent plus implemented interfaces only; transitive ancestors are not resolved here.
+        // Direct parents and implemented interfaces only; transitive ancestors are not resolved here.
         return $ancestorNames;
     }
 
@@ -273,19 +290,20 @@ final readonly class DocsInheritanceHelper
     }
 
     /**
-     * Walks the parent chain to the enclosing class, or null when the method lives outside a class.
+     * Walks the parent chain to the enclosing class-like declaration, or null when the method lives outside one.
      *
-     * @param ClassMethod $classMethod - Method whose ancestor chain is walked outward to its class.
+     * @param ClassMethod $classMethod - Method whose ancestor chain is walked outward to its class, interface, or enum.
      *
-     * @return Class_|null - Enclosing class node, or null outside a class.
+     * @return ClassLike|null - Enclosing class-like node, or null outside a class-like declaration.
      */
-    private function enclosingClass(ClassMethod $classMethod): ?Class_
+    private function enclosingClassLike(ClassMethod $classMethod): ?ClassLike
     {
         $parent = $classMethod->getAttribute('parent');
 
 
         while ($parent instanceof Node) {
-            if ($parent instanceof Class_) {
+            // The nearest class, interface, enum or trait around the method owns it.
+            if ($parent instanceof ClassLike) {
 
                 return $parent;
             }

@@ -463,6 +463,41 @@ PHP;
     }
 
     /**
+     * Verify ProcessCommandConstructionRule flags escapeshellarg() placed inside backtick or $(...) command substitutions.
+     *
+     * @return void - Asserts both subshell command-substitution sinks report while plain escaped shell arguments stay quiet.
+     */
+    public function testProcessCommandConstructionFlagsEscapedOperandInsideSubshells(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'gruff-subshell-');
+        self::assertIsString($path);
+        $source = <<<'PHP'
+<?php
+
+function runSubshell(string $input): void
+{
+    shell_exec('echo `' . escapeshellarg($input) . '`');
+    shell_exec('echo $(' . escapeshellarg($input) . ')');
+    shell_exec('echo "$(echo ' . escapeshellarg($input) . ')"');
+    shell_exec('echo $(( (1 + 2) + ' . escapeshellarg($input) . ' ))');
+    shell_exec('echo ' . escapeshellarg($input));
+    shell_exec('tar -czf "backup-$(date +%F).tgz" ' . escapeshellarg($input));
+    shell_exec('echo "$(echo "hi")" ' . escapeshellarg($input));
+    shell_exec('echo "$(echo \'a)\')" ' . escapeshellarg($input));
+}
+PHP;
+        file_put_contents($path, $source);
+
+        try {
+            $unit     = (new PhpFileParser())->parse(new SourceFile($path, 'src/Subshell.php', SourceFile::TYPE_PHP));
+            $findings = $this->findingsForRule($unit, ProcessCommandConstructionRule::ID);
+            self::assertSame([5, 6, 7, 8], self::findingLines($findings));
+        } finally {
+            unlink($path);
+        }
+    }
+
+    /**
      * Assert the expected security finding count for a rule.
      *
      * @param string        $ruleId        - rule id whose findings are counted; all other rules' findings are filtered out first

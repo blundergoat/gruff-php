@@ -54,9 +54,11 @@ final readonly class AnalyseCommandSetupBuilder
             );
         }
 
-        /** @var list<string> $requestedPaths - Path operands exactly as typed, before any root resolution. */
-        $requestedPaths = (array) $input->getArgument('paths');
-        $projectRoot    = self::projectRootFromTargets($launchDirectory, $requestedPaths);
+        /** @var list<string> $positionalPaths - Positional path operands exactly as typed, before any root resolution. */
+        $positionalPaths = (array) $input->getArgument('paths');
+        $fileOptionPaths = self::fileOptionTargets($input);
+        $requestedPaths  = array_merge($positionalPaths, $fileOptionPaths);
+        $projectRoot     = self::projectRootFromTargets($launchDirectory, $requestedPaths);
 
         // Targets without a common filesystem ancestor cannot share the report's project root.
         if ($projectRoot === null) {
@@ -66,7 +68,8 @@ final readonly class AnalyseCommandSetupBuilder
             );
         }
 
-        $input->setArgument('paths', self::targetsForRoot($launchDirectory, $projectRoot, $requestedPaths));
+        $input->setArgument('paths', self::targetsForRoot($launchDirectory, $projectRoot, $positionalPaths));
+        self::reanchorFileOptionForRoot($input, $launchDirectory, $projectRoot);
 
         // A baseline path means what the user typed from the launch directory, as the targets do.
         foreach (['baseline', 'generate-baseline', 'migrate-baseline'] as $baselineOption) {
@@ -146,6 +149,77 @@ final readonly class AnalyseCommandSetupBuilder
             static fn(string $path): string => self::isAbsolutePath($path) ? $path : $launchDirectory . DIRECTORY_SEPARATOR . $path,
             $paths,
         );
+    }
+
+    /**
+     * Extracts non-blank `--file` option operands so root selection and launch-directory checks treat them like positional paths.
+     *
+     * @param InputInterface $input - Symfony console input carrying optional repeatable `--file` values.
+     *
+     * @return list<string> - Non-blank `--file` targets verbatim in command-line order; empty when `--file` is absent.
+     */
+    private static function fileOptionTargets(InputInterface $input): array
+    {
+        // Only commands declaring `--file` can contribute explicit file operands.
+        if (!$input->hasOption('file')) {
+            return [];
+        }
+
+        $rawValues = $input->getOption('file');
+        // Ignore unexpected non-list shapes and let option validation report them later.
+        if (!is_array($rawValues)) {
+            return [];
+        }
+
+        $targets = [];
+        // Keep only non-blank file paths (and exclude the stdin diff placeholder `-`) so blank values reach option validation unchanged.
+        foreach ($rawValues as $rawValue) {
+            // A blank --file, or the - stdin marker, is not a scan target; validation reports a blank value later.
+            if (!is_string($rawValue) || trim($rawValue) === '' || $rawValue === '-') {
+                continue;
+            }
+
+            $targets[] = $rawValue;
+        }
+
+        return $targets;
+    }
+
+    /**
+     * Re-anchors relative `--file` option entries to the launch directory whenever root resolution picked another directory.
+     *
+     * @param InputInterface $input           - Console input updated in place when `--file` has relative targets.
+     * @param string         $launchDirectory - Working directory the command was started from.
+     * @param string         $projectRoot     - Root chosen by projectRootFromTargets().
+     *
+     * @return void - Updates `--file` in place when needed; preserves blank entries and stdin diff tokens for downstream validation.
+     */
+    private static function reanchorFileOptionForRoot(InputInterface $input, string $launchDirectory, string $projectRoot): void
+    {
+        // Relative `--file` values already resolve against the scan root when launch directory and project root match.
+        if ($launchDirectory === $projectRoot || !$input->hasOption('file')) {
+            return;
+        }
+
+        $rawValues = $input->getOption('file');
+        // Leave non-array option values untouched for downstream validation.
+        if (!is_array($rawValues)) {
+            return;
+        }
+
+        $reanchored = [];
+        // Anchor each non-blank relative path verbatim while keeping blank values and `-` intact so downstream option handling stays exact.
+        foreach ($rawValues as $rawValue) {
+            // Blank values and - pass through untouched, so the later error names exactly what the user typed.
+            if (!is_string($rawValue) || trim($rawValue) === '' || $rawValue === '-') {
+                $reanchored[] = $rawValue;
+                continue;
+            }
+
+            $reanchored[] = self::isAbsolutePath($rawValue) ? $rawValue : $launchDirectory . DIRECTORY_SEPARATOR . $rawValue;
+        }
+
+        $input->setOption('file', $reanchored);
     }
 
     /**

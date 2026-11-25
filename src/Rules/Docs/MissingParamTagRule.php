@@ -279,30 +279,35 @@ final readonly class MissingParamTagRule implements RuleInterface
             return [];
         }
 
-        $ownNames       = array_map($this->paramName(...), $node->params);
-        $ancestorMethod = $inheritanceHelper->sameFileAncestorMethod($node, $statements, $nodeFinder);
-        if (!$ancestorMethod instanceof ClassMethod) {
+        $ownNames        = array_map($this->paramName(...), $node->params);
+        $ancestorMethods = $inheritanceHelper->sameFileAncestorMethods($node, $statements, $nodeFinder);
+        if ($ancestorMethods === []) {
             // With no same-file ancestor to inspect, an inheritance marker stands in for every named parameter.
             return $inheritanceHelper->hasInheritanceMarker($node) ? array_values(array_filter($ownNames, is_string(...))) : [];
         }
 
-        // A same-file ancestor with an inheritance marker is treated as covering every named position it declares.
-        $ancestorDocumented = $inheritanceHelper->hasInheritanceMarker($ancestorMethod)
-            ? array_filter(array_map($this->paramName(...), $ancestorMethod->params), is_string(...))
-            : $this->extractParamNames($ancestorMethod->getDocComment()?->getText() ?? '');
-        $ancestorNames = array_map($this->paramName(...), $ancestorMethod->params);
-        $inherited     = [];
+        $inherited = [];
 
-        // A parameter the ancestor also declares is matched by name; a renamed one is matched by position.
-        // It is inherited only when the ancestor documents it; parameters added past that signature remain owed here.
-        foreach ($ownNames as $position => $ownName) {
-            $ancestorName = in_array($ownName, $ancestorNames, true) ? $ownName : ($ancestorNames[$position] ?? null);
-            if ($ownName !== null && $ancestorName !== null && in_array($ancestorName, $ancestorDocumented, true)) {
-                $inherited[] = $ownName;
+        // Aggregate documented parameters across every matching direct ancestor so multi-interface implementations inherit all declared tags.
+        foreach ($ancestorMethods as $ancestorMethod) {
+            // A same-file ancestor with an inheritance marker is treated as covering every named position it declares.
+            $ancestorDocumented = $inheritanceHelper->hasInheritanceMarker($ancestorMethod)
+                ? array_filter(array_map($this->paramName(...), $ancestorMethod->params), is_string(...))
+                : $this->extractParamNames($ancestorMethod->getDocComment()?->getText() ?? '');
+            $ancestorNames = array_map($this->paramName(...), $ancestorMethod->params);
+
+            // A parameter the ancestor also declares is matched by name; a renamed one is matched by position.
+            // It is inherited only when the ancestor documents it; parameters added past that signature remain owed here.
+            foreach ($ownNames as $position => $ownName) {
+                $ancestorName = in_array($ownName, $ancestorNames, true) ? $ownName : ($ancestorNames[$position] ?? null);
+                // A parameter is inherited only when the matching ancestor parameter, by name or by position, has its own @param.
+                if ($ownName !== null && $ancestorName !== null && in_array($ancestorName, $ancestorDocumented, true)) {
+                    $inherited[] = $ownName;
+                }
             }
         }
 
-        return $inherited;
+        return array_values(array_unique($inherited));
     }
 
     /**

@@ -15,6 +15,7 @@ use GruffPhp\Rules\Docs\MissingFilePhpdocRule;
 use GruffPhp\Rules\Docs\MissingParamTagRule;
 use GruffPhp\Rules\Docs\MissingPropertyPhpdocRule;
 use GruffPhp\Rules\Docs\MissingPhpdocRule;
+use GruffPhp\Rules\Docs\MissingReturnTagRule;
 use GruffPhp\Rules\Docs\MissingThrowsTagRule;
 use GruffPhp\Rules\Docs\RegexCommentRule;
 use GruffPhp\Rules\Docs\TodoDensityRule;
@@ -739,6 +740,88 @@ PHP, RegexCommentRule::ID);
         self::assertFalse(PhysicalCommentAttachment::isCommentOnlyLine('    /* Match the supported marker. */ $unrelated = 1;'));
         self::assertFalse(PhysicalCommentAttachment::isCommentOnlyLine('    /* Context. */ $unrelated = 1; /* Match the supported marker. */'));
         self::assertFalse(PhysicalCommentAttachment::isCommentOnlyLine('    /* Unclosed context.'));
+    }
+
+    /**
+     * Verify BarePhpdocTagsRule accepts a described @param tag ending with a variable and inheritance rules inspect all direct interfaces.
+     *
+     * @return void - Asserts zero findings for a described @param ending in $limit and for tags documented on a second implemented interface.
+     */
+    public function testBareTagVariableDescriptionsAndMultiInterfaceInheritance(): void
+    {
+        $describedParamSource = <<<'PHP'
+<?php
+
+/**
+ * @param int $value - must stay below $limit
+ * @param array{'key(': int} $shape - keyed map whose key contains a parenthesis
+ * @return int - Clamped integer value.
+ */
+function clamp(int $value, int $limit, array $shape): int
+{
+    return $value < $limit ? $value : $limit;
+}
+
+/**
+ * @param	int	$tabbed
+ */
+function bareTabbedParam(int $tabbed): void
+{
+}
+
+/**
+ * Explains @return-value handling in prose without a real return tag.
+ */
+function proseOnlyReturnMention(): int
+{
+    return 1;
+}
+PHP;
+        $multiInterfaceSource = <<<'PHP'
+<?php
+
+interface FirstContract
+{
+    public function handle(string $payload): bool;
+}
+
+interface SecondContract
+{
+    /**
+     * Handles the incoming payload.
+     *
+     * @param string $payload - Raw payload text to validate.
+     *
+     * @return bool - True when the payload is accepted.
+     */
+    public function handle(string $payload): bool;
+}
+
+interface ExtendedContract extends SecondContract
+{
+    /**
+     * Refines the parent contract.
+     */
+    public function handle(string $payload): bool;
+}
+
+final class MultiContractHandler implements FirstContract, SecondContract
+{
+    /**
+     * Executes both contracts.
+     */
+    public function handle(string $payload): bool
+    {
+        return $payload !== '';
+    }
+}
+PHP;
+
+        self::assertCount(1, $this->analyseSourceRule($describedParamSource, BarePhpdocTagsRule::ID));
+        $missingReturnFindings = $this->analyseSourceRule($describedParamSource, MissingReturnTagRule::ID);
+        self::assertSame(['bareTabbedParam()', 'proseOnlyReturnMention()'], array_map(static fn($finding): ?string => $finding->symbol, $missingReturnFindings));
+        self::assertSame([], $this->analyseSourceRule($multiInterfaceSource, MissingReturnTagRule::ID));
+        self::assertSame([], $this->analyseSourceRule($multiInterfaceSource, MissingParamTagRule::ID));
     }
 
     /**

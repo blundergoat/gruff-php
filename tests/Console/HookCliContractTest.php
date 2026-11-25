@@ -201,6 +201,54 @@ final class HookCliContractTest extends CliTestCase
     }
 
     /**
+     * Verify mixed readable/missing operands exit 2, non-config errors never blame .gruff-php.yaml, and blank --file fails cleanly.
+     *
+     * @return void - Asserts exit 2 for fatal diagnostics alongside readable files, and hook.v2 schemaOk false beside every reported error.
+     * @throws JsonException - When decoding hook stdout fails.
+     */
+    public function testHookExitsTwoOnFatalMixedOperandAndKeepsNonConfigRemediation(): void
+    {
+        $project = $this->tempDir();
+
+        try {
+            file_put_contents($project . '/Valid.php', "<?php\n\ndeclare(strict_types=1);\n");
+
+            [$mixedProcess, $mixedReport] = $this->runHook($project, ['hook', 'Valid.php', 'missing.php', '--no-config', '--fail-on', 'none']);
+            self::assertSame(2, $mixedProcess->getExitCode(), $mixedProcess->getOutput());
+            self::assertSame(1, $this->decodedJsonObject($mixedReport['run'] ?? null)['analysedFiles'] ?? null);
+
+            [$rangeProcess, $rangeReport] = $this->runHook($project, ['hook', 'Valid.php', '--no-config', '--changed-ranges=']);
+            self::assertSame(2, $rangeProcess->getExitCode(), $rangeProcess->getOutput());
+            $rangeConfig = $this->decodedJsonObject($rangeReport['config'] ?? null);
+            self::assertFalse($rangeConfig['schemaOk'] ?? true);
+            $rangeConfigError = $this->decodedJsonObject($rangeConfig['error'] ?? null);
+            self::assertIsString($rangeConfigError['remediation'] ?? null);
+            self::assertStringNotContainsString('.gruff-php.yaml', $rangeConfigError['remediation']);
+
+            // A mistyped flag checked before config loads is a hook input problem, not a configuration one.
+            [$scopeProcess, $scopeReport] = $this->runHook($project, ['hook', 'Valid.php', '--no-config', '--changed-scope=bogus']);
+            self::assertSame(2, $scopeProcess->getExitCode(), $scopeProcess->getOutput());
+            $scopeConfig = $this->decodedJsonObject($scopeReport['config'] ?? null);
+            self::assertFalse($scopeConfig['schemaOk'] ?? true);
+            $scopeRemediation = $this->decodedJsonObject($scopeConfig['error'] ?? null)['remediation'] ?? null;
+            self::assertIsString($scopeRemediation);
+            self::assertStringNotContainsString('.gruff-php.yaml', $scopeRemediation);
+
+            foreach (['--file=', '--file=,'] as $blankFileFlag) {
+                [$blankFileProcess, $blankFileReport] = $this->runHook($project, ['hook', $blankFileFlag, '--no-config']);
+                self::assertSame(2, $blankFileProcess->getExitCode(), $blankFileProcess->getOutput());
+                $blankDiagnostics = $blankFileReport['diagnostics'] ?? null;
+                self::assertIsArray($blankDiagnostics);
+                $blankMessage = $this->decodedJsonObject($blankDiagnostics[0] ?? null)['message'] ?? null;
+                self::assertIsString($blankMessage);
+                self::assertStringContainsString('--file requires a non-empty value.', $blankMessage);
+            }
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+
+    /**
      * Verify the file-length hook finding carries scope, remediation, string-valued identity fields, and normalized threshold metadata.
      *
      * @return void - Asserts the file-length finding's fields and its measured, threshold, unit, and direction metadata.

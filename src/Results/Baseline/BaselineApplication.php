@@ -62,6 +62,13 @@ final readonly class BaselineApplication
 
         // The user asked to capture the current state, so write a fresh baseline instead of comparing against one; generation always wins.
         if ($options->generateBaselinePath !== null) {
+            // A fatal diagnostic such as --changed-ranges= or a missing path leaves the scan incomplete, so keep any existing baseline untouched.
+            foreach ($diagnostics as $diagnostic) {
+                if ($diagnostic->isFatal) {
+                    return null;
+                }
+            }
+
             return $this->generate($baselineStore, $options, $findings, $diagnostics, DeclarationInventory::forFindings($projectRoot, $findings));
         }
 

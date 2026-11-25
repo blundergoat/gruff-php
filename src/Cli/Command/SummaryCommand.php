@@ -681,7 +681,8 @@ final class SummaryCommand extends Command
             if ($location !== null && $diagnostic->filePath !== null && $diagnostic->line !== null) {
                 $location .= ':' . $diagnostic->line;
             }
-            $lines[] = $location === null
+            // Bounded deep-scan messages already include their path=... token, so prepending $location would print the path twice.
+            $lines[] = $location === null || $diagnostic->type === 'bounded-deep-scan'
                 ? sprintf('  [%s] %s', strtoupper($diagnostic->type), $diagnostic->message)
                 : sprintf('  [%s] %s %s', strtoupper($diagnostic->type), $location, $diagnostic->message);
         }

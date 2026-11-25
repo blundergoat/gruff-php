@@ -118,9 +118,13 @@ final class RuleRegressionSnapshotTest extends TestCase
 
         // Precision-floor M09 (2026-11-22): default scans no longer run test-quality.setup-bloat, and
         // complexity.maintainability-index is off by default.
+
         // 0.6.0 M01 (2026-11-24): naming.abbreviation-allowlist exempts common 2-3 letter English words and universal
         // technical terms (27 fixture hits such as $sum, $row, $out, $zip, $tag, $map, $ok, $one, $two, $ids, $ssl, $xml, $api).
-        self::assertCount(1947, $findings);
+
+        // 0.6.0 PR #14 fix (2026-11-25): docs.missing-return-tag now checks line-anchored @return tags instead of substring matches,
+        // so ReturnDescriptionFixture::noReturnTagIsClean() (whose prose says "no @return tag at all") is now caught (+1 -> 1948).
+        self::assertCount(1948, $findings);
 
 
 
@@ -131,10 +135,10 @@ final class RuleRegressionSnapshotTest extends TestCase
 
 
 
-        // 0.6.0 PR #14 fix (2026-11-25): sensitive-data.* findings now emit 1-based column offsets so two secrets of
-        // the same rule on the same line survive deduplication; unit count (163) and finding count (1947) are unchanged.
+        // 0.6.0 PR #14 fix (2026-11-25): line-anchored @return detection in docs.missing-return-tag adds the missed
+        // ReturnDescriptionFixture::noReturnTagIsClean() finding (1947 -> 1948); unit count (163) is unchanged.
         self::assertSame(
-            '603e7eb902eb7518d86ac1a784e8c16cd553d389eb377e9fb1beb649fd2dff10',
+            '1aa2070b0baf3028d35e4e9eb3b9af31c2aec674fed6366d4ae2d660f95b6df2',
             hash('sha256', $json),
         );
     }

@@ -204,4 +204,131 @@ final class AnalyseCliRuleSelectionTest extends CliTestCase
         self::assertSame(2, $process->getExitCode());
         self::assertStringContainsString('[USAGE-ERROR] Unsupported profile "security-plus". Use default or security.', $process->getOutput());
     }
+
+    /**
+     * Verify --file targeting a PHP file outside the launch directory produces a valid v3 JSON report without crashing.
+     *
+     * @return void - Asserts exit code 0 and a decoded v3 JSON report containing the external file's findings.
+     * @throws JsonException - If decoding the analyse JSON output fails.
+     */
+    public function testAnalyseFileOptionOutsideLaunchDirectoryProducesValidJson(): void
+    {
+        $externalDir = $this->tempDir();
+
+        try {
+            $externalFile = $externalDir . '/ExternalSample.php';
+            file_put_contents($externalFile, "<?php\nfinal class ExternalSample {}\n");
+
+            $process = new Process([
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff-php',
+                'analyse',
+                '--file',
+                $externalFile,
+                '--no-config',
+                '--no-baseline',
+                '--no-cache',
+                '--format',
+                'json',
+                '--fail-on',
+                'none',
+            ], self::PROJECT_ROOT);
+            $process->run();
+
+            self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+            $report = $this->decodeJsonOutput($process);
+            self::assertSame('gruff.analysis.v3', $report['schemaVersion'] ?? null);
+            $findings = $report['findings'] ?? null;
+            self::assertIsArray($findings);
+            self::assertNotSame([], $findings);
+        } finally {
+            $this->removeDir($externalDir);
+        }
+    }
+
+    /**
+     * Verify --show-rule narrows visible findings instead of unioning with --include-rule.
+     *
+     * @return void - Asserts only the requested --show-rule finding is visible while the other included rule is counted as hidden.
+     * @throws JsonException - If decoding the analyse JSON output fails.
+     */
+    public function testAnalyseShowRuleNarrowsIncludedRules(): void
+    {
+        $project = $this->tempDir();
+
+        try {
+            file_put_contents($project . '/Sample.php', "<?php\nfinal class Sample {}\n");
+
+            $process = new Process([
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff-php',
+                'analyse',
+                'Sample.php',
+                '--no-config',
+                '--no-baseline',
+                '--no-cache',
+                '--include-rule',
+                'docs.missing-file-phpdoc',
+                '--include-rule',
+                'docs.missing-class-phpdoc',
+                '--show-rule',
+                'docs.missing-file-phpdoc',
+                '--format',
+                'json',
+                '--fail-on',
+                'none',
+            ], $project);
+            $process->run();
+
+            self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+            $report   = $this->decodeJsonOutput($process);
+            $findings = $report['findings'] ?? null;
+            self::assertIsArray($findings);
+            self::assertCount(1, $findings);
+            $firstFinding = $findings[0] ?? null;
+            self::assertIsArray($firstFinding);
+            self::assertSame('docs.missing-file-phpdoc', $firstFinding['ruleId'] ?? null);
+
+            $displayFilter = $report['displayFilter'] ?? null;
+            self::assertIsArray($displayFilter);
+            self::assertSame(1, $displayFilter['hiddenFindings'] ?? null);
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+
+    /**
+     * Verify whitespace-only --file operands fail as usage errors instead of resolving to the whole project root.
+     *
+     * @return void - Asserts exit code 2 and the non-empty --file usage error message.
+     */
+    public function testAnalyseRejectsWhitespaceOnlyFileOption(): void
+    {
+        $project = $this->tempDir();
+
+        try {
+            file_put_contents($project . '/Sample.php', "<?php\nfinal class Sample {}\n");
+
+            $process = new Process([
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff-php',
+                'analyse',
+                '--file',
+                '   ',
+                '--no-config',
+                '--no-baseline',
+                '--no-cache',
+                '--format',
+                'text',
+                '--fail-on',
+                'none',
+            ], $project);
+            $process->run();
+
+            self::assertSame(2, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
+            self::assertStringContainsString('--file requires a non-empty value.', $process->getOutput());
+        } finally {
+            $this->removeDir($project);
+        }
+    }
 }

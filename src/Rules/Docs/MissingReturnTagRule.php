@@ -89,7 +89,8 @@ final readonly class MissingReturnTagRule implements RuleInterface
             $docText = $docComment->getText();
 
 
-            if (str_contains($docText, '@return')) {
+            // A method that already documents its return needs no finding.
+            if (PhpdocTagText::hasReturnTag($docText)) {
                 continue;
             }
 
@@ -133,12 +134,18 @@ final readonly class MissingReturnTagRule implements RuleInterface
         NodeFinder $nodeFinder,
         DocsInheritanceHelper $inheritanceHelper,
     ): bool {
-        $ancestorMethod = $inheritanceHelper->sameFileAncestorMethod($classMethod, $statements, $nodeFinder);
-        if ($ancestorMethod instanceof ClassMethod) {
-            // A visible ancestor stands in only when it declares the return, or inherits it in turn through its own
-            // marker; one hop, so a malformed cyclic `extends` cannot recurse.
-            return str_contains($ancestorMethod->getDocComment()?->getText() ?? '', '@return')
-                || $inheritanceHelper->hasInheritanceMarker($ancestorMethod);
+        $ancestorMethods = $inheritanceHelper->sameFileAncestorMethods($classMethod, $statements, $nodeFinder);
+        // An override can rely on a same-file ancestor that documents its return; otherwise only a marker such as {@inheritDoc} excuses it.
+        if ($ancestorMethods !== []) {
+            // Any direct ancestor declaring @return or carrying a valid inheritance marker satisfies the inherited return contract.
+            foreach ($ancestorMethods as $ancestorMethod) {
+                if (PhpdocTagText::hasReturnTag($ancestorMethod->getDocComment()?->getText() ?? '')
+                    || $inheritanceHelper->hasInheritanceMarker($ancestorMethod)) {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         return $inheritanceHelper->hasInheritanceMarker($classMethod);

@@ -369,6 +369,11 @@ final readonly class BaselineStore
 
         $writtenBaseline = $this->write($outputPath, $accepted, $inventory);
 
+        // Re-verify after persistence so any write-through to the legacy file fails loudly instead of returning success.
+        if (file_get_contents($legacyAbsolute) !== $before) {
+            throw new BaselineException(sprintf('Migration changed the 0.5 input %s; the retreat path is no longer intact.', $legacyPath));
+        }
+
         return new BaselineMigration(writtenBaseline: $writtenBaseline, accepted: count($accepted), sensitiveCounted: $writtenBaseline->sensitiveTotal());
     }
 
@@ -450,8 +455,8 @@ final readonly class BaselineStore
                 throw new BaselineException(sprintf('Baseline occurrences[%d] duplicates identity %s; counts must be merged into one entry.', $index, $validatedEntry->identity));
             }
 
-            // Require deterministic order so malformed or hand-edited inventories are rejected before they affect the scan.
-            if ($validatedEntry->identity < $previous) {
+            // Require deterministic bytewise order matching SORT_STRING so PHP numeric-string coercion cannot reject valid hashes.
+            if (strcmp($validatedEntry->identity, $previous) < 0) {
                 throw new BaselineException(sprintf('Baseline occurrences[%d] breaks the ascending identity order.', $index));
             }
 

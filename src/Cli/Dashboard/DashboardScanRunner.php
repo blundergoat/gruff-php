@@ -15,6 +15,7 @@ use Symfony\Component\Process\Process;
 /**
  * Runs scans submitted from the dashboard and returns an HTML report or an error panel.
  * The selected project and form values decide what the `analyse` subprocess scans.
+ *
  * Full scans that honour ignore rules can reuse a report when the tracked inputs match.
  * Diff and include-ignored requests always run a new scan.
  *
@@ -163,8 +164,10 @@ final class DashboardScanRunner
         // A scan requested with --no-config cannot change when a config file is edited.
         if ($state['noConfig'] !== '1') {
             $loader = new ConfigLoader($scanRoot);
+            // Leaving the default .gruff-php.yaml form value untouched defers to auto-discovery, so edits to legacy .gruff.yaml invalidate the cache.
+            $explicitConfig = $state['config'] !== '' && $state['config'] !== ConfigLoader::DEFAULT_CONFIG_FILE ? $state['config'] : null;
             try {
-                $configPath = $loader->resolveConfigPath($state['config']);
+                $configPath = $loader->resolveConfigPath($explicitConfig);
                 // Include the selected config so the next dashboard refresh sees a setting change.
                 if ($configPath !== null) {
                     $fingerprintInputs[] = $this->fileFingerprint($configPath);

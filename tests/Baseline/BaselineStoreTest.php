@@ -447,6 +447,31 @@ final class BaselineStoreTest extends TestCase
     }
 
     /**
+     * Verify read() accepts valid SORT_STRING-ordered hex identities even when PHP would coerce them numerically out of order.
+     *
+     * @return void - Asserts both numeric-looking hex identities load in their stored bytewise order.
+     */
+    public function testReadAcceptsNumericStringHexIdentitiesInSortStringOrder(): void
+    {
+        $root = $this->tempDir();
+
+        try {
+            $json = $this->document(
+                '{"identity":"1000000000000000","count":1},{"identity":"1e00000000000001","count":2}',
+            );
+            file_put_contents($root . '/gruff-baseline.json', $json);
+
+            $loaded = (new BaselineStore($root))->read('gruff-baseline.json');
+
+            self::assertCount(2, $loaded->entries);
+            self::assertSame('1000000000000000', $loaded->entries[0]->identity);
+            self::assertSame('1e00000000000001', $loaded->entries[1]->identity);
+        } finally {
+            $this->removeDir($root);
+        }
+    }
+
+    /**
      * Copy the committed 0.5 fixture into the temp project as the migration input, and hand back its exact bytes.
      *
      * @param string $root - Temp project root.

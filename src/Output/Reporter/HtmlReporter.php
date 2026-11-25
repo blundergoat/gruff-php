@@ -499,13 +499,7 @@ final readonly class HtmlReporter
             if ($report->shouldListAbsentBaseline) {
 
                 foreach ($report->baseline->staleEntries as $resolvedEntry) {
-                    $items[] = sprintf(
-                        'Resolved: %s %s (resolved %d): %s',
-                        $resolvedEntry->ruleId,
-                        $resolvedEntry->path,
-                        $resolvedEntry->count,
-                        $resolvedEntry->subject,
-                    );
+                    $items[] = 'Resolved: ' . $resolvedEntry->resolvedSummary();
                 }
             }
         }
