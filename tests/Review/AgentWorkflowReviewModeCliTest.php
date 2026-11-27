@@ -33,7 +33,7 @@ final class AgentWorkflowReviewModeCliTest extends TestCase
         $changedOnlyProcess->run();
 
         self::assertSame(2, $changedOnlyProcess->getExitCode(), $changedOnlyProcess->getOutput() . $changedOnlyProcess->getErrorOutput());
-        self::assertStringContainsString('--changed-only requires --diff-vs.', $changedOnlyProcess->getOutput());
+        self::assertStringContainsString('--changed-only requires --diff-base.', $changedOnlyProcess->getOutput());
 
         $diffConflictProcess = new Process([
                                                PHP_BINARY,
@@ -46,6 +46,6 @@ final class AgentWorkflowReviewModeCliTest extends TestCase
         $diffConflictProcess->run();
 
         self::assertSame(2, $diffConflictProcess->getExitCode(), $diffConflictProcess->getOutput() . $diffConflictProcess->getErrorOutput());
-        self::assertStringContainsString('--diff, --since, --changed-ranges, and --diff-vs are mutually exclusive.', $diffConflictProcess->getOutput());
+        self::assertStringContainsString('--diff, --since, --changed-ranges, and --diff-base are mutually exclusive.', $diffConflictProcess->getOutput());
     }
 }

@@ -13,13 +13,13 @@ jobs:
   analyse:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: shivammathur/setup-php@v2
         with:
           php-version: "8.3"
       - run: composer install --no-interaction --prefer-dist
       - run: vendor/bin/gruff-php analyse src --format sarif --fail-on none > gruff-php.sarif
-      - uses: github/codeql-action/upload-sarif@v3
+      - uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: gruff-php.sarif
 ```

@@ -186,7 +186,7 @@ final class BaselineFilterTest extends TestCase
     /**
      * Verify the earlier variable finding remains unchanged and the later one is reported new.
      *
-     * @return void - Asserts exact unchanged and new finding lists and no absent reviewed occurrences.
+     * @return void - Asserts exact unchanged and new finding lists, no absent occurrences, and per-file, per-name ordinals.
      */
     public function testVariableSymbolsAreRankedByDeclarationLine(): void
     {
@@ -198,6 +198,12 @@ final class BaselineFilterTest extends TestCase
         self::assertSame([$first], $application['unchanged']);
         self::assertSame([$second], $application['new']);
         self::assertSame(0, $application['report']->absentCount);
+
+        // Ordinals count same-named declarations in one file: another name or another file starts again at 1.
+        $otherName = $this->finding(ruleId: 'naming.identifier-quality', symbol: '$other', line: 5);
+        $otherFile = $this->finding(ruleId: 'naming.identifier-quality', symbol: '$value', line: 5, filePath: 'src/Gadget.php');
+        $ordinals  = BaselineIdentity::assignOrdinals([$first, $second, $otherName, $otherFile]);
+        self::assertSame([1, 2, 1, 1], array_map(static fn(Finding $finding): int => $ordinals[spl_object_id($finding)], [$first, $second, $otherName, $otherFile]));
     }
 
     /**
@@ -215,6 +221,41 @@ final class BaselineFilterTest extends TestCase
 
         self::assertSame([$reviewed], $application['unchanged']);
         self::assertSame([$earlier], $application['new']);
+    }
+
+    /**
+     * Verify a finding named by a positional label, such as `closure@31`, keeps its review when code is inserted above it.
+     * Two labelled declarations in one file stay apart, and fixing another rule's finding on a closure renumbers none of them.
+     *
+     * @return void - Asserts the line-free subject, per-file and per-label ordinals, unchanged shifted closures, and rule-local ranks.
+     */
+    public function testPositionalLabelsKeepTheirReviewWhenLinesShift(): void
+    {
+        $first     = $this->finding(ruleId: 'naming.short-variable', symbol: 'closure@31', line: 31);
+        $second    = $this->finding(ruleId: 'naming.short-variable', symbol: 'closure@40', line: 40);
+        $arrow     = $this->finding(ruleId: 'naming.short-variable', symbol: 'arrow@20', line: 20);
+        $elsewhere = $this->finding(ruleId: 'naming.short-variable', symbol: 'closure@10', line: 10, filePath: 'src/Gadget.php');
+
+        self::assertSame('class@anonymous#1', BaselineIdentity::subject($this->finding(symbol: 'class@anonymous:40', line: 40), 1));
+
+        // Each label ranks by its line among the same file's labels of its kind, so two closures never share a SARIF fingerprint.
+        $ordinals = BaselineIdentity::assignOrdinals([$first, $second, $arrow, $elsewhere]);
+        self::assertSame([1, 2, 1, 1], array_map(static fn(Finding $finding): int => $ordinals[spl_object_id($finding)], [$first, $second, $arrow, $elsewhere]));
+
+        $shifted = $this->classify([$first, $second], [
+            $this->finding(ruleId: 'naming.short-variable', symbol: 'closure@33', line: 33),
+            $this->finding(ruleId: 'naming.short-variable', symbol: 'closure@42', line: 42),
+        ]);
+        self::assertSame([], $shifted['new']);
+        self::assertSame(0, $shifted['report']->absentCount);
+
+        $onlyFirstReviewed = $this->classify([$first], [$first, $second]);
+        self::assertSame([$first], $onlyFirstReviewed['unchanged']);
+        self::assertSame([$second], $onlyFirstReviewed['new']);
+
+        $otherRule           = $this->finding(ruleId: 'naming.identifier-quality', symbol: 'closure@31', line: 31);
+        $afterOtherRuleFixed = $this->classify([$otherRule, $second], [$second]);
+        self::assertSame([$second], $afterOtherRuleFixed['unchanged']);
     }
 
     /**

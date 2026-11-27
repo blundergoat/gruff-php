@@ -762,7 +762,7 @@ final readonly class AnalyseCommandOptions
 
         // A branch comparison and changed-region scan use different matching rules, so the caller must choose one.
         if ($this->changeScope->diffVs !== null && $changedModes !== []) {
-            return '--diff, --since, --changed-ranges, and --diff-vs are mutually exclusive.';
+            return '--diff, --since, --changed-ranges, and --diff-base are mutually exclusive.';
         }
 
 
@@ -780,10 +780,10 @@ final readonly class AnalyseCommandOptions
     }
 
     /**
-     * Makes sure --changed-only has the --diff-vs companion it depends on, so a user asking to
+     * Makes sure --changed-only has the --diff-base (or --diff-vs) companion it depends on, so a user asking to
      * report just the changed files can't accidentally leave out what those changes are measured against.
      *
-     * @return string|null - the message when --changed-only is set without the --diff-vs comparison ref it needs, or null otherwise.
+     * @return string|null - the message when --changed-only is set without a comparison ref, or null otherwise.
      */
     private function changedOnlyUsageError(): ?string
     {
@@ -794,7 +794,7 @@ final readonly class AnalyseCommandOptions
         }
 
 
-        return '--changed-only requires --diff-vs.';
+        return '--changed-only requires --diff-base.';
     }
 
     /**

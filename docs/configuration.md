@@ -155,7 +155,8 @@ identity matching: a finding counts as new when its line-free identity has more
 live instances than the baseline accepted, so unrelated line shifts never
 re-trigger the gate. Legacy files fail closed: carry a `gruff.baseline.v2`
 file's reviews forward once with
-`analyse --migrate-baseline <old> --generate-baseline <new>`, and regenerate a
+`analyse --migrate-baseline <old> --generate-baseline <new>` after migrating any
+0.5 config (or pointing `--config` at the migrated file), and regenerate a
 `gruff.baseline.v1` file with `analyse --generate-baseline`, adding `--force` at
 the default `gruff-baseline.json`, which `--migrate-baseline` refuses because it
 reads only v2.

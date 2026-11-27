@@ -1,6 +1,6 @@
 ---
 category: setup
-last_reviewed: 2026-11-25
+last_reviewed: 2026-11-28
 ---
 
 # Setup Footguns
@@ -58,6 +58,16 @@ last_reviewed: 2026-11-25
 **Prevention:** When `composer perf` exits `1`, inspect the sign of `delta` in the output table before investigating a performance regression. `scripts/test-performance.sh` (search: `abs="$(awk -v d="$delta"`) compares the absolute value of `delta` against `tolerance * 1.5` (30% for wall time with default `GRUFF_PERF_WALL_TOLERANCE=20`), so a speedup greater than 30% fails identically to a slowdown. When a negative delta reflects intentional rule removals or a deliberate parser speedup, regenerate the platform baseline with `bash scripts/test-performance.sh --baseline --yes` and re-run `composer perf` to confirm stability.
 
 **Evidence:** Measured 2026-11-24 during 0.6.0 preflight after retiring 46 rules (`127` rules on PHP 8.3.30 in the 0.5.2 baseline vs `83` rules on PHP 8.4.26): `composer perf` exited `1` because `medium` dropped `-61.7%` and `large` dropped `-66.7%` against `scripts/performance-baselines/linux-x86_64.json`. Regenerating the baseline for `0.6.0` and re-running `composer perf` passed all 6 metrics (`small` 44ms, `medium` 860ms, `large` 1647ms; deltas `-3.3%` to `+2.3%`, exit `0`).
+
+## Footgun: The documentation drift gate never runs a documented command or config example
+
+**Status:** active | **Created:** 2026-11-28 | **Evidence:** ACTUAL_MEASURED
+**Decision changed:** How to verify a doc edit that shows a gruff-php command, upgrade step, or `.gruff-php.yaml` snippet before calling it correct.
+**Trigger phase:** VERIFY
+
+**Prevention:** Run what the doc shows. Load each changed YAML example through `php bin/gruff-php analyse --config <file> --format=json` and check for a config diagnostic, and replay changed upgrade steps in a scratch project shaped like the version being upgraded from. A passing `Documentation drift` row in `bash scripts/preflight-checks.sh` proves only that catalogue counts, rule IDs, cited decisions, and links resolve: `scripts/preflight-checks.sh` (search: `docs_drift_check()`) reads the docs but executes none of their examples.
+
+**Evidence:** Measured 2026-11-28 while preparing 0.6.0, with the drift gate passing throughout. The preset example in `docs/gruff-cli-agent-instructions.md` (search: `your override on top of the preset`) set `threshold` without `severity`, so every copy exited `2` with `Config key "rules.complexity.cognitive.severity" must be "advisory", "warning", or "error".` (`src/Engine/Config/RuleConfigApplier.php`, search: `private function severityThreshold`). The baseline step in `UPGRADING.md` (search: `A 0.5 config no longer loads`) and three other docs ran `analyse --migrate-baseline` while the 0.5 config was still in place, which exits `2` with `Config key "schemaVersion" is required.` Both examples were fixed only after they were run.
 
 ## Resolved Entries
 

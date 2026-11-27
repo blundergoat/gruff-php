@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GruffPhp\Tests\Reporting;
 
 use GruffPhp\Engine\Analysis\AnalysisReport;
+use GruffPhp\Results\Baseline\BaselineReport;
 use GruffPhp\Results\Finding\Confidence;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Pillar;
@@ -68,6 +69,50 @@ final class TextReporterTest extends TestCase
         self::assertSame($plain, $classified);
         self::assertStringNotContainsString('remediationAction', $classified);
         self::assertStringNotContainsString('APPLY', $classified);
+    }
+
+    /**
+     * Verify the generation tip only promises an automatic rerun for the default baseline path.
+     * A baseline written elsewhere, such as the upgrade guide's migrated file, applies only through --baseline.
+     *
+     * @return void - Asserts the rerun advice for both spellings of the default path and the --baseline advice for another path.
+     */
+    public function testGeneratedBaselineTipMatchesHowTheFileIsApplied(): void
+    {
+        $reporter = new TextReporter();
+        $default  = $reporter->render($this->reportWithGeneratedBaseline('gruff-baseline.json'));
+        $dotted   = $reporter->render($this->reportWithGeneratedBaseline('./gruff-baseline.json'));
+        $migrated = $reporter->render($this->reportWithGeneratedBaseline('gruff-baseline.0.6.json'));
+
+        self::assertStringContainsString('Tip: commit gruff-baseline.json and rerun `gruff-php analyse` to apply it', $default);
+        self::assertStringContainsString('Tip: commit ./gruff-baseline.json and rerun `gruff-php analyse` to apply it', $dotted);
+        self::assertStringContainsString('Tip: commit gruff-baseline.0.6.json and pass --baseline gruff-baseline.0.6.json to apply it', $migrated);
+        self::assertStringNotContainsString('rerun `gruff-php analyse` to apply it', $migrated);
+    }
+
+    /**
+     * Build a findings-free report that has just generated a baseline at the given path.
+     *
+     * @param string $baselinePath - Path the report says the baseline was written to.
+     *
+     * @return AnalysisReport - Report whose baseline section records a generated file with no entries.
+     */
+    private function reportWithGeneratedBaseline(string $baselinePath): AnalysisReport
+    {
+        return new AnalysisReport(
+            toolVersion:     '0.6.0',
+            requestedPaths:  ['src'],
+            format:          'text',
+            failOn:          'none',
+            filesDiscovered: 1,
+            filesParsed:     1,
+            ignoredPaths:    [],
+            missingPaths:    [],
+            diagnostics:     [],
+            findings:        [],
+            exitCode:        0,
+            baseline:        new BaselineReport(path: $baselinePath, generated: true, totalEntries: 0, suppressedFindings: 0, staleEvaluation: 'generated'),
+        );
     }
 
     /**

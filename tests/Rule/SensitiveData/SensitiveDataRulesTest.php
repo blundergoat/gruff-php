@@ -8,6 +8,7 @@ use GruffPhp\Engine\Config\AnalysisConfig;
 use GruffPhp\Engine\Config\ConfigLoader;
 use GruffPhp\Engine\Config\RuleSettings;
 use GruffPhp\Results\Finding\Finding;
+use GruffPhp\Results\Finding\Pillar;
 use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Engine\Parser\PhpFileParser;
 use GruffPhp\Rules\Contracts\RuleContext;
@@ -40,7 +41,7 @@ final class SensitiveDataRulesTest extends TestCase
     /**
      * Checks detector counts, literal secretValues() matches in messages and JSON-encoded metadata, and preview syntax.
      *
-     * @return void - Asserts expected counts, no literal matches, and no string previews rejected by the marker regex.
+     * @return void - Asserts expected counts, no literal matches, a marker on every sensitive-data finding, and no marker rejected by the regex.
      */
     public function testCredentialPatternsAreDetectedWithFixedPreviews(): void
     {
@@ -72,9 +73,9 @@ final class SensitiveDataRulesTest extends TestCase
      * The pattern admits the bare marker, the listed categories, and a connection marker with a scheme-shaped suffix.
      * Rejection indicates invalid marker syntax; it does not establish that the marker contains matched secret text.
      *
-     * @param Finding $finding - Sensitive-data finding whose metadata preview marker is judged.
+     * @param Finding $finding - Finding from the default rule set; only a sensitive-data finding must carry a marker.
      *
-     * @return bool - true when the marker is outside the grammar; a finding with no string marker is never outside it
+     * @return bool - true when the marker is outside the grammar, or when a sensitive-data finding carries no string marker
      */
     private static function isMarkerOutsideGrammar(Finding $finding): bool
     {
@@ -83,8 +84,12 @@ final class SensitiveDataRulesTest extends TestCase
                    . '|google-api-key|anthropic-api-key|npm-token|gitlab-token|gcp-service-account|email|phone'
                    . '|payment-card|ssn|medicare|mrn|connection-string:[a-z][a-z0-9+.-]*))?\]$/';
 
-        // A finding carrying no string marker has nothing to judge, so the grammar cannot reject it.
-        return is_string($marker) && preg_match($grammar, $marker) !== 1;
+        // Markers are unconditional on sensitive-data findings; the default rule set also returns findings that carry none.
+        if (!is_string($marker)) {
+            return $finding->pillar === Pillar::SensitiveData;
+        }
+
+        return preg_match($grammar, $marker) !== 1;
     }
 
     /**

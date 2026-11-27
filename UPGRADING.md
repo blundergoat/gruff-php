@@ -28,8 +28,9 @@ Every break below is the one this port's own `CHANGELOG.md` records; nothing her
 - **Normalized density scoring replaces the absolute-sum formula.** Pillar scores now use `floor + (100 - floor) / (1 + density / densityScale)` over evaluated PHP files, so project size no longer drags grades down (4x code duplication previously dropped this port's composite from `79.70` to `70.00`). Raw weights replace the retired `4x`/`5x` multipliers in `score.pillars[].penalty` and `score.topOffenders[].penalty` (one high-confidence error is `12`, not `48`).
 - **Disabled static pillars leave `scoredPillars`, and empty runs emit `null` grades.** Default scans score only static pillars with at least one enabled rule, so default-off `maintainability` no longer adds a synthetic `100` row. When nothing is evaluated (an empty directory, all files unparseable, or every rule disabled), `score.composite.{score,grade}` and `score.topOffenders[].{score,grade}` are `null` (`Composite: n/a (nothing evaluated)` in text summary and in text `analyse` when files were discovered; no score line in text `analyse` when nothing was discovered; `**Grade:** n/a (n/a/100)` in Markdown; `n/a` / `not evaluated` in HTML).
 - **Per-command exit gates move from `minimumSeverity:` to `failOn:`.** Pre-0.6.0 configs with a `minimumSeverity:` command map exit `2` pointing to `failOn` (`analyse`, `report`, `dashboard`) and `gruff-php migrate-config`. `minimumSeverity` remains as a scalar display floor (`advisory`, `warning`, or `error`, never `none`) that hides findings without affecting exit codes or scores (`gruff-spec/contracts/core/cli.v1.json`, ratified 2026-09-06).
+- **`--diff-vs` is superseded by `--diff-base`.** The old spelling still works on `analyse` and `report` but prints a warning that it is going away, so switch scripts to `--diff-base`. Passing both with different refs exits `2`.
 - **Empty `--changed-ranges=` exits `2` instead of scanning the whole tree.** Both `analyse` and `hook` now exit `2` with one `changed-region` diagnostic and zero findings. Callers whose range calculation can return empty must skip the scan instead of passing an empty flag (the shipped `.goat-flow/hooks/gruff-code-quality.mjs` wrapper already does).
-- **Default discovery follows the family fallback policy.** Non-VCS scans honour `.gitignore`, committed control metadata stays scannable, explicit supported files bypass Git and fallback ignores, lockfiles are no longer skipped by filename, `.gruff-cache` stays skipped by default even under `.gitignore`, and PHP keeps `.phpunit.cache` and `var/cache` as fallback ignores while blocking VCS internals.
+- **Default discovery follows the family fallback policy.** Outside a Git checkout, a `.gitignore` switches off the fallback ignores (such as `node_modules`, `build`, and `coverage`) but its own patterns are not applied, so list those directories under `paths.ignore` there. Committed control metadata stays scannable, explicit supported files bypass Git and fallback ignores, lockfiles are no longer skipped by filename, `.gruff-cache` stays skipped by default even under `.gitignore`, and PHP keeps `.phpunit.cache` and `var/cache` as fallback ignores while blocking VCS internals.
 
 ### Rules, defaults, and exclusions
 
@@ -51,6 +52,8 @@ Every break below is the one this port's own `CHANGELOG.md` records; nothing her
    composer require --dev blundergoat/gruff-php:^0.6
    ```
 
+   If Composer refuses because the project pins Symfony 7.0 to 7.3, move those components to 7.4
+   first: `symfony/yaml` and `symfony/process` now require releases without known advisories.
 3. For an existing 0.5 config, run `gruff-php migrate-config --config .gruff-php.yaml --output .gruff-php.0.6.yaml`
    (or `--dry-run` first). Migration moves legacy `minimumSeverity` command maps to `failOn`,
    drops `allowlists.secretPreviews`, removes verified retired rule IDs across `rules:` and
@@ -59,11 +62,15 @@ Every break below is the one this port's own `CHANGELOG.md` records; nothing her
    `gruff-php init --force` to regenerate registry defaults while preserving `paths.ignore` and
    valid `failOn` settings.
 4. Carry a `0.5` (`gruff.baseline.v2`) baseline forward rather than regenerating it, so previously
-   reviewed findings stay reviewed:
+   reviewed findings stay reviewed. A 0.5 config no longer loads, so either run this after the
+   migrated config is in place, or point `--config` at it as shown:
 
    ```bash
-   vendor/bin/gruff-php analyse --migrate-baseline gruff-baseline.json --generate-baseline gruff-baseline.0.6.json
+   vendor/bin/gruff-php analyse --config .gruff-php.0.6.yaml --migrate-baseline gruff-baseline.json --generate-baseline gruff-baseline.0.6.json
    ```
+
+   Then move `gruff-baseline.0.6.json` over `gruff-baseline.json`, or pass it with `--baseline`.
+   Until you do, `analyse` reads the 0.5 file and exits `2`.
 
    For an older `gruff.baseline.v1` baseline, regenerate in place with
    `vendor/bin/gruff-php analyse --generate-baseline gruff-baseline.json --force`.

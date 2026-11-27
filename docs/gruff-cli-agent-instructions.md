@@ -240,7 +240,8 @@ Baselines use the `gruff.baseline.v3` schema: `occurrences` rows keyed by a
 precomputed line-free `identity` digest with the `count` they accept, so
 accepted debt keeps matching after unrelated line shifts. Legacy files fail
 closed (exit code `2`): migrate a `gruff.baseline.v2` file with
-`--migrate-baseline <old> --generate-baseline <new>`, and regenerate a
+`--migrate-baseline <old> --generate-baseline <new>` after migrating any 0.5
+config (or pointing `--config` at the migrated file), and regenerate a
 `gruff.baseline.v1` file with `--generate-baseline`, adding `--force` at the
 default `gruff-baseline.json`, because `--migrate-baseline` reads only v2. A symbol-bearing
 finding's subject is its symbol rather than its message, so rewording a rule
@@ -404,6 +405,7 @@ extends: gruff.recommended   # or gruff.starter (lean) / gruff.strict (tighter)
 rules:
   complexity.cognitive:
     threshold: 25            # your override on top of the preset
+    severity: error          # the shorthand threshold always names its severity
 ```
 
 - `gruff.recommended` — gruff's default rule set; `extends: gruff.recommended` with no overrides behaves exactly like no config at all.

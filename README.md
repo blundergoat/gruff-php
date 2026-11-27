@@ -142,7 +142,7 @@ jobs:
   gruff:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: shivammathur/setup-php@v2
         with:
           php-version: "8.3"
@@ -218,7 +218,7 @@ Baselines suppress reviewed findings by counted identity so a team can freeze kn
 
 - **Survives ordinary edits:** Shifting line numbers or rewording a rule message does not expire a symbol-bearing entry, and two same-named declarations in one file stay distinct. Extra occurrences beyond the accepted count report as new; missing ones report as resolved.
 - **No baselining secrets:** Sensitive-data findings are never baseline-eligible. Generated baselines count them under `sensitive.counts` with no rows, so secrets stay visible until fixed or recorded with a reason under `sensitiveExclusions`.
-- **Legacy baselines fail closed (exit `2`):** Carry a `gruff.baseline.v2` file forward once with `analyse --migrate-baseline <old> --generate-baseline <new>` (the original stays untouched). A `gruff.baseline.v1` file cannot be migrated (`--migrate-baseline` refuses it); regenerate it from a reviewed scan with `analyse --generate-baseline <new path>`, or in place with `--force` at the default `gruff-baseline.json`.
+- **Legacy baselines fail closed (exit `2`):** Carry a `gruff.baseline.v2` file forward once with `analyse --migrate-baseline <old> --generate-baseline <new>`, after migrating any 0.5 config or pointing `--config` at the migrated file (the original stays untouched). A `gruff.baseline.v1` file cannot be migrated (`--migrate-baseline` refuses it); regenerate it from a reviewed scan with `analyse --generate-baseline <new path>`, or in place with `--force` at the default `gruff-baseline.json`.
 - **Known blind spot:** Because rows match by `count`, fixing one instance while adding another under the same identity stays within budget and looks unchanged (measured on this repository's fixtures, 102 of 2,303 generated rows accept more than one instance).
 
 ```bash

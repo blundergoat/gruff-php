@@ -7,6 +7,7 @@ namespace GruffPhp\Output\Reporter;
 use GruffPhp\Engine\Analysis\AnalysisReport;
 use GruffPhp\Engine\Analysis\RunDiagnostic;
 use GruffPhp\Engine\Analysis\SensitiveExclusionSummary;
+use GruffPhp\Results\Baseline\BaselineStore;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Mutation\MutationAnalysisResult;
 
@@ -334,13 +335,22 @@ final readonly class TextReporter
         $lines[] = sprintf('  Stale entries: %d', count($report->baseline->staleEntries));
         $lines[] = '  Note: suppressed findings are accepted debt and are removed before scoring.';
 
-        // A fresh --generate-baseline run just wrote the file, so tell the user to commit it and rerun to apply it.
+        // A fresh --generate-baseline run just wrote the file; only the default path is found again by a plain rerun.
         if ($report->baseline->generated) {
-            $lines[] = sprintf(
-                '  Tip: commit %s and rerun `gruff-php analyse` to apply it; pass --baseline %s for explicit application.',
-                $report->baseline->path,
-                $report->baseline->path,
-            );
+            // Treat `./gruff-baseline.json` like the bare default name; any other spelling gets advice that holds either way.
+            $isDefaultName = preg_replace('#^(?:\./)+#', '', $report->baseline->path) === BaselineStore::DEFAULT_FILENAME;
+            $lines[]       = $isDefaultName
+                ? sprintf(
+                    '  Tip: commit %s and rerun `gruff-php analyse` to apply it; pass --baseline %s for explicit application.',
+                    $report->baseline->path,
+                    $report->baseline->path,
+                )
+                : sprintf(
+                    '  Tip: commit %s and pass --baseline %s to apply it; a plain `gruff-php analyse` applies only %s at the project root.',
+                    $report->baseline->path,
+                    $report->baseline->path,
+                    BaselineStore::DEFAULT_FILENAME,
+                );
 
             return;
         }

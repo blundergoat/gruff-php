@@ -778,7 +778,7 @@ final readonly class AnalyseCommandSetupBuilder
             return null;
         }
 
-        return 'The new-findings gate needs a reference point. Configure --baseline or --diff-vs <ref> before enabling --fail-on-new or failureConditions.newFindings.';
+        return 'The new-findings gate needs a reference point. Configure --baseline or --diff-base <ref> before enabling --fail-on-new or failureConditions.newFindings.';
     }
 
     /**

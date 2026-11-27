@@ -35,7 +35,7 @@ The example output below is captured from the current checkout.
 php bin/gruff-php summary tests/Fixtures/Source/mixed --no-config --top=3
 ```
 
-```
+```text
 gruff-php 0.6.0 summary
 Composite: B (89.36 / 100)
 Findings: 16 total · 0 error · 5 warning · 11 advisory
@@ -70,7 +70,7 @@ Pillars are ordered by finding count (loudest first). Enabled pillars with zero 
 
 `summary` applies any configured [`sensitiveExclusions`](configuration.md#sensitive-exclusions), so its counts and grade match `analyse` over the same tree. When a run suppresses findings, a final line prints the total in the same format `analyse` uses:
 
-```
+```text
 Suppressed findings: 1 via sensitiveExclusions[0] sensitive-data.aws-access-key: 1 (Synthetic key used by the scanner fixtures; not a live credential.)
 ```
 
