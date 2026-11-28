@@ -12,9 +12,8 @@ use GruffPhp\Results\Baseline\BaselineException;
  * When a user runs `gruff-php analyse --generate-baseline`, every ordinary finding is named by this identity and nothing positional.
  * On the next `analyse --baseline`, a finding that moved lines still matches, while a new sibling of the same rule never inherits the review.
  *
- * Four decisions live here:
+ * Three decisions live here:
  * - a symbol-bearing finding is named by its symbol plus a declaration ordinal, so two same-named methods in one file stay apart;
- * - an unnamed closure, arrow function, or anonymous class drops the line from its label (`closure@31` becomes `closure`) and is told apart by ordinal;
  * - a finding naming no symbol falls back to its message with measured values normalised, the only stable thing a file-level finding has;
  * - a sensitive finding receives no identity at all, because a stored identity is what would let a review hide a secret.
  */
@@ -39,12 +38,6 @@ final readonly class BaselineIdentity
      * What every measured value becomes in a subject, so a file that grew from 1010 to 1200 lines keeps the identity the user reviewed.
      */
     private const MEASURED_VALUE_PLACEHOLDER = '#';
-
-    /**
-     * A label rules give an unnamed declaration, such as `closure@31`, `Closure@31`, `arrow@19` or `class@anonymous:40`.
-     * The line helps a reader find the declaration but moves on every edit above it, so identities drop it and rank by it instead.
-     */
-    private const POSITIONAL_LABEL_PATTERN = '/(?<![\w$\\\\])(Closure|closure|arrow|anonymous|trait|enum|unknown|class@anonymous)[@:]([0-9]+)/';
 
     /**
      * Checks whether the finding is eligible for baseline review.
@@ -117,7 +110,7 @@ final readonly class BaselineIdentity
             throw new BaselineException($findingLabel . ' without a declaration ordinal.');
         }
 
-        return self::linelessSymbol($symbol) . self::ORDINAL_SEPARATOR . $ordinal;
+        return $symbol . self::ORDINAL_SEPARATOR . $ordinal;
     }
 
     /**
@@ -153,8 +146,7 @@ final readonly class BaselineIdentity
 
     /**
      * Ranks each symbol-bearing finding's declaration among same-named symbols in its file.
-     * Named declarations use ordinal 1; variable symbols are ranked by finding lines and optional inventory positions.
-     * Positional labels are ranked by their line among the same rule's labels, so fixing another rule's finding renumbers none.
+     * Non-variable symbols use ordinal 1; variable symbols are ranked by finding lines and optional inventory positions.
      * Symbol-less findings receive 0.
      *
      * @param list<Finding>             $findings - One run's findings.
@@ -175,7 +167,7 @@ final readonly class BaselineIdentity
                 continue;
             }
 
-            $key      = self::ordinalGroup($finding);
+            $key      = $finding->filePath . "\0" . $symbol;
             $position = self::declarationPosition($finding);
 
             $positionByFinding[spl_object_id($finding)] = $position;
@@ -200,7 +192,7 @@ final readonly class BaselineIdentity
                 continue;
             }
 
-            $positions = array_keys($positionsBySymbol[self::ordinalGroup($finding)]);
+            $positions = array_keys($positionsBySymbol[$finding->filePath . "\0" . (string)$finding->symbol]);
             sort($positions);
             $rank = array_search($positionByFinding[$findingId], $positions, true);
 
@@ -212,53 +204,15 @@ final readonly class BaselineIdentity
 
     /**
      * Returns the position used to rank ordinals and detect collisions.
-     * Variable symbols use the finding line, positional labels the line they embed, and named declarations position 1.
+     * Non-variable symbols use position 1; variable symbols use the finding line.
      *
      * @param Finding $finding - Finding with a non-empty symbol.
      *
-     * @return int - Position used for ranking: the finding's or label's line, or 1 for a named declaration.
+     * @return int - Position used for ranking: 1 for a non-variable symbol, otherwise the finding's line.
      */
     public static function declarationPosition(Finding $finding): int
     {
-        $symbol = (string)$finding->symbol;
-
-        // A variable is located by its finding; the label's own line already records where an unnamed declaration starts.
-        if (self::isVariableSymbol($symbol)) {
-            return $finding->line ?? 1;
-        }
-
-        // Read the line out of a label such as `closure@31`; a named declaration has none and ranks at 1.
-        return preg_match(self::POSITIONAL_LABEL_PATTERN, $symbol, $label) === 1 ? (int)$label[2] : 1;
-    }
-
-    /**
-     * Names the group whose positions rank a finding's ordinal: its file and symbol, plus its rule for a positional label.
-     *
-     * @param Finding $finding - Finding with a non-empty symbol.
-     *
-     * @return string - NUL-joined ranking key; a positional label is keyed by its line-free form.
-     */
-    private static function ordinalGroup(Finding $finding): string
-    {
-        $symbol   = (string)$finding->symbol;
-        $lineless = self::linelessSymbol($symbol);
-
-        // Labels from different rules would otherwise share ranks, and fixing one rule's finding would renumber another's.
-        return $lineless === $symbol
-            ? $finding->filePath . "\0" . $symbol
-            : $finding->filePath . "\0" . $finding->ruleId . "\0" . $lineless;
-    }
-
-    /**
-     * Removes the line from each positional label, so a closure keeps one name when it moves; the ordinal keeps two closures apart.
-     *
-     * @param string $symbol - Symbol as the rule emitted it.
-     *
-     * @return string - The symbol without label lines; unchanged when it holds no positional label.
-     */
-    private static function linelessSymbol(string $symbol): string
-    {
-        return (string)preg_replace(self::POSITIONAL_LABEL_PATTERN, '$1', $symbol);
+        return self::isVariableSymbol((string)$finding->symbol) ? ($finding->line ?? 1) : 1;
     }
 
     /**

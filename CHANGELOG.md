@@ -2,7 +2,7 @@
 
 Notable user-facing changes to `gruff-php` are listed here.
 
-## 0.6.0 - 2026-11-27
+## 0.6.0 - 2026-11-29
 
 Upgrading from `0.5.x`: this release updates every machine-readable contract at once so all five gruff ports ship one shared shape. [`UPGRADING.md`](UPGRADING.md) walks through each migration command and the retreat path (pin `0.5.*` and keep your pre-upgrade config and baseline files, which `0.5` still reads).
 
