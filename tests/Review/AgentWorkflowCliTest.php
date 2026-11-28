@@ -9,8 +9,9 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers agent workflow CLI flows: list-rules metadata, display filters, SARIF output, branch-review introduced/removed/line-shifted findings,
- * changed-only scoping, and review-mode option validation.
+ * Covers rule metadata, display filters, SARIF output, and finding paths through the CLI.
+ * Exercises branch-review changes, including line shifts and added or deleted files.
+ * Checks changed-only discovery and the diagnostic returned outside a Git repository.
  */
 final class AgentWorkflowCliTest extends TestCase
 {
@@ -20,8 +21,8 @@ final class AgentWorkflowCliTest extends TestCase
     /**
      * Verify list rules JSON includes identifier quality metadata.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts rule presence, pillar, default severity, and a description value other than an empty string.
+     * @throws JsonException - If the command's stdout is invalid JSON.
      */
     public function testListRulesJsonIncludesIdentifierQualityMetadata(): void
     {
@@ -31,7 +32,7 @@ final class AgentWorkflowCliTest extends TestCase
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         $payload  = $this->decodeJson($process);
         $ruleRows = $this->listValue($payload, 'rules');
-        /** @var array<string, array<string, mixed>> $rules Rules indexed by ID for direct assertions. */
+        /** @var array<string, array<string, mixed>> $rules - Rules indexed by ID for direct assertions. */
         $rules = [];
 
         foreach ($ruleRows as $ruleRow) {
@@ -46,10 +47,10 @@ final class AgentWorkflowCliTest extends TestCase
     }
 
     /**
-     * Verify --include-rule narrows execution and scoring to the named rule while --min-severity stays a display-only filter in run metadata.
+     * Check hidden findings, filter metadata, and the composite grade for an include-rule run.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts hidden-count agreement, active filter metadata, no displayed findings, single scored pillar, and composite grade F.
+     * @throws JsonException - If the command's stdout is invalid JSON.
      */
     public function testIncludeRuleNarrowsExecutionWhileMinSeverityRemainsDisplayOnly(): void
     {
@@ -73,21 +74,27 @@ final class AgentWorkflowCliTest extends TestCase
         $findings    = $this->arrayValue($summary, 'findings');
         $runMetadata = $this->arrayValue($report, 'run');
         $filters     = $this->arrayValue($runMetadata, 'filters');
+        $display     = $this->arrayValue($report, 'displayFilter');
         $score       = $this->arrayValue($report, 'score');
         $composite   = $this->arrayValue($score, 'composite');
+        $total       = $this->intValue($findings, 'total');
 
-        self::assertSame(0, $this->intValue($findings, 'total'));
+        self::assertSame([], $this->listValue($report, 'findings'));
+        self::assertGreaterThan(0, $total);
+        self::assertSame($total, $this->intValue($display, 'hiddenFindings'));
         self::assertTrue($filters['active'] ?? null);
         self::assertSame('warning', $this->stringValue($filters, 'minSeverity'));
         self::assertSame(['naming.identifier-quality'], $this->listValue($filters, 'includeRules'));
-        self::assertSame('A', $this->stringValue($composite, 'grade'));
+        // Only the naming pillar had an enabled rule, so unexecuted pillars do not inflate the composite above F.
+        self::assertSame(['naming'], $this->listValue($score, 'scoredPillars'));
+        self::assertSame('F', $this->stringValue($composite, 'grade'));
     }
 
     /**
-     * Verify SARIF output is JSON and contains findings.
+     * Verify SARIF JSON declares version 2.1.0 and has nonempty results in its first run.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts successful CLI completion, the SARIF version, and nonempty first-run results.
+     * @throws JsonException - If the command's stdout is invalid JSON.
      */
     public function testSarifOutputIsJsonAndContainsFindings(): void
     {
@@ -114,10 +121,10 @@ final class AgentWorkflowCliTest extends TestCase
     }
 
     /**
-     * Verify paths relative to normalizes JSON finding files.
+     * Check that every returned finding path starts with the fixture-relative prefix.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts that no reported finding path lacks the tests/Fixtures/Naming/ prefix.
+     * @throws JsonException - If the command's stdout is invalid JSON.
      */
     public function testPathsRelativeToNormalizesJsonFindingFiles(): void
     {
@@ -138,7 +145,7 @@ final class AgentWorkflowCliTest extends TestCase
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         $report = $this->decodeJson($process);
 
-        $files           = array_map(
+        $files = array_map(
             fn(mixed $findingValue): string => $this->stringValue($this->stringKeyedArray($findingValue), 'file'),
             $this->listValue($report, 'findings'),
         );
@@ -153,8 +160,8 @@ final class AgentWorkflowCliTest extends TestCase
     /**
      * Verify branch review keeps line shifted finding unchanged and reports introduced.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts HEAD comparison counts, expected symbols, and the Markdown introduction summary.
+     * @throws JsonException - If a command's stdout is invalid JSON.
      */
     public function testBranchReviewKeepsLineShiftedFindingUnchangedAndReportsIntroduced(): void
     {
@@ -189,7 +196,7 @@ final class AgentWorkflowCliTest extends TestCase
 
             self::assertSame(0, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
             $report = $this->decodeJson($process);
-            $review = $this->arrayValue($report, 'review');
+            $review = $this->phpTopLevelExtension($report, 'review');
             $counts = $this->arrayValue($review, 'counts');
 
             self::assertSame('HEAD', $this->stringValue($review, 'base'));
@@ -229,8 +236,8 @@ final class AgentWorkflowCliTest extends TestCase
     /**
      * Verify a symbol-less finding that only shifted lines is neither introduced nor removed.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts zero introductions, zero removals, and one unchanged finding after a line insertion.
+     * @throws JsonException - If the command's stdout is invalid JSON.
      */
     public function testBranchReviewKeepsLineShiftedSymbolLessFindingUnchanged(): void
     {
@@ -250,7 +257,7 @@ final class AgentWorkflowCliTest extends TestCase
             $this->runGit($repo, 'add', 'src/Sink.php');
             $this->runGit($repo, 'commit', '-m', 'base');
 
-            // Insert one line above the finding so its line and fingerprint shift without any semantic change.
+            // Insert one line above the finding so its source line shifts without changing its durable identity.
             file_put_contents(
                 $repo . '/src/Sink.php',
                 "<?php\n\n// Unrelated line inserted above the finding.\nfunction runSink(string \$code): mixed\n{\n    return eval(\$code);\n}\n",
@@ -263,7 +270,8 @@ final class AgentWorkflowCliTest extends TestCase
                                        'src',
                                        '--format=json',
                                        '--fail-on=none',
-                                       '--no-config',
+                                       '--config',
+                                       self::PROJECT_ROOT . '/tests/Fixtures/Config/enable-default-off-rules.yaml',
                                        '--no-baseline',
                                        '--diff-vs=HEAD',
                                        '--include-rule=security.dangerous-function-call',
@@ -272,7 +280,7 @@ final class AgentWorkflowCliTest extends TestCase
 
             self::assertSame(0, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
             $report = $this->decodeJson($process);
-            $review = $this->arrayValue($report, 'review');
+            $review = $this->phpTopLevelExtension($report, 'review');
             $counts = $this->arrayValue($review, 'counts');
 
             self::assertSame(0, $this->intValue($counts, 'introduced'));
@@ -286,8 +294,8 @@ final class AgentWorkflowCliTest extends TestCase
     /**
      * Verify branch review reports removed findings.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts one removal, zero introductions, at least one unchanged finding, and the oldRisk removal.
+     * @throws JsonException - If the command's stdout is invalid JSON.
      */
     public function testBranchReviewReportsRemovedFindings(): void
     {
@@ -322,7 +330,7 @@ final class AgentWorkflowCliTest extends TestCase
 
             self::assertSame(0, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
             $report = $this->decodeJson($process);
-            $review = $this->arrayValue($report, 'review');
+            $review = $this->phpTopLevelExtension($report, 'review');
             $counts = $this->arrayValue($review, 'counts');
 
             self::assertSame(0, $this->intValue($counts, 'introduced'));
@@ -337,8 +345,8 @@ final class AgentWorkflowCliTest extends TestCase
     /**
      * Verify branch review added file does not fail base snapshot.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts successful analysis without diagnostics, at least one introduction, and no removals.
+     * @throws JsonException - If the command's stdout is invalid JSON.
      */
     public function testBranchReviewAddedFileDoesNotFailBaseSnapshot(): void
     {
@@ -376,7 +384,7 @@ final class AgentWorkflowCliTest extends TestCase
             $report = $this->decodeJson($process);
             self::assertSame([], $this->diagnosticTypes($report));
 
-            $review = $this->arrayValue($report, 'review');
+            $review = $this->phpTopLevelExtension($report, 'review');
             $counts = $this->arrayValue($review, 'counts');
 
             self::assertGreaterThanOrEqual(1, $this->intValue($counts, 'introduced'));
@@ -389,8 +397,8 @@ final class AgentWorkflowCliTest extends TestCase
     /**
      * Verify branch review changed only without paths scopes current scan to changed files.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts one discovered file, one newRisk introduction, no diagnostics, and a non-null score delta.
+     * @throws JsonException - If the command's stdout is invalid JSON.
      */
     public function testBranchReviewChangedOnlyWithoutPathsScopesCurrentScanToChangedFiles(): void
     {
@@ -428,15 +436,15 @@ final class AgentWorkflowCliTest extends TestCase
             self::assertSame([], $this->diagnosticTypes($report));
 
             $summary = $this->arrayValue($report, 'summary');
-            self::assertSame(1, $this->intValue($summary, 'filesDiscovered'));
+            self::assertSame(1, $this->intValue($summary, 'discoveredFiles'));
 
-            $review = $this->arrayValue($report, 'review');
+            $review = $this->phpTopLevelExtension($report, 'review');
             $counts = $this->arrayValue($review, 'counts');
 
             self::assertSame(1, $this->intValue($counts, 'introduced'));
             self::assertContains('Example::newRisk()', $this->symbolsFromFindings($review['introduced'] ?? null));
 
-            // Discovery found a file, so this review keeps a real score to price the change against.
+            // A nonempty scan supplies source evidence for a score delta.
             self::assertNotNull($review['deltaScore'] ?? null);
         } finally {
             $this->removeDir($repo);
@@ -446,8 +454,8 @@ final class AgentWorkflowCliTest extends TestCase
     /**
      * Verify branch review deleted file reports removed findings without a score delta.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts removals survive an empty scan, both JSON deltas are null, and text omits the score delta.
+     * @throws JsonException - If a command's stdout is invalid JSON.
      */
     public function testBranchReviewDeletedFileReportsRemovedFindings(): void
     {
@@ -484,13 +492,13 @@ final class AgentWorkflowCliTest extends TestCase
             $report = $this->decodeJson($process);
             self::assertSame(['empty-analysis'], $this->diagnosticTypes($report));
 
-            $review = $this->arrayValue($report, 'review');
+            $review = $this->phpTopLevelExtension($report, 'review');
             $counts = $this->arrayValue($review, 'counts');
 
             self::assertGreaterThanOrEqual(1, $this->intValue($counts, 'removed'));
             self::assertContains('Example::oldRisk()', $this->symbolsFromFindings($review['removed'] ?? null));
 
-            // An empty current side scores a synthetic 100 the report withholds, so the delta drawn from it must stay null.
+            // An empty current side has no source evidence to score, so its comparison delta must stay null.
             self::assertArrayHasKey('deltaScore', $review);
             self::assertNull($review['deltaScore']);
 
@@ -513,7 +521,7 @@ final class AgentWorkflowCliTest extends TestCase
             $explicitPathReport = $this->decodeJson($explicitPathProcess);
             self::assertSame(['empty-analysis'], $this->diagnosticTypes($explicitPathReport));
 
-            $explicitPathReview = $this->arrayValue($explicitPathReport, 'review');
+            $explicitPathReview = $this->phpTopLevelExtension($explicitPathReport, 'review');
             $explicitPathCounts = $this->arrayValue($explicitPathReview, 'counts');
 
             self::assertGreaterThanOrEqual(1, $this->intValue($explicitPathCounts, 'removed'));
@@ -538,7 +546,7 @@ final class AgentWorkflowCliTest extends TestCase
             self::assertSame(0, $textProcess->getExitCode(), $textProcess->getOutput() . $textProcess->getErrorOutput());
             $textReport = $textProcess->getOutput();
 
-            // The TEXT report must not price an unscored run: the removals are reported, the score movement is not.
+            // The text report keeps removals but omits score movement when the current scan cannot be scored.
             self::assertStringContainsString('the score is not applicable', $textReport);
             self::assertMatchesRegularExpression('/Findings: 0 introduced, [1-9]\d* removed/', $textReport);
             self::assertStringNotContainsString('Score delta', $textReport);
@@ -548,10 +556,10 @@ final class AgentWorkflowCliTest extends TestCase
     }
 
     /**
-     * Verify review mode reports non Git diagnostic.
+     * Verify review mode fails with a changed-region diagnostic outside a Git repository.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts exit code 2 and inclusion of the changed-region diagnostic type.
+     * @throws JsonException - If the command's stdout is invalid JSON.
      */
     public function testReviewModeReportsNonGitDiagnostic(): void
     {
@@ -577,20 +585,20 @@ final class AgentWorkflowCliTest extends TestCase
             self::assertSame(2, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
             $report = $this->decodeJson($process);
 
-            self::assertContains('diff-mode-error', $this->diagnosticTypes($report));
+            // A changed-region diagnostic tells callers that the requested review scope could not be read.
+            self::assertContains('changed-region', $this->diagnosticTypes($report));
         } finally {
             $this->removeDir($repo);
         }
     }
 
     /**
-     * Decode a finished CLI process's stdout into a string-keyed payload.
+     * Decode a finished CLI process's stdout and assert string keys on its top-level array.
      *
      * @param Process $process - finished CLI process whose stdout holds the report JSON; caller must run it first.
      *
-     * @return array<string, mixed> - decoded top-level JSON object keyed by report field; non-object
-     *   payloads fail the test
-     * @throws JsonException
+     * @return array<string, mixed> - Decoded array with string keys, possibly empty; scalars and numeric keys fail assertions.
+     * @throws JsonException - If the process stdout is invalid JSON.
      */
     private function decodeJson(Process $process): array
     {
@@ -603,9 +611,9 @@ final class AgentWorkflowCliTest extends TestCase
      * Read an associative array from decoded JSON output.
      *
      * @param array<string, mixed> $payload - Decoded JSON object containing the nested key under test.
-     * @param string               $key - key whose value must itself be a string-keyed array; missing key asserts.
+     * @param string               $key     - key whose value must itself be a string-keyed array; missing key asserts.
      *
-     * @return array<string, mixed> - the nested JSON object at that key, ready for further key reads
+     * @return array<string, mixed> - Nested string-keyed array; empty arrays pass, while missing or invalid values fail assertions.
      */
     private function arrayValue(array $payload, string $key): array
     {
@@ -613,8 +621,27 @@ final class AgentWorkflowCliTest extends TestCase
     }
 
     /**
+     * Read a PHP-owned v3 top-level extension from decoded analysis output.
+     *
+     * @param array<string, mixed> $payload - Decoded v3 analysis document.
+     * @param string               $key     - PHP extension key to read.
+     *
+     * @return array<string, mixed> - The selected extension's string-keyed array; empty arrays are accepted.
+     */
+    private function phpTopLevelExtension(array $payload, string $key): array
+    {
+        $extensions    = $this->arrayValue($payload, 'extensions');
+        $phpExtensions = $this->arrayValue($extensions, 'php');
+        $topLevel      = $this->arrayValue($phpExtensions, 'topLevel');
+
+        return $this->arrayValue($topLevel, $key);
+    }
+
+    /**
+     * Read an integer field from decoded JSON, failing the test for missing or non-integer values.
+     *
      * @param array<string, mixed> $payload - Decoded JSON object containing the integer key under test.
-     * @param string               $key - key whose value must be an int; a non-int (or missing) value fails the test.
+     * @param string               $key     - key whose value must be an int; a non-int (or missing) value fails the test.
      *
      * @return int - the value at that key, asserted to be an int so callers can use it without re-checking
      */
@@ -627,12 +654,12 @@ final class AgentWorkflowCliTest extends TestCase
     }
 
     /**
-     * Read a list from decoded JSON output.
+     * Read an array field from decoded JSON and reindex its values as a list.
      *
-     * @param array<string, mixed> $payload - Decoded JSON object containing the list key under test.
-     * @param string               $key - key whose value must be a list; missing key resolves to null and asserts.
+     * @param array<string, mixed> $payload - Decoded JSON payload containing the array field under test.
+     * @param string               $key     - Key whose value must be an array; missing or null values fail assertions.
      *
-     * @return list<mixed> - the JSON array at that key, reindexed to 0-based order
+     * @return list<mixed> - Array values in iteration order with zero-based keys; associative keys are discarded.
      */
     private function listValue(array $payload, string $key): array
     {
@@ -640,8 +667,10 @@ final class AgentWorkflowCliTest extends TestCase
     }
 
     /**
+     * Read a string field from decoded JSON, failing the test for missing or non-string values.
+     *
      * @param array<string, mixed> $payload - Decoded JSON object containing the string key under test.
-     * @param string               $key - key whose value must be a string; a non-string (or missing) value fails.
+     * @param string               $key     - key whose value must be a string; a non-string (or missing) value fails.
      *
      * @return string - the value at that key, asserted to be a string so callers can use it without re-checking
      */
@@ -673,11 +702,11 @@ final class AgentWorkflowCliTest extends TestCase
     }
 
     /**
-     * Build symbols from findings for the branch-review workflow.
+     * Collect the symbol field from each branch-review finding without validating its type.
      *
-     * @param mixed $findings - decoded `findings` value expected to be a list of finding objects; non-list fails the test.
+     * @param mixed $findings - Array of finding records; non-array values fail the test.
      *
-     * @return list<mixed> - one symbol string per finding, in finding order, with null where a finding has no symbol
+     * @return list<mixed> - Symbol values in finding order; absent or null symbols produce null, and other values pass through.
      */
     private function symbolsFromFindings(mixed $findings): array
     {
@@ -692,7 +721,7 @@ final class AgentWorkflowCliTest extends TestCase
     }
 
     /**
-     * Validate that a decoded JSON value is a list.
+     * Assert that a decoded value is an array and return its values as a list.
      *
      * @param mixed $payload - decoded JSON value expected to be an array; a scalar or null fails the assertion.
      *
@@ -706,9 +735,9 @@ final class AgentWorkflowCliTest extends TestCase
     }
 
     /**
-     * Validate that a decoded JSON value is an associative array.
+     * Assert that a decoded value is an array containing only string keys.
      *
-     * @param mixed $payload - decoded JSON value expected to be a JSON object; arrays and scalars fail the assertion.
+     * @param mixed $payload - Decoded JSON value; non-arrays and numeric keys fail assertions, while an empty array passes.
      *
      * @return array<string, mixed> - only the confirmed string-keyed entries, narrowed for type-safe callers
      */
@@ -728,7 +757,7 @@ final class AgentWorkflowCliTest extends TestCase
     /**
      * Skip the current test when Git is unavailable.
      *
-     * @return void
+     * @return void - Marks the test skipped when Git fails; otherwise allows execution to continue.
      */
     private function skipWhenGitIsUnavailable(): void
     {
@@ -743,10 +772,10 @@ final class AgentWorkflowCliTest extends TestCase
     /**
      * Run a Git command in a fixture repository.
      *
-     * @param string $cwd - Working directory.
-     * @param string $args - Command arguments.
+     * @param string $cwd  - Fixture repository where the Git command runs.
+     * @param string $args - Git subcommand and arguments, passed in order.
      *
-     * @return void
+     * @return void - Asserts that the Git process exits with code 0.
      */
     private function runGit(string $cwd, string ...$args): void
     {
@@ -773,14 +802,14 @@ final class AgentWorkflowCliTest extends TestCase
     /**
      * Remove a temporary directory tree.
      *
-     * @param string $path - Filesystem path.
+     * @param string $path - Temporary fixture directory to clean; non-directory paths are ignored.
      *
-     * @return void
+     * @return void - Attempts recursive cleanup without following child directory symlinks; ignores non-directory paths.
      */
     private function removeDir(string $path): void
     {
         if (!is_dir($path)) {
-            // Nothing to clean up when the fixture directory was never created (e.g. an early test failure).
+
             return;
         }
 

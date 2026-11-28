@@ -296,4 +296,40 @@ class CognitiveFixture
             default => 'small',
         };
     }
+
+    // Cognitive = 6: foreach +1; the if at nesting 1 does work before its inner if, so it is no guard: +2; the inner if
+    // decrements before returning, so it is no guard either and pays nesting 2: +3.
+    public function nonGuardStillNests(array $items): int
+    {
+        foreach ($items as $item) {
+            if ($item > 0) {
+                $item++;
+                if ($item > 5) {
+                    $item--;
+                    return $item;
+                }
+            }
+        }
+
+        return 0;
+    }
+
+    // Cognitive = 5: foreach +1; an if with an else is no guard, so at nesting 1: +2; its else +1; the lone continue
+    // guard at nesting 1 pays no penalty: +1.
+    public function guardNeedsNoElse(array $items): int
+    {
+        foreach ($items as $item) {
+            if ($item > 0) {
+                return 1;
+            } else {
+                $item--;
+            }
+
+            if ($item === 0) {
+                continue;
+            }
+        }
+
+        return 0;
+    }
 }

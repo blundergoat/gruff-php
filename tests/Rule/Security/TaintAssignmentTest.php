@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\Security;
 
-use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Config\ConfigLoader;
 use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Engine\Parser\PhpFileParser;
 use GruffPhp\Engine\Source\SourceFile;
@@ -16,7 +16,6 @@ use GruffPhp\Rules\Security\ProcessCommandConstructionRule;
 use GruffPhp\Rules\Security\UnsafeArchiveExtractionRule;
 use GruffPhp\Rules\Security\ReflectedXssRule;
 use GruffPhp\Rules\Security\RequestControlledUrlRule;
-use GruffPhp\Rules\Security\VariableIncludeRule;
 use PhpParser\Error;
 use PhpParser\Node\Stmt;
 use PhpParser\NodeTraverser;
@@ -25,15 +24,16 @@ use PhpParser\ParserFactory;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers which assignment shapes carry request taint to security sinks: concat propagates,
- * references are deliberately untracked.
+ * Covers request-taint propagation through compound concatenation and archive receivers.
+ * Archive cases distinguish tainted destinations, entries and sources from clean receiver resets.
+ * Reference-alias cases expect no header findings for either a cleaned or a tainted partner.
  */
 final class TaintAssignmentTest extends TestCase
 {
     /**
      * Verify compound concat assignments propagate request taint into shared-helper sinks.
      *
-     * @return void
+     * @return void - Asserts one finding for each of the four selected security rules.
      */
     public function testCompoundAssignmentTaintReachesSharedHelperSinks(): void
     {
@@ -42,7 +42,6 @@ final class TaintAssignmentTest extends TestCase
         // One finding per tainted sink; the clean-overwrite and clean-concat functions must add none.
         self::assertRuleCount(HeaderInjectionRule::ID, 1, $findings);
         self::assertRuleCount(ReflectedXssRule::ID, 1, $findings);
-        self::assertRuleCount(VariableIncludeRule::ID, 1, $findings);
         self::assertRuleCount(ProcessCommandConstructionRule::ID, 1, $findings);
         self::assertRuleCount(RequestControlledUrlRule::ID, 1, $findings);
     }
@@ -50,7 +49,7 @@ final class TaintAssignmentTest extends TestCase
     /**
      * Verify request-controlled archive sources flag extraction while cleaned receivers stay silent.
      *
-     * @return void
+     * @return void - Asserts exact finding lines, selected messages and archive-source metadata.
      */
     public function testArchiveSourceTaintFlagsUploadedArchivesButNotCleanedReceivers(): void
     {
@@ -59,10 +58,10 @@ final class TaintAssignmentTest extends TestCase
                                      static fn(Finding $finding): bool => $finding->ruleId === UnsafeArchiveExtractionRule::ID,
                                  ));
 
-        // 18/25 are the destination/entries shapes; 32/54 the direct tainted-source shapes; 66/89/100
-        // the conditional shapes (a skippable clean re-open cannot clear taint, including sibling
-        // branches, and a skippable tainted open still flags). Clean open, unskippable re-open/reassignment,
-        // and the clean re-open on the sink's own path must all stay silent.
+        // A skippable clean reopen must not silence an extraction reached with the tainted source.
+
+
+
         self::assertSame(
             [18, 25, 32, 54, 66, 89, 100],
             array_map(static fn(Finding $finding): ?int => $finding->line, $findings),
@@ -77,9 +76,9 @@ final class TaintAssignmentTest extends TestCase
     }
 
     /**
-     * Verify reference assignments stay untracked so aliasing can never manufacture a false positive.
+     * Verify the two reference-alias examples produce no header-injection findings.
      *
-     * @return void
+     * @return void - Asserts no header findings for aliases cleaned or tainted through their partner.
      */
     public function testReferenceAssignmentsAreDeliberatelyUntracked(): void
     {
@@ -111,7 +110,8 @@ PHP,
         );
 
         $registry = RuleRegistry::defaults();
-        $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', AnalysisConfig::fromRegistry($registry)));
+        // header-injection is opt-in, so the test config turns it on; with it off this zero would prove nothing.
+        $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', (new ConfigLoader(__DIR__ . '/../../..'))->load('tests/Fixtures/Config/enable-default-off-rules.yaml', $registry)));
 
         self::assertRuleCount(HeaderInjectionRule::ID, 0, $findings);
     }
@@ -123,7 +123,7 @@ PHP,
      * @param int           $expectedCount - Expected number of findings for that rule.
      * @param list<Finding> $findings - Full-run findings to filter.
      *
-     * @return void
+     * @return void - Asserts that the selected rule has exactly the expected number of findings.
      */
     private static function assertRuleCount(string $ruleId, int $expectedCount, array $findings): void
     {
@@ -135,11 +135,11 @@ PHP,
     }
 
     /**
-     * Run the full default registry over one security fixture file.
+     * Run the full registry over one security fixture file, with the opt-in security rules turned on.
      *
      * @param string $fixture - Fixture filename under tests/Fixtures/Security.
      *
-     * @return list<Finding> - every finding the default rule set produced for the fixture
+     * @return list<Finding> - every finding the default and opt-in rules produced for the fixture
      */
     private function analyse(string $fixture): array
     {
@@ -149,7 +149,7 @@ PHP,
                                                      'tests/Fixtures/Security/' . $fixture,
                                                  ));
 
-        return $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', AnalysisConfig::fromRegistry($registry)));
+        return $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', (new ConfigLoader(__DIR__ . '/../../..'))->load('tests/Fixtures/Config/enable-default-off-rules.yaml', $registry)));
     }
 
     /**
@@ -172,7 +172,7 @@ PHP,
 
         $nodeTraverser = new NodeTraverser();
         $nodeTraverser->addVisitor(new ParentConnectingVisitor());
-        /** @var list<Stmt> $traversed Statements connected to parent attributes for rule traversal. */
+        /** @var list<Stmt> $traversed - Statements connected to parent attributes for rule traversal. */
         $traversed = $nodeTraverser->traverse($statements);
 
         return new AnalysisUnit(

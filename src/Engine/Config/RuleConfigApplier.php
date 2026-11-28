@@ -34,27 +34,27 @@ final readonly class RuleConfigApplier
     }
 
     /**
-     * Folds every `rules.<id>` override block into the config, skipping unknown rule ids - the entry point that turns config into rule behaviour.
+     * Returns a config with known `rules.<id>` overrides applied, warning about unknown rule ids.
      *
-     * @param AnalysisConfig $config - Config to update.
+     * @param AnalysisConfig $config - Existing config used as the base for returned overrides.
      * @param RuleRegistry   $registry - Rule registry used to validate rule ids.
      * @param ConfigObject   $rootConfig - Parsed root config object.
      *
-     * @return AnalysisConfig - the input config with every known rule's overrides folded in; unknown rule ids are warned about and skipped.
-     * @throws ConfigException When rule config carries invalid keys or values.
+     * @return AnalysisConfig - Config with overrides applied; the same instance when rules is absent, null, or empty.
+     * @throws ConfigException - When rule config carries invalid keys or values.
      */
     public function apply(AnalysisConfig $config, RuleRegistry $registry, array $rootConfig): AnalysisConfig
     {
-        // No `rules:` section means there is nothing to override, so the config passes through unchanged.
+        // An absent or null `rules` section leaves the supplied config unchanged.
         if (!isset($rootConfig['rules'])) {
             return $config;
         }
 
         $rulesConfig = $this->requireObject($rootConfig['rules'], 'Config key "rules" must be an object.');
 
-        // Apply each rule's override block in turn.
+
         foreach ($rulesConfig as $ruleId => $ruleConfigValue) {
-            // An id the registry does not recognise is warned about and skipped rather than treated as fatal.
+
             if (!$registry->has($ruleId)) {
                 // Warn-and-ignore keeps configs that still carry blocks for retired rules working after an upgrade.
                 $this->warnUnknownRuleId($ruleId);
@@ -73,16 +73,12 @@ final readonly class RuleConfigApplier
     }
 
     /**
-     * Emits a one-line warning that a config block names an unrecognised rule id, so the user can spot a typo or a retired rule.
-     *
-     * Unknown ids under `rules:` are skipped rather than rejected so configs
-     * that still name retired rules (for example older init-generated files)
-     * keep working; `selection:` entries stay strict because they change which
-     * rules run.
+     * Warns that an unknown rule override is ignored so a typo or retired id can be corrected.
+     * Skipping unknown overrides lets configurations containing retired rules remain usable after an upgrade.
      *
      * @param string $ruleId - Unknown rule id named by the config block.
      *
-     * @return void
+     * @return void - Sends one warning to the configured sink or writes a newline-terminated warning to STDERR.
      */
     private function warnUnknownRuleId(string $ruleId): void
     {
@@ -92,7 +88,7 @@ final readonly class RuleConfigApplier
             $ruleId,
         );
 
-        // A custom sink takes the warning when one was wired up; otherwise it goes to STDERR.
+
         if ($this->warningSink !== null) {
             ($this->warningSink)($line);
 
@@ -120,15 +116,16 @@ final readonly class RuleConfigApplier
     ): AnalysisConfig {
         $this->assertKnownRuleKeys($ruleId, $ruleConfig);
 
-        // A `severity` with no `threshold` to attach it to is meaningless, so reject it up front.
+
         if (array_key_exists('severity', $ruleConfig) && !array_key_exists('threshold', $ruleConfig)) {
             throw new ConfigException(sprintf('Config key "rules.%s.severity" requires "threshold".', $ruleId));
         }
 
-        $settings         = $config->ruleSettings($ruleId);
+        // A config block keyed by a supported legacy id configures the rule that replaced it; errors retain the supplied key.
+        $settings         = $config->ruleSettings(RuleRegistry::canonicalRuleId($ruleId));
         $definitionSingle = $registry->get($ruleId)->definition()->severityThreshold;
 
-        // A single-threshold rule cannot take a tiered `thresholds` map, so reject that combination.
+
         if ($definitionSingle instanceof SeverityThreshold && array_key_exists('thresholds', $ruleConfig)) {
             throw new ConfigException(sprintf(
                                           'Config key "rules.%s.thresholds" is not supported; this rule uses a single threshold and severity.',
@@ -140,7 +137,7 @@ final readonly class RuleConfigApplier
         $severityThreshold = $this->severityThreshold($ruleId, $ruleConfig, $registry)
                              ?? $settings->severityThreshold;
 
-        return $config->withRuleSettings($ruleId, new RuleSettings(
+        return $config->withRuleSettings(RuleRegistry::canonicalRuleId($ruleId), new RuleSettings(
             enabled:           $this->isEnabled($ruleId, $ruleConfig, $settings->enabled),
             thresholds:        $severityThreshold instanceof SeverityThreshold
                                    ? $settings->thresholds
@@ -157,13 +154,13 @@ final readonly class RuleConfigApplier
      * @param string       $ruleId - Rule id named in the thrown error so the user can locate the bad key.
      * @param ConfigObject $ruleConfig - One rule's override block; only its top-level keys are checked here.
      *
-     * @return void
+     * @return void - Completes when every top-level key is supported; throws ConfigException for an unknown key.
      */
     private function assertKnownRuleKeys(string $ruleId, array $ruleConfig): void
     {
-        // Check every key the user set in this block.
+
         foreach (array_keys($ruleConfig) as $key) {
-            // A key outside the supported set is a config error worth naming.
+
             if (!in_array($key, ['enabled', 'threshold', 'severity', 'thresholds', 'options', 'excludeFromScore'], true)) {
                 throw new ConfigException(sprintf('Unknown config key "rules.%s.%s".', $ruleId, $key));
             }
@@ -181,12 +178,12 @@ final readonly class RuleConfigApplier
      */
     private function excludeFromScore(string $ruleId, array $ruleConfig, bool $isExcludedByDefault): bool
     {
-        // With no override, the rule keeps its current score-exclusion flag.
+
         if (!array_key_exists('excludeFromScore', $ruleConfig)) {
             return $isExcludedByDefault;
         }
 
-        // `excludeFromScore` is a yes/no switch, so a non-boolean is rejected.
+
         if (!is_bool($ruleConfig['excludeFromScore'])) {
             throw new ConfigException(sprintf('Config key "rules.%s.excludeFromScore" must be boolean.', $ruleId));
         }
@@ -205,12 +202,12 @@ final readonly class RuleConfigApplier
      */
     private function isEnabled(string $ruleId, array $ruleConfig, bool $isEnabledByDefault): bool
     {
-        // With no override, the rule keeps whatever enabled state it already had.
+
         if (!array_key_exists('enabled', $ruleConfig)) {
             return $isEnabledByDefault;
         }
 
-        // `enabled` is a yes/no switch, so a non-boolean is rejected.
+
         if (!is_bool($ruleConfig['enabled'])) {
             throw new ConfigException(sprintf('Config key "rules.%s.enabled" must be boolean.', $ruleId));
         }
@@ -219,14 +216,14 @@ final readonly class RuleConfigApplier
     }
 
     /**
-     * Overlays a rule's configured `thresholds` map onto its built-in defaults, for rules that score against several named thresholds.
+     * Overlays named threshold overrides onto the rule's current settings, validating names against its definition.
      *
      * @param string                   $ruleId - Rule id used in error messages and to look up its allowed thresholds.
      * @param ConfigObject             $ruleConfig - One rule's override block; read for an optional thresholds map.
      * @param RuleRegistry             $registry - Registry queried for the rule's set of valid threshold names.
-     * @param array<string, int|float> $defaultThresholds - Rule's built-in thresholds, used as the base each override merges onto.
+     * @param array<string, int|float> $defaultThresholds - Current thresholds retained for names without overrides.
      *
-     * @return array<string, int|float> - effective thresholds keyed by name: defaults with any configured overrides overlaid.
+     * @return array<string, int|float> - Effective named thresholds, preserving current values for keys not overridden.
      */
     private function thresholds(
         string       $ruleId,
@@ -234,12 +231,12 @@ final readonly class RuleConfigApplier
         RuleRegistry $registry,
         array        $defaultThresholds,
     ): array {
-        // A `severity` here belongs with the single-threshold form, not the tiered map, so reject it.
+
         if (array_key_exists('severity', $ruleConfig)) {
             throw new ConfigException(sprintf('Config key "rules.%s.severity" requires "threshold".', $ruleId));
         }
 
-        // With no `thresholds` map in the block, the rule's built-in thresholds stand.
+
         if (!array_key_exists('thresholds', $ruleConfig)) {
             return $defaultThresholds;
         }
@@ -251,7 +248,7 @@ final readonly class RuleConfigApplier
         );
         $allowedThresholds = $registry->get($ruleId)->definition()->defaultThresholds;
 
-        // Overlay each configured threshold onto the defaults.
+
         foreach ($thresholdConfig as $thresholdName => $thresholdValue) {
             $thresholds[$thresholdName] = $this->thresholdValue(
                 $ruleId,
@@ -271,26 +268,25 @@ final readonly class RuleConfigApplier
      * @param ConfigObject $ruleConfig - One rule's override block; read for the single-value threshold/severity pair.
      * @param RuleRegistry $registry - Registry queried for the rule's definition to validate the single-threshold form.
      *
-     * @return SeverityThreshold|null - the validated threshold/severity pair, or null when the block sets no "threshold" so the caller keeps the
-     *                                rule's current one.
+     * @return SeverityThreshold|null - Validated threshold/severity pair, or null when `threshold` is absent.
      */
     private function severityThreshold(
         string       $ruleId,
         array        $ruleConfig,
         RuleRegistry $registry,
     ): ?SeverityThreshold {
-        // No `threshold` key means there is no single-threshold override to build.
+
         if (!array_key_exists('threshold', $ruleConfig)) {
             return null;
         }
 
-        // Setting both `threshold` and `thresholds` is contradictory, so reject the pair.
+
         if (array_key_exists('thresholds', $ruleConfig)) {
             throw new ConfigException(sprintf('Config key "rules.%s" cannot combine "threshold" and "thresholds".', $ruleId));
         }
 
         $thresholdValue    = $ruleConfig['threshold'];
-        // Read the paired severity too; a missing one is caught by the validation below.
+
         $severityValue     = $ruleConfig['severity'] ?? null;
         $definition        = $registry->get($ruleId)->definition();
         $defaultThresholds = $definition->defaultThresholds;
@@ -299,17 +295,17 @@ final readonly class RuleConfigApplier
                              && array_key_exists('error', $defaultThresholds)
                              && count($defaultThresholds) === 2;
 
-        // Only a rule with a threshold/severity rubric accepts this key at all.
+
         if (!$hasSingleDefault && !$hasTieredDefault) {
             throw new ConfigException(sprintf('Config key "rules.%s.threshold" is only supported for rules with a threshold/severity rubric.', $ruleId));
         }
 
-        // The threshold is a number the rule compares findings against, so reject non-numeric input.
+
         if (!is_int($thresholdValue) && !is_float($thresholdValue)) {
             throw new ConfigException(sprintf('Config key "rules.%s.threshold" must be numeric.', $ruleId));
         }
 
-        // The paired severity must be one of the three levels the user can pick.
+
         if (!is_string($severityValue) || !in_array($severityValue, [Severity::Advisory->value, Severity::Warning->value, Severity::Error->value], true)) {
             throw new ConfigException(sprintf('Config key "rules.%s.severity" must be "advisory", "warning", or "error".', $ruleId));
         }
@@ -333,12 +329,12 @@ final readonly class RuleConfigApplier
         mixed  $thresholdValue,
         array  $allowedThresholds,
     ): int|float {
-        // A threshold name the rule never declared is a config error.
+
         if (!array_key_exists($thresholdName, $allowedThresholds)) {
             throw new ConfigException(sprintf('Unknown threshold "rules.%s.thresholds.%s".', $ruleId, $thresholdName));
         }
 
-        // Thresholds are numeric cutoffs, so reject anything non-numeric.
+
         if (!is_int($thresholdValue) && !is_float($thresholdValue)) {
             throw new ConfigException(sprintf('Threshold "rules.%s.thresholds.%s" must be numeric.', $ruleId, $thresholdName));
         }
@@ -347,14 +343,14 @@ final readonly class RuleConfigApplier
     }
 
     /**
-     * Overlays a rule's configured `options` onto its built-in defaults, validating each name and value against the default's type.
+     * Overlays configured options onto the rule's current values, selecting validators by the types of definition defaults.
      *
      * @param string                         $ruleId - Rule id used in error messages and to look up its allowed options.
      * @param ConfigObject                   $ruleConfig - One rule's override block; read for an optional options map.
-     * @param RuleRegistry                   $registry - Registry queried for the rule's allowed option names and default types.
-     * @param array<string, RuleOptionValue> $defaultOptions - Rule's built-in options, used as the base each override merges onto.
+     * @param RuleRegistry                   $registry - Registry supplying allowed option names and default values.
+     * @param array<string, RuleOptionValue> $defaultOptions - Current option values used as the base for configured overrides.
      *
-     * @return array<string, RuleOptionValue> - effective options keyed by name: defaults with any validated overrides overlaid.
+     * @return array<string, RuleOptionValue> - Current options with accepted overrides replacing the corresponding values.
      */
     private function options(
         string       $ruleId,
@@ -362,7 +358,7 @@ final readonly class RuleConfigApplier
         RuleRegistry $registry,
         array        $defaultOptions,
     ): array {
-        // With no `options` block, the rule's default options stand.
+
         if (!array_key_exists('options', $ruleConfig)) {
             return $defaultOptions;
         }
@@ -374,9 +370,9 @@ final readonly class RuleConfigApplier
         );
         $allowedOptions = $registry->get($ruleId)->definition()->defaultOptions;
 
-        // Validate and overlay each configured option in turn.
+
         foreach ($optionsConfig as $optionName => $optionValue) {
-            // An option the rule never declared is a config error.
+
             if (!array_key_exists($optionName, $allowedOptions)) {
                 throw new ConfigException(sprintf('Unknown option "rules.%s.options.%s".', $ruleId, $optionName));
             }
@@ -396,24 +392,24 @@ final readonly class RuleConfigApplier
      * @param mixed           $optionValue - Raw configured value, validated against the default's shape.
      * @param RuleOptionValue $defaultValue - Default option value used as the type contract.
      *
-     * @return RuleOptionValue - the configured value validated against the default's runtime type and returned in that shape.
+     * @return RuleOptionValue - the configured value after validation for the default's type; a float default may return an int unchanged.
      */
     private function optionValue(string $ruleId, string $optionName, mixed $optionValue, mixed $defaultValue): int|float|bool|string|array
     {
-        // The default's runtime type is the contract: each branch picks the validator whose accepted type
-        // matches it, so an override can only widen/narrow within that one default-declared shape.
+        // The default's runtime type selects the validator, so an override keeps the shape the rule declared;
+        // only a float default also accepts an int.
         if (is_int($defaultValue)) {
             // An int default forbids the float-tolerant numeric path; an override of 1.0 is a config error.
             return $this->integerOptionValue($ruleId, $optionName, $optionValue);
         }
 
         if (is_float($defaultValue)) {
-            // A float default tolerates an int override (3 for 3.0); both coerce to the same option type.
+            // Float defaults accept either numeric type without coercing the configured value.
             return $this->numericOptionValue($ruleId, $optionName, $optionValue);
         }
 
         if (is_bool($defaultValue)) {
-            // Bool is checked before the array branches so true/false never reach list/map shape validation.
+
             return $this->isBooleanOptionValue($ruleId, $optionName, $optionValue);
         }
 
@@ -443,7 +439,7 @@ final readonly class RuleConfigApplier
      */
     private function integerOptionValue(string $ruleId, string $optionName, mixed $optionValue): int
     {
-        // An int option rejects anything that is not already an integer.
+
         if (!is_int($optionValue)) {
             throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be an integer.', $ruleId, $optionName));
         }
@@ -462,7 +458,7 @@ final readonly class RuleConfigApplier
      */
     private function numericOptionValue(string $ruleId, string $optionName, mixed $optionValue): int|float
     {
-        // A numeric option accepts an int or a float, but nothing else.
+
         if (!is_int($optionValue) && !is_float($optionValue)) {
             throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be numeric.', $ruleId, $optionName));
         }
@@ -481,7 +477,7 @@ final readonly class RuleConfigApplier
      */
     private function isBooleanOptionValue(string $ruleId, string $optionName, mixed $optionValue): bool
     {
-        // A boolean option rejects anything that is not literally true or false.
+
         if (!is_bool($optionValue)) {
             throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be boolean.', $ruleId, $optionName));
         }
@@ -500,7 +496,7 @@ final readonly class RuleConfigApplier
      */
     private function stringOptionValue(string $ruleId, string $optionName, mixed $optionValue): string
     {
-        // A string option rejects any non-string value.
+
         if (!is_string($optionValue)) {
             throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be a string.', $ruleId, $optionName));
         }
@@ -641,9 +637,9 @@ final readonly class RuleConfigApplier
      * @param string $optionName - Option key used to build the error path when an item's type is wrong.
      * @param string $key - Configured map key, surfaced in the error path to point at the bad entry.
      * @param mixed  $optionItem - Configured map value being type-checked.
-     * @param mixed  $sample - A default-map value; its type fixes what every configured value must match.
+     * @param mixed  $sample - Default-map sample; float samples allow either numeric type.
      *
-     * @return void
+     * @return void - Completes if the item meets the sample's scalar constraint; throws ConfigException on a mismatch.
      */
     private function assertMapItemType(
         string $ruleId,
@@ -652,47 +648,47 @@ final readonly class RuleConfigApplier
         mixed  $optionItem,
         mixed  $sample,
     ): void {
-        // A string sample means every value must be a string.
+
         if (is_string($sample) && !is_string($optionItem)) {
             throw new ConfigException(sprintf('Option "rules.%s.options.%s.%s" must be a string.', $ruleId, $optionName, $key));
         }
 
-        // An int sample means every value must be an integer.
+
         if (is_int($sample) && !is_int($optionItem)) {
             throw new ConfigException(sprintf('Option "rules.%s.options.%s.%s" must be an integer.', $ruleId, $optionName, $key));
         }
 
-        // A float sample means every value must be numeric.
+
         if (is_float($sample) && !is_int($optionItem) && !is_float($optionItem)) {
             throw new ConfigException(sprintf('Option "rules.%s.options.%s.%s" must be numeric.', $ruleId, $optionName, $key));
         }
 
-        // A bool sample means every value must be boolean.
+
         if (is_bool($sample) && !is_bool($optionItem)) {
             throw new ConfigException(sprintf('Option "rules.%s.options.%s.%s" must be boolean.', $ruleId, $optionName, $key));
         }
     }
 
     /**
-     * Confirms a decoded config value is an object (a string-keyed map), normalising its entries or throwing the caller's message otherwise.
+     * Normalises a decoded string-keyed config map, accepting an empty array as an empty object.
      *
-     * @param mixed  $decodedValue - Decoded YAML/JSON value; must be a string-keyed (non-list) array.
-     * @param string $message - Caller-supplied error text thrown when the value is not object-like.
+     * @param mixed  $decodedValue - Decoded map; [] is accepted, while non-empty lists and integer keys are rejected.
+     * @param string $message - Caller-supplied error text for invalid map shape or keys; entry validation may throw its own message.
      *
-     * @return ConfigObject - the value as a string-keyed map with each entry normalised into the supported config shape.
+     * @return ConfigObject - String-keyed map with each entry normalised into the supported config shape.
      */
     private function requireObject(mixed $decodedValue, string $message): array
     {
-        // Reject anything that is not an object: a scalar, or a non-empty list.
+
         if (!is_array($decodedValue) || ($decodedValue !== [] && array_is_list($decodedValue))) {
             throw new ConfigException($message);
         }
 
         $normalizedRuleConfig = [];
 
-        // Normalise each entry, requiring a string key.
+
         foreach ($decodedValue as $key => $decodedItem) {
-            // A numeric key means this was a list, not the object the caller expects.
+
             if (!is_string($key)) {
                 throw new ConfigException($message);
             }
@@ -704,15 +700,15 @@ final readonly class RuleConfigApplier
     }
 
     /**
-     * Normalises one decoded config value, recursing into arrays and validating scalars.
+     * Normalises one decoded value, validating leaf types and bounding the depth of nested arrays.
      *
-     * @param mixed $decodedValue - One decoded YAML/JSON value, either a nested array or a scalar.
+     * @param mixed $decodedValue - Decoded array, scalar, null, or object; objects pass through without inspection.
      *
-     * @return ConfigValue - the value normalised into the supported shape: a depth-bounded nested array or a validated scalar.
+     * @return ConfigValue - The normalised array or unchanged supported leaf value, including null and objects.
      */
     private function configValue(mixed $decodedValue): array|bool|float|int|object|string|null
     {
-        // An array recurses through the depth-bounded normaliser.
+
         if (is_array($decodedValue)) {
             return $this->configArray($decodedValue);
         }
@@ -721,15 +717,15 @@ final readonly class RuleConfigApplier
     }
 
     /**
-     * Confirms a decoded leaf value is a YAML/JSON-compatible scalar (or null/object), passing it through unchanged or rejecting it.
+     * Accepts scalar values, null, and objects unchanged; rejects other decoded leaf values.
      *
-     * @param mixed $decodedValue - One decoded leaf value to confirm is a supported scalar (or null/object).
+     * @param mixed $decodedValue - Leaf value; scalars, null, and objects are accepted without conversion.
      *
-     * @return ConfigScalar - the same value passed through unchanged once confirmed to be a supported scalar, null, or object.
+     * @return ConfigScalar - The same scalar, null, or object; unsupported leaf types are rejected.
      */
     private function configScalar(mixed $decodedValue): bool|float|int|object|string|null
     {
-        // A supported scalar - or null, or an object - passes straight through.
+
         if (is_bool($decodedValue) || is_float($decodedValue) || is_int($decodedValue) || is_object($decodedValue) || is_string($decodedValue) || $decodedValue === null) {
             return $decodedValue;
         }
@@ -742,14 +738,13 @@ final readonly class RuleConfigApplier
      *
      * @param array<array-key, mixed> $decodedRuleValues - Top-level decoded array; nested arrays recurse one level deeper.
      *
-     * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>>> - the
-     *                          level-1 array with scalars validated and nested arrays normalised through the depth-2 pass.
+     * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>>>
+     *   - The array with validated leaves and nested arrays limited to the fourth level.
      */
     private function configArray(array $decodedRuleValues): array
     {
         $normalizedRuleValues = [];
 
-        // Normalise each entry, descending into any nested array.
         foreach ($decodedRuleValues as $key => $decodedItem) {
             $normalizedRuleValues[$key] = is_array($decodedItem) ? $this->configArrayDepth2($decodedItem) : $this->configScalar($decodedItem);
         }
@@ -762,14 +757,12 @@ final readonly class RuleConfigApplier
      *
      * @param array<array-key, mixed> $decodedRuleValues - Second-level decoded array; nested arrays recurse one level deeper.
      *
-     * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>> - the level-2 array with scalars
-     *                          validated and nested arrays normalised through the depth-3 pass.
+     * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>> - Validated leaves and nested arrays.
      */
     private function configArrayDepth2(array $decodedRuleValues): array
     {
         $normalizedRuleValues = [];
 
-        // Normalise each entry, descending into any nested array.
         foreach ($decodedRuleValues as $key => $decodedItem) {
             $normalizedRuleValues[$key] = is_array($decodedItem) ? $this->configArrayDepth3($decodedItem) : $this->configScalar($decodedItem);
         }
@@ -782,14 +775,12 @@ final readonly class RuleConfigApplier
      *
      * @param array<array-key, mixed> $decodedRuleValues - Third-level decoded array; nested arrays recurse one level deeper.
      *
-     * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar>> - the level-3 array with scalars validated and nested arrays normalised
-     *                          through the depth-4 pass.
+     * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar>> - Validated leaves and normalised fourth-level arrays.
      */
     private function configArrayDepth3(array $decodedRuleValues): array
     {
         $normalizedRuleValues = [];
 
-        // Normalise each entry, descending into any nested array.
         foreach ($decodedRuleValues as $key => $decodedItem) {
             $normalizedRuleValues[$key] = is_array($decodedItem) ? $this->configArrayDepth4($decodedItem) : $this->configScalar($decodedItem);
         }
@@ -802,15 +793,15 @@ final readonly class RuleConfigApplier
      *
      * @param array<array-key, mixed> $decodedRuleValues - Fourth-level decoded array; a further nested array is rejected as too deep.
      *
-     * @return array<array-key, ConfigScalar> - the deepest allowed level with every item confirmed to be a supported scalar.
+     * @return array<array-key, ConfigScalar> - Supported leaf values preserved; further nested arrays are rejected.
      */
     private function configArrayDepth4(array $decodedRuleValues): array
     {
         $normalizedRuleValues = [];
 
-        // Normalise each entry at the deepest allowed level.
+
         foreach ($decodedRuleValues as $key => $decodedItem) {
-            // A nested array here is deeper than gruff supports, so reject it.
+
             if (is_array($decodedItem)) {
                 throw new ConfigException('Config value nesting is deeper than supported.');
             }

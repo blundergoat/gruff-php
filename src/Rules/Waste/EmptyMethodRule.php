@@ -10,7 +10,7 @@ use GruffPhp\Results\Finding\Pillar;
 use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
-use GruffPhp\Rules\Complexity\CyclomaticComplexityRule;
+use GruffPhp\Rules\Complexity\FunctionComplexity;
 use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
@@ -19,11 +19,10 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 
 /**
- * Flags a method or function with a genuinely empty body, catching stubs that were never filled in -
- * while exempting promoted constructors, whose empty body is doing real assignment work.
+ * Flags empty bodies on named functions and non-abstract methods, which can indicate unfinished stubs.
  *
- * Runs per file over every callable, skipping abstract methods. A non-abstract empty body is reported at
- * advisory; a constructor that exists only to promote properties is left alone.
+ * A promoted parameter supplies property-assignment work even when a constructor body is empty.
+ * Closures are outside this rule's scan.
  */
 final readonly class EmptyMethodRule implements RuleInterface
 {
@@ -39,7 +38,7 @@ final readonly class EmptyMethodRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // High confidence because an empty body is unambiguous; advisory keeps the finding opt-in.
+
         return new RuleDefinition(
             id:              self::ID,
             name:            'Empty method',
@@ -51,12 +50,12 @@ final readonly class EmptyMethodRule implements RuleInterface
     }
 
     /**
-     * Reports each non-abstract empty callable body, excluding promoted constructors.
+     * Reports empty named functions and non-abstract methods, excluding constructors recognized by the promotion check.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext - Unused; the rule interface requires it, and this rule reads no options or project root.
      *
-     * @return list<Finding> - One finding per non-abstract empty body, excluding promoted constructors.
+     * @return list<Finding> - One finding per eligible empty function or method; empty when none qualify.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -65,15 +64,15 @@ final readonly class EmptyMethodRule implements RuleInterface
 
         $findings = [];
 
-        // Check each function and method in the file.
+
         foreach ($nodes as $node) {
-            /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
+            /** @var ClassMethod|Function_ $node - NodeIndex selects only class methods and named functions. */
             // An abstract method has no body by design.
             if ($node instanceof ClassMethod && $node->isAbstract()) {
                 continue;
             }
 
-            // Only a present-but-empty body counts: null means bodyless, a non-empty list means real code.
+            // Bodyless declarations are exempt; even a Nop makes a present body nonempty for this check.
             if ($node->stmts === null || $node->stmts !== []) {
                 continue;
             }
@@ -83,7 +82,7 @@ final readonly class EmptyMethodRule implements RuleInterface
                 continue;
             }
 
-            $symbol = CyclomaticComplexityRule::resolveSymbol($node);
+            $symbol = FunctionComplexity::resolveSymbol($node);
 
             $findings[] = new Finding(
                 ruleId:      $definition->id,
@@ -104,15 +103,15 @@ final readonly class EmptyMethodRule implements RuleInterface
     }
 
     /**
-     * Reports whether an empty constructor exists only to promote properties, so its empty body is fine.
+     * Reports whether an empty constructor has a promoted parameter, so its body still performs promotion work.
      *
      * @param ClassMethod $classMethod - Method to test; only `__construct` with promoted params earns the exemption.
      *
-     * @return bool - True when the constructor exists solely for property promotion.
+     * @return bool - True when the method is __construct and at least one parameter is promoted.
      */
     private function isPromotedConstructor(ClassMethod $classMethod): bool
     {
-        // Non-constructors gain nothing from an empty body, so they stay reportable.
+
         if ($classMethod->name->toString() !== '__construct') {
             return false;
         }
@@ -120,12 +119,12 @@ final readonly class EmptyMethodRule implements RuleInterface
         // A single promoted param means the empty body is really doing work.
         foreach ($classMethod->params as $param) {
             if ($param->isPromoted()) {
-                // A promoted param means the empty body is doing real work (assigning the property); exempt it.
+
                 return true;
             }
         }
 
-        // A parameterless or non-promoting empty constructor carries no behaviour, so it remains a finding.
+
         return false;
     }
 }

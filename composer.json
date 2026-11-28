@@ -42,12 +42,12 @@
         "nikic/php-parser": "^5.6",
         "symfony/console": "^6.4 || ^7.0 || ^8.0",
         "symfony/finder": "^6.4 || ^7.0 || ^8.0",
-        "symfony/process": "^6.4 || ^7.0 || ^8.0",
-        "symfony/yaml": "^6.4 || ^7.0 || ^8.0"
+        "symfony/process": "^6.4.33 || ^7.4.5 || ^8.0.5",
+        "symfony/yaml": "^6.4.50 || ^7.4.23 || ^8.1.11"
     },
     "require-dev": {
         "friendsofphp/php-cs-fixer": "^3.95",
-        "infection/infection": "^0.32",
+        "infection/infection": "^0.35",
         "phpstan/phpstan": "^2.0",
         "phpunit/phpunit": "^12.5"
     },
@@ -72,6 +72,7 @@
             "composer validate --strict",
             "@audit:dependencies",
             "@security:scan",
+            "php bin/gruff-php analyse . --fail-on=advisory",
             "bash -n scripts/preflight-checks.sh",
             "bash -n scripts/dependency-install.sh",
             "bash -n scripts/dependency-update.sh",
@@ -97,6 +98,9 @@
             "infection/extension-installer": true
         },
         "optimize-autoloader": true,
+        "platform": {
+            "php": "8.3.0"
+        },
         "sort-packages": true
     },
     "minimum-stability": "stable",

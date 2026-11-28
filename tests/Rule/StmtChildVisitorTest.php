@@ -14,7 +14,9 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Verifies the shared statement-child visitor used by complexity and waste rules.
+ * Exercises statement classification and child-block traversal using parsed PHP snippets.
+ * Assertions cover branch and loop kinds, switch-case owners and child-statement counts.
+ * An assignment supplies the non-control-flow case that must yield no child blocks.
  */
 final class StmtChildVisitorTest extends TestCase
 {
@@ -52,7 +54,7 @@ final class StmtChildVisitorTest extends TestCase
      *
      * @param string $source - PHP source fragment without the open tag.
      *
-     * @return void
+     * @return void - Asserts the supplied statement is classified as control flow.
      */
     #[DataProvider('controlFlowSampleProvider')]
     public function testControlFlowStatementIsRecognised(string $source): void
@@ -67,7 +69,7 @@ final class StmtChildVisitorTest extends TestCase
      *
      * @param string $source - PHP source fragment without the open tag.
      *
-     * @return void
+     * @return void - Asserts the supplied statement is not classified as control flow.
      */
     #[DataProvider('nonControlFlowSampleProvider')]
     public function testNonControlFlowStatementIsRejected(string $source): void
@@ -80,7 +82,7 @@ final class StmtChildVisitorTest extends TestCase
     /**
      * Verify an if/elseif/else chain yields one block per branch with the right kinds.
      *
-     * @return void
+     * @return void - Asserts three ordered branch kinds, each containing one statement.
      */
     public function testIfChainYieldsBranchBlocks(): void
     {
@@ -115,7 +117,7 @@ final class StmtChildVisitorTest extends TestCase
      *
      * @param string $source - PHP source fragment without the open tag.
      *
-     * @return void
+     * @return void - Asserts one loop-body block containing one statement.
      */
     #[DataProvider('loopSampleProvider')]
     public function testLoopTypeYieldsSingleBody(string $source): void
@@ -131,7 +133,7 @@ final class StmtChildVisitorTest extends TestCase
     /**
      * Verify switch statements yield one block per case, all tagged with the SWITCH_CASE kind.
      *
-     * @return void
+     * @return void - Asserts three switch-case blocks owned by case nodes.
      */
     public function testSwitchYieldsCaseBlocks(): void
     {
@@ -158,7 +160,7 @@ final class StmtChildVisitorTest extends TestCase
     /**
      * Verify try/catch/finally yields one block for try, each catch, and finally.
      *
-     * @return void
+     * @return void - Asserts ordered try, catch, catch and finally block kinds.
      */
     public function testTryCatchFinallyYieldsAllArms(): void
     {
@@ -176,7 +178,7 @@ final class StmtChildVisitorTest extends TestCase
     /**
      * Verify try without finally yields try + catches but no finally block.
      *
-     * @return void
+     * @return void - Asserts only the try and catch block kinds are returned.
      */
     public function testTryCatchWithoutFinallySkipsFinallyBlock(): void
     {
@@ -190,9 +192,9 @@ final class StmtChildVisitorTest extends TestCase
     }
 
     /**
-     * Verify non-control-flow nodes yield no blocks.
+     * Verify an assignment yields no child blocks.
      *
-     * @return void
+     * @return void - Asserts the assignment produces an empty block list.
      */
     public function testNonControlFlowYieldsNothing(): void
     {
@@ -204,7 +206,7 @@ final class StmtChildVisitorTest extends TestCase
     }
 
     /**
-     * Parse a single statement from source.
+     * Parse source and return its first statement.
      *
      * @param string $source - PHP source fragment without the open tag.
      *

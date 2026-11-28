@@ -11,29 +11,25 @@ use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
 
 /**
- * Turns a mutation-analysis result into the findings a user actually sees and acts on.
+ * Creates survivor, budget-breach, and MSI-regression findings from mutation analysis.
+ * Survivor findings carry the mutant's file, optional line, status, and remediation.
  *
- * Mutation numbers on their own don't tell a user what to do; this factory translates them into
- * concrete findings. It raises one `mutation.survived-mutant` finding per mutation the tests failed to
- * kill, a `mutation.budget-exceeded` finding when too many survived, and a `mutation.msi-regression`
- * finding when the score dropped versus the baseline - each with a message and remediation pointing at
- * the weak test, so mutation feedback lands in the same findings list as every other check.
+ * Budget and regression findings use a project-level location.
  */
 final readonly class MutationFindingFactory
 {
     /**
-     * Builds the findings for one mutation run: one per survived mutant, plus a budget-breach and an
-     * MSI-regression finding when those gates trip - the whole of what mutation analysis tells the user.
+     * Builds one finding per escaped or timed-out mutant, plus applicable budget and MSI findings.
      *
-     * @param MutationAnalysisResult $result - Mutation analysis result to convert into findings.
+     * @param MutationAnalysisResult $result - Mutation result supplying survivors, budget status, and the rounded MSI delta.
      *
-     * @return list<Finding> - Findings for any survived mutants, budget breach, and MSI regression this run produced; empty when all three gate signals are clear.
+     * @return list<Finding> - Survivor findings followed by any budget and negative-delta findings; empty when none apply.
      */
     public function findingsFor(MutationAnalysisResult $result): array
     {
         $findings = [];
 
-        // One finding per mutation that slipped past the tests, pinned to the file and line it lives on.
+
         foreach ($result->report->survivedMutants() as $infectionMutant) {
             $findings[] = new Finding(
                 ruleId:      'mutation.survived-mutant',
@@ -58,7 +54,7 @@ final readonly class MutationFindingFactory
             );
         }
 
-        // Too many survivors for the budget the user set: one project-level finding that fails the run.
+
         if ($result->isBudgetExceeded()) {
             $findings[] = new Finding(
                 ruleId:      'mutation.budget-exceeded',
@@ -82,7 +78,7 @@ final readonly class MutationFindingFactory
         }
 
         $delta = $result->msiDelta();
-        // The score fell versus the baseline (a negative delta), so flag the regression; a null delta means there was no baseline to compare against.
+
         if ($delta !== null && $delta < 0) {
             $findings[] = new Finding(
                 ruleId:      'mutation.msi-regression',
@@ -102,8 +98,8 @@ final readonly class MutationFindingFactory
             );
         }
 
-        // Survived mutants, budget breach, and MSI regression are the three independent
-        // gate signals; hand back whichever subset this result produced.
+
+
         return $findings;
     }
 
@@ -111,8 +107,7 @@ final readonly class MutationFindingFactory
      * Words the survived-mutant message to match how it survived, so a timeout doesn't read as a clean
      * escape the tests simply missed.
      *
-     * @param InfectionMutant $infectionMutant - Survived mutant whose status selects the wording; status is the
-     *                                          raw Infection label, so only 'timed out' diverges from the escaped case.
+     * @param InfectionMutant $infectionMutant - Survivor whose normalised status selects timeout or escape wording.
      *
      * @return string - Finding message naming the mutator; phrased to mark a timeout as "ran out of time" rather than a clean test pass.
      */
@@ -120,15 +115,15 @@ final readonly class MutationFindingFactory
     {
         // A timeout is not a clean escape, so give it its own wording.
         if ($infectionMutant->status === 'timed out') {
-            // A timeout is not a clean escape: Infection ran out of time before any test verdict,
-            // so the wording avoids implying the tests actually passed.
+
+
             return sprintf(
                 'Mutation timed out via %s; Infection exceeded the timeout before a clear test failure.',
                 $infectionMutant->mutator,
             );
         }
 
-        // Default escaped case: the suite ran to completion and no test failed against the mutant.
+
         return sprintf(
             'Mutation escaped via %s; tests did not fail against this mutant.',
             $infectionMutant->mutator,
@@ -136,23 +131,21 @@ final readonly class MutationFindingFactory
     }
 
     /**
-     * Picks remediation guidance that matches how the mutant survived - performance first for a
-     * timeout, test strength for an escape - so the user's next step is the one that will help.
+     * Selects performance guidance for timeouts and test-strengthening guidance for escapes.
      *
-     * @param InfectionMutant $infectionMutant - Survived mutant whose status selects the guidance; a 'timed out'
-     *                                          status points the developer at performance before test strength.
+     * @param InfectionMutant $infectionMutant - Survivor whose normalised status selects the recommended investigation.
      *
      * @return string - Remediation guidance; a timeout steers the reader to performance first, an escape to test strength.
      */
     private function survivedRemediation(InfectionMutant $infectionMutant): string
     {
-        // A timeout usually means slow code rather than a coverage gap, so its guidance leads with speed.
+        // A timeout gives no clear test-failure verdict, so investigate execution time before test strength.
         if ($infectionMutant->status === 'timed out') {
-            // Timeouts are usually a speed problem, not a coverage gap, so steer the reader to that first.
+
             return 'Investigate slow or non-terminating behavior first, then add or strengthen unit tests if the mutant should be killed; gruff-php consumes Infection output and does not generate mutants.';
         }
 
-        // Escaped mutant: the only fix is a test that fails on the mutated behavior.
+
         return 'Add or strengthen unit tests that fail when this mutant changes behavior; gruff-php consumes Infection output and does not generate mutants.';
     }
 }

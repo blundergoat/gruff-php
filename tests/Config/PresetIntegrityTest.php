@@ -12,17 +12,18 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Yaml\Yaml;
 
 /**
- * Guards the bundled presets against drift: each loads cleanly and references only
- * rule ids that exist in the registry.
+ * Checks bundled presets through the config loader and the default rule registry.
+ * Each preset must produce an AnalysisConfig instance.
+ * Rule keys in each preset's array-valued rules block must belong to that registry.
  */
 final class PresetIntegrityTest extends TestCase
 {
     /**
-     * Verify every bundled preset loads into a usable config.
+     * Verifies that each bundled preset loads as an AnalysisConfig.
      *
      * @param string $preset - Bundled preset name.
      *
-     * @return void
+     * @return void - Asserts that the loader returns an AnalysisConfig instance.
      */
     #[DataProvider('presetProvider')]
     public function testPresetLoads(string $preset): void
@@ -36,11 +37,11 @@ final class PresetIntegrityTest extends TestCase
     }
 
     /**
-     * Verify every rule id referenced by a preset exists in the registry.
+     * Checks rule keys from a preset's array-valued rules block against the default registry.
      *
      * @param string $preset - Bundled preset name.
      *
-     * @return void
+     * @return void - Asserts that the YAML parses as an array and every extracted rule key is registered.
      */
     #[DataProvider('presetProvider')]
     public function testPresetReferencesOnlyKnownRules(string $preset): void
@@ -58,7 +59,7 @@ final class PresetIntegrityTest extends TestCase
     }
 
     /**
-     * Provide the three bundled preset names.
+     * Provides one PHPUnit data set per name in ConfigLoader::BUNDLED_PRESETS.
      *
      * @return array<string, array{string}> - PHPUnit data set keyed by preset name, each holding that preset's name as the sole argument
      */
@@ -75,7 +76,7 @@ final class PresetIntegrityTest extends TestCase
     /**
      * Resolve the on-disk path for a bundled preset.
      *
-     * @param string $preset - Preset name.
+     * @param string $preset - Bundled preset name used as the YAML filename stem.
      *
      * @return string - absolute filesystem path to the preset's YAML profile under the package root
      */

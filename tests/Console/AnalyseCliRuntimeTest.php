@@ -8,13 +8,15 @@ use Symfony\Component\Process\Process;
 
 /**
  * Covers the --print-runtime CLI contract used by scripts/test-performance.sh.
+ * Checks summary fields, detailed rule timings, exclusions, and phase coverage.
+ * Checks that the mixed fixture leaves stderr empty when runtime reporting is omitted.
  */
 final class AnalyseCliRuntimeTest extends CliTestCase
 {
     /**
-     * Verify --print-runtime emits a single JSON line on stderr with the documented summary shape.
+     * Verify the trailing stderr payload has summary fields and omits per-rule totals.
      *
-     * @return void
+     * @return void - Asserts summary counters and phase durations, and that per-rule totals are absent.
      */
     public function testPrintRuntimeEmitsSummaryShapeOnStderr(): void
     {
@@ -56,11 +58,11 @@ final class AnalyseCliRuntimeTest extends CliTestCase
     /**
      * Verify --runtime-mode=detailed adds a sorted per-rule totals array.
      *
-     * @return void
+     * @return void - Asserts nonempty per-rule rows with positive invocation counts, nonnegative durations, and descending totals.
      */
     public function testPrintRuntimeDetailedAddsPerRuleTotals(): void
     {
-        // --no-cache forces every rule to execute; a warm result cache would skip rule invocations entirely.
+        // Disable cached findings so this test measures rule invocations on a fresh analysis.
         $process = new Process([
             PHP_BINARY,
             self::PROJECT_ROOT . '/bin/gruff-php',
@@ -104,7 +106,7 @@ final class AnalyseCliRuntimeTest extends CliTestCase
     /**
      * Verify --exclude-rule removes the rule from execution: it must not appear in the detailed per-rule totals.
      *
-     * @return void
+     * @return void - Asserts the control records the rule, the excluded run omits it, and rulesExecuted drops by one.
      */
     public function testExcludeRuleRemovesRuleFromExecution(): void
     {
@@ -124,19 +126,10 @@ final class AnalyseCliRuntimeTest extends CliTestCase
     }
 
     /**
-     * Verify the timed phases account for at least half of measured wall time.
+     * Verify timed phases total more than half the wall time for an uncached src scan.
+     * This detects untimed work only when it pushes the measured ratio to 0.5 or below.
      *
-     * Locks the regression class where an untimed seam (historically the
-     * project-rule context pass) ran outside every phase: phase coverage then
-     * dropped to 20-33% of wall while --print-runtime claimed the run was
-     * accounted for. With every pass timed, coverage on a src-sized corpus
-     * measures ~0.99; the only untimed remainder is constant per-process setup
-     * (config load, registry construction), which stays under a millisecond-scale
-     * budget. The 0.5 floor is deliberately conservative: CI jitter cannot
-     * plausibly halve the ratio on a multi-second run, but any reintroduced
-     * whole-corpus untimed seam would.
-     *
-     * @return void
+     * @return void - Asserts positive wall time, integer phase durations, and phase coverage above 0.5.
      */
     public function testRuntimePhasesCoverMostOfWallTime(): void
     {
@@ -178,9 +171,9 @@ final class AnalyseCliRuntimeTest extends CliTestCase
     }
 
     /**
-     * Verify the analyse command default behaviour is unchanged when --print-runtime is omitted.
+     * Verify a successful analyse run leaves stderr empty when --print-runtime is omitted.
      *
-     * @return void
+     * @return void - Asserts exit status 0 and empty stderr for the mixed fixture.
      */
     public function testAnalyseWithoutPrintRuntimeProducesEmptyStderr(): void
     {
@@ -230,7 +223,9 @@ final class AnalyseCliRuntimeTest extends CliTestCase
         self::assertIsInt($payload['rulesExecuted']);
         self::assertIsArray($payload['rules']);
 
-        /** @var array{rulesExecuted: int, rules: list<array{ruleId: string, totalNs: int, invocations: int}>} $payload validated above */
+        /**
+         * @var array{rulesExecuted: int, rules: list<array{ruleId: string, totalNs: int, invocations: int}>} $payload - CLI row shape assumed.
+         */
         return $payload;
     }
 
@@ -243,13 +238,14 @@ final class AnalyseCliRuntimeTest extends CliTestCase
      */
     private function decodeRuntimePayload(string $stderr): array
     {
+        // Other stderr output may precede the payload, so only the final non-blank line is decoded as JSON.
         $lines = array_values(array_filter(preg_split('/\r?\n/', trim($stderr)) ?: [], static fn (string $line): bool => $line !== ''));
         self::assertNotEmpty($lines, 'stderr must contain a runtime payload line');
 
         $payload = json_decode($lines[count($lines) - 1], true, flags: JSON_THROW_ON_ERROR);
         self::assertIsArray($payload);
 
-        /** @var array<string, mixed> $payload decoded JSON payload is validated key by key by the caller. */
+        /** @var array<string, mixed> $payload - Runtime data from the trailing JSON line. */
         return $payload;
     }
 }

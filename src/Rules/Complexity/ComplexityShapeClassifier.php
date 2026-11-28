@@ -10,40 +10,38 @@ use PhpParser\Node\Expr;
 use PhpParser\Node\Stmt;
 
 /**
- * Recognises the one complexity shape raw branch counts over-penalise: a flat run of top-level guard
- * clauses, so the complexity rules can spare well-structured validation from a false warning.
+ * Identifies function and method bodies with at least five top-level early-exit guards.
+ * Guards may be interspersed with other statements, but else/elseif and the listed nested control nodes disqualify the body.
  *
- * A method that opens with five-plus early-return `if` guards and no nesting reads as simple to a human
- * yet scores high on branch count. isFlatGuardClauseFlow() spots exactly that pattern - flat, no
- * else/elseif, every guard exits early, nothing heavier nested - so callers can downgrade its severity.
+ * Complexity rules use this shape when choosing severity; classification alone does not suppress a finding.
  */
 final readonly class ComplexityShapeClassifier
 {
-    // Classification tag for a method whose branches are all top-level guard clauses rather than nested decisions.
+    // Classification tag for functions or methods meeting the minimum guard count and control-node checks.
     public const SHAPE_FLAT_GUARD_CLAUSES = 'flat-guard-clauses';
 
     /**
-     * Reports whether a function-like body is a flat stack of early-exit guard clauses (5+, no nesting).
+     * Recognise at least five top-level early-exit guards with no else/elseif or disallowed nested control.
      *
-     * @param Stmt\ClassMethod|Stmt\Function_ $node - Function-like node to classify.
+     * @param Stmt\ClassMethod|Stmt\Function_ $node - Function or method whose body nodes have parent attributes.
      *
-     * @return bool - True when branch count comes from flat early-exit guards, not nested or fall-through branches.
+     * @return bool - Whether the body meets the guard-shape checks; false for a missing or empty body.
      */
     public static function isFlatGuardClauseFlow(Stmt\ClassMethod|Stmt\Function_ $node): bool
     {
         $stmts = $node->stmts ?? [];
-        // An empty body has no guard shape to recognise.
+
         if ($stmts === []) {
             return false;
         }
 
         $topLevelIfs = 0;
-        // Every top-level statement must be a simple guard or a plain, control-free statement.
+
         foreach ($stmts as $stmt) {
-            // A top-level if has to be a simple early-exit guard.
+
             if ($stmt instanceof Stmt\If_) {
                 $topLevelIfs++;
-                // Any non-guard if breaks the flat shape.
+
                 if (!self::isSimpleTopLevelIf($stmt)) {
                     return false;
                 }
@@ -51,25 +49,25 @@ final readonly class ComplexityShapeClassifier
                 continue;
             }
 
-            // A loop or switch at the top level is not guard flow.
+
             if (self::isDisallowedTopLevelStatement($stmt)) {
                 return false;
             }
         }
 
-        // Fewer than five guards is ordinary branching, not the shape worth exempting.
+
         if ($topLevelIfs < 5) {
             return false;
         }
 
-        // No control flow may hide deeper in the body.
+
         foreach (NodeIndex::bodyDescendants($node) as $child) {
-            // A nested if (anything below the top level) breaks the flat shape.
+
             if ($child instanceof Stmt\If_ && $child->getAttribute('parent') !== $node) {
                 return false;
             }
 
-            // Any nested loop, switch, match, or ternary breaks it too.
+
             if (self::isDisallowedNestedControl($child)) {
                 return false;
             }
@@ -79,22 +77,23 @@ final readonly class ComplexityShapeClassifier
     }
 
     /**
-     * Reports whether one top-level if is a clean guard: no else/elseif, no nested control, exits early.
+     * Check a guard's else/elseif clauses, immediate statements, and final exit.
+     * The caller separately rejects disallowed control deeper in the body.
      *
-     * @param Stmt\If_ $ifStatement - Candidate top-level if.
+     * @param Stmt\If_ $ifStatement - Candidate guard checked before the caller's descendant scan.
      *
-     * @return bool - True when it has no else/elseif, no nested control, and a branch that exits early.
+     * @return bool - True for an early-exit guard without else/elseif or rejected immediate statements.
      */
     private static function isSimpleTopLevelIf(Stmt\If_ $ifStatement): bool
     {
-        // An else or elseif means it is branching, not a one-way guard.
+
         if ($ifStatement->elseifs !== [] || $ifStatement->else !== null) {
             return false;
         }
 
-        // The guard body must hold no nested if or heavy control.
+
         foreach ($ifStatement->stmts as $stmt) {
-            // A nested if or loop disqualifies the guard.
+
             if ($stmt instanceof Stmt\If_ || self::isDisallowedTopLevelStatement($stmt)) {
                 return false;
             }
@@ -104,28 +103,23 @@ final readonly class ComplexityShapeClassifier
     }
 
     /**
-     * Reports whether a guard branch ends by leaving the method early (return, throw, or exit/die).
+     * Require a return statement or a throw/exit expression as the final branch statement.
+     * This prevents fall-through conditionals from qualifying as early-exit guards.
      *
-     * Mirrors the terminator set the unreachable-code analysis uses: a `return`, or an `exit`/`die` or
-     * `throw` expression. A guard clause short-circuits; a branch that does work and falls through is
-     * ordinary branching, so without this check flat fall-through conditionals (for example building an
-     * array) would be mis-tagged as guard clauses and wrongly downgraded below the fail-on threshold.
-     * `break`/`continue` cannot appear at a method body's top level, so they are intentionally excluded.
+     * @param array<Stmt> $stmts - Branch statements in source order; an empty branch has no terminating statement.
      *
-     * @param array<Stmt> $stmts - Statements in the `if` branch body, in source order.
-     *
-     * @return bool - True when the final statement returns, throws, or exits the process.
+     * @return bool - Whether the final statement returns, throws, or exits; false for an empty branch.
      */
     private static function isEarlyExitBranch(array $stmts): bool
     {
         $last = $stmts === [] ? null : $stmts[array_key_last($stmts)];
 
-        // A trailing return exits the method early.
+
         if ($last instanceof Stmt\Return_) {
             return true;
         }
 
-        // A trailing exit/die or throw also exits early.
+
         if ($last instanceof Stmt\Expression) {
             return $last->expr instanceof Expr\Exit_ || $last->expr instanceof Expr\Throw_;
         }
@@ -136,9 +130,9 @@ final readonly class ComplexityShapeClassifier
     /**
      * Reports whether a node is nested control flow that disqualifies the flat-guard shape.
      *
-     * @param Node $node - Statement or expression node to classify.
+     * @param Node $node - Body descendant checked by the flat-guard classifier.
      *
-     * @return bool - True when the node is not part of the flat-guard exemption.
+     * @return bool - True for loops, switch, try/catch, match, or ternary nodes; nested if checks run separately.
      */
     private static function isDisallowedNestedControl(Node $node): bool
     {
@@ -154,11 +148,11 @@ final readonly class ComplexityShapeClassifier
     }
 
     /**
-     * Reports whether a top-level statement is too control-heavy to count as flat validation.
+     * Identify top-level loops, switch statements, and try/catch blocks that disqualify guard flow.
      *
-     * @param Stmt $stmt - Top-level statement.
+     * @param Stmt $stmt - Immediate function-body or guard-body statement to check.
      *
-     * @return bool - True when the statement should keep the normal complexity severity.
+     * @return bool - True for for, foreach, while, do/while, switch, or try/catch statements.
      */
     private static function isDisallowedTopLevelStatement(Stmt $stmt): bool
     {

@@ -46,30 +46,33 @@ final class DisabledSslVerificationRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::High,
+            // Off unless a project sets `enabled: true`: precision-floor M02 found it right on its 1 judged finding, with the rest unresolved, too few
+            // to establish its precision floor, so it is off by default rather than deleted (ADR-034).
+            isEnabledByDefault: false,
         );
     }
 
     /**
-     * Reports each cURL call that turns peer or hostname verification off.
+     * Reports cURL calls whose option and value match the rule's disabled-verification patterns.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext - Unused; the rule interface requires it, and this rule reads no options or project root.
      *
-     * @return list<Finding> - One finding per cURL call that turns peer or hostname verification off.
+     * @return list<Finding> - One finding per call matched by a disabled-verification pattern.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $findings = [];
 
-        // Check every function call in the file.
+
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
             $name = SecurityNodeHelper::globalFunctionName($call);
-            // A single curl_setopt disabling a verify option is a finding.
+
             if ($name === 'curl_setopt' && $this->isDisabledCurlSetopt($call)) {
                 $findings[] = $this->finding($analysisUnit, $call);
             }
 
-            // An options map disabling a verify option is a finding too.
+
             if ($name === 'curl_setopt_array' && $this->isDisabledCurlSetoptArray($call)) {
                 $findings[] = $this->finding($analysisUnit, $call);
             }
@@ -79,11 +82,11 @@ final class DisabledSslVerificationRule implements RuleInterface
     }
 
     /**
-     * Reports whether a `curl_setopt` call disables SSL verification.
+     * Reports whether a curl_setopt call's option and value match a disabled-verification pattern.
      *
      * @param Expr\FuncCall $call - Parsed `curl_setopt($handle, $option, $value)` call whose option/value pair is read.
      *
-     * @return bool - True when SSL verification is disabled.
+     * @return bool - True when the option and value match; false when either is absent or unrecognized.
      */
     private function isDisabledCurlSetopt(Expr\FuncCall $call): bool
     {
@@ -91,65 +94,62 @@ final class DisabledSslVerificationRule implements RuleInterface
         $valueArg  = SecurityNodeHelper::sinkArgumentValue($call, 2);
 
         if ($optionArg === null || $valueArg === null) {
-            // Without both an option and a value argument the call cannot be the two-arg form this rule inspects.
             return false;
         }
 
         $option = SecurityNodeHelper::constantName($optionArg);
         if ($option === 'CURLOPT_SSL_VERIFYPEER') {
-            // Verification is disabled exactly when the peer-verify option is set to a false-like value.
+
             return SecurityNodeHelper::isFalseLike($valueArg);
         }
 
         if ($option === 'CURLOPT_SSL_VERIFYHOST') {
-            // Verification is disabled exactly when the hostname-verify option is set to a false-like value.
+
             return SecurityNodeHelper::isFalseLike($valueArg);
         }
 
-        // Any other cURL option is irrelevant to certificate verification.
+
         return false;
     }
 
     /**
-     * Reports whether a `curl_setopt_array` option map disables SSL verification.
+     * Reports whether a curl_setopt_array option map matches a disabled-verification pattern.
      *
      * @param Expr\FuncCall $call - Parsed `curl_setopt_array($handle, $options)` call; its options array is scanned.
      *
-     * @return bool - True when the option array disables SSL verification.
+     * @return bool - True when one option/value entry matches; false when the argument or its entries do not match.
      */
     private function isDisabledCurlSetoptArray(Expr\FuncCall $call): bool
     {
         $optionsArg = SecurityNodeHelper::sinkArgumentValue($call, 1);
         if (!$optionsArg instanceof Expr\Array_) {
-            // A non-literal options argument (variable, spread) is opaque to static inspection; assume nothing is off.
+
             return false;
         }
 
-        // Weigh each option in the map.
+
         foreach ($optionsArg->items as $arrayItem) {
-            // A spread entry has no key to read.
+
             if (!$arrayItem->key instanceof Node) {
                 continue;
             }
 
             $option = SecurityNodeHelper::constantName($arrayItem->key);
-            // Skip an entry whose key is not a named constant.
+
             if ($option === null) {
                 continue;
             }
 
-            // Only the two SSL verification options matter here.
+
             if (!in_array($option, ['CURLOPT_SSL_VERIFYHOST', 'CURLOPT_SSL_VERIFYPEER'], true)) {
                 continue;
             }
 
             if (SecurityNodeHelper::isFalseLike($arrayItem->value)) {
-                // A single verify-peer/verify-host entry set to a false-like value is enough to disable verification.
                 return true;
             }
         }
 
-        // No verification-related option in the map was turned off.
         return false;
     }
 
@@ -159,11 +159,10 @@ final class DisabledSslVerificationRule implements RuleInterface
      * @param AnalysisUnit $analysisUnit - Parsed unit supplying the display path recorded on the finding.
      * @param Node         $node - cURL call node whose start line localises the finding for the reviewer.
      *
-     * @return Finding - Security finding.
+     * @return Finding - High-confidence finding anchored to the cURL call.
      */
     private function finding(AnalysisUnit $analysisUnit, Node $node): Finding
     {
-        // Report against the cURL call's own line so the reviewer lands on the disabled-verification toggle.
         return new Finding(
             ruleId:      self::ID,
             message:     'cURL SSL verification is disabled.',

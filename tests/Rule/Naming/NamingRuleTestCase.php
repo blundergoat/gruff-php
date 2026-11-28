@@ -12,7 +12,9 @@ use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Provides shared fixture helpers for naming rule tests.
+ * Provides fixture-file and inline-source helpers for naming-rule tests.
+ * Uses the default rule registry, with optional configuration for inline analysis.
+ * Filters findings to a requested rule and parses fixtures with repository-relative display paths.
  */
 abstract class NamingRuleTestCase extends TestCase
 {
@@ -20,9 +22,9 @@ abstract class NamingRuleTestCase extends TestCase
     private PhpFileParser $parser;
 
     /**
-     * Prepare parser fixtures before each rule test.
+     * Create the parser used by each naming-rule test.
      *
-     * @return void
+     * @return void - Initializes the parser property for fixture and inline-source analysis.
      */
     protected function setUp(): void
     {
@@ -35,7 +37,7 @@ abstract class NamingRuleTestCase extends TestCase
      * @param string $fixture - Fixture filename under tests/Fixtures/Naming.
      * @param string $ruleId - Rule id to keep; findings from every other rule are discarded.
      *
-     * @return list<\GruffPhp\Results\Finding\Finding> - findings emitted by the named rule, in detection order; empty when the fixture is clean
+     * @return list<\GruffPhp\Results\Finding\Finding> - Findings for the requested rule in canonical report order; empty when none remain.
      */
     protected function analyseRule(string $fixture, string $ruleId): array
     {
@@ -48,15 +50,14 @@ abstract class NamingRuleTestCase extends TestCase
     }
 
     /**
-     * Analyse naming fixtures and return findings for assertions.
+     * Analyse inline PHP and return findings for assertions.
      *
      * @param string              $source      - Inline PHP written to a throwaway temp file before parsing.
      * @param string              $ruleId      - Rule id to keep; findings from every other rule are discarded.
      * @param string              $displayPath - Path the rule sees, letting a test exercise path-sensitive naming checks.
      * @param AnalysisConfig|null $config      - Effective config override; null uses registry defaults.
      *
-     * @return list<\GruffPhp\Results\Finding\Finding> - findings emitted by the named rule for the inline source, in detection order; empty when no
-     *                                         violation fires
+     * @return list<\GruffPhp\Results\Finding\Finding> - Findings for the requested rule in canonical report order; empty when none remain.
      */
     protected function analyseSourceRule(
         string $source,
@@ -89,9 +90,9 @@ abstract class NamingRuleTestCase extends TestCase
     /**
      * Parse the named fixture into an analysis unit.
      *
-     * @param string $filename - Fixture filename.
+     * @param string $filename - Fixture filename relative to tests/Fixtures/Naming.
      *
-     * @return \GruffPhp\Engine\Parser\AnalysisUnit - the parsed fixture ready for rule analysis, carrying its repo-relative display path
+     * @return \GruffPhp\Engine\Parser\AnalysisUnit - Parsed fixture with diagnostics and a repository-relative display path.
      */
     protected function parseFixture(string $filename): \GruffPhp\Engine\Parser\AnalysisUnit
     {

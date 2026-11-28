@@ -9,8 +9,9 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers the shared ignore engine: configured globs stay authoritative under
- * include-ignored, built-in directory and generated-file sources, and git rules.
+ * Tests the shared resolver's ignore decisions and reported rule sources.
+ * Covers configured globs, caller overrides, VCS internals, and default path exclusions.
+ * Checks governing .gitignore behavior and Git rule lookup.
  */
 final class PathIgnoreResolverTest extends TestCase
 {
@@ -18,9 +19,9 @@ final class PathIgnoreResolverTest extends TestCase
     private array $tempDirs = [];
 
     /**
-     * Remove temporary git repositories created for git-rule tests.
+     * Remove temporary directories created by resolver tests.
      *
-     * @return void
+     * @return void - Removes temporary directory trees registered by tempDir().
      */
     protected function tearDown(): void
     {
@@ -32,15 +33,17 @@ final class PathIgnoreResolverTest extends TestCase
     /**
      * Provide ignored-path source and pattern cases.
      *
-     * @return array<string, array{string, string, list<string>, string, string}> - display path, absolute path, configured patterns, expected
-     *                                                              source, and expected matching pattern.
+     * @return array<string, array{string, string, list<string>, string, string}> - Named [display path, absolute path, globs, source, pattern] cases.
      */
     public static function ignoredPathDecisionProvider(): array
     {
         return [
             'configured file glob' => ['legacy/Bad.php', '/project/legacy/Bad.php', ['legacy/**'], 'config', 'legacy/**'],
             'configured directory glob' => ['legacy', '/project/legacy', ['legacy/**'], 'config', 'legacy/**'],
-            'generated lockfile' => ['composer.lock', '/project/composer.lock', [], 'generated', 'composer.lock'],
+            'vcs internals' => ['nested/.git/config', '/project/nested/.git/config', [], 'default', '.git'],
+            'php cache' => ['.gruff-cache/cache.php', '/project/.gruff-cache/cache.php', [], 'default', '.gruff-cache'],
+            'phpunit cache' => ['.phpunit.cache/result.php', '/project/.phpunit.cache/result.php', [], 'default', '.phpunit.cache'],
+            'framework cache' => ['var/cache/result.php', '/project/var/cache/result.php', [], 'default', 'var/cache'],
         ];
     }
 
@@ -53,7 +56,7 @@ final class PathIgnoreResolverTest extends TestCase
      * @param string       $expectedSource - Expected ignore source.
      * @param string       $expectedPattern - Expected matching pattern.
      *
-     * @return void
+     * @return void - Asserts exclusion and the expected source and matching pattern.
      */
     #[\PHPUnit\Framework\Attributes\DataProvider('ignoredPathDecisionProvider')]
     public function testIgnoredPathDecisionReportsSourceAndPattern(
@@ -73,7 +76,7 @@ final class PathIgnoreResolverTest extends TestCase
     /**
      * Verify configured ignores remain authoritative even when ignored files are included.
      *
-     * @return void
+     * @return void - Asserts that the configured glob still excludes the path with source config.
      */
     public function testConfiguredPatternStaysAuthoritativeUnderIncludeIgnored(): void
     {
@@ -84,27 +87,176 @@ final class PathIgnoreResolverTest extends TestCase
     }
 
     /**
-     * Verify a built-in directory is reported as the default source and is bypassed by include-ignored.
+     * Verify a built-in directory is reported as ignored by the default source, naming the matched entry.
      *
-     * @return void
+     * @return void - Asserts exclusion with source default and matching pattern vendor.
      */
-    public function testDefaultDirectorySourceAndIncludeIgnoredBypass(): void
+    public function testDefaultDirectoryIsReportedAsTheDefaultSource(): void
+    {
+        $decision = (new PathIgnoreResolver('/project'))->decide('vendor/acme/V.php', '/project/vendor/acme/V.php', [], false);
+
+        self::assertTrue($decision->ignored);
+        self::assertSame('default', $decision->source);
+        self::assertSame('vendor', $decision->pattern);
+    }
+
+    /**
+     * Verify include-ignored bypasses the default exclusion for a vendor path.
+     *
+     * @return void - Asserts that the vendor path is not ignored.
+     */
+    public function testIncludeIgnoredBypassesADefaultDirectory(): void
+    {
+        $decision = (new PathIgnoreResolver('/project'))->decide('vendor/acme/V.php', '/project/vendor/acme/V.php', [], true);
+
+        self::assertFalse($decision->ignored);
+    }
+
+    /**
+     * Verify a .git path stays ignored when include-ignored and explicit-file overrides are both enabled.
+     *
+     * @return void - Asserts exclusion and the .git matching pattern despite both overrides.
+     */
+    public function testVcsInternalsStayBlockedUnderIncludeIgnored(): void
+    {
+        $decision = (new PathIgnoreResolver('/project'))->decide('.git/config', '/project/.git/config', [], true, true);
+
+        self::assertTrue($decision->ignored);
+        self::assertSame('.git', $decision->pattern);
+    }
+
+    /**
+     * Verify a parent .gitignore containing only an unrelated rule disables the node_modules fallback.
+     * This checks fallback deference from FAMILY-CONTRACT.md section 7.
+     *
+     * @return void - Asserts that the nested node_modules path is not ignored.
+     */
+    public function testFallbackDefersToGitignoreInAncestorChain(): void
+    {
+        $root = $this->tempDir();
+        self::assertTrue(mkdir($root . '/packages/app/node_modules', 0777, true));
+        file_put_contents($root . '/packages/app/.gitignore', "*.log\n");
+
+        $decision = (new PathIgnoreResolver($root))->decide(
+            'packages/app/node_modules/acme.php',
+            $root . '/packages/app/node_modules/acme.php',
+            [],
+            false,
+        );
+
+        self::assertFalse($decision->ignored);
+    }
+
+    /**
+     * Verify Gruff's own .gruff-cache directory stays ignored even when a governing .gitignore exists without listing it.
+     *
+     * @return void - Asserts .gruff-cache JSON artifacts remain excluded with source default and pattern .gruff-cache.
+     */
+    public function testGruffCacheStaysIgnoredUnderGoverningGitignore(): void
+    {
+        $root = $this->tempDir();
+        file_put_contents($root . '/.gitignore', "*.log\n");
+
+        $decision = (new PathIgnoreResolver($root))->decide(
+            '.gruff-cache/entry.json',
+            $root . '/.gruff-cache/entry.json',
+            [],
+            false,
+            false,
+            false,
+        );
+
+        self::assertTrue($decision->ignored);
+        self::assertSame(PathIgnoreResolver::SOURCE_DEFAULT, $decision->source);
+        self::assertSame('.gruff-cache', $decision->pattern);
+
+        // A regular file named .gruff-cache is not a cache directory and must not be dropped as tool-cache.
+        $fileNamedCache = (new PathIgnoreResolver($root))->decide(
+            '.gruff-cache',
+            $root . '/.gruff-cache',
+            [],
+            false,
+            false,
+            false,
+        );
+        self::assertFalse($fileNamedCache->ignored);
+    }
+
+    /**
+     * Verify representative dependency, build-output, and minified paths stay excluded under a governing .gitignore.
+     * Check mixed-case directory names, the outermost match, and file/directory boundaries.
+     *
+     * @return void - Asserts ignored flags and patterns, including file/directory boundary cases.
+     */
+    public function testThirdPartyClassesIgnoreAGoverningGitignore(): void
+    {
+        $root = $this->tempDir();
+        file_put_contents($root . '/.gitignore', "*.log\n");
+        $resolver = new PathIgnoreResolver($root);
+        $decide   = static fn(string $path, bool $isDirectory): array => [
+            $resolver->decide($path, $root . '/' . $path, [], false, false, $isDirectory)->ignored,
+            $resolver->decide($path, $root . '/' . $path, [], false, false, $isDirectory)->pattern,
+        ];
+
+        self::assertSame([true, 'vendors'], $decide('pkg/Vendors', true));
+        self::assertSame([true, 'third_party'], $decide('pkg/THIRD_PARTY/Copied.php', false));
+        self::assertSame([true, 'third-party'], $decide('pkg/third-party/Copied.php', false));
+        self::assertSame([true, 'bower_components'], $decide('web/bower_components', true));
+        self::assertSame([true, 'dist'], $decide('app/Dist/Built.php', false));
+        self::assertSame([true, 'vendor'], $decide('vendor/lib/dist/Copied.php', false));
+        self::assertSame([true, PathIgnoreResolver::MINIFIED_FILE_PATTERN], $decide('config/settings.min.json', false));
+        // A file's own name is not a directory, and a directory with .min. in its name is not a minified file.
+        self::assertSame([false, null], $decide('src/dist', false));
+        self::assertSame([false, null], $decide('assets/theme.min.d', true));
+    }
+
+    /**
+     * Verify include-ignored allows a vendor path and explicit-file status allows vendor and minified paths.
+     *
+     * @return void - Asserts that the sampled vendor and minified paths are not ignored.
+     */
+    public function testIncludeIgnoredAndExplicitFilesBypassThirdPartyClasses(): void
     {
         $resolver = new PathIgnoreResolver('/project');
 
-        $ignored = $resolver->decide('vendor/acme/V.php', '/project/vendor/acme/V.php', [], false);
-        self::assertTrue($ignored->ignored);
-        self::assertSame('default', $ignored->source);
-        self::assertSame('vendor', $ignored->pattern);
+        self::assertFalse($resolver->decide('vendor/acme/V.php', '/project/vendor/acme/V.php', [], true, false, false)->ignored);
+        self::assertFalse($resolver->decide('vendor/acme/V.php', '/project/vendor/acme/V.php', [], false, true, false)->ignored);
+        self::assertFalse($resolver->decide('public/app.min.php', '/project/public/app.min.php', [], false, true, false)->ignored);
+    }
 
-        $included = $resolver->decide('vendor/acme/V.php', '/project/vendor/acme/V.php', [], true);
-        self::assertFalse($included->ignored);
+    /**
+     * Verify first-party names that only resemble the classes, and the external and lib directories, stay in scope.
+     *
+     * @return void - Asserts that every listed lookalike, external, and lib path is not ignored.
+     */
+    public function testFirstPartyNamesResemblingThirdPartyClassesStayInScope(): void
+    {
+        $root = $this->tempDir();
+        file_put_contents($root . '/.gitignore', "*.log\n");
+        $resolver = new PathIgnoreResolver($root);
+
+        $paths = [
+            'src/Vendor.php',
+            'src/VendorRepository.php',
+            'src/Distributor.php',
+            'vendoring/Copied.php',
+            'distro/Built.php',
+            'external/Typings.php',
+            'lib/Helpers.php',
+            'src/admin.mini.php',
+            'app.min.js.map',
+        ];
+
+
+        foreach ($paths as $path) {
+            self::assertFalse($resolver->decide($path, $root . '/' . $path, [], false, false, false)->ignored, $path);
+        }
     }
 
     /**
      * Verify an unmatched path is reported as not ignored.
      *
-     * @return void
+     * @return void - Asserts that the path is not ignored and has no ignore source.
      */
     public function testUnmatchedPathIsNotIgnored(): void
     {
@@ -115,9 +267,9 @@ final class PathIgnoreResolverTest extends TestCase
     }
 
     /**
-     * Verify the git rule lookup returns the matching pattern and null for tracked paths.
+     * Verify Git rule lookup returns the matching pattern and null for a nonmatching path.
      *
-     * @return void
+     * @return void - Asserts the matching log rule and no rule for the PHP path.
      */
     public function testGitIgnoreRuleReturnsMatchingPattern(): void
     {
@@ -136,7 +288,7 @@ final class PathIgnoreResolverTest extends TestCase
     /**
      * Require the git executable for git-rule tests.
      *
-     * @return void
+     * @return void - Returns after a successful Git probe; skips on an unsuccessful exit; process exceptions propagate.
      */
     private function requireGit(): void
     {
@@ -152,9 +304,9 @@ final class PathIgnoreResolverTest extends TestCase
      * Run a git command inside a temporary repository.
      *
      * @param string       $root - Repository root.
-     * @param list<string> $args - Git arguments.
+     * @param list<string> $args - Git subcommand and arguments that must exit successfully.
      *
-     * @return void
+     * @return void - Asserts a zero exit code, using Git's error output as the failure message.
      */
     private function runGit(string $root, array $args): void
     {
@@ -165,7 +317,7 @@ final class PathIgnoreResolverTest extends TestCase
     }
 
     /**
-     * Create a temporary repository directory tracked for teardown.
+     * Create a temporary directory and register it for teardown.
      *
      * @return string - absolute path to the freshly created directory, already registered for teardown
      */
@@ -182,14 +334,14 @@ final class PathIgnoreResolverTest extends TestCase
     /**
      * Remove a temporary directory tree.
      *
-     * @param string $path - Directory path.
+     * @param string $path - Root of the temporary directory tree to remove.
      *
-     * @return void
+     * @return void - Attempts recursive cleanup; returns immediately for non-directory paths.
      */
     private function removeDir(string $path): void
     {
         if (!is_dir($path)) {
-            // Nothing to remove when the path was never created or already gone.
+
             return;
         }
 

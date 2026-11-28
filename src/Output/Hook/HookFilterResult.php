@@ -7,23 +7,19 @@ namespace GruffPhp\Output\Hook;
 use GruffPhp\Results\Finding\Finding;
 
 /**
- * Carries the outcome of hook finding-filtering back to the `hook` command that assembles the
- * agent feedback payload. When an editor or coding agent runs `gruff-php hook` after touching a
- * file, the filter either narrows a changed-region pass down to the findings on the edited lines
- * (with `--diff`/`--since`/`--changed-ranges`/`--baseline`), or - on a plain full scan - passes
- * every finding through. It hands back this object: the kept findings the agent is shown, a count
- * of any hidden for sitting outside the change or already existing, and the identity map the
- * command uses to stamp each kept finding's stable id.
+ * Carries hook-filtered findings, the suppressed count, and identities for the original input findings.
+ * The hook command uses the filtering result to assemble feedback after new-only and changed-region policies run.
+ *
+ * An empty kept list can mean every finding was suppressed, so it does not by itself establish a clean scan.
  */
 final readonly class HookFilterResult
 {
     /**
-     * Bundles the three filtering outputs the `hook` command needs to build its payload: what to
-     * show the agent, how much was held back, and how to label each finding.
+     * Bundles the retained findings, suppression count, and optional input identities from a filtering pass.
      *
-     * @param list<Finding>      $findings        - Findings that survived filtering and get shown to the agent; empty means nothing was surfaced - the edited lines (or, on a full scan, the whole scanned scope) came back clean.
-     * @param int                $suppressedCount - How many findings were hidden for sitting outside the change or already existing, surfaced as the payload's suppressed count so the agent knows some were held back.
-     * @param array<int, string> $identities      - Disambiguated stable identity for every input finding, kept and suppressed alike, keyed by `spl_object_id($finding)`; the command reads it only to stamp each kept finding. Empty (the default) means no map was carried, so the report computes each identity on the fly.
+     * @param list<Finding> $findings - Findings retained by filtering; empty may mean all input findings were suppressed.
+     * @param int $suppressedCount - Number of input findings excluded by new-only or changed-region filtering.
+     * @param array<int, string> $identities - Disambiguated identities for all input findings, keyed by spl_object_id(); defaults to empty.
      */
     public function __construct(
         public array $findings,

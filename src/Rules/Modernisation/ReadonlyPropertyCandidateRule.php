@@ -22,10 +22,10 @@ use PhpParser\NodeFinder;
  * Flags a property that is only ever assigned once, in the constructor of a final class, so the user can
  * consider marking it `readonly` and letting the engine enforce that immutability.
  *
- * Runs per file on PHP 8.1+ targets. It limits itself to eligible shapes - a final, non-readonly class
- * with no parent and no traits - then reports each typed property the constructor assigns and no later
- * method mutates or unsets. Advisory only: reflection or hydration may rely on mutability, so gruff-php
- * suggests rather than gates.
+ * Runs per file on PHP 8.1+ targets, and only on a final, non-readonly class with no parent and no traits.
+ *
+ * Within that shape it reports each typed property the constructor assigns and no later method mutates or unsets.
+ * Advisory only, because reflection or hydration may still rely on mutability, so gruff-php suggests rather than gates.
  */
 final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
 {
@@ -48,11 +48,21 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A property written after construction through a dynamic name ($this->$field = ...) or by reflection, as a hydrator or ORM does.',
+                    'mitigation' => 'Only statically named assignments and unsets count as late writes, so confirm no dynamic or reflective write exists before applying readonly.',
+                ],
+                [
+                    'shape'      => 'A property mutated only by being passed to a function by reference, such as sort($this->items).',
+                    'mitigation' => 'A by-reference mutation produces no assignment node and stays invisible here, so check for one before applying readonly.',
+                ],
+            ],
         );
     }
 
     /**
-     * Reports each constructor-only property in a final class that could become readonly.
+     * Reports constructor-only properties that pass this rule's readonly-candidate checks.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context supplying the target PHP version.
@@ -68,7 +78,7 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
 
         $findings = [];
 
-        // Inspect every class declared in the file.
+
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Class_::class) as $class) {
             array_push($findings, ...$this->classFindings($analysisUnit, $class));
         }
@@ -82,11 +92,11 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
      * @param AnalysisUnit $analysisUnit - Parsed unit used to anchor finding paths.
      * @param Stmt\Class_  $class - Class declaration being inspected.
      *
-     * @return list<Finding> - property findings for constructor-only assignments in this class
+     * @return list<Finding> - Property findings for declarations that pass this rule's assignment checks.
      */
     private function classFindings(AnalysisUnit $analysisUnit, Stmt\Class_ $class): array
     {
-        // Only a self-contained final class is safe to suggest readonly for.
+        // Only final, non-readonly classes without a parent or traits are eligible for property suggestions.
         if (!$this->isEligibleClass($class)) {
             return [];
         }
@@ -95,17 +105,17 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
         $lateAssignments        = $this->lateAssignments($class);
         $findings               = [];
 
-        // Check each property the class declares.
+
         foreach ($class->getProperties() as $property) {
-            // A static, already-readonly, or untyped property is not a candidate.
+
             if ($property->isStatic() || $property->isReadonly() || $property->type === null) {
                 continue;
             }
 
-            // One declaration can name several properties, so weigh each.
+            // One declaration can name several properties, so check each separately.
             foreach ($property->props as $propertyProperty) {
                 $finding = $this->propertyFinding($analysisUnit, $propertyProperty, $constructorAssignments, $lateAssignments);
-                // Keep only the properties that actually qualified.
+
                 if ($finding instanceof Finding) {
                     $findings[] = $finding;
                 }
@@ -116,9 +126,9 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
     }
 
     /**
-     * Reports whether a class shape can safely receive property-level readonly suggestions.
+     * Reports whether a class shape is eligible for property-level readonly suggestions.
      *
-     * @param Stmt\Class_ $class - Class declaration being inspected.
+     * @param Stmt\Class_ $class - Class tested for finality, readonly status, inheritance, and trait use.
      *
      * @return bool - true when the class is final, non-readonly, has no parent, and uses no traits
      */
@@ -180,9 +190,9 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
     {
         $assignments = [];
         $constructor = null;
-        // Find the constructor among the class methods.
+
         foreach ($class->getMethods() as $method) {
-            // Stop at the constructor; that is the only body we read here.
+
             if (strtolower($method->name->toString()) === '__construct') {
                 $constructor = $method;
                 break;
@@ -198,13 +208,13 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
         // Record each `$this->prop = ...` the constructor performs.
         foreach ($nodeFinder->findInstanceOf($constructor->stmts ?? [], Expr\Assign::class) as $assign) {
             $name = ModernisationNodeHelper::propertyFetchName($assign->var);
-            // Track only assignments to a named `$this` property.
+
             if ($name !== null && ModernisationNodeHelper::isThisPropertyFetch($assign->var)) {
                 $assignments[$name] = true;
             }
         }
 
-        // The set of `$this` properties the constructor assigns, keyed by name for O(1) candidate lookups.
+
         return $assignments;
     }
 
@@ -247,25 +257,23 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
     }
 
     /**
-     * Resolves a write target to its base `$this` property and records the mutation.
+     * Resolves a write target to its base $this property and records the mutation.
      *
-     * @param Expr $expr - Assignment or unset target; array-index writes like `$this->items[] = x` resolve to the
-     *   base property so element mutation still counts as mutating the property.
-     * @param array<string, true> &$assignments - Accumulator mutated in place; the resolved property name is added
-     *   when the target is a `$this` property, and left untouched otherwise.
+     * @param Expr $expr - Assignment or unset target; array offsets are reduced to their base property.
+     * @param array<string, true> &$assignments - Receives the named $this property; unchanged when the target is not one.
      *
-     * @return void
+     * @return void - Adds the resolved property name to the mutation set when one is found.
      */
     private function recordPropertyMutation(Expr $expr, array &$assignments): void
     {
         $target = $expr;
-        // Peel off array-index writes so `$this->items[] = x` still credits the underlying property.
+        // Remove array offsets so $this->items[] = x records a mutation of the underlying property.
         while ($target instanceof Expr\ArrayDimFetch) {
             $target = $target->var;
         }
 
         $name = ModernisationNodeHelper::propertyFetchName($target);
-        // Record the mutation only for a named `$this` property.
+
         if ($name !== null && ModernisationNodeHelper::isThisPropertyFetch($target)) {
             $assignments[$name] = true;
         }

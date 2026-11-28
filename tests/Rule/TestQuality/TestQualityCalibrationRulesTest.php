@@ -5,22 +5,22 @@ declare(strict_types=1);
 namespace GruffPhp\Tests\Rule\TestQuality;
 
 use GruffPhp\Engine\Config\AnalysisConfig;
+use GruffPhp\Engine\Config\ConfigLoader;
 use GruffPhp\Engine\Config\RuleSettings;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Engine\Parser\PhpFileParser;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\RuleRegistry;
-use GruffPhp\Rules\TestQuality\ConditionalTestLogicRule;
-use GruffPhp\Rules\TestQuality\MysteryGuestRule;
 use GruffPhp\Rules\TestQuality\RepeatedStructureMissingDataProviderRule;
 use GruffPhp\Rules\TestQuality\TestLongerThanSutRule;
-use GruffPhp\Rules\TestQuality\TestMethodTooLongRule;
 use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers calibration-specific test-quality rule shapes.
+ * Covers test-quality calibration through the configured rule registry.
+ * Parsed fixtures exercise the integration-harness count and a repeated-structure path exclusion.
+ * Assertions filter findings by rule ID; the fixture methods are not executed.
  */
 final class TestQualityCalibrationRulesTest extends TestCase
 {
@@ -28,21 +28,9 @@ final class TestQualityCalibrationRulesTest extends TestCase
     private const PROJECT_ROOT = __DIR__ . '/../../..';
 
     /**
-     * Verify mystery guest ignores files created by the test or written by the SUT.
+     * Verify the integration-harness fixture produces one test-longer-than-SUT finding.
      *
-     * @return void
-     */
-    public function testMysteryGuestIgnoresPreparedAndSutOwnedPaths(): void
-    {
-        $findings = $this->analysePath('tests/Fixtures/TestQuality/integration-harness-exemptions.php');
-
-        self::assertRuleCount(MysteryGuestRule::ID, 1, $findings);
-    }
-
-    /**
-     * Verify test-longer-than-SUT ignores command and process integration harness calls.
-     *
-     * @return void
+     * @return void - Asserts the rule-specific finding count is one.
      */
     public function testTestLongerThanSutIgnoresIntegrationHarnessCalls(): void
     {
@@ -52,54 +40,9 @@ final class TestQualityCalibrationRulesTest extends TestCase
     }
 
     /**
-     * Verify path overrides can raise the long-test threshold for integration-heavy folders.
+     * Verify repeated-structure rule supports project-specific path exemptions.
      *
-     * @return void
-     */
-    public function testTestMethodTooLongSupportsPathOverrides(): void
-    {
-        $registry = RuleRegistry::defaults();
-        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
-            TestMethodTooLongRule::ID,
-            new RuleSettings(
-                true,
-                ['maxMeaningfulLines' => 25],
-                ['pathOverrides' => ['tests/Fixtures/TestQuality/**' => 40]],
-            ),
-        );
-        $findings = $this->analysePath('tests/Fixtures/TestQuality/test-method-too-long.php', $config);
-
-        self::assertRuleCount(TestMethodTooLongRule::ID, 0, $findings);
-    }
-
-    /**
-     * Verify conditional logic rubric supports project-specific path exemptions.
-     *
-     * @return void
-     */
-    public function testConditionalLogicRuleSupportsIgnoredPathPatterns(): void
-    {
-        $registry = RuleRegistry::defaults();
-        $fixture  = 'tests/Fixtures/TestQuality/phpunit-core-smells.php';
-        $baseline = $this->analysePath($fixture);
-
-        self::assertRuleCount(ConditionalTestLogicRule::ID, 1, $baseline);
-
-        $config = AnalysisConfig::fromRegistry($registry)
-                                ->withRuleSettings(
-                                    ConditionalTestLogicRule::ID,
-                                    new RuleSettings(true, [], ['ignoredPathPatterns' => ['tests/Fixtures/TestQuality/**']]),
-                                );
-
-        $findings = $this->analysePath($fixture, $config);
-
-        self::assertRuleCount(ConditionalTestLogicRule::ID, 0, $findings);
-    }
-
-    /**
-     * Verify repeated-structure rubric supports project-specific path exemptions.
-     *
-     * @return void
+     * @return void - Asserts no repeated-structure findings under the configured path pattern.
      */
     public function testRepeatedStructureRuleSupportsIgnoredPathPatterns(): void
     {
@@ -117,11 +60,11 @@ final class TestQualityCalibrationRulesTest extends TestCase
     /**
      * Assert how many findings one rule emitted.
      *
-     * @param string        $ruleId - Rule whose findings are isolated before counting.
+     * @param string        $ruleId        - Rule whose findings are isolated before counting.
      * @param int           $expectedCount - Findings the rule must report for this fixture.
-     * @param list<Finding> $findings - Full analysis output to filter by rule id.
+     * @param list<Finding> $findings      - Full analysis output to filter by rule id.
      *
-     * @return void
+     * @return void - Asserts the number of findings whose rule ID matches the requested rule.
      */
     private static function assertRuleCount(string $ruleId, int $expectedCount, array $findings): void
     {
@@ -135,28 +78,29 @@ final class TestQualityCalibrationRulesTest extends TestCase
     /**
      * Analyse test-quality fixtures and return findings for assertions.
      *
-     * @param string          $path - Project-relative fixture path to parse and scan.
-     * @param ?AnalysisConfig $config - Override config; null applies the registry defaults.
+     * @param string          $path   - Project-relative fixture path to parse and scan.
+     * @param ?AnalysisConfig $config - Configuration override; null loads the fixture configuration that enables default-off rules.
      *
-     * @return list<Finding> - every finding the full default rule set emitted for the fixture, unfiltered; empty when clean
+     * @return list<Finding> - Unfiltered findings from rules enabled by the chosen configuration; empty when none are reported.
      */
     private function analysePath(string $path, ?AnalysisConfig $config = null): array
     {
         $registry = RuleRegistry::defaults();
         $unit     = $this->unitForPath($path);
+        $config ??= (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/enable-default-off-rules.yaml', $registry);
 
         return $registry->analyse(
             [$unit],
-            new RuleContext(self::PROJECT_ROOT, $config ?? AnalysisConfig::fromRegistry($registry)),
+            new RuleContext(self::PROJECT_ROOT, $config),
         );
     }
 
     /**
      * Parse the requested path into an analysis unit.
      *
-     * @param string $path - Filesystem path.
+     * @param string $path - Project-relative fixture path, also used as the display path.
      *
-     * @return AnalysisUnit - the parsed fixture, repo-relative display path preserved, ready to feed the rule registry
+     * @return AnalysisUnit - Fixture contents and any read or parse diagnostics, retaining the supplied display path.
      */
     private function unitForPath(string $path): AnalysisUnit
     {

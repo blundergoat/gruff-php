@@ -1,7 +1,8 @@
 # ADR-029: Baseline v2 group/count matching
 
-**Status:** Accepted
+**Status:** Superseded by ADR-033
 **Date:** 2026-07-03
+**Updated:** 2026-10-03 (the v3 line-free identity replaced the `(file, ruleId, message)` key in 0.6.0)
 **Author(s):** Matthew Hansen (decision), Claude (record)
 **Ticket/Context:** 0.5.0 baseline line-shift resilience
 

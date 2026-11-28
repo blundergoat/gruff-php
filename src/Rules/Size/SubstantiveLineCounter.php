@@ -5,33 +5,30 @@ declare(strict_types=1);
 namespace GruffPhp\Rules\Size;
 
 use GruffPhp\Engine\Parser\AnalysisUnit;
+use GruffPhp\Rules\Shared\NodeIndex;
+use PhpParser\Node\AttributeGroup;
 use WeakMap;
 
 /**
- * Shared substantive-line counting for the size rules: blank lines and comment-only lines are free
- * (family ratification, 2026-08-05), so required documentation can never push a file or class over
- * a size budget.
- *
- * Comment tokens from the parser are masked out of the source (newlines preserved) before counting
- * non-blank lines, so a line holding both code and a trailing comment still counts. Units without
- * parser tokens fall back to counting non-blank raw lines; syntax-error units can retain tokens and
- * receive the same comment masking as successfully parsed source.
+ * Counts substantive lines for file, class, and test length rules under FAMILY-CONTRACT section 12: Code lines in every line count.
+ * Masks comment tokens and located attribute groups with spaces, preserving newlines; blank masked lines do not count.
+ * With no spans, raw non-blank lines count; syntax-error units can retain comment tokens but have no parsed attributes.
  */
 final class SubstantiveLineCounter
 {
     /**
      * Cumulative substantive-line counts keyed by analysis-unit identity.
      *
-     * @var WeakMap<AnalysisUnit, list<int>>|null
+     * @var WeakMap<AnalysisUnit, list<int>>|null - Prefix counts with a leading zero, or null before cache initialization.
      */
     private static ?WeakMap $prefixCache = null;
 
     /**
      * Counts the substantive lines of the whole unit.
      *
-     * @param AnalysisUnit $analysisUnit - Unit whose source and comment tokens are inspected.
+     * @param AnalysisUnit $analysisUnit - Unit whose source, comment tokens, and parsed attributes are inspected.
      *
-     * @return int - Number of non-blank lines after comment masking.
+     * @return int - Non-blank line count after comment and attribute masking; zero when no code remains.
      */
     public static function countAll(AnalysisUnit $analysisUnit): int
     {
@@ -41,13 +38,13 @@ final class SubstantiveLineCounter
     }
 
     /**
-     * Counts the substantive lines inside one inclusive 1-based line range.
+     * Counts substantive lines in an inclusive 1-based range, stopping at the source end.
      *
-     * @param AnalysisUnit $analysisUnit - Unit whose source and comment tokens are inspected.
+     * @param AnalysisUnit $analysisUnit - Unit whose source, comment tokens, and parsed attributes are inspected.
      * @param int          $startLine    - First line of the range, 1-based inclusive.
      * @param int          $endLine      - Last line of the range, 1-based inclusive.
      *
-     * @return int - Number of non-blank lines after comment masking within the range.
+     * @return int - Masked non-blank line count; zero for reversed ranges or starts past the source.
      */
     public static function countRange(AnalysisUnit $analysisUnit, int $startLine, int $endLine): int
     {
@@ -56,7 +53,7 @@ final class SubstantiveLineCounter
         $startIndex      = max(0, $startLine - 1);
         $requestedLength = max(0, $endLine - $startLine + 1);
 
-        // Preserve the original array-slice bounds: an empty or out-of-source range contributes nothing.
+
         if ($requestedLength === 0 || $startIndex >= $lineCount) {
             return 0;
         }
@@ -71,7 +68,7 @@ final class SubstantiveLineCounter
      *
      * @param AnalysisUnit $analysisUnit - Unit to remove from the substantive-line cache.
      *
-     * @return void
+     * @return void - Removes the unit's cached counts, leaving an uninitialized cache untouched.
      */
     public static function evictUnit(AnalysisUnit $analysisUnit): void
     {
@@ -86,7 +83,7 @@ final class SubstantiveLineCounter
      *
      * Prefix index zero is always zero; index N stores the substantive count through source line N.
      *
-     * @param AnalysisUnit $analysisUnit - Unit whose comment-masked source is counted.
+     * @param AnalysisUnit $analysisUnit - Unit whose source is counted after comment and attribute masking.
      *
      * @return list<int> - Cumulative substantive-line counts with a leading zero.
      */
@@ -95,7 +92,7 @@ final class SubstantiveLineCounter
         self::$prefixCache ??= new WeakMap();
         $cached = self::$prefixCache[$analysisUnit] ?? null;
         if ($cached !== null) {
-            // A hit means this unit's mask and every range count are already represented by the prefix.
+
             return $cached;
         }
 
@@ -103,7 +100,7 @@ final class SubstantiveLineCounter
         $prefix = [0];
 
         foreach (self::maskedLines($analysisUnit) as $line) {
-            // A line is substantive when anything beyond whitespace survives the comment mask.
+
             if (trim($line) !== '') {
                 ++$count;
             }
@@ -116,32 +113,73 @@ final class SubstantiveLineCounter
     }
 
     /**
-     * Splits the comment-masked source into lines shared by both counting entry points.
+     * Splits the masked source into lines; a line that is blank after masking holds no code.
      *
-     * @param AnalysisUnit $analysisUnit - Unit whose comment tokens are blanked in place.
+     * Shared by both counting entry points and by rules that add their own per-line exclusions.
      *
-     * @return list<string> - Source lines with comment token text replaced by spaces.
+     * @param AnalysisUnit $analysisUnit - Unit whose comment tokens and attribute groups with usable offsets are blanked.
+     *
+     * @return list<string> - Source lines with each located comment or attribute span replaced by spaces.
      */
-    private static function maskedLines(AnalysisUnit $analysisUnit): array
+    public static function maskedLines(AnalysisUnit $analysisUnit): array
     {
         $masked       = '';
         $sourceOffset = 0;
 
-        // Copy source and masked-comment spans in order so each source byte is visited at most once.
-        foreach ($analysisUnit->tokens as $token) {
-            if (!$token->is([\T_COMMENT, \T_DOC_COMMENT])) {
-                continue;
-            }
-
-            $tokenLength = strlen($token->text);
-            $masked .= substr($analysisUnit->source, $sourceOffset, $token->pos - $sourceOffset);
-            $masked .= preg_replace('/[^\n]/', ' ', $token->text) ?? $token->text;
-            $sourceOffset = $token->pos + $tokenLength;
+        // Copy source and masked spans in order so each source byte is visited at most once.
+        foreach (self::freeSpans($analysisUnit) as [$start, $end]) {
+            $masked .= substr($analysisUnit->source, $sourceOffset, $start - $sourceOffset);
+            // Blank every character except newlines, so the masked span keeps its line count.
+            $masked .= preg_replace('/[^\n]/', ' ', substr($analysisUnit->source, $start, $end - $start)) ?? '';
+            $sourceOffset = $end;
         }
 
-        // Preserve the untouched tail after the final comment token.
+
         $masked .= substr($analysisUnit->source, $sourceOffset);
 
         return explode("\n", $masked);
+    }
+
+    /**
+     * Lists merged, source-ordered spans for comment tokens and parsed attribute groups with usable offsets.
+     *
+     * @param AnalysisUnit $analysisUnit - Unit whose comment tokens and attribute groups are read.
+     *
+     * @return list<array{int, int}> - Non-overlapping spans as start-inclusive, end-exclusive byte offsets.
+     */
+    private static function freeSpans(AnalysisUnit $analysisUnit): array
+    {
+        $spans = [];
+
+        // A syntax-error unit keeps every token, so only comment tokens are taken from the stream.
+        foreach ($analysisUnit->tokens as $token) {
+            if ($token->is([\T_COMMENT, \T_DOC_COMMENT])) {
+                $spans[] = [$token->pos, $token->pos + strlen($token->text)];
+            }
+        }
+
+        // An attribute group without parser offsets cannot be located, so it stays countable.
+        foreach (NodeIndex::nodesOf($analysisUnit, AttributeGroup::class) as $attributeGroup) {
+            $start = $attributeGroup->getStartFilePos();
+            $end   = $attributeGroup->getEndFilePos() + 1;
+            if ($start >= 0 && $end > $start) {
+                $spans[] = [$start, $end];
+            }
+        }
+
+        usort($spans, static fn (array $left, array $right): int => $left[0] <=> $right[0]);
+
+        $merged = [];
+        foreach ($spans as [$start, $end]) {
+            $last = count($merged) - 1;
+            // A comment written inside an attribute is already part of that attribute's span.
+            if ($last >= 0 && $start <= $merged[$last][1]) {
+                $merged[$last][1] = max($merged[$last][1], $end);
+                continue;
+            }
+            $merged[] = [$start, $end];
+        }
+
+        return $merged;
     }
 }

@@ -16,9 +16,14 @@ use GruffPhp\Rules\Contracts\RuleInterface;
 use PhpParser\Node\Stmt\ClassMethod;
 
 /**
- * Flags a test that runs without a single observable check - no PHPUnit/Pest assertion, no mock
- * verification, no expectException, no explicit assertion-count marker - so it proves nothing and passes
- * as long as the code does not throw. Runs over every test in the file. Error severity, medium confidence.
+ * Reports PHPUnit or Pest tests that execute code without any recognized assertion, expectation, or skip/incomplete marker.
+ *
+ * When a user enables `test-quality.no-assertions` in `.gruff-php.yaml`, this catches smoke tests that only prove code did not crash.
+ * Emits error findings at medium confidence and stays disabled by default so projects can opt in explicitly.
+ *
+ * Recognizes the following expectation evidence before flagging a test:
+ * - Direct PHPUnit assertions, Pest `expect()` calls, mock verifications, and `addToAssertionCount()` / `markTestIncomplete()` / `markTestSkipped()`.
+ * - Same-class helper method chains up to eight bodies deep and Laravel `AssertableJson::fromArray()` fluent JSON checks.
  */
 final readonly class NoAssertionsRule implements RuleInterface
 {
@@ -34,33 +39,41 @@ final readonly class NoAssertionsRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Error severity: a test that asserts nothing proves nothing, so it should fail the gate by default.
         return new RuleDefinition(
-            id:              self::ID,
-            name:            'Test without assertions',
-            pillar:          Pillar::TestQuality,
-            tier:            RuleTier::V01,
-            defaultSeverity: Severity::Error,
-            confidence:      Confidence::Medium,
+            id:                  self::ID,
+            name:                'Test without assertions',
+            pillar:              Pillar::TestQuality,
+            tier:                RuleTier::V01,
+            defaultSeverity:     Severity::Error,
+            confidence:          Confidence::Medium,
+            isEnabledByDefault:  false,
+            falsePositiveShapes: [
+                [
+                    'shape' => 'A test whose checks run inside a project helper with a domain name, such as seeInDatabase() or verifyRendered(), rather than an assert-prefixed call.',
+                    'mitigation' => 'Direct supported expectations, invoked same-class helpers within eight method bodies, and addToAssertionCount(), markTestIncomplete(), or markTestSkipped() calls are recognized. External or unresolved helpers still need a visible assertion; helper names alone do not establish a check.',
+                ],
+            ],
         );
     }
 
     /**
-     * Reports tests that do not contain an observable assertion or expectation.
+     * Reports each test scope for which no supported check or exemption is detected.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext  - Unused; the rule interface requires it, and this rule reads no options or project root.
      *
-     * @return list<Finding> - Findings for assertion-free tests.
+     * @return list<Finding> - Findings for scopes with no detected check or exemption; empty when none qualify.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $findings = [];
 
-        // Weigh every test scope in the file.
+        // Check every discovered PHPUnit test method or Pest test callback in the file for observable verification.
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
-            // A test with any observable expectation is already proving something.
-            if ($this->hasObservableExpectation($scope)) {
+            // Keep the test quiet once any direct assertion, same-class helper assertion, or fluent JSON check is found.
+            if ($this->hasObservableExpectation($scope)
+                || InvokedTestMethodEvidence::hasExpectation($scope, $analysisUnit)
+                || FluentJsonAssertionEvidence::hasExpectation($scope, $analysisUnit)) {
                 continue;
             }
 
@@ -68,13 +81,13 @@ final readonly class NoAssertionsRule implements RuleInterface
                 ruleId:      self::ID,
                 message:     sprintf('%s has no detected PHPUnit or Pest assertions.', $scope->symbol),
                 filePath:    $analysisUnit->file->displayPath,
-                line:        $scope->line,
+                line:        $scope->anchorLine(),
                 severity:    Severity::Error,
                 pillar:      Pillar::TestQuality,
                 tier:        RuleTier::V01,
                 confidence:  Confidence::Medium,
                 symbol:      $scope->symbol,
-                remediation: 'Add an assertion or expectation that proves observable behavior, or disable this rule for custom assertion wrappers.',
+                remediation: 'Add an assertion or expectation that proves the observable behaviour this test names.',
                 metadata:    ['framework' => $scope->isPest ? 'pest' : 'phpunit'],
             );
         }
@@ -83,39 +96,38 @@ final readonly class NoAssertionsRule implements RuleInterface
     }
 
     /**
-     * Reports whether a test has any observable assertion, verification, or expectation marker.
+     * Reports whether the rule detects a supported assertion, verification, expectation, skip, or incomplete marker.
      *
-     * @param TestQualityScope $scope - Test scope whose body is searched for any observable expectation.
+     * @param TestQualityScope $scope - Test scope searched for supported expectation evidence.
      *
-     * @return bool - True when the test has an observable expectation.
+     * @return bool - True when supported assertion, verification, expectation, skip, or incomplete evidence is detected.
      */
     private function hasObservableExpectation(TestQualityScope $scope): bool
     {
+        // Standard PHPUnit assertions and Pest expect() calls immediately satisfy the rule.
         if (TestQualityNodeHelper::assertionCalls($scope) !== []) {
-            // A direct assertion call is the clearest proof of intent, so the test is already covered.
             return true;
         }
 
+        // A legacy @expectedException docblock annotation counts as observable throw evidence for older PHPUnit tests.
         if ($scope->node instanceof ClassMethod && $this->hasExpectedExceptionAnnotation($scope->node)) {
-            // A legacy @expectedException docblock asserts a throw, so count it as an observable expectation.
             return true;
         }
 
-        // Fall back to scanning the test's calls for a mock check or explicit marker.
+        // Scan remaining calls for mock expectations or explicit PHPUnit assertion-count and skip/incomplete markers.
         foreach (TestQualityNodeHelper::calls($scope) as $call) {
+            // A supported mock-expectation call such as expects() or shouldReceive() counts as observable verification.
             if (TestQualityNodeHelper::isMockVerificationCall($call)) {
-                // A mock verification (such as a Mockery expectation) is checked at teardown, so it counts.
                 return true;
             }
 
             $name = TestQualityNodeHelper::callName($call);
+            // Explicitly recording assertion counts or marking a test skipped/incomplete explains why no assert*() call appears.
             if (in_array($name, ['addtoassertioncount', 'marktestincomplete', 'marktestskipped'], true)) {
-                // These PHPUnit calls register an explicit expectation or deliberate skip, not an empty test.
                 return true;
             }
         }
 
-        // No assertion, expectation annotation, mock verification, or marker found, so the test verifies nothing.
         return false;
     }
 

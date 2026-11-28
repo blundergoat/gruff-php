@@ -15,7 +15,9 @@ use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers class-length thresholds (warning/error), interface exemption, and trait inclusion.
+ * Covers class-length findings under explicit warning and error thresholds.
+ * Verifies finding counts, severity, and declaration symbols where asserted.
+ * Includes an interface exemption and a trait that exceeds its warning threshold.
  */
 final class ClassLengthRuleTest extends TestCase
 {
@@ -25,9 +27,9 @@ final class ClassLengthRuleTest extends TestCase
     private PhpFileParser $parser;
 
     /**
-     * Prepare parser fixtures before each rule test.
+     * Initializes the class-length rule and fixture parser before each test.
      *
-     * @return void
+     * @return void - Assigns fresh instances to the rule and parser properties.
      */
     protected function setUp(): void
     {
@@ -38,7 +40,7 @@ final class ClassLengthRuleTest extends TestCase
     /**
      * Verify no findings for small class.
      *
-     * @return void
+     * @return void - Asserts an empty finding list with warning 300 and error 500.
      */
     public function testNoFindingsForSmallClass(): void
     {
@@ -50,7 +52,7 @@ final class ClassLengthRuleTest extends TestCase
     /**
      * Verify warning for class above warning threshold.
      *
-     * @return void
+     * @return void - Asserts one class-length warning naming LongMethodFixture.
      */
     public function testWarningForClassAboveWarningThreshold(): void
     {
@@ -65,7 +67,7 @@ final class ClassLengthRuleTest extends TestCase
     /**
      * Verify error for class above error threshold.
      *
-     * @return void
+     * @return void - Asserts a single finding with error severity.
      */
     public function testErrorForClassAboveErrorThreshold(): void
     {
@@ -78,7 +80,7 @@ final class ClassLengthRuleTest extends TestCase
     /**
      * Verify interface is not flagged.
      *
-     * @return void
+     * @return void - Asserts the interface fixture produces no class-length findings.
      */
     public function testInterfaceIsNotFlagged(): void
     {
@@ -90,7 +92,7 @@ final class ClassLengthRuleTest extends TestCase
     /**
      * Verify trait is flagged.
      *
-     * @return void
+     * @return void - Asserts one warning naming LongTraitFixture.
      */
     public function testTraitIsFlagged(): void
     {
@@ -102,12 +104,12 @@ final class ClassLengthRuleTest extends TestCase
     }
 
     /**
-     * Analyse fixture paths and return findings for assertions.
+     * Analyses one size fixture with the supplied class-length thresholds.
      *
      * @param string             $fixture - Fixture filename under tests/Fixtures/Size to scan.
-     * @param array<string, int> $thresholds - Rule option overrides applied before the fixture runs.
+     * @param array<string, int> $thresholds - Warning/error thresholds supplied to this rule.
      *
-     * @return list<\GruffPhp\Results\Finding\Finding> - findings the rule emitted for the fixture; empty when the class stays within thresholds
+     * @return list<\GruffPhp\Results\Finding\Finding> - Findings from this rule only; empty if no measured declaration exceeds its threshold.
      */
     private function analyse(string $fixture, array $thresholds): array
     {
@@ -125,7 +127,7 @@ final class ClassLengthRuleTest extends TestCase
     /**
      * Parse the named fixture into an analysis unit.
      *
-     * @param string $filename - Fixture filename.
+     * @param string $filename - Name of a PHP fixture under tests/Fixtures/Size.
      *
      * @return \GruffPhp\Engine\Parser\AnalysisUnit - parsed fixture ready to feed to the rule, with its display path kept repo-relative
      */

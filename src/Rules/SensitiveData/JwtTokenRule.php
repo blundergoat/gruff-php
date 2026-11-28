@@ -14,12 +14,11 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\SourceTextRuleInterface;
 
 /**
- * Flags a string that matches the three-segment JWT shape (`eyJ....eyJ....sig`), so the user can move
- * embedded tokens out of source fixtures and config and mint them at runtime instead.
+ * Flags a string shaped like a JWT (`eyJ....eyJ....signature`), so the user moves the token out of source and config and mints it at runtime.
+ * For example, a developer pastes a working session token into a config file or fixture to get a request through.
  *
- * A source-text rule that skips matches inside comments and obvious dummy values and redacts the reported
- * token. It shares its shape check with the high-entropy rule so each dotted secret reports exactly once.
- * Warning severity, medium confidence - test fixtures do legitimately embed sample tokens.
+ * - Matches inside comments and obvious dummy values are skipped, and the report shows only a redacted marker.
+ * - Warning severity, medium confidence: test fixtures do legitimately embed sample tokens.
  */
 final readonly class JwtTokenRule implements SourceTextRuleInterface
 {
@@ -32,22 +31,6 @@ final readonly class JwtTokenRule implements SourceTextRuleInterface
      * Three-segment JWT shape: two base64url `eyJ` JSON segments plus a signature segment.
      */
     private const JWT_SHAPE_PATTERN = 'eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}';
-
-    /**
-     * Reports whether a whole literal is JWT-shaped.
-     *
-     * Shared with the high-entropy rule so each dotted secret reports exactly once:
-     * real JWTs under this rule, opaque dotted tokens under high-entropy.
-     *
-     * @param string $literal - Candidate string literal.
-     *
-     * @return bool - true when the entire literal matches the three-segment `eyJ` JWT shape this rule scans for
-     */
-    public static function matchesJwtShape(string $literal): bool
-    {
-        // Anchors the shared three-segment JWT pattern so the ENTIRE literal must be JWT-shaped, not a substring.
-        return preg_match('/^' . self::JWT_SHAPE_PATTERN . '$/', $literal) === 1;
-    }
 
     /**
      * Describes the JWT-token sensitive-data rule for the registry and reports.
@@ -65,52 +48,60 @@ final readonly class JwtTokenRule implements SourceTextRuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A test fixture or documentation sample embedding a real-shaped but expired or synthetic JWT outside a comment.',
+                    'mitigation' => 'Only obvious dummy values and matches inside comments are skipped, so mint the token at runtime or move the sample into a comment.',
+                ],
+            ],
         );
     }
 
     /**
      * Reports each string that resembles an embedded JWT token, redacting the value.
      *
-     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Supplies raw source and comment tokens for scanning.
+     * @param RuleContext $ruleContext - Required by the rule interface; unused by this scanner.
      *
-     * @return list<\GruffPhp\Results\Finding\Finding> - Findings for JWT-like literals.
+     * @return list<\GruffPhp\Results\Finding\Finding> - One finding per retained JWT-shaped match; empty when none survive.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
+        // Fast pre-screen: files without the base64url JSON prefix `eyJ` cannot contain a supported JWT literal.
         if (!str_contains($analysisUnit->source, 'eyJ')) {
-            // Every JWT header segment begins "eyJ"; without it no token can match, so skip the scan.
             return [];
         }
 
-        // Match every JWT-shaped token in the source, capturing each one's byte offset.
+        // Candidate offsets allow comment and dummy-value filters before a redacted finding is emitted.
         preg_match_all('/\b' . self::JWT_SHAPE_PATTERN . '\b/', $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
         $findings      = [];
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
-        // Weigh each candidate the scan found.
+
+        // Judge each token match independently so a sample token in a comment cannot hide a live-shaped token elsewhere.
         foreach ($matches[0] as $match) {
             [$candidateSecret, $offset] = $match;
-            // A token inside a comment is an example, not a live secret.
+
+            // Skip documentation examples inside PHP comments so explanatory docblocks do not trigger false alarms.
             if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
                 continue;
             }
 
-            // An obvious sample or dummy token is not a real secret.
+            // Skip documented vendor examples (such as jwt.io) and placeholder tokens before reporting.
             if (SecretScannerHelper::isLikelyDummyValue($candidateSecret)) {
                 continue;
             }
 
-            $preview    = SecretScannerHelper::redactedPreview($candidateSecret);
-            $findings[] = SecretScannerHelper::finding(
-                analysisUnit: $analysisUnit,
-                ruleId:       self::ID,
-                message:      sprintf('JWT-like token literal detected: %s.', $preview),
-                line:         SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
-                confidence:   Confidence::Medium,
-                detector:     'jwt-token',
-                preview:      $preview,
-                remediation:  'Move tokens out of source fixtures/config and generate them at runtime.',
+            $displayMarker = SecretScannerHelper::categoryMarker('jwt');
+            $findings[]    = SecretScannerHelper::findingAtOffset(
+                analysisUnit:  $analysisUnit,
+                ruleId:        self::ID,
+                message:       sprintf('JWT-like token literal detected: %s.', $displayMarker),
+                offset:        $offset,
+                confidence:    Confidence::Medium,
+                detector:      'jwt-token',
+                displayMarker: $displayMarker,
+                remediation:   'Move tokens out of source fixtures/config and generate them at runtime.',
             );
         }
 

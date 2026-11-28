@@ -6,13 +6,15 @@ namespace GruffPhp\Tests\Review;
 
 /**
  * Provides PHP source strings for branch-review CLI fixtures.
+ * The Example variants preserve or add undocumented methods for finding comparisons.
+ * The NewRisk variant supplies an unserialize() call without an object restriction.
  */
 final class AgentWorkflowFixtureSources
 {
     /**
      * Return source code for the base review fixture.
      *
-     * @return string - PHP source for the clean Example class used as the "before" side of a branch-review diff
+     * @return string - PHP source for Example with an undocumented calculate() method retained in the changed fixture.
      */
     public static function baseExampleSource(): string
     {
@@ -93,7 +95,7 @@ PHP;
     /**
      * Return source code for an added risky review fixture.
      *
-     * @return string - PHP source for the NewRisk class whose unserialize() of caller input trips a real security rule
+     * @return string - PHP source with an unrestricted unserialize() call, reported when security.unsafe-unserialize is enabled.
      */
     public static function addedRiskSource(): string
     {

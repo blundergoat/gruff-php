@@ -5,27 +5,21 @@ declare(strict_types=1);
 namespace GruffPhp\Tests\Rule\Waste;
 
 use GruffPhp\Engine\Config\AnalysisConfig;
-use GruffPhp\Engine\Config\RuleSettings;
-use GruffPhp\Results\Finding\Pillar;
-use GruffPhp\Results\Finding\RemediationAction;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\PhpFileParser;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\RuleRegistry;
 use GruffPhp\Rules\Waste\CommentedOutCodeRule;
-use GruffPhp\Rules\Waste\EmptyClassRule;
 use GruffPhp\Rules\Waste\EmptyMethodRule;
-use GruffPhp\Rules\Waste\OneLineMethodRule;
-use GruffPhp\Rules\Waste\RedundantVariableRule;
 use GruffPhp\Rules\Waste\UnreachableCodeRule;
 use GruffPhp\Rules\Waste\UnusedImportRule;
-use GruffPhp\Rules\Waste\UnusedParameterRule;
 use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers waste detection: unreachable code, empty methods and classes, unused imports and parameters, commented-out code, one-line wrapper methods
- * (with intent and allowlist exemptions), and redundant variable-before-return.
+ * Covers waste detection: unreachable code, empty methods, unused imports, and commented-out code.
+ * Checks rule findings and exclusions using parsed dead-code fixtures.
+ * Also asserts that the clean fixture produces no waste or dead-code findings.
  */
 final class WasteRulesTest extends TestCase
 {
@@ -33,9 +27,9 @@ final class WasteRulesTest extends TestCase
     private PhpFileParser $parser;
 
     /**
-     * Prepare parser fixtures before each rule test.
+     * Initialize the parser used to read rule fixtures.
      *
-     * @return void
+     * @return void - Leaves each rule-fixture test with a fresh parser.
      */
     protected function setUp(): void
     {
@@ -43,9 +37,9 @@ final class WasteRulesTest extends TestCase
     }
 
     /**
-     * Verify unreachable code after return.
+     * Check the unreachable-code fixture's finding count, rule IDs, and warning severity.
      *
-     * @return void
+     * @return void - Asserts three warning findings, all attributed to UnreachableCodeRule.
      */
     public function testUnreachableCodeAfterReturn(): void
     {
@@ -61,9 +55,9 @@ final class WasteRulesTest extends TestCase
     }
 
     /**
-     * Verify no unreachable code in clean file.
+     * Check that the unreachable-code rule reports no findings for the clean fixture.
      *
-     * @return void
+     * @return void - Asserts an empty findings list for UnreachableCodeRule.
      */
     public function testNoUnreachableCodeInCleanFile(): void
     {
@@ -73,9 +67,9 @@ final class WasteRulesTest extends TestCase
     }
 
     /**
-     * Verify empty method detected.
+     * Check that the empty-method rule emits advisory findings for the empty-members fixture.
      *
-     * @return void
+     * @return void - Asserts a nonempty result containing only EmptyMethodRule advisory findings.
      */
     public function testEmptyMethodDetected(): void
     {
@@ -91,9 +85,9 @@ final class WasteRulesTest extends TestCase
     }
 
     /**
-     * Verify abstract method not flagged as empty.
+     * Checks that abstract declarations are excluded from empty-method findings.
      *
-     * @return void
+     * @return void - Asserts that AbstractFixture::abstractMethod() is absent from the finding symbols.
      */
     public function testAbstractMethodNotFlaggedAsEmpty(): void
     {
@@ -104,9 +98,9 @@ final class WasteRulesTest extends TestCase
     }
 
     /**
-     * Verify promoted constructor not flagged as empty.
+     * Checks that constructors with promoted properties are excluded from empty-method findings.
      *
-     * @return void
+     * @return void - Asserts that PromotedConstructorFixture::__construct() is absent from the finding symbols.
      */
     public function testPromotedConstructorNotFlaggedAsEmpty(): void
     {
@@ -117,35 +111,9 @@ final class WasteRulesTest extends TestCase
     }
 
     /**
-     * Verify empty class detected.
+     * Checks that the fixture reports exactly InvalidArgumentException and LogicException as unused.
      *
-     * @return void
-     */
-    public function testEmptyClassDetected(): void
-    {
-        $findings = $this->analyseRule('empty-members.php', EmptyClassRule::ID);
-
-        self::assertCount(1, $findings);
-        self::assertSame('EmptyClassFixture', $findings[0]->symbol);
-    }
-
-    /**
-     * Verify empty exception marker not flagged as empty class.
-     *
-     * @return void
-     */
-    public function testEmptyExceptionMarkerNotFlaggedAsEmptyClass(): void
-    {
-        $findings = $this->analyseRule('empty-members.php', EmptyClassRule::ID);
-
-        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
-        self::assertNotContains('EmptyExceptionFixture', $symbols);
-    }
-
-    /**
-     * Verify unused imports detected.
-     *
-     * @return void
+     * @return void - Asserts two findings naming InvalidArgumentException and LogicException.
      */
     public function testUnusedImportsDetected(): void
     {
@@ -159,9 +127,9 @@ final class WasteRulesTest extends TestCase
     }
 
     /**
-     * Verify used import not flagged.
+     * Checks that a referenced RuntimeException import is absent from unused-import findings.
      *
-     * @return void
+     * @return void - Asserts that RuntimeException is absent from the unused-import finding symbols.
      */
     public function testUsedImportNotFlagged(): void
     {
@@ -172,90 +140,9 @@ final class WasteRulesTest extends TestCase
     }
 
     /**
-     * Verify unused parameter in private method.
+     * Checks that the fixture yields commented-out-code findings whose first severity is advisory.
      *
-     * @return void
-     */
-    public function testUnusedParameterInPrivateMethod(): void
-    {
-        $findings = $this->analyseRule('unused-parameter.php', UnusedParameterRule::ID);
-
-        $params = array_map(static fn($finding) => $finding->metadata['parameter'] ?? null, $findings);
-        self::assertContains('unused', $params);
-    }
-
-    /**
-     * Verify used parameter not flagged.
-     *
-     * @return void
-     */
-    public function testUsedParameterNotFlagged(): void
-    {
-        $findings = $this->analyseRule('unused-parameter.php', UnusedParameterRule::ID);
-
-        $params = array_map(static fn($finding) => $finding->metadata['parameter'] ?? null, $findings);
-        self::assertNotContains('used', $params);
-        self::assertNotContains('a', $params);
-        self::assertNotContains('b', $params);
-    }
-
-    /**
-     * Verify unused parameter in public method without external contract.
-     *
-     * @return void
-     */
-    public function testUnusedParameterInPublicMethodWithoutExternalContract(): void
-    {
-        $findings = $this->analyseRule('unused-parameter.php', UnusedParameterRule::ID);
-
-        $reported = array_values(array_filter(
-                                     array_map(
-                                         static fn($finding): ?string => $finding->symbol !== null && is_string($finding->metadata['parameter'] ?? null)
-                                             ? $finding->symbol . ':' . $finding->metadata['parameter']
-                                             : null,
-                                         $findings,
-                                     ),
-                                     'is_string',
-                                 ));
-
-        self::assertContains('UnusedParameterFixture::publicMethod():detailed', $reported);
-    }
-
-    /**
-     * Verify public method parameters with external contracts are not checked.
-     *
-     * @return void
-     */
-    public function testPublicMethodParametersWithExternalContractsAreNotChecked(): void
-    {
-        $findings = $this->analyseRule('unused-parameter.php', UnusedParameterRule::ID);
-
-        $paramsBySymbol = [];
-        foreach ($findings as $finding) {
-            $paramsBySymbol[$finding->symbol ?? ''][] = $finding->metadata['parameter'] ?? null;
-        }
-
-        self::assertArrayNotHasKey('InheritedParameterFixture::hook()', $paramsBySymbol);
-        self::assertArrayNotHasKey('ContractParameterFixture::handle()', $paramsBySymbol);
-    }
-
-    /**
-     * Verify promoted private constructor parameters are used as properties.
-     *
-     * @return void
-     */
-    public function testPromotedPrivateConstructorParametersAreUsedAsProperties(): void
-    {
-        $findings = $this->analyseRule('unused-parameter.php', UnusedParameterRule::ID);
-
-        $params = array_map(static fn($finding) => $finding->metadata['parameter'] ?? null, $findings);
-        self::assertNotContains('promoted', $params);
-    }
-
-    /**
-     * Verify commented out code detected.
-     *
-     * @return void
+     * @return void - Asserts nonempty CommentedOutCodeRule findings with an advisory first finding.
      */
     public function testCommentedOutCodeDetected(): void
     {
@@ -266,205 +153,21 @@ final class WasteRulesTest extends TestCase
     }
 
     /**
-     * Verify one line call wrapper methods are detected.
+     * Defines the precision fixture's reportable comment set by exact source line.
      *
-     * @return void
+     * @return void - Asserts the exact finding lines for the commented-out-code-precision fixture.
      */
-    public function testOneLineCallWrapperMethodsAreDetected(): void
+    public function testCommentedOutCodeSkipsProseAndRestatements(): void
     {
-        $findings = $this->analyseRule('one-line-methods.php', OneLineMethodRule::ID);
-        $symbols  = array_map(static fn($finding): ?string => $finding->symbol, $findings);
+        $findings = $this->analyseRule('commented-out-code-precision.php', CommentedOutCodeRule::ID);
 
-        self::assertContains('PrivatePassThroughFixture::rows()', $symbols);
-        self::assertContains('PrivatePassThroughFixture::oneShotHelper()', $symbols);
-
-        $rowsFinding = array_values(array_filter(
-                                        $findings,
-                                        static fn($finding): bool => $finding->symbol === 'PrivatePassThroughFixture::rows()',
-                                    ))[0] ?? null;
-
-        self::assertNotNull($rowsFinding);
-        self::assertSame(Severity::Advisory, $rowsFinding->severity);
-        self::assertSame(Pillar::Maintainability, $rowsFinding->pillar);
-        self::assertSame('return', $rowsFinding->metadata['statementKind']);
-        self::assertSame(RemediationAction::Apply->value, $rowsFinding->metadata['remediationAction'] ?? null);
-        self::assertSame(
-            'rules.waste.one-line-method.options.allowedSymbols',
-            $rowsFinding->metadata['configurationKey'] ?? null,
-        );
+        self::assertSame([31, 32, 37, 39, 41, 43, 45, 47, 49, 50, 52], array_map(static fn($finding): ?int => $finding->line, $findings));
     }
 
     /**
-     * Verify exact named callbacks are exempt while conservative callback shapes and ordinary wrappers remain visible.
+     * Checks that the clean fixture emits no findings from the waste or dead-code rule families.
      *
-     * @return void
-     */
-    public function testOneLineMethodRulePreservesNamedCallbackBoundaries(): void
-    {
-        $findings = $this->analyseRule('one-line-methods.php', OneLineMethodRule::ID);
-        $symbols  = array_map(static fn($finding): ?string => $finding->symbol, $findings);
-
-        $supportedCallbackSymbols = [
-            'NamedCallbackBoundaryFixture::compareRows()',
-            'NamedCallbackBoundaryFixture::serialiseRow()',
-            'NamedCallbackBoundaryFixture::formatThisRow()',
-            'NamedCallbackBoundaryFixture::formatSelfRow()',
-            'NamedCallbackBoundaryFixture::formatStaticRow()',
-            'NamedCallbackBoundaryFixture::formatClassRow()',
-            'NamedCallbackBoundaryFixture::formatMagicRow()',
-            'NamedCallbackBoundaryFixture::formatReorderedRow()',
-        ];
-        self::assertSame([], array_values(array_intersect($supportedCallbackSymbols, $symbols)));
-
-        self::assertContains('ConservativeCallbackBoundaryFixture::foreignClassTarget()', $symbols);
-        self::assertContains('ConservativeCallbackBoundaryFixture::dynamicReceiverTarget()', $symbols);
-        self::assertContains('ConservativeCallbackBoundaryFixture::computedMethodTarget()', $symbols);
-        self::assertContains('ConservativeCallbackBoundaryFixture::missingClassTarget()', $symbols);
-        self::assertContains('ConservativeCallbackBoundaryFixture::shortNameCollisionTarget()', $symbols);
-        self::assertContains('ConservativeCallbackBoundaryFixture::stringCallbackTarget()', $symbols);
-        self::assertContains('ConservativeCallbackBoundaryFixture::metadataOnlyTarget()', $symbols);
-        self::assertContains('ParentDeclaredCallbackBoundaryFixture::parentDeclaredTarget()', $symbols);
-
-        $ordinaryWrapperFindings = array_values(array_filter(
-            $findings,
-            static fn($finding): bool => $finding->symbol === 'PrivatePassThroughFixture::oneShotHelper()',
-        ));
-        self::assertCount(1, $ordinaryWrapperFindings);
-        self::assertSame('b785028ab40a58c3', $ordinaryWrapperFindings[0]->stableIdentity());
-    }
-
-    /**
-     * Verify one line method rule skips pure expressions and no argument accessors.
-     *
-     * @return void
-     */
-    public function testOneLineMethodRuleSkipsPureExpressionsAndNoArgumentAccessors(): void
-    {
-        $findings = $this->analyseRule('one-line-methods.php', OneLineMethodRule::ID);
-        $symbols  = array_map(static fn($finding): ?string => $finding->symbol, $findings);
-
-        self::assertNotContains('OneLineMethodFixture::formatGreeting()', $symbols);
-        self::assertNotContains('OneLineMethodFixture::getName()', $symbols);
-        self::assertNotContains('OneLineMethodFixture::testItUsesFixture()', $symbols);
-        self::assertNotContains('PracticeAssistantSessionDto::sessionId()', $symbols);
-    }
-
-    /**
-     * Verify one-line method caller and named-factory exemptions are opt-in.
-     *
-     * @return void
-     */
-    public function testOneLineMethodRuleSupportsIntentBearingExemptions(): void
-    {
-        $registry = RuleRegistry::defaults();
-        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
-            OneLineMethodRule::ID,
-            new RuleSettings(
-                true,
-                [],
-                [
-                    'minParameters'                 => 1,
-                    'minInFileCallers'              => 2,
-                    'namedAlternativeFactoryExempt' => true,
-                ],
-            ),
-        );
-        $findings = $this->analyseRule('one-line-methods.php', OneLineMethodRule::ID, $config);
-        $symbols  = array_map(static fn($finding): ?string => $finding->symbol, $findings);
-
-        self::assertNotContains('OneLineMethodFixture::isEligible()', $symbols);
-        self::assertNotContains('SingleFactoryFixture::only()', $symbols);
-        self::assertNotContains('OneLineMethodFixture::sharedHelper()', $symbols);
-        self::assertNotContains('AlternativeFactoryFixture::ready()', $symbols);
-        self::assertNotContains('AlternativeFactoryFixture::failed()', $symbols);
-        self::assertNotContains('ContractRowsAdapter::rows()', $symbols);
-        self::assertNotContains('AbstractPayloadAdapterImplementation::normalisePayload()', $symbols);
-        self::assertNotContains('TraitPayloadLabelAdapter::labelFor()', $symbols);
-        self::assertNotContains('DomainVocabularyWrapper::supportsPracticeAssistant()', $symbols);
-        self::assertContains('PrivatePassThroughFixture::rows()', $symbols);
-        self::assertContains('PrivatePassThroughFixture::oneShotHelper()', $symbols);
-    }
-
-    /**
-     * Verify caller-count exemption is scoped to the owning class. A second class in
-     * the same file that defines a same-named method (e.g. `save()`) but only has one
-     * self-caller must still fire even when another class's `save()` has two callers.
-     *
-     * @return void
-     */
-    public function testOneLineMethodRuleScopesCallerCountToOwningClass(): void
-    {
-        $findings = $this->analyseRule('one-line-methods.php', OneLineMethodRule::ID);
-        $symbols  = array_map(static fn($finding): ?string => $finding->symbol, $findings);
-
-        // CrossClassCallerOwnerB::save() has only one in-class caller and must still fire,
-        // even though CrossClassCallerOwnerA::save() (different class, same method name)
-        // has two callers in the same file.
-        self::assertContains('CrossClassCallerOwnerB::save()', $symbols);
-
-        // CrossClassCallerOwnerA::save() has two self-callers; default minInFileCallers: 2
-        // means it does not fire.
-        self::assertNotContains('CrossClassCallerOwnerA::save()', $symbols);
-    }
-
-    /**
-     * Verify one-line method rule supports explicit symbol allowlists.
-     *
-     * @return void
-     */
-    public function testOneLineMethodRuleSupportsExplicitSymbolAllowlists(): void
-    {
-        $registry = RuleRegistry::defaults();
-        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
-            OneLineMethodRule::ID,
-            new RuleSettings(
-                true,
-                [],
-                [
-                    'minParameters'                 => 1,
-                    'minInFileCallers'              => 0,
-                    'namedAlternativeFactoryExempt' => false,
-                    'allowedSymbols'                => ['PrivatePassThroughFixture::oneShotHelper()'],
-                ],
-            ),
-        );
-        $findings = $this->analyseRule('one-line-methods.php', OneLineMethodRule::ID, $config);
-        $symbols  = array_map(static fn($finding): ?string => $finding->symbol, $findings);
-
-        self::assertNotContains('PrivatePassThroughFixture::oneShotHelper()', $symbols);
-        self::assertContains('OneLineMethodFixture::sharedHelper()', $symbols);
-        self::assertContains('PrivatePassThroughFixture::rows()', $symbols);
-    }
-
-    /**
-     * Verify redundant variable before return detected.
-     *
-     * @return void
-     */
-    public function testRedundantVariableBeforeReturnDetected(): void
-    {
-        $findings  = $this->analyseRule('redundant-variable.php', RedundantVariableRule::ID);
-        $variables = array_map(static fn($finding): mixed => $finding->metadata['variable'] ?? null, $findings);
-
-        self::assertSame(['result', 'branchResult'], $variables);
-    }
-
-    /**
-     * Verify redundant variable rule respects PHPStan narrowing comments.
-     *
-     * @return void
-     */
-    public function testRedundantVariableRuleIgnoresPhpStanNarrowingComments(): void
-    {
-        $findings = $this->analyseRule('redundant-variable-phpstan-narrowing.php', RedundantVariableRule::ID);
-
-        self::assertSame([], $findings);
-    }
-
-    /**
-     * Verify clean file has no waste findings.
-     *
-     * @return void
+     * @return void - Asserts an empty result after filtering for waste and dead-code rule ID prefixes.
      */
     public function testCleanFileHasNoWasteFindings(): void
     {
@@ -484,7 +187,7 @@ final class WasteRulesTest extends TestCase
      * @param string              $ruleId - Rule identifier to keep; all other findings are discarded.
      * @param AnalysisConfig|null $config - Overriding config, or null to use the registry defaults.
      *
-     * @return list<\GruffPhp\Results\Finding\Finding> - findings emitted only by the requested rule, in analyser order; empty when that rule produced none
+     * @return list<\GruffPhp\Results\Finding\Finding> - Findings for the requested rule in analyser order; empty if none match.
      */
     private function analyseRule(string $fixture, string $ruleId, ?AnalysisConfig $config = null): array
     {
@@ -498,9 +201,9 @@ final class WasteRulesTest extends TestCase
     /**
      * Parse the named fixture into an analysis unit.
      *
-     * @param string $filename - Fixture filename
+     * @param string $filename - Filename relative to tests/Fixtures/DeadCode.
      *
-     * @return \GruffPhp\Engine\Parser\AnalysisUnit - Hand back the dead-code fixture parsed from disk, with its project-relative display path attached
+     * @return \GruffPhp\Engine\Parser\AnalysisUnit - Analysis unit with the fixture's display path and any read or parse diagnostics.
      */
     private function parseFixture(string $filename): \GruffPhp\Engine\Parser\AnalysisUnit
     {

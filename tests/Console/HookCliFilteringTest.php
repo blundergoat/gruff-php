@@ -8,18 +8,16 @@ use JsonException;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers gruff.hook.v1 rule-selection and new-only identity edge cases.
+ * Covers gruff.hook.v2 rule-selection and new-only identity edge cases.
  */
 final class HookCliFilteringTest extends CliTestCase
 {
     /**
-     * Verify --include-rule narrows to exactly the named rule even when the config selects a pillar.
+     * Verify that an explicit hook rule replaces the configured pillar selection.
+     * Retaining both selections would also run the configured pillar's rules.
      *
-     * Regression: preserving the config's tier/pillar includes alongside the hook --include-rule made
-     * RuleSelection::allows() OR them in, so a focused `--include-rule X` also ran the configured pillar.
-     *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts that only waste.empty-method findings remain.
+     * @throws JsonException - When the hook output cannot be decoded as JSON.
      */
     public function testHookIncludeRuleNarrowsPastConfiguredPillar(): void
     {
@@ -60,8 +58,8 @@ YAML);
     /**
      * Verify unknown hook rule filters return an in-band error instead of running zero rules.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts exit code 2, an unknown-rule schema error, and no findings for both filters.
+     * @throws JsonException - When the hook output cannot be decoded as JSON.
      */
     public function testHookRejectsUnknownExecutionRuleFilters(): void
     {
@@ -88,7 +86,7 @@ YAML);
                 self::assertFalse($config['schemaOk'] ?? true, sprintf('Expected schema failure for %s.', $option));
                 self::assertSame(
                     sprintf('Unknown rule id "docs.missing-public-phpdox" for %s.', $option),
-                    $config['error'] ?? null,
+                    is_array($config['error'] ?? null) ? ($config['error']['message'] ?? null) : null,
                     sprintf('Expected unknown-rule message for %s.', $option),
                 );
                 self::assertSame([], $this->findingRows($report), sprintf('Expected no findings for %s.', $option));
@@ -99,14 +97,11 @@ YAML);
     }
 
     /**
-     * Verify repeated same-rule line findings get distinct identities so a new duplicate still surfaces.
+     * Verify that a baseline covering one occurrence leaves one duplicate finding visible.
+     * The duplicate findings share a stable identity, so baseline matching must preserve their counts.
      *
-     * Regression: line-scoped identities omit the line, so two symbol-less same-message findings (e.g.
-     * security.error-suppression) collapsed to one stableIdentity, letting a baseline holding one
-     * suppress a newly added duplicate elsewhere in the same file.
-     *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts a shared identity, one remaining finding, and an applied baseline.
+     * @throws JsonException - When the hook output cannot be decoded as JSON.
      */
     public function testHookDisambiguatesDuplicateLineFindingsForNewOnly(): void
     {
@@ -121,7 +116,7 @@ selection:
 YAML);
             file_put_contents($tempDir . '/E.php', $this->singleSuppressionSource());
 
-            [$baselineProcess, $baselineReport] = $this->runHook($tempDir, [
+            [, $baselineReport] = $this->runHook($tempDir, [
                 'hook',
                 'E.php',
                 '--config',
@@ -129,7 +124,7 @@ YAML);
                 '--format',
                 'json',
             ]);
-            file_put_contents($tempDir . '/baseline.json', $baselineProcess->getOutput());
+            $this->generateBaseline($tempDir, 'gruff-test.yaml', 'baseline.json');
             self::assertCount(1, $this->findingRows($baselineReport));
 
             file_put_contents($tempDir . '/E.php', $this->doubleSuppressionSource());
@@ -143,7 +138,9 @@ YAML);
             ]);
             $fullRows = $this->findingRows($fullReport);
             self::assertCount(2, $fullRows);
-            self::assertNotSame($fullRows[0]['stableIdentity'] ?? null, $fullRows[1]['stableIdentity'] ?? null);
+            // Baseline v3 matches duplicates by count rather than by naming each one separately: two findings on one
+            // declaration share an identity, and a baseline recording one occurrence leaves exactly one of them new.
+            self::assertSame($fullRows[0]['stableIdentity'] ?? null, $fullRows[1]['stableIdentity'] ?? null);
 
             [, $filteredReport] = $this->runHook($tempDir, [
                 'hook',
@@ -156,20 +153,39 @@ YAML);
                 'json',
             ]);
             self::assertCount(1, $this->findingRows($filteredReport));
-            self::assertSame(1, $this->suppressedCount($filteredReport));
+            // A baseline match is reviewed debt, not a changed-region drop, so the run block is what records it.
+            self::assertTrue($this->runBaselineBlock($filteredReport)['applied'] ?? false);
         } finally {
             $this->removeDir($tempDir);
         }
     }
 
     /**
+     * Read the applied-baseline block a v2 hook payload reports, so a test can assert what classified the run.
+     *
+     * @param array<string, mixed> $report - Decoded hook report.
+     *
+     * @return array<string, mixed> - The run.baseline array; missing or non-array blocks fail assertions, and fields are not validated.
+     */
+    private function runBaselineBlock(array $report): array
+    {
+        $runAudit = $report['run'] ?? null;
+        self::assertIsArray($runAudit);
+        $baseline = $runAudit['baseline'] ?? null;
+        self::assertIsArray($baseline);
+
+        /** @var array<string, mixed> $baseline - Decoded JSON object, asserted as an array above. */
+        return $baseline;
+    }
+
+    /**
      * Run the gruff CLI hook command.
      *
-     * @param string       $cwd  - Working directory.
+     * @param string       $cwd  - Directory in which the command resolves project files.
      * @param list<string> $args - CLI argv after the binary.
      *
-     * @return array{0: Process, 1: array<string, mixed>} - Process and decoded JSON.
-     * @throws JsonException
+     * @return array{0: Process, 1: array<string, mixed>} - Completed command process and its decoded JSON output.
+     * @throws JsonException - When the command output cannot be decoded as JSON.
      */
     private function runHook(string $cwd, array $args): array
     {
@@ -180,27 +196,27 @@ YAML);
     }
 
     /**
-     * Return decoded finding rows after asserting the payload shape.
+     * Read the report's findings array after asserting only its outer array shape.
      *
-     * @param array<string, mixed> $report - Decoded hook report.
+     * @param array<string, mixed> $report - Hook payload whose findings field is asserted.
      *
-     * @return list<array<string, mixed>> - Finding rows.
+     * @return list<array<string, mixed>> - Rows read from the report's findings field after its array assertion.
      */
     private function findingRows(array $report): array
     {
         $findings = $report['findings'] ?? null;
         self::assertIsArray($findings);
 
-        /** @var list<array<string, mixed>> $findings Decoded JSON finding rows, asserted as an array above. */
+        /** @var list<array<string, mixed>> $findings - Decoded JSON finding rows, asserted as an array above. */
         return $findings;
     }
 
     /**
      * Extract rule ids from finding rows.
      *
-     * @param list<array<string, mixed>> $findings - Finding rows.
+     * @param list<array<string, mixed>> $findings - Rows whose ruleId fields are extracted.
      *
-     * @return list<string> - Rule ids in finding order.
+     * @return list<string> - Rule IDs in row order, with empty strings for missing or non-string IDs.
      */
     private function ruleIds(array $findings): array
     {
@@ -211,25 +227,36 @@ YAML);
     }
 
     /**
-     * Read the hook suppressed count.
+     * Generate a baseline through analyse so hook tests use the public baseline-writing path.
      *
-     * @param array<string, mixed> $report - Decoded hook report.
+     * @param string $cwd          - Project directory the baseline is generated in.
+     * @param string $configFile   - Config the generating scan runs under, so the baseline covers the same rules.
+     * @param string $baselineFile - Project-relative destination for the generated baseline.
      *
-     * @return int - Suppressed count.
+     * @return void - Asserts that the generating scan wrote the requested baseline file.
      */
-    private function suppressedCount(array $report): int
+    private function generateBaseline(string $cwd, string $configFile, string $baselineFile): void
     {
-        $suppressed = $report['suppressed'] ?? null;
-        self::assertIsArray($suppressed);
-        self::assertIsInt($suppressed['count'] ?? null);
+        $process = new Process([
+            PHP_BINARY,
+            self::PROJECT_ROOT . '/bin/gruff-php',
+            'analyse',
+            '.',
+            '--config',
+            $configFile,
+            '--generate-baseline',
+            $baselineFile,
+        ], $cwd);
+        $process->run();
 
-        return $suppressed['count'];
+        // Findings can cause a nonzero exit after generation succeeds, so check the file directly.
+        self::assertFileExists($cwd . '/' . $baselineFile, $process->getErrorOutput());
     }
 
     /**
-     * Source that yields one file-length finding and two empty-method findings.
+     * PHP fixture with two empty methods, used to test configured pillar and explicit rule selection.
      *
-     * @return string - PHP source.
+     * @return string - Fixture text written to Example.php for the rule-selection tests.
      */
     private function fileAndSymbolSource(): string
     {
@@ -252,7 +279,7 @@ PHP;
     /**
      * Source with one error-suppression operator.
      *
-     * @return string - PHP source.
+     * @return string - Fixture text written to E.php before generating the baseline.
      */
     private function singleSuppressionSource(): string
     {
@@ -269,7 +296,7 @@ PHP;
     /**
      * Source with two error-suppression operators sharing one message.
      *
-     * @return string - PHP source.
+     * @return string - Fixture text written to E.php after the single-finding baseline is recorded.
      */
     private function doubleSuppressionSource(): string
     {

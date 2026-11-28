@@ -5,28 +5,32 @@ declare(strict_types=1);
 namespace GruffPhp\Results\Scoring;
 
 /**
- * The complete scoring verdict for one run - the composite grade plus every breakdown a user drills
- * into: per-pillar grades, the worst files, and the complexity spread.
- *
- * This is the object every reporter renders when it shows a score: the headline composite letter, the
- * pillar table, the top file offenders, and the histogram of how complex the code is. Whatever surface
- * the user is on - terminal, JSON, the HTML dashboard - reads its numbers from here, so the grade they
- * see is the same everywhere.
+ * Holds the composite grade, pillar and file summaries, and scoring attribution for one analysis run.
+ * Reporters can serialize the stored values with toArray(); an absent composite becomes null score and grade.
+ * The complexity distribution counts contributing cyclomatic findings rather than every method.
  */
 final readonly class ScoreReport
 {
     /**
      * Bundles the composite grade with the pillar, file, and distribution breakdowns a report renders.
      *
-     * @param Grade              $composite - Overall letter grade and score for the whole run - the headline figure.
-     * @param list<PillarScore>  $pillars - Per-pillar scores that make up the breakdown table.
-     * @param list<FileScore>    $topOffenders - Lowest-scoring files, worst first, for the "fix these first" list; empty when nothing scored.
-     * @param array<string, int> $complexityDistribution - Method counts per cyclomatic-complexity bucket, for the histogram.
-     * @param string             $scope - Which code the score covers (for example whole-project or a diff), so the user knows what was graded.
-     * @param string             $explanation - Plain-English note on how the score was reached, shown under the headline.
+     * @param Grade|null $composite - Composite grade, or null when no applicable pillar has a grade.
+     * @param list<array{file: string, symbol: string, ruleIds: list<string>, findings: int, weight: float}> $clusters - Groups sharing one weight.
+     * @param list<array{ruleId: string, findings: int, weight: float}> $ruleAttribution - Finding counts and weights by native rule ID.
+     * @param int $evaluatedFiles - Number of parsed PHP files used as the static scoring denominator.
+     * @param list<string> $scoredPillars - Resolved pillar names, including any pillar without a grade.
+     * @param list<PillarScore> $pillars - Per-pillar scores that make up the breakdown table.
+     * @param list<FileScore> $topOffenders - Worst grades first, then more findings and ascending path; ungraded files may appear.
+     * @param array<string, int> $complexityDistribution - Counts of scored cyclomatic findings by range label, not all methods.
+     * @param string $scope - Which code the score covers, such as the full project or a diff.
+     * @param string $explanation - Plain-English note on how the score was reached, shown under the headline.
      */
     public function __construct(
-        public Grade  $composite,
+        public ?Grade $composite,
+        public array  $clusters,
+        public array  $ruleAttribution,
+        public int    $evaluatedFiles,
+        public array  $scoredPillars,
         public array  $pillars,
         public array  $topOffenders,
         public array  $complexityDistribution,
@@ -36,11 +40,14 @@ final readonly class ScoreReport
     }
 
     /**
-     * Flattens the whole verdict into the JSON shape reporters serialise, so an editor, CI gate, or the
-     * dashboard reads the same grade a person sees in the terminal.
+     * Flattens the score report into an array, preserving null composite fields and converting nested score objects.
      *
      * @return array{
-     *     composite: array{score: float, grade: string},
+     *     composite: array{score: float|null, grade: string|null},
+     *     clusters: list<array{file: string, symbol: string, ruleIds: list<string>, findings: int, weight: float}>,
+     *     ruleAttribution: list<array{ruleId: string, findings: int, weight: float}>,
+     *     evaluatedFiles: int,
+     *     scoredPillars: list<string>,
      *     pillars: list<array{
      *         pillar: string,
      *         applicable: bool,
@@ -54,8 +61,8 @@ final readonly class ScoreReport
      *     }>,
      *     topOffenders: list<array{
      *         file: string,
-     *         score: float,
-     *         grade: string,
+     *         score: float|null,
+     *         grade: string|null,
      *         findings: int,
      *         advisory: int,
      *         warning: int,
@@ -69,12 +76,16 @@ final readonly class ScoreReport
      *     complexityDistribution: array<string, int>,
      *     scope: string,
      *     explanation: string
-     * } - JSON-serialisable snapshot of the full report; nested value objects rendered via their own toArray, distribution keyed by complexity bucket.
+     * } - Full report snapshot; nested values use their own toArray and the distribution is keyed by complexity bucket.
      */
     public function toArray(): array
     {
         return [
-            'composite'              => $this->composite->toArray(),
+            'composite'              => $this->composite?->toArray() ?? ['score' => null, 'grade' => null],
+            'clusters'               => $this->clusters,
+            'ruleAttribution'        => $this->ruleAttribution,
+            'evaluatedFiles'         => $this->evaluatedFiles,
+            'scoredPillars'          => $this->scoredPillars,
             'pillars'                => array_map(
                 static fn(PillarScore $pillar): array => $pillar->toArray(),
                 $this->pillars,

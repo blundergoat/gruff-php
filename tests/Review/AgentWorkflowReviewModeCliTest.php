@@ -9,6 +9,8 @@ use Symfony\Component\Process\Process;
 
 /**
  * Covers review-mode CLI option validation that does not need branch-review fixtures.
+ * Checks --changed-only without --diff-vs and conflicting --diff and --diff-vs options.
+ * Asserts exit code 2 and diagnostic text for both invocations.
  */
 final class AgentWorkflowReviewModeCliTest extends TestCase
 {
@@ -16,9 +18,9 @@ final class AgentWorkflowReviewModeCliTest extends TestCase
     private const PROJECT_ROOT = __DIR__ . '/../..';
 
     /**
-     * Verify review mode invalid option combinations fail early.
+     * Verify invalid review-mode option combinations report usage errors.
      *
-     * @return void
+     * @return void - Asserts exit code 2 and the expected diagnostic for each tested option combination.
      */
     public function testReviewModeInvalidOptionCombinationsFailEarly(): void
     {
@@ -31,7 +33,7 @@ final class AgentWorkflowReviewModeCliTest extends TestCase
         $changedOnlyProcess->run();
 
         self::assertSame(2, $changedOnlyProcess->getExitCode(), $changedOnlyProcess->getOutput() . $changedOnlyProcess->getErrorOutput());
-        self::assertStringContainsString('--changed-only requires --diff-vs.', $changedOnlyProcess->getOutput());
+        self::assertStringContainsString('--changed-only requires --diff-base.', $changedOnlyProcess->getOutput());
 
         $diffConflictProcess = new Process([
                                                PHP_BINARY,
@@ -44,6 +46,6 @@ final class AgentWorkflowReviewModeCliTest extends TestCase
         $diffConflictProcess->run();
 
         self::assertSame(2, $diffConflictProcess->getExitCode(), $diffConflictProcess->getOutput() . $diffConflictProcess->getErrorOutput());
-        self::assertStringContainsString('--diff, --since, --changed-ranges, and --diff-vs are mutually exclusive.', $diffConflictProcess->getOutput());
+        self::assertStringContainsString('--diff, --since, --changed-ranges, and --diff-base are mutually exclusive.', $diffConflictProcess->getOutput());
     }
 }

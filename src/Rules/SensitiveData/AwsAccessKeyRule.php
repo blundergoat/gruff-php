@@ -14,12 +14,11 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\SourceTextRuleInterface;
 
 /**
- * Flags a string shaped like an AWS access key ID (`AKIA...`/`ASIA...` plus 16 chars), so the user can pull
- * a committed credential out of source and rotate it.
+ * Flags a string shaped like an AWS access key ID (`AKIA...`/`ASIA...` plus 16 chars) so users can remove and rotate it.
  *
- * A source-text rule: it scans the raw file, skipping matches inside comments and obvious dummy values, and
- * redacts the reported value. Warning severity, high confidence - the AKIA/ASIA prefix with a fixed body is
- * a near-unique AWS shape.
+ * Scans raw source text rather than only PHP AST literals so credentials in config or fixture files are caught too:
+ * - Skips matches inside comments and obvious dummy values, and redacts every reported value.
+ * - Reports Warning severity with High confidence because the fixed `AKIA`/`ASIA` shape is near-unique to AWS.
  */
 final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
 {
@@ -35,7 +34,7 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // High confidence: the AKIA/ASIA prefix plus a fixed 16-char body is a near-unique AWS shape, rarely noise.
+        // High confidence: retained matches require an AWS prefix and fixed-length body, then pass dummy and mask filters.
         return new RuleDefinition(
             id:              self::ID,
             name:            'AWS access key',
@@ -47,50 +46,72 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
     }
 
     /**
-     * Reports each string that resembles a live AWS access key ID, redacting the value.
+     * Reports AWS access-key-ID matches that survive comment, sample, placeholder and mask exclusions.
      *
-     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Supplies raw source and comment tokens for scanning.
+     * @param RuleContext $ruleContext - Required by the rule interface; unused by this scanner.
      *
-     * @return list<\GruffPhp\Results\Finding\Finding> - Findings for AWS keys; empty when matches are comments or dummy values.
+     * @return list<\GruffPhp\Results\Finding\Finding> - One finding per retained AWS key-ID match; empty when none survive.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
+        // Fast pre-screen: files without an AKIA or ASIA prefix cannot contain a supported AWS access-key ID.
         if (!str_contains($analysisUnit->source, 'AKIA') && !str_contains($analysisUnit->source, 'ASIA')) {
-            // Neither AWS key-id prefix is present, so the regex cannot match; skip it to keep the rule near-free.
             return [];
         }
 
-        // Match every AWS access-key-id shape, capturing each one's byte offset.
+        // AWS access-key IDs require an AKIA or ASIA prefix and sixteen uppercase-alphanumeric characters; offsets locate findings.
         preg_match_all('/\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/', $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
         $findings      = [];
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
-        // Weigh each candidate the scan found.
+
+        // Judge each match independently so one example key in a comment does not hide a live-shaped key on the next line.
         foreach ($matches[0] as $match) {
             [$candidateSecret, $offset] = $match;
-            // A match inside a comment is documentation or an example, not a live secret.
+
+            // Documentation examples inside PHP comments are skipped rather than reported as live credentials.
             if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
                 continue;
             }
 
-            // An obvious placeholder or dummy value is not a real credential.
-            if (SecretScannerHelper::isLikelyDummyValue($candidateSecret)) {
+            // Skip vendor-documented samples and placeholder tokens such as AKIA...EXAMPLE before reporting.
+            if (SecretScannerHelper::isLikelyDummyValue($candidateSecret, shouldSplitIdentifierWords: false)) {
                 continue;
             }
 
-            $findings[] = SecretScannerHelper::finding(
-                analysisUnit: $analysisUnit,
-                ruleId:       self::ID,
-                message:      sprintf('Potential AWS access key detected: %s.', SecretScannerHelper::redactedPreview($candidateSecret)),
-                line:         SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
-                confidence:   Confidence::High,
-                detector:     'aws-access-key',
-                preview:      SecretScannerHelper::redactedPreview($candidateSecret),
-                remediation:  'Remove the key from source and rotate it if it was real.',
+            // A body that is entirely X shows where a key goes and names no credential (FAMILY-CONTRACT.md section 5).
+            if (self::isMaskedKey($candidateSecret)) {
+                continue;
+            }
+
+            $findings[] = SecretScannerHelper::findingAtOffset(
+                analysisUnit:  $analysisUnit,
+                ruleId:        self::ID,
+                message:       sprintf('Potential AWS access key detected: %s.', SecretScannerHelper::categoryMarker('aws-access-key')),
+                offset:        $offset,
+                confidence:    Confidence::High,
+                detector:      'aws-access-key',
+                displayMarker: SecretScannerHelper::categoryMarker('aws-access-key'),
+                remediation:   'Remove the key from source and rotate it if it was real.',
             );
         }
 
         return $findings;
+    }
+
+    /**
+     * Reports whether a key-shaped match is a masked value: the prefix followed by a body that is entirely X.
+     *
+     * Only the whole body counts, because a real key may contain a run of X and hiding it would hide a live credential.
+     *
+     * @param string $candidateSecret - The matched key-shaped literal.
+     *
+     * @return bool - true when the sixteen-character body is all X
+     */
+    private static function isMaskedKey(string $candidateSecret): bool
+    {
+        // Require the entire sixteen-character body to be X so a partial run cannot hide a credential.
+        return preg_match('/^(?:AKIA|ASIA)X{16}$/', $candidateSecret) === 1;
     }
 }

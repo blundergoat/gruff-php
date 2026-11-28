@@ -7,13 +7,10 @@ namespace GruffPhp\Results\Review;
 use GruffPhp\Results\Finding\Finding;
 
 /**
- * The outcome of a branch review - what this branch introduced, removed, and left unchanged, plus how
- * the score moved - ready for a reporter to render.
+ * Holds introduced, removed, and unchanged findings from a branch review, with an optional score delta.
+ * BranchReviewComparator produces it for comparisons against a base ref.
  *
- * `BranchReviewComparator` produces this when a user runs `gruff-php analyse --diff-vs <base>`. It
- * holds the three finding buckets, the base ref they were compared against, whether the review was
- * limited to changed files, and the score delta, so a report can tell the user "your branch adds N and
- * fixes M" and break that down per rule.
+ * Records whether analysis was limited to changed files and exposes per-rule deltas for reporting.
  *
  * @phpstan-type ReviewScalar bool|float|int|object|string|null
  * @phpstan-type ReviewValue ReviewScalar|array<array-key, ReviewScalar|array<array-key, ReviewScalar|array<array-key, ReviewScalar|array<array-key,
@@ -24,12 +21,12 @@ final readonly class BranchReviewResult
     /**
      * Bundles the three finding buckets with the base ref, scope flag, and score delta of one review.
      *
-     * @param string        $base - Base ref the branch was compared against (for example `origin/main`).
+     * @param string        $base - Base ref the branch was compared against (for example "origin/main").
      * @param bool          $isChangedOnly - True when the review only looked at changed files rather than the whole project.
      * @param list<Finding> $introduced - Findings new on this branch - the ones the review puts front and centre.
      * @param list<Finding> $removed - Findings the branch resolved: present in base, gone now.
      * @param list<Finding> $unchanged - Findings present in both base and branch, carried for context.
-     * @param float|null    $deltaScore - Score change versus the base snapshot; null when the run has no applicable score to move, so the review reports which findings changed without pricing them.
+     * @param float|null    $deltaScore - Score change from base; null when either snapshot has no applicable score.
      */
     public function __construct(
         public string $base,
@@ -62,25 +59,22 @@ final readonly class BranchReviewResult
     }
 
     /**
-     * Breaks the review down per rule - how many findings each rule gained or lost on this branch - so
-     * the user can see which checks their changes helped and which they set back.
+     * Summarises finding changes by rule, omitting rules whose introduced and removed counts cancel out.
+     * Rows sort by net change ascending (largest reductions first), then by rule ID.
      *
-     * Net = introduced - removed. Rules whose introduced and removed cancel out are omitted. Ties are
-     * broken by rule id ascending so the output is deterministic.
-     *
-     * @return list<array{ruleId: string, introduced: int, removed: int, net: int}> - One row per rule with a nonzero net change, ascending by net (largest reductions first) then rule id; empty when introduced and removed fully cancel out.
+     * @return list<array{ruleId: string, introduced: int, removed: int, net: int}> - Nonzero deltas by net then rule ID; empty if none.
      */
     public function perRuleDelta(): array
     {
         $buckets = [];
 
-        // Tally how many findings this branch added under each rule.
+
         foreach ($this->introduced as $finding) {
             $buckets[$finding->ruleId] ??= ['introduced' => 0, 'removed' => 0];
             $buckets[$finding->ruleId]['introduced']++;
         }
 
-        // Tally how many findings this branch resolved under each rule.
+
         foreach ($this->removed as $finding) {
             $buckets[$finding->ruleId] ??= ['introduced' => 0, 'removed' => 0];
             $buckets[$finding->ruleId]['removed']++;
@@ -88,7 +82,7 @@ final readonly class BranchReviewResult
 
         $rows = [];
 
-        // Turn each rule's raw tallies into a net change, keeping only the rules that actually moved.
+
         foreach ($buckets as $ruleId => $counts) {
             $netDelta = $counts['introduced'] - $counts['removed'];
             // A rule that added exactly as many as it removed is a wash, so leave it out of the breakdown.
@@ -116,7 +110,7 @@ final readonly class BranchReviewResult
      * Flattens the review into the JSON shape reporters serialise, so an editor or CI gets the same
      * introduced/removed counts and per-rule breakdown a person reads in the terminal.
      *
-     * @return array<string, ReviewValue> - report payload keyed by field name: base ref, changed-only flag, per-bucket counts, delta score (null when unavailable), per-rule deltas, and the serialized finding groups.
+     * @return array<string, ReviewValue> - Status, ref, scope, counts, score delta (null if unavailable), rule deltas, and finding lists.
      */
     public function toArray(): array
     {

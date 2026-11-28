@@ -8,7 +8,8 @@ Treat analyzer output as sensitive when scanning private code.
 
 | Version | Supported |
 | --- | --- |
-| Current `0.3.x` release line | Supported. |
+| Current `0.6.x` release line | Supported. |
+| `0.5.x` and earlier | No fixes. |
 | Older development snapshots | Best effort only. |
 
 ## Reporting A Vulnerability
@@ -53,6 +54,8 @@ If gruff reports a real secret:
 
 1. Rotate or revoke the secret first.
 2. Remove it from source history if required by your incident process.
-3. Add a baseline or allowlist only after confirming the value is not live.
 
-Do not use `allowlists.secretPreviews` to hide active credentials.
+For a confirmed sample or false positive, record the exact file, rule, and
+reason under `sensitiveExclusions`. Reports include an audit row for each
+configured exclusion. Sensitive-data findings are ineligible for baseline
+matching. Remove any legacy `allowlists.secretPreviews` entry during migration.

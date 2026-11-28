@@ -19,23 +19,18 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * Backs the `gruff-php check-ignore` command - the quick "would gruff skip this file?" probe.
+ * Reports whether `gruff-php check-ignore` operands match configuration, built-in, or Git ignore rules.
+ * Uses the current directory and resolved configuration without discovering or analysing source files.
  *
- * Reach for this when a scan seems to miss a file, or before writing an ignore pattern, to see
- * whether a path is excluded and which rule excludes it. It resolves config and consults the same
- * ignore engine as `analyse`, then reports a verdict for each path without analysing anything, so
- * the answer always matches what a real scan would do.
- *
- * Exit codes mirror `git check-ignore`: 0 when at least one path is ignored, 1 when none are, and
- * 2 on a usage or configuration error - so a script can branch on the exit code alone.
+ * Existing files receive the explicit-file exception used by `analyse`; a non-ignored verdict does not guarantee discovery.
+ * Exit codes are 0 when any operand is ignored, 1 when none are, and 2 for handled usage, config, working-directory, or JSON errors.
  */
 final class CheckIgnoreCommand extends Command
 {
     /**
-     * Declares the `check-ignore` command's paths argument and its `--format`, `--config`, and
-     * `--no-config` flags - everything the user can type after `gruff-php check-ignore`.
+     * Registers the `check-ignore` command, its required paths argument, and output/configuration options.
      *
-     * @return void
+     * @return void - Populates the command definition used to parse invocations.
      */
     protected function configure(): void
     {
@@ -49,18 +44,17 @@ final class CheckIgnoreCommand extends Command
     }
 
     /**
-     * Runs the whole command when a user types `gruff-php check-ignore <paths>`: validate the flags,
-     * resolve the ignore verdict for each path, then render the report as text or JSON.
+     * Runs check-ignore by validating the flags, resolving each path's ignore verdict, and rendering
+     * the report as text or JSON.
      *
      * @param InputInterface  $input - Parsed invocation supplying the paths argument and format/config options.
      * @param OutputInterface $output - Console stream that receives the rendered report and any error lines.
      *
-     * @return int - 0 when any path is ignored, 1 when none are, 2 on a usage or config error.
+     * @return int - 0 if any path is ignored, 1 if none are, or 2 for handled option, config, working-directory, or JSON errors.
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $format = $input->getOption('format');
-        // Reject anything but text or json before doing any work - say the user typed `--format=xml`.
         // A usage error here (exit 2) reads differently from the "nothing ignored" result (exit 1),
         // so a script can tell a broken invocation apart from a clean miss.
         if (!is_string($format) || !in_array($format, ['text', 'json'], true)) {
@@ -72,20 +66,20 @@ final class CheckIgnoreCommand extends Command
         $configPath = $input->getOption('config');
         $configPath = is_string($configPath) && $configPath !== '' ? $configPath : null;
         $noConfig   = (bool) $input->getOption('no-config');
-        // Both `--no-config` and `--config <file>` were given, which ask for opposite config
-        // resolution; refuse rather than silently obey one and drop the other flag the user typed.
+        // Both --no-config and --config <file> were given, which request opposite config resolution;
+        // refuse rather than silently obeying one and dropping the other flag.
         if ($noConfig && $configPath !== null) {
             $output->writeln('<error>USAGE-ERROR --no-config cannot be combined with --config.</error>');
 
             return Command::INVALID;
         }
 
-        /** @var list<string> $paths The command definition declares a required variadic paths argument. */
+        /** @var list<string> $paths - Required variadic operands supplied by the command definition. */
         $paths = $input->getArgument('paths');
 
         $projectRoot = getcwd();
-        // `getcwd()` returns false when the launch directory was deleted or is unreadable; ignore
-        // resolution is anchored at that root, so without it we fail as a usage error, not a guess.
+        // Without a working directory, relative operands and config discovery have no project root.
+
         if ($projectRoot === false) {
             $output->writeln('<error>Unable to determine the current working directory.</error>');
 
@@ -93,8 +87,8 @@ final class CheckIgnoreCommand extends Command
         }
 
         $patterns = $this->ignorePatterns($projectRoot, $configPath, $noConfig, $output);
-        // A null pattern list means config loading failed and `ignorePatterns()` already printed the
-        // reason; stop with the usage exit code so a later "nothing ignored" result can't mask it.
+        // A null pattern list means config loading failed and ignorePatterns() already printed the
+        // reason; stop with the usage exit code so a later "nothing ignored" result cannot mask it.
         if ($patterns === null) {
             return Command::INVALID;
         }
@@ -103,8 +97,8 @@ final class CheckIgnoreCommand extends Command
         $results  = [];
         $anyIgnored = false;
 
-        // Classify each path the user listed, keeping a row per path and remembering whether any one
-        // of them was ignored - that flag becomes the command's exit code.
+
+
         foreach ($paths as $path) {
             $decision = $this->decideForPath($resolver, $projectRoot, $patterns, $path);
             $anyIgnored = $anyIgnored || $decision->ignored;
@@ -116,7 +110,7 @@ final class CheckIgnoreCommand extends Command
             ];
         }
 
-        // Render the collected decisions in the chosen format; only JSON encoding can fail here.
+
         try {
             $rendered = $this->render($results, $format, $output->isVerbose());
         } catch (JsonException $exception) {
@@ -131,18 +125,17 @@ final class CheckIgnoreCommand extends Command
             $output->write($rendered, false, OutputInterface::OUTPUT_RAW);
         }
 
-        // Mirror `git check-ignore`: a match is the success signal (exit 0), no match is the
-        // failure signal (exit 1), so callers can branch on the exit code alone.
+
+
         return $anyIgnored ? Command::SUCCESS : Command::FAILURE;
     }
 
     /**
-     * Loads the ignore patterns exactly as `analyse` would, so check-ignore's verdict always matches
-     * a real scan. Called once per run before any path is classified.
+     * Resolves configured ignore patterns, reporting configuration failures to the output stream.
      *
      * @param string          $projectRoot - Absolute project root that anchors config discovery and relative patterns.
      * @param string|null     $configPath - Explicit config file to load, or null to auto-discover the default file.
-     * @param bool            $noConfig - When true, skip file discovery entirely and use only built-in defaults.
+     * @param bool $noConfig - When true, use registry defaults without loading a configuration file.
      * @param OutputInterface $output - Stream that receives the config error message before this returns null.
      *
      * @return list<string>|null - Configured ignore patterns; null when the config could not be loaded, which aborts the run with a usage error.
@@ -151,17 +144,17 @@ final class CheckIgnoreCommand extends Command
     {
         $registry = RuleRegistry::defaults();
 
-        // `--no-config` means "pretend there's no config file": build the patterns from registry
-        // defaults alone, so the verdict matches `analyse --no-config` on the same project.
+
+
         if ($noConfig) {
             return AnalysisConfig::fromRegistry($registry)->ignoredPathPatterns();
         }
 
         try {
-            $configLoader = new ConfigLoader($projectRoot, ConfigLoader::packageRoot());
+            $configLoader = new ConfigLoader($projectRoot, shouldResolveFromLaunchDir: true);
 
-            // Load through the same `ConfigLoader` that `analyse` uses, so both commands agree on
-            // which paths a given config excludes.
+
+
             return $configLoader->load($configPath, $registry)->ignoredPathPatterns();
         } catch (ConfigException $exception) {
             $output->writeln(sprintf('<error>%s</error>', $exception->getMessage()));
@@ -173,8 +166,8 @@ final class CheckIgnoreCommand extends Command
     }
 
     /**
-     * Decides whether one path is ignored, checking gruff's own rules first and falling back to
-     * `.gitignore` only when they don't already exclude it. Called once per path in the report.
+     * Checks configuration and built-in exclusions before using Git as a fallback for non-file operands.
+     * Existing files bypass optional default and Git exclusions; configured patterns and VCS-directory exclusions still apply.
      *
      * @param PathIgnoreResolver $resolver - Engine that evaluates config/built-in patterns and the Git fallback.
      * @param string             $projectRoot - Absolute root the path is made relative to before matching.
@@ -188,47 +181,54 @@ final class CheckIgnoreCommand extends Command
         $absolutePath = PathHelper::resolveAgainst($projectRoot, $path);
         $displayPath  = PathHelper::relativeToRoot($absolutePath, $projectRoot) ?? PathHelper::normalizeSeparators($path);
 
-        $decision = $resolver->decide($displayPath, $absolutePath, $patterns, false);
+        $isExplicitFile = is_file($absolutePath);
+        $decision = $resolver->decide($displayPath, $absolutePath, $patterns, false, $isExplicitFile);
         // gruff's own config or built-in rules already exclude the path; keep their verdict so the
-        // reported source and pattern are the gruff ones, and skip the slower Git lookup entirely.
+        // reported source and pattern are the gruff ones, and skip the Git lookup entirely.
         if ($decision->ignored) {
             return $decision;
         }
 
+        // An existing file operand is the same explicit request analyse receives, so Git/default
+        // exclusions cannot turn this check into a different answer.
+        if ($isExplicitFile) {
+            return $decision;
+        }
+
         $gitRule = $resolver->gitIgnoreRule($displayPath);
-        // gruff wouldn't exclude it, but `.gitignore` does; report it as ignored and attribute the
-        // match to Git so the user sees why a scan would skip a file gruff's own config keeps.
+        // Gruff would keep the path but .gitignore excludes it; attribute the match to Git so the user
+        // sees why a scan would skip a file that Gruff's own config keeps.
         if ($gitRule !== null) {
             return IgnoreDecision::ignored(PathIgnoreResolver::SOURCE_GITIGNORE, $gitRule);
         }
 
-        // Nothing - gruff config, built-in, or Git - matched, so report the path as not ignored.
+
         return $decision;
     }
 
     /**
      * Turns the collected decisions into the text a person reads (only the ignored paths, like
-     * `git check-ignore`) or the JSON a script consumes (every path). The command's final step.
+     * git check-ignore) or the JSON a script consumes (every path).
      *
-     * @param list<array{path: string, ignored: bool, source: string|null, pattern: string|null}> $results - One entry per requested path, in request order, each carrying its ignore decision.
-     * @param string $format - Already-validated output format, either `json` or `text`.
+     * @param list<array{path: string, ignored: bool, source: string|null, pattern: string|null}> $results - Decisions in request order.
+     * @param string $format - Already-validated output format, either json or text.
      * @param bool   $isVerbose - When true, text output appends the matching source and pattern per path.
      *
      * @return string|null - Text or JSON to print; null when text mode has no ignored paths to list, so the caller prints nothing.
-     * @throws JsonException When JSON mode cannot encode the result payload.
+     * @throws JsonException - When JSON encoding rejects the result payload.
      */
     private function render(array $results, string $format, bool $isVerbose): ?string
     {
-        // JSON mode is for machine consumers, so it reports every path, ignored or not; pretty-print
-        // with unescaped slashes so the paths stay readable if a human does look.
+
+
         if ($format === 'json') {
             return json_encode($results, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . PHP_EOL;
         }
 
         $lines = [];
-        // Text mode shows only the paths that are ignored, one per line, like `git check-ignore`.
+
         foreach ($results as $result) {
-            // This path isn't ignored, so it never appears in text output; skip straight past it.
+
             if (!$result['ignored']) {
                 continue;
             }

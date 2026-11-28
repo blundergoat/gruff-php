@@ -10,15 +10,16 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers git archive snapshotting: requested-path scoping, absolute-path canonicalisation, empty snapshots, cleanup on failure, and rejection of
- * unsafe refs.
+ * Covers temporary snapshots of committed Git trees for branch-review analysis.
+ * Checks requested-path selection, dotted absolute paths and snapshots without files for absent paths.
+ * Checks invalid-ref cleanup and unsafe-ref rejection.
  */
 final class GitArchiveSnapshotTest extends TestCase
 {
     /**
      * Verify create archives only requested base paths.
      *
-     * @return void
+     * @return void - Asserts the target exists and the unrelated file and directory are absent.
      */
     public function testCreateArchivesOnlyRequestedBasePaths(): void
     {
@@ -43,9 +44,9 @@ final class GitArchiveSnapshotTest extends TestCase
     }
 
     /**
-     * Verify absolute snapshot paths are canonicalized before root trimming.
+     * Verify a dotted absolute path selects the requested file without including its sibling.
      *
-     * @return void
+     * @return void - Asserts the target exists and the unrelated source file is absent.
      */
     public function testCreateCanonicalizesAbsoluteRequestedPaths(): void
     {
@@ -70,9 +71,9 @@ final class GitArchiveSnapshotTest extends TestCase
     }
 
     /**
-     * Verify create returns empty snapshot when requested paths do not exist in base.
+     * Verify absent base paths yield a snapshot directory with no files.
      *
-     * @return void
+     * @return void - Asserts the returned directory exists and filesBelow() returns an empty list.
      */
     public function testCreateReturnsEmptySnapshotWhenRequestedPathsDoNotExistInBase(): void
     {
@@ -96,9 +97,9 @@ final class GitArchiveSnapshotTest extends TestCase
     }
 
     /**
-     * Verify create removes temporary snapshot when base ref fails.
+     * Verify an invalid base ref leaves no new review snapshot directories.
      *
-     * @return void
+     * @return void - Asserts DiffException names the invalid ref and no new review directories remain.
      */
     public function testCreateRemovesTemporarySnapshotWhenBaseRefFails(): void
     {
@@ -128,8 +129,7 @@ final class GitArchiveSnapshotTest extends TestCase
     /**
      * Provide unsafe ref cases for parameterized tests.
      *
-     * @return array<string, array{string}> - data-provider rows keyed by scenario name; each row holds one unsafe ref string git must reject before
-     *                       archiving
+     * @return array<string, array{string}> - Named rows containing one unsafe ref for the rejection test.
      */
     public static function unsafeRefProvider(): array
     {
@@ -142,11 +142,11 @@ final class GitArchiveSnapshotTest extends TestCase
     }
 
     /**
-     * Verify create rejects unsafe refs before archiving.
+     * Verify unsafe refs raise DiffException with the safe-ref validation message.
      *
      * @param string $ref - Unsafe git ref input.
      *
-     * @return void
+     * @return void - Asserts the safe-ref validation exception for each supplied ref.
      */
     #[\PHPUnit\Framework\Attributes\DataProvider('unsafeRefProvider')]
     public function testCreateRejectsUnsafeRefsBeforeArchiving(string $ref): void
@@ -192,8 +192,7 @@ final class GitArchiveSnapshotTest extends TestCase
     /**
      * List files below a temporary test directory.
      *
-     * @param string $path - directory root to walk; paths are returned relative to it, so callers
-     *                     compare against expected layout without leaking the random temp prefix.
+     * @param string $path - Directory root to scan; returned paths omit this root's temporary prefix.
      *
      * @return list<string> - file paths found under the root, relative to it and sorted ascending; empty when the dir holds no files
      */
@@ -218,7 +217,7 @@ final class GitArchiveSnapshotTest extends TestCase
     }
 
     /**
-     * List temporary branch-review directories created by a test.
+     * List directories whose names start with gruff-review- under the system temporary directory.
      *
      * @return list<string> - absolute paths to matching gruff-review-* temp dirs, sorted ascending; empty when none exist
      */
@@ -234,7 +233,7 @@ final class GitArchiveSnapshotTest extends TestCase
     /**
      * Skip the current test when Git is unavailable.
      *
-     * @return void
+     * @return void - Marks the test skipped when git --version is unsuccessful.
      */
     private function skipWhenGitIsUnavailable(): void
     {
@@ -249,10 +248,10 @@ final class GitArchiveSnapshotTest extends TestCase
     /**
      * Run a Git command in a fixture repository.
      *
-     * @param string $cwd - Working directory.
-     * @param string $args - Command arguments.
+     * @param string $cwd - Fixture repository in which the Git command runs.
+     * @param string $args - Git subcommand and arguments passed after the executable.
      *
-     * @return void
+     * @return void - Asserts Git exits with code zero, using stderr as the failure message.
      */
     private function runGit(string $cwd, string ...$args): void
     {
@@ -265,9 +264,9 @@ final class GitArchiveSnapshotTest extends TestCase
     /**
      * Create a temporary directory for filesystem assertions.
      *
-     * @param string $prefix - Temporary directory prefix.
+     * @param string $prefix - Prefix appended to the system temporary-directory path.
      *
-     * @return string - absolute path to the freshly created directory; the caller owns it and must tear it down via removeDir()
+     * @return string - Freshly created directory path; the caller owns it and must tear it down via removeDir().
      */
     private function tempDir(string $prefix): string
     {
@@ -281,14 +280,13 @@ final class GitArchiveSnapshotTest extends TestCase
     /**
      * Remove a temporary directory tree.
      *
-     * @param string $path - Filesystem path.
+     * @param string $path - Temporary directory tree to remove; non-directory paths are ignored.
      *
-     * @return void
+     * @return void - Unlinks child symlinks and removes directories after their contents.
      */
     private function removeDir(string $path): void
     {
         if (!is_dir($path)) {
-            // Nothing to remove (path absent or never created); stay a no-op so finally-block cleanup is idempotent.
             return;
         }
 

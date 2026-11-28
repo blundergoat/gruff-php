@@ -8,21 +8,24 @@ use JsonException;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers the report CLI command: static and JSON output, HTML report flag forwarding, repeated rule filter forwarding, dash-prefixed path preservation, baseline flag, and no-write-on-invalid-analyse behaviour.
+ * Exercise report output on stdout and disk, including HTML options, JSON and baseline suppression.
+ *
+ * Cover selected analyse options, new-findings failure status, dash-prefixed paths and sensitive-snippet redaction.
+ * Check invalid profile and configuration cases, including preservation of existing output files.
  */
 final class ReportCliTest extends CliTestCase
 {
     /**
      * Raw sensitive snippets that report surfaces must never render.
      *
-     * @var list<string>
+     * @var list<string> - Synthetic fixture fragments checked for absence in HTML and JSON output.
      */
     private const SENSITIVE_SNIPPETS = ['MIIBVgIBADANBgkqhkiG', 's3cr3tValue', 'Tok3nXyZ9'];
 
     /**
      * Verify report command outputs static HTML report.
      *
-     * @return void
+     * @return void - Asserts exit 0, report markers and absence of the dashboard toolbar.
      */
     public function testReportCommandOutputsStaticHtmlReport(): void
     {
@@ -43,7 +46,7 @@ final class ReportCliTest extends CliTestCase
     /**
      * Verify report command forwards HTML report flags.
      *
-     * @return void
+     * @return void - Asserts editor links and filters appear when enabled, and filters disappear when disabled.
      */
     public function testReportCommandForwardsHtmlReportFlags(): void
     {
@@ -84,9 +87,9 @@ final class ReportCliTest extends CliTestCase
     /**
      * Verify report command outputs JSON report.
      *
-     * @throws JsonException
+     * @throws JsonException - If the CLI output cannot be decoded as JSON.
      *
-     * @return void
+     * @return void - Asserts exit 0 and schemaVersion gruff.analysis.v3 in decoded output.
      */
     public function testReportCommandOutputsJsonReport(): void
     {
@@ -103,15 +106,77 @@ final class ReportCliTest extends CliTestCase
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
 
         $report = $this->decodeJsonOutput($process);
-        self::assertSame('gruff.analysis.v2', $report['schemaVersion'] ?? null);
+        self::assertSame('gruff.analysis.v3', $report['schemaVersion'] ?? null);
     }
 
     /**
-     * Verify report accepts and forwards the newer analyse workflows it used to reject.
+     * Checks that reporting a sibling project reads its exit threshold.
      *
-     * @throws JsonException
+     * @return void - Asserts the target configuration trips its advisory gate.
+     */
+    public function testReportUsesTargetProjectGateFromSibling(): void
+    {
+        $workspace = $this->tempDir();
+
+        try {
+            self::assertTrue(mkdir($workspace . '/launch'));
+            self::assertTrue(mkdir($workspace . '/target'));
+            file_put_contents($workspace . '/target/.gruff-php.yaml', "schemaVersion: gruff-php.config.v0.1\nfailOn: {report: advisory}\n");
+            file_put_contents($workspace . '/target/Example.php', '<?php class Example { public function emptyMethod(): void {} }');
+
+            $process = new Process([
+                PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'report', '../target',
+                '--format=json', '--no-cache', '--include-rule=waste.empty-method',
+            ], $workspace . '/launch');
+            self::assertSame(1, $process->run(), $process->getOutput() . $process->getErrorOutput());
+            $report = $this->decodeJsonOutput($process);
+            self::assertSame('advisory', $this->decodedJsonObject($report['run'] ?? null)['failOn'] ?? null);
+        } finally {
+            $this->removeDir($workspace);
+        }
+    }
+
+    /**
+     * Verify report forwards the CLI budget and preserves its diagnostic.
      *
-     * @return void
+     * @return void - Asserts exit 0 and a bounded-deep-scan diagnostic identifying the CLI override.
+     */
+    public function testReportCommandForwardsDeepScanBudget(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            self::PROJECT_ROOT . '/bin/gruff-php',
+            'report',
+            '--format',
+            'json',
+            '--fail-on',
+            'none',
+            '--no-config',
+            '--no-cache',
+            '--deep-scan-budget',
+            '1:1',
+            'tests/Fixtures/Source/mixed/alpha.php',
+        ], self::PROJECT_ROOT);
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        $report      = $this->decodeJsonOutput($process);
+        $diagnostics = $report['diagnostics'] ?? null;
+        self::assertIsArray($diagnostics);
+        $diagnostic = $diagnostics[0] ?? null;
+        self::assertIsArray($diagnostic);
+        self::assertSame('bounded-deep-scan', $diagnostic['type'] ?? null);
+        $message = $diagnostic['message'] ?? null;
+        self::assertIsString($message);
+        self::assertStringContainsString('override=cli', $message);
+    }
+
+    /**
+     * Verify report accepts the supplied analyse options and exposes an active diff in JSON output.
+     *
+     * @throws JsonException - If the CLI output cannot be decoded as JSON.
+     *
+     * @return void - Asserts exit 0, schemaVersion gruff.analysis.v3 and an enabled diff section.
      */
     public function testReportCommandForwardsChangedScopeGatingAndCacheOptions(): void
     {
@@ -138,18 +203,17 @@ final class ReportCliTest extends CliTestCase
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput() . $process->getOutput());
 
         $report = $this->decodeJsonOutput($process);
-        self::assertSame('gruff.analysis.v2', $report['schemaVersion'] ?? null);
+        self::assertSame('gruff.analysis.v3', $report['schemaVersion'] ?? null);
         // --since forwarded: the child records an active diff block for the changed-region scan.
         $diff = $report['diff'] ?? null;
         self::assertIsArray($diff);
-        self::assertTrue($diff['active'] ?? null);
+        self::assertTrue($diff['enabled'] ?? null);
     }
 
     /**
-     * Verify --fail-on-new forwards with gating semantics: a real introduced finding trips exit 1
-     * while the artifact is still written.
+     * Verify the report command returns exit 1 with --fail-on-new and still writes the requested artifact.
      *
-     * @return void
+     * @return void - Asserts exit 1 and creation of the requested HTML output file.
      */
     public function testReportCommandForwardsFailOnNewAndStillWritesArtifact(): void
     {
@@ -157,8 +221,7 @@ final class ReportCliTest extends CliTestCase
         $outputPath = $repo . '/gruff-report.html';
 
         try {
-            // A one-commit repo whose working tree then gains an error-severity finding: if the
-            // forwarded --fail-on-new were silently dropped, the run would exit 0 and this test fails.
+            // Commit the documented source first so Newcomer.php is the only source addition compared with HEAD.
             self::assertTrue(mkdir($repo . '/src', 0777, true));
             file_put_contents(
                 $repo . '/src/Documented.php',
@@ -202,9 +265,9 @@ final class ReportCliTest extends CliTestCase
     }
 
     /**
-     * Verify the incoherent profile/include combination is rejected before any prompt or subprocess.
+     * Verify report rejects a documentation rule included under the security profile.
      *
-     * @return void
+     * @return void - Asserts exit 2, the profile-selection diagnostic and no schemaVersion in stdout.
      */
     public function testReportCommandRejectsOutOfProfileIncludeBeforeSpawningAnalyse(): void
     {
@@ -220,7 +283,7 @@ final class ReportCliTest extends CliTestCase
             '--profile',
             'security',
             '--include-rule',
-            'docs.missing-public-phpdoc',
+            'docs.missing-phpdoc',
             '--no-config',
             '--no-baseline',
         ], self::PROJECT_ROOT);
@@ -228,14 +291,14 @@ final class ReportCliTest extends CliTestCase
 
         self::assertSame(2, $process->getExitCode());
         self::assertStringContainsString('selects a documentation rule', $process->getOutput());
-        // No report body means report itself rejected the run before spawning the analyse child.
+
         self::assertStringNotContainsString('schemaVersion', $process->getOutput());
     }
 
     /**
-     * Verify unsupported profiles are rejected before report can offer or write config.
+     * Verify an unsupported report profile fails without creating project configuration.
      *
-     * @return void
+     * @return void - Asserts exit 2, the unsupported-profile diagnostic and absence of .gruff-php.yaml.
      */
     public function testReportCommandRejectsUnknownProfileBeforeConfigPrompt(): void
     {
@@ -265,10 +328,10 @@ final class ReportCliTest extends CliTestCase
     /**
      * Run git inside a fixture repository.
      *
-     * @param string $repo - Fixture repository root.
+     * @param string $repo         - Fixture repository root.
      * @param string ...$arguments - Git arguments.
      *
-     * @return void
+     * @return void - Asserts successful completion of Git in the supplied fixture repository.
      */
     private function runGit(string $repo, string ...$arguments): void
     {
@@ -281,7 +344,7 @@ final class ReportCliTest extends CliTestCase
     /**
      * Verify the curated analyse option surface is exposed by report, minus the documented analyse-only flags.
      *
-     * @return void
+     * @return void - Asserts selected help options are present and --generate-baseline and the --file help entry are absent.
      */
     public function testReportCommandOptionParityWithAnalyse(): void
     {
@@ -298,6 +361,10 @@ final class ReportCliTest extends CliTestCase
 
         $reportSupportedOptions = [
             '--profile',
+            '--diff-base',
+            '--min-confidence',
+            '--show-rule',
+            '--hide-pillar',
             '--fail-on-new',
             '--no-cache',
             '--since',
@@ -311,6 +378,7 @@ final class ReportCliTest extends CliTestCase
             '--print-runtime',
             '--runtime-mode',
         ];
+        // Check each option a report caller can use so the help stays aligned with forwarding.
         foreach ($reportSupportedOptions as $optionName) {
             self::assertStringContainsString($optionName, $helpText, sprintf('report --help must document %s.', $optionName));
         }
@@ -322,12 +390,13 @@ final class ReportCliTest extends CliTestCase
     }
 
     /**
-     * Verify report command does not leak raw sensitive-data snippets.
+     * Verify HTML and JSON report output omit the configured sensitive fixture snippets.
      *
-     * @return void
+     * @return void - Asserts exit 0, absence of each listed snippet and a redacted marker for both formats.
      */
     public function testReportCommandDoesNotLeakSensitiveDataSecrets(): void
     {
+        // Test both saved-report formats for accidental exposure of a raw sensitive match.
         foreach (['html', 'json'] as $format) {
             $process = new Process([
                 PHP_BINARY,
@@ -339,11 +408,13 @@ final class ReportCliTest extends CliTestCase
                 $format,
                 '--fail-on',
                 'none',
-                '--no-config',
+                '--config',
+                'tests/Fixtures/Config/enable-default-off-rules.yaml',
             ], self::PROJECT_ROOT);
             $process->run();
 
             self::assertSame(0, $process->getExitCode(), $process->getErrorOutput() . $process->getOutput());
+            // Search for every fixture value that a report must redact before it reaches the caller.
             foreach (self::SENSITIVE_SNIPPETS as $sensitiveSnippet) {
                 self::assertStringNotContainsString($sensitiveSnippet, $process->getOutput(), sprintf('%s report leaked a raw secret.', $format));
             }
@@ -352,11 +423,11 @@ final class ReportCliTest extends CliTestCase
     }
 
     /**
-     * Verify report command forwards repeated rule filters.
+     * Verify report applies a single --include-rule filter to JSON findings.
      *
-     * @throws JsonException
+     * @throws JsonException - If the CLI output cannot be decoded as JSON.
      *
-     * @return void
+     * @return void - Asserts exit 0 and exactly one finding with ruleId docs.missing-phpdoc.
      */
     public function testReportCommandForwardsRepeatedRuleFilters(): void
     {
@@ -371,7 +442,7 @@ final class ReportCliTest extends CliTestCase
             'none',
             '--no-config',
             '--include-rule',
-            'docs.missing-public-phpdoc',
+            'docs.missing-phpdoc',
         ], self::PROJECT_ROOT);
         $process->run();
 
@@ -383,13 +454,13 @@ final class ReportCliTest extends CliTestCase
         self::assertCount(1, $findings);
         $firstFinding = $findings[0] ?? null;
         self::assertIsArray($firstFinding);
-        self::assertSame('docs.missing-public-phpdoc', $firstFinding['ruleId'] ?? null);
+        self::assertSame('docs.missing-phpdoc', $firstFinding['ruleId'] ?? null);
     }
 
     /**
      * Verify report command writes static HTML report.
      *
-     * @return void
+     * @return void - Asserts exit 0, the write confirmation and an output file containing the verdict section.
      */
     public function testReportCommandWritesStaticHtmlReport(): void
     {
@@ -424,7 +495,7 @@ final class ReportCliTest extends CliTestCase
      *
      * @throws JsonException
      *
-     * @return void
+     * @return void - Asserts exit 0 and an output substring naming the file --dash.php.
      */
     public function testReportCommandPreservesDashPrefixedPaths(): void
     {
@@ -458,7 +529,7 @@ final class ReportCliTest extends CliTestCase
     /**
      * Verify report command does not overwrite output files when analyse exits invalid.
      *
-     * @return void
+     * @return void - Asserts exit 2 and preservation of the existing report file contents.
      */
     public function testReportCommandDoesNotWriteOutputAfterInvalidAnalyseRun(): void
     {
@@ -492,9 +563,9 @@ final class ReportCliTest extends CliTestCase
     /**
      * Verify report command forwards baseline flag.
      *
-     * @throws JsonException
+     * @throws JsonException - If the CLI output cannot be decoded as JSON.
      *
-     * @return void
+     * @return void - Asserts exit 0 and one suppressed finding after loading the generated baseline.
      */
     public function testReportCommandForwardsBaselineFlag(): void
     {
@@ -533,6 +604,35 @@ final class ReportCliTest extends CliTestCase
             $baseline = $decoded['baseline'] ?? null;
             self::assertIsArray($baseline);
             self::assertSame(1, $baseline['suppressedFindings'] ?? null);
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+
+    /**
+     * Verify an explicit empty --fail-on= fails validation with exit 2 instead of silently disabling the gate.
+     *
+     * @return void - Asserts exit code 2 and the unsupported fail-threshold diagnostic.
+     */
+    public function testReportCommandRejectsEmptyFailOnOption(): void
+    {
+        $project = $this->createBaselineProject();
+
+        try {
+            $process = new Process([
+                PHP_BINARY,
+                __DIR__ . '/../../bin/gruff-php',
+                'report',
+                'src',
+                '--no-config',
+                '--format',
+                'json',
+                '--fail-on=',
+            ], $project);
+            $process->run();
+
+            self::assertSame(2, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
+            self::assertStringContainsString('Unsupported fail threshold ""', $process->getOutput() . $process->getErrorOutput());
         } finally {
             $this->removeDir($project);
         }

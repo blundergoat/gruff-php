@@ -11,19 +11,17 @@ use GruffPhp\Results\Finding\Pillar;
 use GruffPhp\Engine\Parser\PhpFileParser;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\RuleRegistry;
-use GruffPhp\Rules\SensitiveData\DatabaseUrlPasswordRule;
 use GruffPhp\Rules\SensitiveData\GcpServiceAccountKeyRule;
-use GruffPhp\Rules\SensitiveData\PhiPatternRule;
 use GruffPhp\Rules\SensitiveData\PiiTestFixtureRule;
 use GruffPhp\Rules\SensitiveData\PrivateKeyRule;
-use GruffPhp\Rules\SensitiveData\UrlEmbeddedCredentialsRule;
 use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers the M12 sensitive-data expansion: GCP service-account keys and
- * HTTP(S) URL-embedded credentials, with overlap precedence and no-leak proof.
+ * Covers GCP service-account fixture findings and rendered previews.
+ * The key fixture produces one GCP finding; the placeholder stays quiet and the private-key finding uses a different line.
+ * The six exercised report formats include a redaction marker and omit the checked key-body prefix.
  */
 final class SensitiveDataExpansionRulesTest extends TestCase
 {
@@ -36,16 +34,13 @@ final class SensitiveDataExpansionRulesTest extends TestCase
     /** Placeholder GCP service-account key. */
     private const GCP_PLACEHOLDER = 'tests/Fixtures/SensitiveData/gcp-service-account-placeholder.json';
 
-    /** URL-embedded-credentials fixture. */
-    private const URL_FIXTURE = 'tests/Fixtures/SensitiveData/url-credentials.php';
-
     /** Schema-field-name and placeholder PHI/PII fixture. */
     private const PHI_GUARD_FIXTURE = 'tests/Fixtures/SensitiveData/phi-schema-placeholders.php';
 
     /**
-     * Verify a real service-account key fires once with a redacted preview.
+     * Verify one GCP finding has the expected metadata and a redaction marker in its preview.
      *
-     * @return void
+     * @return void - Asserts the finding count, pillar, confidence, detector and preview marker.
      */
     public function testGcpServiceAccountKeyDetected(): void
     {
@@ -63,7 +58,7 @@ final class SensitiveDataExpansionRulesTest extends TestCase
     /**
      * Verify a placeholder service-account key does not fire.
      *
-     * @return void
+     * @return void - Asserts no GCP findings are returned for the placeholder fixture.
      */
     public function testGcpPlaceholderKeyIgnored(): void
     {
@@ -71,9 +66,9 @@ final class SensitiveDataExpansionRulesTest extends TestCase
     }
 
     /**
-     * Verify the GCP and generic private-key rules are complementary, not duplicate.
+     * Verify the key fixture yields one finding per rule on different lines.
      *
-     * @return void
+     * @return void - Asserts one GCP finding, one private-key finding and distinct line numbers.
      */
     public function testGcpAndPrivateKeyFindingsAreDistinct(): void
     {
@@ -87,50 +82,16 @@ final class SensitiveDataExpansionRulesTest extends TestCase
     }
 
     /**
-     * Verify http(s) URL credentials fire and the password is redacted.
+     * Verify six report formats omit the checked key-body prefix and contain a redaction marker.
      *
-     * @return void
-     */
-    public function testUrlEmbeddedCredentialsDetected(): void
-    {
-        $findings = $this->findingsForRule(self::URL_FIXTURE, UrlEmbeddedCredentialsRule::ID);
-
-        self::assertCount(2, $findings);
-        foreach ($findings as $finding) {
-            $preview = $finding->metadata['preview'] ?? null;
-            self::assertIsString($preview, sprintf('Finding on line %s should expose a string preview.', (string)$finding->line));
-            self::assertStringContainsString('redacted', $preview, sprintf('Finding on line %s should redact the password.', (string)$finding->line));
-        }
-    }
-
-    /**
-     * Verify the URL-credentials rule ignores DB schemes (handled elsewhere) and
-     * safe URLs, with no overlap against the database-url rule.
-     *
-     * @return void
-     */
-    public function testUrlCredentialsScopeAndNoDatabaseOverlap(): void
-    {
-        $urlFindings = $this->findingsForRule(self::URL_FIXTURE, UrlEmbeddedCredentialsRule::ID);
-        $dbFindings  = $this->findingsForRule(self::URL_FIXTURE, DatabaseUrlPasswordRule::ID);
-
-        // url-credentials handles only http(s); the mysql:// URL is the database rule's job.
-        self::assertCount(2, $urlFindings);
-        self::assertCount(1, $dbFindings);
-        self::assertNotSame($urlFindings[0]->line, $dbFindings[0]->line);
-    }
-
-    /**
-     * Verify no renderer leaks the raw key body or URL password.
-     *
-     * @return void
+     * @return void - Asserts prefix absence and marker presence in each captured report.
      */
     public function testNewDetectorsDoNotLeakRawSecretsAcrossFormats(): void
     {
-        $rawSecrets = ['MIIBVgIBADANBgkqhkiG', 's3cr3tValue', 'Tok3nXyZ9'];
+        $rawSecrets = ['MIIBVgIBADANBgkqhkiG'];
 
         foreach (['text', 'json', 'sarif', 'github', 'markdown', 'html'] as $format) {
-            $output = $this->runGruff(['analyse', self::GCP_FIXTURE, self::URL_FIXTURE, '--format', $format, '--fail-on', 'none', '--no-config']);
+            $output = $this->runGruff(['analyse', self::GCP_FIXTURE, '--format', $format, '--fail-on', 'none', '--config', 'tests/Fixtures/Config/enable-default-off-rules.yaml']);
 
             foreach ($rawSecrets as $secret) {
                 self::assertStringNotContainsString($secret, $output, sprintf('%s report leaked a raw secret.', $format));
@@ -141,23 +102,22 @@ final class SensitiveDataExpansionRulesTest extends TestCase
     }
 
     /**
-     * Verify schema field names and placeholder identifiers do not fire PHI/PII rules.
+     * Verify schema field names and placeholder identifiers produce no findings from the PII fixture rule.
      *
-     * @return void
+     * @return void - Asserts the selected rule returns no findings for the fixture.
      */
     public function testSchemaAndPlaceholderValuesDoNotFirePhiOrPii(): void
     {
-        self::assertSame([], $this->findingsForRule(self::PHI_GUARD_FIXTURE, PhiPatternRule::ID));
         self::assertSame([], $this->findingsForRule(self::PHI_GUARD_FIXTURE, PiiTestFixtureRule::ID));
     }
 
     /**
-     * Analyse a fixture and return findings for one rule.
+     * Analyse a project-relative fixture with registry defaults and return one rule's findings.
      *
-     * @param string $displayPath - Fixture display path.
-     * @param string $ruleId - Rule identifier to filter for.
+     * @param string $displayPath - Project-relative fixture path resolved under PROJECT_ROOT.
+     * @param string $ruleId - Rule identifier whose findings are retained.
      *
-     * @return list<Finding> - findings emitted by that one rule, in detection order; empty when the rule did not fire
+     * @return list<Finding> - Matching findings in report order; empty when the rule is disabled or has no findings.
      */
     private function findingsForRule(string $displayPath, string $ruleId): array
     {
@@ -172,10 +132,9 @@ final class SensitiveDataExpansionRulesTest extends TestCase
     /**
      * Run the gruff CLI and return its stdout.
      *
-     * @param list<string> $arguments - CLI arguments.
+     * @param list<string> $arguments - Arguments appended after the PHP binary and CLI script.
      *
-     * @return string - the full rendered report captured from stdout; a non-zero exit aborts via assertion first,
-     *   so the returned text is always the complete report to scan for leaked secrets
+     * @return string - Captured stdout after the zero-exit assertion succeeds.
      */
     private function runGruff(array $arguments): string
     {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GruffPhp\Tests\Reporting;
 
 use GruffPhp\Engine\Analysis\AnalysisReport;
+use GruffPhp\Results\Baseline\BaselineReport;
 use GruffPhp\Results\Finding\Confidence;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Pillar;
@@ -15,15 +16,16 @@ use GruffPhp\Output\Reporter\TextReporter;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers the output-volume hint that points users at `summary` when an analyse run
- * crosses the high-watermark for flat-list browsability. See M08.
+ * Covers the text reporter's output-volume hint and handling of remediation metadata.
+ * Builds synthetic advisory findings for a single discovered and parsed file.
+ * Checks that Apply metadata leaves the rendered text unchanged.
  */
 final class TextReporterTest extends TestCase
 {
     /**
      * Verify the hint is suppressed when finding count is below the threshold.
      *
-     * @return void
+     * @return void - Asserts that both footer hint fragments are absent for five findings.
      */
     public function testFooterHintIsSuppressedBelowThreshold(): void
     {
@@ -36,9 +38,9 @@ final class TextReporterTest extends TestCase
     }
 
     /**
-     * Verify the hint surfaces when the finding count reaches the threshold.
+     * Verify the hint surfaces for a report containing 60 findings.
      *
-     * @return void
+     * @return void - Asserts both threshold hint fragments appear for 60 findings.
      */
     public function testFooterHintAppearsAtThreshold(): void
     {
@@ -53,7 +55,7 @@ final class TextReporterTest extends TestCase
     /**
      * Verify action metadata does not alter the family-frozen text finding block.
      *
-     * @return void
+     * @return void - Asserts equal renderings and the absence of remediationAction and APPLY text.
      */
     public function testRemediationActionMetadataDoesNotChangeTextOutput(): void
     {
@@ -70,19 +72,63 @@ final class TextReporterTest extends TestCase
     }
 
     /**
-     * Build a synthetic AnalysisReport with the requested number of findings.
+     * Verify the generation tip only promises an automatic rerun for the default baseline path.
+     * A baseline written elsewhere, such as the upgrade guide's migrated file, applies only through --baseline.
      *
-     * @param int                  $findingCount - Number of synthetic findings to embed.
-     * @param array<string, bool|float|int|string|null|array<array-key, bool|float|int|string|null>> $metadata - Machine-readable fields attached to every synthetic finding; empty keeps findings unclassified.
+     * @return void - Asserts the rerun advice for both spellings of the default path and the --baseline advice for another path.
+     */
+    public function testGeneratedBaselineTipMatchesHowTheFileIsApplied(): void
+    {
+        $reporter = new TextReporter();
+        $default  = $reporter->render($this->reportWithGeneratedBaseline('gruff-baseline.json'));
+        $dotted   = $reporter->render($this->reportWithGeneratedBaseline('./gruff-baseline.json'));
+        $migrated = $reporter->render($this->reportWithGeneratedBaseline('gruff-baseline.0.6.json'));
+
+        self::assertStringContainsString('Tip: commit gruff-baseline.json and rerun `gruff-php analyse` to apply it', $default);
+        self::assertStringContainsString('Tip: commit ./gruff-baseline.json and rerun `gruff-php analyse` to apply it', $dotted);
+        self::assertStringContainsString('Tip: commit gruff-baseline.0.6.json and pass --baseline gruff-baseline.0.6.json to apply it', $migrated);
+        self::assertStringNotContainsString('rerun `gruff-php analyse` to apply it', $migrated);
+    }
+
+    /**
+     * Build a findings-free report that has just generated a baseline at the given path.
      *
-     * @return AnalysisReport - report carrying exactly $findingCount advisory findings over one discovered/parsed file, exit code 0
+     * @param string $baselinePath - Path the report says the baseline was written to.
+     *
+     * @return AnalysisReport - Report whose baseline section records a generated file with no entries.
+     */
+    private function reportWithGeneratedBaseline(string $baselinePath): AnalysisReport
+    {
+        return new AnalysisReport(
+            toolVersion:     '0.6.0',
+            requestedPaths:  ['src'],
+            format:          'text',
+            failOn:          'none',
+            filesDiscovered: 1,
+            filesParsed:     1,
+            ignoredPaths:    [],
+            missingPaths:    [],
+            diagnostics:     [],
+            findings:        [],
+            exitCode:        0,
+            baseline:        new BaselineReport(path: $baselinePath, generated: true, totalEntries: 0, suppressedFindings: 0, staleEvaluation: 'generated'),
+        );
+    }
+
+    /**
+     * Build an advisory-only report for one discovered and parsed file.
+     *
+     * @param int                  $findingCount - Requested finding count; zero or negative produces no findings.
+     * @param array<string, bool|float|int|string|null|array<array-key, bool|float|int|string|null>> $metadata - Shared fields; empty adds none.
+     *
+     * @return AnalysisReport - Report for one file with max(0, $findingCount) advisory findings and exit code 0.
      */
     private function reportWithFindings(int $findingCount, array $metadata = []): AnalysisReport
     {
         $findings = [];
         for ($index = 0; $index < $findingCount; $index++) {
             $findings[] = new Finding(
-                ruleId:     'docs.missing-public-phpdoc',
+                ruleId:     'docs.missing-phpdoc',
                 message:    'Example finding.',
                 filePath:   'src/Example.php',
                 line:       $index + 1,

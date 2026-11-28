@@ -1,19 +1,9 @@
 ---
 category: setup
-last_reviewed: 2026-08-14
+last_reviewed: 2026-11-28
 ---
 
 # Setup Footguns
-
-## Footgun: goat-flow content audit requires a goat-flow-dashboard-views line in a consumer code map
-
-**Status:** active | **Created:** 2026-07-20 | **Evidence:** OBSERVED
-
-goat-flow 1.14.0's `audit --check-content` runs `code-map-dashboard-view-drift` unconditionally on any project with `.goat-flow/code-map.md`. When the target has no `src/dashboard/views/*.html` (true for every consumer project - the npm package ships dist-only), the check falls back to goat-flow's own manifest view list and fails unless the code map contains a line with `views/`, the phrase `HTML view`, and a first parenthesised group listing exactly the goat-flow dashboard view names. `.goat-flow/code-map.md` (search: `src/dashboard/views/ HTML view files`) carries that line on the `node_modules/` entry, phrased truthfully as describing the upstream package.
-
-**Evidence:** This session's 1.13.0 to 1.14.0 upgrade: `audit . --agent claude --check-content` reported `code-map-dashboard-view-drift` ("Code map lists dashboard views as none") with no `src/dashboard/views` on disk. Check source: `node_modules/@blundergoat/goat-flow/dist/cli/audit/check-factual-semantic-drift.js` (search: `readDashboardViewFiles`) - the manifest fallback fires whenever the glob returns zero files.
-
-**Prevention:** Do not strip the odd-looking dashboard-views sentence from the `node_modules/` line in `.goat-flow/code-map.md` during cleanup passes; removing it re-fails the content gate. Keep any other parenthesised text on that line after the view-name list, because the checker parses only the first parenthesised group. This is an upstream check leaking goat-flow self-repo facts into consumer audits - worth reporting to goat-flow; drop the line only after upstream gates the check.
 
 ## Footgun: Package bin bootstraps must use Composer's consumer autoloader
 
@@ -21,7 +11,7 @@ goat-flow 1.14.0's `audit --check-content` runs `code-map-dashboard-view-drift` 
 
 `bin/gruff-php` (search: `$GLOBALS['_composer_autoload_path']`) must prefer Composer's generated bin-proxy autoload path when run from an installed project's `vendor/bin/gruff-php`. A package-local bootstrap such as `__DIR__ . '/../vendor/autoload.php'` works in this checkout, but fails after `composer require --dev blundergoat/gruff-php` because installed dependencies do not carry their own nested `vendor/autoload.php`.
 
-**Evidence:** External install reproduction in `/home/devgoat/projects/strands-php-client`: `vendor/bin/gruff-php init` from package `v0.1.2` failed opening `vendor/blundergoat/gruff-php/bin/../vendor/autoload.php`. Composer's generated proxy at `/home/devgoat/projects/strands-php-client/vendor/bin/gruff-php` sets `$GLOBALS['_composer_autoload_path']` before including the package bin.
+**Evidence:** External install reproduction in `/home/devgoat/projects/strands-php-client`: `vendor/bin/gruff-php init` from package `v0.1.2` failed opening `vendor/blundergoat/gruff-php/bin/../vendor/autoload.php`. Composer's generated proxy at `/home/devgoat/projects/strands-php-client/vendor/bin/gruff-php` sets `$GLOBALS['_composer_autoload_path']` before including the package bin. The regression test the prevention asks for now exists: `tests/Console/ListRulesCliTest.php` (search: `testInstalledVendorBinProxyUsesConsumerAutoloader`) installs the package into a temporary consumer project and runs `vendor/bin/gruff-php init`. It passed on 2026-10-03.
 
 **Prevention:** CLI package bins need a regression test that installs the package into a consumer project and executes `vendor/bin/<tool>`, not only `php bin/<tool>` inside the source checkout. Keep the source-checkout fallback for direct development, but make the Composer proxy autoload path the first candidate.
 
@@ -47,19 +37,65 @@ goat-flow 1.14.0's `audit --check-content` runs `code-map-dashboard-view-drift` 
 
 **Prevention:** Never cite a `--prefer-lowest` run inside this checkout as evidence that an advertised floor works. Prove a runtime floor in a consumer-shaped project that requires only the `require` block, never `require-dev`. Check `composer why <package>` first: when any dev dependency's constraint is tighter than the advertised one, the local resolution is measuring the dev constraint. This is the mirror image of the newer-major trap recorded above (search: `## Footgun: Consumer install tests can resolve newer dependency majors than the source checkout`); both come from the same root cause, that the source checkout's resolution is not a consumer's resolution.
 
+## Footgun: `goat-flow install` silently drops the `.env*` deny catch-alls from `.claude/settings.json`
+
+**Status:** active | **Created:** 2026-10-03 | **Evidence:** ACTUAL_MEASURED
+**Decision changed:** Whether a goat-flow upgrade needs a manual check of `.claude/settings.json` before it is accepted.
+**Trigger phase:** VERIFY
+
+`goat-flow install` replaces the `Read(**/.env*)` and `Edit(**/.env*)` deny rules with eight named variants so `.env.example` stays readable. The rewrite lives in `node_modules/@blundergoat/goat-flow/dist/cli/install-command.js` (search: `rule === "Read(**/.env*)"`) and the variant list in `node_modules/@blundergoat/goat-flow/dist/cli/installer/claude-permissions.js` (search: `ENV_DENY_EXPANSIONS`). After the rewrite, other variants such as `.env.backup` or `.env.prod` are open to Claude's Read and Edit tools, because the Bash deny hook covers only shell commands. This project added both catch-alls back by hand after earlier upgrades removed them: `Read` in `bafe1f7` and `Edit` in `cc89c13`.
+
+**Evidence:** Measured 2026-10-03 during the 1.17.0 upgrade. The install output listed every retired rule it removed, including `Bash(*sudo *)` and `Read(**/secrets/**)`, but printed nothing about the two `.env*` rules. `git diff .claude/settings.json` showed both gone, and they were restored by hand after the install. `.codex/config.toml` never carried a catch-all, so the Codex profile was unaffected. The trap recurred in the 1.18.0 upgrade: commit `a25ff4e` removed both catch-alls again, and they stayed missing until they were restored on 2026-11-23 during the 1.19.0 upgrade. That upgrade cannot show whether 1.19.0 still drops them, because they were already absent when it ran, but 1.19.0's `install-command.js` still carries the rewrite.
+
+**Prevention:** After any `goat-flow install`, search `.claude/settings.json` for `Read(**/.env*)` and `Edit(**/.env*)` and restore whichever is missing. A diff against `HEAD` is not enough: after the 1.18.0 loss, `HEAD` itself lacked both, so the 1.19.0 diff showed nothing. The install log is not a complete list of removals.
+
+## Footgun: `composer perf` fails on large speedups as well as regressions after rule-catalogue changes
+
+**Status:** active | **Created:** 2026-11-25 | **Evidence:** ACTUAL_MEASURED
+**Decision changed:** How to interpret a `composer perf` failure after retiring rules or upgrading the PHP runtime, and when to refresh the checked-in performance baseline.
+**Trigger phase:** VERIFY
+
+**Prevention:** When `composer perf` exits `1`, inspect the sign of `delta` in the output table before investigating a performance regression. `scripts/test-performance.sh` (search: `abs="$(awk -v d="$delta"`) compares the absolute value of `delta` against `tolerance * 1.5` (30% for wall time with default `GRUFF_PERF_WALL_TOLERANCE=20`), so a speedup greater than 30% fails identically to a slowdown. When a negative delta reflects intentional rule removals or a deliberate parser speedup, regenerate the platform baseline with `bash scripts/test-performance.sh --baseline --yes` and re-run `composer perf` to confirm stability.
+
+**Evidence:** Measured 2026-11-24 during 0.6.0 preflight after retiring 46 rules (`127` rules on PHP 8.3.30 in the 0.5.2 baseline vs `83` rules on PHP 8.4.26): `composer perf` exited `1` because `medium` dropped `-61.7%` and `large` dropped `-66.7%` against `scripts/performance-baselines/linux-x86_64.json`. Regenerating the baseline for `0.6.0` and re-running `composer perf` passed all 6 metrics (`small` 44ms, `medium` 860ms, `large` 1647ms; deltas `-3.3%` to `+2.3%`, exit `0`).
+
+## Footgun: The documentation drift gate never runs a documented command or config example
+
+**Status:** active | **Created:** 2026-11-28 | **Evidence:** ACTUAL_MEASURED
+**Decision changed:** How to verify a doc edit that shows a gruff-php command, upgrade step, or `.gruff-php.yaml` snippet before calling it correct.
+**Trigger phase:** VERIFY
+
+**Prevention:** Run what the doc shows. Load each changed YAML example through `php bin/gruff-php analyse --config <file> --format=json` and check for a config diagnostic, and replay changed upgrade steps in a scratch project shaped like the version being upgraded from. A passing `Documentation drift` row in `bash scripts/preflight-checks.sh` proves only that catalogue counts, rule IDs, cited decisions, and links resolve: `scripts/preflight-checks.sh` (search: `docs_drift_check()`) reads the docs but executes none of their examples.
+
+**Evidence:** Measured 2026-11-28 while preparing 0.6.0, with the drift gate passing throughout. The preset example in `docs/gruff-cli-agent-instructions.md` (search: `your override on top of the preset`) set `threshold` without `severity`, so every copy exited `2` with `Config key "rules.complexity.cognitive.severity" must be "advisory", "warning", or "error".` (`src/Engine/Config/RuleConfigApplier.php`, search: `private function severityThreshold`). The baseline step in `UPGRADING.md` (search: `A 0.5 config no longer loads`) and three other docs ran `analyse --migrate-baseline` while the 0.5 config was still in place, which exits `2` with `Config key "schemaVersion" is required.` Both examples were fixed only after they were run.
+
+## Resolved Entries
+
 ## Footgun: `goat-flow hooks sync` reverts this repo's local hook fixes; the failing drift audit is not a repair prompt
 
-**Status:** active | **Created:** 2026-08-14 | **Evidence:** ACTUAL_MEASURED
+**Status:** resolved | **Created:** 2026-08-14 | **Resolved:** 2026-11-23 | **Evidence:** ACTUAL_MEASURED
 **Decision changed:** Whether to act on `goat-flow audit`'s printed repair command when the drift scope covers `.goat-flow/hooks/`.
 **Trigger phase:** ACT
 
-`goat-flow audit . --harness --agent claude` exits 1 with `hookCoverage` reporting `requiredIneffective: 3, effective: 0` and `drift` listing 8 artifacts, and every hook row prints `repairCommand: goat-flow hooks sync`. Running it would overwrite three hook scripts that carry fixes existing nowhere upstream. `.goat-flow/hooks/deny-dangerous.sh` (search: `--no-run-if-empty`) keeps `-e`, `-i`, `-l`, `--eof`, `--replace` and `--max-lines` in the no-argument xargs branch; `xargs --help` documents all six as optional-argument flags, so the shipped template consumes the following token and can walk past the real command. `.goat-flow/hooks/post-turn-safety.sh` (search: `is_normalized_credential_key`) adds the credential-label classifier, and `.goat-flow/hooks/gruff-code-quality.sh` (search: `reported span intersects`) counts findings whose whole span overlaps an edit rather than only the primary line.
+Two installed hooks carried fixes that the published goat-flow 1.18.0 templates lacked, so `goat-flow hooks sync`, or `goat-flow install --force-path` on either file, would delete them. The local gruff-code-quality.sh (anchor: `reported span intersects`) counts a finding when any part of its reported span overlaps the edit in the legacy fallback path (`changed_findings_report` and `suppressed_count`). The 1.18.0 template checks spans only on the contract path (search: `attributable_line_or_span`). The local post-turn-safety.sh (anchor: `quoted path case failed`) unescapes `\"` in quoted Git paths before the Bash 3 compatibility scanner decodes them.
 
-**Evidence:** Measured 2026-08-14. Grep counts for `is_normalized_credential_key`, `CREDENTIAL_ASSIGNMENT_RE`, the xargs no-argument branch, and `reported span intersects` are 2/3/1/1 in the installed copies and 0 in both the published `node_modules/@blundergoat/goat-flow` 1.15.1 package and the `/home/devgoat/projects/goat-flow` checkout at `v1.15.0-57-g6ba24713`, so this is divergence rather than publication version skew. All three hooks pass their self-tests (`deny-dangerous.sh --self-test` reports `executed=400, skipped=0`). Four skill and reference artifacts under `.claude/skills/` and `.goat-flow/skill-docs/playbooks/` are adapted the same way; gruff reports zero findings on both the pristine templates and the installed copies, so this project's own quality gate did not force those edits.
+Both fixes were inert in this checkout under 1.18.0. `php bin/gruff-php hook --capabilities --format json` advertises `gruff.hook.v2`, so the hook used the contract path. Bash 5.2 ran the native post-turn scanner. They still changed what goat-flow reported: `hooks list` marks both hooks `installed-content-diverged`, and `hooks verify --trusted-target` returns `not-configured` with reason `hook-not-installed` for the post-turn and Gruff groups.
 
-**Prevention:** Treat a `drift` or `installation-stale` audit result whose paths include `.goat-flow/hooks/` as a report, not an instruction. Diff the installed copy against `node_modules/@blundergoat/goat-flow/workflow/hooks/<name>` before syncing, and land the local fix upstream in the goat-flow checkout first so the sync is a no-op. Re-running the self-tests after any sync is the only proof the policy corpus survived.
+**Evidence:** Re-measured 2026-10-03 during the 1.16.0 to 1.17.0 upgrade and re-verified 2026-10-15 on 1.18.0. `install --dry-run` classified five hook files as `both-changed` against the 1.15.1 baseline. Two earlier local fixes are now upstream: the xargs optional-argument flags in the bash deny-dangerous guard-runtime.sh and curl `headers=@` detection in its patterns-paths.sh, both retired by goat-flow 1.19.0. Those files then matched the template. The local shared credential classifier was dropped: the 1.17.0/1.18.0 native and fallback copies carry the same 40 exclusion and 32 inclusion patterns it did. Negative controls: adding the local tests to the unmodified 1.17.0/1.18.0 hooks fails with `fallback finding-span overlap failed` and `quoted path case failed on scanner 1`. After the 1.18.0 merge, `deny-dangerous.sh --self-test` reports `executed=921, skipped=914` and `deny-git-mutations.sh --self-test` reports `executed=953, skipped=907`, and both pass. Five skill and playbook files that carried cosmetic-only local edits were restored to the 1.17.0 templates, so `Skill Template Drift` in `goat-flow audit` lists only these two hooks.
 
-## Resolved Entries
+**Resolution:** goat-flow 1.19.0 replaced the bash hooks with Node modules, and the 2026-11-23 upgrade retired both diverged scripts. `install --dry-run` marked `.goat-flow/hooks/gruff-code-quality.sh` and `.goat-flow/hooks/post-turn-safety.sh` as `both-changed` with authority `withheld`, which blocked the install for all four agents. Upstream already carries both local fixes, confirmed by reading the code rather than by a negative-control test. `inRanges` in `.goat-flow/hooks/gruff/feedback.mjs` (search: `return start <= (last ?? first ?? 0) && end >= (first ?? 0);`) counts any overlap between a finding's span and an edit range, and both `contractResult` and `legacyResult` reach it through `reportResult`. The Bash 3 scanner is gone, and `.goat-flow/hooks/post-turn/scanner.mjs` (search: `function unquoteGitPath`) decodes backslash escapes, including `\"`, in quoted Git paths. Forcing both paths was not enough on its own: the first claude, codex and copilot installs each stopped with `Runtime migration is incomplete: a provider still references the retired runtime` until the antigravity install migrated the last provider, and a second run of those three without `--force-path` completed. Every provider config now registers the `.mjs` hooks. The install left both `.sh` files on disk, unregistered, and they were deleted the same day. `git show 8716f99:<path>` still shows the last version of each, including the search anchors above.
+
+**Prevention:** Treat `drift`, `installation-stale` or `both-changed` rows that cover `.goat-flow/hooks/` as a report, not an instruction. Before syncing or forcing a path, three-way merge each file against the previous release's template: install `@blundergoat/goat-flow@<old>` into the scratchpad as the merge base, then check whether upstream already contains each local fix. Re-apply only the fixes that a negative-control self-test shows are missing. Land remaining fixes in the goat-flow checkout so the next upgrade is a no-op, and re-run all four hook self-tests after any sync.
+
+## Footgun: goat-flow content audit requires a goat-flow-dashboard-views line in a consumer code map
+
+**Status:** resolved | **Created:** 2026-07-20 | **Resolved:** 2026-10-03 | **Evidence:** OBSERVED
+
+goat-flow 1.14.0's `audit --check-content` ran `code-map-dashboard-view-drift` on any project with `.goat-flow/code-map.md`. With no `src/dashboard/views/*.html` on disk, the check fell back to goat-flow's own manifest view list, so a consumer code map had to carry a line listing goat-flow's dashboard view names. This project kept that line on the `node_modules/` entry of its code map.
+
+**Resolution:** goat-flow 1.17.0 treats the selected project's files as the only view authority (`node_modules/@blundergoat/goat-flow/dist/cli/audit/check-factual-semantic-drift.js`, search: `an explicit inventory must match target files exactly`). After the upgrade, the workaround line itself failed `audit --check-content` with `code-map-dashboard-view-drift`. The line was removed on 2026-10-03; with no claim and no view files, the check sees absence on both sides.
+
+**Prevention:** Do not add a dashboard-views inventory back to `.goat-flow/code-map.md`; this project has no `src/dashboard/views/`, so any listed view fails the content audit. Before adding a workaround for an upstream check, re-read the checker source in the installed goat-flow version, and re-check the workaround after each upgrade.
 
 ## Footgun: classmap-authoritative hid newly added src/ classes in dev
 

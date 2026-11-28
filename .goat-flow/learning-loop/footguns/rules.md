@@ -1,6 +1,6 @@
 ---
 category: rules
-last_reviewed: 2026-08-14
+last_reviewed: 2026-11-25
 ---
 
 # Rule Footguns
@@ -19,7 +19,7 @@ Four rules (`NestingDepthRule`, `CognitiveComplexityRule`, `RedundantVariableRul
 
 **Status:** active | **Created:** 2026-05-11 | **Evidence:** OBSERVED
 
-Rule heuristics that search a whole docblock or AST subtree can attribute nested syntax to the wrong owner. `src/Rules/Docs/MissingParamTagRule.php` (search: `extractParamNames`) must parse the parameter variable from the whole `@param` line because generic PHPDoc types can contain spaces, and descriptive docblocks without tags still need to count as method-contract docs. `src/Rules/TestQuality/MockWithoutExpectationRule.php` (search: `isMockCreationExpression`) must decide whether the assigned expression itself creates a mock, not whether any nested constructor argument or helper call creates one.
+Rule heuristics that search a whole docblock or AST subtree can attribute nested syntax to the wrong owner. `src/Rules/Docs/MissingParamTagRule.php` (search: `extractParamNames`) must parse the parameter variable from the whole `@param` line because generic PHPDoc types can contain spaces, and descriptive docblocks without tags still need to count as method-contract docs. Before its retirement under [ADR-034](../decisions/ADR-034-rules-wrong-more-often-than-right-are-retired.md), `test-quality.mock-without-expectation` (`~~src/Rules/TestQuality/MockWithoutExpectationRule.php~~`) hit the same AST-subtree trap when deciding whether the assigned expression itself created a mock rather than a nested constructor argument.
 
 **Prevention:** Add regression fixtures for the exact syntax shape that caused the false positive or false negative. For PHPDoc rules, include generics or array shapes with spaces before the parameter variable, plus one-line descriptive docblocks that should require full contract tags. For AST ownership rules, include a fake or value object whose constructor receives a mock/stub so nested mock creation does not get assigned to the outer variable.
 
@@ -27,68 +27,45 @@ Rule heuristics that search a whole docblock or AST subtree can attribute nested
 
 **Status:** active | **Created:** 2026-05-11 | **Evidence:** OBSERVED
 
-`src/Rules/Docs/MissingPublicPhpdocRule.php` (search: `docs.missing-public-phpdoc`) keeps the historical rule ID for output compatibility, but the rule now requires local PHPDoc on every method declaration, including public, protected, private, abstract, accessor, magic, helper, reporter, and interface implementation methods. Agents must not infer that only public methods are checked from the ID or class name.
+`src/Rules/Docs/MissingPhpdocRule.php` (search: `docs.missing-phpdoc`) requires local PHPDoc on every method declaration, including public, protected, private, abstract, accessor, magic, helper, reporter, and interface implementation methods. Before 0.6.0 its name suggested public-only coverage. The old `docs.missing-public-phpdoc` id is now a compatibility alias in `src/Rules/RuleRegistry.php` (search: `RULE_ID_ALIASES`); maintained config and guidance use `docs.missing-phpdoc`. Agents must not infer narrower semantics from a legacy id.
 
 **Prevention:** When changing rule semantics, update `RuleDefinition` names, config comments, docs, tests, and golden fixtures together while preserving rule IDs only when output compatibility requires it. Regression tests should assert representative methods across all visibilities so the compatibility name cannot silently narrow behavior again.
-
-## Footgun: Conservative member scopes can hide concrete public waste
-
-**Status:** active | **Created:** 2026-05-11 | **Evidence:** OBSERVED
-
-`src/Rules/Waste/UnusedParameterRule.php` (search: `analysableNodes`) originally checked standalone functions and private methods only, so a concrete public method like an external healthcare target's `VoiceTraceLogger::trace()` could carry an ignored `$detailed` parameter without any `waste.unused-parameter` finding. The same rule also counted direct `unset($detailed)` as a parameter use even though it is only a placeholder/silencer, not a read of the argument.
-
-**Prevention:** For waste/dead-code rules, make the conservative boundary explicit in tests and include at least one locally owned public method fixture plus one contract/override fixture. Treat direct `unset($param)` as non-use when the rule's question is "does the method actually consume this argument?" and use finding columns or metadata when multiple same-line findings can otherwise share a fingerprint.
 
 ## Footgun: Constructor-promoted properties bypass property-node scans
 
 **Status:** active | **Created:** 2026-05-11 | **Evidence:** OBSERVED
 
-Constructor-promoted properties are represented as `Node\Param` entries with visibility flags, not as `Stmt\Property` declarations. `src/Rules/DeadCode/UnusedPrivatePropertyRule.php` (search: `privateProperties`) originally collected only `Stmt\Property`, so promoted private readonly fields such as an external healthcare target's `VoiceTraceLogger::$appConfigHelper` and `VoiceTraceLogger::$twilioParams` were invisible to the "written but never read" check.
+Constructor-promoted properties are represented as `Node\Param` entries with visibility flags on `__construct`, not as `Stmt\Property` declarations. Rules that inspect class properties must check both: `src/Rules/Modernisation/PublicPropertyRule.php` (search: `promotedPropertyFindings`) and `src/Rules/Size/PropertyCountRule.php` (search: `countProperties`) walk `__construct` parameters alongside `Stmt\Property` nodes. Before its retirement under [ADR-034](../decisions/ADR-034-rules-wrong-more-often-than-right-are-retired.md), `dead-code.unused-private-property` (`~~src/Rules/DeadCode/UnusedPrivatePropertyRule.php~~`) originally collected only `Stmt\Property`, leaving promoted private readonly fields invisible to the "written but never read" check.
 
-**Prevention:** Any rule that scans properties must include promoted constructor parameters in fixtures and treat private promoted params as property declarations with an initial write. Also include a used promoted private property and a public promoted property fixture so the rule proves both detection and visibility boundaries.
-
-## Footgun: naming.boolean-prefix requires the prefix at the start of the identifier
-
-**Status:** active | **Created:** 2026-05-24 | **Evidence:** OBSERVED
-
-`src/Rules/Naming/BooleanPrefixRule.php` (search: `allowedPrefixes`) checks that bool-returning methods, bool parameters, and bool properties *begin* with one of the configured prefixes (default `is`, `has`, `can`, `should`, `will`). Names that merely contain a prefix later in the identifier still fail. `ConfigLoader::projectHasConfig()` was flagged on its first cut because `has` appeared in the middle of the name; renaming to `hasProjectConfig()` cleared the rule. The same trap fires for parameters: `$shouldForce` passes, `$force` and `$forceShould` both fail.
-
-**Prevention:** When adding any bool-returning method, bool parameter, or bool property, put the prefix first. For names that read naturally with the subject before the verb (`projectHasConfig`, `userIsActive`), rephrase as prefix-first (`hasProjectConfig`, `isActiveUser`) or rename the subject out (`hasConfig` on a class already scoped to a project). The rule does not parse English — "name contains a prefix" is not enough; the leading token must be a configured prefix.
+**Prevention:** Any rule that scans properties must include promoted constructor parameters in fixtures and treat promoted params as property declarations with an initial write. Also include both declared and promoted property fixtures across visibility boundaries so the rule proves both detection and scope.
 
 ## Footgun: Retiring a rule leaves stale count references in five doc artefacts
 
-**Status:** active | **Created:** 2026-05-25 | **Evidence:** OBSERVED
+**Status:** active | **Created:** 2026-05-25 | **Evidence:** ACTUAL_MEASURED
+**Decision changed:** Which doc surfaces and prose checks must run after retiring or adding rules before trusting preflight's green Documentation drift check.
+**Trigger phase:** ACT
+**Caught at:** VERIFY
+**Incident count:** 2 | **Latest occurrence:** 2026-11-25
 
-The rule registry's true count lives only in `src/Rules/RuleRegistry.php` (the `NAMING_RULE_PRIORITY` constant plus the public registration block), but human-readable counts of the same facts are stamped in five other artefacts that don't auto-update. The five stamp locations are:
+**Prevention:** After retiring or adding rules in `src/Rules/RuleRegistry.php`, run four checks beyond `scripts/preflight-checks.sh`:
+1. Check all five count stamps (`README.md` rule catalogue + pillar table, `docs/rules.md` `Summary By Pillar` table + `### <pillar> (N)` headings, and `.goat-flow/architecture.md` prose counts) and verify the `docs/rules.md` pillar table sums to `Total rules:`.
+2. Grep `docs/` for every retired rule's option names (not only its backticked rule ID), because orphaned option prose carries no rule ID and bypasses the phantom-rule check.
+3. Cross-check prepared `CHANGELOG.md` and `UPGRADING.md` sections against live `php bin/gruff-php list-rules --format=json` to strip superseded intermediate bullets for rules retired later in the same release and to verify exact `defaultEnabled: false` and `falsePositiveShapes` counts.
+4. Keep `src/Engine/Config/ConfigMigrator.php` (search: `RETIRED_RULE_IDS`) disjoint from active registered rules.
+
+The rule registry's true count lives only in `src/Rules/RuleRegistry.php` (search: `NAMING_RULE_PRIORITY`) - that constant plus the public registration block - but human-readable counts of the same facts are stamped in five other artefacts that don't auto-update:
 
 ```text
-README.md                       — quality-table line ("Rule catalogue")
-README.md                       — per-pillar tally row    | `naming` | N |
-docs/rules.md                   — same pillar tally       | `naming` | N |
-docs/rules.md                   — per-pillar section heading  ### `naming` (N)
-.goat-flow/architecture.md      — prose count ("exposes N rule ids")
+README.md                       - quality-table line ("Rule catalogue")
+README.md                       - per-pillar tally row    | `naming` | N |
+docs/rules.md                   - same pillar tally       | `naming` | N |
+docs/rules.md                   - per-pillar section heading  ### `naming` (N)
+.goat-flow/architecture.md      - prose count ("exposes N rule ids")
 ```
 
-PR #6 retired `naming.parameter-type-name`, dropping the registry count from 120 → 119 and the naming-pillar count from 12 → 11. The PR updated the `docs/rules.md` pillar tally but missed the other four stamps. CodeRabbit's outside-diff sweep caught two of the four (the `docs/rules.md` section heading and the `architecture.md` prose); the two README stamps weren't in the PR's touched-file set so neither AI reviewer surfaced them.
+PR #6 retired `naming.parameter-type-name`, dropping the registry count from 120 to 119 and the naming-pillar count from 12 to 11. The PR updated the `docs/rules.md` pillar tally but missed the other four stamps. Since then, `scripts/preflight-checks.sh` (search: `Compare every per-pillar table row in the README`) checks `README.md` pillar rows and `docs/rules.md`'s `Total rules:` and `falsePositiveShapes` lines, plus backticked phantom rule IDs.
 
-**Prevention:** When retiring or adding a rule, after editing `src/Rules/RuleRegistry.php` run a sweep over the five stamp locations above. Greppable form:
-
-```bash
-grep -rn 'exposes [0-9]* rule\|Rule catalogue\|^|`naming`\|^### `naming` (' \
-    README.md docs/rules.md .goat-flow/architecture.md
-```
-
-Update every hit before claiming retirement done; do not rely on a single PR review to surface all of them — outside-diff coverage is bounded by which files the PR touches.
-
-## Footgun: PHPStan/Psalm array-shape exemptions need a "concrete sibling" gate, not "any nested mixed"
-
-**Status:** active | **Created:** 2026-05-27 | **Evidence:** OBSERVED
-
-`src/Rules/Modernisation/PhpDocMixedOveruseRule.php` (search: `isPreciseArrayShape`) exempts `array{...}` shapes that name at least one sibling field with a non-mixed type, on the basis that the nested `mixed` describes a heterogeneous leaf inside a typed envelope. The naive form of this rule — "any nested mixed inside any parametric type is fine" — silently exempts `array<string|int, mixed>` (mixed-keyed bag), `Collection<mixed>` (single-leaf generic), and `array{value: mixed}` (single-mixed-field shape), all of which are genuine type sloppiness the rule should keep flagging. The discriminator is "is there at least one CONCRETE sibling field?"; without it the exemption swallows real signal.
-
-**Evidence:** External reviewer report section 7 (`.goat-flow/scratchpad/gruff-php-improvement-feedback.md`). The reviewer's original phrasing was "nested mixed inside any parametric type should be fine"; applied literally that exempts `Collection<mixed>` which is clearly not a precise envelope. The implemented rule reads the array-shape body, splits on top-level commas (depth-aware via `splitTopLevelComma`), finds the first top-level colon per pair (depth-aware via `topLevelColonIndex`), and returns true only when at least one pair's value type is NOT exactly `mixed` (case-insensitive). Fixtures at `tests/Fixtures/Modernisation/phpdoc-mixed-overuse.php` `preciseArrayShape*` cover both directions.
-
-**Prevention:** When extending a type-shape exemption beyond a single canonical form, write the counter-fixture first. Every "loose" shape (mixed-keyed bag, single-mixed-field shape, mixed-only generic) gets a `*StillFires` fixture method that asserts the exemption did NOT swallow it. Only after the counter-fixtures are in place add the positive `*IsAllowed` cases. The shape-detector must use a depth-aware splitter (commas inside `<>{}()[]` belong to the inner shape, not the outer one); a naive `explode(',', ...)` would split `array{entries: list<array<string, mixed>>, total: int}` mid-list and corrupt the parse.
+**Recurrence 2026-11-25:** During the 0.6.0 46-rule retirement (`ADR-034`), preflight's Documentation drift check passed while `docs/rules.md` still listed `test-quality | 19` (summing to 84 instead of 83) alongside four orphaned option paragraphs without backticked rule IDs (`allowedSymbols` under `maintainability`; `stateAdjectiveAllowlist`, `acceptedBooleanNames`, and `includePublicApi` under `naming`), `docs/configuration.md` still described retired Boolean-naming `remediationAction` behaviour, and the prepared `0.6.0` section of `CHANGELOG.md` and `UPGRADING.md` still carried pre-ADR-034 draft bullets for retired rules (`waste.one-line-method`, `modernisation.named-argument-opportunity`, `test-quality.test-method-too-long`, six retired `test-quality.*` opt-in rules) plus a stale `64` medium/low `falsePositiveShapes` count (live count: `42` medium/low, `47` total). Manual cross-checking against `php bin/gruff-php list-rules --format=json` caught and reconciled all of them.
 
 ## Footgun: PHPStan rejects prose attached to multiline array-shape tags
 
@@ -164,13 +141,59 @@ The size rules treat immutable value objects gently: `src/Rules/Size/PropertyCou
 **Decision changed:** Whether a new caller may reuse an `AnalysisUnit` after analysis, and where a size rule may be invoked.
 **Trigger phase:** ACT
 
-`src/Engine/Parser/AnalysisUnit.php` (search: `Break ParentConnectingVisitor's back-edges`) clears `source`, `statements`, and `tokens` to cut a measured 4-5GB peak on large scans. `src/Rules/Size/SubstantiveLineCounter.php` (search: `public static function evictUnit`) drops its cached line prefix beside that release. Both release sites, `src/Rules/RuleRegistry.php` (search: `$canReleaseUnits`) and `src/Cli/Command/AnalysisPipeline.php` (search: `SubstantiveLineCounter::evictUnit`), evict then release inside the analysis loop. After that point `SubstantiveLineCounter::countAll()` recomputes from an empty source and returns `0`. It does not throw and does not signal staleness, so `size.file-length` and `size.class-length` would silently find nothing rather than fail loudly.
+`src/Engine/Parser/AnalysisUnit.php` (search: `Remove parent-child cycles before dropping the statements`) clears `source`, `statements`, and `tokens` to cut a measured 4-5GB peak on large scans. `src/Rules/Size/SubstantiveLineCounter.php` (search: `public static function evictUnit`) drops its cached line prefix beside that release. Both release sites, `src/Rules/RuleRegistry.php` (search: `$canReleaseUnits`) and `src/Cli/Command/AnalysisPipeline.php` (search: `SubstantiveLineCounter::evictUnit`), evict then release inside the analysis loop. After that point `SubstantiveLineCounter::countAll()` recomputes from an empty source and returns `0`. It does not throw and does not signal staleness, so `size.file-length` and `size.class-length` would silently find nothing rather than fail loudly.
 
 **Evidence:** `tests/Rule/Size/SubstantiveLineCounterTest.php` (search: `testEvictsCachedPrefixBeforeUnitRelease`) pins the zero as expected behaviour: it evicts, releases, then asserts `countAll()` returns `0`. The trap is currently unreachable, and that is a property of the call sites rather than of the counter: `src/Cli/Command/BranchReviewBuilder.php` (search: `$baseRegistry->analyse`) re-analyses base units but omits `shouldReleaseUnitsAfterAnalysis`, which defaults to `false`, and also passes `$projectUnits`, which independently forces `$canReleaseUnits` to `false`. `SubstantiveLineCounter` is consumed only by `src/Rules/Size/FileLengthRule.php` and `src/Rules/Size/ClassLengthRule.php`, both per-unit rules that run before the eviction in the same iteration.
 
 **Prevention:** Before adding a caller that reuses `$sources->analysisUnits` after `RuleRegistry::analyse()`, confirm whether that call released them. Never pass units through a second size-rule pass without re-parsing. If a future caller genuinely needs post-release counting, make the counter fail loudly on a released unit rather than returning `0`; a zero here is indistinguishable from a genuinely empty file.
 
+## Footgun: Built-in `naming.abbreviation-allowlist` exemptions must stay disjoint from the sixteen-word init seed
+
+**Status:** active | **Created:** 2026-11-25 | **Evidence:** OBSERVED
+**Decision changed:** Which short words may be added to `AbbreviationAllowlistRule::BUILT_IN_NON_ABBREVIATIONS` without breaking family replace-not-merge semantics.
+**Trigger phase:** ACT
+**Caught at:** VERIFY
+**hallucination-risk:** high
+
+**Prevention:** Keep `src/Rules/Naming/AbbreviationAllowlistRule.php` (search: `BUILT_IN_NON_ABBREVIATIONS`) strictly disjoint from the sixteen ratified terms in `src/Engine/Config/AnalysisConfig.php` (search: `DEFAULT_ACCEPTED_ABBREVIATIONS`). Preserve the disjointness invariant in `tests/Rule/Naming/NamingRuleConfigurationTest.php` (search: `testBuiltInNonAbbreviationsStayDisjointFromRatifiedSixteenSeed`) and verify `gruff-spec` `conformance-bootstrap` after any allowlist change.
+
+`FAMILY-CONTRACT.md` section 8 requires `allowlists.acceptedAbbreviations` to replace the 16-word default seed rather than merge with it, and `gruff-spec` (`conformance-bootstrap`) tests that contract by omitting a seeded word (`rx`) and asserting that it reports. Adding any seeded word (such as `age`, `app`, `db`, `fs`, `id`, `io`, `key`, `log`, `max`, `min`, `now`, `raw`, `rx`, `tx`, `ui`, or `url`) to `BUILT_IN_NON_ABBREVIATIONS` unconditionally silences that word even when a project replaces `acceptedAbbreviations`, masking replace-not-merge and breaking cross-port conformance.
+
+**Evidence:** Verified 2026-11-24 against `src/Engine/Config/AnalysisConfig.php` (search: `DEFAULT_ACCEPTED_ABBREVIATIONS`), `src/Rules/Naming/AbbreviationAllowlistRule.php` (search: `BUILT_IN_NON_ABBREVIATIONS`), and `tests/Rule/Naming/NamingRuleConfigurationTest.php` (search: `testAbbreviationAllowlistExemptsPlainEnglishWordsAndUniversalTechTerms`), with `gruff-spec --suite conformance-bootstrap --port php` exiting `0`.
+
 ## Resolved Entries
+
+## Footgun: Conservative member scopes can hide concrete public waste
+
+**Status:** resolved | **Created:** 2026-05-11 | **Resolved:** 2026-10-14 | **Evidence:** OBSERVED
+
+`waste.unused-parameter` (`~~src/Rules/Waste/UnusedParameterRule.php~~`) originally checked standalone functions and private methods only, so a concrete public method could carry an ignored parameter without any finding. The same rule also counted direct `unset($detailed)` as a parameter use even though it is only a placeholder/silencer, not a read of the argument.
+
+**Resolution:**
+
+- [ADR-034](../decisions/ADR-034-rules-wrong-more-often-than-right-are-retired.md) retired `waste.unused-parameter` after the 0.7.0 precision measurement found it right on 6 of 25 judged findings (external interface/event/hook signatures look identical to owned public methods without cross-file symbol resolution).
+- Kept as a design record: for waste/dead-code rules, make the conservative boundary explicit in tests, treat direct `unset($param)` as non-use when the question is whether the method consumes the argument, and use finding columns or metadata when multiple same-line findings can share a fingerprint.
+
+## Footgun: naming.boolean-prefix requires the prefix at the start of the identifier
+
+**Status:** resolved | **Created:** 2026-05-24 | **Resolved:** 2026-10-14 | **Evidence:** OBSERVED
+
+`naming.boolean-prefix` (`~~src/Rules/Naming/BooleanPrefixRule.php~~`) checked that bool-returning methods, bool parameters, and bool properties *begin* with one of the configured prefixes (`is`, `has`, `can`, `should`, `will`). Names that merely contained a prefix later in the identifier (`projectHasConfig`, `$forceShould`) still failed.
+
+**Resolution:**
+
+- [ADR-034](../decisions/ADR-034-rules-wrong-more-often-than-right-are-retired.md) retired `naming.boolean-prefix` after the 0.7.0 precision measurement found it right on 8 of 25 judged findings.
+
+## Footgun: PHPStan/Psalm array-shape exemptions need a "concrete sibling" gate, not "any nested mixed"
+
+**Status:** resolved | **Created:** 2026-05-27 | **Resolved:** 2026-10-14 | **Evidence:** OBSERVED
+
+`modernisation.phpdoc-mixed-overuse` (`~~src/Rules/Modernisation/PhpDocMixedOveruseRule.php~~`) exempted `array{...}` shapes that named at least one sibling field with a non-mixed type. The naive form — "any nested mixed inside any parametric type is fine" — silently exempted `array<string|int, mixed>`, `Collection<mixed>`, and `array{value: mixed}`.
+
+**Resolution:**
+
+- [ADR-034](../decisions/ADR-034-rules-wrong-more-often-than-right-are-retired.md) retired `modernisation.phpdoc-mixed-overuse` after the 0.7.0 precision measurement found it right on 6 of 25 judged findings.
+- Kept as a design record: when extending a type-shape exemption beyond a single canonical form, write the counter-fixture first for every loose shape and split nested type strings with a depth-aware delimiter walker rather than `explode(',', ...)`.
 
 ## Footgun: Vendored code under `src/Vendor/` evades the vendor filter
 

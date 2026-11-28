@@ -8,15 +8,20 @@ use JsonException;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers analyse CLI behavior backed by Git-aware source discovery.
+ * Covers default analyse discovery in a temporary Git repository.
+ * The fixture mixes tracked files, an untracked skill, and ignored local state.
+ * Checks the discovery count and rejects ignored state paths in reported findings.
  */
 final class AnalyseCliGitDiscoveryTest extends CliTestCase
 {
+    /** Expected discovery count for tracked files plus the untracked skill file. */
+    private const TRACKED_FIXTURE_FILES = 5;
+
     /**
      * Verify analyse command uses Git-visible files for default discovery.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts five discovered files and no findings referencing the ignored state file.
+     * @throws JsonException - If decoding the CLI JSON report fails.
      */
     public function testAnalyseCommandUsesGitVisibleFilesForDefaultDiscovery(): void
     {
@@ -58,7 +63,7 @@ final class AnalyseCliGitDiscoveryTest extends CliTestCase
             $report  = $this->decodeJsonOutput($process);
             $summary = $report['summary'] ?? null;
             self::assertIsArray($summary);
-            self::assertSame(5, $summary['filesDiscovered'] ?? null);
+            self::assertSame(self::TRACKED_FIXTURE_FILES, $summary['discoveredFiles'] ?? null);
             $findings = $report['findings'] ?? null;
             self::assertIsArray($findings);
             foreach ($findings as $index => $finding) {
@@ -77,7 +82,7 @@ final class AnalyseCliGitDiscoveryTest extends CliTestCase
     /**
      * Require the git executable for Git-backed CLI tests.
      *
-     * @return void
+     * @return void - Skips the test when git --version exits unsuccessfully.
      */
     private function requireGit(): void
     {
@@ -92,10 +97,10 @@ final class AnalyseCliGitDiscoveryTest extends CliTestCase
     /**
      * Run a git command in a temporary project.
      *
-     * @param string       $project - Project root.
-     * @param list<string> $args - Git arguments.
+     * @param string       $project - Temporary project root used as the Git working directory.
+     * @param list<string> $args    - Git subcommand and options appended to the invocation.
      *
-     * @return void
+     * @return void - Asserts that the Git command exits successfully.
      */
     private function runGit(string $project, array $args): void
     {
@@ -108,11 +113,11 @@ final class AnalyseCliGitDiscoveryTest extends CliTestCase
     /**
      * Write a temporary project file, creating parent directories as needed.
      *
-     * @param string $project - Project root.
-     * @param string $path - Project-relative path.
-     * @param string $contents - File contents.
+     * @param string $project  - Temporary project root that receives the file.
+     * @param string $path     - Project-relative path.
+     * @param string $contents - Fixture content written to the resolved project path.
      *
-     * @return void
+     * @return void - Writes fixture contents after asserting any required directory creation succeeds.
      */
     private function writeProjectFile(string $project, string $path, string $contents): void
     {

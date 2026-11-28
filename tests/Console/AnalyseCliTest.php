@@ -5,19 +5,21 @@ declare(strict_types=1);
 namespace GruffPhp\Tests\Console;
 
 use GruffPhp\Cli\Application;
+use GruffPhp\Cli\Command\AnalyseCommandSetupBuilder;
 use JsonException;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers the analyse CLI end-to-end: single-file mode, syntax-error handling, threshold-driven exits, JSON/HTML/SARIF/GitHub outputs, profile and
- * selection config, scoring, and editor-link options.
+ * Exercises analyse CLI reports, exit statuses, path selection, configuration, and scoring.
+ * Covers text, JSON, HTML, and GitHub annotation output.
+ * Includes launch-directory path resolution and run-invalidating diagnostic envelopes.
  */
 final class AnalyseCliTest extends CliTestCase
 {
     /**
-     * Verify analyse command runs as no op.
+     * Checks mixed-fixture discovery and report output when only errors fail the scan.
      *
-     * @return void
+     * @return void - Asserts exit 0, version text, discovery counts, and the ignored vendor path.
      */
     public function testAnalyseCommandRunsAsNoOp(): void
     {
@@ -34,16 +36,17 @@ final class AnalyseCliTest extends CliTestCase
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         self::assertStringContainsString('gruff-php ' . Application::VERSION, $process->getOutput());
-        self::assertStringContainsString('Discovered: 2', $process->getOutput());
-        self::assertStringContainsString('Ignored: 6', $process->getOutput());
+        // vendor/ignored.php is skipped despite the repository .gitignore, because vendor never defers to a .gitignore (section 7).
+        self::assertStringContainsString('Discovered: 6', $process->getOutput());
+        self::assertStringContainsString('Ignored: 1', $process->getOutput());
         self::assertStringContainsString('tests/Fixtures/Source/mixed/vendor/ignored.php', $process->getOutput());
     }
 
     /**
      * Verify zero-file scans are explicit and unscored in both human and machine-readable reports.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts empty-scan text, null composite values, and a non-invalidating JSON diagnostic.
+     * @throws JsonException - If decoding the command's stdout as JSON fails.
      */
     public function testAnalyseCommandReportsEmptyAnalysisAsUnscored(): void
     {
@@ -51,7 +54,7 @@ final class AnalyseCliTest extends CliTestCase
             PHP_BINARY,
             self::PROJECT_ROOT . '/bin/gruff-php',
             'analyse',
-            'tests/Fixtures/Source/mixed/build',
+            'tests/Fixtures/Source/mixed/composer.lock',
             '--no-config',
             '--no-cache',
         ];
@@ -74,9 +77,12 @@ final class AnalyseCliTest extends CliTestCase
         $diagnostics = $report['diagnostics'] ?? null;
 
         self::assertIsArray($summary);
-        self::assertSame(0, $summary['filesDiscovered'] ?? null);
+        self::assertSame(0, $summary['discoveredFiles'] ?? null);
         self::assertSame(0, $summary['exitCode'] ?? null);
-        self::assertArrayNotHasKey('score', $report);
+        $score = $report['score'] ?? null;
+        self::assertIsArray($score);
+        // A run that scored nothing publishes nulls because consumers could interpret 0 as a failing grade.
+        self::assertSame(['grade' => null, 'score' => null], $score['composite'] ?? null);
         self::assertIsArray($diagnostics);
         $emptyAnalysisDiagnostic = $diagnostics[0] ?? null;
         self::assertIsArray($emptyAnalysisDiagnostic);
@@ -87,8 +93,8 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command supports an explicit single-file option.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts the requested input, one discovered and parsed file, and exit 0.
+     * @throws JsonException - If decoding the command's stdout as JSON fails.
      */
     public function testAnalyseCommandSupportsSingleFileOption(): void
     {
@@ -114,16 +120,16 @@ final class AnalyseCliTest extends CliTestCase
 
         self::assertIsArray($runMetadata);
         self::assertIsArray($summary);
-        self::assertSame(['tests/Fixtures/Source/mixed/alpha.php'], $runMetadata['paths'] ?? null);
-        self::assertSame(1, $summary['filesDiscovered'] ?? null);
-        self::assertSame(1, $summary['filesParsed'] ?? null);
+        self::assertSame(['tests/Fixtures/Source/mixed/alpha.php'], $runMetadata['inputs'] ?? null);
+        self::assertSame(1, $summary['discoveredFiles'] ?? null);
+        self::assertSame(1, $summary['parsedFiles'] ?? null);
         self::assertSame(0, $summary['exitCode'] ?? null);
     }
 
     /**
-     * Verify analyse command reports syntax errors without aborting.
+     * Checks the parse-error report and exit 2 when a scan includes a file with invalid PHP.
      *
-     * @return void
+     * @return void - Asserts the diagnostic location, one parse error, and the reported exit code.
      */
     public function testAnalyseCommandReportsSyntaxErrorsWithoutAborting(): void
     {
@@ -144,9 +150,9 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
-     * Verify analyse command reports warning findings without failing by default.
+     * Checks warning-report output when the CLI explicitly uses the error failure threshold.
      *
-     * @return void
+     * @return void - Asserts exit 0 and exact text output against the warning fixture.
      */
     public function testAnalyseCommandReportsWarningFindingsWithoutFailingByDefault(): void
     {
@@ -171,9 +177,9 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
-     * Verify analyse command fails when finding meets default error threshold.
+     * Checks exit 1 and the reported finding when the configured file-length rule emits an error.
      *
-     * @return void
+     * @return void - Asserts the error finding's location and rule ID plus exit 1.
      */
     public function testAnalyseCommandFailsWhenFindingMeetsDefaultErrorThreshold(): void
     {
@@ -188,14 +194,16 @@ final class AnalyseCliTest extends CliTestCase
         $process->run();
 
         self::assertSame(1, $process->getExitCode());
-        self::assertStringContainsString('[error] size.file-length', $process->getOutput());
+        // FAMILY-CONTRACT section 1 fixes the location between severity and rule ID for text findings.
+
+        self::assertStringContainsString('[error] tests/Fixtures/Source/mixed/alpha.php:1 size.file-length', $process->getOutput());
         self::assertStringContainsString('Exit code: 1', $process->getOutput());
     }
 
     /**
      * Verify analyse command can fail on warning threshold.
      *
-     * @return void
+     * @return void - Asserts exit 1 and the warning failure threshold in the text report.
      */
     public function testAnalyseCommandCanFailOnWarningThreshold(): void
     {
@@ -219,8 +227,8 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command outputs JSON report.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts golden output, the analysis-v3 schema, four findings, and a warning-severity file-length finding.
+     * @throws JsonException - If decoding the command's stdout as JSON fails.
      */
     public function testAnalyseCommandOutputsJsonReport(): void
     {
@@ -250,9 +258,9 @@ final class AnalyseCliTest extends CliTestCase
         $summary  = $report['summary'] ?? null;
         $findings = $report['findings'] ?? null;
 
-        self::assertSame('gruff.analysis.v2', $report['schemaVersion'] ?? null);
+        self::assertSame('gruff.analysis.v3', $report['schemaVersion'] ?? null);
         self::assertIsArray($summary);
-        self::assertSame(1, $summary['filesDiscovered'] ?? null);
+        self::assertSame(1, $summary['discoveredFiles'] ?? null);
         self::assertSame(0, $summary['exitCode'] ?? null);
         self::assertIsArray($findings);
         self::assertCount(4, $findings);
@@ -271,8 +279,8 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command outputs JSON parse errors.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts exit 2, one parse error, and a first diagnostic of type parse-error.
+     * @throws JsonException - If decoding the command's stdout as JSON fails.
      */
     public function testAnalyseCommandOutputsJsonParseErrors(): void
     {
@@ -304,183 +312,9 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
-     * Verify --exclude-rule is execution-level: the excluded rule's findings neither display nor trip the fail gate.
-     *
-     * @return void
-     * @throws JsonException
-     */
-    public function testAnalyseCommandExcludeRuleSkipsExecutionAndExitCode(): void
-    {
-        $baseArguments = [
-            PHP_BINARY,
-            __DIR__ . '/../../bin/gruff-php',
-            'analyse',
-            'tests/Fixtures/Source/Code',
-            '--no-config',
-            '--no-baseline',
-            '--format',
-            'json',
-            '--fail-on',
-            'advisory',
-        ];
-
-        $controlProcess = new Process($baseArguments, __DIR__ . '/../..');
-        $controlProcess->run();
-        self::assertSame(1, $controlProcess->getExitCode(), 'the fixture must trip the advisory gate for the exclusion proof to mean anything');
-
-        $excludedProcess = new Process([...$baseArguments, '--exclude-rule', 'docs.missing-public-phpdoc'], __DIR__ . '/../..');
-        $excludedProcess->run();
-        self::assertSame(0, $excludedProcess->getExitCode(), $excludedProcess->getErrorOutput());
-
-        $report  = $this->decodeJsonOutput($excludedProcess);
-        $summary = $report['summary'] ?? null;
-        self::assertIsArray($summary);
-        $findingCounts = $summary['findings'] ?? null;
-        self::assertIsArray($findingCounts);
-        self::assertSame(0, $findingCounts['total'] ?? null);
-    }
-
-    /**
-     * Verify analyse command applies configured rule selection.
-     *
-     * @return void
-     * @throws JsonException
-     */
-    public function testAnalyseCommandAppliesConfiguredRuleSelection(): void
-    {
-        $process = new Process([
-                                   PHP_BINARY,
-                                   __DIR__ . '/../../bin/gruff-php',
-                                   'analyse',
-                                   'tests/Fixtures/Source/Code',
-                                   '--config',
-                                   'tests/Fixtures/Config/only-size-rules.yaml',
-                                   '--format',
-                                   'json',
-                                   '--fail-on',
-                                   'none',
-                               ], __DIR__ . '/../..');
-        $process->run();
-
-        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-
-        $report  = $this->decodeJsonOutput($process);
-        $summary = $report['summary'] ?? null;
-        self::assertIsArray($summary);
-        $findingCounts = $summary['findings'] ?? null;
-        self::assertIsArray($findingCounts);
-        self::assertSame(0, $findingCounts['total'] ?? null);
-    }
-
-    /**
-     * Verify security profile limits rule execution to security and sensitive-data rules.
-     *
-     * @return void
-     * @throws JsonException
-     */
-    public function testAnalyseCommandSecurityProfileRunsSecurityRulesOnly(): void
-    {
-        $process = new Process([
-                                   PHP_BINARY,
-                                   __DIR__ . '/../../bin/gruff-php',
-                                   'analyse',
-                                   'tests/Fixtures/Security/cumulative-security.php',
-                                   '--no-config',
-                                   '--profile',
-                                   'security',
-                                   '--format',
-                                   'json',
-                                   '--fail-on',
-                                   'none',
-                               ], __DIR__ . '/../..');
-        $process->run();
-
-        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-
-        $report   = $this->decodeJsonOutput($process);
-        $findings = $report['findings'] ?? null;
-        $score    = $report['score'] ?? null;
-        self::assertIsArray($findings);
-        self::assertIsArray($score);
-        $composite = $score['composite'] ?? null;
-        self::assertIsArray($composite);
-        self::assertNotCount(0, $findings);
-        self::assertSame('F', $composite['grade'] ?? null);
-
-        foreach ($findings as $index => $finding) {
-            self::assertIsArray($finding, sprintf('Finding %d should be an array.', $index));
-            $ruleId = $finding['ruleId'] ?? null;
-            self::assertIsString($ruleId, sprintf('Finding %d should include a string ruleId.', $index));
-            self::assertTrue(
-                str_starts_with($ruleId, 'security.') || str_starts_with($ruleId, 'sensitive-data.'),
-                'Unexpected rule from security profile: ' . $ruleId,
-            );
-        }
-    }
-
-    /**
-     * Verify security profile replaces configured rule selection.
-     *
-     * @return void
-     * @throws JsonException
-     */
-    public function testAnalyseCommandSecurityProfileOverridesConfiguredSelection(): void
-    {
-        $process = new Process([
-                                   PHP_BINARY,
-                                   __DIR__ . '/../../bin/gruff-php',
-                                   'analyse',
-                                   'tests/Fixtures/Security/cumulative-security.php',
-                                   '--config',
-                                   'tests/Fixtures/Config/only-size-rules.yaml',
-                                   '--profile',
-                                   'security',
-                                   '--format',
-                                   'json',
-                                   '--fail-on',
-                                   'none',
-                               ], __DIR__ . '/../..');
-        $process->run();
-
-        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-
-        $report   = $this->decodeJsonOutput($process);
-        $findings = $report['findings'] ?? null;
-        self::assertIsArray($findings);
-        $ruleIds = array_map(
-            static fn(mixed $finding): mixed => is_array($finding) ? ($finding['ruleId'] ?? null) : null,
-            $findings,
-        );
-
-        self::assertContains('security.dangerous-function-call', $ruleIds);
-        self::assertNotContains('docs.missing-file-phpdoc', $ruleIds);
-    }
-
-    /**
-     * Verify analyse command rejects unknown execution profiles.
-     *
-     * @return void
-     */
-    public function testAnalyseCommandReportsInvalidProfile(): void
-    {
-        $process = new Process([
-                                   PHP_BINARY,
-                                   __DIR__ . '/../../bin/gruff-php',
-                                   'analyse',
-                                   '--profile',
-                                   'security-plus',
-                                   'tests/Fixtures/Source/Code',
-                               ], __DIR__ . '/../..');
-        $process->run();
-
-        self::assertSame(2, $process->getExitCode());
-        self::assertStringContainsString('[USAGE-ERROR] Unsupported profile "security-plus". Use default or security.', $process->getOutput());
-    }
-
-    /**
      * Verify analyse command applies configured path ignores.
      *
-     * @return void
+     * @return void - Asserts exit 0, five discovered files, two ignored paths, and the ignored alpha.php path.
      */
     public function testAnalyseCommandAppliesConfiguredPathIgnores(): void
     {
@@ -497,15 +331,16 @@ final class AnalyseCliTest extends CliTestCase
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-        self::assertStringContainsString('Discovered: 1', $process->getOutput());
-        self::assertStringContainsString('Ignored: 7', $process->getOutput());
+        // alpha.php is config-ignored and vendor/ignored.php is a skipped vendor copy (section 7).
+        self::assertStringContainsString('Discovered: 5', $process->getOutput());
+        self::assertStringContainsString('Ignored: 2', $process->getOutput());
         self::assertStringContainsString('tests/Fixtures/Source/mixed/alpha.php', $process->getOutput());
     }
 
     /**
      * Verify analyse command reports invalid selection config.
      *
-     * @return void
+     * @return void - Asserts exit 2 and the unknown rule ID in the selection configuration diagnostic.
      */
     public function testAnalyseCommandReportsInvalidSelectionConfig(): void
     {
@@ -524,12 +359,13 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
-     * Verify analyse command applies configured secret preview allowlist.
+     * Checks rejection of a non-empty legacy secret-preview list with exit 2 and a removal diagnostic.
+     * Verifies that stdout omits the configured preview's T3R2 fragment.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts the rejection message and absence of the checked preview fragment.
+     * @throws JsonException - If decoding the command's stdout as JSON fails.
      */
-    public function testAnalyseCommandAppliesConfiguredSecretPreviewAllowlist(): void
+    public function testAnalyseCommandRejectsConfiguredLegacySecretPreview(): void
     {
         $process = new Process([
                                    PHP_BINARY,
@@ -545,23 +381,25 @@ final class AnalyseCliTest extends CliTestCase
                                ], __DIR__ . '/../..');
         $process->run();
 
-        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-        $report   = $this->decodeJsonOutput($process);
-        $findings = $report['findings'] ?? null;
-        self::assertIsArray($findings);
-        $ruleIds = array_map(
-            static fn(mixed $finding): mixed => is_array($finding) ? ($finding['ruleId'] ?? null) : null,
-            $findings,
+        self::assertSame(2, $process->getExitCode());
+        $report = $this->decodeJsonOutput($process);
+        // Missing diagnostics would mean the rejected configuration never reached the report users and integrations inspect.
+        $diagnostics = $report['diagnostics'] ?? null;
+        self::assertIsArray($diagnostics);
+        // An empty diagnostics list would leave the user with exit 2 but no actionable correction.
+        $diagnostic = $diagnostics[0] ?? null;
+        self::assertIsArray($diagnostic);
+        self::assertSame(
+            'Config key "allowlists.secretPreviews" is removed in 0.6.0: FAMILY-CONTRACT.md section 5 makes category markers unconditional, so the key authorises nothing; delete it from the configuration.',
+            $diagnostic['message'] ?? null,
         );
-
-        self::assertNotContains('sensitive-data.aws-access-key', $ruleIds);
-        self::assertContains('sensitive-data.api-key-pattern', $ruleIds);
+        self::assertStringNotContainsString('T3R2', $process->getOutput());
     }
 
     /**
      * Verify analyse command reports missing infection executable in run mode.
      *
-     * @return void
+     * @return void - Asserts exit 2 and a mutation-tool diagnostic naming the missing Infection executable.
      */
     public function testAnalyseCommandReportsMissingInfectionExecutableInRunMode(): void
     {
@@ -588,8 +426,8 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command outputs scoring data in JSON report.
      *
-     * @return void
-     * @throws JsonException
+     * @return void - Asserts grade A, full-project score scope, and absence of a diff field.
+     * @throws JsonException - If decoding the command's stdout as JSON fails.
      */
     public function testAnalyseCommandOutputsScoringDataInJsonReport(): void
     {
@@ -613,18 +451,18 @@ final class AnalyseCliTest extends CliTestCase
         $diff   = $report['diff'] ?? null;
 
         self::assertIsArray($score);
-        self::assertIsArray($diff);
+        self::assertNull($diff);
         $composite = $score['composite'] ?? null;
         self::assertIsArray($composite);
         self::assertSame('A', $composite['grade'] ?? null);
         self::assertSame('full-project', $score['scope'] ?? null);
-        self::assertSame(false, $diff['active'] ?? null);
+        self::assertArrayNotHasKey('diff', $report);
     }
 
     /**
      * Verify analyse command outputs HTML report.
      *
-     * @return void
+     * @return void - Asserts report sections, omission of the mutation row, and absence of the Google Fonts domain.
      */
     public function testAnalyseCommandOutputsHtmlReport(): void
     {
@@ -654,7 +492,7 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command supports HTML editor links.
      *
-     * @return void
+     * @return void - Asserts a VS Code link prefix and the expected fixture path with line number.
      */
     public function testAnalyseCommandSupportsHtmlEditorLinks(): void
     {
@@ -679,9 +517,9 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
-     * Verify analyse command defaults HTML locations to copyable spans.
+     * Checks HTML location markup when editor links are explicitly disabled.
      *
-     * @return void
+     * @return void - Asserts location-span attributes and absence of VS Code and PhpStorm URI prefixes.
      */
     public function testAnalyseCommandDefaultsHtmlLocationsToCopyableSpans(): void
     {
@@ -707,9 +545,9 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
-     * Verify analyse command supports interactive HTML report.
+     * Checks that the interactive option controls HTML filter markup and the module-script marker.
      *
-     * @return void
+     * @return void - Asserts both markers appear when enabled and disappear with --report-interactive=false.
      */
     public function testAnalyseCommandSupportsInteractiveHtmlReport(): void
     {
@@ -753,7 +591,7 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command reports invalid HTML report options.
      *
-     * @return void
+     * @return void - Asserts exit 2 and HTML diagnostics for invalid editor-link and interactive values.
      */
     public function testAnalyseCommandReportsInvalidHtmlReportOptions(): void
     {
@@ -797,7 +635,7 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command outputs github annotations.
      *
-     * @return void
+     * @return void - Asserts exit 0, a GitHub error annotation prefix, and the missing-PHPDoc rule title.
      */
     public function testAnalyseCommandOutputsGithubAnnotations(): void
     {
@@ -816,25 +654,208 @@ final class AnalyseCliTest extends CliTestCase
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         self::assertStringContainsString('::error file=tests/Fixtures/Source/Code/OrderCalculator.php', $process->getOutput());
-        self::assertStringContainsString('title=docs.missing-public-phpdoc', $process->getOutput());
+        self::assertStringContainsString('title=docs.missing-phpdoc', $process->getOutput());
     }
 
     /**
-     * Load an expected CLI golden output fixture with its version stamps normalised.
+     * Checks the JSON config-error envelope when a sibling-directory target uses a missing config file.
+     * The envelope must omit the external input and config field and mark the first diagnostic as run-invalidating.
      *
-     * The stamped tool version inside a golden is rewritten to the live
-     * `Application::VERSION` at compare time, so version bumps never require
-     * regenerating goldens and goldens can never stamp-drift silently.
+     * @return void - Asserts exit 2, empty run inputs, no config field, and a run-invalidating config-error diagnostic.
+     * @throws JsonException - If decoding the command's stdout as JSON fails.
+     */
+    public function testAnalyseCommandPublishesTheConfigErrorEnvelopeForATargetNamedFromASiblingDirectory(): void
+    {
+        $workspace = $this->tempDir();
+        self::assertTrue(mkdir($workspace . '/proj'));
+        self::assertTrue(mkdir($workspace . '/sib'));
+        self::assertNotFalse(file_put_contents($workspace . '/proj/a.php', "<?php\necho 1;\n"));
+
+        try {
+            $process = new Process([
+                                       PHP_BINARY,
+                                       self::PROJECT_ROOT . '/bin/gruff-php',
+                                       'analyse',
+                                       '../proj',
+                                       '--config',
+                                       '../missing.yaml',
+                                       '--format',
+                                       'json',
+                                       '--no-cache',
+                                   ], $workspace . '/sib');
+            $process->run();
+
+            self::assertSame(2, $process->getExitCode(), $process->getErrorOutput());
+            $report = $this->decodeJsonOutput($process);
+            $runBlock = $this->decodedJsonObjectAt($report, 'run');
+            self::assertSame([], $runBlock['inputs'] ?? null);
+            self::assertArrayNotHasKey('config', $runBlock);
+            $diagnostics = $report['diagnostics'] ?? null;
+            self::assertIsArray($diagnostics);
+            $diagnostic = $this->decodedJsonObject($diagnostics[0] ?? null);
+            self::assertSame('config-error', $diagnostic['type'] ?? null);
+            self::assertTrue($diagnostic['invalidatesRun'] ?? null);
+        } finally {
+            $this->removeDir($workspace);
+        }
+    }
+
+    /**
+     * Checks a nested launch using a relative config path against a project-root launch.
+     *
+     * @return void - Asserts the nested run exits 0 and both decoded findings values match, with null used when absent.
+     */
+    public function testAnalyseCommandReadsAnExplicitRelativeConfigFromTheLaunchDirectory(): void
+    {
+        $project = $this->tempDir();
+        self::assertTrue(mkdir($project . '/a/b', 0777, true));
+        self::assertNotFalse(file_put_contents($project . '/a.php', "<?php\necho 1;\n"));
+        self::assertNotFalse(file_put_contents($project . '/cfg.yaml', "schemaVersion: \"gruff-php.config.v0.1\"\nminimumSeverity: error\n"));
+        $arguments = [PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'analyse', '--format', 'json', '--fail-on', 'none', '--no-baseline', '--no-cache'];
+
+        try {
+            $nested = new Process([...$arguments, '--config', '../../cfg.yaml', '../..'], $project . '/a/b');
+            $nested->run();
+            $inside = new Process([...$arguments, '--config', 'cfg.yaml', '.'], $project);
+            $inside->run();
+
+            self::assertSame(0, $nested->getExitCode(), $nested->getOutput() . $nested->getErrorOutput());
+            self::assertSame($this->decodeJsonOutput($inside)['findings'] ?? null, $this->decodeJsonOutput($nested)['findings'] ?? null);
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+
+    /**
+     * Checks baseline generation and application from a nested launch directory using a relative baseline path.
+     * Also checks that a missing baseline outside the project yields a versioned JSON error report without the workspace path.
+     *
+     * @return void - Asserts baseline placement and application, then exit 2 and an analysis-v3 envelope for a missing baseline.
+     */
+    public function testAnalyseCommandReadsTypedBaselinePathsFromTheLaunchDirectory(): void
+    {
+        $workspace = $this->tempDir();
+        $project   = $workspace . '/outer/project';
+        self::assertTrue(mkdir($project . '/a/b', 0777, true));
+        self::assertNotFalse(file_put_contents($project . '/a.php', "<?php\necho 1;\n"));
+        $arguments = [PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'analyse', '--no-config', '--fail-on', 'none', '--no-cache'];
+
+        try {
+            $generated = new Process([...$arguments, '--generate-baseline', '../../base.json', '../..'], $project . '/a/b');
+            $generated->run();
+            $applied = new Process([...$arguments, '--format', 'json', '--baseline', '../../base.json', '../..'], $project . '/a/b');
+            $applied->run();
+            $outside = new Process([...$arguments, '--format', 'json', '--baseline', '../missing.json', '.'], $project);
+            $outside->run();
+
+            self::assertSame(0, $generated->getExitCode(), $generated->getOutput() . $generated->getErrorOutput());
+            self::assertFileExists($project . '/base.json');
+            self::assertFileDoesNotExist($workspace . '/outer/base.json');
+            self::assertSame(0, $applied->getExitCode(), $applied->getOutput() . $applied->getErrorOutput());
+            $baseline = $this->decodedJsonObjectAt($this->decodeJsonOutput($applied), 'baseline');
+            self::assertTrue($baseline['applied'] ?? null);
+            self::assertSame('base.json', $baseline['path'] ?? null);
+            self::assertSame(2, $outside->getExitCode(), $outside->getErrorOutput());
+            self::assertStringNotContainsString($workspace, $outside->getOutput());
+            self::assertSame('gruff.analysis.v3', $this->decodeJsonOutput($outside)['schemaVersion'] ?? null);
+        } finally {
+            $this->removeDir($workspace);
+        }
+    }
+
+    /**
+     * Checks rejection of two sibling targets with one run-invalidating target-error diagnostic and no findings.
+     * Running one of those targets alone must exit 0.
+     *
+     * @return void - Asserts the rejected run's JSON envelope and the single-target run's successful exit.
+     * @throws JsonException - If decoding the command's stdout as JSON fails.
+     */
+    public function testAnalyseCommandRefusesSeveralTargetsOutsideTheLaunchDirectoryWithAnEnvelope(): void
+    {
+        $workspace = $this->tempDir();
+        self::assertTrue(mkdir($workspace . '/a'));
+        self::assertTrue(mkdir($workspace . '/b'));
+        self::assertTrue(mkdir($workspace . '/sib'));
+        self::assertNotFalse(file_put_contents($workspace . '/a/one.php', "<?php\necho 1;\n"));
+        self::assertNotFalse(file_put_contents($workspace . '/b/two.php', "<?php\necho 2;\n"));
+
+        try {
+            $process = new Process([
+                                       PHP_BINARY,
+                                       self::PROJECT_ROOT . '/bin/gruff-php',
+                                       'analyse',
+                                       '../a',
+                                       '../b',
+                                       '--no-config',
+                                       '--format',
+                                       'json',
+                                       '--no-cache',
+                                   ], $workspace . '/sib');
+            $process->run();
+
+            self::assertSame(2, $process->getExitCode(), $process->getErrorOutput());
+            $report      = $this->decodeJsonOutput($process);
+            $diagnostics = $report['diagnostics'] ?? null;
+            self::assertIsArray($diagnostics);
+            self::assertCount(1, $diagnostics);
+            $diagnostic = $this->decodedJsonObject($diagnostics[0] ?? null);
+            self::assertSame('target-error', $diagnostic['type'] ?? null);
+            self::assertTrue($diagnostic['invalidatesRun'] ?? null);
+            self::assertSame([], $report['findings'] ?? null);
+
+            $single = new Process([
+                                      PHP_BINARY,
+                                      self::PROJECT_ROOT . '/bin/gruff-php',
+                                      'analyse',
+                                      '../a',
+                                      '--no-config',
+                                      '--format',
+                                      'json',
+                                      '--fail-on',
+                                      'none',
+                                      '--no-cache',
+                                  ], $workspace . '/sib');
+            $single->run();
+            self::assertSame(0, $single->getExitCode(), $single->getErrorOutput());
+        } finally {
+            $this->removeDir($workspace);
+        }
+    }
+
+    /**
+     * Checks that unrelated POSIX target trees whose only common ancestor is the filesystem root return no project root.
+     *
+     * @return void - Asserts null when two unrelated top-level trees share only `/`.
+     */
+    public function testProjectRootFromTargetsReturnsNullForUnrelatedRootLevelTrees(): void
+    {
+        if (DIRECTORY_SEPARATOR !== '/' || !is_dir('/usr') || !is_dir('/var')) {
+            self::markTestSkipped('POSIX /usr and /var directories are required.');
+        }
+
+        $launchDirectory = $this->tempDir();
+
+        try {
+            self::assertNull(AnalyseCommandSetupBuilder::projectRootFromTargets($launchDirectory, ['/usr', '/var']));
+        } finally {
+            $this->removeDir($launchDirectory);
+        }
+    }
+
+    /**
+     * Loads the expected CLI output users should see and normalises its version stamps before comparison.
+     * This keeps renderer checks focused on the UI contract when the application version changes.
      *
      * @param string $fileName - Basename under tests/Fixtures/Cli/Golden whose contents are the expected output.
      *
-     * @return string - fixture text with the header/`"version"` stamps replaced by the live version
+     * @return string - Fixture text with the header and JSON version stamps replaced by the live version.
      */
     private function goldenOutput(string $fileName): string
     {
         $contents = file_get_contents(self::PROJECT_ROOT . '/tests/Fixtures/Cli/Golden/' . $fileName);
         self::assertIsString($contents);
 
+        // Replace the version in the "gruff-php X.Y.Z" header and in the JSON "version" field with the live version.
         $normalised = preg_replace(
             ['/^gruff-php \d+\.\d+\.\d+(?:-[A-Za-z0-9.]+)? /m', '/"version": "\d+\.\d+\.\d+(?:-[A-Za-z0-9.]+)?"/'],
             ['gruff-php ' . Application::VERSION . ' ', '"version": "' . Application::VERSION . '"'],

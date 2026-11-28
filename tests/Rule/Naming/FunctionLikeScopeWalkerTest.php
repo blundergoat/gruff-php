@@ -12,15 +12,16 @@ use GruffPhp\Engine\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers function-like scope walking: isolation of nested closures, shadowed parameters, separate scopes for arrow functions inside foreach, and
- * method-before-body-closure yield order.
+ * Covers parameter and local-variable isolation across nested closures.
+ * Checks separate scopes for arrow functions declared inside foreach bodies.
+ * Checks that methods precede body closures in the returned scope list.
  */
 final class FunctionLikeScopeWalkerTest extends TestCase
 {
     /**
      * Verify nested closures keep parameter and local-variable names isolated by scope.
      *
-     * @return void
+     * @return void - Asserts scope kinds and isolated parameter and local-variable names.
      */
     public function testScopesIsolateNestedClosuresAndShadowedParameters(): void
     {
@@ -63,7 +64,7 @@ final class FunctionLikeScopeWalkerTest extends TestCase
     /**
      * Verify arrow functions inside foreach bodies become separate scopes.
      *
-     * @return void
+     * @return void - Asserts separate enclosing and arrow scopes with their expected names.
      */
     public function testArrowFunctionsInsideForeachAreSeparateScopes(): void
     {
@@ -99,7 +100,7 @@ final class FunctionLikeScopeWalkerTest extends TestCase
     /**
      * Verify class methods are yielded before closures declared in their bodies.
      *
-     * @return void
+     * @return void - Asserts method-before-closure order and the names assigned to each scope.
      */
     public function testMethodsAreYieldedBeforeBodyClosures(): void
     {
@@ -135,7 +136,7 @@ final class FunctionLikeScopeWalkerTest extends TestCase
      *
      * @param string $source - Inline PHP source defining the functions and closures to walk.
      *
-     * @return list<FunctionLikeScope> - the fixture's scopes in depth-first declaration order, the positions tests index by
+     * @return list<FunctionLikeScope> - Function-like scopes discovered in the fixture.
      */
     private function scopesFor(string $source): array
     {

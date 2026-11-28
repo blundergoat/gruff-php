@@ -17,19 +17,50 @@ use GruffPhp\Results\Mutation\MutationAnalysisResult;
 use GruffPhp\Rules\RuleRegistry;
 use GruffPhp\Rules\Size\FileLengthRule;
 use GruffPhp\Results\Scoring\Grade;
+use GruffPhp\Results\Scoring\ScoreReport;
 use GruffPhp\Results\Scoring\ScoreCalculator;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers score calculation: simple A-F grade boundaries, mutation-pillar omission when Infection data is absent, file-metric inclusion, and
- * pillar-scoped composites.
+ * Covers A-F grade thresholds and the presence or absence of mutation scoring.
+ * Checks correlated penalties, pillar counts, and per-file metrics.
+ * Verifies selected-pillar composites and per-rule score exclusions.
  */
 final class ScoreCalculatorTest extends TestCase
 {
     /**
-     * Verify grade boundaries use simple af scale.
+     * Checks that every registered primary and secondary pillar is in STATIC_PILLARS.
+     * Keeping clean catalogue pillars present prevents findings from changing the composite divisor.
      *
-     * @return void
+     * @return void - Asserts that no registered primary or secondary pillar is missing.
+     */
+    public function testStaticPillarsCoverEveryCataloguePillar(): void
+    {
+        $staticPillars   = (new \ReflectionClassConstant(ScoreCalculator::class, 'STATIC_PILLARS'))->getValue();
+        $cataloguePillars = [];
+
+
+        foreach (RuleRegistry::defaults()->all() as $rule) {
+            $definition = $rule->definition();
+            $cataloguePillars[$definition->pillar->value] = true;
+
+            foreach ($definition->secondaryPillars as $secondaryPillar) {
+                $cataloguePillars[$secondaryPillar->value] = true;
+            }
+        }
+
+        self::assertIsArray($staticPillars);
+        $unnamedPillars = array_filter(
+            array_keys($cataloguePillars),
+            static fn(string $pillar): bool => !in_array($pillar, $staticPillars, true),
+        );
+        self::assertSame([], array_values($unnamedPillars));
+    }
+
+    /**
+     * Checks that 90/80/70/60 map to A/B/C/D and 59.99 maps to F.
+     *
+     * @return void - Asserts A/B/C/D at 90/80/70/60 and F at 59.99.
      */
     public function testGradeBoundariesUseSimpleAFScale(): void
     {
@@ -43,19 +74,19 @@ final class ScoreCalculatorTest extends TestCase
     /**
      * Verify score report omits mutation pillar when infection data is absent.
      *
-     * @return void
+     * @return void - Asserts mutation is absent, scope is full-project, and the security pillar is graded F.
      */
     public function testScoreReportOmitsMutationPillarWhenInfectionDataIsAbsent(): void
     {
         $score = (new ScoreCalculator())->calculate([
-                                                        $this->finding('docs.missing-public-phpdoc', Pillar::Documentation, Severity::Advisory),
+                                                        $this->finding('docs.missing-phpdoc', Pillar::Documentation, Severity::Advisory),
                                                         $this->finding('security.dangerous-function-call', Pillar::Security, Severity::Error),
-                                                    ], null, DiffResult::inactive());
+                                                    ], 10, null, DiffResult::inactive());
 
-        self::assertLessThan(100.0, $score->composite->score);
+        self::assertLessThan(100.0, $this->composite($score)->score);
         self::assertSame('full-project', $score->scope);
         self::assertSame(
-            'Per-pillar scores start at 100 and subtract weighted finding penalties; correlated size and complexity findings on one symbol share a single penalty; the composite is the average of applicable pillar scores. '
+            'Each pillar scores on the density of its weighted findings per evaluated file, on a curve from 50 to 100, so a larger project is not penalised for its size; correlated size and complexity findings on one symbol share a single weight; the composite is the average of applicable pillar scores. '
             . 'Mutation is omitted when no Infection report is supplied.',
             $score->explanation,
         );
@@ -69,9 +100,9 @@ final class ScoreCalculatorTest extends TestCase
     }
 
     /**
-     * Verify overlapping size and complexity findings remain native findings.
+     * Checks that the input rule IDs remain unchanged and no design pillar appears in the report.
      *
-     * @return void
+     * @return void - Asserts original input IDs, no design pillar, and a composite below 100.
      */
     public function testOverlappingSizeAndComplexityFindingsRemainNativeFindings(): void
     {
@@ -81,25 +112,21 @@ final class ScoreCalculatorTest extends TestCase
             $this->finding('complexity.cyclomatic', Pillar::Complexity, Severity::Warning, filePath: 'src/Other.php', line: 9, symbol: 'Other::run()'),
         ];
 
-        $score = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive());
+        $score = (new ScoreCalculator())->calculate($findings, 10, null, DiffResult::inactive());
 
         self::assertSame(['size.method-length', 'complexity.cognitive', 'complexity.cyclomatic'], array_map(
             static fn(Finding $finding): string => $finding->ruleId,
             $findings,
         ));
         self::assertArrayNotHasKey('design', $this->pillarMap($score->pillars));
-        self::assertLessThan(100.0, $score->composite->score);
+        self::assertLessThan(100.0, $this->composite($score)->score);
     }
 
     /**
-     * Verify correlated findings on one symbol are billed once, not per symptom.
+     * Checks that the same findings score higher when clustered on one symbol than when spread across symbols.
+     * Both complexity findings and the size finding still contribute to their pillar counts.
      *
-     * The same three findings score better when they pile onto a single method
-     * (one root cause, clustered) than when spread across three distinct methods
-     * (three independent root causes), while every finding still counts toward
-     * its pillar.
-     *
-     * @return void
+     * @return void - Asserts a higher clustered composite, two complexity findings, and one size finding.
      */
     public function testCorrelatedFindingsOnOneSymbolShareOnePenalty(): void
     {
@@ -107,15 +134,15 @@ final class ScoreCalculatorTest extends TestCase
                                                             $this->finding('size.method-length', Pillar::Size, Severity::Warning, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
                                                             $this->finding('complexity.cognitive', Pillar::Complexity, Severity::Warning, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
                                                             $this->finding('complexity.cyclomatic', Pillar::Complexity, Severity::Warning, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
-                                                        ], null, DiffResult::inactive());
+                                                        ], 10, null, DiffResult::inactive());
 
         $spread = (new ScoreCalculator())->calculate([
                                                          $this->finding('size.method-length', Pillar::Size, Severity::Warning, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
                                                          $this->finding('complexity.cognitive', Pillar::Complexity, Severity::Warning, filePath: 'src/Big.php', line: 40, symbol: 'Big::other()'),
                                                          $this->finding('complexity.cyclomatic', Pillar::Complexity, Severity::Warning, filePath: 'src/Big.php', line: 70, symbol: 'Big::third()'),
-                                                     ], null, DiffResult::inactive());
+                                                     ], 10, null, DiffResult::inactive());
 
-        self::assertGreaterThan($spread->composite->score, $clustered->composite->score);
+        self::assertGreaterThan($this->composite($spread)->score, $this->composite($clustered)->score);
 
         $pillars = $this->pillarMap($clustered->pillars);
         self::assertSame(2, $pillars['complexity']->findings);
@@ -123,14 +150,10 @@ final class ScoreCalculatorTest extends TestCase
     }
 
     /**
-     * Verify a cluster contributes max(member penalty) / member count, not the sum.
+     * Checks the aggregate complexity penalty for correlated error, warning and advisory findings.
+     * Their combined penalty is 12.0, with all three findings still counted.
      *
-     * An Error (base 12), a Warning (base 4), and an Advisory (base 1) on one
-     * method share max(12, 4, 1) / 3 = 4.0 each. Three findings × 4.0 × the 4.0
-     * pillar multiplier = 48.0, proving the largest symptom sets the bill and the
-     * weaker overlapping symptoms do not stack on top of it.
-     *
-     * @return void
+     * @return void - Asserts a 12.0 penalty and three complexity findings.
      */
     public function testClusterPenaltyIsMaxMemberPenaltyDividedByCount(): void
     {
@@ -138,38 +161,53 @@ final class ScoreCalculatorTest extends TestCase
                                                         $this->finding('complexity.cyclomatic', Pillar::Complexity, Severity::Error, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
                                                         $this->finding('complexity.cognitive', Pillar::Complexity, Severity::Warning, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
                                                         $this->finding('complexity.nesting-depth', Pillar::Complexity, Severity::Advisory, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
-                                                    ], null, DiffResult::inactive());
+                                                    ], 10, null, DiffResult::inactive());
 
         $complexity = $this->pillarMap($score->pillars)['complexity'];
-        self::assertEqualsWithDelta(48.0, $complexity->penalty, 0.0001);
+        self::assertEqualsWithDelta(12.0, $complexity->penalty, 0.0001);
         self::assertSame(3, $complexity->findings);
     }
 
     /**
-     * Verify a lone correlated finding and an unrelated rule on the same symbol keep full penalty.
+     * Checks that two warnings on the same symbol share a total penalty even without line numbers.
+     * The pillar penalty and the single published cluster weight must both be 4.0.
      *
-     * Clustering needs two or more correlated findings, so a single complexity
-     * finding keeps its base penalty; a naming finding sharing the symbol is a
-     * different root cause and is never folded into the cluster.
+     * @return void - Asserts a 4.0 complexity penalty and one cluster with weight 4.0.
+     */
+    public function testCorrelatedFindingsWithoutALineShareOnePenalty(): void
+    {
+        $score = (new ScoreCalculator())->calculate([
+            $this->finding('complexity.cyclomatic', Pillar::Complexity, Severity::Warning, filePath: 'src/Big.php', line: null, symbol: 'Big::run()'),
+            $this->finding('complexity.cognitive', Pillar::Complexity, Severity::Warning, filePath: 'src/Big.php', line: null, symbol: 'Big::run()'),
+        ], 10, null, DiffResult::inactive());
+
+        self::assertEqualsWithDelta(4.0, $this->pillarMap($score->pillars)['complexity']->penalty, 0.0001);
+        self::assertCount(1, $score->clusters);
+        self::assertSame(4.0, $score->clusters[0]['weight'] ?? null);
+    }
+
+    /**
+     * Checks that a lone complexity finding and an unrelated naming finding on the same symbol retain full penalties.
+     * Each contributes 4.0 to its own pillar.
      *
-     * @return void
+     * @return void - Asserts a 4.0 penalty in both the complexity and naming pillars.
      */
     public function testLoneCorrelatedAndUnrelatedFindingsKeepFullPenalty(): void
     {
         $score = (new ScoreCalculator())->calculate([
                                                         $this->finding('complexity.cyclomatic', Pillar::Complexity, Severity::Warning, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
                                                         $this->finding('naming.generic-method-name', Pillar::Naming, Severity::Warning, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
-                                                    ], null, DiffResult::inactive());
+                                                    ], 10, null, DiffResult::inactive());
 
         $pillars = $this->pillarMap($score->pillars);
-        self::assertEqualsWithDelta(16.0, $pillars['complexity']->penalty, 0.0001);
-        self::assertEqualsWithDelta(16.0, $pillars['naming']->penalty, 0.0001);
+        self::assertEqualsWithDelta(4.0, $pillars['complexity']->penalty, 0.0001);
+        self::assertEqualsWithDelta(4.0, $pillars['naming']->penalty, 0.0001);
     }
 
     /**
      * Verify score report includes mutation pillar, file mutation scores, distribution, and diff scope.
      *
-     * @return void
+     * @return void - Asserts mutation metrics, complexity buckets, diff scope, and per-file maxima.
      */
     public function testScoreReportIncludesMutationAndFileMetrics(): void
     {
@@ -196,7 +234,7 @@ final class ScoreCalculatorTest extends TestCase
                                                                              ],
                                                              ));
 
-        $score   = (new ScoreCalculator())->calculate($findings, $mutationAnalysisResult, new DiffResult(
+        $score   = (new ScoreCalculator())->calculate($findings, 10, $mutationAnalysisResult, new DiffResult(
             active:       true,
             mode:         'unstaged',
             base:         null,
@@ -210,7 +248,7 @@ final class ScoreCalculatorTest extends TestCase
         self::assertSame(['1-5' => 1, '6-10' => 1, '11-15' => 0, '16-20' => 0, '21+' => 0], $score->complexityDistribution);
         self::assertSame('diff', $payload['scope']);
         self::assertSame(
-            'Per-pillar scores start at 100 and subtract weighted finding penalties; correlated size and complexity findings on one symbol share a single penalty; the composite is the average of applicable pillar scores. '
+            'Each pillar scores on the density of its weighted findings per evaluated file, on a curve from 50 to 100, so a larger project is not penalised for its size; correlated size and complexity findings on one symbol share a single weight; the composite is the average of applicable pillar scores. '
             . 'Mutation uses the supplied Infection MSI as the mutation pillar score.',
             $payload['explanation'],
         );
@@ -250,7 +288,7 @@ final class ScoreCalculatorTest extends TestCase
     /**
      * Verify score calculation can scope composite scoring to selected pillars.
      *
-     * @return void
+     * @return void - Asserts only the selected pillars are reported and their composite grade is C.
      */
     public function testScoreReportCanScopeCompositeToSelectedPillars(): void
     {
@@ -259,6 +297,7 @@ final class ScoreCalculatorTest extends TestCase
                               $this->finding('security.dangerous-function-call', Pillar::Security, Severity::Error),
                               $this->finding('security.unsafe-unserialize', Pillar::Security, Severity::Error),
                           ],
+                          10,
                           null,
                           DiffResult::inactive(),
             scorePillars: [Pillar::Security, Pillar::SensitiveData],
@@ -267,13 +306,13 @@ final class ScoreCalculatorTest extends TestCase
         $pillars = array_map(static fn($pillar): string => $pillar->pillar, $score->pillars);
 
         self::assertSame(['security', 'sensitive-data'], $pillars);
-        self::assertSame('F', $score->composite->letter);
+        self::assertSame('C', $this->composite($score)->letter);
     }
 
     /**
-     * Verify findings from `excludeFromScore: true` rules are filtered before the penalty bucket.
+     * Checks that excluding the file-length rule changes the composite from below 100 to 100.
      *
-     * @return void
+     * @return void - Asserts the rule penalises the default score but not the excluded-rule score.
      */
     public function testExcludeFromScoreRuleFindingsDoNotPenaliseTheComposite(): void
     {
@@ -282,17 +321,17 @@ final class ScoreCalculatorTest extends TestCase
             $this->finding(FileLengthRule::ID, Pillar::Size, Severity::Error),
         ];
 
-        $scoredWithRule    = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive());
-        $scoredWithoutRule = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive(), analysisConfig: $this->configWithExcludedRule($registry, FileLengthRule::ID));
+        $scoredWithRule    = (new ScoreCalculator())->calculate($findings, 10, null, DiffResult::inactive());
+        $scoredWithoutRule = (new ScoreCalculator())->calculate($findings, 10, null, DiffResult::inactive(), analysisConfig: $this->configWithExcludedRule($registry, FileLengthRule::ID));
 
-        self::assertLessThan(100.0, $scoredWithRule->composite->score);
-        self::assertSame(100.0, $scoredWithoutRule->composite->score);
+        self::assertLessThan(100.0, $this->composite($scoredWithRule)->score);
+        self::assertSame(100.0, $this->composite($scoredWithoutRule)->score);
     }
 
     /**
-     * Verify default behaviour (no config supplied) is unchanged.
+     * Checks that a file-length finding still reduces the composite when analysisConfig is null.
      *
-     * @return void
+     * @return void - Asserts that the composite score is below 100 with a null analysis configuration.
      */
     public function testNullAnalysisConfigKeepsAllFindingsInScore(): void
     {
@@ -300,18 +339,18 @@ final class ScoreCalculatorTest extends TestCase
             $this->finding(FileLengthRule::ID, Pillar::Size, Severity::Error),
         ];
 
-        $score = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive(), analysisConfig: null);
+        $score = (new ScoreCalculator())->calculate($findings, 10, null, DiffResult::inactive(), analysisConfig: null);
 
-        self::assertLessThan(100.0, $score->composite->score);
+        self::assertLessThan(100.0, $this->composite($score)->score);
     }
 
     /**
      * Build an AnalysisConfig with one rule marked excludeFromScore.
      *
      * @param RuleRegistry $registry - Source of rule defaults the config is seeded from.
-     * @param string       $ruleId - Rule identifier to mark excluded.
+     * @param string $ruleId - Rule identifier present in the supplied registry.
      *
-     * @return AnalysisConfig - a copy seeded from the registry with the named rule flagged excludeFromScore so its findings drop out of the composite
+     * @return AnalysisConfig - Registry defaults with the named rule excluded from scoring and its other settings preserved.
      */
     private function configWithExcludedRule(RuleRegistry $registry, string $ruleId): AnalysisConfig
     {
@@ -332,8 +371,7 @@ final class ScoreCalculatorTest extends TestCase
      *
      * @param list<\GruffPhp\Results\Scoring\PillarScore> $pillars - Pillar scores returned by the calculator fixture.
      *
-     * @return array<string, \GruffPhp\Results\Scoring\PillarScore> - the same scores keyed by pillar name for index-free lookup; empty when no pillars were
-     *                       given
+     * @return array<string, \GruffPhp\Results\Scoring\PillarScore> - Last score per pillar name; empty input returns an empty array.
      */
     private function pillarMap(array $pillars): array
     {
@@ -348,24 +386,23 @@ final class ScoreCalculatorTest extends TestCase
     /**
      * Build a finding fixture for assertions.
      *
-     * @param string                                                                                 $ruleId - Rule identifier.
-     * @param Pillar                                                                                 $pillar - Pillar assigned to the finding fixture.
-     * @param Severity                                                                               $severity - Severity assigned to the finding fixture.
-     * @param string                                                                                 $filePath - Finding file path.
-     * @param int                                                                                    $line - Finding line number.
-     * @param int|null                                                                               $endLine - End line of the finding span; null
-     *                                                                                                         means the finding spans a single line.
-     * @param string|null                                                                            $symbol - Optional reported symbol for grouping and display assertions.
-     * @param array<string, bool|float|int|string|null|array<array-key, bool|float|int|string|null>> $metadata - Metadata attached to the finding fixture.
+     * @param string $ruleId - Rule identifier assigned to the fixture.
+     * @param Pillar $pillar - Primary pillar assigned to the fixture.
+     * @param Severity $severity - Severity assigned to the fixture.
+     * @param string $filePath - File path assigned to the fixture.
+     * @param int|null $line - Start line assigned to the fixture; null leaves it unspecified.
+     * @param int|null $endLine - End line assigned to the fixture; null leaves it unspecified.
+     * @param string|null $symbol - Symbol used for grouping and display; null supplies no symbol.
+     * @param array<string, bool|float|int|string|null|array<array-key, bool|float|int|string|null>> $metadata - Metadata attached to the fixture.
      *
-     * @return Finding - a fully populated fixture (High confidence, V01 tier) carrying the supplied fields for scoring assertions
+     * @return Finding - Fixture with High confidence, V01 tier, and the supplied scoring fields.
      */
     private function finding(
         string   $ruleId,
         Pillar   $pillar,
         Severity $severity,
         string   $filePath = 'src/Example.php',
-        int      $line = 1,
+        ?int     $line = 1,
         ?int     $endLine = null,
         ?string  $symbol = null,
         array    $metadata = [],
@@ -384,4 +421,20 @@ final class ScoreCalculatorTest extends TestCase
             metadata:   $metadata,
         );
     }
+
+    /**
+     * Reads a fixture's composite after asserting its presence.
+     * A run that evaluated nothing may omit it, but every caller here supplies a positive denominator.
+     *
+     * @param ScoreReport $score - Report whose composite the assertion is about to read.
+     *
+     * @return Grade - The composite grade, once its presence has been asserted.
+     */
+    private function composite(ScoreReport $score): Grade
+    {
+        self::assertNotNull($score->composite, 'the fixture evaluated files, so it must carry a composite');
+
+        return $score->composite;
+    }
+
 }

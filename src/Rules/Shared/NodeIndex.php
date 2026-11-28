@@ -16,36 +16,32 @@ use PhpParser\NodeVisitorAbstract;
 use WeakMap;
 
 /**
- * A per-unit cache that turns "find every node of class X" into an O(1) lookup for rules.
- *
- * Many rules want the same node kinds from a file's AST (every method call, every string, every if).
- * Rather than each rule walking the tree itself, this walks each AnalysisUnit once, files every node
- * under its concrete class plus every ancestor and interface, and memoises the result against the unit.
- * It also caches function-body descendants and logical line counts, and lets streaming flows evict a
- * unit's entry the moment its AST is released so nothing stays pinned in memory.
+ * Caches AST node lookups and function-body metrics for rule scans.
+ * A unit walk builds preorder buckets for concrete classes and supported ancestors and interfaces.
+ * Streaming callers evict the unit's buckets before releasing its AST; body caches use node keys.
  */
 final class NodeIndex
 {
     /**
-     * Cache keyed on AnalysisUnit. Each value is a map of FQCN -> list of
-     * matching nodes in preorder, matching NodeFinder semantics.
+     * Caches preorder node buckets under each analysis unit.
+     * The universal Node and NodeAbstract types are not indexed.
      *
-     * @var WeakMap<AnalysisUnit, array<class-string<Node>, list<Node>>>|null
+     * @var WeakMap<AnalysisUnit, array<class-string<Node>, list<Node>>>|null - Unit buckets, or null before indexing begins.
      */
     private static ?WeakMap $cache = null;
 
     /**
-     * Cache keyed on function-like nodes. Each value stores the node's body
-     * descendants only, matching the previous NodeFinder calls over stmts.
+     * Caches descendants reached through a function, method, or closure's statements.
+     * Entries are keyed by the body-owning node and exclude that node itself.
      *
-     * @var WeakMap<Node, list<Node>>|null
+     * @var WeakMap<Node, list<Node>>|null - Body descendant lists, or null before the first body lookup.
      */
     private static ?WeakMap $bodyCache = null;
 
     /**
      * Cache keyed on function-like nodes for logical statement line counts.
      *
-     * @var WeakMap<Node, int>|null
+     * @var WeakMap<Node, int>|null - Cached counts, or null before the first count request.
      */
     private static ?WeakMap $logicalLineCountCache = null;
 
@@ -53,46 +49,41 @@ final class NodeIndex
      * Process-wide cache of class hierarchy keys per concrete node class, so
      * each visitor instance can reuse parent/interface lookups across files.
      *
-     * @var array<class-string<Node>, list<class-string<Node>>>
+     * @var array<class-string<Node>, list<class-string<Node>>> - Reusable index keys, excluding the universal node types.
      */
     private static array $hierarchyCache = [];
 
     /**
-     * Drops every cache entry tied to one analysis unit, so a streaming flow can free its AST at once.
-     *
-     * Use this from streaming flows that release the unit's AST immediately
-     * after analysis so the index does not pin already-unreachable nodes until
-     * the unit itself is garbage collected.
+     * Remove a unit's class-index entry before its AST is released.
+     * Node-keyed body and line-count caches are left to WeakMap lifetime handling.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to remove from the cache.
      *
-     * @return void
+     * @return void - Removes the unit's class-index entry if it exists.
      */
     public static function evictUnit(AnalysisUnit $analysisUnit): void
     {
-        // Only touch the cache when it has actually been built.
+
         if (self::$cache !== null) {
             unset(self::$cache[$analysisUnit]);
         }
     }
 
     /**
-     * Returns every node of one concrete class in the unit, in preorder, from the shared per-unit index.
-     *
-     * Matches NodeFinder::findInstanceOf semantics for a single class but
-     * relies on a shared per-unit cache so repeat queries do no extra work.
+     * Return cached preorder nodes for a concrete class or indexed ancestor/interface.
+     * The universal Node and NodeAbstract types are not indexed.
      *
      * @template T of Node
-     * @param AnalysisUnit    $analysisUnit - Parsed unit whose AST is indexed.
-     * @param class-string<T> $class - Exact node class to retrieve from the per-unit index.
+     * @param AnalysisUnit $analysisUnit - Parsed unit whose AST is indexed.
+     * @param class-string<T> $class - Concrete or supported ancestor/interface type whose bucket is requested.
      *
-     * @return list<T> - matching nodes in document preorder; empty when the unit holds none of that class.
+     * @return list<T> - Matching nodes in preorder; empty when the requested type has no indexed bucket.
      */
     public static function nodesOf(AnalysisUnit $analysisUnit, string $class): array
     {
         $byClass = self::index($analysisUnit);
-        /** @var list<T> $nodes Cached entries are keyed by the exact requested class-string. */
-        // A class the unit never used simply has no bucket, so treat that as an empty list.
+        /** @var list<T> $nodes - Cached entries are keyed by the exact requested class-string. */
+
         $nodes = $byClass[$class] ?? [];
 
         return $nodes;
@@ -141,38 +132,34 @@ final class NodeIndex
     public static function bodyDescendants(Node $node): array
     {
         if (!$node instanceof ClassMethod && !$node instanceof Function_ && !$node instanceof Closure) {
-            // A node with no body has no descendants to walk, so treat it as empty rather than rejecting the caller.
+
             return [];
         }
 
-        // Only function-like nodes reach here, so the body cache can safely assume a statement list exists.
+
         return self::bodyIndex($node);
     }
 
     /**
-     * Returns the body descendants of a function-like node matching any of the given classes, in preorder.
-     *
-     * Use this for scope-bounded rule scans (e.g. test-method scans) that
-     * previously called NodeFinder->find with a class-disjunction predicate on
-     * a function body.
+     * Return each body descendant matching any requested class, once, in preorder.
      *
      * @template T of Node
-     * @param Node                  $node - Function-like node whose body should be scanned.
-     * @param list<class-string<T>> $classes - Concrete node classes to keep.
+     * @param Node $node - Function-like node whose body should be scanned.
+     * @param list<class-string<T>> $classes - Node classes or interfaces accepted by the filter.
      *
-     * @return list<T> - body descendants matching any supplied class, in preorder, each kept once; empty when no classes or no body.
+     * @return list<T> - Body descendants matching any supplied class, in preorder, each kept once; empty when no classes or no body.
      */
     public static function descendantsOfAny(Node $node, array $classes): array
     {
         if ($classes === [] || self::bodyDescendants($node) === []) {
-            // No filter classes or no body means nothing can match, so skip the scan entirely.
+
             return [];
         }
 
         $matches = [];
-        // Check each body descendant against the wanted classes.
+
         foreach (self::bodyDescendants($node) as $descendant) {
-            // Keep the descendant on the first class it matches.
+
             foreach ($classes as $class) {
                 if ($descendant instanceof $class) {
                     $matches[] = $descendant;
@@ -189,20 +176,19 @@ final class NodeIndex
      *
      * @param Node $node - Function-like node whose logical lines should be counted.
      *
-     * @return int - count of distinct start lines carrying a real statement; Nop placeholders are excluded and statements sharing one physical line
-     *             count once.
+     * @return int - Distinct positive statement start lines, excluding Nop nodes; zero when no statements qualify.
      */
     public static function logicalStatementLineCount(Node $node): int
     {
         self::$logicalLineCountCache ??= new WeakMap();
         $cached                      = self::$logicalLineCountCache[$node] ?? null;
         if (is_int($cached)) {
-            // is_int guards the WeakMap miss; a hit means this body was already counted, so reuse it.
+
             return $cached;
         }
 
         $lines = [];
-        // Look at every statement in the body.
+
         foreach (self::bodyDescendants($node) as $child) {
             // Skip non-statements and Nop placeholders; they carry no real line.
             if (!$child instanceof Stmt || $child instanceof Nop) {
@@ -210,7 +196,7 @@ final class NodeIndex
             }
 
             $line = $child->getStartLine();
-            // Record each real start line once (a shared physical line counts once).
+            // Exclude unavailable source locations from the logical line count.
             if ($line > 0) {
                 $lines[$line] = true;
             }
@@ -224,24 +210,24 @@ final class NodeIndex
     }
 
     /**
-     * Walks one unit's AST a single time and buckets every node by concrete, ancestor, and interface class.
+     * Build or reuse a unit's preorder buckets for supported node hierarchy types.
      *
-     * @param AnalysisUnit $analysisUnit - Parsed unit whose full AST is walked once; the result is memoised against it.
+     * @param AnalysisUnit $analysisUnit - Parsed unit whose AST supplies the cached buckets.
      *
-     * @return array<class-string<Node>, list<Node>> - map from each concrete, ancestor, and interface class-string to its preorder nodes.
+     * @return array<class-string<Node>, list<Node>> - Preorder buckets; Node and NodeAbstract are excluded.
      */
     private static function index(AnalysisUnit $analysisUnit): array
     {
         self::$cache ??= new WeakMap();
         $cached      = self::$cache[$analysisUnit] ?? null;
         if ($cached !== null) {
-            // A populated entry means this unit was already walked, so reuse it instead of re-traversing the AST.
+
             return $cached;
         }
 
         $hierarchyCacheRef = &self::$hierarchyCache;
         $visitor           = new class ($hierarchyCacheRef) extends NodeVisitorAbstract {
-            /** @var array<class-string<Node>, list<Node>> */
+            /** @var array<class-string<Node>, list<Node>> - Preorder buckets collected for indexed hierarchy types. */
             private array $nodesByClass = [];
 
             /**
@@ -254,23 +240,20 @@ final class NodeIndex
             }
 
             /**
-             * Files each visited node under its concrete class and every ancestor and interface it has.
-             *
-             * Indexing under ancestor classes and implemented interfaces is what
-             * lets abstract-base lookups still work.
+             * Index a visited node under its concrete class and supported ancestor and interface keys.
              *
              * @param Node $node - Node currently being traversed.
              *
-             * @return null - the PhpParser visitor signal to leave the node in place and keep descending into its children.
+             * @return null - Leaves the node unchanged and continues traversal into its children.
              */
             public function enterNode(Node $node): null
             {
                 $concrete = $node::class;
                 // Compute this concrete class's full key set once, then cache it process-wide.
                 if (!isset($this->hierarchyCache[$concrete])) {
-                    /** @var list<class-string<Node>> $hierarchy class-string list for index keys; PHPStan cannot narrow the dynamic ::class expression on its own. */
+                    /** @var list<class-string<Node>> $hierarchy - Node hierarchy keys; narrows the dynamic class name for PHPStan. */
                     $hierarchy = [$concrete];
-                    /** @var array<string, class-string<Node>> $parents class_parents() returns string=>string but every entry here is a Node subclass under our traversal. */
+                    /** @var array<string, class-string<Node>> $parents - Parent class names for this Node implementation. */
                     $parents = class_parents($concrete) ?: [];
                     // Index under each ancestor class too, so a base-class lookup finds the node.
                     foreach ($parents as $parent) {
@@ -280,9 +263,9 @@ final class NodeIndex
                         }
                         $hierarchy[] = $parent;
                     }
-                    /** @var array<string, class-string<Node>> $implements class_implements() returns string=>string but every entry here is a Node interface under our traversal. */
+                    /** @var array<string, class-string<Node>> $implements - Interface names returned for the concrete node class. */
                     $implements = class_implements($concrete) ?: [];
-                    // Index under each implemented interface too.
+
                     foreach ($implements as $interface) {
                         // Skip the universal Node interface; every node has it, so it is no filter.
                         if ($interface === 'PhpParser\Node') {
@@ -293,19 +276,18 @@ final class NodeIndex
                     $this->hierarchyCache[$concrete] = $hierarchy;
                 }
 
-                // File the node under every key in its hierarchy.
+
                 foreach ($this->hierarchyCache[$concrete] as $key) {
                     $this->nodesByClass[$key][] = $node;
                 }
 
-                // Null tells PhpParser to leave the node untouched and keep descending; we only observe, never rewrite.
                 return null;
             }
 
             /**
-             * Returns the accumulated index keyed by concrete, ancestor, and interface class.
+             * Return the accumulated buckets for indexed node hierarchy types.
              *
-             * @return array<class-string<Node>, list<Node>> - accumulated index keyed by concrete, ancestor, and interface class-string; preorder within each key.
+             * @return array<class-string<Node>, list<Node>> - Indexed nodes in preorder within each bucket.
              */
             public function nodesByClass(): array
             {
@@ -319,9 +301,7 @@ final class NodeIndex
 
         self::$cache[$analysisUnit] = $visitor->nodesByClass();
 
-        // Return via the accessor rather than re-reading self::$cache: WeakMap offset access is statically
-        // nullable, whereas nodesByClass() is typed non-null, so this hands the freshly built index straight
-        // back without reintroducing a null branch the caller would have to guard.
+        // nodesByClass() preserves the non-null return type because self::$cache offset access remains nullable to static analysis.
         return $visitor->nodesByClass();
     }
 
@@ -337,12 +317,12 @@ final class NodeIndex
         self::$bodyCache ??= new WeakMap();
         $cached          = self::$bodyCache[$node] ?? null;
         if ($cached !== null) {
-            // A populated entry means this body was already walked, so reuse it instead of re-walking the statements.
+
             return $cached;
         }
 
         $visitor = new class extends NodeVisitorAbstract {
-            /** @var list<Node> */
+            /** @var list<Node> - Body descendants collected in traversal order. */
             private array $nodes = [];
 
             /**
@@ -356,7 +336,6 @@ final class NodeIndex
             {
                 $this->nodes[] = $node;
 
-                // Null tells PhpParser to keep descending; every visited descendant is appended, none rewritten.
                 return null;
             }
 
@@ -372,7 +351,7 @@ final class NodeIndex
         };
 
         $statements = [];
-        // Only pull statements from an actual function-like body.
+
         if ($node instanceof ClassMethod || $node instanceof Function_ || $node instanceof Closure) {
             // A body that was never populated yields an empty walk.
             $statements = $node->stmts ?? [];
@@ -384,9 +363,7 @@ final class NodeIndex
 
         self::$bodyCache[$node] = $visitor->nodes();
 
-        // Return via the accessor rather than re-reading self::$bodyCache: WeakMap offset access is statically
-        // nullable, whereas nodes() is typed non-null, so this hands the freshly built descendant list straight
-        // back without reintroducing a null branch the caller would have to guard.
+        // nodes() preserves the non-null return type because self::$bodyCache offset access remains nullable to static analysis.
         return $visitor->nodes();
     }
 }

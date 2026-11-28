@@ -8,11 +8,10 @@ use GruffPhp\Engine\Cache\ResultCache;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers the result cache's once-per-run eviction contract: put() never evicts
- * (per-put eviction globbed the cache directory on every write, which made
- * large-repo scans I/O-bound), finalizeRun() trims the store to its entry cap
- * oldest-first exactly once, and canHoldRun() rejects working sets that cannot
- * fit under the cap so over-cap runs skip the cache instead of thrashing it.
+ * Covers cache entry retention before and after an explicit finalizeRun() call.
+ *
+ * Asserts that writes beyond the cap retain all entries and finalization keeps the newest entries.
+ * Checks that canHoldRun() accepts the default cap and rejects a working set one file larger.
  */
 final class ResultCacheTest extends TestCase
 {
@@ -22,7 +21,7 @@ final class ResultCacheTest extends TestCase
     private const TEST_ENTRY_CAP = 3;
 
     /**
-     * Entries each test writes through put(); deliberately above TEST_ENTRY_CAP.
+     * Entry count for the write tests; deliberately above TEST_ENTRY_CAP.
      */
     private const ENTRIES_WRITTEN = 6;
 
@@ -32,9 +31,9 @@ final class ResultCacheTest extends TestCase
     private string $cacheDir = '';
 
     /**
-     * Choose a unique throwaway cache directory; the cache creates it on first put.
+     * Choose a randomly named throwaway cache directory path; the cache creates it on first put.
      *
-     * @return void
+     * @return void - Sets the temporary cache path used by the test.
      */
     protected function setUp(): void
     {
@@ -44,23 +43,31 @@ final class ResultCacheTest extends TestCase
     /**
      * Remove the throwaway cache directory and its entries.
      *
-     * @return void
+     * @return void - Deletes cache files and removes the directory if present.
      */
     protected function tearDown(): void
     {
+        // Remove each temporary finding entry so the next test starts with its own cache.
         foreach ($this->entryPaths() as $entryPath) {
             unlink($entryPath);
         }
 
+        $evictionLock = $this->cacheDir . '/.eviction.lock';
+        // A scan that never evicts entries may not create the shared lock file.
+        if (is_file($evictionLock)) {
+            unlink($evictionLock);
+        }
+
+        // A test that never writes results may not have created a cache folder.
         if (is_dir($this->cacheDir)) {
             rmdir($this->cacheDir);
         }
     }
 
     /**
-     * Verify put() never evicts mid-run, even once the store is past its cap.
+     * Verify all entries remain after writing beyond the configured cap.
      *
-     * @return void
+     * @return void - Asserts that the on-disk entry count equals the number written.
      */
     public function testPutBeyondTheCapDoesNotEvictDuringTheRun(): void
     {
@@ -78,7 +85,7 @@ final class ResultCacheTest extends TestCase
     /**
      * Verify finalizeRun() trims the store to its cap, evicting oldest entries first.
      *
-     * @return void
+     * @return void - Asserts that exactly the newest entries remain after finalization.
      */
     public function testFinalizeRunEvictsOldestEntriesDownToTheCap(): void
     {
@@ -98,7 +105,7 @@ final class ResultCacheTest extends TestCase
     /**
      * Verify canHoldRun() accepts a working set that exactly fills the cap.
      *
-     * @return void
+     * @return void - Asserts that a file count of MAX_ENTRIES is accepted.
      */
     public function testCanHoldRunAcceptsAWorkingSetExactlyAtTheCap(): void
     {
@@ -108,7 +115,7 @@ final class ResultCacheTest extends TestCase
     /**
      * Verify canHoldRun() rejects a working set one file over the cap.
      *
-     * @return void
+     * @return void - Asserts that one file beyond MAX_ENTRIES is rejected.
      */
     public function testCanHoldRunRejectsAWorkingSetOverTheCap(): void
     {
@@ -118,10 +125,10 @@ final class ResultCacheTest extends TestCase
     /**
      * Write the given number of empty-findings entries through put().
      *
-     * @param ResultCache $cache - Cache under test.
-     * @param int         $entryCount - Entries to write, keyed entry-0 .. entry-N.
+     * @param ResultCache $cache      - Cache that receives the generated entries.
+     * @param int         $entryCount - Number of entries to write; zero or negative values write none.
      *
-     * @return void
+     * @return void - Writes entries with empty findings using zero-based entry keys.
      */
     private function putEntries(ResultCache $cache, int $entryCount): void
     {
@@ -134,7 +141,7 @@ final class ResultCacheTest extends TestCase
      * Give each entry a distinct ascending mtime (entry-0 oldest) so oldest-first
      * eviction is deterministic despite filemtime's one-second granularity.
      *
-     * @return void
+     * @return void - Assigns increasing timestamps to the expected entries and clears cached file metadata.
      */
     private function staggerEntryTimestamps(): void
     {
@@ -179,13 +186,14 @@ final class ResultCacheTest extends TestCase
     /**
      * List the absolute paths of on-disk cache entries.
      *
-     * @return list<string> - Entry paths; empty when the directory does not exist yet.
+     * @return list<string> - Entry paths; empty when no JSON entries match or glob() fails.
      */
     private function entryPaths(): array
     {
         $paths = glob($this->cacheDir . '/*.json');
+        // Treat a missing temporary cache as empty so the test can ask whether any entries were written.
         if (!is_array($paths)) {
-            // Glob failed or the cache directory was never created; report an empty store.
+
             return [];
         }
 

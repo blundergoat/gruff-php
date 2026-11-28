@@ -22,12 +22,10 @@ use PhpParser\Node\Scalar;
 /**
  * Flags a wildcard CORS origin combined with credentialed requests.
  *
- * `Access-Control-Allow-Origin: *` together with
- * `Access-Control-Allow-Credentials: true` is an unsafe CORS posture: it asks
- * the browser to share credentialed responses with any origin. The check is
- * pure syntax over literal `header()` calls in one file - request-controlled
- * header values are left to `security.header-injection` so evidence never
- * overlaps.
+ * Literal header() calls are grouped by their nearest function-like scope or by file scope.
+ * A matching pair produces a warning even when the calls occur on mutually exclusive paths.
+ *
+ * Non-literal header values are skipped and can instead be inspected by security.header-injection.
  */
 final class PermissiveCorsRule implements RuleInterface
 {
@@ -41,7 +39,7 @@ final class PermissiveCorsRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // The rule is warning-level because credentialed wildcard CORS is exploitable posture.
+
         return new RuleDefinition(
             id:              self::ID,
             name:            'Permissive CORS with credentials',
@@ -50,6 +48,12 @@ final class PermissiveCorsRule implements RuleInterface
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::Medium,
             description:     'Wildcard Access-Control-Allow-Origin combined with Access-Control-Allow-Credentials: true.',
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'A wildcard origin and a credentialed CORS header emitted in one function on mutually exclusive branches, one for a public endpoint and one for an authenticated endpoint.',
+                    'mitigation' => 'Headers are grouped per function-like scope rather than per execution path, so move the two postures into separate functions.',
+                ],
+            ],
         );
     }
 
@@ -57,18 +61,18 @@ final class PermissiveCorsRule implements RuleInterface
      * Reports a wildcard CORS origin paired with credentialed CORS in the same scope.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext - Unused; the rule interface requires it, and this rule reads no options or project root.
      *
-     * @return list<Finding> - Findings only for scopes that contain both unsafe CORS headers.
+     * @return list<Finding> - Findings for scopes whose literal header text matches both CORS patterns.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        /** @var array<string, array{wildcardLine: int|null, credentials: bool}> $scopes keyed by scope so separate functions do not combine headers. */
+        /** @var array<string, array{wildcardLine: int|null, credentials: bool}> $scopes - CORS header state per scope. */
         $scopes = [];
 
-        // Check every function call in the file.
+
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
-            // Only a header() call can carry a CORS directive here.
+
             if (SecurityNodeHelper::globalFunctionName($call) !== 'header') {
                 continue;
             }
@@ -79,32 +83,32 @@ final class PermissiveCorsRule implements RuleInterface
                 continue;
             }
 
-            // Match a literal wildcard CORS origin header, case-insensitively.
+            // A wildcard origin matters only when this scope also enables credentials.
             $isWildcard = preg_match('/access-control-allow-origin\s*:\s*\*/i', $firstArg->value) === 1;
             // Match credentialed CORS headers so the paired wildcard origin can be flagged.
             $isCredentials = preg_match('/access-control-allow-credentials\s*:\s*true/i', $firstArg->value) === 1;
-            // Ignore any header that is neither of the two CORS directives.
+
             if (!$isWildcard && !$isCredentials) {
                 continue;
             }
 
             $scopeKey            = $this->scopeKey($call);
             $scopes[$scopeKey] ??= ['wildcardLine' => null, 'credentials' => false];
-            // Remember the first wildcard-origin line seen in this scope.
+
             if ($isWildcard && $scopes[$scopeKey]['wildcardLine'] === null) {
                 $scopes[$scopeKey]['wildcardLine'] = $call->getStartLine();
             }
 
-            // Note that this scope also enables credentials.
+
             if ($isCredentials) {
                 $scopes[$scopeKey]['credentials'] = true;
             }
         }
 
         $findings = [];
-        // Report only a scope that set both unsafe directives.
+
         foreach ($scopes as $scope) {
-            // A scope missing either half is not the unsafe combination.
+
             if ($scope['wildcardLine'] === null || !$scope['credentials']) {
                 continue;
             }
@@ -135,7 +139,7 @@ final class PermissiveCorsRule implements RuleInterface
     private function scopeKey(Node $node): string
     {
         $current = $node->getAttribute('parent');
-        // Walk outward to the nearest enclosing function-like.
+
         while ($current instanceof Node) {
             if ($current instanceof FunctionLike) {
                 // Function-like identity keeps unrelated local header calls from merging.

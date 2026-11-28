@@ -14,16 +14,15 @@ use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\RuleInterface;
+use PhpParser\Node;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Scalar;
+use PhpParser\Node\Stmt;
 
 /**
- * Flags code that forces PHP error display on, leaking diagnostics to users.
- *
- * Detects `ini_set('display_errors', <truthy>)` and the startup-errors variant
- * as committed-code debug switches. The check is pure syntax (no config or
- * container parsing); environment-driven toggles like `APP_DEBUG` live in
- * `.env` and are out of scope.
+ * Reports recognized literal-on `ini_set()` calls for `display_errors` and `display_startup_errors`.
+ * Emits one warning per matching call unless a recognized SAPI or bare-constant branch guard suppresses it.
+ * Constants not declared in the file are treated as configuration switches without resolving their runtime values.
  */
 final class DebugModeEnabledRule implements RuleInterface
 {
@@ -31,20 +30,27 @@ final class DebugModeEnabledRule implements RuleInterface
     public const ID = 'security.debug-mode-enabled';
 
     /**
-     * `ini_set` directives that expose PHP errors to the response.
+     * `ini_set` directives that put PHP errors into the page a visitor receives.
      *
-     * @var list<string>
+     * @var list<string> - Error-display directive names recognized by this rule.
      */
     private const DISPLAY_DIRECTIVES = ['display_errors', 'display_startup_errors'];
 
     /**
-     * Describes the debug-mode rule for the registry and reports.
+     * SAPI names accepted as command-line indicators by the guard matcher.
+     *
+     * @var list<string> - Names allowed in the literal SAPI membership list.
+     */
+    private const COMMAND_LINE_SAPIS = ['cli', 'phpdbg', 'embed'];
+
+    /**
+     * Describes the rule for `list-rules` and for each finding it reports.
      *
      * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
-        // The registry needs warning-level metadata because forced error display leaks diagnostics.
+        // Warning-level because forced error display leaks file paths and internals to anyone who triggers an error.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Debug error display enabled',
@@ -52,6 +58,9 @@ final class DebugModeEnabledRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence:      Confidence::Medium,
+            // Off unless a project sets `enabled: true`: precision-floor M02 left 3 findings across the corpus after its repair, fewer than the ten a
+            // precision floor needs, so it stays opt-in until more evidence exists (ADR-034).
+            isEnabledByDefault: false,
             description:     'Forces PHP error display on via ini_set(display_errors, ...), leaking diagnostics in production.',
             falsePositiveShapes: [
                 [
@@ -63,33 +72,38 @@ final class DebugModeEnabledRule implements RuleInterface
     }
 
     /**
-     * Reports each `ini_set()` call that forces error display on.
+     * Reports recognized literal-on ini_set() toggles outside the supported branch guards.
      *
-     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed file the user asked to analyse.
+     * @param RuleContext  $ruleContext - Unused; the rule interface requires it, and this rule reads no options or project root.
      *
-     * @return list<Finding> - One finding per literal display-errors toggle in the parsed unit.
+     * @return list<Finding> - One finding per matching toggle; empty when no call passes the literal and guard checks.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $findings = [];
 
-        // Check every function call in the file.
+
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
-            // Only a global ini_set() can flip an error-display directive.
+
             if (SecurityNodeHelper::globalFunctionName($call) !== 'ini_set') {
                 continue;
             }
 
             $directive = SecurityNodeHelper::sinkArgumentValue($call, 0);
-            // Only a literal display_errors / display_startup_errors directive is in scope.
+            // Settings such as memory_limit, or a directive name the code computes, are not this rule's concern.
             if (!$directive instanceof Scalar\String_ || !in_array(strtolower($directive->value), self::DISPLAY_DIRECTIVES, true)) {
                 continue;
             }
 
-            $directiveValue = SecurityNodeHelper::sinkArgumentValue($call, 1);
-            // A falsy or absent value leaves error display off, which is the safe state.
-            if ($directiveValue === null || !$this->isTruthy($directiveValue)) {
+            $displaySetting = SecurityNodeHelper::sinkArgumentValue($call, 1);
+
+            if ($displaySetting === null || !$this->turnsDisplayOn($displaySetting)) {
+                continue;
+            }
+
+
+            if ($this->isHiddenFromWebVisitors($call, $analysisUnit)) {
                 continue;
             }
 
@@ -113,30 +127,190 @@ final class DebugModeEnabledRule implements RuleInterface
     }
 
     /**
-     * Reports whether a literal argument turns the directive on.
+     * Checks enclosing branch bodies for recognized SAPI or configuration guards.
+     * Stops at the nearest function-like scope; an outer guard can also cover a call in a nested condition.
      *
-     * @param Expr $directiveValue - Second argument to ini_set.
+     * @param Expr\FuncCall $call - The ini_set() call that turns display on.
+     * @param AnalysisUnit $analysisUnit - File searched for its own definition of a guarding constant.
      *
-     * @return bool - True when the value is a truthy on-literal.
+     * @return bool - True when an enclosing branch matches the SAPI or external-constant guard heuristic.
      */
-    private function isTruthy(Expr $directiveValue): bool
+    private function isHiddenFromWebVisitors(Expr\FuncCall $call, AnalysisUnit $analysisUnit): bool
     {
-        if ($directiveValue instanceof Scalar\String_) {
-            // Literal string switches are the common ini_set shape for enabling display.
-            return in_array(strtolower($directiveValue->value), ['1', 'on', 'true', 'yes', 'stdout', 'stderr'], true);
+        $owningFunction = SecurityNodeHelper::enclosingFunctionLike($call);
+        $current        = $call;
+        $parent         = $call->getAttribute('parent');
+
+        // Stop at the owning function: a guard in the caller does not prove when a closure or method runs.
+        while ($parent instanceof Node && $parent !== $owningFunction) {
+            $inBranchBody = ($parent instanceof Stmt\If_ || $parent instanceof Stmt\ElseIf_ || $parent instanceof Stmt\Else_)
+                && in_array($current, $parent->stmts, true);
+
+            if ($inBranchBody && ($this->runsOnlyFromCommandLine($parent) || $this->runsOnlyWhenConfigEnabled($parent, $analysisUnit))) {
+                return true;
+            }
+
+            $current = $parent;
+            $parent  = $parent->getAttribute('parent');
         }
 
-        if ($directiveValue instanceof Scalar\Int_) {
-            // Non-zero integer literals are PHP truthy toggles for ini settings.
-            return $directiveValue->value !== 0;
+        return false;
+    }
+
+    /**
+     * Reports whether a later branch of an if-chain runs only after an earlier test ruled out every web SAPI.
+     *
+     * @param Stmt\If_|Stmt\ElseIf_|Stmt\Else_ $branch - Branch whose body holds the toggle.
+     *
+     * @return bool - True when an earlier negated membership test limits PHP_SAPI to command-line values.
+     */
+    private function runsOnlyFromCommandLine(Stmt\If_|Stmt\ElseIf_|Stmt\Else_ $branch): bool
+    {
+        $ifChain = $branch->getAttribute('parent');
+        // Direct SAPI checks on the first branch are not recognized here.
+        if ($branch instanceof Stmt\If_ || !$ifChain instanceof Stmt\If_) {
+            return false;
         }
 
-        if ($directiveValue instanceof Expr\ConstFetch) {
-            // Only the true constant clearly enables display in static syntax.
-            return strtolower($directiveValue->name->toString()) === 'true';
+        $earlierConditions = [$ifChain->cond];
+        // Only conditions before this branch were tested when it runs; later elseif tests never decided anything.
+        foreach ($ifChain->elseifs as $elseIf) {
+
+            if ($elseIf === $branch) {
+                break;
+            }
+
+            $earlierConditions[] = $elseIf->cond;
         }
 
-        // Unknown expressions are not treated as enabled without static proof.
+        // Each earlier condition was false, so a failed "not a command-line SAPI" test means the script runs from the command line.
+        foreach ($earlierConditions as $condition) {
+
+            if ($condition instanceof Expr\BooleanNot && $this->testsForCommandLineSapi($condition->expr)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Recognizes in_array() calls comparing PHP_SAPI with a non-empty literal list of command-line SAPIs.
+     *
+     * @param Expr $condition - Operand of a negated if or elseif condition.
+     *
+     * @return bool - True for in_array(PHP_SAPI, ...) with a non-empty list of unkeyed, non-unpacked accepted SAPI strings; false otherwise.
+     */
+    private function testsForCommandLineSapi(Expr $condition): bool
+    {
+
+        if (!$condition instanceof Expr\FuncCall || SecurityNodeHelper::globalFunctionName($condition) !== 'in_array') {
+            return false;
+        }
+
+        $sapiOperand = SecurityNodeHelper::sinkArgumentValue($condition, 0);
+        $sapiList    = SecurityNodeHelper::sinkArgumentValue($condition, 1);
+        // Without PHP_SAPI and a literal non-empty list, this heuristic cannot establish command-line-only execution.
+        if ($sapiOperand === null || SecurityNodeHelper::constantName($sapiOperand) !== 'PHP_SAPI' || !$sapiList instanceof Expr\Array_ || $sapiList->items === []) {
+            return false;
+        }
+
+        // Every listed SAPI must be a command-line one; a single web SAPI such as fpm-fcgi lets a web request through.
+        foreach ($sapiList->items as $sapiEntry) {
+            $isCommandLineSapi = $sapiEntry->key === null && !$sapiEntry->unpack && $sapiEntry->value instanceof Scalar\String_
+                && in_array(strtolower($sapiEntry->value->value), self::COMMAND_LINE_SAPIS, true);
+
+            if (!$isCommandLineSapi) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Recognizes an if or elseif guard that uses a bare constant not declared in this file.
+     *
+     * @param Stmt\If_|Stmt\ElseIf_|Stmt\Else_ $branch - Branch whose body holds the toggle.
+     * @param AnalysisUnit $analysisUnit - File searched for its own definition of the same constant.
+     *
+     * @return bool - True for a non-keyword constant condition with no matching declaration in the file.
+     */
+    private function runsOnlyWhenConfigEnabled(Stmt\If_|Stmt\ElseIf_|Stmt\Else_ $branch, AnalysisUnit $analysisUnit): bool
+    {
+
+        if ($branch instanceof Stmt\Else_) {
+            return false;
+        }
+
+        $constantName = SecurityNodeHelper::constantName($branch->cond);
+        // Negated and compound conditions are not plain switches, and a literal true condition is not an external switch.
+        if ($constantName === null || in_array($constantName, ['TRUE', 'FALSE', 'NULL'], true)) {
+            return false;
+        }
+
+        // A local declaration prevents this heuristic from treating the constant as an external switch.
+        return !$this->fileSetsConstant($analysisUnit, $constantName);
+    }
+
+    /**
+     * Searches the file for a matching literal define() call or const declaration, regardless of execution order.
+     *
+     * @param AnalysisUnit $analysisUnit - File to search.
+     * @param string $constantName - Upper-cased constant name from the branch condition.
+     *
+     * @return bool - True when a matching declaration is found; false does not establish where the value comes from.
+     */
+    private function fileSetsConstant(AnalysisUnit $analysisUnit, string $constantName): bool
+    {
+        // Declaration order and reachability do not affect this syntactic check.
+        foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
+            $definedName = SecurityNodeHelper::sinkArgumentValue($call, 0);
+
+            if (SecurityNodeHelper::globalFunctionName($call) === 'define' && $definedName instanceof Scalar\String_ && strtoupper($definedName->value) === $constantName) {
+                return true;
+            }
+        }
+
+
+        foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Const_::class) as $constStatement) {
+
+            foreach ($constStatement->consts as $declaredConstant) {
+
+                if (strtoupper($declaredConstant->name->toString()) === $constantName) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Reports whether a literal setting matches the rule's enabled-value list.
+     *
+     * @param Expr $displaySetting - Second argument to ini_set().
+     *
+     * @return bool - True for a recognized enabled literal; false for any other literal or computed value.
+     */
+    private function turnsDisplayOn(Expr $displaySetting): bool
+    {
+
+        if ($displaySetting instanceof Scalar\String_) {
+            return in_array(strtolower($displaySetting->value), ['1', 'on', 'true', 'yes', 'stdout', 'stderr'], true);
+        }
+
+
+        if ($displaySetting instanceof Scalar\Int_) {
+            return $displaySetting->value !== 0;
+        }
+
+
+        if ($displaySetting instanceof Expr\ConstFetch) {
+            return strtolower($displaySetting->name->toString()) === 'true';
+        }
+
+        // A computed value such as `$debug` might be off, so the rule does not guess.
         return false;
     }
 }

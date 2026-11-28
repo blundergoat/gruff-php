@@ -16,20 +16,20 @@ gruff-php exists to make AI-generated code safe for a human to sign off on. When
 - **Secure where the eye fails.** Security and sensitive-data rules catch the classes of mistake a human reviewer skims past.
 - **Tested for real, not padded.** Test-quality rules reward genuine assertions and flag low-signal ceremony, so a green suite means the behaviour is actually exercised rather than mocked into a tautology.
 
-Wired into a coding agent's loop — as a pre-commit hook, a CI gate (`--fail-on`), or the agent's own verification step — gruff pushes the agent to keep producing code a human can confidently approve, not just code that compiles and passes. See [`docs/mission.md`](docs/mission.md) for the full rationale.
+Wired into a coding agent's loop — as a pre-commit hook, a CI gate (`--fail-on`), or the agent's own verification step — gruff pushes the agent to keep producing code a human can confidently approve, not just code that compiles and passes. See [`docs/mission.md`](https://github.com/blundergoat/gruff-php/blob/main/docs/mission.md) for the full rationale.
 
 ## Status At A Glance
 
 | Field | Value |
 | --- | --- |
-| Current source | `0.5.2` |
+| Current source | `0.6.0` |
 | Runtime | PHP `^8.3` |
 | Package | `blundergoat/gruff-php` |
 | Binary | `bin/gruff-php` from checkout; `vendor/bin/gruff-php` after install |
-| Rule catalogue | 128 rules across 10 pillars |
+| Rule catalogue | 83 rules across 10 pillars |
 | Primary config | `.gruff-php.yaml`; legacy `.gruff.yaml` is accepted when the primary file is absent |
-| Analysis schema | `gruff.analysis.v2` |
-| Baseline schema | `gruff.baseline.v2` |
+| Analysis schema | `gruff.analysis.v3` |
+| Baseline schema | `gruff.baseline.v3` |
 | Severity gate | `--fail-on` with `none`, `advisory`, `warning`, `error` |
 | Dashboard | `127.0.0.1:8765` by default |
 
@@ -93,8 +93,10 @@ vendor/bin/gruff-php dashboard
 | `analyse [paths...]` | Run the analyzer and print findings. |
 | `summary [paths...]` | Print compact score, pillar, rule, and file summaries. |
 | `report [paths...]` | Render an HTML or JSON report to stdout or `--output`. |
+| `hook [paths...]` | Run gruff-php using the cross-analyzer agent-hook contract; emits `gruff.hook.v2` JSON. |
 | `dashboard` | Serve the local browser dashboard. |
 | `init` | Write a default `.gruff-php.yaml` populated with registry defaults. |
+| `migrate-config` | Rewrite a 0.5 config for the current schema, writing the result to a different file. |
 | `check-ignore <paths...>` | Report whether gruff would ignore each path, with the matching source and pattern. |
 | `list-rules [rule-id]` | Print rule metadata as a table or JSON, or show one rule's detail view. |
 | `list`, `help`, `completion` | Symfony Console command catalogue, help, and shell completion support. |
@@ -106,7 +108,7 @@ vendor/bin/gruff-php dashboard
 | Format | Use it for |
 | --- | --- |
 | `text` | Human terminal output. |
-| `json` | Full `gruff.analysis.v2` report. |
+| `json` | Full `gruff.analysis.v3` report. |
 | `html` | Self-contained inspection report. |
 | `markdown` | Pull-request or issue comment summary. |
 | `github` | GitHub Actions workflow annotations. |
@@ -140,7 +142,7 @@ jobs:
   gruff:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: shivammathur/setup-php@v2
         with:
           php-version: "8.3"
@@ -162,25 +164,24 @@ profile's rule set freely.
 
 ## Configuration
 
-Place `.gruff-php.yaml` in the project root. `analyse`, `report`, and `dashboard` auto-load it unless `--config <path>` or `--no-config` is supplied. Legacy `.gruff.yaml` files are still auto-loaded when `.gruff-php.yaml` is absent. Unknown keys and unsupported rule options fail closed.
+Place `.gruff-php.yaml` in your project root. `analyse`, `report`, `dashboard`, `summary`, `hook`, and `check-ignore` pick it up automatically unless you pass `--config <path>` or `--no-config`. If `.gruff-php.yaml` is absent, legacy `.gruff.yaml` still loads. Unknown keys and unsupported rule options fail closed; run `vendor/bin/gruff-php migrate-config` to convert a `0.5` config without modifying the original file.
 
 ```yaml
 schemaVersion: gruff-php.config.v0.1
 minimumPhpVersion: 8.3
+
+failOn:
+  analyse: advisory
+  report: none
+  dashboard: none
 
 paths:
   ignore:
     - tests/Fixtures/**
     - generated
 
-selection:
-  tiers: [v0.1]
-  pillars: [security, sensitive-data]
-  excludeRules: []
-
 allowlists:
-  acceptedAbbreviations: [id, db]
-  secretPreviews: []
+  acceptedAbbreviations: [age, app, db, dob, dto, fs, id, io, key, log, max, min, now, raw, rx, tx, ui, url, utc]
 
 rules:
   size.method-length:
@@ -190,34 +191,35 @@ rules:
     enabled: false
 ```
 
-Use `vendor/bin/gruff-php list-rules --format json` to inspect supported thresholds and options.
+Use `vendor/bin/gruff-php list-rules --format json` to inspect supported thresholds and options, or see [Configuration](https://github.com/blundergoat/gruff-php/blob/main/docs/configuration.md) for `extends`, `minimumSeverity`, `failureConditions`, `deepScanBudget`, and `sensitiveExclusions`.
 
 ## Rules And Pillars
 
-The v0.1 catalogue contains 128 registry rules:
+The built-in catalogue contains 83 registry rules:
 
 | Pillar | Rules |
 | --- | ---: |
-| `size` | 7 |
+| `size` | 6 |
 | `complexity` | 4 |
-| `maintainability` | 2 |
-| `dead-code` | 10 |
-| `naming` | 11 |
+| `maintainability` | 1 |
+| `dead-code` | 6 |
+| `naming` | 6 |
 | `documentation` | 15 |
-| `modernisation` | 9 |
-| `security` | 25 |
-| `sensitive-data` | 11 |
-| `test-quality` | 34 |
+| `modernisation` | 2 |
+| `security` | 18 |
+| `sensitive-data` | 7 |
+| `test-quality` | 18 |
 
-Some dead-code pillar rules keep a `waste.*` rule-id prefix for historical continuity. Filter by the `pillar` field from `list-rules --format json` when the pillar matters more than the rule-id prefix.
+Some `dead-code` rules keep a `waste.*` prefix for historical continuity. When you filter by pillar rather than rule name, read the `pillar` field from `list-rules --format json`.
 
 ## Baselines And Changed-Code Scans
 
-Baselines suppress reviewed findings by grouped counts: each `gruff.baseline.v2`
-row accepts `count` instances of one `(file, ruleId, message)` identity, so
-accepted debt keeps matching after unrelated edits shift line numbers. Instances
-beyond a group's accepted count report as new; missing instances report as
-resolved.
+Baselines suppress reviewed findings by counted identity so a team can freeze known debt without turning rules off. Each `gruff.baseline.v3` row under `occurrences` stores a line-free SHA-256 `identity` (tool language, rule ID, project-relative path, and symbol plus declaration ordinal, or normalised message when no symbol exists) alongside an accepted `count`.
+
+- **Survives ordinary edits:** Shifting line numbers or rewording a rule message does not expire a symbol-bearing entry, and two same-named declarations in one file stay distinct. Extra occurrences beyond the accepted count report as new; missing ones report as resolved.
+- **No baselining secrets:** Sensitive-data findings are never baseline-eligible. Generated baselines count them under `sensitive.counts` with no rows, so secrets stay visible until fixed or recorded with a reason under `sensitiveExclusions`.
+- **Legacy baselines fail closed (exit `2`):** Carry a `gruff.baseline.v2` file forward once with `analyse --migrate-baseline <old> --generate-baseline <new>`, after migrating any 0.5 config or pointing `--config` at the migrated file (the original stays untouched). A `gruff.baseline.v1` file cannot be migrated (`--migrate-baseline` refuses it); regenerate it from a reviewed scan with `analyse --generate-baseline <new path>`, or in place with `--force` at the default `gruff-baseline.json`.
+- **Known blind spot:** Because rows match by `count`, fixing one instance while adding another under the same identity stays within budget and looks unchanged (measured on this repository's fixtures, 102 of 2,303 generated rows accept more than one instance).
 
 ```bash
 vendor/bin/gruff-php analyse --generate-baseline --fail-on none
@@ -225,15 +227,7 @@ vendor/bin/gruff-php analyse --baseline=gruff-baseline.json --fail-on warning
 vendor/bin/gruff-php analyse --no-baseline --fail-on none
 ```
 
-Because the finding message is part of the match key, releases that reword a
-rule's message invalidate the affected baseline groups — regenerate the baseline
-after upgrading across such a release (0.5.0 rewords several rule messages; see
-`CHANGELOG.md`). Legacy `gruff.baseline.v1` files fail closed with a regenerate
-instruction rather than parsing silently. Known blind spot: fixing one accepted
-instance while adding a different one with the same file, rule, and message
-keeps the group within budget and reports as unchanged.
-
-Changed-code scans can filter to symbol-aware changed regions and report how many findings were suppressed as out of scope:
+Changed-code scans narrow findings to edited regions and report how many findings were filtered out:
 
 ```bash
 vendor/bin/gruff-php analyse --format json --changed-ranges "3-3,8-10" src/Example.php --fail-on none
@@ -241,15 +235,21 @@ vendor/bin/gruff-php analyse --format json --since HEAD src/Example.php --fail-o
 git diff | vendor/bin/gruff-php analyse --format json --diff - --fail-on none
 ```
 
-Bare `--diff` compares the working tree to `HEAD`. `--changed-scope=symbol` is the default and keeps ordinary findings whose own location or enclosing declaration overlaps a changed hunk; file/class aggregate findings are kept only when the hunk touches their reported anchor. Use `--changed-scope=hunk` for strict line-span filtering, or `--changed-scope=file` when a changed-file review should keep file-level aggregates and class aggregate findings whose reported span overlaps the hunk. JSON output includes top-level `suppressedCount` when changed-region mode is active.
+Bare `--diff` compares the working tree against `HEAD`. Choose how broadly edits match findings with `--changed-scope`:
 
-Branch review compares against a base ref:
+- `symbol` (default): keeps ordinary findings whose line or enclosing declaration overlaps a changed hunk; keeps file and class aggregates only when the hunk touches their reported anchor.
+- `hunk`: strict changed-line filtering only.
+- `file`: also keeps file-level and overlapping class-level aggregates for changed files.
+
+In JSON output, changed-region runs report the filtered count at both `summary.suppressedFindings` and `diff.filteredFindings` (equal values).
+
+Branch review compares your working tree against a base ref and separates introduced, removed, and unchanged findings:
 
 ```bash
-vendor/bin/gruff-php analyse --diff-vs=origin/main --changed-only --fail-on none
+vendor/bin/gruff-php analyse --diff-base=origin/main --changed-only --fail-on none
 ```
 
-Display filters such as `--min-severity`, `--include-pillar`, and `--exclude-pillar` reduce rendered output without changing which rules execute. The rule-id flags `--include-rule` and `--exclude-rule` instead select rule execution, matching the hook command: an excluded rule does not run, and the exit code reflects the narrowed run.
+Display filters (`--min-severity`, `--include-pillar`, `--exclude-pillar`) narrow rendered output without changing which rules run. Execution flags (`--include-rule`, `--exclude-rule`) control which rules actually execute, matching `hook`: an excluded rule does not run, and scores and exit codes reflect the narrowed run.
 
 ## Mutation Analysis
 
@@ -279,7 +279,7 @@ Default scans are local source inspections. `gruff-php` parses PHP files and sel
 
 ## Stability Contract
 
-The current pre-1.0 line treats rule IDs, finding fingerprints, baseline identity, `gruff.analysis.v2`, `gruff.baseline.v2`, SARIF rendering, and CLI exit semantics as compatibility-sensitive. Breaking changes should be tagged as a future minor release and recorded in [`CHANGELOG.md`](CHANGELOG.md).
+The current pre-1.0 line treats rule IDs, finding fingerprints, baseline identity, `gruff.analysis.v3`, `gruff.baseline.v3`, SARIF rendering, and CLI exit semantics as compatibility-sensitive. Breaking changes should be tagged as a future minor release and recorded in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## How It Compares
 
@@ -305,15 +305,19 @@ Performance checks are available with `composer perf`; mutation workflows live i
 
 ## Documentation
 
-- [Mission](docs/mission.md)
+- [Mission](https://github.com/blundergoat/gruff-php/blob/main/docs/mission.md)
+- [Documentation index](https://github.com/blundergoat/gruff-php/blob/main/docs/README.md)
+- [Output formats](https://github.com/blundergoat/gruff-php/blob/main/docs/output-formats.md)
+- [Upgrading](UPGRADING.md)
 - [Changelog](CHANGELOG.md)
-- [Contributing](CONTRIBUTING.md)
+- [Contributing](https://github.com/blundergoat/gruff-php/blob/main/CONTRIBUTING.md)
 - [Security](SECURITY.md)
 - [Support](SUPPORT.md)
-- [Summary command](docs/gruff-cli-summary.md)
-- [Agent instructions](docs/gruff-cli-agent-instructions.md)
-- [Branch review](docs/gruff-cli-branch-review.md)
-- [Naming conventions](docs/naming-conventions.md)
+- [Summary command](https://github.com/blundergoat/gruff-php/blob/main/docs/gruff-cli-summary.md)
+- [Agent instructions](https://github.com/blundergoat/gruff-php/blob/main/docs/gruff-cli-agent-instructions.md)
+- [Branch review](https://github.com/blundergoat/gruff-php/blob/main/docs/gruff-cli-branch-review.md)
+- [Naming conventions](https://github.com/blundergoat/gruff-php/blob/main/docs/naming-conventions.md)
+- [Releasing](https://github.com/blundergoat/gruff-php/blob/main/docs/releasing.md) - maintainer-only
 
 ## Author
 

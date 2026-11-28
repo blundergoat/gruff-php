@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Review;
 
-use GruffPhp\Results\Baseline\BaselineEntry;
 use GruffPhp\Results\Finding\Confidence;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Pillar;
@@ -15,14 +14,16 @@ use GruffPhp\Results\Review\FindingReviewIdentity;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers counting of duplicate review finding identities rather than collapsing them.
+ * Covers duplicate counting and line-insensitive matching in branch reviews.
+ * Checks introduced, removed, and unchanged counts for symbol-less findings.
+ * Compares review keys, group keys, and stable identities under line and message changes.
  */
 final class BranchReviewComparatorTest extends TestCase
 {
     /**
      * Verify duplicate review identities are counted instead of collapsed.
      *
-     * @return void
+     * @return void - Asserts one unchanged finding, one introduced finding, and no removed findings for duplicate identities.
      */
     public function testDuplicateReviewIdentitiesAreCounted(): void
     {
@@ -45,7 +46,7 @@ final class BranchReviewComparatorTest extends TestCase
     /**
      * Verify a symbol-less finding that moved lines compares as unchanged.
      *
-     * @return void
+     * @return void - Asserts one unchanged finding and empty introduced and removed lists after a line shift.
      */
     public function testSymbolLessLineShiftComparesUnchanged(): void
     {
@@ -70,7 +71,7 @@ final class BranchReviewComparatorTest extends TestCase
     /**
      * Verify an added duplicate symbol-less occurrence compares as introduced despite line drift.
      *
-     * @return void
+     * @return void - Asserts one unchanged finding, one introduced finding, and no removed findings after adding a duplicate.
      */
     public function testSymbolLessDuplicateOccurrenceComparesIntroduced(): void
     {
@@ -93,7 +94,7 @@ final class BranchReviewComparatorTest extends TestCase
     /**
      * Verify a removed duplicate symbol-less occurrence compares as removed despite line drift.
      *
-     * @return void
+     * @return void - Asserts one unchanged finding, no introduced findings, and one removed finding after removing a duplicate.
      */
     public function testSymbolLessRemovedOccurrenceComparesRemoved(): void
     {
@@ -114,9 +115,9 @@ final class BranchReviewComparatorTest extends TestCase
     }
 
     /**
-     * Verify the symbol-less review key, the baseline group key, and stableIdentity() agree on grouping.
+     * Verify line shifts preserve each identity and message changes split them.
      *
-     * @return void
+     * @return void - Asserts matching review/group keys and stable hashes for shifted findings, with distinct values after rewording.
      */
     public function testSymbolLessIdentityAgreesWithBaselineGroupKeyAndStableIdentity(): void
     {
@@ -126,23 +127,23 @@ final class BranchReviewComparatorTest extends TestCase
         $shifted        = [$this->symbolLessFinding('Example finding.', $lineTen), $this->symbolLessFinding('Example finding.', $lineFifty)];
         $reworded       = [$this->symbolLessFinding('Example finding.', $lineTen), $this->symbolLessFinding('Different finding.', $lineTen)];
 
-        // Same (file, ruleId, message) at different lines: all three identities must match.
-        self::assertSame($reviewIdentity->key($shifted[0]), $reviewIdentity->key($shifted[1]));
-        self::assertSame(BaselineEntry::groupKeyForFinding($shifted[0]), BaselineEntry::groupKeyForFinding($shifted[1]));
-        self::assertSame($shifted[0]->stableIdentity(), $shifted[1]->stableIdentity());
-        // The review key must literally be the baseline group key, not a parallel implementation.
-        self::assertSame(BaselineEntry::groupKeyForFinding($shifted[0]), $reviewIdentity->key($shifted[0]));
 
-        // Different messages at the same line: all three identities must split.
+        self::assertSame($reviewIdentity->key($shifted[0]), $reviewIdentity->key($shifted[1]));
+        self::assertSame(FindingReviewIdentity::groupKeyForFinding($shifted[0]), FindingReviewIdentity::groupKeyForFinding($shifted[1]));
+        self::assertSame($shifted[0]->stableIdentity(), $shifted[1]->stableIdentity());
+
+        self::assertSame(FindingReviewIdentity::groupKeyForFinding($shifted[0]), $reviewIdentity->key($shifted[0]));
+
+
         self::assertNotSame($reviewIdentity->key($reworded[0]), $reviewIdentity->key($reworded[1]));
-        self::assertNotSame(BaselineEntry::groupKeyForFinding($reworded[0]), BaselineEntry::groupKeyForFinding($reworded[1]));
+        self::assertNotSame(FindingReviewIdentity::groupKeyForFinding($reworded[0]), FindingReviewIdentity::groupKeyForFinding($reworded[1]));
         self::assertNotSame($reworded[0]->stableIdentity(), $reworded[1]->stableIdentity());
     }
 
     /**
      * Build a finding fixture.
      *
-     * @param string $message - finding message; pass the same value twice to mint two identical-identity findings.
+     * @param string $message - finding message; pass the same value twice to create two identical-identity findings.
      *
      * @return Finding - an advisory documentation finding whose identity varies only by the given message
      */
@@ -165,7 +166,7 @@ final class BranchReviewComparatorTest extends TestCase
      * Build a symbol-less finding fixture at a given line.
      *
      * @param string $message - Finding message; part of the review identity.
-     * @param int    $line - Source line; varied to prove lines never affect symbol-less identity.
+     * @param int    $line - Source line varied to exercise line-shift comparisons.
      *
      * @return Finding - an advisory documentation finding with no symbol, so identity rests on file, rule, and message
      */

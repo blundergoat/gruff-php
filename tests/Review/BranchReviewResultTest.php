@@ -13,15 +13,16 @@ use GruffPhp\Results\Review\BranchReviewResult;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers per-rule delta bucketing on branch-review results: rule-grouped counts,
- * net direction sort, zero-net omission, deterministic tie-breaking by rule id.
+ * Covers per-rule delta counts for introduced and removed findings.
+ * Checks ascending net changes and rule-ID tie-breaking.
+ * Checks that equal introduced and removed counts omit the rule from the result.
  */
 final class BranchReviewResultTest extends TestCase
 {
     /**
      * Verify perRuleDelta groups introduced and removed findings by rule id and ranks by net.
      *
-     * @return void
+     * @return void - Asserts exact per-rule counts and order for net deltas -3, 1, and 1.
      */
     public function testPerRuleDeltaGroupsByRuleAndSortsByNet(): void
     {
@@ -29,15 +30,15 @@ final class BranchReviewResultTest extends TestCase
             base:          'main',
             isChangedOnly: false,
             introduced:    [
-                $this->finding('docs.missing-public-phpdoc'),
-                $this->finding('docs.missing-public-phpdoc'),
-                $this->finding('modernisation.phpdoc-mixed-overuse'),
+                $this->finding('docs.missing-phpdoc'),
+                $this->finding('docs.missing-phpdoc'),
+                $this->finding('modernisation.public-property'),
             ],
             removed:       [
                 $this->finding('size.method-length'),
                 $this->finding('size.method-length'),
                 $this->finding('size.method-length'),
-                $this->finding('docs.missing-public-phpdoc'),
+                $this->finding('docs.missing-phpdoc'),
             ],
             unchanged:     [],
             deltaScore:    null,
@@ -48,8 +49,8 @@ final class BranchReviewResultTest extends TestCase
         self::assertSame(
             [
                 ['ruleId' => 'size.method-length', 'introduced' => 0, 'removed' => 3, 'net' => -3],
-                ['ruleId' => 'docs.missing-public-phpdoc', 'introduced' => 2, 'removed' => 1, 'net' => 1],
-                ['ruleId' => 'modernisation.phpdoc-mixed-overuse', 'introduced' => 1, 'removed' => 0, 'net' => 1],
+                ['ruleId' => 'docs.missing-phpdoc', 'introduced' => 2, 'removed' => 1, 'net' => 1],
+                ['ruleId' => 'modernisation.public-property', 'introduced' => 1, 'removed' => 0, 'net' => 1],
             ],
             $delta,
         );
@@ -58,15 +59,15 @@ final class BranchReviewResultTest extends TestCase
     /**
      * Verify zero-net rules are omitted from the delta output.
      *
-     * @return void
+     * @return void - Asserts an empty result when a rule's introduced and removed counts are equal.
      */
     public function testPerRuleDeltaOmitsZeroNetRules(): void
     {
         $result = new BranchReviewResult(
             base:          'main',
             isChangedOnly: false,
-            introduced:    [$this->finding('docs.missing-public-phpdoc')],
-            removed:       [$this->finding('docs.missing-public-phpdoc')],
+            introduced:    [$this->finding('docs.missing-phpdoc')],
+            removed:       [$this->finding('docs.missing-phpdoc')],
             unchanged:     [],
             deltaScore:    null,
         );
@@ -77,7 +78,7 @@ final class BranchReviewResultTest extends TestCase
     /**
      * Verify ties at the same net delta order by rule id ascending.
      *
-     * @return void
+     * @return void - Asserts alphabetical rule-ID order for three equal positive net deltas.
      */
     public function testPerRuleDeltaSortsTiedNetByRuleId(): void
     {
@@ -101,11 +102,9 @@ final class BranchReviewResultTest extends TestCase
     /**
      * Build a finding fixture for delta tests.
      *
-     * @param string $ruleId - rule id to stamp on the fixture; the only field that varies across
-     *   cases, since perRuleDelta() buckets and sorts purely on this value.
+     * @param string $ruleId - Rule ID used to group this fixture in perRuleDelta().
      *
-     * @return Finding - finding whose every other field is held constant so delta grouping and
-     *   tie-breaking depend on $ruleId alone.
+     * @return Finding - Advisory documentation finding with all fields except ruleId fixed.
      */
     private function finding(string $ruleId): Finding
     {

@@ -10,7 +10,9 @@ use GruffPhp\Rules\Docs\MissingPropertyPhpdocRule;
 use GruffPhp\Rules\RuleRegistry;
 
 /**
- * Covers configuration-specific behavior for property documentation findings.
+ * Exercises missing-property findings with acceptLineComments disabled and enabled.
+ * Contrasts attached descriptive line comments with generic, detached, trailing and block comments.
+ * Checks that one attached comment can cover both names in a grouped property declaration.
  */
 final class MissingPropertyPhpdocOptionsTest extends DocsRuleTestCase
 {
@@ -42,7 +44,9 @@ final class PropertyCommentFixture
     public string $detached = '';
 
     /** Already documented. */
-    public string $documented = ''; // Follows from the previous declaration.
+    public string $documented = '';
+
+    public bool $plainOwner = false; // Follows from the previous declaration.
     public string $trailingFollower = '';
 
     /* Cache key shared across workers. */
@@ -56,7 +60,7 @@ PHP;
     /**
      * Verify the line-comment option requires physically attached, meaning-bearing line prose.
      *
-     * @return void
+     * @return void - Asserts the default and opt-in finding sets for attached, detached, generic, block and trailing comments.
      */
     public function testLineCommentOptionRequiresAttachedMeaningfulLineProse(): void
     {
@@ -73,6 +77,7 @@ PHP;
             'PropertyCommentFixture::$first',
             'PropertyCommentFixture::$generic',
             'PropertyCommentFixture::$hashAttached',
+            'PropertyCommentFixture::$plainOwner',
             'PropertyCommentFixture::$restatedProperty',
             'PropertyCommentFixture::$second',
             'PropertyCommentFixture::$singleWord',
@@ -101,6 +106,7 @@ PHP;
             'PropertyCommentFixture::$detached',
             'PropertyCommentFixture::$fillerName',
             'PropertyCommentFixture::$generic',
+            'PropertyCommentFixture::$plainOwner',
             'PropertyCommentFixture::$restatedProperty',
             'PropertyCommentFixture::$singleWord',
             'PropertyCommentFixture::$trailingFollower',
@@ -112,7 +118,7 @@ PHP;
      *
      * @param list<\GruffPhp\Results\Finding\Finding> $findings - Property findings to summarize.
      *
-     * @return list<string> - Sorted finding symbols; a missing symbol becomes an empty string and fails expectations.
+     * @return list<string> - One symbol per finding in lexical order; null symbols become empty strings.
      */
     private static function symbols(array $findings): array
     {

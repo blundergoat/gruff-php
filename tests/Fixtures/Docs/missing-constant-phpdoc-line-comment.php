@@ -136,6 +136,7 @@ final class LineCommentedConstantFixture
 
     /** Explicitly documents only the declaration on this line. */
     protected const TRAILING_COMMENT_OWNER = 'owner'; // Validation patterns used by this documented owner only.
+
     protected const TRAILING_COMMENT_FOLLOWER = 'follower';
 
     protected const SEARCH_RESULT_LIMIT = 25;

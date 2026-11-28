@@ -9,7 +9,9 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers branch-review behavior when mutation input is present.
+ * Covers branch-review score deltas when an Infection report is supplied.
+ * Uses a Git fixture with a changed target file and mutants attributed to an unrelated file.
+ * Asserts an MSI of 50 and a score delta within 0.001 of zero.
  */
 final class BranchReviewMutationCliTest extends TestCase
 {
@@ -17,11 +19,11 @@ final class BranchReviewMutationCliTest extends TestCase
     private const PROJECT_ROOT = __DIR__ . '/../..';
 
     /**
-     * Verify branch review score delta ignores mutation-only score inputs.
+     * Verify the supplied mutation report has MSI 50 while the branch score delta remains zero.
      *
-     * @throws JsonException When CLI JSON output cannot be decoded.
+     * @throws JsonException - When CLI JSON output cannot be decoded.
      *
-     * @return void
+     * @return void - Asserts MSI 50 and deltaScore within 0.001 of zero.
      */
     public function testBranchReviewDeltaExcludesMutationInput(): void
     {
@@ -58,9 +60,9 @@ final class BranchReviewMutationCliTest extends TestCase
 
             self::assertSame(0, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
             $report   = $this->decodeJson($process);
-            $mutation = $this->arrayValue($report, 'mutation');
+            $mutation = $this->phpTopLevelExtension($report, 'mutation');
             $totals   = $this->arrayValue($mutation, 'totals');
-            $review   = $this->arrayValue($report, 'review');
+            $review   = $this->phpTopLevelExtension($report, 'review');
 
             self::assertEquals(50.0, $totals['msi'] ?? null);
             self::assertEqualsWithDelta(0.0, $this->floatValue($review, 'deltaScore'), 0.001);
@@ -72,11 +74,11 @@ final class BranchReviewMutationCliTest extends TestCase
     /**
      * Return a minimal Infection report with non-perfect mutation score.
      *
-     * @return string - JSON report fixture.
+     * @return string - Infection report with MSI 50 and both mutants outside the changed file.
      */
     private function infectionReportJson(): string
     {
-        // One killed and one escaped mutant pin msi to 50.0, the non-perfect score the delta-score assertion expects.
+        // A non-perfect MSI distinguishes the supplied mutation score from the expected zero branch delta.
         return <<<'JSON'
 {
   "stats": {
@@ -126,7 +128,7 @@ JSON;
      * @param Process $process - finished CLI process whose stdout must hold the report JSON; caller runs it first.
      *
      * @return array<string, mixed> - Decoded CLI report.
-     * @throws JsonException When CLI output is invalid JSON.
+     * @throws JsonException - When CLI output is invalid JSON.
      */
     private function decodeJson(Process $process): array
     {
@@ -138,10 +140,10 @@ JSON;
     /**
      * Read a nested string-keyed array from a payload.
      *
-     * @param array<string, mixed> $payload - Source payload.
+     * @param array<string, mixed> $payload - Payload containing the requested nested array.
      * @param string               $key     - key whose value must itself be a string-keyed array; missing key asserts.
      *
-     * @return array<string, mixed> - Nested payload.
+     * @return array<string, mixed> - Requested value after its array and string-key constraints pass.
      */
     private function arrayValue(array $payload, string $key): array
     {
@@ -149,12 +151,29 @@ JSON;
     }
 
     /**
+     * Read a PHP-owned v3 top-level extension from decoded analysis output.
+     *
+     * @param array<string, mixed> $payload - Decoded v3 analysis document.
+     * @param string               $key     - PHP extension key to read.
+     *
+     * @return array<string, mixed> - String-keyed array at extensions.php.topLevel[$key]; empty arrays are accepted.
+     */
+    private function phpTopLevelExtension(array $payload, string $key): array
+    {
+        $extensions    = $this->arrayValue($payload, 'extensions');
+        $phpExtensions = $this->arrayValue($extensions, 'php');
+        $topLevel      = $this->arrayValue($phpExtensions, 'topLevel');
+
+        return $this->arrayValue($topLevel, $key);
+    }
+
+    /**
      * Read a numeric value from a payload as float.
      *
-     * @param array<string, mixed> $payload - Source payload.
+     * @param array<string, mixed> $payload - Payload containing the requested numeric value.
      * @param string               $key     - key whose value must be int or float; a non-numeric value fails the test.
      *
-     * @return float - Numeric payload value.
+     * @return float - Requested integer or float normalized for float comparisons.
      */
     private function floatValue(array $payload, string $key): float
     {
@@ -168,9 +187,9 @@ JSON;
     /**
      * Assert a decoded JSON value is an array with string keys.
      *
-     * @param mixed $payload - decoded JSON value expected to be a JSON object; arrays and scalars fail the assertion.
+     * @param mixed $payload - Decoded value; scalars and arrays with integer keys fail, while empty arrays are accepted.
      *
-     * @return array<string, mixed> - String-keyed payload.
+     * @return array<string, mixed> - The same entries, after asserting that every key is a string.
      */
     private function stringKeyedArray(mixed $payload): array
     {
@@ -188,7 +207,7 @@ JSON;
     /**
      * Skip the current test when Git is unavailable.
      *
-     * @return void
+     * @return void - Skips the current test if git --version exits unsuccessfully.
      */
     private function skipWhenGitIsUnavailable(): void
     {
@@ -203,10 +222,10 @@ JSON;
     /**
      * Run a Git command in a fixture repository.
      *
-     * @param string $cwd - Working directory.
-     * @param string $args - Command arguments.
+     * @param string $cwd  - Fixture repository where the Git command runs.
+     * @param string $args - Git subcommand and arguments passed in order.
      *
-     * @return void
+     * @return void - Asserts that the Git command exits with code 0.
      */
     private function runGit(string $cwd, string ...$args): void
     {
@@ -219,7 +238,7 @@ JSON;
     /**
      * Create a temporary directory for filesystem assertions.
      *
-     * @return string - Fixture directory.
+     * @return string - Absolute path to the freshly created fixture directory.
      */
     private function tempDir(): string
     {
@@ -235,12 +254,12 @@ JSON;
      *
      * @param string $path - Filesystem path to delete.
      *
-     * @return void
+     * @return void - Attempts recursive removal; returns immediately when $path is not a directory.
      */
     private function removeDir(string $path): void
     {
         if (!is_dir($path)) {
-            // Nothing to clean up when the fixture directory was never created (e.g. an early test failure).
+
             return;
         }
 

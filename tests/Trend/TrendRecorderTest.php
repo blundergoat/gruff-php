@@ -12,8 +12,9 @@ use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
 /**
- * Covers trend history recording: previous-score delta computation, nested history bounding, missing-history handling, and rejection of invalid
- * payloads.
+ * Exercises persisted trend history through TrendRecorder::record().
+ * Checks same-scope deltas, legacy scope defaults, and missing or blank history.
+ * Checks nested history creation, snapshot fields, per-scope retention, and invalid payload rejection.
  *
  * @phpstan-type InvalidHistoryScalar bool|float|int|string
  * @phpstan-type InvalidHistoryNested array<array-key, InvalidHistoryScalar>
@@ -22,9 +23,9 @@ use RuntimeException;
 final class TrendRecorderTest extends TestCase
 {
     /**
-     * Verify record appends entry and calculates previous score delta.
+     * Verify a newly recorded score is compared with the existing history entry.
      *
-     * @return void
+     * @return void - Asserts the report path, both scores, their delta, and a two-entry history.
      */
     public function testRecordAppendsEntryAndCalculatesPreviousScoreDelta(): void
     {
@@ -57,7 +58,7 @@ final class TrendRecorderTest extends TestCase
     /**
      * Verify deltas compare only like-for-like scopes across mixed history entries.
      *
-     * @return void
+     * @return void - Asserts each scope's previous score and delta, plus the combined entry count.
      */
     public function testRecordComparesOnlySameScopeEntries(): void
     {
@@ -105,7 +106,7 @@ final class TrendRecorderTest extends TestCase
     /**
      * Verify a diff run against full-project-only history records its entry but reports no delta.
      *
-     * @return void
+     * @return void - Asserts null comparison values, two history entries, and a diff scope on the last entry.
      */
     public function testDiffRunAgainstFullProjectHistoryReportsNoDelta(): void
     {
@@ -138,7 +139,7 @@ final class TrendRecorderTest extends TestCase
     /**
      * Verify legacy entries without a scope field compare as full-project history.
      *
-     * @return void
+     * @return void - Asserts the previous score and delta using a history row without a scope field.
      */
     public function testLegacyEntriesWithoutScopeCompareAsFullProject(): void
     {
@@ -167,7 +168,7 @@ final class TrendRecorderTest extends TestCase
     /**
      * Verify record creates nested history, keeps the newest fifty entries, and persists scalar payloads.
      *
-     * @return void
+     * @return void - Asserts persisted snapshot fields, null initial comparisons, and retained history counts and endpoint scores.
      */
     public function testRecordCreatesNestedHistoryAndBoundsPersistedEntries(): void
     {
@@ -200,7 +201,7 @@ final class TrendRecorderTest extends TestCase
             $firstPersisted = $persisted[0] ?? null;
             self::assertIsArray($firstPersisted);
             self::assertCount(1, $persisted);
-            self::assertSame('gruff.analysis.v2', $firstPersisted['schemaVersion'] ?? null);
+            self::assertSame('gruff.analysis.v3', $firstPersisted['schemaVersion'] ?? null);
             self::assertSame(91, $firstPersisted['score'] ?? null);
             self::assertSame('A', $firstPersisted['grade'] ?? null);
             self::assertSame('full-project', $firstPersisted['scope'] ?? null);
@@ -228,7 +229,7 @@ final class TrendRecorderTest extends TestCase
     /**
      * Verify history retention keeps fifty snapshots for each score scope.
      *
-     * @return void
+     * @return void - Asserts fifty persisted entries per scope and the first and last score in each group.
      */
     public function testRecordBoundsPersistedEntriesPerScope(): void
     {
@@ -287,9 +288,9 @@ final class TrendRecorderTest extends TestCase
     }
 
     /**
-     * Verify record treats missing and empty history files as no prior score.
+     * Verify record reports no prior score for missing and whitespace-only history files.
      *
-     * @return void
+     * @return void - Asserts null previous scores and deltas for both missing and whitespace-only history.
      */
     public function testRecordTreatsMissingAndEmptyHistoryAsNoPriorScore(): void
     {
@@ -312,10 +313,10 @@ final class TrendRecorderTest extends TestCase
     /**
      * Verify record rejects invalid history JSON shapes.
      *
-     * @param InvalidHistoryPayload $historyPayload - Invalid history payload.
+     * @param InvalidHistoryPayload $historyPayload - Structure encoded into history.json to exercise validation failures.
      * @param string                $message - Expected exception message.
      *
-     * @return void
+     * @return void - Expects a RuntimeException containing the supplied message for the persisted payload.
      */
     #[DataProvider('invalidHistoryProvider')]
     public function testRecordRejectsInvalidHistoryPayloads(array $historyPayload, string $message): void
@@ -337,8 +338,7 @@ final class TrendRecorderTest extends TestCase
     /**
      * Provide invalid persisted history payloads.
      *
-     * @return iterable<string, array{0: InvalidHistoryPayload, 1: string}> - data-provider cases keyed by name, each pairing a malformed history
-     *                          payload with the exception message it must trigger
+     * @return iterable<string, array{0: InvalidHistoryPayload, 1: string}> - Named cases pairing malformed history with expected error text.
      */
     public static function invalidHistoryProvider(): iterable
     {
@@ -372,6 +372,10 @@ final class TrendRecorderTest extends TestCase
     private function score(float $score, string $scope = 'full-project'): ScoreReport
     {
         return new ScoreReport(
+            clusters:               [],
+            ruleAttribution:        [],
+            evaluatedFiles:         10,
+            scoredPillars:          [],
             composite:              Grade::fromScore($score),
             pillars:                [],
             topOffenders:           [],
@@ -398,14 +402,14 @@ final class TrendRecorderTest extends TestCase
     /**
      * Remove a temporary directory tree.
      *
-     * @param string $path - Filesystem path.
+     * @param string $path - Temporary directory to remove recursively; non-directory paths are ignored.
      *
-     * @return void
+     * @return void - Cleans up the tree without following child directory symlinks.
      */
     private function removeDir(string $path): void
     {
         if (!is_dir($path)) {
-            // Nothing to clean up when the path is absent, so stop the recursion here.
+
             return;
         }
 

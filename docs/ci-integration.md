@@ -13,13 +13,13 @@ jobs:
   analyse:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: shivammathur/setup-php@v2
         with:
           php-version: "8.3"
       - run: composer install --no-interaction --prefer-dist
       - run: vendor/bin/gruff-php analyse src --format sarif --fail-on none > gruff-php.sarif
-      - uses: github/codeql-action/upload-sarif@v3
+      - uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: gruff-php.sarif
 ```
@@ -34,27 +34,26 @@ vendor/bin/gruff-php analyse src tests --fail-on warning
 
 Use `--fail-on none` when the job should only publish reports.
 
-Project defaults can also live in `.gruff-php.yaml` under `minimumSeverity:`
-so CI invocations stay short and the threshold lives next to the rest of
-the analysis policy:
+Project defaults can also live in `.gruff-php.yaml` under `failOn:` so CI
+invocations stay short and the threshold lives next to the rest of the
+analysis policy:
 
 ```yaml
 schemaVersion: gruff-php.config.v0.1
-minimumSeverity:
+failOn:
   analyse: advisory
   report: none
   dashboard: none
 ```
 
-Precedence is `--fail-on` flag > YAML `minimumSeverity.<cmd>` > binary
-default. The CLI flag still wins when set, so per-job overrides remain
-unaffected. See
-[`docs/configuration.md`](configuration.md#minimum-severity) for the full
-rejection contract.
+Precedence is `--fail-on` flag > YAML `failOn.<cmd>` > binary default. The
+CLI flag still wins when set, so per-job overrides remain unaffected. See
+[`docs/configuration.md`](configuration.md#fail-on) for the full rejection
+contract.
 
-The `analyse` binary default is `advisory` in 0.2.0+. CI jobs that relied
-on the previous `error` floor must either pass `--fail-on error` or set
-`minimumSeverity.analyse: error` in the project config.
+By default, `analyse` fails on `advisory` findings and above. CI jobs that want
+to gate only on errors should pass `--fail-on error` or set `failOn.analyse: error`
+in `.gruff-php.yaml`.
 
 ## Baselines
 
@@ -69,26 +68,26 @@ Future scans auto-apply `gruff-baseline.json` when present. Use
 
 ## Diff Scans
 
-PHP supports changed-code workflows:
+Run changed-code checks on staged edits or against a base branch:
 
 ```sh
 vendor/bin/gruff-php analyse src --diff=staged --format github --fail-on warning
-vendor/bin/gruff-php analyse src --diff-vs=origin/main --changed-only --fail-on none
+vendor/bin/gruff-php analyse src --diff-base=origin/main --changed-only --fail-on none
 ```
 
-Document project-specific diff policy in the repository that runs the job.
+`--diff` filters current findings to changed lines or files, while `--diff-base`
+compares against a Git base-ref snapshot to isolate introduced findings.
 
 ## Ignored Paths
 
-`paths.ignore` is authoritative in every mode — including diff and explicit-path
-scans, the shapes a coding-agent hook uses. A matching path is excluded from
-analysis and produces no findings, so a hook that passes the agent's changed
-files never surfaces findings for code the project deliberately excluded.
-`--include-ignored` opts back into Git/default ignores only; it never overrides
-`paths.ignore`.
+`paths.ignore` is authoritative in every mode, including diff and explicit-path
+scans used by coding-agent hooks. Matching paths are skipped before analysis and
+produce no findings, so a hook passing changed files never reports on paths the
+project deliberately excluded. `--include-ignored` opts back into Git and
+default ignores only; it never overrides `paths.ignore`.
 
-Ask whether gruff would ignore a path — and why — without running an analysis,
-using `check-ignore`:
+Check whether `gruff-php` would ignore a path, and why, without running an
+analysis:
 
 ```sh
 vendor/bin/gruff-php check-ignore --format json src/App.php legacy/Old.php

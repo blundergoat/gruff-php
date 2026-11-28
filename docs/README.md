@@ -1,25 +1,30 @@
-# gruff-php docs
+# gruff-php Documentation
 
-Use these docs with the top-level README for the stable user-facing surface.
+Start with the [top-level README](../README.md) for installation and quick start, then use these guides for configuration, rules, and workflows.
 
-## Core Docs
+## Core Guides
 
-- [Configuration](configuration.md) - config discovery, schema, allowlists, selection, and rule overrides.
-- [Rules](rules.md) - rule IDs, severities, thresholds, and remediation guidance.
+- [Mission](mission.md) - why `gruff-php` exists and what its rules optimise for.
+- [Configuration](configuration.md) - config discovery, schema, presets, allowlists, selection, sensitive exclusions, and rule overrides.
+- [Rules](rules.md) - built-in rule catalogue, severities, confidence evidence, thresholds, and false-positive guidance.
 - [Output Formats](output-formats.md) - text, JSON, HTML, Markdown, GitHub annotations, hotspot, and SARIF.
-- [CI Integration](ci-integration.md) - GitHub Actions, SARIF upload, baselines, and diff scans.
-- [Dashboard](dashboard.md) - local dashboard flags and safety model.
-- [Releasing](releasing.md) - release checks and packaging notes.
+- [CI Integration](ci-integration.md) - GitHub Actions, SARIF upload, baselines, diff scans, and `check-ignore`.
+- [Dashboard](dashboard.md) - local browser dashboard flags and safety boundary.
+- [Upgrading](../UPGRADING.md) - what each release line breaks, migration steps, and how to roll back.
 
-## Extra Docs
+## Workflows and Reference
 
-- [Naming Conventions](naming-conventions.md) - cross-project naming notes that complement the workspace contract.
-- [CLI Agent Instructions](gruff-cli-agent-instructions.md) - agent-oriented PHP workflow.
-- [CLI Summary](gruff-cli-summary.md) - PHP CLI summary notes.
-- [Branch Review](gruff-cli-branch-review.md) - branch-review workflow notes.
+- [CLI Summary](gruff-cli-summary.md) - compact terminal and JSON digests with `gruff-php summary`.
+- [CLI Agent Instructions](gruff-cli-agent-instructions.md) - command quick-start for coding agents.
+- [Branch Review](gruff-cli-branch-review.md) - diff-base comparison workflow for reviewing introduced findings.
+- [Naming Conventions](naming-conventions.md) - cross-port rule ID and config naming conventions.
+
+## Maintainer Docs
+
+- [Releasing](releasing.md) - maintainer-only release checks, version bumps, and packaging notes.
 
 ## Shared Contract
 
-Cross-language naming and CLI expectations are summarized in
+Cross-language naming and CLI conventions are summarized in
 [Naming Conventions](naming-conventions.md#shared-contract). PHP keeps
 documented extensions for mutation and Infection workflows.

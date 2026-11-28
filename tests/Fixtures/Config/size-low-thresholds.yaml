@@ -18,6 +18,3 @@ rules:
     size.property-count:
         threshold: 3
         severity: warning
-    size.average-method-length:
-        threshold: 2
-        severity: warning

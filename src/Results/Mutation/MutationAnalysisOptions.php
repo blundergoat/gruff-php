@@ -5,27 +5,23 @@ declare(strict_types=1);
 namespace GruffPhp\Results\Mutation;
 
 /**
- * The mutation-analysis knobs for one `analyse` run, gathered into a single readonly value.
+ * Carries mutation-analysis settings from the command layer to the mutation builder.
+ * The report path identifies output to parse whether Infection runs now or the report already exists.
  *
- * A user turns mutation testing on and shapes it through flags and config - pointing at an existing
- * Infection report, asking gruff to run Infection itself, or naming the binary, config, baseline,
- * budget, and test-framework options. This object carries those choices from the command layer into
- * the mutation builder, so the run knows whether to read a report, shell out to Infection, or leave
- * mutation feedback out of the results entirely.
+ * A null report path disables analysis and causes dependent flags to be diagnosed.
  */
 final readonly class MutationAnalysisOptions
 {
     /**
-     * Captures every mutation input the user requested for this run, so the builder can act on their
-     * choices without re-reading command-line flags.
+     * Stores mutation report, runner, baseline, and budget choices for one analysis.
      *
-     * @param string|null $infectionReportPath - Existing Infection report to read; null when the user pointed at none, so gruff either runs Infection itself or skips mutation analysis.
-     * @param bool        $shouldRunInfection - True when the user asked gruff to invoke Infection directly rather than read a report they already generated.
-     * @param string      $infectionBin - Infection executable path or command name to launch when running it directly.
-     * @param string|null $infectionConfigPath - Infection config file to use; null leaves Infection to find its own default.
-     * @param string|null $infectionTestFrameworkOptions - Extra options forwarded to the test framework Infection drives; null when the user added none.
-     * @param string|null $mutationBaselinePath - Earlier report to compare against; null when the user set no baseline, so no score movement is shown.
-     * @param int|null    $mutationBudget - Most surviving mutants the run tolerates before it fails; null when the user set no budget, so survivors only report.
+     * @param string|null $infectionReportPath - Report to read after an optional run; null skips analysis and diagnoses dependent flags.
+     * @param bool $shouldRunInfection - Whether to launch Infection before reading the requested report.
+     * @param string $infectionBin - Executable path or command name used when launching Infection.
+     * @param string|null $infectionConfigPath - Explicit config; null uses project infection.json5 when present, otherwise Infection's default.
+     * @param string|null $infectionTestFrameworkOptions - Options forwarded to Infection's test framework; null or blank forwards none.
+     * @param string|null $mutationBaselinePath - Comparison report; null leaves score movement unavailable.
+     * @param int|null $mutationBudget - Maximum tolerated survivors; null disables the survivor-budget check.
      */
     public function __construct(
         public ?string $infectionReportPath,

@@ -19,7 +19,7 @@ final readonly class ThresholdMatch
     /**
      * Captures the threshold a measured value matched and the severity it earns.
      *
-     * @param int|float $threshold - Threshold value the measurement met or exceeded.
+     * @param int|float $threshold - Boundary strictly exceeded or fallen below, according to the rule's comparison direction.
      * @param Severity  $severity - Severity assigned because that threshold matched.
      */
     public function __construct(

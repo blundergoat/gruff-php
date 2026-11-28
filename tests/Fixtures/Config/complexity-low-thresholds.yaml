@@ -10,8 +10,10 @@ rules:
         threshold: 1
         severity: warning
     complexity.maintainability-index:
+        enabled: true
         threshold: 200
         severity: warning
     complexity.halstead-volume:
+        enabled: true
         threshold: 1
         severity: warning

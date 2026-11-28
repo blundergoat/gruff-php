@@ -28,7 +28,7 @@ final class MissingReadmeRule implements RuleInterface
      */
     public const ID = 'docs.missing-readme';
 
-    /** @var array<string, bool> */
+    /** @var array<string, bool> - Cached README presence checks keyed by project root. */
     private array $readmePresenceByRoot = [];
 
     /**
@@ -56,8 +56,8 @@ final class MissingReadmeRule implements RuleInterface
     /**
      * Emits a single finding when the project root has no README.md file.
      *
-     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Unused; README presence depends only on the project root.
+     * @param RuleContext  $ruleContext - Supplies the project root that is checked once for a README.md file.
      *
      * @return list<Finding> - Missing README finding, or an empty list.
      */
@@ -72,7 +72,7 @@ final class MissingReadmeRule implements RuleInterface
         $readmePresent = $this->readmePresenceByRoot[$root]
             ??= file_exists($root . '/README.md');
 
-        // A README already exists at the root, so there is nothing to report.
+
         if ($readmePresent) {
             return [];
         }

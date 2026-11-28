@@ -11,7 +11,7 @@ use GruffPhp\Results\Finding\RemediationAction;
 use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
-use GruffPhp\Rules\Complexity\CyclomaticComplexityRule;
+use GruffPhp\Rules\Complexity\FunctionComplexity;
 use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Shared\PhysicalCommentAttachment;
 use GruffPhp\Rules\Contracts\RuleContext;
@@ -46,8 +46,7 @@ final readonly class RegexCommentRule implements RuleInterface
     public const ID = 'docs.regex-comment';
 
     /**
-     * Regex function names that require a preceding explanation. Defaults cover the five common
-     * PCRE functions; projects can override via `defaultOptions.functionNames` to extend or narrow.
+     * Default PCRE functions requiring an explanation; configure rules.docs.regex-comment.options.functionNames to change the set.
      */
     private const REGEX_FUNCTIONS = [
         'preg_match',
@@ -62,7 +61,7 @@ final readonly class RegexCommentRule implements RuleInterface
      * The one-call ceiling prevents a broad function summary from hiding several
      * unrelated transformations that each need their own reviewer-facing purpose.
      *
-     * @var list<string>
+     * @var list<string> - Lowercase substrings accepted in the nearest callable's PHPDoc.
      */
     private const FUNCTION_DOC_KEYWORDS = ['regex', 'pattern', 'preg_'];
 
@@ -71,7 +70,7 @@ final readonly class RegexCommentRule implements RuleInterface
      * Hyphenated folding and explicit collapse/normalisation phrases keep the contract
      * deterministic without treating generic words such as safe or valid as documentation.
      *
-     * @var list<string>
+     * @var list<string> - Lowercase substrings accepted for a statically verified whitespace replacement.
      */
     private const WHITESPACE_CONTRACT_PHRASES = [
         'whitespace-fold',
@@ -102,7 +101,7 @@ final readonly class RegexCommentRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // functionNames defaults to the five PCRE calls; exposed via defaultOptions so projects can retarget it.
+
         return new RuleDefinition(
             id:                 self::ID,
             name:               'Regex comment',
@@ -133,12 +132,12 @@ final readonly class RegexCommentRule implements RuleInterface
     }
 
     /**
-     * Reports each configured regex matcher call that lacks a preceding explanatory comment.
+     * Reports configured regex calls not covered by a local comment, labelled match arm, or callable contract.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for configured regex functions.
      *
-     * @return list<Finding> - Findings for uncommented regex calls.
+     * @return list<Finding> - One finding per uncovered configured call; empty when no calls need findings.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -150,15 +149,15 @@ final readonly class RegexCommentRule implements RuleInterface
         $statementContexts      = [];
         $statementGroupCoverage = [];
 
-        // Weigh each function call in the file.
+
         foreach ($regexCallNodes as $regexCallNode) {
             $functionName = $this->functionName($regexCallNode);
-            // Only the configured regex functions are in scope.
+
             if ($functionName === null || !in_array($functionName, $functionNames, true)) {
                 continue;
             }
 
-            // Documented calls produce no finding, whichever ordered coverage route explains them.
+
             if ($this->coverageReason(
                 $sourceLines,
                 $analysisUnit->source,
@@ -195,6 +194,7 @@ final readonly class RegexCommentRule implements RuleInterface
 
     /**
      * Classifies the first deterministic documentation route covering one configured call.
+     *
      * @param list<string> $sourceLines    - Whole-file source split on newlines, indexed from zero.
      * @param string       $source         - Whole-file source used to prove physical owner-comment placement.
      * @param list<Stmt>   $rootStatements - Top-level statements used when the owner has no parent node.
@@ -203,7 +203,8 @@ final readonly class RegexCommentRule implements RuleInterface
      * @param FuncCall     $regexCallNode  - Configured call whose nearest user explanation is being resolved.
      * @param string       $functionName   - Lowercase configured function name used by callable contracts.
      * @param list<string> $functionNames  - Lowercase configured names used to bound broad callable contracts.
-     * @return 'immediate'|'statement_owner'|'statement_group'|'match_arm'|'function_contract'|null - First matching route, or null when the user still needs a finding.
+     *
+     * @return 'immediate'|'statement_owner'|'statement_group'|'match_arm'|'function_contract'|null - First matching route, or null if uncovered.
      */
     private function coverageReason(
         array $sourceLines,
@@ -215,7 +216,7 @@ final readonly class RegexCommentRule implements RuleInterface
         string $functionName,
         array $functionNames,
     ): ?string {
-        // A physical comment immediately above the call is the narrowest and oldest coverage route.
+        // Prefer a comment at the call site before checking broader documentation.
         if ($this->hasImmediateCommentAbove($sourceLines, $regexCallNode->getStartLine())) {
             return 'immediate';
         }
@@ -237,12 +238,12 @@ final readonly class RegexCommentRule implements RuleInterface
             return 'statement_group';
         }
 
-        // A string-labelled match arm names the condition without a duplicate inline comment.
+        // A string-literal match-arm result is treated as labelled context for its condition.
         if ($this->isInsideStringLabelledMatchArm($regexCallNode)) {
             return 'match_arm';
         }
 
-        // The existing callable contract is checked last so nearer source context always wins.
+        // Check callable-level coverage last so nearer source context always wins.
         if ($this->hasCallableContractCoveringCall($regexCallNode, $functionName, $functionNames)) {
             return 'function_contract';
         }
@@ -252,6 +253,7 @@ final readonly class RegexCommentRule implements RuleInterface
 
     /**
      * Reports whether the call's nearest statement has an own-line comment directly above it.
+     *
      * @param string   $source        - Whole-file source used to reject trailing same-line comments.
      * @param FuncCall $regexCallNode - Configured call whose statement owner is being checked.
      * @return bool - True only for a physically adjacent comment belonging to the nearest statement.
@@ -265,6 +267,7 @@ final readonly class RegexCommentRule implements RuleInterface
 
     /**
      * Reports whether a call belongs to a contiguous sibling run documented above its first regex statement.
+     *
      * @param string       $source         - Whole-file source used to prove own-line comment placement.
      * @param list<Stmt>   $rootStatements - Top-level statements used for file-scope statement groups.
      * @param array<int, array{siblings: list<Stmt>, index: int}|null> $statementContexts - Cached sibling context per statement id.
@@ -317,6 +320,7 @@ final readonly class RegexCommentRule implements RuleInterface
 
     /**
      * Resolves and caches the exact sibling list and index containing one statement.
+     *
      * @param Stmt       $statement      - Statement whose sibling boundary is required.
      * @param list<Stmt> $rootStatements - Top-level statement list for file-scope owners.
      * @param array<int, array{siblings: list<Stmt>, index: int}|null> $statementContexts - Context cache populated for each resolved sibling.
@@ -325,13 +329,13 @@ final readonly class RegexCommentRule implements RuleInterface
     private function statementContext(Stmt $statement, array $rootStatements, array &$statementContexts): ?array
     {
         $statementId = spl_object_id($statement);
-        // Previously resolved statements keep their exact list identity and source index.
+
         if (array_key_exists($statementId, $statementContexts)) {
             return $statementContexts[$statementId];
         }
         // Top-level statements use the analysis unit's root list because they have no parent node.
         foreach ($rootStatements as $rootStatement) {
-            // Finding the target proves that every root sibling can be cached together.
+
             if ($rootStatement === $statement) {
                 $this->cacheStatementContexts($rootStatements, $statementContexts);
 
@@ -355,7 +359,7 @@ final readonly class RegexCommentRule implements RuleInterface
             $containsStatement = false;
             // Mixed child arrays are not statement lists and must not form documentation groups.
             foreach ($subNode as $childNode) {
-                // One non-statement member disqualifies the whole candidate sibling list.
+
                 if (!$childNode instanceof Stmt) {
                     $siblings          = [];
                     $containsStatement = false;
@@ -365,7 +369,7 @@ final readonly class RegexCommentRule implements RuleInterface
                 $containsStatement = $containsStatement || $childNode === $statement;
             }
 
-            // The matching all-statement array defines the only eligible sibling boundary.
+
             if ($containsStatement) {
                 $this->cacheStatementContexts($siblings, $statementContexts);
 
@@ -377,14 +381,15 @@ final readonly class RegexCommentRule implements RuleInterface
     }
 
     /**
-     * Caches one statement list by object id so later calls resolve sibling context in constant time.
+     * Caches one statement list by object id so later calls can reuse its sibling context.
+     *
      * @param list<Stmt> $statements - Exact sibling list in source order.
      * @param array<int, array{siblings: list<Stmt>, index: int}|null> $statementContexts - Context cache populated in place.
-     * @return void
+     * @return void - Populates the context cache for every sibling.
      */
     private function cacheStatementContexts(array $statements, array &$statementContexts): void
     {
-        // Cache every sibling together so each statement list is scanned at most once.
+
         foreach ($statements as $index => $statement) {
             $statementContexts[spl_object_id($statement)] = ['siblings' => $statements, 'index' => $index];
         }
@@ -392,6 +397,7 @@ final readonly class RegexCommentRule implements RuleInterface
 
     /**
      * Reports whether one statement directly owns at least one configured regex call.
+     *
      * @param Stmt         $statement     - Sibling statement being considered for group membership.
      * @param list<string> $functionNames - Lowercase configured regex function names.
      * @return bool - True when a configured call resolves back to this exact nearest statement owner.
@@ -402,7 +408,7 @@ final readonly class RegexCommentRule implements RuleInterface
         // A group member must directly own a configured call, not merely contain one in a nested scope.
         foreach ($calls as $call) {
             $functionName = $this->functionName($call);
-            // Only configured calls whose nearest statement is this sibling qualify it for the group.
+
             if ($functionName !== null
                 && in_array($functionName, $functionNames, true)
                 && $this->nearestStatementOwner($call) === $statement) {
@@ -415,6 +421,7 @@ final readonly class RegexCommentRule implements RuleInterface
 
     /**
      * Reports whether one statement carries a physically adjacent own-line comment.
+     *
      * @param string $source    - Whole-file source used for physical placement checks.
      * @param Stmt   $statement - Statement whose attached comments are tested.
      * @return bool - True when any attached comment is its own line immediately above the statement.
@@ -423,7 +430,7 @@ final readonly class RegexCommentRule implements RuleInterface
     {
         // Parser-attached comments still need a physical own-line and adjacency check.
         foreach ($statement->getComments() as $comment) {
-            // The first qualifying attachment supplies reviewer-facing context for the statement.
+
             if (PhysicalCommentAttachment::isOwnLineImmediatelyAbove($comment, $statement, $source)) {
                 return true;
             }
@@ -445,12 +452,12 @@ final readonly class RegexCommentRule implements RuleInterface
 
         // Climb only within the call's own callable so outer statements cannot lend their comments inward.
         while ($parent instanceof Node) {
-            // A closure, arrow function, method, or function boundary ends ownership for this call.
+
             if ($parent instanceof FunctionLike) {
                 return null;
             }
 
-            // The first statement is the narrowest formatting owner visible to the user.
+
             if ($parent instanceof Stmt) {
                 return $parent;
             }
@@ -473,7 +480,7 @@ final readonly class RegexCommentRule implements RuleInterface
     {
         $previousLine = $sourceLines[$regexCallLine - 2] ?? null;
         if ($previousLine === null) {
-            // Call sits on the first line, so there is no line above it to carry an explanation.
+
             return false;
         }
 
@@ -491,7 +498,7 @@ final readonly class RegexCommentRule implements RuleInterface
     private function functionName(FuncCall $funcCall): ?string
     {
         if (!$funcCall->name instanceof Name) {
-            // A variable or expression callee has no static name to compare against the configured list.
+
             return null;
         }
 
@@ -500,51 +507,49 @@ final readonly class RegexCommentRule implements RuleInterface
     }
 
     /**
-     * Resolves the function or method symbol that encloses a regex call, or null at file scope.
+     * Resolves the nearest enclosing named function or method symbol, skipping closures and arrow functions.
      *
-     * @param Node $node - Regex call node; the walk starts here and climbs parents to find its enclosing callable.
+     * @param Node $node - Regex call node whose parents are searched for a named function or method.
      *
-     * @return string|null - Function or method symbol containing the regex call.
+     * @return string|null - Named ancestor's symbol, or null when no named function or method encloses the call.
      */
     private function symbol(Node $node): ?string
     {
         $parent = $node->getAttribute('parent');
 
-        // Climb the parent chain to the enclosing callable.
+
         while ($parent instanceof Node) {
             if ($parent instanceof ClassMethod || $parent instanceof Function_) {
-                // First enclosing callable found; its resolved symbol names the finding's location for the reader.
-                return CyclomaticComplexityRule::resolveSymbol($parent);
+
+                return FunctionComplexity::resolveSymbol($parent);
             }
 
             $parent = $parent->getAttribute('parent');
         }
 
-        // Call lives at file scope with no enclosing callable, so there is no symbol to attribute it to.
+
         return null;
     }
 
     /**
-     * Reports whether the regex call lives inside a `match (true)` arm whose key is a string-literal label.
-     *
-     * The string literal already acts as the human-readable explanation, so per-call comments would
-     * duplicate it. Requires at least one literal-string arm condition reachable from the call.
+     * Reports whether the call occurs in a match-arm condition with a string-literal result.
+     * A string-literal result is treated as context for the condition, so this rule does not require a separate comment.
      *
      * @param FuncCall $regexCallNode - Regex call under inspection; its ancestor match arms are scanned for a label.
      *
-     * @return bool - True when the call sits inside a string-labelled match arm.
+     * @return bool - True when an arm condition contains the call and the arm result is a string literal.
      */
     private function isInsideStringLabelledMatchArm(FuncCall $regexCallNode): bool
     {
         $parent = $regexCallNode->getAttribute('parent');
 
-        // Climb the parent chain looking for an owning match arm.
+
         while ($parent instanceof Node) {
             if ($parent instanceof MatchArm) {
-                // Check each condition of the arm.
+
                 foreach ($parent->conds ?? [] as $condition) {
                     if ($this->containsRegexCall($condition, $regexCallNode) && $parent->body instanceof Scalar\String_) {
-                        // The arm owning this call yields a string-literal label, which already names the regex.
+                        // A string-literal result is treated as context for the condition containing this call.
                         return true;
                     }
                 }
@@ -553,15 +558,12 @@ final readonly class RegexCommentRule implements RuleInterface
             $parent = $parent->getAttribute('parent');
         }
 
-        // No ancestor arm both owns the call and yields a string label, so the exemption does not apply.
+
         return false;
     }
 
     /**
-     * Reports whether a node subtree contains the exact target regex call.
-     *
-     * Used to confirm the surrounding match-arm condition actually owns the call we're about to emit a
-     * finding for.
+     * Reports whether a match-arm condition subtree contains the exact target regex call.
      *
      * @param Node     $condition - Match-arm condition subtree to search for the target call.
      * @param FuncCall $regexCallNode - Exact call node being matched by identity, not by structural equality.
@@ -571,11 +573,11 @@ final readonly class RegexCommentRule implements RuleInterface
     private function containsRegexCall(Node $condition, FuncCall $regexCallNode): bool
     {
         if ($condition === $regexCallNode) {
-            // The condition is the call itself, so no subtree walk is needed to confirm ownership.
+
             return true;
         }
 
-        // Otherwise the condition owns the call only if the exact same node instance appears somewhere below it.
+
         return (new NodeFinder())->findFirst(
             $condition,
             static fn (Node $node): bool => $node === $regexCallNode,
@@ -583,13 +585,13 @@ final readonly class RegexCommentRule implements RuleInterface
     }
 
     /**
-     * Reports whether the nearest callable carries a deterministic contract for this exact call.
+     * Reports whether the nearest callable docblock qualifies as context for this call under bounded syntactic checks.
      *
      * @param FuncCall     $regexCallNode - Configured call whose nearest callable docblock is examined.
      * @param string       $functionName - Lowercase call name used for explicit contract matching.
      * @param list<string> $functionNames - Configured names counted within the same callable scope.
      *
-     * @return bool - True for a proven whitespace fold or a one-call explicit regex contract.
+     * @return bool - True for a recognized literal whitespace-collapse shape or a one-call explicit regex contract.
      */
     private function hasCallableContractCoveringCall(
         FuncCall $regexCallNode,
@@ -598,21 +600,21 @@ final readonly class RegexCommentRule implements RuleInterface
     ): bool {
         $callable = $this->nearestCallable($regexCallNode);
 
-        // File-scope calls have no callable contract to explain their transformation.
+
         if ($callable === null) {
             return false;
         }
 
         $docComment = $callable->getDocComment();
 
-        // An undocumented callable cannot replace the required call-level explanation.
+
         if ($docComment === null) {
             return false;
         }
 
         $docText = strtolower($docComment->getText());
 
-        // A narrow prose contract applies only when this call visibly performs the promised fold.
+        // A narrow prose contract applies only when this call has the recognized literal collapse shape.
         if ($this->isWhitespaceCollapseCall($regexCallNode, $functionName)
             && $this->hasWhitespaceCollapseDescription($docText)) {
             return true;
@@ -627,7 +629,7 @@ final readonly class RegexCommentRule implements RuleInterface
 
         // The sole call is covered when the callable explicitly names regex behaviour or that function.
         foreach ($keywords as $keyword) {
-            // Generic prose without one of these explicit terms remains a finding for the user.
+
             if (str_contains($docText, $keyword)) {
                 return true;
             }
@@ -649,7 +651,7 @@ final readonly class RegexCommentRule implements RuleInterface
 
         // Stop at the first callable so an outer method cannot document a nested callback's call.
         while ($parent instanceof Node) {
-            // This is the contract boundary visible to the call under inspection.
+
             if ($parent instanceof FunctionLike) {
                 return $parent;
             }
@@ -673,7 +675,7 @@ final readonly class RegexCommentRule implements RuleInterface
         $callCount = 0;
         $calls     = (new NodeFinder())->findInstanceOf($callable, FuncCall::class);
 
-        // Count only statically named configured calls whose nearest callable is this exact node.
+
         foreach ($calls as $call) {
             $candidateName = $this->functionName($call);
 
@@ -691,16 +693,16 @@ final readonly class RegexCommentRule implements RuleInterface
     }
 
     /**
-     * Proves that a call replaces every static whitespace run with one literal space.
+     * Recognises the exact literal preg_replace shape that this rule treats as a whitespace collapse.
      *
      * @param FuncCall $regexCallNode - Call whose arguments are checked without evaluating user code.
      * @param string   $functionName - Resolved lowercase callee name.
      *
-     * @return bool - True only for the exact three-argument static collapse transformation.
+     * @return bool - True only for the exact three-argument literal shape recognized by this rule.
      */
     private function isWhitespaceCollapseCall(FuncCall $regexCallNode, string $functionName): bool
     {
-        // Other configured functions and limited replacements do not prove a complete fold.
+        // Other configured functions and limited replacements do not match the accepted whitespace-collapse shape.
         if ($functionName !== 'preg_replace'
             || count($regexCallNode->args) !== self::WHITESPACE_REPLACE_ARGUMENT_COUNT) {
             return false;
@@ -708,7 +710,7 @@ final readonly class RegexCommentRule implements RuleInterface
 
         $arguments = $this->whitespaceReplaceArguments($regexCallNode);
 
-        // Invalid, incomplete, or ambiguous argument mappings cannot prove the promised transformation.
+        // Invalid, incomplete, or ambiguous argument mappings do not match the accepted shape.
         if ($arguments === null) {
             return false;
         }
@@ -716,7 +718,7 @@ final readonly class RegexCommentRule implements RuleInterface
         $pattern     = $arguments['pattern']->value;
         $replacement = $arguments['replacement']->value;
 
-        // Literal pattern and replacement values are required so no runtime guess enters suppression.
+        // Literal pattern and replacement values keep this check limited to statically visible syntax.
         if (!$pattern instanceof Scalar\String_ || !$replacement instanceof Scalar\String_) {
             return false;
         }
@@ -738,9 +740,9 @@ final readonly class RegexCommentRule implements RuleInterface
         $nextPositionalSlot = 0;
         $hasNamedArgument   = false;
 
-        // Resolve source-order arguments into PHP's semantic parameter slots.
+
         foreach ($regexCallNode->args as $argument) {
-            // Placeholders and unpacking cannot prove three exact static argument values.
+            // Placeholders and unpacking prevent a definite mapping to all three parameter slots.
             if (!$argument instanceof Arg || $argument->unpack) {
                 return null;
             }
@@ -782,17 +784,17 @@ final readonly class RegexCommentRule implements RuleInterface
     }
 
     /**
-     * Matches the bounded plain-language phrases accepted for a proven whitespace fold.
+     * Matches the bounded plain-language phrases accepted for a statically recognized whitespace-collapse shape.
      *
      * @param string $docText - Lowercase nearest-callable PHPDoc text.
      *
-     * @return bool - True when the contract explicitly names folding, collapse, or normalisation.
+     * @return bool - True when the doc text contains an accepted folding, collapse, or normalisation phrase.
      */
     private function hasWhitespaceCollapseDescription(string $docText): bool
     {
-        // Each phrase is intentionally explicit enough to avoid generic safe or valid prose.
+
         foreach (self::WHITESPACE_CONTRACT_PHRASES as $phrase) {
-            // The first exact phrase is sufficient because the call shape was already proven.
+            // The first exact phrase is sufficient after the call has matched the required literal shape.
             if (str_contains($docText, $phrase)) {
                 return true;
             }

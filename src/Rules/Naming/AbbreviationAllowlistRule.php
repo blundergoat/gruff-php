@@ -11,7 +11,7 @@ use GruffPhp\Results\Finding\RemediationAction;
 use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
-use GruffPhp\Rules\Complexity\CyclomaticComplexityRule;
+use GruffPhp\Rules\Complexity\FunctionComplexity;
 use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
@@ -29,9 +29,8 @@ use PhpParser\Node\Stmt\Property;
  * Requires a short lowercase abbreviation to be declared in project config before it is accepted, so the
  * user builds an explicit, documented vocabulary instead of scattering ad-hoc short names.
  *
- * Kept deliberately separate from ShortVariableRule: a single-character variable is a local clarity problem,
- * while a 2-3 character abbreviation needs an explicit project vocabulary through
- * allowlists.acceptedAbbreviations. High confidence, advisory severity.
+ * Kept deliberately separate from ShortVariableRule: single-character names are a local clarity issue, while 2-3 character
+ * abbreviations need an explicit project vocabulary through `allowlists.acceptedAbbreviations`. High confidence, advisory severity.
  */
 final readonly class AbbreviationAllowlistRule implements RuleInterface
 {
@@ -43,6 +42,79 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
 
     /** Names that should never be treated as project abbreviations. */
     private const DEFAULT_IGNORED_NAMES = ['this'];
+
+    /**
+     * Common 2-3 letter English words and universal technical terms that are not project-specific abbreviations.
+     * Kept strictly disjoint from `AnalysisConfig::DEFAULT_ACCEPTED_ABBREVIATIONS` so omitting a seeded entry still takes effect.
+     *
+     * @var array<string, true>
+     */
+    private const BUILT_IN_NON_ABBREVIATIONS = [
+        // Common 2-letter English words (disjoint from db, fs, id, io, rx, tx, ui).
+        'am' => true, 'an' => true, 'as' => true, 'at' => true, 'be' => true, 'by' => true, 'do' => true, 'go' => true,
+        'he' => true, 'hi' => true, 'if' => true, 'in' => true, 'is' => true, 'it' => true, 'me' => true, 'my' => true,
+        'no' => true, 'of' => true, 'ok' => true, 'on' => true, 'or' => true, 'so' => true, 'to' => true, 'up' => true,
+        'us' => true, 'we' => true,
+        // Common 3-letter English words (disjoint from age, app, key, log, max, min, now, raw, url).
+        'act' => true, 'add' => true, 'aid' => true, 'aim' => true, 'air' => true, 'all' => true, 'and' => true, 'any' => true,
+        'arc' => true, 'are' => true, 'arm' => true, 'art' => true, 'ask' => true, 'bad' => true, 'bag' => true, 'ban' => true,
+        'bat' => true, 'bay' => true, 'bed' => true, 'bet' => true, 'bid' => true, 'big' => true, 'bit' => true, 'box' => true,
+        'boy' => true, 'bud' => true, 'bug' => true, 'bus' => true, 'but' => true, 'buy' => true, 'can' => true, 'cap' => true,
+        'car' => true, 'cop' => true, 'cow' => true, 'cry' => true, 'cup' => true, 'cut' => true, 'dad' => true, 'dam' => true,
+        'day' => true, 'den' => true, 'did' => true, 'die' => true, 'dig' => true, 'dim' => true, 'dip' => true, 'dog' => true,
+        'dot' => true, 'dry' => true, 'due' => true, 'dug' => true, 'ear' => true, 'eat' => true, 'egg' => true, 'end' => true,
+        'era' => true, 'eve' => true, 'eye' => true, 'fan' => true, 'far' => true, 'fat' => true, 'fax' => true, 'fed' => true,
+        'fee' => true, 'few' => true, 'fin' => true, 'fit' => true, 'fix' => true, 'fly' => true, 'fog' => true, 'for' => true,
+        'fox' => true, 'fun' => true, 'fur' => true, 'gap' => true, 'gas' => true, 'get' => true, 'god' => true, 'got' => true,
+        'gum' => true, 'gun' => true, 'gut' => true, 'guy' => true, 'gym' => true, 'had' => true, 'has' => true, 'hat' => true,
+        'her' => true, 'hid' => true, 'him' => true, 'hip' => true, 'his' => true, 'hit' => true, 'hop' => true, 'hot' => true,
+        'how' => true, 'hub' => true, 'hue' => true, 'hug' => true, 'hut' => true, 'ice' => true, 'icy' => true, 'ill' => true,
+        'ink' => true, 'inn' => true, 'ion' => true, 'its' => true, 'jam' => true, 'jar' => true, 'jaw' => true, 'jet' => true,
+        'job' => true, 'jog' => true, 'jot' => true, 'joy' => true, 'jug' => true, 'kid' => true, 'kin' => true, 'kit' => true,
+        'lab' => true, 'lad' => true, 'lag' => true, 'lap' => true, 'law' => true, 'lax' => true, 'lay' => true, 'led' => true,
+        'leg' => true, 'let' => true, 'lid' => true, 'lie' => true, 'lip' => true, 'lit' => true, 'lot' => true, 'low' => true,
+        'mad' => true, 'man' => true, 'map' => true, 'mat' => true, 'may' => true, 'men' => true, 'met' => true, 'mid' => true,
+        'mix' => true, 'mob' => true, 'mom' => true, 'mop' => true, 'mud' => true, 'mug' => true, 'nap' => true, 'net' => true,
+        'new' => true, 'nil' => true, 'nod' => true, 'nor' => true, 'not' => true, 'nut' => true, 'oak' => true, 'oar' => true,
+        'oat' => true, 'odd' => true, 'off' => true, 'oft' => true, 'oil' => true, 'old' => true, 'one' => true, 'orb' => true,
+        'ore' => true, 'our' => true, 'out' => true, 'ova' => true, 'owe' => true, 'owl' => true, 'own' => true, 'pad' => true,
+        'pal' => true, 'pan' => true, 'par' => true, 'pat' => true, 'paw' => true, 'pay' => true, 'pea' => true, 'peg' => true,
+        'pen' => true, 'pep' => true, 'per' => true, 'pet' => true, 'pew' => true, 'pie' => true, 'pig' => true, 'pin' => true,
+        'pit' => true, 'ply' => true, 'pod' => true, 'pop' => true, 'pot' => true, 'pry' => true, 'pug' => true, 'pun' => true,
+        'pup' => true, 'put' => true, 'rag' => true, 'ram' => true, 'ran' => true, 'rap' => true, 'rat' => true, 'ray' => true,
+        'red' => true, 'rib' => true, 'rid' => true, 'rig' => true, 'rim' => true, 'rip' => true, 'rob' => true, 'rod' => true,
+        'roe' => true, 'rot' => true, 'row' => true, 'rub' => true, 'rug' => true, 'rum' => true, 'run' => true, 'rut' => true,
+        'rye' => true, 'sad' => true, 'sag' => true, 'sap' => true, 'sat' => true, 'saw' => true, 'say' => true, 'sea' => true,
+        'see' => true, 'set' => true, 'sew' => true, 'sex' => true, 'she' => true, 'shy' => true, 'sin' => true, 'sip' => true,
+        'sir' => true, 'sis' => true, 'sit' => true, 'six' => true, 'ski' => true, 'sky' => true, 'sly' => true, 'sob' => true,
+        'sod' => true, 'son' => true, 'sop' => true, 'sot' => true, 'sow' => true, 'soy' => true, 'spa' => true, 'spy' => true,
+        'sty' => true, 'sue' => true, 'sum' => true, 'sun' => true, 'sup' => true, 'tag' => true, 'tan' => true, 'tap' => true,
+        'tar' => true, 'tat' => true, 'tax' => true, 'tea' => true, 'ten' => true, 'the' => true, 'thy' => true, 'tic' => true,
+        'tie' => true, 'tin' => true, 'tip' => true, 'toe' => true, 'ton' => true, 'too' => true, 'top' => true, 'tot' => true,
+        'tow' => true, 'toy' => true, 'try' => true, 'tub' => true, 'tug' => true, 'two' => true, 'urn' => true, 'use' => true,
+        'van' => true, 'vat' => true, 'vet' => true, 'vex' => true, 'via' => true, 'vie' => true, 'vow' => true, 'wad' => true,
+        'wag' => true, 'wan' => true, 'war' => true, 'was' => true, 'wax' => true, 'way' => true, 'web' => true, 'wed' => true,
+        'wee' => true, 'wet' => true, 'who' => true, 'why' => true, 'wig' => true, 'win' => true, 'wit' => true, 'woe' => true,
+        'wok' => true, 'won' => true, 'woo' => true, 'wow' => true, 'wry' => true, 'yak' => true, 'yam' => true, 'yap' => true,
+        'yaw' => true, 'yea' => true, 'yes' => true, 'yet' => true, 'yew' => true, 'yin' => true, 'yip' => true, 'you' => true,
+        'zap' => true, 'zed' => true, 'zen' => true, 'zip' => true, 'zoo' => true,
+        // Universal technical terms and plurals (disjoint from the 16 seeded words and domain abbreviations like dob/dto/utc).
+        'api' => true, 'cli' => true, 'css' => true, 'csv' => true, 'dns' => true, 'dom' => true, 'env' => true, 'eof' => true,
+        'ftp' => true, 'git' => true, 'hex' => true, 'ids' => true, 'ip' => true, 'iso' => true, 'jwt' => true, 'pdf' => true,
+        'php' => true, 'png' => true, 'rsa' => true, 'sha' => true, 'sms' => true, 'sql' => true, 'ssh' => true, 'ssl' => true,
+        'svg' => true, 'tcp' => true, 'tls' => true, 'ttl' => true, 'udp' => true, 'uri' => true, 'utf' => true, 'www' => true,
+        'xml' => true, 'yml' => true,
+    ];
+
+    /**
+     * Returns the built-in short English words and universal technical terms exempted from abbreviation findings.
+     *
+     * @return list<string> - Lowercase non-abbreviation names exempted without requiring allowlists.acceptedAbbreviations.
+     */
+    public static function builtInNonAbbreviations(): array
+    {
+        return array_keys(self::BUILT_IN_NON_ABBREVIATIONS);
+    }
 
     /**
      * Describes the abbreviation-allowlist rule for the registry and reports.
@@ -70,12 +142,12 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     }
 
     /**
-     * Reports undeclared lowercase abbreviations on properties, parameters, and locals.
+     * Reports unapproved lowercase names in the configured abbreviation band on properties, parameters, and locals.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context carrying accepted abbreviations.
      *
-     * @return list<Finding> - one finding per undeclared abbreviation; empty when every short name is sanctioned
+     * @return list<Finding> - One per matching property, parameter, or distinct local name per scope; may be empty.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -86,7 +158,8 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
         $accepted   = $this->lowercaseList($ruleContext->config->acceptedAbbreviations());
         $findings   = [];
 
-        // Check every declared property in the file.
+
+        // Check every class property declaration for unapproved short lowercase names.
         foreach (NodeIndex::nodesOf($analysisUnit, Property::class) as $property) {
             array_push(
                 $findings,
@@ -102,7 +175,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
             );
         }
 
-        // Check parameters and locals across every function-like scope.
+        // Check every function, method, closure, and arrow-function scope for unapproved parameter and local names.
         foreach ((new FunctionLikeScopeWalker())->scopes($analysisUnit->statements) as $scope) {
             array_push(
                 $findings,
@@ -127,7 +200,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
      * @param RuleDefinition $definition - Rule metadata used to populate emitted findings.
      * @param AnalysisUnit   $analysisUnit - Parsed unit that owns the property declaration.
      * @param Property       $property - Property statement whose individual props are inspected.
-     * @param list<string>   $ignored - Lowercased built-in names that are never reported.
+     * @param list<string>   $ignored - Lowercased names excluded by the ignoredNames option.
      * @param list<string>   $accepted - Lowercased project abbreviations that suppress findings.
      * @param int            $minLength - Inclusive lower bound for abbreviation length.
      * @param int            $maxLength - Inclusive upper bound for abbreviation length.
@@ -157,7 +230,8 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
                 minLength:    $minLength,
                 maxLength:    $maxLength,
             );
-            // Keep the property only when its name is an undeclared abbreviation.
+
+            // Collect the finding only when the property name falls in the abbreviation band and is not allowed.
             if ($finding instanceof Finding) {
                 $findings[] = $finding;
             }
@@ -172,7 +246,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
      * @param RuleDefinition    $definition - Rule metadata used to populate emitted findings.
      * @param AnalysisUnit      $analysisUnit - Parsed unit that owns the callable scope.
      * @param FunctionLikeScope $scope - Callable scope whose parameters and locals are inspected.
-     * @param list<string>      $ignored - Lowercased built-in names that are never reported.
+     * @param list<string>      $ignored - Lowercased names excluded by the ignoredNames option.
      * @param list<string>      $accepted - Lowercased project abbreviations that suppress findings.
      * @param int               $minLength - Inclusive lower bound for abbreviation length.
      * @param int               $maxLength - Inclusive upper bound for abbreviation length.
@@ -216,7 +290,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
      * @param RuleDefinition    $definition - Rule metadata used to populate emitted findings.
      * @param AnalysisUnit      $analysisUnit - Parsed unit that owns the callable scope.
      * @param FunctionLikeScope $scope - Callable scope whose parameters are inspected.
-     * @param list<string>      $ignored - Lowercased built-in names that are never reported.
+     * @param list<string>      $ignored - Lowercased names excluded by the ignoredNames option.
      * @param list<string>      $accepted - Lowercased project abbreviations that suppress findings.
      * @param int               $minLength - Inclusive lower bound for abbreviation length.
      * @param int               $maxLength - Inclusive upper bound for abbreviation length.
@@ -235,9 +309,10 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
         $findings = [];
         $symbol   = $this->symbol($scope);
 
-        // Weigh each declared parameter.
+
+        // Inspect each parameter in declaration order for unapproved short abbreviations.
         foreach ($scope->node->params as $param) {
-            // Skip anything without a plain string name.
+            // Skip malformed or dynamic parameter nodes without a static variable name.
             if (!$param->var instanceof Variable || !is_string($param->var->name)) {
                 continue;
             }
@@ -252,7 +327,8 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
                 minLength:    $minLength,
                 maxLength:    $maxLength,
             );
-            // Keep the parameter only when its name is an undeclared abbreviation.
+
+            // Collect the finding only when the parameter name falls in the abbreviation band and is not allowed.
             if ($finding instanceof Finding) {
                 $findings[] = $finding;
             }
@@ -267,7 +343,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
      * @param RuleDefinition    $definition - Rule metadata used to populate emitted findings.
      * @param AnalysisUnit      $analysisUnit - Parsed unit that owns the callable scope.
      * @param FunctionLikeScope $scope - Callable scope whose locals are inspected.
-     * @param list<string>      $ignored - Lowercased built-in names that are never reported.
+     * @param list<string>      $ignored - Lowercased names excluded by the ignoredNames option.
      * @param list<string>      $accepted - Lowercased project abbreviations that suppress findings.
      * @param int               $minLength - Inclusive lower bound for abbreviation length.
      * @param int               $maxLength - Inclusive upper bound for abbreviation length.
@@ -287,9 +363,10 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
         $symbol       = $this->symbol($scope);
         $exemptLocals = $this->exemptLocalNames($scope);
 
-        // Weigh each local the scope declares.
+
+        // Inspect each non-exempt local variable in discovery order for unapproved short abbreviations.
         foreach ($scope->localVariables as $name => $variable) {
-            // Skip a conventional loop or catch variable.
+            // Variables used by loop headers and catch clauses are exempt from abbreviation findings.
             if (isset($exemptLocals[$name])) {
                 continue;
             }
@@ -304,7 +381,8 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
                 minLength:    $minLength,
                 maxLength:    $maxLength,
             );
-            // Keep the local only when its name is an undeclared abbreviation.
+
+            // Collect the finding only when the local variable name falls in the abbreviation band and is not allowed.
             if ($finding instanceof Finding) {
                 $findings[] = $finding;
             }
@@ -314,24 +392,18 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     }
 
     /**
-     * Builds a finding for one identifier, or null when it passes every abbreviation gate.
+     * Builds a finding for an unapproved name in the configured abbreviation band.
      *
-     * @param RuleDefinition                                         $definition - Rule metadata supplying id, severity, and tier for any finding
-     *                                                                             raised.
-     * @param AnalysisUnit                                           $analysisUnit - Parsed unit, used only for its display path on the emitted
-     *                                                                             finding.
-     * @param Node                                                   $node - Declaration node whose start line the finding points at.
-     * @param array{kind: string, name: string, symbol: string|null} $identifier - Kind label, raw name, and owning
-     *                                                                             symbol; symbol is null for top-level locals.
-     * @param list<string>                                           $ignored - Lowercased built-in names that are never reported (e.g. this).
-     * @param list<string>                                           $accepted - Lowercased project vocabulary from acceptedAbbreviations that
-     *                                                                             suppresses a finding.
-     * @param int                                                    $minLength - Inclusive lower bound; shorter names fall to ShortVariableRule
-     *                                                                             instead.
-     * @param int                                                    $maxLength - Inclusive upper bound; longer names are treated as real words, not
-     *                                                                             abbreviations.
+     * @param RuleDefinition $definition - Metadata applied to an emitted finding.
+     * @param AnalysisUnit $analysisUnit - Supplies the finding's display path.
+     * @param Node $node - Supplies the finding's start line.
+     * @param array{kind: string, name: string, symbol: string|null} $identifier - Kind label, raw name, and symbol copied to the finding.
+     * @param list<string> $ignored - Lowercased names excluded by the ignoredNames option.
+     * @param list<string> $accepted - Lowercased project abbreviations exempted by configuration.
+     * @param int $minLength - Inclusive lower length bound; shorter names are skipped.
+     * @param int $maxLength - Inclusive upper length bound; longer names are skipped.
      *
-     * @return Finding|null - a finding for an undeclared abbreviation; null when out of scope or sanctioned
+     * @return Finding|null - A finding for an unapproved lowercase alphabetic name in the length band; otherwise null.
      */
     private function finding(
         RuleDefinition $definition,
@@ -347,20 +419,24 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
         $name      = $identifier['name'];
         $symbol    = $identifier['symbol'];
         $lowerName = strtolower($name);
-        // Only lowercase alphabetic identifiers can contain unapproved short abbreviations.
+        // This rule judges only lowercase alphabetic identifiers as short abbreviations.
         if ($lowerName !== $name || !preg_match('/^[a-z]+$/', $name)) {
             // Mixed-case or non-alphabetic names are out of scope; null means "not an abbreviation", not "approved".
             return null;
         }
 
         $length = strlen($name);
+        // Names shorter than minLength (handled by short-variable) or longer than maxLength are outside this rule's band.
         if ($length < $minLength || $length > $maxLength) {
-            // Outside the configured abbreviation length band, so this name is somebody else's concern.
             return null;
         }
 
-        if (in_array($lowerName, $ignored, true) || in_array($lowerName, $accepted, true)) {
-            // The name is built-in (this) or declared project vocabulary, so it is sanctioned and produces no finding.
+        // Skip explicitly ignored names, project-configured abbreviations, and built-in everyday English/tech words.
+        if (
+            in_array($lowerName, $ignored, true)
+            || in_array($lowerName, $accepted, true)
+            || isset(self::BUILT_IN_NON_ABBREVIATIONS[$lowerName])
+        ) {
             return null;
         }
 
@@ -383,7 +459,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     }
 
     /**
-     * Reads a positive integer rule option, falling back when configuration is not numeric.
+     * Reads an integer length option, clamping it to at least one or using the supplied default.
      *
      * @param RuleContext    $ruleContext - Source of resolved settings for this rule.
      * @param RuleDefinition $definition - Rule whose settings bag the option is read from.
@@ -396,7 +472,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     {
         $optionValue = $ruleContext->settingsFor($definition)->option($name);
 
-        // Clamp to at least 1 so a misconfigured zero or negative length can never match every name.
+
         return is_int($optionValue) ? max(1, $optionValue) : $default;
     }
 
@@ -405,15 +481,16 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
      *
      * @param FunctionLikeScope $scope - Scope whose body is scanned for loop and catch variable declarations.
      *
-     * @return array<string, true> - set of loop and catch variable names exempt from findings, keyed for fast lookup
+     * @return array<string, true> - Loop and catch variable names exempt from findings, keyed for membership checks.
      */
     private function exemptLocalNames(FunctionLikeScope $scope): array
     {
         $names = [];
 
-        // Scan the scope body for loop and catch declarations.
+
+        // Scan body descendants once to collect loop-counter and catch-variable exemptions for this callable.
         foreach ($scope->bodyDescendants as $scopeNode) {
-            // A for, foreach, or catch introduces conventional variable names.
+            // Variables used by loop headers and catch clauses are exempt from abbreviation findings.
             if ($scopeNode instanceof For_ || $scopeNode instanceof Foreach_ || $scopeNode instanceof Catch_) {
                 $this->collectExemptLocalNames($scopeNode, $names);
             }
@@ -428,7 +505,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
      * @param Node                $node - Loop or catch node to inspect; other node kinds contribute nothing.
      * @param array<string, true> $names - Accumulator mutated in place; matched variable names are added as keys.
      *
-     * @return void
+     * @return void - Updates $names with the collected exemption names.
      */
     private function collectExemptLocalNames(Node $node, array &$names): void
     {
@@ -437,10 +514,11 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
             $this->collectVariableNames($node->init, $names);
         }
 
-        // A foreach binds its value, and optionally its key.
+        // Foreach value and optional key variables (including destructured targets) stay exempt from abbreviation findings.
         if ($node instanceof Foreach_) {
             $foreachVariables = [$node->valueVar];
-            // Include the key variable when the loop declares one.
+
+            // Include the optional foreach key expression when the loop declares one.
             if ($node->keyVar instanceof Node) {
                 $foreachVariables[] = $node->keyVar;
             }
@@ -448,7 +526,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
             $this->collectVariableNames($foreachVariables, $names);
         }
 
-        // A catch clause names its exception variable.
+        // Catch variables such as `$ex` are idiomatic exception handles and stay exempt.
         if ($node instanceof Catch_ && $node->var instanceof Variable && is_string($node->var->name)) {
             $names[$node->var->name] = true;
         }
@@ -460,32 +538,32 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
      * @param array<Node>         $nodes - Loop init or foreach key/value nodes to walk for variable references.
      * @param array<string, true> $names - Accumulator mutated in place; each discovered variable name is added as a key.
      *
-     * @return void
+     * @return void - Adds string-named variable references from the supplied subtrees to $names.
      */
     private function collectVariableNames(array $nodes, array &$names): void
     {
-        // Walk each supplied node.
+        // Walk each root expression in the loop header so nested destructuring patterns are captured too.
         foreach ($nodes as $node) {
             $this->collectVariableName($node, $names);
         }
     }
 
     /**
-     * Records a local variable name when the node is a variable reference.
+     * Collects string-named variable references from the node and its descendants.
      *
      * @param Node                $node - Node to test and then recurse into; only string-named variables are recorded.
      * @param array<string, true> $names - Accumulator mutated in place; each discovered variable name is added as a key.
      *
-     * @return void
+     * @return void - Adds discovered variable names to $names without removing existing entries.
      */
     private function collectVariableName(Node $node, array &$names): void
     {
-        // Record a plainly named variable.
+        // Record plain variable names while ignoring dynamic variable-variables.
         if ($node instanceof Variable && is_string($node->name)) {
             $names[$node->name] = true;
         }
 
-        // Recurse into the node's children to reach nested variables.
+        // Recurse into direct child AST nodes to capture variables inside array destructuring or compound init clauses.
         foreach ($this->childNodes($node) as $child) {
             $this->collectVariableName($child, $names);
         }
@@ -502,7 +580,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     {
         $children = [];
 
-        // Flatten every sub-node slot the parser exposes for this node.
+        // Inspect each AST sub-node property declared by php-parser for this node type.
         foreach ($node->getSubNodeNames() as $name) {
             $this->collectChildNodes($node->{$name}, $children);
         }
@@ -516,22 +594,22 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
      * @param mixed      $subNode - A sub-node slot value: a Node, an array of them, or a scalar that is skipped.
      * @param list<Node> $children - Accumulator mutated in place; discovered Node instances are appended.
      *
-     * @return void
+     * @return void - Appends Node instances to $children, flattening arrays without visiting node descendants.
      */
     private function collectChildNodes(mixed $subNode, array &$children): void
     {
+        // A single node is a leaf for this pass; stop so we do not descend past the immediate children.
         if ($subNode instanceof Node) {
             $children[] = $subNode;
-            // A single node is a leaf for this pass; stop so we do not descend past the immediate children.
             return;
         }
 
+        // Ignore scalar attributes and null slots because they cannot contain nested AST nodes.
         if (!is_array($subNode)) {
-            // Scalars and nulls hold no child nodes, so there is nothing to collect.
             return;
         }
 
-        // An array slot can hold several children, so recurse into each entry.
+        // Flatten nested sub-node arrays (for example, list items or statement blocks) into the child list.
         foreach ($subNode as $childSubNode) {
             $this->collectChildNodes($childSubNode, $children);
         }
@@ -542,13 +620,13 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
      *
      * @param FunctionLikeScope $scope - Scope whose node determines whether a real name or a synthetic label is used.
      *
-     * @return string - the qualified name for a method or function, or a kind@line label for a closure or arrow fn
+     * @return string - A method or function label from resolveSymbol(), otherwise a kind@line label.
      */
     private function symbol(FunctionLikeScope $scope): string
     {
-        // Named callables resolve to their declared symbol.
+        // Named methods and functions report their real declared symbol rather than an anonymous line marker.
         if ($scope->node instanceof ClassMethod || $scope->node instanceof Function_) {
-            return CyclomaticComplexityRule::resolveSymbol($scope->node);
+            return FunctionComplexity::resolveSymbol($scope->node);
         }
 
         // Closures and arrow functions have no name, so fall back to a kind@line label.

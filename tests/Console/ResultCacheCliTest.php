@@ -7,9 +7,9 @@ namespace GruffPhp\Tests\Console;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers the on-disk result cache: a warm run is byte-identical to a cold run,
- * --no-cache reproduces the same output, editing a file invalidates its entry,
- * and runs with project rules bypass the cache entirely.
+ * Covers the on-disk result cache through repeated scans and --no-cache output comparisons.
+ * Checks cache-directory creation and finding counts after corrupt entries and a file edit.
+ * Also compares bounded and unbounded scan reports when the deep-scan budget changes.
  */
 final class ResultCacheCliTest extends CliTestCase
 {
@@ -21,7 +21,7 @@ final class ResultCacheCliTest extends CliTestCase
     /**
      * Build a temporary project with one finding-bearing file and one clean file.
      *
-     * @return void
+     * @return void - Creates the temporary project and writes its README and two PHP fixtures.
      */
     protected function setUp(): void
     {
@@ -34,7 +34,7 @@ final class ResultCacheCliTest extends CliTestCase
     /**
      * Remove the temporary fixture.
      *
-     * @return void
+     * @return void - Removes the per-test project tree when it exists.
      */
     protected function tearDown(): void
     {
@@ -42,9 +42,9 @@ final class ResultCacheCliTest extends CliTestCase
     }
 
     /**
-     * Verify a warm run reproduces a cold run byte-for-byte and populates the cache.
+     * Verify the first scan creates the cache directory and the next scan emits identical stdout.
      *
-     * @return void
+     * @return void - Asserts first-run success, cache-directory existence and byte-identical scan stdout.
      */
     public function testWarmRunIsByteIdenticalToCold(): void
     {
@@ -58,9 +58,9 @@ final class ResultCacheCliTest extends CliTestCase
     }
 
     /**
-     * Verify a structurally invalid cache entry fails open to a cold scan.
+     * Verify scanning after cache rows are corrupted succeeds and reports one finding.
      *
-     * @return void
+     * @return void - Asserts exit code zero and one finding after corrupting the cached finding rows.
      */
     public function testInvalidCacheFindingRowsAreTreatedAsMisses(): void
     {
@@ -73,9 +73,9 @@ final class ResultCacheCliTest extends CliTestCase
     }
 
     /**
-     * Verify --no-cache produces output identical to a cached run.
+     * Verify --no-cache preserves stdout from a scan with caching enabled.
      *
-     * @return void
+     * @return void - Asserts byte-identical stdout with caching enabled and with --no-cache.
      */
     public function testNoCacheMatchesCachedOutput(): void
     {
@@ -86,16 +86,16 @@ final class ResultCacheCliTest extends CliTestCase
     }
 
     /**
-     * Verify editing a file invalidates only its cache entry (no stale serve).
+     * Verify adding an eval call to the clean file increases the reported finding count from one to two.
      *
-     * @return void
+     * @return void - Asserts one finding before the edit and two afterward.
      */
     public function testEditingAFileInvalidatesItsEntry(): void
     {
         $before = $this->decodeFindings($this->runScan());
         self::assertCount(1, $before);
 
-        // Introduce a second security finding in the previously clean file.
+
         $this->writeProjectFile('src/Clean.php', $this->cleanSource(true));
         $after = $this->decodeFindings($this->runScan());
 
@@ -103,16 +103,16 @@ final class ResultCacheCliTest extends CliTestCase
     }
 
     /**
-     * Verify a default no-config run writes the per-file cache now that no registered rule needs project context.
+     * Verify an unprofiled scan with the explicit rule configuration creates the cache directory.
      *
-     * @return void
+     * @return void - Asserts successful execution and cache-directory existence with the explicit configuration.
      */
     public function testDefaultRunWritesCacheWithNoProjectRulesRegistered(): void
     {
-        // No --profile: since the project rules were retired the default rule set has no
-        // ProjectRuleInterface implementor, so the cache guard passes and entries are written.
+        // Omit --profile to exercise cache-directory creation beyond the security-only scans.
+
         $process = new Process(
-            [PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'analyse', 'src', '--no-config', '--fail-on', 'none', '--format', 'json'],
+            [PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'analyse', 'src', '--config', self::PROJECT_ROOT . '/tests/Fixtures/Config/enable-default-off-rules.yaml', '--fail-on', 'none', '--format', 'json'],
             $this->project,
         );
         $process->run();
@@ -122,9 +122,87 @@ final class ResultCacheCliTest extends CliTestCase
     }
 
     /**
+     * Verify repeated bounded scans emit identical stdout with a bounded-scan diagnostic.
+     * Disabling the budget must remove diagnostics and report the dangerous eval call.
+     *
+     * @return void - Asserts bounded output stability and an unbounded report with no diagnostics and the dangerous-call finding.
+     */
+    public function testDeepScanBudgetParticipatesInCacheIdentity(): void
+    {
+        $project = self::PROJECT_ROOT . '/tests/runtime-gruff-cache-' . bin2hex(random_bytes(6));
+        self::assertTrue(mkdir($project . '/src', 0777, true));
+        self::assertNotFalse(file_put_contents($project . '/README.md', "Cache budget fixture.\n"));
+        self::assertNotFalse(file_put_contents(
+            $project . '/src/Danger.php',
+            "<?php\n\$key = 'AKIAQ7R2M8N4P6T9V1X3';\neval(\$_GET['code']);\n",
+        ));
+
+        try {
+            $boundedArguments = [
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff-php',
+                'analyse',
+                '--config', self::PROJECT_ROOT . '/tests/Fixtures/Config/enable-default-off-rules.yaml',
+                '--profile',
+                'security',
+                '--format',
+                'json',
+                '--fail-on',
+                'none',
+                '--deep-scan-budget',
+                '1:1',
+                'src/Danger.php',
+            ];
+            $cold = new Process($boundedArguments, $project);
+            $cold->run();
+            $warm = new Process($boundedArguments, $project);
+            $warm->run();
+
+            self::assertSame(0, $cold->getExitCode(), $cold->getErrorOutput());
+            self::assertSame($cold->getOutput(), $warm->getOutput());
+            $boundedReport      = $this->decodeJsonOutput($warm);
+            $boundedDiagnostics = $boundedReport['diagnostics'] ?? null;
+            self::assertIsArray($boundedDiagnostics);
+            $boundedDiagnostic = $boundedDiagnostics[0] ?? null;
+            self::assertIsArray($boundedDiagnostic);
+            self::assertSame('bounded-deep-scan', $boundedDiagnostic['type'] ?? null);
+
+            $unbounded = new Process([
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff-php',
+                'analyse',
+                '--config', self::PROJECT_ROOT . '/tests/Fixtures/Config/enable-default-off-rules.yaml',
+                '--profile',
+                'security',
+                '--format',
+                'json',
+                '--fail-on',
+                'none',
+                '--deep-scan-budget',
+                'off',
+                'src/Danger.php',
+            ], $project);
+            $unbounded->run();
+            $unboundedReport   = $this->decodeJsonOutput($unbounded);
+            $unboundedFindings = $unboundedReport['findings'] ?? null;
+            self::assertIsArray($unboundedFindings);
+            $ruleIds = [];
+            foreach ($unboundedFindings as $index => $finding) {
+                self::assertIsArray($finding, sprintf('unbounded finding %s is not an array', (string)$index));
+                $ruleIds[] = $finding['ruleId'] ?? null;
+            }
+
+            self::assertSame([], $unboundedReport['diagnostics'] ?? null);
+            self::assertContains('security.dangerous-function-call', $ruleIds);
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+
+    /**
      * Prime the cache and replace each cache entry with an invalid finding row.
      *
-     * @return void
+     * @return void - Overwrites the non-empty set of JSON cache entries with structurally invalid findings.
      */
     private function writeInvalidCacheEntries(): void
     {
@@ -151,9 +229,9 @@ final class ResultCacheCliTest extends CliTestCase
     }
 
     /**
-     * Run a cache-eligible security-profile scan, returning the completed process.
+     * Run a security-profile scan, returning the completed process.
      *
-     * @param list<string> $extraArgs - Additional CLI arguments.
+     * @param list<string> $extraArgs - Arguments appended to the fixed analyse command.
      *
      * @return Process - Completed analyse process.
      */
@@ -161,7 +239,7 @@ final class ResultCacheCliTest extends CliTestCase
     {
         $process = new Process(
             array_merge(
-                [PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'analyse', 'src', '--no-config', '--profile', 'security', '--fail-on', 'none', '--format', 'json'],
+                [PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'analyse', 'src', '--config', self::PROJECT_ROOT . '/tests/Fixtures/Config/enable-default-off-rules.yaml', '--profile', 'security', '--fail-on', 'none', '--format', 'json'],
                 $extraArgs,
             ),
             $this->project,
@@ -176,7 +254,7 @@ final class ResultCacheCliTest extends CliTestCase
      *
      * @param Process $process - Completed analyse process whose stdout holds the JSON report.
      *
-     * @return list<mixed> - Findings list.
+     * @return list<mixed> - Reindexed findings; empty for non-array reports or absent or null findings.
      */
     private function decodeFindings(Process $process): array
     {
@@ -191,7 +269,7 @@ final class ResultCacheCliTest extends CliTestCase
     /**
      * Source for a file carrying one security finding (a dynamic eval call).
      *
-     * @return string - PHP source.
+     * @return string - Fixture source whose dynamic eval call supplies the initial security finding.
      */
     private function dangerSource(): string
     {
@@ -203,7 +281,7 @@ final class ResultCacheCliTest extends CliTestCase
      *
      * @param bool $shouldIncludeFinding - Whether to include a dynamic eval call.
      *
-     * @return string - PHP source.
+     * @return string - Fixture source with an add() method and an optional dynamic eval call.
      */
     private function cleanSource(bool $shouldIncludeFinding): string
     {
@@ -217,10 +295,10 @@ final class ResultCacheCliTest extends CliTestCase
     /**
      * Write a fixture file, creating parent directories as needed.
      *
-     * @param string $path - Project-relative file path.
-     * @param string $contents - File contents.
+     * @param string $path     - Project-relative file path.
+     * @param string $contents - Complete replacement contents for the fixture file.
      *
-     * @return void
+     * @return void - Creates missing parent directories and writes or replaces the fixture file.
      */
     private function writeProjectFile(string $path, string $contents): void
     {

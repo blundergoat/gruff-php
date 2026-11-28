@@ -9,15 +9,16 @@ use GruffPhp\Rules\RuleRegistry;
 use GruffPhp\Rules\Size\FileLengthRule;
 
 /**
- * Covers ConfigLoader compatibility with configs naming unknown rule ids: blocks for retired or mistyped rules are skipped instead of failing the
- * load.
+ * Exercises loading configuration files containing unknown or retired rule IDs.
+ * Checks that the fixture IDs are absent from the default registry and loading still succeeds.
+ * Asserts that the registered file-length rule remains enabled.
  */
 final class ConfigLoaderUnknownRuleIdTest extends ConfigLoaderTestCase
 {
     /**
      * Verify unknown rule ids in a rules block are ignored without failing the load.
      *
-     * @return void
+     * @return void - Asserts size.nope is unregistered and loading leaves the file-length rule enabled.
      */
     public function testIgnoresUnknownRuleIdsInRulesBlock(): void
     {
@@ -29,14 +30,14 @@ final class ConfigLoaderUnknownRuleIdTest extends ConfigLoaderTestCase
             $registry,
         );
 
-        // The unknown block is dropped; registered rules keep their registry defaults.
+
         self::assertTrue($config->ruleSettings(FileLengthRule::ID)->enabled);
     }
 
     /**
-     * Verify a config still carrying every retired project-rule block loads as registry defaults.
+     * Verify retired project-rule blocks load without disabling the registered file-length rule.
      *
-     * @return void
+     * @return void - Asserts the fixture's retired IDs are unregistered and the file-length rule stays enabled.
      */
     public function testIgnoresRetiredProjectRuleBlocks(): void
     {

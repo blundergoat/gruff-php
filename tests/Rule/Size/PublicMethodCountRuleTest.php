@@ -16,7 +16,9 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers public-method-count thresholds: allowed shapes pass and excessive counts emit a warning.
+ * Checks public-method-count findings using parsed size fixtures.
+ * Allowed cases cover counts at or below the warning threshold and ignored interfaces.
+ * An excessive-count case asserts one warning with the expected rule, symbol, and count.
  */
 final class PublicMethodCountRuleTest extends TestCase
 {
@@ -26,9 +28,9 @@ final class PublicMethodCountRuleTest extends TestCase
     private PhpFileParser $parser;
 
     /**
-     * Prepare parser fixtures before each rule test.
+     * Create the rule and parser used by each test.
      *
-     * @return void
+     * @return void - Initializes fresh rule and parser instances.
      */
     protected function setUp(): void
     {
@@ -39,10 +41,10 @@ final class PublicMethodCountRuleTest extends TestCase
     /**
      * Verify allowed public method shapes are not flagged.
      *
-     * @param string             $fixture - Fixture filename.
-     * @param array<string, int> $thresholds - Rule thresholds.
+     * @param string             $fixture - Filename under tests/Fixtures/Size to analyse.
+     * @param array<string, int> $thresholds - Warning and error public-method limits passed to the rule.
      *
-     * @return void
+     * @return void - Asserts that the configured fixture produces no findings.
      */
     #[DataProvider('allowedPublicMethodShapeProvider')]
     public function testAllowedPublicMethodShapesAreNotFlagged(string $fixture, array $thresholds): void
@@ -55,11 +57,12 @@ final class PublicMethodCountRuleTest extends TestCase
     /**
      * Verify warning for too many public methods.
      *
-     * @return void
+     * @return void - Asserts one warning for the expected rule and symbol, with a public-method count of 16.
      */
     public function testWarningForTooManyPublicMethods(): void
     {
-        $findings = $this->analyse('many-public-methods.php', ['warning' => 15, 'error' => 25]);
+        // Sixteen public methods exceed the 1.5-times boundary for a limit of 10, so the matched warning severity is retained.
+        $findings = $this->analyse('many-public-methods.php', ['warning' => 10, 'error' => 25]);
 
         self::assertCount(1, $findings);
         self::assertSame(PublicMethodCountRule::ID, $findings[0]->ruleId);
@@ -69,7 +72,7 @@ final class PublicMethodCountRuleTest extends TestCase
     }
 
     /**
-     * Analyse fixture paths and return findings for assertions.
+     * Analyse one fixture and return findings for assertions.
      *
      * @param string             $fixture - Fixture filename under tests/Fixtures/Size to scan.
      * @param array<string, int> $thresholds - Warning/error public-method-count limits for this case.
@@ -90,7 +93,7 @@ final class PublicMethodCountRuleTest extends TestCase
     }
 
     /**
-     * Provide fixture and threshold combinations that should stay below the rule limit.
+     * Provide no-finding cases for public method counts, excluded visibility, and ignored interfaces.
      *
      * @return iterable<string, array{0: string, 1: array<string, int>}> - named cases pairing a fixture filename with its warning/error thresholds
      */
@@ -104,7 +107,7 @@ final class PublicMethodCountRuleTest extends TestCase
     /**
      * Parse the named fixture into an analysis unit.
      *
-     * @param string $filename - Fixture filename.
+     * @param string $filename - Filename under tests/Fixtures/Size to parse.
      *
      * @return \GruffPhp\Engine\Parser\AnalysisUnit - parsed fixture with a repo-relative display path for finding reports
      */

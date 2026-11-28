@@ -10,7 +10,9 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Locks the FailThreshold parser and trigger contract.
+ * Covers exact CLI threshold parsing and severity-trigger decisions.
+ * Checks canonical values against their enum cases and rejects the listed unsupported inputs.
+ * Exercises each threshold against advisory, warning, and error severities.
  */
 final class FailThresholdTest extends TestCase
 {
@@ -20,7 +22,7 @@ final class FailThresholdTest extends TestCase
      * @param string        $rawInput - Raw CLI value supplied to FailThreshold::fromInput.
      * @param FailThreshold $expected - Enum case the parser must return for the canonical value.
      *
-     * @return void
+     * @return void - Asserts that the canonical input resolves to the expected enum case.
      */
     #[DataProvider('canonicalValuesProvider')]
     public function testFromInputAcceptsCanonicalValue(string $rawInput, FailThreshold $expected): void
@@ -33,7 +35,7 @@ final class FailThresholdTest extends TestCase
      *
      * @param string $rawInput - Raw CLI value the parser must reject as unsupported.
      *
-     * @return void
+     * @return void - Asserts that the supplied unsupported input resolves to null.
      */
     #[DataProvider('rejectedValuesProvider')]
     public function testFromInputRejectsBannedValue(string $rawInput): void
@@ -44,11 +46,11 @@ final class FailThresholdTest extends TestCase
     /**
      * isTriggeredBy returns the documented value for every threshold/severity pair.
      *
-     * @param FailThreshold $threshold - Threshold under test.
+     * @param FailThreshold $threshold - Fail threshold compared with the supplied finding severity.
      * @param Severity      $severity - Finding severity compared against the threshold.
      * @param bool          $shouldTrigger - Expected isTriggeredBy result for this pair.
      *
-     * @return void
+     * @return void - Asserts the expected trigger result for the supplied threshold and severity.
      */
     #[DataProvider('triggerMatrixProvider')]
     public function testIsTriggeredBy(FailThreshold $threshold, Severity $severity, bool $shouldTrigger): void
@@ -59,8 +61,7 @@ final class FailThresholdTest extends TestCase
     /**
      * Canonical CLI fail-on values paired with the enum case the parser must return.
      *
-     * @return iterable<string, array{string, FailThreshold}> - one data row per canonical CLI fail-on value, each pairing the raw input with the
-     *                          enum case the parser must return; covers all four cases
+     * @return iterable<string, array{string, FailThreshold}> - Named canonical inputs paired with their expected enum cases.
      */
     public static function canonicalValuesProvider(): iterable
     {
@@ -73,8 +74,7 @@ final class FailThresholdTest extends TestCase
     /**
      * Inputs the parser must reject as unsupported (banned aliases, case variants, empty string).
      *
-     * @return iterable<string, array{string}> - one data row per input the parser must reject (banned aliases, case variants, empty string), each
-     *                          wrapping the single raw value expected to yield null
+     * @return iterable<string, array{string}> - Named unsupported inputs, each wrapped as one argument.
      */
     public static function rejectedValuesProvider(): iterable
     {
@@ -96,8 +96,7 @@ final class FailThresholdTest extends TestCase
     /**
      * Every (threshold, severity) pair paired with the documented isTriggeredBy result.
      *
-     * @return iterable<string, array{FailThreshold, Severity, bool}> - one data row per (threshold, severity) combination, each carrying the pair
-     *                          and the expected isTriggeredBy outcome; covers the full matrix
+     * @return iterable<string, array{FailThreshold, Severity, bool}> - Threshold/severity pairs and their expected trigger results.
      */
     public static function triggerMatrixProvider(): iterable
     {

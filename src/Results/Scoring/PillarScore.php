@@ -5,13 +5,10 @@ declare(strict_types=1);
 namespace GruffPhp\Results\Scoring;
 
 /**
- * One quality pillar's line in the score breakdown - its grade, its finding counts by severity, and
- * the penalty those findings cost.
+ * One quality pillar's score-report row, carrying applicability, an optional grade, severity counts, and penalty.
+ * Static pillars use finding weights; the mutation pillar uses the mutation score.
  *
- * The score report grades each pillar (naming, security, complexity, ...) on its own, so a user can
- * see exactly where their code is strong and where it slips. This readonly row carries that per-pillar
- * verdict: whether the pillar even applied to this run, its letter grade and score when it did, how
- * many findings of each severity landed against it, and the penalty they added up to.
+ * An applicable static pillar can remain ungraded when no files were evaluated.
  */
 final readonly class PillarScore
 {
@@ -19,13 +16,13 @@ final readonly class PillarScore
      * Captures one pillar's grade, severity tallies, and penalty for the score breakdown.
      *
      * @param string     $pillar - Pillar identifier this row scores (for example 'security' or 'naming').
-     * @param bool       $applicable - False when no rule in this pillar applied to the run, so the pillar is listed but not graded.
-     * @param Grade|null $grade - Letter grade and score for the pillar; null when the pillar was inapplicable, so the report shows "n/a" rather than a misleading zero.
+     * @param bool       $applicable - Whether this pillar applies; false when an included mutation pillar lacks a report.
+     * @param Grade|null $grade - Optional grade; null for an inapplicable pillar or a static pillar with no evaluated files.
      * @param int        $findings - Total findings counted against the pillar.
      * @param int        $advisory - Advisory-severity findings in the pillar.
      * @param int        $warning - Warning-severity findings in the pillar.
      * @param int        $error - Error-severity findings in the pillar.
-     * @param float      $penalty - Total score penalty these findings cost the pillar.
+     * @param float      $penalty - Summed finding weights for static analysis, or the nonnegative MSI shortfall from 100 for mutation.
      */
     public function __construct(
         public string $pillar,
@@ -52,8 +49,7 @@ final readonly class PillarScore
      *     warning: int,
      *     error: int,
      *     penalty: float
-     * } - report-ready snapshot of this pillar; score and grade are null when the pillar is inapplicable, and penalty is rounded to 2 decimals to
-     * match report precision.
+     * } - Report row; an inapplicable pillar has null score and grade, and penalty is rounded to two decimals.
      */
     public function toArray(): array
     {

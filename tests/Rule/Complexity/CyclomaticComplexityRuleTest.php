@@ -12,13 +12,11 @@ use GruffPhp\Rules\Complexity\CyclomaticComplexityRule;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\RuleRegistry;
 use GruffPhp\Engine\Source\SourceFile;
-use PhpParser\Node\Stmt\ClassMethod;
-use PhpParser\NodeFinder;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers cyclomatic complexity counting on fixtures plus warning and error threshold transitions for individual methods.
+ * Covers the cyclomatic rule on fixtures: its dispatch-once count, warning and error thresholds, bodyless declarations and
+ * flat guard clauses. FunctionComplexityTest covers the shared count it starts from.
  */
 final class CyclomaticComplexityRuleTest extends TestCase
 {
@@ -28,9 +26,9 @@ final class CyclomaticComplexityRuleTest extends TestCase
     private PhpFileParser $parser;
 
     /**
-     * Prepare parser fixtures before each rule test.
+     * Give each test an independent cyclomatic-complexity rule and parser.
      *
-     * @return void
+     * @return void - Installs a fresh rule and parser for the next test.
      */
     protected function setUp(): void
     {
@@ -39,57 +37,34 @@ final class CyclomaticComplexityRuleTest extends TestCase
     }
 
     /**
-     * Provide method ccn cases for parameterized tests.
+     * Verify reported complexity is 2 for switch and match, and 3 for the if/elseif chain.
      *
-     * @return array<string, array{string, int}> - data rows keyed by case label, each pairing a fixture method name with its expected cyclomatic
-     *                       count
+     * @return void - Asserts dispatch and branch counts in the rule's reported metadata.
      */
-    public static function methodCcnProvider(): array
+    public function testRuleCountsEachDispatchOnce(): void
     {
-        return [
-            'flat method'         => ['flat', 1],
-            'if/elseif'           => ['ifElseIf', 3],
-            'loop with condition' => ['loopWithCondition', 4],
-            'switch block'        => ['switchBlock', 4],
-            'match block'         => ['matchBlock', 4],
-            'mixed operators'     => ['mixedOperators', 7],
-            'try/catch loop'      => ['tryCatchLoop', 4],
-        ];
-    }
+        $findings = $this->analyse('cyclomatic.php', ['warning' => 1, 'error' => 20]);
+        $reported = [];
 
-    /**
-     * Verify cyclomatic count matches expected.
-     *
-     * @param string $methodName - Fixture method name.
-     * @param int    $expectedCcn - Expected cyclomatic complexity.
-     *
-     * @return void
-     */
-    #[DataProvider('methodCcnProvider')]
-    public function testCyclomaticCountMatchesExpected(string $methodName, int $expectedCcn): void
-    {
-        $unit       = $this->parseFixture('cyclomatic.php');
-        $nodeFinder = new NodeFinder();
-        $methods    = $nodeFinder->findInstanceOf($unit->statements, ClassMethod::class);
-
-        $method = null;
-
-        foreach ($methods as $candidateMethod) {
-            if ($candidateMethod->name->toString() === $methodName) {
-                $method = $candidateMethod;
-
-                break;
-            }
+        foreach ($findings as $finding) {
+            $reported[(string) $finding->symbol] = $finding->metadata;
         }
 
-        self::assertNotNull($method, sprintf('Method %s not found in fixture.', $methodName));
-        self::assertSame($expectedCcn, CyclomaticComplexityRule::computeCyclomaticComplexity($method));
+        $byMethod = static fn (string $method): array => array_values(array_filter(
+            $reported,
+            static fn (string $symbol): bool => str_contains($symbol, '::' . $method . '('),
+            ARRAY_FILTER_USE_KEY,
+        ))[0] ?? [];
+
+        self::assertSame(2, $byMethod('switchBlock')['complexity'] ?? null, 'three cases and a default are one decision');
+        self::assertSame(2, $byMethod('matchBlock')['complexity'] ?? null, 'three arm conditions are one decision');
+        self::assertSame(3, $byMethod('ifElseIf')['complexity'] ?? null, 'an if/elseif chain keeps one point per branch');
     }
 
     /**
-     * Verify no findings for simple methods.
+     * Require simple.php to produce no cyclomatic-complexity findings at warning 10 and error 20.
      *
-     * @return void
+     * @return void - Asserts that the simple fixture produces no findings at the supplied cutoffs.
      */
     public function testNoFindingsForSimpleMethods(): void
     {
@@ -99,9 +74,9 @@ final class CyclomaticComplexityRuleTest extends TestCase
     }
 
     /**
-     * Verify warning for method above threshold.
+     * Verify every reported method exceeds the warning cutoff and belongs to the cyclomatic rule.
      *
-     * @return void
+     * @return void - Asserts rule identity and counts above three; it does not assert severity.
      */
     public function testWarningForMethodAboveThreshold(): void
     {
@@ -123,7 +98,7 @@ final class CyclomaticComplexityRuleTest extends TestCase
     /**
      * Verify error for method above error threshold.
      *
-     * @return void
+     * @return void - Asserts that at least one reported method reaches Error severity.
      */
     public function testErrorForMethodAboveErrorThreshold(): void
     {
@@ -135,40 +110,9 @@ final class CyclomaticComplexityRuleTest extends TestCase
     }
 
     /**
-     * Verify hasExecutableBody separates bodyless signatures from real bodies (P6).
+     * Verify only the concrete method reports at a zero warning cutoff, which would flag every measured declaration.
      *
-     * This is the shared predicate the cyclomatic, cognitive, and nesting-depth
-     * rules use to skip declarations with no control flow, so a regression here
-     * would let any of them measure an abstract or interface method.
-     *
-     * @return void
-     */
-    public function testHasExecutableBodyDistinguishesBodylessSignatures(): void
-    {
-        $unit       = $this->parseFixture('bodyless.php');
-        $nodeFinder = new NodeFinder();
-        $methods    = $nodeFinder->findInstanceOf($unit->statements, ClassMethod::class);
-
-        $hasBodyByName = [];
-        foreach ($methods as $method) {
-            $hasBodyByName[$method->name->toString()] = CyclomaticComplexityRule::hasExecutableBody($method);
-        }
-
-        self::assertFalse($hasBodyByName['declaredCount'] ?? null, 'Interface method has no body.');
-        self::assertFalse($hasBodyByName['abstractTotal'] ?? null, 'Abstract method has no body.');
-        self::assertTrue($hasBodyByName['concreteTotal'] ?? null, 'Concrete method has a body.');
-    }
-
-    /**
-     * Verify bodyless declarations are skipped even at a zero threshold (P6).
-     *
-     * A warning threshold of 0 would flag every measured node, since base
-     * cyclomatic complexity is 1, so without the bodyless guard the abstract and
-     * interface methods would each report a finding. Only the concrete method is
-     * reported, proving the rule filters bodyless signatures rather than leaning
-     * on "no body folds to baseline complexity".
-     *
-     * @return void
+     * @return void - Asserts that bodyless signatures are omitted from the reported symbols.
      */
     public function testBodylessDeclarationsAreNotMeasured(): void
     {
@@ -182,7 +126,7 @@ final class CyclomaticComplexityRuleTest extends TestCase
     /**
      * Verify flat guard-clause validators are advisory while nested decision trees stay severe.
      *
-     * @return void
+     * @return void - Asserts shape metadata and severity for flat guards and nested branching.
      */
     public function testFlatGuardClauseComplexityIsAdvisoryButNestedLogicStaysSevere(): void
     {
@@ -203,7 +147,7 @@ final class CyclomaticComplexityRuleTest extends TestCase
     /**
      * Verify flat fall-through branches that do work (not early-exit guards) keep their branching severity.
      *
-     * @return void
+     * @return void - Asserts that a flat fall-through builder retains Warning severity and branching metadata.
      */
     public function testFlatFallThroughBranchesAreNotDowngradedToAdvisory(): void
     {
@@ -215,7 +159,7 @@ final class CyclomaticComplexityRuleTest extends TestCase
         }
 
         // telemetryBuilder is flat but falls through (no return/throw/exit), so it is branching complexity
-        // rather than a guard clause and must not be downgraded to advisory regardless of branch count.
+        // rather than a guard clause and must not be downgraded to advisory at these thresholds.
         self::assertSame(Severity::Warning, $bySymbol['GuardClauseComplexityFixture::telemetryBuilder()']->severity ?? null);
         self::assertSame('branching', $bySymbol['GuardClauseComplexityFixture::telemetryBuilder()']->metadata['complexityShape'] ?? null);
     }
@@ -224,8 +168,7 @@ final class CyclomaticComplexityRuleTest extends TestCase
      * Analyse complexity fixtures and return findings for assertions.
      *
      * @param string             $fixture    - fixture filename under Fixtures/Complexity to parse and run.
-     * @param array<string, int> $thresholds - warning/error cutoffs keyed by level; sets where the rule starts
-     *                                       emitting, so a test can force or suppress findings on the same fixture.
+     * @param array<string, int> $thresholds - Warning/error cutoffs controlling which fixture methods report.
      *
      * @return list<\GruffPhp\Results\Finding\Finding> - findings the rule emits under those thresholds, to assert on.
      */
@@ -244,7 +187,7 @@ final class CyclomaticComplexityRuleTest extends TestCase
     /**
      * Parse the named fixture into an analysis unit.
      *
-     * @param string $filename - Fixture filename.
+     * @param string $filename - File to load from tests/Fixtures/Complexity.
      *
      * @return \GruffPhp\Engine\Parser\AnalysisUnit - parsed fixture carrying the repo-relative display path the rule reports findings against
      */

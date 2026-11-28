@@ -10,35 +10,39 @@ use GruffPhp\Engine\Source\SourceDiscoveryResult;
 use GruffPhp\Engine\Source\SourceFile;
 
 /**
- * The parsed sources for one analysis run - units, diagnostics, and discovery metadata.
+ * Carries discovery metadata, diagnostics, and file counts for one analysis run.
  *
- * Sits between source loading and rule execution: it holds the parsed `AnalysisUnit`s the rules
- * inspect, the diagnostics (like parse errors) surfaced to the user, and the discovery result behind
- * the "N discovered / parsed / ignored / missing" counts shown in the summary and report.
+ * Batch runs retain analysis units; streaming runs can supply counts after releasing those units.
+ * Parsed-file coverage includes text inputs. Only PHP files that received structural analysis count toward the score.
  */
 final readonly class AnalysisSourceSet
 {
     /**
-     * Cached count for streaming flows that release each unit's AST before
-     * the source set is constructed.
+     * Cached count for streaming flows that release each unit's AST before the source set is constructed.
      */
     private ?int $explicitParsedFileCount;
+
+    /** Ratified scoring denominator captured at parse time, when the units themselves were released. */
+    private ?int $explicitEvaluatedFileCount;
 
     /**
      * Bundles one run's discovered files and parsed units with the counts the user ultimately sees.
      *
-     * @param SourceDiscoveryResult $discovery       - Discovery result for the requested paths.
-     * @param list<AnalysisUnit>    $analysisUnits   - Parsed analysis units, possibly released.
-     * @param list<RunDiagnostic>   $diagnostics     - Diagnostics emitted while loading sources.
-     * @param int|null              $parsedFileCount - Pre-computed parsed-file count for streaming flows; null derives it live from the units.
+     * @param SourceDiscoveryResult $discovery          - Discovery result for the requested paths.
+     * @param list<AnalysisUnit>    $analysisUnits      - Parsed analysis units, possibly released.
+     * @param list<RunDiagnostic>   $diagnostics        - Diagnostics emitted while loading sources.
+     * @param int|null              $parsedFileCount    - Pre-computed parsed-file count for streaming flows; null derives it live from the units.
+     * @param int|null              $evaluatedFileCount - Pre-computed eligible PHP-file count for streaming flows; null derives it live.
      */
     public function __construct(
         public SourceDiscoveryResult $discovery,
         public array $analysisUnits,
         public array $diagnostics,
         ?int $parsedFileCount = null,
+        ?int $evaluatedFileCount = null,
     ) {
-        $this->explicitParsedFileCount = $parsedFileCount;
+        $this->explicitParsedFileCount    = $parsedFileCount;
+        $this->explicitEvaluatedFileCount = $evaluatedFileCount;
     }
 
     /**
@@ -55,9 +59,32 @@ final readonly class AnalysisSourceSet
     }
 
     /**
-     * Counts the files gruff actually parsed, feeding the "N parsed" figure in the summary and report.
+     * Counts PHP inputs that reached structural analysis for the scoring denominator.
+     * Text-only and bounded inputs still contribute to parsedFileCount().
      *
-     * @return int - Number of units without parse diagnostics.
+     * @return int - The streaming count or the number of retained PHP units with a complete parse.
+     */
+    public function evaluatedFileCount(): int
+    {
+        // Streaming flows release each unit after parsing it, so the count captured then is all there is.
+        if ($this->explicitEvaluatedFileCount !== null) {
+            return $this->explicitEvaluatedFileCount;
+        }
+
+        return count(array_filter(
+            $this->analysisUnits,
+            static fn (AnalysisUnit $analysisUnit): bool => $analysisUnit->file->isPhp()
+                && !$analysisUnit->hasParseErrors() && !$analysisUnit->isDeepScanBounded(),
+        ));
+    }
+
+    /**
+     * Counts supported inputs accepted without fatal parse diagnostics.
+     *
+     * Uses a supplied streaming count when present; otherwise derives coverage from retained units.
+     * The scoring denominator is the narrower evaluatedFileCount().
+     *
+     * @return int - Coverage count, including text inputs and PHP files with nonfatal budget notes.
      */
     public function parsedFileCount(): int
     {
@@ -67,8 +94,8 @@ final readonly class AnalysisSourceSet
             return $this->explicitParsedFileCount;
         }
 
-        // No pre-computed count, so the units are still in memory: derive it by excluding
-        // units that failed to parse, matching how non-streaming callers measure coverage.
+
+
         return count(array_filter(
             $this->analysisUnits,
             static fn (AnalysisUnit $analysisUnit): bool => !$analysisUnit->hasParseErrors(),

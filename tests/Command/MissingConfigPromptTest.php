@@ -17,14 +17,16 @@ use Symfony\Component\Console\Output\ConsoleSectionOutput;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * Covers MissingConfigPrompt: triggers init on accept, skips on decline, --no-config, --config, and non-interactive runs.
+ * Covers the missing-config init offer with accepting and declining input streams.
+ * Checks silent skips for config options, existing config files, and non-interactive or machine-readable runs.
+ * Verifies init targets the supplied project root and sends prompt output to the error stream when available.
  */
 final class MissingConfigPromptTest extends TestCase
 {
     /**
-     * Verify accepting the prompt runs init and writes a config file.
+     * Verify accepting the prompt creates the default config and prints baseline guidance.
      *
-     * @return void
+     * @return void - Asserts a null result, config creation, prompt text, and baseline guidance.
      */
     public function testAcceptedPromptWritesConfigFile(): void
     {
@@ -51,9 +53,9 @@ final class MissingConfigPromptTest extends TestCase
     }
 
     /**
-     * Verify declining the prompt leaves the project untouched.
+     * Verify declining the prompt returns null without creating the default config.
      *
-     * @return void
+     * @return void - Asserts a null result and absence of the default config file.
      */
     public function testDeclinedPromptDoesNotWriteConfigFile(): void
     {
@@ -78,7 +80,7 @@ final class MissingConfigPromptTest extends TestCase
     /**
      * Verify non-interactive callers skip the prompt silently.
      *
-     * @return void
+     * @return void - Asserts a null result, no output, and no default config file.
      */
     public function testNonInteractiveInputSkipsPromptSilently(): void
     {
@@ -103,13 +105,10 @@ final class MissingConfigPromptTest extends TestCase
     }
 
     /**
-     * Verify a non-TTY real stdin skips the prompt even when the interactive flag is on.
+     * Verify a false TTY probe skips the prompt when no explicit stream is set.
+     * The interactive flag alone must not allow prompting when the fallback TTY check fails.
      *
-     * Symfony leaves Input::$interactive true for piped callers that omit -n,
-     * so when no explicit stream was set the guard must probe the real STDIN
-     * instead of blocking forever in the question helper.
-     *
-     * @return void
+     * @return void - Asserts a null result, no output, and no default config file.
      */
     public function testNonTtyRealStdinWithoutExplicitStreamSkipsPromptSilently(): void
     {
@@ -135,12 +134,10 @@ final class MissingConfigPromptTest extends TestCase
     }
 
     /**
-     * Verify an explicitly set stream counts as interactive even when STDIN is not a TTY.
+     * Verify an explicit stream permits prompting when the fallback TTY probe would return false.
+     * Explicit streams supply test and embedder answers, so the real-STDIN probe applies only when no stream was set.
      *
-     * Embedders and tests answer the prompt through setStream(), so the real
-     * STDIN probe must only apply when no stream was set.
-     *
-     * @return void
+     * @return void - Asserts a null result, prompt text, and no default config after the decline.
      */
     public function testExplicitStreamStillPromptsWhenStdinProbeReportsNoTty(): void
     {
@@ -166,11 +163,9 @@ final class MissingConfigPromptTest extends TestCase
 
     /**
      * Verify a machine-readable output format skips the prompt despite an interactive stream.
+     * Machine consumers parse the payload, so the init offer must not run even when an answerable input stream exists.
      *
-     * Machine consumers parse the payload, so the init offer must never run
-     * even when an answerable input stream exists.
-     *
-     * @return void
+     * @return void - Asserts a null result, no output, and no default config file.
      */
     public function testMachineReadableFormatSkipsPromptDespiteInteractiveStream(): void
     {
@@ -197,7 +192,7 @@ final class MissingConfigPromptTest extends TestCase
     /**
      * Verify --no-config callers skip the prompt silently.
      *
-     * @return void
+     * @return void - Asserts a null result, no output, and no default config file.
      */
     public function testNoConfigSkipsPromptSilently(): void
     {
@@ -223,7 +218,7 @@ final class MissingConfigPromptTest extends TestCase
     /**
      * Verify an explicit --config path skips the prompt silently.
      *
-     * @return void
+     * @return void - Asserts a null result, no output, and no default config file.
      */
     public function testExplicitConfigPathSkipsPromptSilently(): void
     {
@@ -249,7 +244,7 @@ final class MissingConfigPromptTest extends TestCase
     /**
      * Verify an existing project config skips the prompt silently.
      *
-     * @return void
+     * @return void - Asserts a null result, no output, and unchanged existing config contents.
      */
     public function testExistingConfigSkipsPromptSilently(): void
     {
@@ -276,9 +271,9 @@ final class MissingConfigPromptTest extends TestCase
     }
 
     /**
-     * Verify a legacy `.gruff.yaml` is treated as existing project config.
+     * Verify a legacy .gruff.yaml is treated as existing project config.
      *
-     * @return void
+     * @return void - Asserts a null result, no output, preserved legacy contents, and no default config file.
      */
     public function testExistingLegacyConfigSkipsPromptSilently(): void
     {
@@ -307,11 +302,9 @@ final class MissingConfigPromptTest extends TestCase
 
     /**
      * Verify init writes to the supplied project root, not the process CWD.
+     * A caller targeting another repository must not create config in the current working directory.
      *
-     * Locks the dashboard regression where `--project /other/repo` would
-     * dispatch init against CWD and create config in the wrong directory.
-     *
-     * @return void
+     * @return void - Asserts a null result, config creation in the supplied root, and no config in the CWD.
      */
     public function testPromptDispatchesInitInGivenProjectRoot(): void
     {
@@ -345,11 +338,10 @@ final class MissingConfigPromptTest extends TestCase
     }
 
     /**
-     * Verify ConsoleOutputInterface callers route prompt chatter to STDERR.
+     * Verify ConsoleOutputInterface callers route prompt and init text to their error stream.
+     * This keeps the main output stream available for the calling command's payload.
      *
-     * Stops the prompt from corrupting machine-readable payloads written to STDOUT.
-     *
-     * @return void
+     * @return void - Asserts a null result, empty main output, and prompt plus config-write text in the error buffer.
      */
     public function testConsoleOutputInterfaceRoutesPromptToErrorStream(): void
     {
@@ -376,10 +368,8 @@ final class MissingConfigPromptTest extends TestCase
     }
 
     /**
-     * Build a minimal ConsoleOutputInterface that captures error chatter into the given buffer.
-     *
-     * The fake's own BufferedOutput parent captures any main-stream writes so the
-     * caller can assert that the routing under test never leaks payloads onto stdout.
+     * Build a ConsoleOutputInterface fake that sends error-stream writes to the supplied buffer.
+     * Its BufferedOutput parent captures main-stream writes so tests can verify that standard output remains empty.
      *
      * @param BufferedOutput $bufferedOutput - Buffer that should receive the error-stream chatter.
      *
@@ -406,7 +396,7 @@ final class MissingConfigPromptTest extends TestCase
              */
             public function getErrorOutput(): OutputInterface
             {
-                // Expose the injected buffer so assertions can read whatever was routed to STDERR.
+
                 return $this->bufferedOutput;
             }
 
@@ -415,7 +405,7 @@ final class MissingConfigPromptTest extends TestCase
              *
              * @param OutputInterface $output - Replacement stream the fake silently discards.
              *
-             * @return void
+             * @return void - Leaves the injected error buffer unchanged.
              */
             public function setErrorOutput(OutputInterface $output): void
             {
@@ -425,9 +415,9 @@ final class MissingConfigPromptTest extends TestCase
             /**
              * Reject section creation; the fake never participates in sectioned rendering.
              *
-             * @throws LogicException Always; the test scenario never exercises sectioned output.
+             * @throws LogicException - Always because sectioned output is unsupported by this fake.
              *
-             * @return ConsoleSectionOutput - Never returns — the call always throws.
+             * @return ConsoleSectionOutput - Never returns; every call throws LogicException.
              */
             public function section(): ConsoleSectionOutput
             {
@@ -443,7 +433,7 @@ final class MissingConfigPromptTest extends TestCase
      *
      * @param callable(string): void $callable - Closure that receives the project root.
      *
-     * @return void
+     * @return void - Invokes CWD restoration and project cleanup in finally after the callback, including when it throws.
      */
     private function withTemporaryProject(callable $callable): void
     {
@@ -502,12 +492,12 @@ final class MissingConfigPromptTest extends TestCase
      *
      * @param string $path - Absolute path to remove.
      *
-     * @return void
+     * @return void - Skips non-directory paths; otherwise invokes recursive removal after asserting readable directory listings.
      */
     private function removeTempDirectory(string $path): void
     {
         if (!is_dir($path)) {
-            // Already gone (or never created), so there is nothing to recurse into.
+
             return;
         }
 

@@ -14,10 +14,10 @@ use GruffPhp\Rules\Docs\MissingConstantPhpdocRule;
 use GruffPhp\Rules\Docs\MissingFilePhpdocRule;
 use GruffPhp\Rules\Docs\MissingParamTagRule;
 use GruffPhp\Rules\Docs\MissingPropertyPhpdocRule;
-use GruffPhp\Rules\Docs\MissingPublicPhpdocRule;
+use GruffPhp\Rules\Docs\MissingPhpdocRule;
+use GruffPhp\Rules\Docs\MissingReturnTagRule;
 use GruffPhp\Rules\Docs\MissingThrowsTagRule;
 use GruffPhp\Rules\Docs\RegexCommentRule;
-use GruffPhp\Rules\Docs\StaleParamTagRule;
 use GruffPhp\Rules\Docs\TodoDensityRule;
 use GruffPhp\Rules\Docs\VarAnnotationDescriptionRule;
 use GruffPhp\Rules\RuleRegistry;
@@ -25,29 +25,15 @@ use GruffPhp\Rules\Shared\PhysicalCommentAttachment;
 
 /**
  * Covers documentation tag, file, class, property, and constant rules.
+ * Exercises fixture findings, declaration exemptions, and local comment attachment.
+ * Checks regex diagnostics and promoted-constructor documentation ownership.
  */
 final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
 {
-    /** Expected maximum names covered by one bounded pattern-family comment. */
-    private const BOUNDED_GROUP_LIMIT = 5;
-
     /**
-     * Verify stale param tag detected.
+     * Verify a fixture method with an undocumented throw is reported.
      *
-     * @return void
-     */
-    public function testStaleParamTagDetected(): void
-    {
-        $findings = $this->analyseRule('phpdoc-tags.php', StaleParamTagRule::ID);
-
-        self::assertCount(1, $findings);
-        self::assertSame('oldParam', $findings[0]->metadata['parameter']);
-    }
-
-    /**
-     * Verify missing throws tag detected.
-     *
-     * @return void
+     * @return void - Asserts the missing-throws findings include PhpdocTagsFixture::throwsWithoutTag().
      */
     public function testMissingThrowsTagDetected(): void
     {
@@ -58,19 +44,19 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify only same-scope throws require @throws; nested-scope throws belong to their own contracts.
+     * Verify direct throws are reported without attributing nested throws to their enclosing methods.
      *
-     * @return void
+     * @return void - Asserts two direct-throw findings and excludes four outer methods containing nested throws.
      */
     public function testMissingThrowsTagPrunesNestedFunctionLikeScopes(): void
     {
         $findings = $this->analyseRule('throws-nested-scopes.php', MissingThrowsTagRule::ID);
 
         $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
-        // Direct throws in a method and a free function still report...
+
         self::assertContains('ScopedThrows::directThrow()', $symbols);
         self::assertContains('freeFunctionDirectThrow()', $symbols);
-        // ...while arrow-function, closure, anonymous-class, and IIFE throws never charge the outer method.
+
         self::assertNotContains('ScopedThrows::arrowFunctionThrow()', $symbols);
         self::assertNotContains('ScopedThrows::closureThrow()', $symbols);
         self::assertNotContains('ScopedThrows::anonymousClassThrow()', $symbols);
@@ -79,13 +65,13 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify override aware throws rule uses inherited contracts but local phpdoc is required.
+     * Verify the override-aware throws rule accepts inherited contracts but still requires local PHPDoc.
      *
-     * @return void
+     * @return void - Asserts inherited throws contracts are accepted while the implementation without local PHPDoc is flagged.
      */
     public function testOverrideAwareThrowsRuleUsesInheritedContractsButLocalPhpdocIsRequired(): void
     {
-        $missingPhpdoc        = $this->analyseRule('phpdoc-tags.php', MissingPublicPhpdocRule::ID);
+        $missingPhpdoc        = $this->analyseRule('phpdoc-tags.php', MissingPhpdocRule::ID);
         $missingThrows        = $this->analyseRule('phpdoc-tags.php', MissingThrowsTagRule::ID);
         $missingPhpdocSymbols = array_map(static fn ($finding): ?string => $finding->symbol, $missingPhpdoc);
         $missingThrowsSymbols = array_map(static fn ($finding): ?string => $finding->symbol, $missingThrows);
@@ -99,7 +85,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify bare PHPDoc tags are detected.
      *
-     * @return void
+     * @return void - Asserts five fixture methods appear in bare-tag findings, including generic, resource, and shape tags.
      */
     public function testBarePhpdocTagsDetected(): void
     {
@@ -116,7 +102,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify descriptive PHPDoc tags are not bare PHPDoc.
      *
-     * @return void
+     * @return void - Asserts three fixture methods with tag descriptions are absent from bare-tag findings.
      */
     public function testDescriptivePhpdocTagsAreNotBarePhpdoc(): void
     {
@@ -129,9 +115,9 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify todo density detected.
+     * Verify the TODO-density fixture produces one finding with the expected count.
      *
-     * @return void
+     * @return void - Asserts exactly one finding has count metadata equal to twelve.
      */
     public function testTodoDensityDetected(): void
     {
@@ -144,7 +130,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify var annotations require description.
      *
-     * @return void
+     * @return void - Asserts one finding identifies missing in its variable metadata and $missing as its symbol.
      */
     public function testVarAnnotationsRequireDescription(): void
     {
@@ -158,12 +144,12 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify var annotation on attribute decorated property does not flag.
      *
-     * @return void
+     * @return void - Asserts $attributedProperty is absent from local var-annotation findings.
      */
     public function testVarAnnotationOnAttributeDecoratedPropertyDoesNotFlag(): void
     {
-        // Regression: attributes between `@var` and a property keyword used to trip
-        // the token-stream heuristic, but the AST-driven path should skip declarations.
+        // Attributes between the @var docblock and property must preserve the declaration exemption.
+
         $findings = $this->analyseRule('var-annotation-description.php', VarAnnotationDescriptionRule::ID);
 
         $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
@@ -173,7 +159,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify var annotation on attribute decorated method does not flag.
      *
-     * @return void
+     * @return void - Asserts $attributedMethodResult is absent from local var-annotation findings.
      */
     public function testVarAnnotationOnAttributeDecoratedMethodDoesNotFlag(): void
     {
@@ -184,9 +170,9 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify call, statement-owner, match-arm, and narrow callable coverage while retained calls report.
+     * Verify regex-comment findings, diagnostic metadata, and retained finding identities for the fixture.
      *
-     * @return void
+     * @return void - Asserts expected symbols, regex functions, diagnostics, stable identities, and comment-line classification.
      */
     public function testRegexCommentRequiresImmediatePurposeComment(): void
     {
@@ -295,7 +281,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify clean fixture has no doc findings.
      *
-     * @return void
+     * @return void - Asserts the clean fixture has no findings whose rule IDs start with the docs. prefix.
      */
     public function testCleanFixtureHasNoDocFindings(): void
     {
@@ -310,7 +296,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify missing class phpdoc flags class interface trait enum.
      *
-     * @return void
+     * @return void - Asserts exactly four undocumented symbols and the class, enum, interface, and trait kinds.
      */
     public function testMissingClassPhpdocFlagsClassInterfaceTraitEnum(): void
     {
@@ -335,9 +321,9 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify missing class phpdoc skips anonymous and documented classes.
+     * Verify the reported symbols exclude DocumentedClass and AnonymousFactory.
      *
-     * @return void
+     * @return void - Asserts DocumentedClass and AnonymousFactory are absent from the reported symbols.
      */
     public function testMissingClassPhpdocSkipsAnonymousAndDocumentedClasses(): void
     {
@@ -351,7 +337,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify missing file phpdoc flags files without any docblock.
      *
-     * @return void
+     * @return void - Asserts one finding names the without-any-docblock.php fixture and reports line one.
      */
     public function testMissingFilePhpdocFlagsFilesWithoutAnyDocblock(): void
     {
@@ -368,7 +354,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify missing file phpdoc skips file with explicit file docblock.
      *
-     * @return void
+     * @return void - Asserts the with-file-docblock.php fixture produces no missing-file-PHPDoc findings.
      */
     public function testMissingFilePhpdocSkipsFileWithExplicitFileDocblock(): void
     {
@@ -383,7 +369,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify missing file phpdoc skips single documented class file.
      *
-     * @return void
+     * @return void - Asserts the with-only-class-docblock.php fixture produces no missing-file-PHPDoc findings.
      */
     public function testMissingFilePhpdocSkipsSingleDocumentedClassFile(): void
     {
@@ -398,7 +384,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify each promoted-constructor documentation gap has one rule owner.
      *
-     * @return void
+     * @return void - Asserts exactly four ownership rows across the missing-PHPDoc, parameter, and property rules.
      */
     public function testPromotedConstructorDocumentationHasOneOwner(): void
     {
@@ -465,7 +451,7 @@ final class OrdinarySkeleton
 PHP;
 
         $findings = [
-            ...$this->analyseSourceRule($source, MissingPublicPhpdocRule::ID),
+            ...$this->analyseSourceRule($source, MissingPhpdocRule::ID),
             ...$this->analyseSourceRule($source, MissingParamTagRule::ID),
             ...$this->analyseSourceRule($source, MissingPropertyPhpdocRule::ID),
         ];
@@ -486,7 +472,7 @@ PHP;
                 'docs.missing-param-tag|PartialPromotions::__construct()|missingPromoted',
                 'docs.missing-param-tag|PromotedSkeleton::__construct()|promoted',
                 'docs.missing-param-tag|ProsePromotion::__construct()|promoted',
-                'docs.missing-public-phpdoc|NoDocPromotions::__construct()|',
+                'docs.missing-phpdoc|NoDocPromotions::__construct()|',
             ],
             $ownershipRows,
         );
@@ -495,7 +481,7 @@ PHP;
     /**
      * Verify missing property PHPDoc flags only undocumented declarations.
      *
-     * @return void
+     * @return void - Asserts only DocumentedProperty::$undocumented is reported, with kind declared.
      */
     public function testMissingPropertyPhpdocFlagsOnlyUndocumentedDeclarations(): void
     {
@@ -514,7 +500,7 @@ PHP;
     /**
      * Verify missing property phpdoc skips anonymous class property.
      *
-     * @return void
+     * @return void - Asserts every finding has a symbol and none contains the anonymous property's $exempt name.
      */
     public function testMissingPropertyPhpdocSkipsAnonymousClassProperty(): void
     {
@@ -533,7 +519,7 @@ PHP;
     /**
      * Verify missing constant phpdoc flags class constants and enum cases.
      *
-     * @return void
+     * @return void - Asserts one class constant and two enum cases are reported with their kinds and Apply remediation.
      */
     public function testMissingConstantPhpdocFlagsClassConstantsAndEnumCases(): void
     {
@@ -568,7 +554,7 @@ PHP;
     /**
      * Verify missing constant phpdoc exempts enum cases when enum has docblock.
      *
-     * @return void
+     * @return void - Asserts DocumentedEnum::FIRST and DocumentedEnum::SECOND are absent from constant findings.
      */
     public function testMissingConstantPhpdocExemptsEnumCasesWhenEnumHasDocblock(): void
     {
@@ -582,7 +568,7 @@ PHP;
     /**
      * Verify local comments cover only the intended constant and group shapes.
      *
-     * @return void
+     * @return void - Asserts the exact reported constants and selected missing or low-quality comment diagnostics.
      */
     public function testMissingConstantPhpdocAllowsUsefulLocalCommentsByDefault(): void
     {
@@ -598,10 +584,7 @@ PHP;
                 'MAX_PAGES',
                 'PRIVATE_TODO_COMMENT',
                 'PRIVATE_DETACHED_COMMENT',
-                'PATIENT_OVERFLOW_PATTERN',
-                'COMPARISON_ZETA_PATTERN',
-                'VISIBILITY_PROTECTED_PATTERN',
-                'SINGLE_MATCHER_FOLLOWER',
+                'RESET_GROUP_BETA_PATTERN',
                 'RESET_AFTER_LOCAL_PATTERN',
                 'BLANK_AFTER_GROUP_PATTERN',
                 'METHOD_AFTER_GROUP_PATTERN',
@@ -624,16 +607,12 @@ PHP;
         self::assertArrayNotHasKey('commentKind', $byConstant['PRIVATE_DETACHED_COMMENT']->metadata);
         self::assertSame('missing', $byConstant['TRAILING_COMMENT_FOLLOWER']->metadata['commentQuality'] ?? null);
         self::assertArrayNotHasKey('commentKind', $byConstant['TRAILING_COMMENT_FOLLOWER']->metadata);
-
-        $this->assertBoundedGroupOverflow($byConstant['PATIENT_OVERFLOW_PATTERN']);
-        $this->assertBoundedGroupOverflow($byConstant['COMPARISON_ZETA_PATTERN']);
-        $this->assertSameStatementGroupOverflow();
     }
 
     /**
      * Verify strict API mode requires PHPDoc for public constants with useful local comments.
      *
-     * @return void
+     * @return void - Asserts selected strict-mode findings, grouped-comment metadata, and the documented constant's exemption.
      */
     public function testMissingConstantPhpdocCanRequirePhpdocForApiConstants(): void
     {
@@ -668,17 +647,18 @@ PHP;
         self::assertTrue($patientReference->metadata['requiresApiPhpdoc'] ?? null);
         self::assertTrue($patientReference->metadata['groupedLocalComment'] ?? null);
 
+        // PATIENT_OVERFLOW_PATTERN shares the grouped local comment, but strict mode still requires PHPDoc.
         $patientOverflow = $byConstant['PATIENT_OVERFLOW_PATTERN'];
-        $this->assertBoundedGroupOverflow($patientOverflow);
+        self::assertSame('meaningful', $patientOverflow->metadata['commentQuality'] ?? null);
         self::assertTrue($patientOverflow->metadata['requiresApiPhpdoc'] ?? null);
-        self::assertArrayNotHasKey('groupedLocalComment', $patientOverflow->metadata);
-        self::assertStringContainsString('also requires PHPDoc', $patientOverflow->message);
+        self::assertTrue($patientOverflow->metadata['groupedLocalComment'] ?? null);
+        self::assertStringContainsString('requires PHPDoc for exported constants', $patientOverflow->message);
     }
 
     /**
      * Verify API path patterns can opt specific exported paths into strict constant PHPDoc.
      *
-     * @return void
+     * @return void - Asserts a matching path requires API PHPDoc for TELEMETRY_KEY while DOCUMENTED_TELEMETRY_KEY stays exempt.
      */
     public function testMissingConstantPhpdocCanRequirePhpdocForApiPathPatterns(): void
     {
@@ -698,7 +678,7 @@ PHP;
     /**
      * Verify comment-only delimiter chains cover a regex while executable segments still report.
      *
-     * @return void
+     * @return void - Asserts regex finding presence and symbols, plus classification of comment-only, executable, and unclosed lines.
      */
     private function assertRegexCommentLineClassification(): void
     {
@@ -763,41 +743,85 @@ PHP, RegexCommentRule::ID);
     }
 
     /**
-     * Verify one multi-name declaration reports only the names beyond a bounded group comment.
+     * Verify BarePhpdocTagsRule accepts a described @param tag ending with a variable and inheritance rules inspect all direct interfaces.
      *
-     * @return void
+     * @return void - Asserts zero findings for a described @param ending in $limit and for tags documented on a second implemented interface.
      */
-    private function assertSameStatementGroupOverflow(): void
+    public function testBareTagVariableDescriptionsAndMultiInterfaceInheritance(): void
     {
-        $findings = $this->analyseSourceRule(<<<'PHP'
+        $describedParamSource = <<<'PHP'
 <?php
-final class PatternBag
+
+/**
+ * @param int $value - must stay below $limit
+ * @param array{'key(': int} $shape - keyed map whose key contains a parenthesis
+ * @return int - Clamped integer value.
+ */
+function clamp(int $value, int $limit, array $shape): int
 {
-    // Validation patterns used by the supported inputs.
-    public const A = 'a', B = 'b', C = 'c', D = 'd', E = 'e', F = 'f';
+    return $value < $limit ? $value : $limit;
 }
-PHP, MissingConstantPhpdocRule::ID);
 
-        self::assertCount(1, $findings);
-        self::assertSame('PatternBag::F', $findings[0]->symbol);
-        $this->assertBoundedGroupOverflow($findings[0]);
-        self::assertStringContainsString('Start a new adjacent patterns/regexes group comment', $findings[0]->remediation ?? '');
-    }
+/**
+ * @param	int	$tabbed
+ */
+function bareTabbedParam(int $tabbed): void
+{
+}
 
+/**
+ * Explains @return-value handling in prose without a real return tag.
+ */
+function proseOnlyReturnMention(): int
+{
+    return 1;
+}
+PHP;
+        $multiInterfaceSource = <<<'PHP'
+<?php
+
+interface FirstContract
+{
+    public function handle(string $payload): bool;
+}
+
+interface SecondContract
+{
     /**
-     * Assert the shared machine-readable shape for a name beyond a bounded group comment.
+     * Handles the incoming payload.
      *
-     * @param Finding $finding - Overflow finding to inspect.
+     * @param string $payload - Raw payload text to validate.
      *
-     * @return void
+     * @return bool - True when the payload is accepted.
      */
-    private function assertBoundedGroupOverflow(Finding $finding): void
+    public function handle(string $payload): bool;
+}
+
+interface ExtendedContract extends SecondContract
+{
+    /**
+     * Refines the parent contract.
+     */
+    public function handle(string $payload): bool;
+}
+
+final class MultiContractHandler implements FirstContract, SecondContract
+{
+    /**
+     * Executes both contracts.
+     */
+    public function handle(string $payload): bool
     {
-        self::assertSame('bounded-group-overflow', $finding->metadata['commentQuality'] ?? null);
-        self::assertSame('line', $finding->metadata['commentKind'] ?? null);
-        self::assertTrue($finding->metadata['groupCoverageExceeded'] ?? null);
-        self::assertSame(self::BOUNDED_GROUP_LIMIT, $finding->metadata['groupCoverageLimit'] ?? null);
-        self::assertStringContainsString('exceeds the 5-name coverage limit', $finding->message);
+        return $payload !== '';
+    }
+}
+PHP;
+
+        self::assertCount(1, $this->analyseSourceRule($describedParamSource, BarePhpdocTagsRule::ID));
+        $missingReturnFindings = $this->analyseSourceRule($describedParamSource, MissingReturnTagRule::ID);
+        self::assertSame(['bareTabbedParam()', 'proseOnlyReturnMention()'], array_map(static fn($finding): ?string => $finding->symbol, $missingReturnFindings));
+        self::assertSame([], $this->analyseSourceRule($multiInterfaceSource, MissingReturnTagRule::ID));
+        self::assertSame([], $this->analyseSourceRule($multiInterfaceSource, MissingParamTagRule::ID));
     }
 
     /**

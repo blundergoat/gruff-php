@@ -14,12 +14,11 @@ use GruffPhp\Rules\Contracts\RuleDefinition;
 use GruffPhp\Rules\Contracts\SourceTextRuleInterface;
 
 /**
- * Flags a hardcoded API key from a known provider (Stripe, GitHub, OpenAI, Anthropic, Slack, npm, Google,
- * Azure, GitLab), so the user can pull the committed credential from source and rotate it.
+ * Flags a hardcoded API key from a known provider (Stripe, GitHub, OpenAI, Anthropic, Slack, npm, Google, Azure, GitLab).
  *
- * A source-text rule: it runs each provider's prefix pattern over the raw file, skipping matches inside
- * comments and obvious dummy values, and redacts every reported key. Warning severity, high confidence -
- * the published provider prefixes make a non-dummy match very likely a real key.
+ * Scans the raw file with each provider's prefix pattern so users can remove committed credentials and rotate them:
+ * - Skips matches inside comments and obvious dummy values, and redacts every reported value.
+ * - Reports Warning severity with High confidence because published prefixes make non-dummy matches likely real keys.
  */
 final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
 {
@@ -31,12 +30,11 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
     /**
      * Lists the provider key patterns this rule scans for, in scan order.
      *
-     * @return list<array{name: string, pattern: string}> - each entry pairs a provider label with its detection regex; ordering is the scan order
-     *                          applied per source unit
+     * @return list<array{name: string, pattern: string}> - Provider labels and detection regexes in scan order.
      */
     private function patterns(): array
     {
-        // Each pattern anchors on a provider's published key prefix and minimum length, keeping false positives low.
+        // Provider-specific prefixes and structures narrow candidates before comment and dummy-value filtering.
         return [
             ['name' => 'stripe', 'pattern' => '/\bsk_live_[A-Za-z0-9]{16,}\b/'],
             ['name' => 'github', 'pattern' => '/\bghp_[A-Za-z0-9]{36}\b/'],
@@ -56,12 +54,11 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
     /**
      * Describes the API-key-pattern sensitive-data rule for the registry and reports.
      *
-     * @return RuleDefinition - identity, pillar, tier, and the Warning/High defaults the engine applies unless a config override raises or silences
-     *                        this rule
+     * @return RuleDefinition - Rule metadata with warning severity and high confidence.
      */
     public function definition(): RuleDefinition
     {
-        // High confidence: provider prefixes are distinctive enough that a non-dummy match is very likely a real key.
+        // High confidence: retained matches satisfy a provider-specific structure and pass comment and dummy-value filters.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Common API key pattern',
@@ -75,58 +72,78 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
     /**
      * Reports each string that resembles a hardcoded provider API key, redacting the value.
      *
-     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Supplies raw source and comment tokens for scanning.
+     * @param RuleContext $ruleContext - Required by the rule interface; unused by this scanner.
      *
-     * @return list<\GruffPhp\Results\Finding\Finding> - one finding per non-dummy key-like literal outside comments; empty means clean (no prefix hit, or
-     *                                         every match was a comment or dummy value), not an error
+     * @return list<\GruffPhp\Results\Finding\Finding> - One finding per retained pattern match; empty when none survive.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $findings = [];
 
-        // Fast bail: real API keys for the supported providers all contain one
-        // of these distinctive prefixes. Skipping the per-pattern regex when
-        // none are present makes this rule near-free for the common case.
+        // Supported key shapes contain one of the screened tokens, so source without a token cannot match.
         if (preg_match('/sk_live_|ghp_|github_pat_|gh[ours]_|sk-proj-|sk-ant-|xox[baprs]-|hooks\.slack\.com\/services|npm_|AIza|[?&]sv=|glpat-/i', $analysisUnit->source) !== 1) {
-            // No supported prefix in the source means no provider pattern can match, so skip the per-pattern scan.
+
             return [];
         }
 
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
 
-        // Run each provider's key pattern over the source.
-        foreach ($this->patterns() as $definition) {
-            // Match every occurrence of this provider's key shape, capturing each offset.
-            preg_match_all($definition['pattern'], $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
+        // Scan each provider's prefix pattern in order so every matched vendor produces its own labelled finding.
+        foreach ($this->patterns() as $providerPattern) {
+            // Candidate offsets allow comment filtering and source-line/column reporting before a redacted finding is emitted.
+            preg_match_all($providerPattern['pattern'], $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
-            // Weigh each candidate this pattern found.
+            // Filter each candidate independently so an example token in a comment never hides a live key on the same file.
             foreach ($matches[0] as $match) {
                 [$candidateSecret, $offset] = $match;
-                // A key inside a comment is an example, not a live secret.
+
+                // Documentation snippets inside PHP comments are skipped rather than reported as committed credentials.
                 if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
                     continue;
                 }
 
-                // An obvious placeholder key is not a real secret.
+                // Skip vendor samples and placeholder words so README-style dummy keys stay quiet.
                 if (SecretScannerHelper::isLikelyDummyValue($candidateSecret)) {
                     continue;
                 }
 
-                $preview    = SecretScannerHelper::redactedPreview($candidateSecret);
-                $findings[] = SecretScannerHelper::finding(
-                    analysisUnit: $analysisUnit,
-                    ruleId:       self::ID,
-                    message:      sprintf('Potential %s API key detected: %s.', $definition['name'], $preview),
-                    line:         SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
-                    confidence:   Confidence::High,
-                    detector:     $definition['name'],
-                    preview:      $preview,
-                    remediation:  'Remove committed API keys and rotate the credential if it was real.',
+                $displayMarker = SecretScannerHelper::categoryMarker(self::markerCategory($providerPattern['name']));
+                $findings[]    = SecretScannerHelper::findingAtOffset(
+                    analysisUnit:  $analysisUnit,
+                    ruleId:        self::ID,
+                    message:       sprintf('Potential %s API key detected: %s.', $providerPattern['name'], $displayMarker),
+                    offset:        $offset,
+                    confidence:    Confidence::High,
+                    detector:      $providerPattern['name'],
+                    displayMarker: $displayMarker,
+                    remediation:   'Remove committed API keys and rotate the credential if it was real.',
                 );
             }
         }
 
         return $findings;
+    }
+
+    /**
+     * Maps one provider pattern name to its ratified family marker category.
+     * An unratified provider returns null rather than inventing a marker category.
+     *
+     * @param string $providerName - Name of the pattern that matched, as patterns() declares it.
+     *
+     * @return string|null - the ratified category, or null when this provider has none
+     */
+    private static function markerCategory(string $providerName): ?string
+    {
+        return match ($providerName) {
+            'stripe' => 'stripe-live-key',
+            'github', 'github-fine-grained', 'github-oauth' => 'github-token',
+            'anthropic' => 'anthropic-api-key',
+            'slack', 'slack-webhook' => 'slack-token',
+            'npm' => 'npm-token',
+            'google-api-key' => 'google-api-key',
+            'gitlab' => 'gitlab-token',
+            default => null,
+        };
     }
 }

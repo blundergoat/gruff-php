@@ -20,9 +20,9 @@ final class NewFindingsGateCliTest extends CliTestCase
     private string $project = '';
 
     /**
-     * Build a temporary project whose Calc fixture has one undocumented method.
+     * Create a temporary project with a README and a Calc fixture containing documented alpha.
      *
-     * @return void
+     * @return void - Creates and populates the per-test project directory.
      */
     protected function setUp(): void
     {
@@ -34,7 +34,7 @@ final class NewFindingsGateCliTest extends CliTestCase
     /**
      * Remove the temporary fixture.
      *
-     * @return void
+     * @return void - Removes the fixture directory and its contents when it exists.
      */
     protected function tearDown(): void
     {
@@ -44,9 +44,9 @@ final class NewFindingsGateCliTest extends CliTestCase
     /**
      * Verify --fail-on-new passes (exit 0, zero new) when every finding is baselined.
      *
-     * @throws JsonException
+     * @throws JsonException - If the CLI output cannot be decoded as JSON.
      *
-     * @return void
+     * @return void - Asserts exit 0, zero new findings and no failure reason.
      */
     public function testPassesWhenNoNewFindings(): void
     {
@@ -56,16 +56,16 @@ final class NewFindingsGateCliTest extends CliTestCase
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         $report = $this->decodeJsonOutput($process);
-        self::assertSame(0, $report['newFindingsCount'] ?? null);
-        self::assertArrayNotHasKey('failureReason', $report);
+        self::assertSame(0, $this->newFindingsCount($report));
+        self::assertNull($this->failureReason($report));
     }
 
     /**
-     * Verify --fail-on-new does not also apply the default total-findings gate.
+     * Verify --fail-on-new passes when the comparison with HEAD has no changes.
      *
-     * @throws JsonException
+     * @throws JsonException - If the CLI output cannot be decoded as JSON.
      *
-     * @return void
+     * @return void - Asserts exit 0, zero new findings and no failure reason against unchanged HEAD.
      */
     public function testFailOnNewDoesNotApplyDefaultTotalGate(): void
     {
@@ -78,14 +78,14 @@ final class NewFindingsGateCliTest extends CliTestCase
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         $report = $this->decodeJsonOutput($process);
-        self::assertSame(0, $report['newFindingsCount'] ?? null);
-        self::assertArrayNotHasKey('failureReason', $report);
+        self::assertSame(0, $this->newFindingsCount($report));
+        self::assertNull($this->failureReason($report));
     }
 
     /**
-     * Verify explicit --fail-on overrides a configured new-findings gate unless --fail-on-new is also set.
+     * Verify explicit --fail-on none bypasses a configured new-findings gate without a reference.
      *
-     * @return void
+     * @return void - Asserts exit 0 and absence of the missing-reference diagnostic.
      */
     public function testExplicitFailOnOverridesConfiguredNewFindingsGate(): void
     {
@@ -103,9 +103,9 @@ final class NewFindingsGateCliTest extends CliTestCase
     /**
      * Verify --fail-on-new fails with a "new" scope on a finding not in the baseline.
      *
-     * @throws JsonException
+     * @throws JsonException - If the CLI output cannot be decoded as JSON.
      *
-     * @return void
+     * @return void - Asserts exit 1 with failure scope new and threshold kind error.
      */
     public function testFailsOnBaselineNewFinding(): void
     {
@@ -115,7 +115,7 @@ final class NewFindingsGateCliTest extends CliTestCase
         $process = $this->runGruff(['analyse', 'src', '--no-config', '--baseline', 'gruff-baseline.json', '--fail-on-new', '--format', 'json']);
 
         self::assertSame(1, $process->getExitCode());
-        $failureReason = $this->decodeJsonOutput($process)['failureReason'] ?? null;
+        $failureReason = $this->failureReason($this->decodeJsonOutput($process));
         self::assertIsArray($failureReason);
         self::assertSame('new', $failureReason['scope'] ?? null);
         self::assertSame('error', $failureReason['thresholdKind'] ?? null);
@@ -124,9 +124,9 @@ final class NewFindingsGateCliTest extends CliTestCase
     /**
      * Verify --fail-on-new fails on a finding introduced versus a --diff-vs base ref.
      *
-     * @throws JsonException
+     * @throws JsonException - If the CLI output cannot be decoded as JSON.
      *
-     * @return void
+     * @return void - Asserts exit 1 and failure scope new after adding an undocumented method.
      */
     public function testFailsOnDiffVsIntroducedFinding(): void
     {
@@ -138,15 +138,15 @@ final class NewFindingsGateCliTest extends CliTestCase
         $process = $this->runGruff(['analyse', 'src', '--no-config', '--no-baseline', '--diff-vs', 'HEAD', '--fail-on-new', '--format', 'json']);
 
         self::assertSame(1, $process->getExitCode());
-        $failureReason = $this->decodeJsonOutput($process)['failureReason'] ?? null;
+        $failureReason = $this->failureReason($this->decodeJsonOutput($process));
         self::assertIsArray($failureReason);
         self::assertSame('new', $failureReason['scope'] ?? null);
     }
 
     /**
-     * Verify --fail-on-new errors at setup when no baseline or --diff-vs reference exists.
+     * Verify --fail-on-new rejects a run without a baseline or --diff-vs reference.
      *
-     * @return void
+     * @return void - Asserts exit 2 and the missing-reference diagnostic.
      */
     public function testErrorsWithoutReferencePoint(): void
     {
@@ -157,11 +157,11 @@ final class NewFindingsGateCliTest extends CliTestCase
     }
 
     /**
-     * Write the Calc fixture, optionally with a second undocumented method.
+     * Write Calc with documented alpha and an optional undocumented beta method.
      *
-     * @param bool $shouldIncludeBeta - Whether to include a second undocumented public method.
+     * @param bool $shouldIncludeBeta - Whether to add undocumented beta beside documented alpha.
      *
-     * @return void
+     * @return void - Writes the Calc source file used by the gate scenarios.
      */
     private function writeCalc(bool $shouldIncludeBeta): void
     {
@@ -173,6 +173,52 @@ final class NewFindingsGateCliTest extends CliTestCase
             'src/Calc.php',
             "<?php\n\nnamespace Demo;\n\n/**\n * Calc fixture for the new-findings gate.\n */\nclass Calc\n{\n    /**\n     * Add one to the amount.\n     *\n     * @param int \$amount Amount to increment.\n     * @return int Incremented amount.\n     */\n    public function alpha(int \$amount): int\n    {\n        return \$amount + 1;\n    }\n{$beta}}\n",
         );
+    }
+
+    /**
+     * Reads the canonical new-finding total from a report used by the gate scenarios.
+     *
+     * @param array<string, mixed> $report - Decoded analysis report containing a baseline section.
+     *
+     * @return int - Number of findings considered new by the configured gate.
+     */
+    private function newFindingsCount(array $report): int
+    {
+        $baseline = $report['baseline'] ?? null;
+        self::assertIsArray($baseline);
+        $count = $baseline['newFindings'] ?? null;
+        self::assertIsInt($count);
+
+        return $count;
+    }
+
+    /**
+     * Reads PHP's named failure-reason extension when a new-findings gate trips.
+     *
+     * @param array<string, mixed> $report - Decoded v3 analysis document.
+     *
+     * @return array<string, mixed>|null - Failure reason when the report contains one, otherwise null.
+     */
+    private function failureReason(array $report): ?array
+    {
+        $extensions = $report['extensions'] ?? null;
+        if (!is_array($extensions)) {
+            return null;
+        }
+
+        $phpExtensions = $extensions['php'] ?? null;
+        if (!is_array($phpExtensions)) {
+            return null;
+        }
+
+        $topLevel = $phpExtensions['topLevel'] ?? null;
+        if (!is_array($topLevel)) {
+            return null;
+        }
+
+        $failureReason = $topLevel['failureReason'] ?? null;
+
+        return is_array($failureReason) ? $this->decodedJsonObject($failureReason) : null;
     }
 
     /**
@@ -193,9 +239,9 @@ final class NewFindingsGateCliTest extends CliTestCase
     /**
      * Run a git command inside the fixture project.
      *
-     * @param list<string> $args - Git arguments.
+     * @param list<string> $args - Arguments passed to Git in the fixture project.
      *
-     * @return void
+     * @return void - Asserts that Git exits successfully in the temporary project.
      */
     private function git(array $args): void
     {
@@ -208,10 +254,10 @@ final class NewFindingsGateCliTest extends CliTestCase
     /**
      * Write a fixture file, creating parent directories as needed.
      *
-     * @param string $path - Project-relative file path.
-     * @param string $contents - File contents.
+     * @param string $path     - Project-relative file path.
+     * @param string $contents - Contents written to the fixture file.
      *
-     * @return void
+     * @return void - Creates missing parent directories and writes the fixture file.
      */
     private function writeProjectFile(string $path, string $contents): void
     {

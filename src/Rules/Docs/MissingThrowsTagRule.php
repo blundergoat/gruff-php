@@ -10,7 +10,7 @@ use GruffPhp\Results\Finding\Pillar;
 use GruffPhp\Results\Finding\RuleTier;
 use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
-use GruffPhp\Rules\Complexity\CyclomaticComplexityRule;
+use GruffPhp\Rules\Complexity\FunctionComplexity;
 use GruffPhp\Rules\Shared\NodeIndex;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
@@ -47,20 +47,26 @@ final readonly class MissingThrowsTagRule implements RuleInterface
     {
         // Advisory because an undocumented throw is a contract gap, not a defect; callers tune severity in config.
         return new RuleDefinition(
-            id:              self::ID,
-            name:            'Missing @throws tag',
-            pillar:          Pillar::Documentation,
-            tier:            RuleTier::V01,
-            defaultSeverity: Severity::Advisory,
-            confidence:      Confidence::Medium,
+            id:                  self::ID,
+            name:                'Missing @throws tag',
+            pillar:              Pillar::Documentation,
+            tier:                RuleTier::V01,
+            defaultSeverity:     Severity::Advisory,
+            confidence:          Confidence::Medium,
+            falsePositiveShapes: [
+                [
+                    'shape' => 'A guard clause that throws for a state the author treats as unreachable, such as a LogicException behind an already-validated invariant.',
+                    'mitigation' => 'Any throw in the method\'s own scope requires the tag, so document the guard as an internal invariant or restructure so the impossible state cannot throw.',
+                ],
+            ],
         );
     }
 
     /**
-     * Reports each documented public function-like that throws without an `@throws` tag.
+     * Reports each documented public method or named function that contains a direct throw expression but lacks an @throws tag.
      *
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
-     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     * @param RuleContext  $ruleContext  - Unused; the rule interface requires it, and this rule reads no options or project root.
      *
      * @return list<Finding> - Findings for missing @throws documentation.
      */
@@ -72,15 +78,15 @@ final readonly class MissingThrowsTagRule implements RuleInterface
 
         $findings = [];
 
-        // Check every method and function in the file.
+
         foreach ($nodes as $node) {
-            /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
+            /** @var ClassMethod|Function_ $node - NodeIndex limits this scan to methods and named functions. */
             // A non-public method's contract is internal, so this rule leaves it alone.
             if ($node instanceof ClassMethod && !$node->isPublic()) {
                 continue;
             }
 
-            // Nothing to document when the body does not throw in its own scope.
+            // Without a direct throw expression, this syntax-based rule requests no local @throws tag.
             if (!$this->hasDirectThrow($node->stmts ?? [])) {
                 continue;
             }
@@ -92,17 +98,17 @@ final readonly class MissingThrowsTagRule implements RuleInterface
                 continue;
             }
 
-            // A docblock that already declares its throws is fine.
+
             if (str_contains($docComment->getText(), '@throws')) {
                 continue;
             }
 
-            // An inherited, documented contract already covers the throw.
+            // An inherited docblock or explicit inheritance marker exempts this method from a local @throws tag.
             if ($node instanceof ClassMethod && (new DocsInheritanceHelper())->hasInheritedContractDoc($node, $analysisUnit->statements, $nodeFinder)) {
                 continue;
             }
 
-            $symbol = CyclomaticComplexityRule::resolveSymbol($node);
+            $symbol = FunctionComplexity::resolveSymbol($node);
 
             $findings[] = new Finding(
                 ruleId:      $definition->id,
@@ -122,16 +128,17 @@ final readonly class MissingThrowsTagRule implements RuleInterface
     }
 
     /**
-     * Reports whether a statement list throws in its own lexical scope.
+     * Reports whether a statement list contains a throw expression in its own lexical scope.
+     *
+     * Public so docs.missing-phpdoc asks when a callable throws by the same test.
      *
      * @param array<Node> $statements - Function-like body statements to search.
      *
-     * @return bool - true when a `throw` sits directly in this scope; throws inside nested closures, arrow
-     *              functions, anonymous classes, or nested functions belong to those scopes' own contracts
+     * @return bool - True when a throw expression appears outside nested functions, closures, arrow functions, and class-like declarations.
      */
-    private function hasDirectThrow(array $statements): bool
+    public function hasDirectThrow(array $statements): bool
     {
-        // One direct throw anywhere in the body is enough to require an @throws tag on the docblock.
+        // A direct throw expression anywhere in the body is enough for this syntax-based rule.
         foreach ($statements as $statement) {
             if ($this->containsDirectThrow($statement)) {
                 return true;
@@ -142,19 +149,16 @@ final readonly class MissingThrowsTagRule implements RuleInterface
     }
 
     /**
-     * Recursively searches one node for a same-scope throw, pruning nested scopes.
-     *
-     * This is why the user is never asked to document a callback's exception on the
-     * outer method. Immediately invoked closures are pruned too: their throw
-     * propagates like any called function's, and this rule documents lexical throws only.
+     * Searches a node for a lexical throw, excluding nested functions and class-like declarations.
+     * Immediately invoked closures are excluded too; propagated exceptions are outside this rule's scope.
      *
      * @param Node $node - Node to inspect.
      *
-     * @return bool - true when the node is or directly contains a throw before any nested scope boundary
+     * @return bool - True when the node or a descendant is a throw before any nested scope boundary.
      */
     private function containsDirectThrow(Node $node): bool
     {
-        // Found a throw that belongs to this method's own contract.
+
         if ($node instanceof Throw_) {
             return true;
         }
@@ -165,18 +169,18 @@ final readonly class MissingThrowsTagRule implements RuleInterface
             return false;
         }
 
-        // Keep descending through ordinary statements and expressions.
+
         foreach ($node->getSubNodeNames() as $name) {
             $subNode = $node->$name;
 
-            // Single child node: recurse straight into it.
+
             if ($subNode instanceof Node && $this->containsDirectThrow($subNode)) {
                 return true;
             }
 
-            // Child lists (statement bodies, argument lists): recurse into each node they hold.
+
             if (is_array($subNode)) {
-                // Recurse into each child node the list holds.
+
                 foreach ($subNode as $child) {
                     if ($child instanceof Node && $this->containsDirectThrow($child)) {
                         return true;

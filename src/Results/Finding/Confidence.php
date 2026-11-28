@@ -5,12 +5,10 @@ declare(strict_types=1);
 namespace GruffPhp\Results\Finding;
 
 /**
- * How much to trust a rule's signal - the dial between "definitely a problem" and "worth a look".
+ * Describes how certain a rule is about a finding.
  *
- * Heuristic rules can misfire, so each finding carries a confidence the user can weigh: it colours how
- * the finding is presented and lets someone tune out the lower-confidence noise when they only want the
- * near-certain issues. Higher confidence means fewer false positives in normal use, so this is what
- * separates a finding a user can act on blind from one they may want to eyeball first.
+ * Reports expose low, medium, and high so reviewers can weigh the signal.
+ * The `--min-confidence` gate can limit which findings cause a nonzero exit.
  */
 enum Confidence: string
 {
@@ -28,4 +26,18 @@ enum Confidence: string
      * Signal expected to hold in normal use, so the user can generally trust it at face value.
      */
     case High = 'high';
+
+    /**
+     * Orders confidence from the lowest to the highest gate threshold.
+     *
+     * @return int - Rank from zero to two.
+     */
+    public function rank(): int
+    {
+        return match ($this) {
+            self::Low => 0,
+            self::Medium => 1,
+            self::High => 2,
+        };
+    }
 }

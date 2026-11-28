@@ -20,6 +20,8 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Covers machine-readable reporter behaviour when source-derived strings carry invalid UTF-8 bytes.
+ * JSON assertions inspect decoded finding fields; hotspot and SARIF assertions check the escaped replacement character.
+ * Valid-input assertions reject the escaped replacement character in each reporter's output.
  */
 final class InvalidUtf8ReporterTest extends TestCase
 {
@@ -29,9 +31,9 @@ final class InvalidUtf8ReporterTest extends TestCase
     /**
      * Verify the JSON reporter substitutes invalid bytes and still emits decodable JSON.
      *
-     * @throws JsonException
+     * @throws JsonException - If rendering or decoding the report fails.
      *
-     * @return void
+     * @return void - Asserts decoded message and file fields contain U+FFFD in place of invalid bytes.
      */
     public function testJsonReporterSubstitutesInvalidBytesAndStaysDecodable(): void
     {
@@ -48,11 +50,11 @@ final class InvalidUtf8ReporterTest extends TestCase
     }
 
     /**
-     * Verify the hotspot reporter substitutes invalid path bytes and still emits decodable JSON.
+     * Verify the hotspot report remains decodable and includes an escaped replacement character.
      *
-     * @throws JsonException
+     * @throws JsonException - If rendering or decoding the report fails.
      *
-     * @return void
+     * @return void - Asserts a decoded array and an escaped U+FFFD in the rendered JSON.
      */
     public function testHotspotReporterSubstitutesInvalidBytesAndStaysDecodable(): void
     {
@@ -60,16 +62,16 @@ final class InvalidUtf8ReporterTest extends TestCase
 
         $decoded = json_decode($rendered, true, 512, JSON_THROW_ON_ERROR);
         self::assertIsArray($decoded);
-        // Non-ASCII stays escaped in rendered output, so the substitution appears as the � escape.
+        // The reporter JSON-escapes the replacement character, so the rendered text contains \ufffd.
         self::assertStringContainsString('\ufffd', $rendered);
     }
 
     /**
      * Verify the SARIF reporter substitutes invalid bytes instead of degrading to its encode-error object.
      *
-     * @throws JsonException
+     * @throws JsonException - If the rendered JSON cannot be decoded.
      *
-     * @return void
+     * @return void - Asserts a decoded array, no root error key, version 2.1.0, and an escaped U+FFFD.
      */
     public function testSarifReporterSubstitutesInvalidBytesAndStaysDecodable(): void
     {
@@ -83,9 +85,9 @@ final class InvalidUtf8ReporterTest extends TestCase
     }
 
     /**
-     * Verify ordinary valid-UTF-8 reports gain no substitution characters from the new flag.
+     * Verify valid-input reporter output contains no escaped replacement character.
      *
-     * @return void
+     * @return void - Asserts that JSON, hotspot, and SARIF output omit the JSON escape for U+FFFD.
      */
     public function testCleanReportsGainNoSubstitutionCharacters(): void
     {
@@ -99,7 +101,7 @@ final class InvalidUtf8ReporterTest extends TestCase
     /**
      * Build a scored report whose finding message and file path carry invalid UTF-8 bytes.
      *
-     * @return AnalysisReport - report exercising every reporter surface that embeds source-derived strings
+     * @return AnalysisReport - Scored report with invalid UTF-8 in its finding message and file path.
      */
     private function reportWithInvalidBytes(): AnalysisReport
     {
@@ -127,13 +129,13 @@ final class InvalidUtf8ReporterTest extends TestCase
             diagnostics:     [],
             findings:        $findings,
             exitCode:        0,
-            score:           (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive()),
+            score:           (new ScoreCalculator())->calculate($findings, 10, null, DiffResult::inactive()),
             diff:            DiffResult::inactive(),
         );
     }
 
     /**
-     * Build one warning finding with controllable identity strings.
+     * Build one warning finding with a caller-supplied message and file path.
      *
      * @param string $message - Finding message; the invalid-byte cases inject raw non-UTF-8 here.
      * @param string $filePath - Display path; also exercised with raw invalid bytes.

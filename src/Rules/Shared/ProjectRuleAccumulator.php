@@ -10,23 +10,16 @@ use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\Contracts\RuleDefinition;
 
 /**
- * Streaming variant of ProjectRuleInterface that accumulates per-unit state.
- *
- * RuleRegistry calls accumulate() once per analysis unit during the main
- * per-unit loop. Rules that implement this interface keep only the
- * project-level summary they need (typed-name maps, declaration registers,
- * etc.) instead of holding every AST reference until the project pass. The
- * orchestrator can release each unit's AST/source/tokens immediately after
- * accumulate returns when every enabled project rule is an accumulator,
- * which keeps peak memory close to one unit's worth instead of the whole
- * project.
+ * Collects per-unit summaries for project rules without retaining every AST.
+ * RuleRegistry feeds eligible analysis units to accumulate() during the per-unit pass.
+ * Streaming callers can release units when every enabled project rule supports this interface.
  */
 interface ProjectRuleAccumulator
 {
     /**
      * Describes the rule for the registry and reports.
      *
-     * @return RuleDefinition - Rule metadata.
+     * @return RuleDefinition - Definition consumed by the rule registry and report builders.
      */
     public function definition(): RuleDefinition;
 
@@ -35,19 +28,17 @@ interface ProjectRuleAccumulator
      *
      * @param RuleContext $ruleContext - Rule context carrying config and settings.
      *
-     * @return void
+     * @return void - Resets the rule's accumulated state for a new project pass.
      */
     public function startProject(RuleContext $ruleContext): void;
 
     /**
      * Extracts the project-level data this rule needs from one unit, so the unit can then be released.
      *
-     * @param AnalysisUnit $analysisUnit - Parsed unit to accumulate.
-     * @param RuleContext  $ruleContext - Rule context carrying config and settings.
+     * @param AnalysisUnit $analysisUnit - Parsed unit whose project-level data is retained before release.
+     * @param RuleContext $ruleContext - Rule context carrying config and settings.
      *
-     * @return void Implementations should store what they need on `$this` or
-     *              an internal collector; the unit may be released by the
-     *              orchestrator immediately after this call returns.
+     * @return void - Updates retained project data; the caller may release the unit immediately afterward.
      */
     public function accumulate(AnalysisUnit $analysisUnit, RuleContext $ruleContext): void;
 

@@ -8,52 +8,73 @@ use GruffPhp\Results\Finding\Finding;
 use JsonException;
 
 /**
- * Shapes internal `Finding` objects into the `gruff.hook.v1` finding entries the `hook` command
- * emits to an editor or coding agent.
+ * Converts findings to `gruff.hook.v2` entries for editor and agent consumers.
  *
- * This is the last pass before a finding leaves the tool: it copies the reportable fields, fills in
- * a default remediation line when the rule offered none, and rewrites raw threshold metadata into
- * the uniform `measured`/`threshold`/`unit`/`direction` shape a consumer can render as "you are at
- * N, the limit is M" without knowing which rule fired. It also sorts a batch worst-first so the
- * caller shows the most serious findings at the top of its list.
+ * Supplies fallback remediation and threshold metadata defaults while preserving rule-provided metadata.
+ * Orders presented batches by severity, then location and rule ID.
  */
 final readonly class HookFindingPresenter
 {
     /**
      * Builds the single JSON finding entry the `hook` command emits for one result, copying the
-     * reportable fields and attaching the caller's stable identity plus a freshly recomputed fingerprint.
+     * reportable fields and attaching the ratified family identity plus a freshly recomputed fingerprint.
      *
-     * @param Finding $finding        - The internal finding to reshape for the hook contract.
-     * @param string  $stableIdentity - Disambiguated hook identity for this finding, resolved across the full result set so no two entries collide.
+     * @param Finding     $finding        - The internal finding to reshape for the hook contract.
+     * @param string|null $stableIdentity - The ratified family identity, or null for a sensitive finding, which the family never names.
+     * @param int         $symbolOrdinal  - 1-based declaration ordinal of the finding's symbol in its file; 0 when it names no symbol.
+     * @param string|null $baselineStatus - What an applied baseline made of this finding; null when no baseline was applied.
      *
      * @return array<string, mixed> - JSON-ready hook finding entry with `metadata` always an object, never an empty list.
-     * @throws JsonException When the fingerprint cannot be encoded.
+     * @throws JsonException - When the fingerprint cannot be encoded.
      */
-    public function toArray(Finding $finding, string $stableIdentity): array
+    public function toArray(Finding $finding, ?string $stableIdentity, int $symbolOrdinal = 0, ?string $baselineStatus = null): array
     {
         $scope   = HookFindingScope::classify($finding);
         $payload = [
-            'ruleId'         => $finding->ruleId,
-            'pillar'         => $finding->pillar->value,
-            'severity'       => $finding->severity->value,
-            'scope'          => $scope,
-            'file'           => $finding->filePath,
-            'line'           => $finding->line,
-            'endLine'        => $finding->endLine,
-            'symbol'         => $finding->symbol,
-            'message'        => $finding->message,
-            'remediation'    => $finding->remediation ?? sprintf('Address the %s finding or configure the rule if this is intentional.', $finding->ruleId),
-            'metadata'       => $this->metadata($finding),
+            'ruleId' => $finding->ruleId,
+            'pillar' => $finding->pillar->value,
+            'severity' => $finding->severity->value,
+            'confidence' => $finding->confidence->value,
+            'scope' => $scope === HookFindingScope::LINE ? HookFindingScope::SYMBOL : $scope,
+            'file' => $finding->filePath,
+            'line' => $finding->line,
+            'endLine' => $this->endLine($finding),
+            'symbol' => $finding->symbol,
+            'symbolOrdinal' => $symbolOrdinal,
+            'message' => $finding->message,
+            'remediation' => $finding->remediation ?? sprintf('Address the %s finding or configure the rule if this is intentional.', $finding->ruleId),
+            'baselineStatus' => $baselineStatus,
+            'metadata' => $this->metadata($finding),
             'stableIdentity' => $stableIdentity,
-            'fingerprint'    => $finding->fingerprint(),
+            'fingerprint' => $finding->fingerprint(),
         ];
 
-        // With no metadata to report, swap the empty array for an object so the JSON shows `"metadata": {}` and a consumer can always treat it as a keyed map, never a list.
+        // Encode empty metadata as a JSON object so consumers receive a keyed map.
         if ($payload['metadata'] === []) {
             $payload['metadata'] = (object)[];
         }
 
         return $payload;
+    }
+
+    /**
+     * Reports a valid span end for the hook payload, falling back to the start line.
+     * A missing start line yields null even if an end line was supplied.
+     *
+     * @param Finding $finding - The finding whose span end is being reported.
+     *
+     * @return int|null - End line, or the start for an absent or reversed end; null without a start line.
+     */
+    private function endLine(Finding $finding): ?int
+    {
+
+        // A file-wide finding has no line range for the caller to highlight.
+        if ($finding->line === null) {
+            return null;
+        }
+
+
+        return $finding->endLine !== null && $finding->endLine >= $finding->line ? $finding->endLine : $finding->line;
     }
 
     /**
@@ -87,28 +108,28 @@ final readonly class HookFindingPresenter
     }
 
     /**
-     * Rewrites a threshold rule's raw metadata into the uniform `measured`/`threshold`/`unit`/`direction`
-     * shape the hook contract promises, so a consumer can render the measurement against its limit without
-     * knowing the rule. Non-threshold findings pass straight through.
+     * Adds measured, threshold, unit, and direction defaults when metadata has a non-null threshold.
+     * Rule-provided values override these defaults; missing or null thresholds leave metadata unchanged.
      *
-     * @param Finding $finding - The finding whose metadata is being normalised for the hook payload.
+     * @param Finding $finding - Finding whose metadata is prepared for the hook payload.
      *
-     * @return array<string, mixed> - The normalised shape for a threshold finding, or the rule's raw metadata untouched for a non-threshold one; empty when the rule attached none, which a consumer shows as a finding with no measured detail.
+     * @return array<string, mixed> - Original metadata, enriched with defaults only for a non-null threshold.
      */
     private function metadata(Finding $finding): array
     {
         $metadata = $finding->metadata;
 
-        // A finding with no `threshold` key is not a limit breach - a naming or docs rule, say - so hand its metadata back untouched rather than inventing measured and limit fields.
+
+        // Preserve metadata as supplied when there is no threshold to explain to the reviewer.
         if (!isset($metadata['threshold'])) {
             return $metadata;
         }
 
         $measured   = $this->measuredValue($finding);
         $normalized = [
-            'measured'  => $measured,
+            'measured' => $measured,
             'threshold' => $metadata['threshold'],
-            'unit'      => $this->unit($finding),
+            'unit' => $this->unit($finding),
             'direction' => $this->direction($finding),
         ];
 
@@ -121,27 +142,31 @@ final readonly class HookFindingPresenter
      *
      * @param Finding $finding - The finding whose threshold measurement is being extracted.
      *
-     * @return bool|float|int|string|null - The measured value to display; null when none was found, so the consumer shows the limit with no measured figure beside it.
+     * @return bool|float|int|string|null - First preferred scalar or fallback number; null when neither is present.
      */
     private function measuredValue(Finding $finding): bool|float|int|string|null
     {
-        // First try the metadata keys this rule is known to store its measurement under, since those hold the measurement worth showing.
+
+        // Prefer the rule's known measurement so the hook can say what crossed its limit.
         foreach ($this->measuredKeys($finding->ruleId) as $key) {
             $value = $finding->metadata[$key] ?? null;
-            // Take the first known key that actually holds a scalar; that is the measurement the consumer will render.
+
+            // A scalar observation can be shown directly beside the threshold.
             if (is_bool($value) || is_float($value) || is_int($value) || is_string($value)) {
                 return $value;
             }
         }
 
-        // No known key matched, so scan the rest of the metadata for any numeric value we can report instead.
+
+        // Rules without a known measurement key can still report a numeric observation.
         foreach ($finding->metadata as $key => $value) {
-            // Skip the limit and its type - those describe the boundary, not how far past it the code went.
+            // Skip the limit and its type; they describe the boundary, not the observed value.
             if ($key === 'threshold' || $key === 'thresholdType') {
                 continue;
             }
 
-            // Any remaining number is a fair stand-in for the measurement, so surface the first one found.
+
+            // Use the first numeric observation available to explain why a finding crossed a limit.
             if (is_float($value) || is_int($value)) {
                 return $value;
             }
@@ -167,7 +192,6 @@ final readonly class HookFindingPresenter
             'complexity.maintainability-index' => ['maintainabilityIndex'],
             'complexity.nesting-depth' => ['depth'],
             'docs.todo-density' => ['count'],
-            'size.average-method-length' => ['averageLength'],
             'size.parameter-count' => ['parameters'],
             'size.property-count' => ['properties'],
             'size.public-method-count' => ['publicMethods'],
@@ -191,7 +215,6 @@ final readonly class HookFindingPresenter
             'complexity.maintainability-index' => 'score',
             'complexity.halstead-volume' => 'volume',
             'complexity.nesting-depth' => 'levels',
-            'size.average-method-length',
             'size.class-length',
             'size.file-length',
             'size.method-length' => 'lines',
@@ -213,8 +236,7 @@ final readonly class HookFindingPresenter
     }
 
     /**
-     * Turns a severity word into a sortable rank so `sort()` can push errors above warnings above
-     * advisories when ordering a batch for display.
+     * Turns a severity word into a sortable rank so `sort()` can push errors above warnings above advisories when ordering a batch for display.
      *
      * @param string $severity - The finding's severity word, such as `error`, `warning`, or `advisory`.
      *

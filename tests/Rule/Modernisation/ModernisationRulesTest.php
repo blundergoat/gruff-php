@@ -7,41 +7,32 @@ namespace GruffPhp\Tests\Rule\Modernisation;
 use GruffPhp\Engine\Config\AnalysisConfig;
 use GruffPhp\Engine\Config\ConfigLoader;
 use GruffPhp\Engine\Config\RuleSettings;
-use GruffPhp\Results\Finding\Confidence;
 use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Results\Finding\Pillar;
-use GruffPhp\Results\Finding\RemediationAction;
-use GruffPhp\Results\Finding\Severity;
 use GruffPhp\Engine\Parser\AnalysisUnit;
 use GruffPhp\Engine\Parser\PhpFileParser;
-use GruffPhp\Rules\Modernisation\ConstructorPromotionCandidateRule;
-use GruffPhp\Rules\Modernisation\FirstClassCallableCandidateRule;
-use GruffPhp\Rules\Modernisation\ForbiddenGlobalAccessRule;
-use GruffPhp\Rules\Modernisation\MatchExpressionCandidateRule;
-use GruffPhp\Rules\Modernisation\MixedTypeOveruseRule;
-use GruffPhp\Rules\Modernisation\NamedArgumentOpportunityRule;
 use GruffPhp\Rules\Modernisation\PublicPropertyRule;
 use GruffPhp\Rules\Modernisation\ReadonlyPropertyCandidateRule;
 use GruffPhp\Rules\Contracts\RuleContext;
 use GruffPhp\Rules\RuleRegistry;
 use GruffPhp\Rules\Security\ErrorSuppressionRule;
 use GruffPhp\Engine\Source\SourceFile;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers modernisation rule detection: PHP version gating, PHP 8.x candidates, exemption of legitimate mutable cases, and error-suppression flagged
- * as security-with-modernisation pillar.
+ * Covers readonly-candidate version gates and public-property findings in modernisation fixtures.
+ * Checks readonly owners, restricted setters, class exemptions and mutation cases against expected findings.
+ * Checks that error suppression carries the modernisation secondary pillar without a duplicate modernisation-rule finding.
  */
 final class ModernisationRulesTest extends TestCase
 {
-    /** Project root used by filesystem and CLI tests. */
+    /** Shared project root for fixture loading, configuration lookup and rule contexts. */
     private const PROJECT_ROOT = __DIR__ . '/../../..';
 
     /**
-     * Verify PHP version gating suppresses PHP eight suggestions.
+     * Verifies that a PHP 7.4 target suppresses readonly candidates while retaining the public-property finding.
      *
-     * @return void
+     * @return void - Asserts zero readonly findings and one public-property finding for the PHP 7.4 configuration.
      */
     public function testPhpVersionGatingSuppressesPhpEightSuggestions(): void
     {
@@ -50,20 +41,14 @@ final class ModernisationRulesTest extends TestCase
             $this->config('tests/Fixtures/Config/php74.yaml'),
         );
 
-        self::assertRuleCount(ConstructorPromotionCandidateRule::ID, 0, $findings);
-        self::assertRuleCount(FirstClassCallableCandidateRule::ID, 0, $findings);
-        self::assertRuleCount(MatchExpressionCandidateRule::ID, 0, $findings);
-        self::assertRuleCount(MixedTypeOveruseRule::ID, 0, $findings);
-        self::assertRuleCount(NamedArgumentOpportunityRule::ID, 0, $findings);
         self::assertRuleCount(ReadonlyPropertyCandidateRule::ID, 0, $findings);
         self::assertRuleCount(PublicPropertyRule::ID, 1, $findings);
-        self::assertRuleCount(ForbiddenGlobalAccessRule::ID, 1, $findings);
     }
 
     /**
-     * Verify PHP eight two config enables modernisation candidates.
+     * A PHP 8.2 target enables readonly candidates while retaining the public-property finding.
      *
-     * @return void
+     * @return void - Asserts two readonly-candidate findings and one public-property finding under the PHP 8.2 configuration.
      */
     public function testPhpEightTwoConfigEnablesModernisationCandidates(): void
     {
@@ -72,134 +57,26 @@ final class ModernisationRulesTest extends TestCase
             $this->config('tests/Fixtures/Config/php82.yaml'),
         );
 
-        self::assertRuleCount(ConstructorPromotionCandidateRule::ID, 2, $findings);
         self::assertRuleCount(ReadonlyPropertyCandidateRule::ID, 2, $findings);
         self::assertRuleCount(PublicPropertyRule::ID, 1, $findings);
-        self::assertRuleCount(MatchExpressionCandidateRule::ID, 1, $findings);
-        self::assertRuleCount(FirstClassCallableCandidateRule::ID, 1, $findings);
-        self::assertRuleCount(NamedArgumentOpportunityRule::ID, 1, $findings);
-        self::assertRuleCount(MixedTypeOveruseRule::ID, 1, $findings);
-        self::assertRuleCount(ForbiddenGlobalAccessRule::ID, 1, $findings);
     }
 
     /**
-     * Verify PHP eight candidates are detected.
+     * Verifies the public-property finding count in the PHP 8.0 fixture.
      *
-     * @return void
+     * @return void - Asserts one public-property finding.
      */
     public function testPhpEightCandidatesAreDetected(): void
     {
         $findings = $this->analysePath('tests/Fixtures/Modernisation/php80-candidates.php');
 
-        self::assertRuleCount(ConstructorPromotionCandidateRule::ID, 2, $findings);
         self::assertRuleCount(PublicPropertyRule::ID, 1, $findings);
-        self::assertRuleCount(MatchExpressionCandidateRule::ID, 1, $findings);
-        self::assertRuleCount(MixedTypeOveruseRule::ID, 1, $findings);
-        self::assertRuleCount(NamedArgumentOpportunityRule::ID, 4, $findings);
-        self::assertRuleCount(ForbiddenGlobalAccessRule::ID, 2, $findings);
-
-        $namedArgumentFindings = array_values(array_filter(
-            $findings,
-            static fn(Finding $finding): bool => $finding->ruleId === NamedArgumentOpportunityRule::ID,
-        ));
-        self::assertSame(
-            [RemediationAction::Consider->value],
-            array_values(array_unique(array_map(
-                static fn(Finding $finding): string => is_string($finding->metadata['remediationAction'] ?? null)
-                    ? $finding->metadata['remediationAction']
-                    : '',
-                $namedArgumentFindings,
-            ))),
-        );
-        self::assertSame(
-            [Severity::Advisory->value],
-            array_values(array_unique(array_map(
-                static fn(Finding $finding): string => $finding->severity->value,
-                $namedArgumentFindings,
-            ))),
-        );
-        self::assertSame(
-            [Confidence::Low->value],
-            array_values(array_unique(array_map(
-                static fn(Finding $finding): string => $finding->confidence->value,
-                $namedArgumentFindings,
-            ))),
-        );
-        self::assertSame(
-            ['Consider named arguments only for stable APIs where parameter names are part of the intended contract; gruff-php reports only.'],
-            array_values(array_unique(array_map(
-                static fn(Finding $finding): ?string => $finding->remediation,
-                $namedArgumentFindings,
-            ))),
-        );
-    }
-
-    /**
-     * Verify direct constructor calls stay outside named-argument advice.
-     *
-     * @return void
-     */
-    public function testNamedArgumentOpportunityExcludesConstructorCalls(): void
-    {
-        $unit = $this->inlineUnit(<<<'PHP'
-<?php
-final class ConfiguredService
-{
-    public function __construct(string $host, string $user, string $password, string $database)
-    {
-    }
-}
-new ConfiguredService('host', 'user', 'pass', 'database');
-PHP);
-
-        $registry = RuleRegistry::defaults();
-        $config   = AnalysisConfig::fromRegistry($registry);
-        $results  = (new NamedArgumentOpportunityRule())->analyse($unit, new RuleContext(self::PROJECT_ROOT, $config));
-
-        self::assertSame([], $results);
-    }
-
-    /**
-     * Verify an ambiguous function call retains advice until its configured floor rises.
-     *
-     * @return void
-     */
-    public function testNamedArgumentOpportunityHonoursRaisedThreshold(): void
-    {
-        $unit = $this->inlineUnit(<<<'PHP'
-<?php
-function configureService(string $host, string $user, string $password, string $database): void
-{
-}
-configureService('host', 'user', 'pass', 'database');
-PHP);
-        $registry       = RuleRegistry::defaults();
-        $defaultConfig  = AnalysisConfig::fromRegistry($registry);
-        $rule           = new NamedArgumentOpportunityRule();
-        $defaultResults = $rule->analyse($unit, new RuleContext(self::PROJECT_ROOT, $defaultConfig));
-
-        self::assertCount(1, $defaultResults);
-        self::assertSame(5, $defaultResults[0]->line);
-
-        $settings     = $defaultConfig->ruleSettings(NamedArgumentOpportunityRule::ID);
-        $raisedConfig = $defaultConfig->withRuleSettings(
-            NamedArgumentOpportunityRule::ID,
-            new RuleSettings(
-                $settings->enabled,
-                ['minPositionalArguments' => 6],
-                $settings->options,
-                $settings->severityThreshold,
-                $settings->excludeFromScore,
-            ),
-        );
-
-        self::assertSame([], $rule->analyse($unit, new RuleContext(self::PROJECT_ROOT, $raisedConfig)));
     }
 
     /**
      * Verify readonly owners stay quiet while public mutable promoted properties report once.
      *
-     * @return void
+     * @return void - Asserts the two mutable property names, their source lines and unique reporting with no parser diagnostics.
      */
     public function testPublicPropertyRuleHandlesReadonlyOwnersAndPromotedProperties(): void
     {
@@ -249,7 +126,7 @@ PHP);
     /**
      * Verify PHP 8.4 restricted-set properties stay quiet while an open write side still reports.
      *
-     * @return void
+     * @return void - Asserts only the open declared and promoted properties are reported, with no parser diagnostics.
      */
     public function testPublicPropertyRuleSkipsAsymmetricVisibilityWriteRestrictions(): void
     {
@@ -281,9 +158,9 @@ PHP);
     }
 
     /**
-     * Verify an exact configured class exemption leaves other mutable classes reportable.
+     * Verifies that the configured class is exempt while the other fixture class remains reportable.
      *
-     * @return void
+     * @return void - Asserts both properties report by default and only the unlisted class reports after configuration.
      */
     public function testPublicPropertyRuleHonoursAllowedClasses(): void
     {
@@ -331,22 +208,21 @@ PHP);
     }
 
     /**
-     * Verify PHP eight one candidates are detected.
+     * The PHP 8.1 fixture produces two readonly-property candidate findings.
      *
-     * @return void
+     * @return void - Asserts two readonly-candidate findings in the PHP 8.1 fixture.
      */
     public function testPhpEightOneCandidatesAreDetected(): void
     {
         $findings = $this->analysePath('tests/Fixtures/Modernisation/php81-candidates.php');
 
         self::assertRuleCount(ReadonlyPropertyCandidateRule::ID, 2, $findings);
-        self::assertRuleCount(FirstClassCallableCandidateRule::ID, 1, $findings);
     }
 
     /**
-     * Verify late mutation inheritance DTO and controller cases are not flagged.
+     * Verifies that the mutation, inheritance, DTO and controller fixtures produce no readonly-candidate or public-property findings.
      *
-     * @return void
+     * @return void - Asserts zero findings for both property rules across the supplied fixtures.
      */
     public function testLateMutationInheritanceDtoAndControllerCasesAreNotFlagged(): void
     {
@@ -356,70 +232,13 @@ PHP);
                                         ]);
 
         self::assertRuleCount(ReadonlyPropertyCandidateRule::ID, 0, $findings);
-        self::assertRuleCount(ConstructorPromotionCandidateRule::ID, 0, $findings);
         self::assertRuleCount(PublicPropertyRule::ID, 0, $findings);
-        self::assertRuleCount(ForbiddenGlobalAccessRule::ID, 0, $findings);
-        self::assertRuleCount(NamedArgumentOpportunityRule::ID, 0, $findings);
     }
 
     /**
-     * Verify forbidden global access skips superglobal writes and unsets while reads keep flagging.
+     * Verifies one error-suppression finding carries a modernisation secondary pillar without a duplicate modernisation-rule finding.
      *
-     * @return void
-     */
-    public function testForbiddenGlobalAccessSkipsWritePositionsAndKeepsReads(): void
-    {
-        $findings = array_values(array_filter(
-                                     $this->analysePath('tests/Fixtures/Modernisation/forbidden-global-write-positions.php'),
-                                     static fn(Finding $finding): bool => $finding->ruleId === ForbiddenGlobalAccessRule::ID,
-                                 ));
-
-        // Plain read, compound assignment, and the read inside a write target's dimension expression.
-        self::assertSame(
-            ['_GET', '_GET', '_POST'],
-            array_map(static fn(Finding $finding): mixed => $finding->metadata['global'] ?? null, $findings),
-        );
-    }
-
-    /**
-     * Verify modernisation rules keep their documented false-positive fixtures quiet.
-     *
-     * @param string $fixture - Fixture file under tests/Fixtures/Modernisation.
-     * @param string $ruleId - Rule expected to report no findings for the fixture.
-     *
-     * @return void
-     */
-    #[DataProvider('modernisationFalsePositiveProvider')]
-    public function testModernisationRulesIgnoreFalsePositiveFixtures(string $fixture, string $ruleId): void
-    {
-        $findings = $this->analysePath($fixture);
-
-        self::assertRuleCount($ruleId, 0, $findings);
-    }
-
-    /**
-     * Provide false-positive fixtures for modernisation rules.
-     *
-     * @return list<array{fixture: string, ruleId: string}> - fixture/rule pairs that should produce zero findings
-     */
-    public static function modernisationFalsePositiveProvider(): array
-    {
-        return [
-            [
-                'fixture' => 'tests/Fixtures/Modernisation/first-class-callable-non-class-const.php',
-                'ruleId'  => FirstClassCallableCandidateRule::ID,
-            ],
-            [
-                'fixture' => 'tests/Fixtures/Modernisation/first-class-callable-associative-array.php',
-                'ruleId'  => FirstClassCallableCandidateRule::ID,
-            ],
-        ];
-    }
-
-    /**
-     * Verify error suppression uses security finding with modernisation secondary pillar.
-     *
-     * @return void
+     * @return void - Asserts the suppression count, secondary pillar and absence of modernisation.error-suppression findings.
      */
     public function testErrorSuppressionUsesSecurityFindingWithModernisationSecondaryPillar(): void
     {
@@ -443,10 +262,10 @@ PHP);
      * Assert the expected modernisation finding count for a rule.
      *
      * @param string        $ruleId - Rule id whose findings are counted.
-     * @param int           $expectedCount - Number of findings the fixture should trip for that rule.
+     * @param int           $expectedCount - Expected number of findings carrying that rule ID.
      * @param list<Finding> $findings - Full finding set to filter down to the rule.
      *
-     * @return void
+     * @return void - Asserts that exactly $expectedCount findings carry the requested rule ID.
      */
     private static function assertRuleCount(string $ruleId, int $expectedCount, array $findings): void
     {
@@ -492,9 +311,9 @@ PHP);
     /**
      * Parse the requested path into an analysis unit.
      *
-     * @param string $path - Filesystem path.
+     * @param string $path - Project-relative fixture path to read.
      *
-     * @return AnalysisUnit - the parsed fixture ready for rule analysis, carrying the project-relative display path
+     * @return AnalysisUnit - Fixture source and parse results under that display path, including diagnostics on read or parse failure.
      */
     private function unitForPath(string $path): AnalysisUnit
     {
@@ -521,9 +340,9 @@ PHP);
     /**
      * Build analysis configuration for modernisation assertions.
      *
-     * @param string $path - Filesystem path.
+     * @param string $path - YAML config path; relative paths use the project root, and an empty string requests discovery.
      *
-     * @return AnalysisConfig - config loaded from the fixture's own YAML, applying its rule overrides
+     * @return AnalysisConfig - Loaded settings merged onto registry defaults; defaults alone when discovery finds no config.
      */
     private function config(string $path): AnalysisConfig
     {

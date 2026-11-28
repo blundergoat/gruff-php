@@ -8,13 +8,9 @@ use GruffPhp\Results\Finding\Finding;
 use GruffPhp\Engine\Parser\AnalysisUnit;
 
 /**
- * The contract every project-wide rule implements, so the analyser can run cross-file checks the same
- * way it runs per-file ones.
- *
- * A project rule sees every parsed file at once (via analyseProject), which lets it answer questions no
- * single-file rule can - "is this private method called from anywhere?", "is this constant ever used?".
- * The registry loads it by its definition() and folds whatever findings it raises into the same report
- * the user reads.
+ * Defines the contract for rules that inspect parsed units together across files.
+ * Each rule receives the supplied unit list and can compare declarations or references across units.
+ * The registry merges its findings into the same report as per-file findings.
  */
 interface ProjectRuleInterface
 {
@@ -26,12 +22,12 @@ interface ProjectRuleInterface
     public function definition(): RuleDefinition;
 
     /**
-     * Runs the rule across every parsed file in the project and returns whatever it finds.
+     * Runs the rule across the supplied parsed units and returns project-wide findings.
      *
      * @param list<AnalysisUnit> $units - Parsed units available to the project-level rule.
-     * @param RuleContext        $ruleContext - Project-level rule context for this analysis pass.
+     * @param RuleContext        $ruleContext - Supplies the project root, effective configuration, and per-rule settings for this pass.
      *
-     * @return list<Finding> - findings raised across the whole project; empty when the rule is satisfied.
+     * @return list<Finding> - Findings from the supplied units; empty when no issues are reported.
      */
     public function analyseProject(array $units, RuleContext $ruleContext): array;
 }

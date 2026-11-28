@@ -5,52 +5,87 @@ declare(strict_types=1);
 namespace GruffPhp\Output\Reporter;
 
 use GruffPhp\Engine\Analysis\AnalysisReport;
+use GruffPhp\Engine\Analysis\RunDiagnostic;
+use GruffPhp\Engine\Analysis\SensitiveExclusionSummary;
 use GruffPhp\Results\Finding\Finding;
 
 /**
- * Turns a finished analysis into GitHub Actions annotation commands - the `::error`, `::warning`,
- * and `::notice` workflow lines a runner reads.
+ * Renders `--format github` for a GitHub Actions workflow to display beside the code.
  *
- * Selected when a user runs `gruff-php analyse --format github` inside a GitHub Actions job. Each
- * finding is emitted as one workflow command pinned to its file and line, so the runner raises it as
- * an inline annotation on the pull request's changed-files view instead of leaving the user to hunt
- * through the raw job log. The output is machine text meant for the runner, never read straight by a
- * person, so a report with no findings emits nothing at all.
+ * Includes a file and line range where a finding or diagnostic can identify a source location.
+ * Publishes findings first, followed by run diagnostics and any suppression audit notice.
  */
 final readonly class GithubAnnotationsReporter
 {
     /**
-     * Top of the render: walks every finding in the report and emits one GitHub workflow command per
-     * finding, joined into the block a runner scans after `analyse --format github` finishes.
+     * Renders one workflow command per finding, followed by one per run diagnostic.
      *
-     * @param AnalysisReport $report - Finished analysis whose findings become annotation lines; an empty report yields an empty string.
+     * @param AnalysisReport $report - Analysis whose findings and diagnostics become annotation commands.
      *
-     * @return string - GitHub annotation output; empty when the report has no findings, so nothing is annotated.
+     * @return string - Newline-terminated commands; empty only when both findings and diagnostics are empty.
      */
     public function render(AnalysisReport $report): string
     {
         $lines = [];
 
-        // One workflow command per finding - each line becomes a marker pinned to the user's changed code.
+
+        // Emit one workflow annotation for each finding so GitHub can attach it to the source when possible.
         foreach ($report->findings as $finding) {
             $lines[] = $this->annotation($finding);
         }
 
-        // Append the trailing newline only when there is output, so a clean report emits nothing, not a blank line.
+        // Publish run problems as annotations as well, including failures that produced no findings.
+        foreach ($report->diagnostics as $diagnostic) {
+            $lines[] = $this->diagnosticAnnotation($diagnostic);
+        }
+
+        $suppressionSummary = SensitiveExclusionSummary::describeTotal($report->sensitiveExclusions);
+        // Add a notice when suppression totals explain why the workflow shows fewer findings.
+        if ($suppressionSummary !== null) {
+            $lines[] = '::notice title=Finding suppressions::' . $this->escapeData($suppressionSummary);
+        }
+
         return implode(PHP_EOL, $lines) . ($lines === [] ? '' : PHP_EOL);
     }
 
     /**
-     * Encodes one finding as a single GitHub workflow command: a `::level` line carrying the file,
-     * line, and message that GitHub renders as one clickable annotation on a pull request.
+     * Encodes a run diagnostic as a workflow annotation so non-finding scan notes remain visible.
      *
-     * @param Finding $finding - Finding to encode; its severity picks the annotation level and a null line means a whole-file marker with no row.
+     * @param RunDiagnostic $diagnostic - Run-level note to encode; a fatal one raises the annotation level.
      *
-     * @return string - GitHub annotation line.
+     * @return string - One error or notice command with a diagnostic title, message and any available location.
+     */
+    private function diagnosticAnnotation(RunDiagnostic $diagnostic): string
+    {
+        $properties = ['title=' . $this->escapeProperty($diagnostic->type)];
+        $filePath   = $diagnostic->filePath ?? $diagnostic->path;
+        // A file-level problem can link to its file even when there is no source line to highlight.
+        if ($filePath !== null) {
+            $properties[] = 'file=' . $this->escapeProperty($filePath);
+        }
+        // Attach the start line only when the diagnostic can point to a specific location.
+        if ($diagnostic->line !== null) {
+            $properties[] = 'line=' . $diagnostic->line;
+        }
+
+        return sprintf(
+            '::%s %s::%s',
+            $diagnostic->isFatal ? 'error' : 'notice',
+            implode(',', $properties),
+            $this->escapeData($diagnostic->message),
+        );
+    }
+
+    /**
+     * Encodes one finding with its severity level, file, rule ID and message for a GitHub workflow runner.
+     *
+     * @param Finding $finding - Finding to encode; null line or endLine values omit the corresponding location properties.
+     *
+     * @return string - One workflow command with escaped properties and message.
      */
     private function annotation(Finding $finding): string
     {
-        // Map the finding's severity to GitHub's three levels; anything that isn't error or warning shows as a neutral notice.
+
         $level = match ($finding->severity->value) {
             'error' => 'error',
             'warning' => 'warning',
@@ -61,23 +96,25 @@ final readonly class GithubAnnotationsReporter
             'title=' . $this->escapeProperty($finding->ruleId),
         ];
 
-        // Pin the annotation to a line only when the rule pinpointed one, so it lands on the exact offending row.
+
+        // Some findings apply to the whole file and have no line to highlight.
         if ($finding->line !== null) {
             $properties[] = 'line=' . $finding->line;
         }
 
-        // Stretch the marker across a range when the finding spans several lines, highlighting the whole block.
+
+        // Include the final line when the rule reports an entire source range.
         if ($finding->endLine !== null) {
             $properties[] = 'endLine=' . $finding->endLine;
         }
 
-        // Properties join the message via the `::level props::data` shape GitHub's workflow-command parser requires.
+        // GitHub requires properties and message data in the ::level properties::data workflow-command shape.
         return sprintf('::%s %s::%s', $level, implode(',', $properties), $this->escapeData($finding->message));
     }
 
     /**
-     * Percent-escapes a property value - the file path or rule id - so a stray `:` or `,` inside it
-     * can't split the command apart and misplace the user's annotation.
+     * Percent-escapes a property value such as a file path or rule ID so delimiter characters cannot
+     * split the command or attach the annotation to the wrong location.
      *
      * @param string $text - Raw property value such as a file path or rule id; an empty value passes through as an empty string.
      *
@@ -85,7 +122,7 @@ final readonly class GithubAnnotationsReporter
      */
     private function escapeProperty(string $text): string
     {
-        // Property values additionally escape `:` and `,` because those delimit the property list itself.
+        // Property values also escape colons and commas because both delimit the property list.
         return str_replace(
             ['%', "\r", "\n", ':', ','],
             ['%25', '%0D', '%0A', '%3A', '%2C'],
@@ -94,16 +131,15 @@ final readonly class GithubAnnotationsReporter
     }
 
     /**
-     * Percent-escapes the finding message that trails the command, keeping a `%` or newline in the
-     * text from corrupting the annotation the user reads on the pull request.
+     * Percent-escapes annotation message text so percent signs and line breaks remain data within a workflow command.
      *
-     * @param string $text - Raw finding message shown to the user; an empty message passes through as an empty string.
+     * @param string $text - Raw finding or diagnostic message; an empty message stays empty.
      *
-     * @return string - Escaped data value.
+     * @return string - Message text with percent signs, carriage returns and newlines escaped.
      */
     private function escapeData(string $text): string
     {
-        // The data segment only reserves `%` and newlines, so `:` and `,` pass through unescaped here.
+        // The data segment reserves percent signs and line breaks, while colons and commas remain literal.
         return str_replace(
             ['%', "\r", "\n"],
             ['%25', '%0D', '%0A'],
